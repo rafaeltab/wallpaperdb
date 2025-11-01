@@ -1,0 +1,6 @@
+# Environment files
+.env
+
+# Docker volumes would be managed by docker compose
+# but listing here for clarity
+volumes/

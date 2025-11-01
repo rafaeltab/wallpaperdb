@@ -1,0 +1,12 @@
+{
+  "name": "@wallpaperdb/infra-local",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Local infrastructure for WallpaperDB",
+  "scripts": {
+    "start": "./scripts/start-infra.sh",
+    "stop": "./scripts/stop-infra.sh",
+    "reset": "./scripts/reset-infra.sh",
+    "logs": "./scripts/logs.sh"
+  }
+}

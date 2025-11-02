@@ -1,6 +1,6 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
-        ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-format ingestor-lint \
-        dev build test format lint help
+        ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint \
+        dev build test test-watch format lint help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -12,19 +12,21 @@ help:
 	@echo "  make infra-logs     - Tail logs from all infrastructure services"
 	@echo ""
 	@echo "Ingestor Service:"
-	@echo "  make ingestor-dev   - Start ingestor in development mode"
-	@echo "  make ingestor-build - Build ingestor for production"
-	@echo "  make ingestor-start - Start ingestor in production mode"
-	@echo "  make ingestor-test  - Run ingestor tests"
-	@echo "  make ingestor-format- Format ingestor code"
-	@echo "  make ingestor-lint  - Lint ingestor code"
+	@echo "  make ingestor-dev        - Start ingestor in development mode"
+	@echo "  make ingestor-build      - Build ingestor for production"
+	@echo "  make ingestor-start      - Start ingestor in production mode"
+	@echo "  make ingestor-test       - Run ingestor tests"
+	@echo "  make ingestor-test-watch - Run ingestor tests in watch mode"
+	@echo "  make ingestor-format     - Format ingestor code"
+	@echo "  make ingestor-lint       - Lint ingestor code"
 	@echo ""
 	@echo "All Services:"
-	@echo "  make dev            - Start all services in development mode"
-	@echo "  make build          - Build all services"
-	@echo "  make test           - Run all tests"
-	@echo "  make format         - Format all code"
-	@echo "  make lint           - Lint all code"
+	@echo "  make dev        - Start all services in development mode"
+	@echo "  make build      - Build all services"
+	@echo "  make test       - Run all tests"
+	@echo "  make test-watch - Run all tests in watch mode"
+	@echo "  make format     - Format all code"
+	@echo "  make lint       - Lint all code"
 	@echo ""
 
 infra-start:
@@ -52,6 +54,9 @@ ingestor-start:
 ingestor-test:
 	@turbo run test --filter=@wallpaperdb/ingestor
 
+ingestor-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/ingestor
+
 ingestor-format:
 	@turbo run format --filter=@wallpaperdb/ingestor
 
@@ -67,6 +72,9 @@ build:
 
 test:
 	@turbo run test
+
+test-watch:
+	@turbo run test:watch
 
 format:
 	@turbo run format

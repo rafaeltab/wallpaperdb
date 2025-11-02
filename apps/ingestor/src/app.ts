@@ -1,25 +1,23 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
-import {
-  checkDatabaseHealth,
-  closeDatabaseConnection,
-  createDatabaseConnection,
-} from './connections/database.js';
-import {
-  checkMinioHealth,
-  closeMinioConnection,
-  createMinioConnection,
-} from './connections/minio.js';
-import { checkNatsHealth, closeNatsConnection, createNatsConnection } from './connections/nats.js';
-import {
-  checkOtelHealth,
-  initializeOpenTelemetry,
-  shutdownOpenTelemetry,
-} from './connections/otel.js';
+import { closeDatabaseConnection, createDatabaseConnection } from './connections/database.js';
+import { closeMinioConnection, createMinioConnection } from './connections/minio.js';
+import { closeNatsConnection, createNatsConnection } from './connections/nats.js';
+import { initializeOpenTelemetry, shutdownOpenTelemetry } from './connections/otel.js';
+import { registerRoutes } from './routes/index.js';
 
-// Track shutdown state
-let isShuttingDown = false;
-let connectionsInitialized = false;
+// Connection state interface
+export interface ConnectionsState {
+  isShuttingDown: boolean;
+  connectionsInitialized: boolean;
+}
+
+// Extend Fastify instance with our custom state
+declare module 'fastify' {
+  interface FastifyInstance {
+    connectionsState: ConnectionsState;
+  }
+}
 
 export async function createApp(
   config: Config,
@@ -50,105 +48,38 @@ export async function createApp(
         : false,
   });
 
+  // Initialize connection state
+  fastify.decorate('connectionsState', {
+    isShuttingDown: false,
+    connectionsInitialized: false,
+  });
+
   // Initialize connections
-  async function initializeConnections() {
-    if (connectionsInitialized) {
-      return;
-    }
+  fastify.log.info('Initializing connections...');
 
-    fastify.log.info('Initializing connections...');
+  try {
+    // Initialize database connection
+    createDatabaseConnection(config);
+    fastify.log.info('Database connection pool created');
 
-    try {
-      // Initialize database connection
-      createDatabaseConnection(config);
-      fastify.log.info('Database connection pool created');
+    // Initialize MinIO connection
+    createMinioConnection(config);
+    fastify.log.info('MinIO connection created');
 
-      // Initialize MinIO connection
-      createMinioConnection(config);
-      fastify.log.info('MinIO connection created');
+    // Initialize NATS connection
+    await createNatsConnection(config);
+    fastify.log.info('NATS connection created');
 
-      // Initialize NATS connection
-      await createNatsConnection(config);
-      fastify.log.info('NATS connection created');
-
-      connectionsInitialized = true;
-      fastify.log.info('All connections initialized successfully');
-    } catch (error) {
-      fastify.log.error({ err: error }, 'Failed to initialize connections');
-      throw error;
-    }
+    fastify.connectionsState.connectionsInitialized = true;
+    fastify.log.info('All connections initialized successfully');
+  } catch (error) {
+    fastify.log.error({ err: error }, 'Failed to initialize connections');
+    throw error;
   }
-
-  // Initialize connections
-  await initializeConnections();
-
-  // Health check endpoint
-  fastify.get('/health', async (_request, reply) => {
-    if (isShuttingDown) {
-      return reply.code(503).send({
-        status: 'shutting_down',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const checks = {
-      database: false,
-      minio: false,
-      nats: false,
-      otel: false,
-    };
-
-    try {
-      // Check all connections
-      checks.database = await checkDatabaseHealth();
-      checks.minio = await checkMinioHealth(config);
-      checks.nats = await checkNatsHealth();
-      // OTEL is optional in tests - if disabled, consider it healthy
-      checks.otel = config.nodeEnv === 'test' ? true : await checkOtelHealth();
-
-      const allHealthy = Object.values(checks).every((check) => check === true);
-
-      if (allHealthy) {
-        return reply.code(200).send({
-          status: 'healthy',
-          checks,
-          timestamp: new Date().toISOString(),
-        });
-      }
-      return reply.code(503).send({
-        status: 'unhealthy',
-        checks,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      fastify.log.error({ err: error }, 'Health check error');
-      return reply.code(503).send({
-        status: 'error',
-        checks,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
-      });
-    }
-  });
-
-  // Readiness check endpoint
-  fastify.get('/ready', async (_request, reply) => {
-    if (isShuttingDown || !connectionsInitialized) {
-      return reply.code(503).send({
-        ready: false,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    return reply.code(200).send({
-      ready: true,
-      timestamp: new Date().toISOString(),
-    });
-  });
 
   // Add cleanup hook
   fastify.addHook('onClose', async () => {
-    isShuttingDown = true;
+    fastify.connectionsState.isShuttingDown = true;
     await closeNatsConnection();
     await closeDatabaseConnection();
     closeMinioConnection();
@@ -156,6 +87,9 @@ export async function createApp(
       await shutdownOpenTelemetry();
     }
   });
+
+  // Register all routes
+  await registerRoutes(fastify, config);
 
   return fastify;
 }

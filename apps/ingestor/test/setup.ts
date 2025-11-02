@@ -2,15 +2,15 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 
 // MinIO container types
-import type { StartedMinIOContainer } from '@testcontainers/minio';
+import type { StartedMinioContainer } from '@testcontainers/minio';
 import { beforeAll, afterAll } from 'vitest';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+// import { drizzle } from 'drizzle-orm/node-postgres';
+// import { Pool } from 'pg';
 import type { Config } from '../src/config.js';
 
 // Global test state
 let postgresContainer: StartedPostgreSqlContainer;
-let minioContainer: StartedMinIOContainer;
+let minioContainer: StartedMinioContainer;
 let natsContainer: StartedTestContainer;
 let testConfig: Config;
 
@@ -65,68 +65,16 @@ beforeAll(async () => {
   };
 
   // Initialize database schema
-  const pool = new Pool({
-    connectionString: testConfig.databaseUrl,
-  });
-
-  const db = drizzle(pool);
-
-  // Create ENUMs
-  await pool.query(`
-    CREATE TYPE file_type AS ENUM ('image', 'video');
-  `);
-
-  await pool.query(`
-    CREATE TYPE upload_state AS ENUM (
-      'initiated',
-      'uploading',
-      'stored',
-      'processing',
-      'completed',
-      'failed'
-    );
-  `);
-
-  // Create wallpapers table
-  await pool.query(`
-    CREATE TABLE wallpapers (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      content_hash TEXT,
-      upload_state upload_state NOT NULL DEFAULT 'initiated',
-      state_changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      upload_attempts INTEGER NOT NULL DEFAULT 0,
-      processing_error TEXT,
-      file_type file_type,
-      mime_type TEXT,
-      file_size_bytes BIGINT,
-      original_filename TEXT,
-      width INTEGER,
-      height INTEGER,
-      aspect_ratio DECIMAL(10, 4) GENERATED ALWAYS AS (
-        CASE WHEN width IS NOT NULL AND height IS NOT NULL
-        THEN width::decimal / height::decimal
-        ELSE NULL END
-      ) STORED,
-      storage_key TEXT,
-      storage_bucket TEXT DEFAULT 'wallpapers',
-      uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE INDEX idx_wallpapers_user_id ON wallpapers(user_id);
-    CREATE INDEX idx_wallpapers_upload_state ON wallpapers(upload_state);
-    CREATE INDEX idx_wallpapers_state_changed_at ON wallpapers(state_changed_at);
-    CREATE INDEX idx_wallpapers_uploaded_at ON wallpapers(uploaded_at DESC);
-    CREATE INDEX idx_wallpapers_file_type ON wallpapers(file_type) WHERE file_type IS NOT NULL;
-    CREATE UNIQUE INDEX idx_wallpapers_content_hash
-      ON wallpapers(user_id, content_hash)
-      WHERE content_hash IS NOT NULL AND upload_state IN ('stored', 'processing', 'completed');
-  `);
-
-  await pool.end();
-
-  console.log('Database schema created');
+  // const pool = new Pool({
+  //   connectionString: testConfig.databaseUrl,
+  // });
+  // const db = drizzle(pool);
+  // await pool.query(`
+  //   Some SQl
+  // `);
+  //
+  // await pool.end();
+  // console.log('Database schema created');
 }, 60000);
 
 afterAll(async () => {

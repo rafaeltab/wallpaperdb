@@ -36,8 +36,10 @@ describe('Health Endpoint', () => {
       }
     }
 
+    console.log('Creating app');
     // Create the actual app using the real implementation
     fastify = await createApp(config, { logger: false });
+    console.log('Created app');
   }, 60000); // 60 second timeout for beforeAll
 
   afterAll(async () => {

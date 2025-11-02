@@ -30,6 +30,13 @@ export async function checkNatsHealth(): Promise<boolean> {
   }
 }
 
+export function getNatsClient(): NatsConnection {
+  if (!natsClient) {
+    throw new Error('NATS client not initialized. Call createNatsConnection first.');
+  }
+  return natsClient;
+}
+
 export async function closeNatsConnection(): Promise<void> {
   if (natsClient) {
     await natsClient.close();

@@ -1,11 +1,12 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import type { Config } from '../config.js';
+import * as schema from '../db/schema.js';
 
 const { Pool } = pg;
 
 let pool: pg.Pool | null = null;
-let db: ReturnType<typeof drizzle> | null = null;
+let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export function createDatabaseConnection(config: Config) {
   if (pool && db) {
@@ -19,7 +20,7 @@ export function createDatabaseConnection(config: Config) {
     connectionTimeoutMillis: 2000, // Fail fast if can't get connection
   });
 
-  db = drizzle(pool);
+  db = drizzle(pool, { schema });
 
   return { pool, db };
 }
@@ -38,6 +39,20 @@ export async function checkDatabaseHealth(): Promise<boolean> {
     console.error('Database health check failed:', error);
     return false;
   }
+}
+
+export function getDatabase() {
+  if (!db) {
+    throw new Error('Database not initialized. Call createDatabaseConnection first.');
+  }
+  return db;
+}
+
+export function getPool() {
+  if (!pool) {
+    throw new Error('Database pool not initialized. Call createDatabaseConnection first.');
+  }
+  return pool;
 }
 
 export async function closeDatabaseConnection(): Promise<void> {

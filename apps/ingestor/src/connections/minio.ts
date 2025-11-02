@@ -39,6 +39,13 @@ export async function checkMinioHealth(config: Config): Promise<boolean> {
   }
 }
 
+export function getMinioClient(): S3Client {
+  if (!s3Client) {
+    throw new Error('MinIO client not initialized. Call createMinioConnection first.');
+  }
+  return s3Client;
+}
+
 export function closeMinioConnection(): void {
   // S3 client doesn't need explicit closing
   s3Client = null;

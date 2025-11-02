@@ -4,9 +4,15 @@ import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 // MinIO container types
 import type { StartedMinioContainer } from '@testcontainers/minio';
 import { beforeAll, afterAll } from 'vitest';
-// import { drizzle } from 'drizzle-orm/node-postgres';
-// import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Config } from '../src/config.js';
+import * as schema from '../src/db/schema.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Global test state
 let postgresContainer: StartedPostgreSqlContainer;
@@ -65,16 +71,19 @@ beforeAll(async () => {
   };
 
   // Initialize database schema
-  // const pool = new Pool({
-  //   connectionString: testConfig.databaseUrl,
-  // });
-  // const db = drizzle(pool);
-  // await pool.query(`
-  //   Some SQl
-  // `);
-  //
-  // await pool.end();
-  // console.log('Database schema created');
+  const pool = new Pool({
+    connectionString: testConfig.databaseUrl,
+  });
+
+  try {
+    // Read and execute migration SQL
+    const migrationPath = join(__dirname, '../drizzle/0000_left_starjammers.sql');
+    const migrationSQL = readFileSync(migrationPath, 'utf-8');
+    await pool.query(migrationSQL);
+    console.log('Database schema created');
+  } finally {
+    await pool.end();
+  }
 }, 60000);
 
 afterAll(async () => {

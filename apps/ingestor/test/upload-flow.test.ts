@@ -3,7 +3,12 @@ import type { FastifyInstance } from 'fastify';
 import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getTestConfig } from './setup.js';
 import { createApp } from '../src/app.js';
-import { TEST_IMAGES, generateTestUserId, generateTestFilename, generateContentHash } from './fixtures.js';
+import {
+  TEST_IMAGES,
+  generateTestUserId,
+  generateTestFilename,
+  generateContentHash,
+} from './fixtures.js';
 import { uploadFile, cleanupMinio } from './helpers.js';
 import { CreateBucketCommand } from '@aws-sdk/client-s3';
 
@@ -287,7 +292,6 @@ describe('Upload Flow Integration Tests', () => {
       expect(body.uploadedAt).toBeDefined();
     });
   });
-
 
   describe('File Metadata Extraction', () => {
     it('should extract correct dimensions from image', async () => {

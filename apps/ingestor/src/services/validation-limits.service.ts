@@ -3,13 +3,13 @@
  * These limits are user-specific to support future subscription tiers.
  */
 export interface ValidationLimits {
-  maxFileSizeImage: number;    // bytes
-  maxFileSizeVideo: number;    // bytes
-  minWidth: number;             // pixels
-  minHeight: number;            // pixels
-  maxWidth: number;             // pixels
-  maxHeight: number;            // pixels
-  allowedFormats: string[];     // MIME types
+  maxFileSizeImage: number; // bytes
+  maxFileSizeVideo: number; // bytes
+  minWidth: number; // pixels
+  minHeight: number; // pixels
+  maxWidth: number; // pixels
+  maxHeight: number; // pixels
+  allowedFormats: string[]; // MIME types
 }
 
 /**
@@ -27,19 +27,13 @@ export interface ValidationLimitsService {
 export class DefaultValidationLimitsService implements ValidationLimitsService {
   async getLimitsForUser(_userId: string): Promise<ValidationLimits> {
     return {
-      maxFileSizeImage: 50 * 1024 * 1024,      // 50MB
-      maxFileSizeVideo: 200 * 1024 * 1024,     // 200MB
+      maxFileSizeImage: 50 * 1024 * 1024, // 50MB
+      maxFileSizeVideo: 200 * 1024 * 1024, // 200MB
       minWidth: 1280,
       minHeight: 720,
       maxWidth: 7680,
       maxHeight: 4320,
-      allowedFormats: [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-        'video/webm',
-        'video/mp4'
-      ]
+      allowedFormats: ['image/jpeg', 'image/png', 'image/webp', 'video/webm', 'video/mp4'],
     };
   }
 }

@@ -69,7 +69,7 @@ export async function uploadFile(
   const { file, filename, userId, mimeType = 'image/jpeg' } = options;
 
   // Create multipart form data manually
-  const boundary = '----WebKitFormBoundary' + Math.random().toString(36);
+  const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
   const formData = [
     `--${boundary}`,
     `Content-Disposition: form-data; name="file"; filename="${filename}"`,

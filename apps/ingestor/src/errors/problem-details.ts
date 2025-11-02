@@ -4,11 +4,11 @@
  */
 
 export interface ProblemDetails {
-  type: string;           // URI identifying the problem type
-  title: string;          // Short, human-readable summary
-  status: number;         // HTTP status code
-  detail: string;         // Human-readable explanation specific to this occurrence
-  instance: string;       // URI of the endpoint that generated the error
+  type: string; // URI identifying the problem type
+  title: string; // Short, human-readable summary
+  status: number; // HTTP status code
+  detail: string; // Human-readable explanation specific to this occurrence
+  instance: string; // URI of the endpoint that generated the error
   [key: string]: unknown; // Extension fields for additional context
 }
 
@@ -51,10 +51,7 @@ export class InvalidFileFormatError extends ProblemDetailsError {
   readonly instance = '/upload';
 
   constructor(receivedMimeType: string) {
-    super(
-      'Only JPEG, PNG, WebP, WebM, and MP4 formats are supported',
-      { receivedMimeType }
-    );
+    super('Only JPEG, PNG, WebP, WebM, and MP4 formats are supported', { receivedMimeType });
   }
 }
 
@@ -67,11 +64,7 @@ export class FileTooLargeError extends ProblemDetailsError {
   readonly status = 413;
   readonly instance = '/upload';
 
-  constructor(
-    fileSizeBytes: number,
-    maxFileSizeBytes: number,
-    fileType: 'image' | 'video'
-  ) {
+  constructor(fileSizeBytes: number, maxFileSizeBytes: number, fileType: 'image' | 'video') {
     super(
       `File size of ${Math.round(fileSizeBytes / (1024 * 1024))}MB exceeds your limit of ${Math.round(maxFileSizeBytes / (1024 * 1024))}MB for ${fileType}s`,
       { fileSizeBytes, maxFileSizeBytes, fileType }

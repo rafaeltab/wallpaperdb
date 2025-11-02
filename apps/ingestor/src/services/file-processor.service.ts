@@ -39,7 +39,9 @@ export function calculateContentHash(buffer: Buffer): string {
 /**
  * Detect MIME type from file content (not from extension/filename)
  */
-export async function detectMimeType(buffer: Buffer): Promise<{ mime: string; ext: string } | null> {
+export async function detectMimeType(
+  buffer: Buffer
+): Promise<{ mime: string; ext: string } | null> {
   const result = await fileTypeFromBuffer(buffer);
   return result ? { mime: result.mime, ext: result.ext } : null;
 }
@@ -50,8 +52,8 @@ export async function detectMimeType(buffer: Buffer): Promise<{ mime: string; ex
 async function extractImageMetadata(buffer: Buffer): Promise<{ width: number; height: number }> {
   const metadata = await sharp(buffer, {
     limitInputPixels: 268402689, // 16384 x 16384, prevents decompression bombs
-    sequentialRead: true,         // Memory efficient for large files
-    failOnError: false            // Don't crash on corrupt images
+    sequentialRead: true, // Memory efficient for large files
+    failOnError: false, // Don't crash on corrupt images
   }).metadata();
 
   if (!metadata.width || !metadata.height) {
@@ -100,11 +102,7 @@ function validateFileFormat(mimeType: string, limits: ValidationLimits): void {
 /**
  * Validate image dimensions against user limits
  */
-function validateDimensions(
-  width: number,
-  height: number,
-  limits: ValidationLimits
-): void {
+function validateDimensions(width: number, height: number, limits: ValidationLimits): void {
   if (
     width < limits.minWidth ||
     height < limits.minHeight ||
@@ -128,8 +126,9 @@ function validateDimensions(
  */
 export async function processFile(
   buffer: Buffer,
-  originalFilename: string,
-  limits: ValidationLimits
+  _originalFilename: string,
+  limits: ValidationLimits,
+  providedMimeType?: string
 ): Promise<FileMetadata> {
   // Calculate content hash for idempotency
   const contentHash = calculateContentHash(buffer);
@@ -139,19 +138,46 @@ export async function processFile(
 
   // Detect actual MIME type from content (not from filename)
   const fileType = await detectMimeType(buffer);
+
+  let mimeType: string;
+  let extension: string;
+  let fileCategory: 'image' | 'video';
+
   if (!fileType) {
-    throw new InvalidFileFormatError('unknown');
+    // If file-type can't detect it, use provided MIME type if available
+    if (providedMimeType) {
+      mimeType = providedMimeType;
+      // Extract extension from mime type (e.g., 'text/plain' -> 'txt')
+      extension = mimeType.split('/')[1] || 'bin';
+    } else {
+      mimeType = 'unknown';
+      extension = 'bin';
+    }
+
+    // Determine file category from provided MIME type for proper size validation
+    fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
+
+    // Check file size BEFORE throwing format error
+    // This ensures large invalid files get 413 instead of 400
+    const maxSize = fileCategory === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
+    if (fileSizeBytes > maxSize) {
+      throw new FileTooLargeError(fileSizeBytes, maxSize, fileCategory);
+    }
+
+    // Now throw format error (file is within size limit but invalid format)
+    throw new InvalidFileFormatError(mimeType);
   }
 
-  const { mime: mimeType, ext: extension } = fileType;
+  mimeType = fileType.mime;
+  extension = fileType.ext;
 
   // Validate file format against allowed formats
   validateFileFormat(mimeType, limits);
 
   // Determine if it's image or video
-  const fileCategory: 'image' | 'video' = mimeType.startsWith('image/') ? 'image' : 'video';
+  fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
 
-  // Validate file size
+  // Validate file size (precise check based on actual file type)
   validateFileSize(fileSizeBytes, fileCategory, limits);
 
   // Extract metadata based on file type

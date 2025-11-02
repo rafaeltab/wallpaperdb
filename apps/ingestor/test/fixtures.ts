@@ -40,8 +40,22 @@ export async function createTestImage(options: {
 export function createTestVideo(): Buffer {
   // MP4 file signature
   const mp4Header = Buffer.from([
-    0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, // ftyp box
-    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x20,
+    0x66,
+    0x74,
+    0x79,
+    0x70, // ftyp box
+    0x69,
+    0x73,
+    0x6f,
+    0x6d,
+    0x00,
+    0x00,
+    0x02,
+    0x00,
   ]);
   // Add some padding
   return Buffer.concat([mp4Header, Buffer.alloc(1024)]);
@@ -58,16 +72,11 @@ export function generateContentHash(buffer: Buffer): string {
  * Test wallpaper fixtures
  */
 export const TEST_IMAGES = {
-  validJpeg: async () =>
-    createTestImage({ width: 1920, height: 1080, format: 'jpeg' }),
-  validPng: async () =>
-    createTestImage({ width: 1920, height: 1080, format: 'png' }),
-  validWebp: async () =>
-    createTestImage({ width: 1920, height: 1080, format: 'webp' }),
-  tooSmall: async () =>
-    createTestImage({ width: 800, height: 600, format: 'jpeg' }),
-  tooLarge: async () =>
-    createTestImage({ width: 8000, height: 5000, format: 'jpeg' }),
+  validJpeg: async () => createTestImage({ width: 1920, height: 1080, format: 'jpeg' }),
+  validPng: async () => createTestImage({ width: 1920, height: 1080, format: 'png' }),
+  validWebp: async () => createTestImage({ width: 1920, height: 1080, format: 'webp' }),
+  tooSmall: async () => createTestImage({ width: 800, height: 600, format: 'jpeg' }),
+  tooLarge: async () => createTestImage({ width: 8000, height: 5000, format: 'jpeg' }),
   largeFile: async () => {
     // Create a large image (simulating > 50MB would be slow, so we'll mock this in tests)
     return createTestImage({

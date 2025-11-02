@@ -28,7 +28,16 @@ export interface WallpaperUploadedEvent {
 export async function publishWallpaperUploadedEvent(wallpaper: Wallpaper): Promise<void> {
   const nats = getNatsClient();
 
-  if (!wallpaper.fileType || !wallpaper.mimeType || !wallpaper.width || !wallpaper.height || !wallpaper.fileSizeBytes || !wallpaper.storageKey || !wallpaper.storageBucket || !wallpaper.originalFilename) {
+  if (
+    !wallpaper.fileType ||
+    !wallpaper.mimeType ||
+    !wallpaper.width ||
+    !wallpaper.height ||
+    !wallpaper.fileSizeBytes ||
+    !wallpaper.storageKey ||
+    !wallpaper.storageBucket ||
+    !wallpaper.originalFilename
+  ) {
     throw new Error('Wallpaper data incomplete for event publishing');
   }
 

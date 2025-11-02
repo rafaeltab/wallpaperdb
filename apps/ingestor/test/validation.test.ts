@@ -3,12 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { CreateBucketCommand } from '@aws-sdk/client-s3';
 import { getTestConfig } from './setup.js';
 import { createApp } from '../src/app.js';
-import {
-  TEST_IMAGES,
-  INVALID_FILE,
-  generateTestUserId,
-  generateTestFilename,
-} from './fixtures.js';
+import { TEST_IMAGES, INVALID_FILE, generateTestUserId, generateTestFilename } from './fixtures.js';
 import { uploadFile, cleanupMinio } from './helpers.js';
 
 describe('Validation Integration Tests', () => {
@@ -198,7 +193,6 @@ describe('Validation Integration Tests', () => {
 
       expect(response.statusCode).toBe(200);
     });
-
   });
 
   describe('Dimension Validation', () => {
@@ -321,7 +315,6 @@ describe('Validation Integration Tests', () => {
     });
   });
 
-
   describe('Filename Sanitization', () => {
     it('should accept upload with path traversal characters in filename', async () => {
       const userId = generateTestUserId();
@@ -359,7 +352,7 @@ describe('Validation Integration Tests', () => {
 
     it('should accept upload with very long filename', async () => {
       const userId = generateTestUserId();
-      const longFilename = 'a'.repeat(300) + '.jpg'; // >255 chars
+      const longFilename = `${'a'.repeat(300)}.jpg`; // >255 chars
       const imageBuffer = await TEST_IMAGES.validJpeg();
 
       const response = await uploadFile(fastify, {
@@ -380,7 +373,7 @@ describe('Validation Integration Tests', () => {
       const userId = generateTestUserId();
 
       // Create a request without file
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(36);
+      const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
       const formData = [
         `--${boundary}`,
         `Content-Disposition: form-data; name="userId"`,

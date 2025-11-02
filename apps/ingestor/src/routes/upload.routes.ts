@@ -29,17 +29,19 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     // Extract form fields
     // In production, userId would come from authenticated session
     // For now, we'll extract it from the form data (injected by gateway)
-    const userId = (request.body as { userId?: string })?.userId || 'test-user';
+    const userIdField = data.fields.userId;
+    const userId = userIdField && 'value' in userIdField ? String(userIdField.value) : 'test-user';
 
     // Read file buffer
     const buffer = await data.toBuffer();
     const originalFilename = data.filename;
+    const providedMimeType = data.mimetype;
 
     // Step 1: Get user validation limits
     const limits = await validationLimitsService.getLimitsForUser(userId);
 
     // Step 2: Process file (hash, validate, extract metadata)
-    const fileMetadata = await processFile(buffer, originalFilename, limits);
+    const fileMetadata = await processFile(buffer, originalFilename, limits, providedMimeType);
 
     // Step 3: Check for duplicate upload (by content hash)
     const existing = await db.query.wallpapers.findFirst({
@@ -77,7 +79,8 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
 
     try {
       // Step 5: Update state to 'uploading' and upload to MinIO
-      await db.update(wallpapers)
+      await db
+        .update(wallpapers)
         .set({
           uploadState: 'uploading',
           stateChangedAt: new Date(),
@@ -94,7 +97,8 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       );
 
       // Step 6: Update to 'stored' with full metadata
-      await db.update(wallpapers)
+      await db
+        .update(wallpapers)
         .set({
           uploadState: 'stored',
           stateChangedAt: new Date(),
@@ -124,7 +128,8 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
         await publishWallpaperUploadedEvent(wallpaper);
 
         // Event published successfully
-        await db.update(wallpapers)
+        await db
+          .update(wallpapers)
           .set({
             uploadState: 'processing',
             stateChangedAt: new Date(),
@@ -133,7 +138,10 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       } catch (natsError) {
         // NATS publish failed, but file is uploaded
         // Don't fail the request - reconciliation will retry
-        request.log.warn({ id, error: natsError }, 'NATS publish failed, will be retried by reconciliation');
+        request.log.warn(
+          { id, error: natsError },
+          'NATS publish failed, will be retried by reconciliation'
+        );
         // Leave state as 'stored' - reconciliation will republish
       }
 
@@ -148,10 +156,10 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
         height: fileMetadata.height,
         fileSizeBytes: fileMetadata.fileSizeBytes,
       });
-
     } catch (error) {
       // Upload or processing failed, mark as failed in DB
-      await db.update(wallpapers)
+      await db
+        .update(wallpapers)
         .set({
           uploadState: 'failed',
           processingError: error instanceof Error ? error.message : 'Unknown error',
@@ -160,7 +168,6 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
 
       throw error;
     }
-
   } catch (error) {
     // Handle ProblemDetailsError (validation errors)
     if (error instanceof ProblemDetailsError) {
@@ -172,16 +179,13 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
 
     // Log and return generic error
     request.log.error({ err: error }, 'Upload failed with unexpected error');
-    return reply
-      .code(500)
-      .header('content-type', 'application/problem+json')
-      .send({
-        type: 'https://wallpaperdb.example/problems/internal-error',
-        title: 'Internal Server Error',
-        status: 500,
-        detail: 'An unexpected error occurred',
-        instance: '/upload',
-      });
+    return reply.code(500).header('content-type', 'application/problem+json').send({
+      type: 'https://wallpaperdb.example/problems/internal-error',
+      title: 'Internal Server Error',
+      status: 500,
+      detail: 'An unexpected error occurred',
+      instance: '/upload',
+    });
   }
 }
 

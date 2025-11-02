@@ -24,16 +24,18 @@ export async function uploadToStorage(
   const storageKey = `${wallpaperId}/original.${extension}`;
 
   try {
-    await client.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: storageKey,
-      Body: buffer,
-      ContentType: mimeType,
-      Metadata: {
-        userId,
-        uploadedAt: new Date().toISOString(),
-      },
-    }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: storageKey,
+        Body: buffer,
+        ContentType: mimeType,
+        Metadata: {
+          userId,
+          uploadedAt: new Date().toISOString(),
+        },
+      })
+    );
 
     return {
       storageKey,
@@ -52,10 +54,12 @@ export async function objectExists(bucket: string, key: string): Promise<boolean
   const client = getMinioClient();
 
   try {
-    await client.send(new HeadObjectCommand({
-      Bucket: bucket,
-      Key: key,
-    }));
+    await client.send(
+      new HeadObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      })
+    );
     return true;
   } catch (error) {
     return false;
@@ -69,10 +73,12 @@ export async function deleteFromStorage(bucket: string, key: string): Promise<vo
   const client = getMinioClient();
 
   try {
-    await client.send(new DeleteObjectCommand({
-      Bucket: bucket,
-      Key: key,
-    }));
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      })
+    );
   } catch (error) {
     console.error('Failed to delete from MinIO:', error);
     // Don't throw - this is a cleanup operation

@@ -221,22 +221,12 @@
     "public.file_type": {
       "name": "file_type",
       "schema": "public",
-      "values": [
-        "image",
-        "video"
-      ]
+      "values": ["image", "video"]
     },
     "public.upload_state": {
       "name": "upload_state",
       "schema": "public",
-      "values": [
-        "initiated",
-        "uploading",
-        "stored",
-        "processing",
-        "completed",
-        "failed"
-      ]
+      "values": ["initiated", "uploading", "stored", "processing", "completed", "failed"]
     }
   },
   "schemas": {},

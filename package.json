@@ -1,5 +1,8 @@
 {
     "name": "@wallpaperdb/root",
     "version": "0.0.1",
-    "packageManager": "pnpm@10.18.3"
+    "packageManager": "pnpm@10.18.3",
+    "devDependencies": {
+        "turbo": "^2.5.6"
+    }
 }

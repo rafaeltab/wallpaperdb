@@ -26,6 +26,15 @@
     "lint": {
       "dependsOn": ["^lint"]
     },
+    "format": {
+      "cache": false
+    },
+    "format:check": {
+      "cache": false
+    },
+    "check": {
+      "cache": false
+    },
     "test": {
       "dependsOn": ["^build"]
     }

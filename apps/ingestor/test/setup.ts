@@ -1,5 +1,5 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { GenericContainer, type StartedTestContainer } from 'testcontainers';
+import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers/containers';
 
 // MinIO container types
 import type { StartedMinioContainer } from '@testcontainers/minio';
@@ -17,7 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Global test state
 let postgresContainer: StartedPostgreSqlContainer;
 let minioContainer: StartedMinioContainer;
-let natsContainer: StartedTestContainer;
+let natsContainer: StartedNatsContainer;
 let testConfig: Config;
 
 export function getTestConfig(): Config {
@@ -44,15 +44,14 @@ beforeAll(async () => {
   minioContainer = await new MinioContainer('minio/minio:latest').start();
   console.log('MinIO container started');
 
-  // Start NATS container
-  natsContainer = await new GenericContainer('nats:2.10-alpine')
-    .withExposedPorts(4222)
-    .withCommand(['-js']) // Enable JetStream
-    .start();
+  // Start NATS container with JetStream support
+  natsContainer = await createNatsContainer({
+    enableJetStream: true,
+  });
   console.log('NATS container started');
 
-  const natsPort = natsContainer.getMappedPort(4222);
-  const natsHost = natsContainer.getHost();
+  // Get connection URL from the NATS container
+  const natsUrl = natsContainer.getConnectionUrl();
 
   // Create test config
   testConfig = {
@@ -64,7 +63,7 @@ beforeAll(async () => {
     s3SecretAccessKey: minioContainer.getPassword(),
     s3Bucket: 'wallpapers-test',
     s3Region: 'us-east-1',
-    natsUrl: `nats://${natsHost}:${natsPort}`,
+    natsUrl,
     natsStream: 'WALLPAPERS_TEST',
     otelEndpoint: 'http://localhost:4318', // OTEL can stay local or be mocked
     otelServiceName: 'ingestor-test',

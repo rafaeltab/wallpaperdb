@@ -1,0 +1,35 @@
+{
+  "name": "@wallpaperdb/testcontainers",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "description": "Shared testcontainer utilities for WallpaperDB tests",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./containers": {
+      "import": "./dist/containers/index.js",
+      "types": "./dist/containers/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "testcontainers": "^11.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "nats": "^2.29.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

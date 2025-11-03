@@ -59,21 +59,21 @@ export const wallpapers = pgTable(
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => ({
+  (table) => [
     // Indexes for performance
-    userIdIdx: index('idx_wallpapers_user_id').on(table.userId),
-    uploadStateIdx: index('idx_wallpapers_upload_state').on(table.uploadState),
-    stateChangedAtIdx: index('idx_wallpapers_state_changed_at').on(table.stateChangedAt),
-    uploadedAtIdx: index('idx_wallpapers_uploaded_at').on(table.uploadedAt),
+    index('idx_wallpapers_user_id').on(table.userId),
+    index('idx_wallpapers_upload_state').on(table.uploadState),
+    index('idx_wallpapers_state_changed_at').on(table.stateChangedAt),
+    index('idx_wallpapers_uploaded_at').on(table.uploadedAt),
 
     // Unique constraint for deduplication (per user)
     // Only enforce uniqueness for successfully stored/processing/completed uploads
-    contentHashUnique: uniqueIndex('idx_wallpapers_content_hash')
+    uniqueIndex('idx_wallpapers_content_hash')
       .on(table.userId, table.contentHash)
       .where(
         sql`${table.contentHash} IS NOT NULL AND ${table.uploadState} IN ('stored', 'processing', 'completed')`
       ),
-  })
+  ]
 );
 
 // Type exports for TypeScript

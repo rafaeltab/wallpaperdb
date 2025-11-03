@@ -1,0 +1,19 @@
+{
+    "permissions": {
+        "allow": [
+            "WebFetch",
+            "WebSearch",
+            "Bash(ls:*)",
+            "Bash(pnpm:*)",
+            "Bash(make:*)",
+            "Bash(cat:*)",
+            "Bash(grep:*)"
+        ],
+        "deny": [
+            "Bash(npm:*)"
+        ],
+        "ask": [
+            "Bash(docker:*)"
+        ]
+    }
+}

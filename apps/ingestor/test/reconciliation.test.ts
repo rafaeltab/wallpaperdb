@@ -10,10 +10,10 @@ import {
   CreateBucketCommand,
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
-import { connect } from 'nats';
 import type { NatsConnection, JetStreamClient } from 'nats';
 import { getTestConfig } from './setup.js';
 import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
+import * as schema from '../src/db/schema.js';
 import { wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 
@@ -59,7 +59,7 @@ describe('Reconciliation Service Tests', () => {
 
     // Setup database connection (reused across all tests)
     pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: { wallpapers } });
+    db = drizzle(pool, { schema: schema });
 
     // Setup MinIO client (reused across all tests)
     s3Client = new S3Client({

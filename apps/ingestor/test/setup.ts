@@ -1,5 +1,8 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers/containers';
+import {
+  createNatsContainer,
+  type StartedNatsContainer,
+} from '@wallpaperdb/testcontainers/containers';
 
 // MinIO container types
 import type { StartedMinioContainer } from '@testcontainers/minio';

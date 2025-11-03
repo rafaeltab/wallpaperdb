@@ -1,4 +1,9 @@
-import { PutObjectCommand, HeadObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  PutObjectCommand,
+  HeadObjectCommand,
+  DeleteObjectCommand,
+  type S3Client,
+} from '@aws-sdk/client-s3';
 import { getMinioClient } from '../connections/minio.js';
 import { StorageUploadFailedError } from '../errors/problem-details.js';
 
@@ -50,7 +55,11 @@ export async function uploadToStorage(
 /**
  * Check if object exists in storage
  */
-export async function objectExists(bucket: string, key: string, s3Client?: S3Client): Promise<boolean> {
+export async function objectExists(
+  bucket: string,
+  key: string,
+  s3Client?: S3Client
+): Promise<boolean> {
   const client = s3Client || getMinioClient();
 
   try {
@@ -69,7 +78,11 @@ export async function objectExists(bucket: string, key: string, s3Client?: S3Cli
 /**
  * Delete object from storage
  */
-export async function deleteFromStorage(bucket: string, key: string, s3Client?: S3Client): Promise<void> {
+export async function deleteFromStorage(
+  bucket: string,
+  key: string,
+  s3Client?: S3Client
+): Promise<void> {
   const client = s3Client || getMinioClient();
 
   try {

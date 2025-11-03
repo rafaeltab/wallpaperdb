@@ -1,12 +1,12 @@
-import { eq, and, lt, sql } from 'drizzle-orm';
-import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
+import { eq, and, lt } from 'drizzle-orm';
+import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { getDatabase } from '../connections/database.js';
 import { getMinioClient } from '../connections/minio.js';
-import { wallpapers, type Wallpaper } from '../db/schema.js';
+import { wallpapers } from '../db/schema.js';
 import { objectExists, deleteFromStorage } from './storage.service.js';
 import { publishWallpaperUploadedEvent } from './events.service.js';
-import * as schema from '../db/schema.js';
+import type * as schema from '../db/schema.js';
 
 type DbType = NodePgDatabase<typeof schema>;
 
@@ -28,10 +28,7 @@ export async function reconcileStuckUploads(
     .select()
     .from(wallpapers)
     .where(
-      and(
-        eq(wallpapers.uploadState, 'uploading'),
-        lt(wallpapers.stateChangedAt, tenMinutesAgo)
-      )
+      and(eq(wallpapers.uploadState, 'uploading'), lt(wallpapers.stateChangedAt, tenMinutesAgo))
     );
 
   for (const upload of stuckUploads) {
@@ -78,7 +75,9 @@ export async function reconcileStuckUploads(
             })
             .where(eq(wallpapers.id, upload.id));
 
-          console.log(`Incremented retry attempts for upload ${upload.id} (${upload.uploadAttempts + 1}/3)`);
+          console.log(
+            `Incremented retry attempts for upload ${upload.id} (${upload.uploadAttempts + 1}/3)`
+          );
         }
       }
     } catch (error) {
@@ -101,10 +100,7 @@ export async function reconcileMissingEvents(db?: DbType): Promise<void> {
     .select()
     .from(wallpapers)
     .where(
-      and(
-        eq(wallpapers.uploadState, 'stored'),
-        lt(wallpapers.stateChangedAt, fiveMinutesAgo)
-      )
+      and(eq(wallpapers.uploadState, 'stored'), lt(wallpapers.stateChangedAt, fiveMinutesAgo))
     );
 
   // Process in batches of 10
@@ -148,19 +144,12 @@ export async function reconcileOrphanedIntents(db?: DbType): Promise<void> {
   const orphanedIntents = await database
     .select()
     .from(wallpapers)
-    .where(
-      and(
-        eq(wallpapers.uploadState, 'initiated'),
-        lt(wallpapers.stateChangedAt, oneHourAgo)
-      )
-    );
+    .where(and(eq(wallpapers.uploadState, 'initiated'), lt(wallpapers.stateChangedAt, oneHourAgo)));
 
   // Delete orphaned intents
   for (const intent of orphanedIntents) {
     try {
-      await database
-        .delete(wallpapers)
-        .where(eq(wallpapers.id, intent.id));
+      await database.delete(wallpapers).where(eq(wallpapers.id, intent.id));
 
       console.log(`Deleted orphaned intent ${intent.id}`);
     } catch (error) {

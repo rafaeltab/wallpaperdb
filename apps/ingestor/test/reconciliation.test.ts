@@ -256,10 +256,10 @@ describe('Reconciliation Service Tests', () => {
   describe('Stuck Uploading State Recovery', () => {
     it('should mark upload as failed when MinIO upload failed and file does not exist', async () => {
       // Create stuck upload in 'uploading' state (>10 minutes ago)
-      // MinIO file does NOT exist
+      // MinIO file does NOT exist, and max retries reached
       const id = await createStuckUpload('uploading', 15, {
         hasMinioFile: false,
-        uploadAttempts: 0,
+        uploadAttempts: 3,
       });
 
       // Run reconciliation
@@ -270,7 +270,7 @@ describe('Reconciliation Service Tests', () => {
       const record = await getRecordState(id);
       expect(record).toBeDefined();
       expect(record?.uploadState).toBe('failed');
-      expect(record?.processingError).toContain('Upload failed');
+      expect(record?.processingError).toContain('Max retries exceeded');
     });
 
     it('should recover upload to stored when file exists in MinIO', async () => {

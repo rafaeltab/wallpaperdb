@@ -7,6 +7,8 @@ import {
   PutObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
+  CreateBucketCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { connect } from 'nats';
 import type { NatsConnection, JetStreamClient } from 'nats';
@@ -71,13 +73,24 @@ describe('Reconciliation Service Tests', () => {
       forcePathStyle: true,
     });
 
+    // Create MinIO bucket if it doesn't exist
+    try {
+      await s3Client.send(
+        new CreateBucketCommand({
+          Bucket: config.s3Bucket,
+        })
+      );
+    } catch (error) {
+      // Bucket already exists, ignore error
+    }
+
     // Clean up MinIO bucket
     const listResponse = await s3Client.send(new ListObjectsV2Command({ Bucket: config.s3Bucket }));
     if (listResponse.Contents) {
       for (const object of listResponse.Contents) {
         if (object.Key) {
           await s3Client.send(
-            new PutObjectCommand({
+            new DeleteObjectCommand({
               Bucket: config.s3Bucket,
               Key: object.Key,
             })
@@ -229,7 +242,8 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      await reconcileStuckUploads();
+      const config = getTestConfig();
+      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
 
       // Verify: Record should be marked as 'failed'
       const record = await getRecordState(id);
@@ -247,7 +261,8 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      await reconcileStuckUploads();
+      const config = getTestConfig();
+      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
 
       // Verify: Record should be moved to 'stored' state
       const record = await getRecordState(id);
@@ -263,7 +278,8 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      await reconcileStuckUploads();
+      const config = getTestConfig();
+      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
 
       // Verify: Upload attempts should be incremented
       const record = await getRecordState(id);
@@ -281,7 +297,8 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      await reconcileStuckUploads();
+      const config = getTestConfig();
+      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
 
       // Verify: Record should be marked as 'failed'
       const record = await getRecordState(id);
@@ -297,7 +314,8 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      await reconcileStuckUploads();
+      const config = getTestConfig();
+      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
 
       // Verify: Record should remain unchanged
       const record = await getRecordState(id);
@@ -315,7 +333,7 @@ describe('Reconciliation Service Tests', () => {
       const eventPromise = waitForNatsEvent('wallpaper.uploaded');
 
       // Run reconciliation
-      await reconcileMissingEvents();
+      await reconcileMissingEvents(db);
 
       // Verify: NATS event was published
       const event = (await eventPromise) as WallpaperUploadedEvent;
@@ -340,7 +358,7 @@ describe('Reconciliation Service Tests', () => {
       ]);
 
       // Run reconciliation
-      await reconcileMissingEvents();
+      await reconcileMissingEvents(db);
 
       // Verify: All records moved to 'processing'
       for (const id of ids) {
@@ -374,7 +392,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('stored', 3);
 
       // Run reconciliation
-      await reconcileMissingEvents();
+      await reconcileMissingEvents(db);
 
       // Verify: Record remains in 'stored' state
       const record = await getRecordState(id);
@@ -389,7 +407,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('initiated', 90); // 90 minutes
 
       // Run reconciliation
-      await reconcileOrphanedIntents();
+      await reconcileOrphanedIntents(db);
 
       // Verify: Record should be deleted
       const record = await getRecordState(id);
@@ -401,7 +419,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('initiated', 30); // 30 minutes
 
       // Run reconciliation
-      await reconcileOrphanedIntents();
+      await reconcileOrphanedIntents(db);
 
       // Verify: Record should still exist
       const record = await getRecordState(id);
@@ -416,7 +434,7 @@ describe('Reconciliation Service Tests', () => {
       const storedId = await createStuckUpload('stored', 90);
 
       // Run reconciliation
-      await reconcileOrphanedIntents();
+      await reconcileOrphanedIntents(db);
 
       // Verify: Only initiated record deleted
       expect(await getRecordState(initiatedId)).toBeUndefined();
@@ -431,7 +449,7 @@ describe('Reconciliation Service Tests', () => {
       );
 
       // Run reconciliation
-      await reconcileOrphanedIntents();
+      await reconcileOrphanedIntents(db);
 
       // Verify: All records deleted
       for (const id of ids) {
@@ -450,7 +468,8 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      await reconcileOrphanedMinioObjects();
+      const config = getTestConfig();
+      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
       // Verify: MinIO object should be deleted
       expect(await minioObjectExists(id)).toBe(false);
@@ -475,7 +494,8 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      await reconcileOrphanedMinioObjects();
+      const config = getTestConfig();
+      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
       // Verify: MinIO object should be deleted
       expect(await minioObjectExists(id)).toBe(false);
@@ -491,7 +511,8 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      await reconcileOrphanedMinioObjects();
+      const config = getTestConfig();
+      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
       // Verify: MinIO object should still exist
       expect(await minioObjectExists(id)).toBe(true);
@@ -502,7 +523,8 @@ describe('Reconciliation Service Tests', () => {
       const ids = await Promise.all(Array.from({ length: 20 }, () => createOrphanedMinioObject()));
 
       // Run reconciliation
-      await reconcileOrphanedMinioObjects();
+      const config = getTestConfig();
+      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
       // Verify: All orphaned objects deleted
       for (const id of ids) {
@@ -524,7 +546,8 @@ describe('Reconciliation Service Tests', () => {
       ]);
 
       // Run reconciliation
-      await reconcileOrphanedMinioObjects();
+      const config = getTestConfig();
+      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
       // Verify: Valid object preserved
       expect(await minioObjectExists(validId)).toBe(true);

@@ -31,9 +31,14 @@ export class StartedNatsContainer {
   /**
    * Get the NATS connection URL
    * @returns NATS connection URL in format: nats://host:port
+   * @note Uses 127.0.0.1 instead of localhost to avoid DNS resolution delays
    */
   getConnectionUrl(): string {
-    const host = this.container.getHost();
+    let host = this.container.getHost();
+    // Replace localhost with 127.0.0.1 to avoid DNS resolution delays
+    if (host === 'localhost') {
+      host = '127.0.0.1';
+    }
     const port = this.container.getMappedPort(4222);
     return `nats://${host}:${port}`;
   }

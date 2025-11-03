@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
@@ -13,6 +13,7 @@ import {
 import { connect } from 'nats';
 import type { NatsConnection, JetStreamClient } from 'nats';
 import { getTestConfig } from './setup.js';
+import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
 import { wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 
@@ -51,18 +52,16 @@ describe('Reconciliation Service Tests', () => {
   let s3Client: S3Client;
   let natsClient: NatsConnection;
   let js: JetStreamClient;
+  let config: ReturnType<typeof getTestConfig>;
 
-  beforeEach(async () => {
-    const config = getTestConfig();
+  beforeAll(async () => {
+    config = getTestConfig();
 
-    // Setup database connection
+    // Setup database connection (reused across all tests)
     pool = new Pool({ connectionString: config.databaseUrl });
     db = drizzle(pool, { schema: { wallpapers } });
 
-    // Clean up database before each test
-    await db.delete(wallpapers);
-
-    // Setup MinIO client
+    // Setup MinIO client (reused across all tests)
     s3Client = new S3Client({
       endpoint: config.s3Endpoint,
       region: config.s3Region,
@@ -84,7 +83,27 @@ describe('Reconciliation Service Tests', () => {
       // Bucket already exists, ignore error
     }
 
-    // Clean up MinIO bucket
+    // Initialize global NATS connection (used by reconciliation service)
+    natsClient = await createNatsConnection(config);
+    js = natsClient.jetstream();
+
+    // Create JetStream stream for testing
+    const jsm = await natsClient.jetstreamManager();
+    try {
+      await jsm.streams.add({
+        name: config.natsStream,
+        subjects: ['wallpaper.>'],
+      });
+    } catch (error) {
+      // Stream might already exist, ignore error
+    }
+  });
+
+  beforeEach(async () => {
+    // Clean up database before each test
+    await db.delete(wallpapers);
+
+    // Clean up MinIO bucket before each test
     const listResponse = await s3Client.send(new ListObjectsV2Command({ Bucket: config.s3Bucket }));
     if (listResponse.Contents) {
       for (const object of listResponse.Contents) {
@@ -98,10 +117,12 @@ describe('Reconciliation Service Tests', () => {
         }
       }
     }
+  });
 
-    // Setup NATS connection
-    natsClient = await connect({ servers: config.natsUrl });
-    js = natsClient.jetstream();
+  afterAll(async () => {
+    // Close all connections after all tests complete
+    await pool.end();
+    await closeNatsConnection();
   });
 
   /**
@@ -371,15 +392,15 @@ describe('Reconciliation Service Tests', () => {
       // Create record in 'stored' state
       const id = await createStuckUpload('stored', 10);
 
-      // Simulate NATS failure by closing connection
-      await natsClient.close();
+      // Simulate NATS failure by closing the global connection
+      await closeNatsConnection();
 
       // Run reconciliation (should handle NATS error gracefully)
-      await reconcileMissingEvents();
+      await reconcileMissingEvents(db);
 
-      // Reconnect for verification
-      const config = getTestConfig();
-      natsClient = await connect({ servers: config.natsUrl });
+      // Reconnect for subsequent tests (restore shared connection)
+      natsClient = await createNatsConnection(config);
+      js = natsClient.jetstream();
 
       // Verify: Record remains in 'stored' state for next reconciliation cycle
       const record = await getRecordState(id);

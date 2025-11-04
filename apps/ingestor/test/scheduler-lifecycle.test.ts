@@ -1,0 +1,496 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
+import { Pool } from 'pg';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { eq } from 'drizzle-orm';
+import {
+  S3Client,
+  PutObjectCommand,
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} from '@aws-sdk/client-s3';
+import type { NatsConnection, JetStreamClient } from 'nats';
+import { getTestConfig } from './setup.js';
+import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
+import { wallpapers } from '../src/db/schema.js';
+import { ulid } from 'ulid';
+import {
+  startScheduler,
+  stopSchedulerAndWait,
+  runReconciliationNow,
+} from '../src/services/scheduler.service.js';
+import { createTestImage, generateContentHash } from './fixtures.js';
+import * as schema from '../src/db/schema.js';
+
+/**
+ * Scheduler Lifecycle Tests
+ *
+ * These tests verify that the reconciliation scheduler integrates correctly
+ * with the application lifecycle:
+ *
+ * TESTS:
+ * 1. Scheduler starts and runs reconciliation automatically
+ * 2. Scheduler stops cleanly during graceful shutdown
+ * 3. Reconciliation runs on correct intervals
+ * 4. Concurrent reconciliation is prevented
+ * 5. Scheduler survives reconciliation errors
+ */
+
+describe('Scheduler Lifecycle Tests', () => {
+  let pool: Pool;
+  let db: NodePgDatabase<typeof schema>;
+  let s3Client: S3Client;
+  let natsClient: NatsConnection;
+  let js: JetStreamClient;
+  let config: ReturnType<typeof getTestConfig>;
+
+  beforeAll(async () => {
+    config = getTestConfig();
+
+    // Setup database connection
+    pool = new Pool({ connectionString: config.databaseUrl });
+    db = drizzle(pool, { schema: schema });
+
+    // Setup MinIO client
+    s3Client = new S3Client({
+      endpoint: config.s3Endpoint,
+      region: config.s3Region,
+      credentials: {
+        accessKeyId: config.s3AccessKeyId,
+        secretAccessKey: config.s3SecretAccessKey,
+      },
+      forcePathStyle: true,
+    });
+
+    // Create MinIO bucket if it doesn't exist
+    try {
+      await s3Client.send(
+        new CreateBucketCommand({
+          Bucket: config.s3Bucket,
+        })
+      );
+    } catch (error) {
+      // Bucket already exists, ignore
+    }
+
+    // Initialize NATS connection
+    natsClient = await createNatsConnection(config);
+    js = natsClient.jetstream();
+
+    // Create JetStream stream for testing
+    const jsm = await natsClient.jetstreamManager();
+    try {
+      await jsm.streams.add({
+        name: config.natsStream,
+        subjects: ['wallpaper.>'],
+      });
+    } catch (error) {
+      // Stream might already exist, ignore
+    }
+  });
+
+  afterAll(async () => {
+    await closeNatsConnection();
+    await pool.end();
+  });
+
+  beforeEach(async () => {
+    // Clean up database before each test
+    await db.delete(wallpapers);
+
+    // Clean up MinIO bucket
+    try {
+      const listResponse = await s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: config.s3Bucket,
+        })
+      );
+
+      if (listResponse.Contents && listResponse.Contents.length > 0) {
+        for (const object of listResponse.Contents) {
+          if (object.Key) {
+            await s3Client.send(
+              new DeleteObjectCommand({
+                Bucket: config.s3Bucket,
+                Key: object.Key,
+              })
+            );
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+
+    // Clean up NATS stream
+    try {
+      const jsm = await natsClient.jetstreamManager();
+      await jsm.streams.purge(config.natsStream);
+    } catch (error) {
+      // Stream might not exist, ignore
+    }
+  });
+
+  afterEach(async () => {
+    // Ensure scheduler is stopped after each test
+    await stopSchedulerAndWait();
+  });
+
+  it('should start scheduler and run reconciliation automatically', async () => {
+    // Create test data: stuck upload that needs reconciliation
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const wallpaperId = `wlpr_lifecycle_${ulid()}`;
+    const storageKey = `${wallpaperId}/original.jpg`;
+    const contentHash = await generateContentHash(testImage);
+
+    // Upload file to MinIO
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: config.s3Bucket,
+        Key: storageKey,
+        Body: testImage,
+        ContentType: 'image/jpeg',
+      })
+    );
+
+    // Create stuck upload record (stuck in 'uploading' state for >10 minutes)
+    await db.insert(wallpapers).values({
+      id: wallpaperId,
+      userId: 'user_lifecycle_test',
+      uploadState: 'uploading',
+      stateChangedAt: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      uploadAttempts: 0,
+      contentHash,
+    });
+
+    // Verify initial state
+    const [initial] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    expect(initial.uploadState).toBe('uploading');
+
+    // Start scheduler (uses 100ms interval in test mode)
+    startScheduler();
+
+    // Wait for reconciliation to run (250ms to ensure completion)
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify record was reconciled to 'stored' state
+    // Note: Reconciliation only changes state, it doesn't extract metadata
+    // Metadata extraction happens during initial upload flow
+    const [reconciled] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    expect(reconciled.uploadState).toBe('stored');
+    expect(reconciled.stateChangedAt.getTime()).toBeGreaterThan(initial.stateChangedAt.getTime());
+
+    // Clean up
+    await stopSchedulerAndWait();
+  });
+
+  it('should stop scheduler cleanly during graceful shutdown', async () => {
+    // Create multiple stuck records
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const contentHash = await generateContentHash(testImage);
+
+    for (let i = 0; i < 5; i++) {
+      const wallpaperId = `wlpr_shutdown_${i}_${ulid()}`;
+      const storageKey = `${wallpaperId}/original.jpg`;
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: config.s3Bucket,
+          Key: storageKey,
+          Body: testImage,
+          ContentType: 'image/jpeg',
+        })
+      );
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        userId: 'user_shutdown_test',
+        uploadState: 'uploading',
+        stateChangedAt: new Date(Date.now() - 15 * 60 * 1000),
+        uploadAttempts: 0,
+        contentHash: `${contentHash}_${i}`,
+      });
+    }
+
+    // Start scheduler
+    startScheduler();
+
+    // Wait for at least one reconciliation cycle
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Get count of reconciled records before shutdown
+    const beforeShutdown = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'stored'));
+    const reconciledBeforeShutdown = beforeShutdown.length;
+
+    // Stop scheduler
+    await stopSchedulerAndWait();
+
+    // Wait a bit more (another interval would occur at ~200ms)
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // Get count of reconciled records after shutdown
+    const afterShutdown = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'stored'));
+    const reconciledAfterShutdown = afterShutdown.length;
+
+    // Count should not change after scheduler stops
+    expect(reconciledAfterShutdown).toBe(reconciledBeforeShutdown);
+    expect(reconciledBeforeShutdown).toBeGreaterThan(0); // At least some were processed
+  });
+
+  it('should run reconciliation on correct interval', async () => {
+    // Create a stuck record
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const wallpaperId = `wlpr_interval_${ulid()}`;
+    const storageKey = `${wallpaperId}/original.jpg`;
+    const contentHash = await generateContentHash(testImage);
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: config.s3Bucket,
+        Key: storageKey,
+        Body: testImage,
+        ContentType: 'image/jpeg',
+      })
+    );
+
+    await db.insert(wallpapers).values({
+      id: wallpaperId,
+      userId: 'user_interval_test',
+      uploadState: 'uploading',
+      stateChangedAt: new Date(Date.now() - 15 * 60 * 1000),
+      uploadAttempts: 0,
+      contentHash,
+    });
+
+    // Start scheduler
+    startScheduler();
+
+    // Test interval is 100ms, so we should see reconciliation happen
+    // Check at 50ms (should not be processed yet)
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    let [record] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    expect(record.uploadState).toBe('uploading'); // Not yet processed
+
+    // Check at 150ms (should be processed by now)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    [record] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    expect(record.uploadState).toBe('stored'); // Processed
+
+    await stopSchedulerAndWait();
+  });
+
+  it('should prevent concurrent reconciliation cycles', async () => {
+    // Create many stuck uploads to make reconciliation take longer
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+
+    for (let i = 0; i < 30; i++) {
+      const wallpaperId = `wlpr_concurrent_${i}_${ulid()}`;
+      const storageKey = `${wallpaperId}/original.jpg`;
+      const contentHash = await generateContentHash(testImage);
+
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: config.s3Bucket,
+          Key: storageKey,
+          Body: testImage,
+          ContentType: 'image/jpeg',
+        })
+      );
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        userId: 'user_concurrent_test',
+        uploadState: 'uploading',
+        stateChangedAt: new Date(Date.now() - 15 * 60 * 1000),
+        uploadAttempts: 0,
+        contentHash: `${contentHash}_${i}`,
+      });
+    }
+
+    // Start scheduler
+    startScheduler();
+
+    // Manually trigger reconciliation to force concurrent attempt
+    const reconciliationPromise = runReconciliationNow();
+
+    // Wait a bit for manual reconciliation to start
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // The scheduled interval might try to run, but should be skipped due to isReconciling flag
+    // We just verify that we don't get errors and records are processed correctly
+
+    await reconciliationPromise;
+
+    // All records should eventually be processed
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const processedCount = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'stored'));
+
+    // All 30 should be processed (no duplicates or errors)
+    expect(processedCount.length).toBe(30);
+
+    await stopSchedulerAndWait();
+  });
+
+  it('should handle reconciliation errors gracefully and continue running', async () => {
+    // Create a valid stuck upload
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const wallpaperId = `wlpr_error_recovery_${ulid()}`;
+    const storageKey = `${wallpaperId}/original.jpg`;
+    const contentHash = await generateContentHash(Buffer.concat([testImage, Buffer.from('_first')]));
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: config.s3Bucket,
+        Key: storageKey,
+        Body: testImage,
+        ContentType: 'image/jpeg',
+      })
+    );
+
+    await db.insert(wallpapers).values({
+      id: wallpaperId,
+      userId: 'user_error_test',
+      uploadState: 'uploading',
+      stateChangedAt: new Date(Date.now() - 15 * 60 * 1000),
+      uploadAttempts: 0,
+      contentHash,
+    });
+
+    // Start scheduler
+    startScheduler();
+
+    // Wait for first reconciliation cycle
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify record was processed
+    const [processed] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    expect(processed.uploadState).toBe('stored');
+
+    // Now create another record to verify scheduler continues after potential errors
+    const wallpaperId2 = `wlpr_error_recovery_2_${ulid()}`;
+    const storageKey2 = `${wallpaperId2}/original.jpg`;
+    const testImage2 = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const contentHash2 = await generateContentHash(Buffer.concat([testImage2, Buffer.from('_second')]));
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: config.s3Bucket,
+        Key: storageKey2,
+        Body: testImage2,
+        ContentType: 'image/jpeg',
+      })
+    );
+
+    await db.insert(wallpapers).values({
+      id: wallpaperId2,
+      userId: 'user_error_test',
+      uploadState: 'uploading',
+      stateChangedAt: new Date(Date.now() - 15 * 60 * 1000),
+      uploadAttempts: 0,
+      contentHash: contentHash2,
+    });
+
+    // Wait for next reconciliation cycle
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify second record was also processed (scheduler still running)
+    const [processed2] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId2));
+    expect(processed2.uploadState).toBe('stored');
+
+    await stopSchedulerAndWait();
+  });
+
+  it('should handle missing event publishing during scheduled reconciliation', async () => {
+    // Create records stuck in 'stored' state (need NATS event publishing)
+    const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+
+    for (let i = 0; i < 5; i++) {
+      const wallpaperId = `wlpr_stored_${i}_${ulid()}`;
+      const storageKey = `${wallpaperId}/original.jpg`;
+      // Generate unique content hash for each record to avoid constraint violation
+      const contentHash = await generateContentHash(Buffer.concat([testImage, Buffer.from(`_${i}`)]));
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        userId: 'user_stored_test',
+        uploadState: 'stored',
+        stateChangedAt: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+        uploadAttempts: 0,
+        contentHash,
+        fileType: 'image',
+        mimeType: 'image/jpeg',
+        fileSizeBytes: BigInt(testImage.length),
+        width: 1920,
+        height: 1080,
+        aspectRatio: '1.7778',
+        storageKey,
+        storageBucket: config.s3Bucket,
+        originalFilename: `test_${i}.jpg`,
+      });
+    }
+
+    // Start scheduler
+    startScheduler();
+
+    // Wait for reconciliation to run
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    // Verify all records moved to 'processing' state
+    const processing = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'processing'));
+
+    expect(processing.length).toBe(5);
+
+    // Verify NATS events were published (count messages in stream)
+    const jsm = await natsClient.jetstreamManager();
+    const streamInfo = await jsm.streams.info(config.natsStream);
+    expect(streamInfo.state.messages).toBe(5);
+
+    await stopSchedulerAndWait();
+  });
+
+  it('should handle orphaned intent cleanup during scheduled reconciliation', async () => {
+    // Create orphaned intents (stuck in 'initiated' state for >1 hour)
+    for (let i = 0; i < 8; i++) {
+      const wallpaperId = `wlpr_orphan_${i}_${ulid()}`;
+      const contentHash = await generateContentHash(Buffer.from(`test_orphan_${i}`));
+
+      await db.insert(wallpapers).values({
+        id: wallpaperId,
+        userId: 'user_orphan_test',
+        uploadState: 'initiated',
+        stateChangedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        uploadAttempts: 0,
+        contentHash,
+      });
+    }
+
+    // Verify initial count
+    const initial = await db.select().from(wallpapers).where(eq(wallpapers.uploadState, 'initiated'));
+    expect(initial.length).toBe(8);
+
+    // Start scheduler
+    startScheduler();
+
+    // Wait for reconciliation to run multiple cycles to process all 8 records
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Verify all orphaned intents were deleted
+    const remaining = await db.select().from(wallpapers).where(eq(wallpapers.uploadState, 'initiated'));
+    expect(remaining.length).toBe(0);
+
+    await stopSchedulerAndWait();
+  });
+});

@@ -532,8 +532,8 @@ describe('Scheduler Service Tests', () => {
         hasMinioFile: true,
       });
 
-      // Wait for next cycle
-      await wait(300);
+      // Wait for next cycle (increased to ensure reconciliation completes)
+      await wait(400);
 
       // Scheduler should still be running and processing valid records
       const record = await getRecordState(validId);

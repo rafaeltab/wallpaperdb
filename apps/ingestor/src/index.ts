@@ -1,5 +1,6 @@
 import { loadConfig } from './config.js';
 import { createApp } from './app.js';
+import { startScheduler, stopScheduler } from './services/scheduler.service.js';
 import type { FastifyInstance } from 'fastify';
 
 // Load configuration
@@ -10,6 +11,9 @@ async function gracefulShutdown(signal: string, fastify: FastifyInstance) {
   fastify.log.info(`Received ${signal}, starting graceful shutdown...`);
 
   try {
+    // Stop scheduler first to prevent new reconciliation cycles
+    stopScheduler();
+
     await fastify.close();
     fastify.log.info('Graceful shutdown complete');
     process.exit(0);
@@ -37,6 +41,10 @@ async function start() {
     fastify.log.info(`Server is running on port ${config.port}`);
     fastify.log.info(`Health check available at http://localhost:${config.port}/health`);
     fastify.log.info(`Readiness check available at http://localhost:${config.port}/ready`);
+
+    // Start reconciliation scheduler
+    startScheduler();
+    fastify.log.info('Reconciliation scheduler started');
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

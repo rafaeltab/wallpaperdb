@@ -28,12 +28,19 @@ export class DefaultValidationLimitsService implements ValidationLimitsService {
   async getLimitsForUser(_userId: string): Promise<ValidationLimits> {
     return {
       maxFileSizeImage: 50 * 1024 * 1024, // 50MB
-      maxFileSizeVideo: 200 * 1024 * 1024, // 200MB
+      maxFileSizeVideo: 200 * 1024 * 1024, // 200MB (reserved for future use)
       minWidth: 1280,
       minHeight: 720,
       maxWidth: 7680,
       maxHeight: 4320,
-      allowedFormats: ['image/jpeg', 'image/png', 'image/webp', 'video/webm', 'video/mp4'],
+      allowedFormats: [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        // TODO: Add video support when FFmpeg integration is complete
+        // 'video/webm',
+        // 'video/mp4'
+      ],
     };
   }
 }

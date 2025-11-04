@@ -12,6 +12,7 @@ type DbType = NodePgDatabase<typeof schema>;
 
 /**
  * Reconcile stuck uploads - Fix uploads stuck in 'uploading' state for >10 minutes
+ * Uses row-level locking (FOR UPDATE SKIP LOCKED) for multi-instance safety
  */
 export async function reconcileStuckUploads(
   bucket?: string,
@@ -20,101 +21,125 @@ export async function reconcileStuckUploads(
 ): Promise<void> {
   const database = db || getDatabase();
   const storageBucket = bucket || process.env.S3_BUCKET || 'wallpapers';
-
-  // Query for uploads stuck in 'uploading' state for more than 10 minutes
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
 
-  const stuckUploads = await database
-    .select()
-    .from(wallpapers)
-    .where(
-      and(eq(wallpapers.uploadState, 'uploading'), lt(wallpapers.stateChangedAt, tenMinutesAgo))
-    );
+  // Process records one at a time with row-level locking
+  while (true) {
+    let processed = false;
 
-  for (const upload of stuckUploads) {
     try {
-      // Construct storage key from wallpaper ID (format: {wallpaperId}/original.{ext})
-      // For reconciliation, we try with .jpg as a default since we don't have the extension stored yet
-      const storageKey = `${upload.id}/original.jpg`;
+      await database.transaction(async (tx) => {
+        // Lock next available stuck upload (skip locked rows)
+        const [upload] = await tx
+          .select()
+          .from(wallpapers)
+          .where(
+            and(
+              eq(wallpapers.uploadState, 'uploading'),
+              lt(wallpapers.stateChangedAt, tenMinutesAgo)
+            )
+          )
+          .limit(1)
+          .for('update', { skipLocked: true }); // CRITICAL for multi-instance
 
-      // Check if the file exists in MinIO
-      const fileExists = await objectExists(storageBucket, storageKey, s3Client);
+        if (!upload) return;
 
-      if (fileExists) {
-        // File exists - recover to 'stored' state
-        await database
-          .update(wallpapers)
-          .set({
-            uploadState: 'stored',
-            stateChangedAt: new Date(),
-          })
-          .where(eq(wallpapers.id, upload.id));
+        processed = true;
 
-        console.log(`Recovered stuck upload ${upload.id} to 'stored' state`);
-      } else {
-        // File missing - check retry attempts
-        if (upload.uploadAttempts >= 3) {
-          // Max retries exceeded - mark as failed
-          await database
+        // Construct storage key from wallpaper ID (format: {wallpaperId}/original.{ext})
+        // For reconciliation, we try with .jpg as a default since we don't have the extension stored yet
+        const storageKey = `${upload.id}/original.jpg`;
+
+        // Check if the file exists in MinIO
+        const fileExists = await objectExists(storageBucket, storageKey, s3Client);
+
+        if (fileExists) {
+          // File exists - recover to 'stored' state
+          await tx
             .update(wallpapers)
             .set({
-              uploadState: 'failed',
-              processingError: 'Max retries exceeded',
+              uploadState: 'stored',
               stateChangedAt: new Date(),
             })
             .where(eq(wallpapers.id, upload.id));
 
-          console.log(`Marked upload ${upload.id} as failed (max retries exceeded)`);
+          console.log(`Recovered stuck upload ${upload.id} to 'stored' state`);
         } else {
-          // Increment retry attempts
-          await database
-            .update(wallpapers)
-            .set({
-              uploadAttempts: upload.uploadAttempts + 1,
-              stateChangedAt: new Date(),
-            })
-            .where(eq(wallpapers.id, upload.id));
+          // File missing - check retry attempts
+          if (upload.uploadAttempts >= 3) {
+            // Max retries exceeded - mark as failed
+            await tx
+              .update(wallpapers)
+              .set({
+                uploadState: 'failed',
+                processingError: 'Max retries exceeded',
+                stateChangedAt: new Date(),
+              })
+              .where(eq(wallpapers.id, upload.id));
 
-          console.log(
-            `Incremented retry attempts for upload ${upload.id} (${upload.uploadAttempts + 1}/3)`
-          );
+            console.log(`Marked upload ${upload.id} as failed (max retries exceeded)`);
+          } else {
+            // Increment retry attempts
+            await tx
+              .update(wallpapers)
+              .set({
+                uploadAttempts: upload.uploadAttempts + 1,
+                stateChangedAt: new Date(),
+              })
+              .where(eq(wallpapers.id, upload.id));
+
+            console.log(
+              `Incremented retry attempts for upload ${upload.id} (${upload.uploadAttempts + 1}/3)`
+            );
+          }
         }
-      }
+      });
     } catch (error) {
-      console.error(`Error reconciling stuck upload ${upload.id}:`, error);
-      // Continue processing other uploads
+      console.error('Error reconciling stuck upload:', error);
+      // Continue to next record
     }
+
+    // Exit loop if no records found
+    if (!processed) break;
   }
 }
 
 /**
  * Reconcile missing events - Republish NATS events for records stuck in 'stored' state for >5 minutes
+ * Uses row-level locking (FOR UPDATE SKIP LOCKED) for multi-instance safety
  */
 export async function reconcileMissingEvents(db?: DbType): Promise<void> {
   const database = db || getDatabase();
-
-  // Query for records stuck in 'stored' state for more than 5 minutes
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-  const stuckRecords = await database
-    .select()
-    .from(wallpapers)
-    .where(
-      and(eq(wallpapers.uploadState, 'stored'), lt(wallpapers.stateChangedAt, fiveMinutesAgo))
-    );
+  // Process records one at a time with row-level locking
+  while (true) {
+    let recordFound = false;
 
-  // Process in batches of 10
-  const batchSize = 10;
-  for (let i = 0; i < stuckRecords.length; i += batchSize) {
-    const batch = stuckRecords.slice(i, i + batchSize);
+    try {
+      await database.transaction(async (tx) => {
+        // Lock next available stuck record
+        const [record] = await tx
+          .select()
+          .from(wallpapers)
+          .where(
+            and(
+              eq(wallpapers.uploadState, 'stored'),
+              lt(wallpapers.stateChangedAt, fiveMinutesAgo)
+            )
+          )
+          .limit(1)
+          .for('update', { skipLocked: true }); // CRITICAL for multi-instance
 
-    for (const record of batch) {
-      try {
-        // Try to publish the event
+        if (!record) return;
+
+        recordFound = true;
+
+        // Publish event
         await publishWallpaperUploadedEvent(record);
 
-        // If successful, update state to 'processing'
-        await database
+        // Update state to 'processing'
+        await tx
           .update(wallpapers)
           .set({
             uploadState: 'processing',
@@ -123,39 +148,61 @@ export async function reconcileMissingEvents(db?: DbType): Promise<void> {
           .where(eq(wallpapers.id, record.id));
 
         console.log(`Republished event for wallpaper ${record.id}`);
-      } catch (error) {
-        // NATS publish failed - leave in 'stored' state for next cycle
-        console.error(`Failed to republish event for wallpaper ${record.id}:`, error);
-        // Don't throw - continue processing other records
-      }
+      });
+    } catch (error) {
+      console.error('Failed to republish event:', error);
+      // Transaction will rollback, leaving in 'stored' for retry
+      // Break to avoid infinite retry loop (next cycle will try again)
+      break;
     }
+
+    // Exit if no more records
+    if (!recordFound) break;
   }
 }
 
 /**
  * Reconcile orphaned intents - Delete records in 'initiated' state older than 1 hour
+ * Uses row-level locking (FOR UPDATE SKIP LOCKED) for multi-instance safety
  */
 export async function reconcileOrphanedIntents(db?: DbType): Promise<void> {
   const database = db || getDatabase();
-
-  // Query for records in 'initiated' state older than 1 hour
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  const orphanedIntents = await database
-    .select()
-    .from(wallpapers)
-    .where(and(eq(wallpapers.uploadState, 'initiated'), lt(wallpapers.stateChangedAt, oneHourAgo)));
+  // Process records one at a time with row-level locking
+  while (true) {
+    let processed = false;
 
-  // Delete orphaned intents
-  for (const intent of orphanedIntents) {
     try {
-      await database.delete(wallpapers).where(eq(wallpapers.id, intent.id));
+      await database.transaction(async (tx) => {
+        // Lock next orphaned intent
+        const [intent] = await tx
+          .select()
+          .from(wallpapers)
+          .where(
+            and(
+              eq(wallpapers.uploadState, 'initiated'),
+              lt(wallpapers.stateChangedAt, oneHourAgo)
+            )
+          )
+          .limit(1)
+          .for('update', { skipLocked: true }); // CRITICAL for multi-instance
 
-      console.log(`Deleted orphaned intent ${intent.id}`);
+        if (!intent) return;
+
+        processed = true;
+
+        // Delete the orphaned intent
+        await tx.delete(wallpapers).where(eq(wallpapers.id, intent.id));
+
+        console.log(`Deleted orphaned intent ${intent.id}`);
+      });
     } catch (error) {
-      console.error(`Error deleting orphaned intent ${intent.id}:`, error);
-      // Continue processing other intents
+      console.error('Error deleting orphaned intent:', error);
+      // Continue to next record
     }
+
+    if (!processed) break;
   }
 }
 

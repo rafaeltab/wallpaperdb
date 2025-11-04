@@ -72,6 +72,19 @@ beforeAll(async () => {
     otelServiceName: 'ingestor-test',
   };
 
+  // Set environment variables so that loadConfig() works in scheduler service
+  process.env.NODE_ENV = 'test';
+  process.env.DATABASE_URL = testConfig.databaseUrl;
+  process.env.S3_ENDPOINT = testConfig.s3Endpoint;
+  process.env.S3_ACCESS_KEY_ID = testConfig.s3AccessKeyId;
+  process.env.S3_SECRET_ACCESS_KEY = testConfig.s3SecretAccessKey;
+  process.env.S3_BUCKET = testConfig.s3Bucket;
+  process.env.S3_REGION = testConfig.s3Region;
+  process.env.NATS_URL = testConfig.natsUrl;
+  process.env.NATS_STREAM = testConfig.natsStream;
+  process.env.OTEL_EXPORTER_OTLP_ENDPOINT = testConfig.otelEndpoint;
+  process.env.OTEL_SERVICE_NAME = testConfig.otelServiceName;
+
   // Initialize database schema
   const pool = new Pool({
     connectionString: testConfig.databaseUrl,

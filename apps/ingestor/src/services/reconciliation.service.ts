@@ -123,10 +123,7 @@ export async function reconcileMissingEvents(db?: DbType): Promise<void> {
           .select()
           .from(wallpapers)
           .where(
-            and(
-              eq(wallpapers.uploadState, 'stored'),
-              lt(wallpapers.stateChangedAt, fiveMinutesAgo)
-            )
+            and(eq(wallpapers.uploadState, 'stored'), lt(wallpapers.stateChangedAt, fiveMinutesAgo))
           )
           .limit(1)
           .for('update', { skipLocked: true }); // CRITICAL for multi-instance
@@ -180,10 +177,7 @@ export async function reconcileOrphanedIntents(db?: DbType): Promise<void> {
           .select()
           .from(wallpapers)
           .where(
-            and(
-              eq(wallpapers.uploadState, 'initiated'),
-              lt(wallpapers.stateChangedAt, oneHourAgo)
-            )
+            and(eq(wallpapers.uploadState, 'initiated'), lt(wallpapers.stateChangedAt, oneHourAgo))
           )
           .limit(1)
           .for('update', { skipLocked: true }); // CRITICAL for multi-instance

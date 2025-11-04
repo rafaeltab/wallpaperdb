@@ -519,8 +519,9 @@ describe('Scheduler Service Tests', () => {
         stateChangedAt: new Date(Date.now() - 10 * 60 * 1000),
         uploadAttempts: 0,
         // Missing required fields for 'stored' state - may cause errors
-        fileType: null as any,
-        mimeType: null as any,
+        // Using unknown cast to bypass type safety for testing error handling
+        fileType: null as unknown as 'image',
+        mimeType: null as unknown as string,
       });
 
       // Wait for cycle (should handle error gracefully)
@@ -670,9 +671,7 @@ describe('Scheduler Service Tests', () => {
     it('should handle high volume of stuck records', async () => {
       // Create 50 stuck uploads
       await Promise.all(
-        Array.from({ length: 50 }, () =>
-          createStuckUpload('uploading', 15, { hasMinioFile: true })
-        )
+        Array.from({ length: 50 }, () => createStuckUpload('uploading', 15, { hasMinioFile: true }))
       );
 
       // Start scheduler
@@ -689,9 +688,7 @@ describe('Scheduler Service Tests', () => {
     it('should coordinate with multiple scheduler instances via row-level locking', async () => {
       // Create 30 stuck uploads
       const uploadIds = await Promise.all(
-        Array.from({ length: 30 }, () =>
-          createStuckUpload('uploading', 15, { hasMinioFile: true })
-        )
+        Array.from({ length: 30 }, () => createStuckUpload('uploading', 15, { hasMinioFile: true }))
       );
 
       // Simulate multiple instances by calling reconciliation directly

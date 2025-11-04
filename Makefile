@@ -1,5 +1,6 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
-        ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint \
+        ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
+        ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         dev build test test-watch format lint help
 
 help:
@@ -19,6 +20,12 @@ help:
 	@echo "  make ingestor-test-watch - Run ingestor tests in watch mode"
 	@echo "  make ingestor-format     - Format ingestor code"
 	@echo "  make ingestor-lint       - Lint ingestor code"
+	@echo ""
+	@echo "Ingestor Docker:"
+	@echo "  make ingestor-docker-build - Build ingestor Docker image"
+	@echo "  make ingestor-docker-run   - Run ingestor Docker container (uses infra/.env)"
+	@echo "  make ingestor-docker-stop  - Stop ingestor Docker container"
+	@echo "  make ingestor-docker-logs  - View ingestor Docker container logs"
 	@echo ""
 	@echo "All Services:"
 	@echo "  make dev        - Start all services in development mode"
@@ -62,6 +69,46 @@ ingestor-format:
 
 ingestor-lint:
 	@turbo run lint --filter=@wallpaperdb/ingestor
+
+ingestor-check:
+	@turbo run check --filter=@wallpaperdb/ingestor
+
+# Ingestor Docker commands
+ingestor-docker-build:
+	@echo "Building ingestor Docker image..."
+	@docker build -t wallpaperdb-ingestor:latest -f apps/ingestor/Dockerfile .
+	@echo "✓ Docker image built: wallpaperdb-ingestor:latest"
+
+ingestor-docker-run:
+	@echo "Starting ingestor Docker container..."
+	@if [ ! -f infra/.env ]; then \
+		echo "Error: infra/.env file not found. Run 'make infra-start' first."; \
+		exit 1; \
+	fi
+	@. ./infra/.env && docker run --rm -d \
+		-p 3001:3001 \
+		-e NODE_ENV=production \
+		-e PORT=3001 \
+		-e DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@host.docker.internal:5432/$$POSTGRES_DB \
+		-e S3_ENDPOINT=http://host.docker.internal:9000 \
+		-e S3_ACCESS_KEY_ID=$$MINIO_ROOT_USER \
+		-e S3_SECRET_ACCESS_KEY=$$MINIO_ROOT_PASSWORD \
+		-e S3_BUCKET=wallpapers \
+		-e NATS_URL=nats://host.docker.internal:4222 \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4318 \
+		--name wallpaperdb-ingestor \
+		wallpaperdb-ingestor:latest
+	@echo "✓ Ingestor container started on port 3001"
+	@echo "  Health: http://localhost:3001/health"
+	@echo "  Ready:  http://localhost:3001/ready"
+
+ingestor-docker-stop:
+	@echo "Stopping ingestor Docker container..."
+	@docker stop wallpaperdb-ingestor 2>/dev/null || echo "Container not running"
+	@echo "✓ Ingestor container stopped"
+
+ingestor-docker-logs:
+	@docker logs -f wallpaperdb-ingestor
 
 # All services commands
 dev:

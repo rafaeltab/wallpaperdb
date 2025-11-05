@@ -1,4 +1,5 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
+        redis-cli redis-flush redis-info \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
@@ -12,6 +13,11 @@ help:
 	@echo "  make infra-stop     - Stop all infrastructure services"
 	@echo "  make infra-reset    - Reset all infrastructure data (WARNING: deletes all data)"
 	@echo "  make infra-logs     - Tail logs from all infrastructure services"
+	@echo ""
+	@echo "Redis:"
+	@echo "  make redis-cli      - Connect to Redis CLI"
+	@echo "  make redis-flush    - Flush all Redis data (WARNING: deletes all data)"
+	@echo "  make redis-info     - Show Redis server info"
 	@echo ""
 	@echo "Ingestor Service:"
 	@echo "  make ingestor-dev        - Start ingestor in development mode"
@@ -53,6 +59,16 @@ infra-reset:
 
 infra-logs:
 	@turbo run logs --filter=@wallpaperdb/infra-local
+
+# Redis commands
+redis-cli:
+	@docker exec -it wallpaperdb-redis redis-cli
+
+redis-flush:
+	@docker exec -it wallpaperdb-redis redis-cli FLUSHALL
+
+redis-info:
+	@docker exec wallpaperdb-redis redis-cli INFO
 
 # Ingestor service commands
 ingestor-dev:

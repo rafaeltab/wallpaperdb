@@ -1,10 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import type Redis from 'ioredis';
 import type { Config } from './config.js';
 import { closeDatabaseConnection, createDatabaseConnection } from './connections/database.js';
 import { closeMinioConnection, createMinioConnection } from './connections/minio.js';
 import { closeNatsConnection, createNatsConnection } from './connections/nats.js';
+import { closeRedisConnection, createRedisConnection } from './connections/redis.js';
 import { initializeOpenTelemetry, shutdownOpenTelemetry } from './connections/otel.js';
 import { registerRoutes } from './routes/index.js';
+import { RateLimitService } from './services/rate-limit.service.js';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -16,6 +19,7 @@ export interface ConnectionsState {
 declare module 'fastify' {
   interface FastifyInstance {
     connectionsState: ConnectionsState;
+    rateLimitService: RateLimitService;
   }
 }
 
@@ -57,6 +61,9 @@ export async function createApp(
   // Initialize connections
   fastify.log.info('Initializing connections...');
 
+  // Declare Redis client outside try block for onClose hook access
+  let redisClient: Redis | undefined;
+
   try {
     // Initialize database connection
     createDatabaseConnection(config);
@@ -69,6 +76,24 @@ export async function createApp(
     // Initialize NATS connection
     await createNatsConnection(config);
     fastify.log.info('NATS connection created');
+
+    // Initialize Redis connection (optional - for rate limiting)
+    if (config.redisEnabled) {
+      try {
+        redisClient = createRedisConnection(config);
+        // Only connect if not already connected (singleton pattern)
+        if (redisClient.status !== 'ready' && redisClient.status !== 'connecting') {
+          await redisClient.connect();
+        }
+        fastify.log.info('Redis connection created');
+      } catch (error) {
+        fastify.log.warn(
+          { err: error },
+          'Redis connection failed, rate limiting will use in-memory store'
+        );
+        redisClient = undefined;
+      }
+    }
 
     fastify.connectionsState.connectionsInitialized = true;
     fastify.log.info('All connections initialized successfully');
@@ -83,10 +108,20 @@ export async function createApp(
     await closeNatsConnection();
     await closeDatabaseConnection();
     closeMinioConnection();
+    if (redisClient) {
+      await closeRedisConnection();
+    }
     if (options?.enableOtel !== false && config.nodeEnv !== 'test') {
       await shutdownOpenTelemetry();
     }
   });
+
+  // Initialize custom rate limiting service
+  // (Per-user rate limiting applied in upload route after userId extraction)
+  const rateLimitService = new RateLimitService(config, redisClient);
+  fastify.decorate('rateLimitService', rateLimitService);
+  const rateLimitStore = redisClient ? 'Redis' : 'in-memory';
+  fastify.log.info(`Rate limiting configured (store: ${rateLimitStore})`);
 
   // Register all routes
   await registerRoutes(fastify, config);

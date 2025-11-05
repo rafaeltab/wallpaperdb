@@ -34,6 +34,12 @@ const configSchema = z.object({
   // Rate Limiting
   rateLimitMax: z.number().int().positive().default(100), // Max uploads per window
   rateLimitWindowMs: z.number().int().positive().default(60 * 60 * 1000), // 1 hour
+
+  // Redis (for distributed rate limiting)
+  redisHost: z.string().default('localhost'),
+  redisPort: z.number().int().positive().default(6379),
+  redisPassword: z.string().optional(),
+  redisEnabled: z.boolean().default(true),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -71,6 +77,10 @@ export function loadConfig(): Config {
     rateLimitWindowMs: process.env.RATE_LIMIT_WINDOW_MS
       ? Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10)
       : 60 * 60 * 1000,
+    redisHost: process.env.REDIS_HOST || 'localhost',
+    redisPort: process.env.REDIS_PORT ? Number.parseInt(process.env.REDIS_PORT, 10) : 6379,
+    redisPassword: process.env.REDIS_PASSWORD,
+    redisEnabled: process.env.REDIS_ENABLED !== 'false',
   };
 
   return configSchema.parse(raw);

@@ -70,6 +70,14 @@ beforeAll(async () => {
     natsStream: 'WALLPAPERS_TEST',
     otelEndpoint: 'http://localhost:4318', // OTEL can stay local or be mocked
     otelServiceName: 'ingestor-test',
+    reconciliationIntervalMs: 100,
+    minioCleanupIntervalMs: 500,
+    rateLimitMax: 100,
+    rateLimitWindowMs: 60 * 60 * 1000, // 1 hour
+    redisHost: 'localhost',
+    redisPort: 6379,
+    redisPassword: undefined,
+    redisEnabled: false, // Disable Redis for integration tests (use in-memory)
   };
 
   // Set environment variables so that loadConfig() works in scheduler service

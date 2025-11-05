@@ -6,6 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:distributed": "vitest run --config vitest.distributed.config.ts",
+    "test:distributed:watch": "vitest --config vitest.distributed.config.ts",
     "verify-no-imports": "sh -c '! grep -r \"from.*@wallpaperdb/ingestor\" test/ || (echo \"❌ E2E tests must not import application code\" && exit 1)'"
   },
   "dependencies": {

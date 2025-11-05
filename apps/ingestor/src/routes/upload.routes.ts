@@ -10,6 +10,7 @@ import { uploadToStorage } from '../services/storage.service.js';
 import { publishWallpaperUploadedEvent } from '../services/events.service.js';
 import { ProblemDetailsError, MissingFileError, MissingUserId } from '../errors/problem-details.js';
 import { MultipartFile } from '@fastify/multipart';
+import { RateLimitExceededError } from '../services/rate-limit.service.js';
 
 const validationLimitsService = new DefaultValidationLimitsService();
 
@@ -20,30 +21,44 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
   const db = getDatabase();
 
   try {
-    // Parse multipart form data
-    const data = await request.file();
+    // Use cached multipart data from preHandler
+    const cachedData = (request as any).cachedMultipartData;
 
-    if (!data) {
-      throw new MissingFileError();
+    let buffer: Buffer;
+    let originalFilename: string;
+    let providedMimeType: string;
+    let userId: string;
+
+    if (cachedData) {
+      // Use cached data from preHandler
+      buffer = cachedData.buffer;
+      originalFilename = cachedData.filename;
+      providedMimeType = cachedData.mimetype;
+      userId = cachedData.userId;
+    } else {
+      // If not cached (shouldn't happen), parse again
+      const data = await request.file();
+
+      if (!data) {
+        throw new MissingFileError();
+      }
+
+      userId = parseUserId(data);
+      buffer = await data.toBuffer();
+      originalFilename = data.filename;
+      providedMimeType = data.mimetype;
     }
 
-    // Extract form fields
-    // In production, userId would come from authenticated session
-    // For now, we'll extract it from the form data (injected by gateway)
-    const userId = parseUserId(data);
+    // Step 1: Check rate limit for user
+    const rateLimitResult = await request.server.rateLimitService.checkRateLimit(userId);
 
-    // Read file buffer
-    const buffer = await data.toBuffer();
-    const originalFilename = data.filename;
-    const providedMimeType = data.mimetype;
-
-    // Step 1: Get user validation limits
+    // Step 2: Get user validation limits
     const limits = await validationLimitsService.getLimitsForUser(userId);
 
-    // Step 2: Process file (hash, validate, extract metadata)
+    // Step 3: Process file (hash, validate, extract metadata)
     const fileMetadata = await processFile(buffer, originalFilename, limits, providedMimeType);
 
-    // Step 3: Check for duplicate upload (by content hash)
+    // Step 4: Check for duplicate upload (by content hash)
     const existing = await db.query.wallpapers.findFirst({
       where: and(
         eq(wallpapers.userId, userId),
@@ -53,20 +68,25 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     });
 
     if (existing) {
-      // Return existing upload (idempotency)
-      return reply.code(200).send({
-        id: existing.id,
-        status: 'already_uploaded',
-        uploadedAt: existing.uploadedAt.toISOString(),
-        fileType: existing.fileType,
-        mimeType: existing.mimeType,
-        width: existing.width,
-        height: existing.height,
-        fileSizeBytes: existing.fileSizeBytes,
-      });
+      // Return existing upload (idempotency) with rate limit headers
+      return reply
+        .code(200)
+        .header('X-RateLimit-Limit', String(request.server.rateLimitService['config'].rateLimitMax))
+        .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
+        .header('X-RateLimit-Reset', String(rateLimitResult.reset))
+        .send({
+          id: existing.id,
+          status: 'already_uploaded',
+          uploadedAt: existing.uploadedAt.toISOString(),
+          fileType: existing.fileType,
+          mimeType: existing.mimeType,
+          width: existing.width,
+          height: existing.height,
+          fileSizeBytes: existing.fileSizeBytes,
+        });
     }
 
-    // Step 4: Generate ID and record intent (write-ahead)
+    // Step 5: Generate ID and record intent (write-ahead)
     const id = `wlpr_${ulid()}`;
 
     await db.insert(wallpapers).values({
@@ -78,7 +98,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     });
 
     try {
-      // Step 5: Update state to 'uploading' and upload to MinIO
+      // Step 6: Update state to 'uploading' and upload to MinIO
       await db
         .update(wallpapers)
         .set({
@@ -96,7 +116,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
         userId
       );
 
-      // Step 6: Update to 'stored' with full metadata
+      // Step 7: Update to 'stored' with full metadata
       await db
         .update(wallpapers)
         .set({
@@ -114,7 +134,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
         })
         .where(eq(wallpapers.id, id));
 
-      // Step 7: Publish event to NATS (non-blocking failure)
+      // Step 8: Publish event to NATS (non-blocking failure)
       try {
         // Fetch the complete wallpaper record for event publishing
         const wallpaper = await db.query.wallpapers.findFirst({
@@ -145,17 +165,22 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
         // Leave state as 'stored' - reconciliation will republish
       }
 
-      // Step 8: Return success response
-      return reply.code(200).send({
-        id,
-        status: 'processing',
-        uploadedAt: new Date().toISOString(),
-        fileType: fileMetadata.fileType,
-        mimeType: fileMetadata.mimeType,
-        width: fileMetadata.width,
-        height: fileMetadata.height,
-        fileSizeBytes: fileMetadata.fileSizeBytes,
-      });
+      // Step 9: Return success response with rate limit headers
+      return reply
+        .code(200)
+        .header('X-RateLimit-Limit', String(request.server.rateLimitService['config'].rateLimitMax))
+        .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
+        .header('X-RateLimit-Reset', String(rateLimitResult.reset))
+        .send({
+          id,
+          status: 'processing',
+          uploadedAt: new Date().toISOString(),
+          fileType: fileMetadata.fileType,
+          mimeType: fileMetadata.mimeType,
+          width: fileMetadata.width,
+          height: fileMetadata.height,
+          fileSizeBytes: fileMetadata.fileSizeBytes,
+        });
     } catch (error) {
       // Upload or processing failed, mark as failed in DB
       await db
@@ -169,6 +194,25 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       throw error;
     }
   } catch (error) {
+    // Handle rate limit exceeded
+    if (error instanceof RateLimitExceededError) {
+      return reply
+        .code(429)
+        .header('content-type', 'application/problem+json')
+        .header('Retry-After', String(error.retryAfter))
+        .header('X-RateLimit-Limit', String(error.max))
+        .header('X-RateLimit-Remaining', '0')
+        .header('X-RateLimit-Reset', String(error.reset))
+        .send({
+          type: 'https://wallpaperdb.example/problems/rate-limit-exceeded',
+          title: 'Rate Limit Exceeded',
+          status: 429,
+          detail: `Rate limit exceeded. Maximum ${error.max} requests per ${Math.floor(error.windowMs / 1000)} seconds.`,
+          instance: '/upload',
+          retryAfter: error.retryAfter,
+        });
+    }
+
     // Handle ProblemDetailsError (validation errors)
     if (error instanceof ProblemDetailsError) {
       return reply
@@ -199,6 +243,35 @@ export default async function uploadRoutes(fastify: FastifyInstance, options: { 
       fileSize: 200 * 1024 * 1024, // 200MB max (covers both images and videos)
       files: 1, // Only one file per upload
     },
+  });
+
+  // IMPORTANT: This preHandler runs AFTER rate limiting check!
+  // Rate limiting uses a unique key per request (skip:requestId) when userId is not available.
+  // Once userId is extracted here, future requests from this user will be properly rate limited.
+  fastify.addHook('preHandler', async (request, reply) => {
+    // Only for POST /upload
+    if (request.url === '/upload' && request.method === 'POST') {
+      try {
+        const data = await request.file();
+        if (data) {
+          const userId = parseUserId(data);
+          const buffer = await data.toBuffer();
+
+          // Set userId for future rate limiting (won't affect current request)
+          (request as any).rateLimitUserId = userId;
+
+          // Cache data for handler
+          (request as any).cachedMultipartData = {
+            buffer,
+            filename: data.filename,
+            mimetype: data.mimetype,
+            userId,
+          };
+        }
+      } catch (error) {
+        // Let main handler deal with errors
+      }
+    }
   });
 
   // POST /upload - Upload a wallpaper

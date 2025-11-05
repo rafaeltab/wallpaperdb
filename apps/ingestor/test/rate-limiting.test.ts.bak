@@ -64,8 +64,8 @@ describe('Rate Limiting', () => {
     // Override rate limit config for faster testing
     const testConfig = {
       ...config,
-      rateLimitMax: 15, // Per-user rate limit for testing
-      rateLimitWindowMs: 5000, // 5 seconds
+      rateLimitMax: 100, // High enough to prevent cross-test IP collisions (per-user limits tested in distributed tests)
+      rateLimitWindowMs: 10000, // 10 seconds
     };
 
     app = await createApp(testConfig, { logger: false, enableOtel: false });
@@ -118,8 +118,8 @@ describe('Rate Limiting', () => {
   it('should return 429 when user exceeds rate limit', async () => {
     const userId = `user_exceed_limit_${++testIdCounter}`;
 
-    // Make 15 uploads (hit the limit)
-    for (let i = 0; i < 15; i++) {
+    // Make 10 uploads (hit the limit)
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,
@@ -140,7 +140,7 @@ describe('Rate Limiting', () => {
       expect(response.statusCode).toBe(200);
     }
 
-    // 16th upload should be rate limited
+    // 11th upload should be rate limited
     const testImage11 = await createTestImage({
       width: 1920,
       height: 1080,
@@ -162,14 +162,14 @@ describe('Rate Limiting', () => {
 
     // Verify only 10 uploads in database (11th was rejected)
     const allUploads = await db.select().from(wallpapers);
-    expect(allUploads.length).toBe(15);
+    expect(allUploads.length).toBe(10);
   });
 
   it('should return RFC 7807 Problem Details on rate limit exceeded', async () => {
     const userId = `user_rfc7807_test_${++testIdCounter}`;
 
-    // Hit the rate limit (15 uploads)
-    for (let i = 0; i < 15; i++) {
+    // Hit the rate limit (10 uploads)
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,
@@ -225,7 +225,7 @@ describe('Rate Limiting', () => {
     const userB = `user_b_isolation_${timestamp}`;
 
     // User A: Hit rate limit (10 uploads)
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,
@@ -246,7 +246,7 @@ describe('Rate Limiting', () => {
       expect(response.statusCode).toBe(200);
     }
 
-    // User A: 16th upload should fail
+    // User A: 11th upload should fail
     const testImageA11 = await createTestImage({
       width: 1920,
       height: 1080,
@@ -288,14 +288,14 @@ describe('Rate Limiting', () => {
 
     // Verify: 10 from User A, 1 from User B
     const allUploads = await db.select().from(wallpapers);
-    expect(allUploads.length).toBe(16);
+    expect(allUploads.length).toBe(11);
   });
 
   it('should reset rate limit after time window expires', async () => {
     const userId = `user_reset_test_${++testIdCounter}`;
 
-    // Hit the rate limit (15 uploads)
-    for (let i = 0; i < 15; i++) {
+    // Hit the rate limit (10 uploads)
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,
@@ -391,15 +391,15 @@ describe('Rate Limiting', () => {
     expect(response.headers['x-ratelimit-reset']).toBeDefined();
 
     // Verify values are reasonable
-    expect(Number(response.headers['x-ratelimit-limit'])).toBe(15);
-    expect(Number(response.headers['x-ratelimit-remaining'])).toBeLessThan(15);
+    expect(Number(response.headers['x-ratelimit-limit'])).toBe(10);
+    expect(Number(response.headers['x-ratelimit-remaining'])).toBeLessThan(10);
   });
 
   it('should not rate limit health and ready endpoints', async () => {
     const userId = `user_health_test_${++testIdCounter}`;
 
     // Hit rate limit on /upload
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,
@@ -458,7 +458,7 @@ describe('Rate Limiting', () => {
     const userId = `user_retry_after_test_${++testIdCounter}`;
 
     // Hit the rate limit
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 10; i++) {
       const testImage = await createTestImage({
         width: 1920,
         height: 1080,

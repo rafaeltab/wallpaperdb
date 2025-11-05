@@ -392,4 +392,141 @@ describe('Upload E2E', () => {
         );
         expect(dbResult.rows).toHaveLength(0);
     });
+
+    test('upload without userId returns 400 error', async () => {
+        // Arrange: Create test image but omit userId
+        const testImage = await createTestJpeg();
+        const filename = `test-wallpaper-${Date.now()}.jpg`;
+
+        const formData = new FormData();
+        formData.append('file', new Blob([testImage], { type: 'image/jpeg' }), filename);
+        // Intentionally omit userId
+
+        // Act: Attempt upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP error response
+        expect(response.statusCode).toBe(400);
+        const body = await response.body.json();
+        expect(body).toHaveProperty('type');
+        expect(body.type).toContain('missing-user-id');
+
+        // Verify: No S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length || 0).toBe(0);
+
+        // Verify: No database record created
+        const dbResult = await dbPool.query('SELECT id FROM wallpapers');
+        expect(dbResult.rows).toHaveLength(0);
+    });
+
+    test('upload empty file returns 400 error', async () => {
+        // Arrange: Create empty file (0 bytes)
+        const emptyFile = Buffer.alloc(0);
+        const userId = generateTestUserId();
+        const filename = `empty-file-${Date.now()}.jpg`;
+
+        const formData = new FormData();
+        formData.append('file', new Blob([emptyFile], { type: 'image/jpeg' }), filename);
+        formData.append('userId', userId);
+
+        // Act: Attempt upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP error response
+        expect(response.statusCode).toBe(400);
+
+        // Verify: No S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length || 0).toBe(0);
+
+        // Verify: No successful database record created
+        const dbResult = await dbPool.query(
+            'SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)',
+            [userId, 'stored', 'processing', 'completed']
+        );
+        expect(dbResult.rows).toHaveLength(0);
+    });
+
+    test('upload with no file field returns 400 error', async () => {
+        // Arrange: Create form data with only userId, no file
+        const userId = generateTestUserId();
+
+        const formData = new FormData();
+        formData.append('userId', userId);
+        // Intentionally omit file field
+
+        // Act: Attempt upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP error response
+        expect(response.statusCode).toBe(400);
+
+        // Verify: No S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length || 0).toBe(0);
+
+        // Verify: No database record created
+        const dbResult = await dbPool.query(
+            'SELECT id FROM wallpapers WHERE user_id = $1',
+            [userId]
+        );
+        expect(dbResult.rows).toHaveLength(0);
+    });
+
+    test('upload video file returns 400 error (format not supported)', async () => {
+        // Arrange: Create minimal MP4 file header (video format not supported)
+        // This is a minimal valid MP4 file signature
+        const mp4Header = Buffer.from([
+            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, // ftyp box
+            0x6D, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00, // mp42
+            0x6D, 0x70, 0x34, 0x32, 0x69, 0x73, 0x6F, 0x6D, // isommp42
+        ]);
+        const userId = generateTestUserId();
+        const filename = `test-video-${Date.now()}.mp4`;
+
+        const formData = new FormData();
+        formData.append('file', new Blob([mp4Header], { type: 'video/mp4' }), filename);
+        formData.append('userId', userId);
+
+        // Act: Attempt upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP error response (video not supported)
+        expect(response.statusCode).toBe(400);
+        const body = await response.body.json();
+        expect(body).toHaveProperty('type');
+        // Should fail format validation since video/mp4 is not in allowedFormats
+
+        // Verify: No S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length || 0).toBe(0);
+
+        // Verify: No successful database record created
+        const dbResult = await dbPool.query(
+            'SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)',
+            [userId, 'stored', 'processing', 'completed']
+        );
+        expect(dbResult.rows).toHaveLength(0);
+    });
 });

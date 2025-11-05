@@ -8,7 +8,8 @@ import { DefaultValidationLimitsService } from '../services/validation-limits.se
 import { processFile, sanitizeFilename } from '../services/file-processor.service.js';
 import { uploadToStorage } from '../services/storage.service.js';
 import { publishWallpaperUploadedEvent } from '../services/events.service.js';
-import { ProblemDetailsError, MissingFileError } from '../errors/problem-details.js';
+import { ProblemDetailsError, MissingFileError, MissingUserId } from '../errors/problem-details.js';
+import { MultipartFile } from '@fastify/multipart';
 
 const validationLimitsService = new DefaultValidationLimitsService();
 
@@ -29,8 +30,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     // Extract form fields
     // In production, userId would come from authenticated session
     // For now, we'll extract it from the form data (injected by gateway)
-    const userIdField = data.fields.userId;
-    const userId = userIdField && 'value' in userIdField ? String(userIdField.value) : 'test-user';
+    const userId = parseUserId(data);
 
     // Read file buffer
     const buffer = await data.toBuffer();
@@ -203,4 +203,12 @@ export default async function uploadRoutes(fastify: FastifyInstance, options: { 
 
   // POST /upload - Upload a wallpaper
   fastify.post('/upload', uploadHandler);
+}
+
+function parseUserId(data: MultipartFile): string {
+  const userIdField = data.fields.userId;
+  if (userIdField && 'value' in userIdField) {
+    return String(userIdField.value);
+  }
+  throw new MissingUserId();
 }

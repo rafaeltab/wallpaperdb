@@ -1,4 +1,4 @@
-import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
+import { GenericContainer, type StartedNetwork, type StartedTestContainer, Wait } from 'testcontainers';
 
 /**
  * Configuration options for NATS container
@@ -20,6 +20,16 @@ export interface NatsContainerOptions {
    * Additional command-line arguments to pass to NATS server
    */
   additionalArgs?: string[];
+
+  /**
+   * Docker network to connect the container to
+   */
+  network?: StartedNetwork;
+
+  /**
+   * Network aliases for the container
+   */
+  networkAliases?: string[];
 }
 
 /**
@@ -87,6 +97,8 @@ export async function createNatsContainer(
     image = 'nats:2.10-alpine',
     enableJetStream = true,
     additionalArgs = [],
+    network,
+    networkAliases = [],
   } = options;
 
   // Build command arguments
@@ -96,12 +108,24 @@ export async function createNatsContainer(
   }
   command.push(...additionalArgs);
 
-  // Create and start the container with wait strategy
-  const container = await new GenericContainer(image)
+  // Create container builder
+  let containerBuilder = new GenericContainer(image)
     .withExposedPorts(4222)
     .withCommand(command)
-    .withWaitStrategy(Wait.forLogMessage('Server is ready'))
-    .start();
+    .withWaitStrategy(Wait.forLogMessage('Server is ready'));
+
+  // Add network if specified
+  if (network) {
+    containerBuilder = containerBuilder.withNetwork(network);
+  }
+
+  // Add network aliases if specified
+  for (const alias of networkAliases) {
+    containerBuilder = containerBuilder.withNetworkAliases(alias);
+  }
+
+  // Start the container
+  const container = await containerBuilder.start();
 
   return new StartedNatsContainer(container);
 }

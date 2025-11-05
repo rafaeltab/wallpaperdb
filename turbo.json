@@ -19,6 +19,11 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "build/**"]
     },
+    "build:docker": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -36,7 +41,7 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build", "^build:docker"]
     }
   }
 }

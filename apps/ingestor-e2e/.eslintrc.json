@@ -1,0 +1,17 @@
+{
+  "root": true,
+  "extends": ["../../.eslintrc.json"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": ["@wallpaperdb/ingestor", "@wallpaperdb/ingestor/*"],
+            "message": "❌ E2E tests must not import application code. Use HTTP client only to test the real Docker container."
+          }
+        ]
+      }
+    ]
+  }
+}

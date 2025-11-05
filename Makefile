@@ -1,6 +1,7 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
+        ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         dev build test test-watch format lint help
 
 help:
@@ -26,6 +27,11 @@ help:
 	@echo "  make ingestor-docker-run   - Run ingestor Docker container (uses infra/.env)"
 	@echo "  make ingestor-docker-stop  - Stop ingestor Docker container"
 	@echo "  make ingestor-docker-logs  - View ingestor Docker container logs"
+	@echo ""
+	@echo "Ingestor E2E Tests:"
+	@echo "  make ingestor-e2e-test       - Run E2E tests against Docker container"
+	@echo "  make ingestor-e2e-test-watch - Run E2E tests in watch mode"
+	@echo "  make ingestor-e2e-verify     - Verify no app code imports in E2E tests"
 	@echo ""
 	@echo "All Services:"
 	@echo "  make dev        - Start all services in development mode"
@@ -109,6 +115,19 @@ ingestor-docker-stop:
 
 ingestor-docker-logs:
 	@docker logs -f wallpaperdb-ingestor
+
+# Ingestor E2E test commands
+ingestor-e2e-test:
+	@echo "Running E2E tests (builds Docker image first)..."
+	@turbo run test --filter=@wallpaperdb/ingestor-e2e
+
+ingestor-e2e-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/ingestor-e2e
+
+ingestor-e2e-verify:
+	@echo "Verifying E2E tests don't import application code..."
+	@pnpm --filter @wallpaperdb/ingestor-e2e verify-no-imports
+	@echo "✓ Verification passed - E2E tests are properly isolated"
 
 # All services commands
 dev:

@@ -1,0 +1,30 @@
+{
+  "name": "@wallpaperdb/ingestor-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify-no-imports": "sh -c '! grep -r \"from.*@wallpaperdb/ingestor\" test/ || (echo \"❌ E2E tests must not import application code\" && exit 1)'"
+  },
+  "dependencies": {
+    "undici": "^6.21.0"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@biomejs/biome": "^1.9.4",
+    "@testcontainers/minio": "^11.7.2",
+    "@testcontainers/postgresql": "^11.7.2",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.15.6",
+    "@wallpaperdb/ingestor": "workspace:*",
+    "@wallpaperdb/testcontainers": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "nats": "^2.29.1",
+    "pg": "^8.13.1",
+    "sharp": "^0.33.5",
+    "testcontainers": "^11.7.2",
+    "vitest": "^2.1.8"
+  }
+}

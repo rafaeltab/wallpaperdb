@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "node esbuild.config.js",
+    "build:docker": "docker build -t wallpaperdb-ingestor:latest -f Dockerfile ../..",
     "start": "node dist/index.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",

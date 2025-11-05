@@ -165,3 +165,21 @@ export class EventPublishingFailedError extends ProblemDetailsError {
         super('File uploaded successfully but event publishing failed', traceId ? { traceId } : {});
     }
 }
+
+/**
+ * 429 - Rate limit exceeded
+ */
+export class RateLimitExceededError extends ProblemDetailsError {
+    readonly type = 'https://wallpaperdb.example/problems/rate-limit-exceeded';
+    readonly title = 'Rate Limit Exceeded';
+    readonly status = 429;
+    readonly instance = '/upload';
+
+    constructor(max: number, windowMs: number, retryAfter: number) {
+        const windowMinutes = Math.ceil(windowMs / 60000);
+        super(
+            `You have exceeded the upload limit of ${max} uploads per ${windowMinutes} minute${windowMinutes > 1 ? 's' : ''}. Please try again later.`,
+            { max, windowMs, retryAfter }
+        );
+    }
+}

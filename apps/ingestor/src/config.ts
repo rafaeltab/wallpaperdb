@@ -30,6 +30,10 @@ const configSchema = z.object({
   // Reconciliation
   reconciliationIntervalMs: z.number().int().positive().default(5 * 60 * 1000), // 5 minutes
   minioCleanupIntervalMs: z.number().int().positive().default(24 * 60 * 60 * 1000), // 24 hours
+
+  // Rate Limiting
+  rateLimitMax: z.number().int().positive().default(100), // Max uploads per window
+  rateLimitWindowMs: z.number().int().positive().default(60 * 60 * 1000), // 1 hour
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -61,6 +65,12 @@ export function loadConfig(): Config {
       : isTest
         ? 500
         : 24 * 60 * 60 * 1000,
+    rateLimitMax: process.env.RATE_LIMIT_MAX
+      ? Number.parseInt(process.env.RATE_LIMIT_MAX, 10)
+      : 100,
+    rateLimitWindowMs: process.env.RATE_LIMIT_WINDOW_MS
+      ? Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10)
+      : 60 * 60 * 1000,
   };
 
   return configSchema.parse(raw);

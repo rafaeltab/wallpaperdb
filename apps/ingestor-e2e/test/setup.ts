@@ -63,6 +63,25 @@ beforeAll(async () => {
     // natsContainer = new StartedNatsContainer(natsGenericContainer);
     console.log('NATS container started');
 
+    // Initialize JetStream stream for E2E tests
+    const { connect } = await import('nats');
+    const nc = await connect({ servers: natsContainer.getConnectionUrl() });
+    const jsm = await nc.jetstreamManager();
+
+    try {
+        await jsm.streams.add({
+            name: 'WALLPAPERS_E2E_TEST',
+            subjects: ['wallpaper.>'],
+        });
+        console.log('JetStream stream created');
+    } catch (error: any) {
+        if (!error.message?.includes('stream name already in use')) {
+            console.error('Failed to create JetStream stream:', error);
+        }
+    }
+
+    await nc.close();
+
     // Store configuration for tests
     databaseUrl = postgresContainer.getConnectionUri();
     s3Endpoint = `http://${minioContainer.getHost()}:${minioContainer.getPort()}`;
@@ -147,6 +166,8 @@ beforeAll(async () => {
             NATS_STREAM: 'WALLPAPERS_E2E_TEST',
             OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
             OTEL_SERVICE_NAME: 'ingestor-e2e-test',
+            RECONCILIATION_INTERVAL_MS: '1000', // 1 second for fast E2E testing
+            MINIO_CLEANUP_INTERVAL_MS: '2000', // 2 seconds for fast E2E testing
         })
         .withLogConsumer((stream) => {
             stream.on('data', (line) => console.log(`[INGESTOR] ${line}`));

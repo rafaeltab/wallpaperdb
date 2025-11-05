@@ -35,23 +35,16 @@ let isReconciling = false;
 let schedulerCreatedConnections = false;
 
 /**
- * Get interval configuration based on environment
- * Test environment uses shorter intervals for faster test execution
+ * Get interval configuration from environment
+ * Uses RECONCILIATION_INTERVAL_MS and MINIO_CLEANUP_INTERVAL_MS environment variables,
+ * with sensible defaults based on NODE_ENV
  */
 function getIntervalConfig() {
   const config = loadConfig();
 
-  if (config.nodeEnv === 'test') {
-    return {
-      reconciliationInterval: 100, // 100ms for tests
-      minioCleanupInterval: 500, // 500ms for tests
-    };
-  }
-
-  // Production/development intervals
   return {
-    reconciliationInterval: 5 * 60 * 1000, // 5 minutes
-    minioCleanupInterval: 24 * 60 * 60 * 1000, // 24 hours
+    reconciliationInterval: config.reconciliationIntervalMs,
+    minioCleanupInterval: config.minioCleanupIntervalMs,
   };
 }
 

@@ -19,6 +19,48 @@ async function createTestJpeg(): Promise<Buffer> {
         .toBuffer();
 }
 
+// Helper to create a test PNG image with minimum required dimensions (1280x720)
+async function createTestPng(): Promise<Buffer> {
+    return sharp({
+        create: {
+            width: 1280,
+            height: 720,
+            channels: 3,
+            background: { r: 150, g: 100, b: 200 },
+        },
+    })
+        .png()
+        .toBuffer();
+}
+
+// Helper to create a test WebP image with minimum required dimensions (1280x720)
+async function createTestWebP(): Promise<Buffer> {
+    return sharp({
+        create: {
+            width: 1280,
+            height: 720,
+            channels: 3,
+            background: { r: 200, g: 150, b: 100 },
+        },
+    })
+        .webp()
+        .toBuffer();
+}
+
+// Helper to create a small test JPEG image below minimum dimensions (640x480)
+async function createSmallTestJpeg(): Promise<Buffer> {
+    return sharp({
+        create: {
+            width: 640,
+            height: 480,
+            channels: 3,
+            background: { r: 50, g: 50, b: 50 },
+        },
+    })
+        .jpeg()
+        .toBuffer();
+}
+
 // Generate random user ID
 function generateTestUserId(): string {
     return `user_e2e_${Math.random().toString(36).substring(7)}`;
@@ -157,5 +199,197 @@ describe('Upload E2E', () => {
             (row) => row.upload_state === 'completed' || row.upload_state === 'stored'
         );
         expect(completedOrStored).toHaveLength(0);
+    });
+
+    test('uploading duplicate file returns already_uploaded status without creating duplicate records', async () => {
+        // Arrange: Create test image and user
+        const testImage = await createTestJpeg();
+        const userId = generateTestUserId();
+        const filename = `duplicate-test-${Date.now()}.jpg`;
+
+        // Act: Upload the same image twice
+        const formData1 = new FormData();
+        formData1.append('file', new Blob([testImage], { type: 'image/jpeg' }), filename);
+        formData1.append('userId', userId);
+
+        const response1 = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData1 as any,
+        });
+
+        // Verify first upload succeeded
+        expect(response1.statusCode).toBe(200);
+        const body1 = await response1.body.json();
+        const wallpaperId = (body1 as { id: string }).id;
+
+        // Wait a moment to ensure first upload is fully committed to database
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Upload the same file again with the same user
+        const formData2 = new FormData();
+        formData2.append('file', new Blob([testImage], { type: 'image/jpeg' }), filename);
+        formData2.append('userId', userId);
+
+        const response2 = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData2 as any,
+        });
+
+        // Assert: Second upload returns 200 with already_uploaded status (idempotency)
+        expect(response2.statusCode).toBe(200);
+        const body2 = await response2.body.json();
+        expect(body2).toMatchObject({
+            id: wallpaperId, // Same ID as first upload
+            status: 'already_uploaded',
+        });
+
+        // Verify: Only one S3 object exists
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length).toBe(1);
+        expect(s3Objects.Contents?.[0].Key).toContain(wallpaperId);
+
+        // Verify: Only one database record exists in successful state
+        const dbResult = await dbPool.query(
+            'SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)',
+            [userId, 'stored', 'processing', 'completed']
+        );
+        expect(dbResult.rows).toHaveLength(1);
+        expect(dbResult.rows[0].id).toBe(wallpaperId);
+    });
+
+    test('upload PNG wallpaper creates S3 object and database record', async () => {
+        // Arrange: Create test PNG image and form data
+        const testImage = await createTestPng();
+        const userId = generateTestUserId();
+        const filename = `test-wallpaper-${Date.now()}.png`;
+
+        // Small delay to ensure clean state
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const formData = new FormData();
+        formData.append('file', new Blob([testImage], { type: 'image/png' }), filename);
+        formData.append('userId', userId);
+
+        // Act: Upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP response
+        expect(response.statusCode).toBe(200);
+        const body = await response.body.json();
+        expect(body).toMatchObject({
+            id: expect.stringMatching(/^wlpr_/),
+            status: expect.stringMatching(/^(stored|processing|completed)$/),
+        });
+
+        const wallpaperId = (body as { id: string }).id;
+
+        // Verify: S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents).toBeDefined();
+        expect(s3Objects.Contents?.length).toBeGreaterThan(0);
+        expect(s3Objects.Contents?.[0].Key).toContain(wallpaperId);
+
+        // Verify: Database record created with correct MIME type
+        const dbResult = await dbPool.query(
+            'SELECT id, user_id, upload_state, file_type, mime_type, storage_key FROM wallpapers WHERE id = $1',
+            [wallpaperId]
+        );
+        expect(dbResult.rows).toHaveLength(1);
+        expect(dbResult.rows[0]).toMatchObject({
+            id: wallpaperId,
+            user_id: userId,
+            file_type: 'image',
+            mime_type: 'image/png',
+        });
+        expect(['stored', 'processing', 'completed']).toContain(dbResult.rows[0].upload_state);
+    });
+
+    test('upload WebP wallpaper creates S3 object and database record', async () => {
+        // Arrange: Create test WebP image and form data
+        const testImage = await createTestWebP();
+        const userId = generateTestUserId();
+        const filename = `test-wallpaper-${Date.now()}.webp`;
+
+        const formData = new FormData();
+        formData.append('file', new Blob([testImage], { type: 'image/webp' }), filename);
+        formData.append('userId', userId);
+
+        // Act: Upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP response
+        expect(response.statusCode).toBe(200);
+        const body = await response.body.json();
+        expect(body).toMatchObject({
+            id: expect.stringMatching(/^wlpr_/),
+            status: expect.stringMatching(/^(stored|processing|completed)$/),
+        });
+
+        const wallpaperId = (body as { id: string }).id;
+
+        // Verify: S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents).toBeDefined();
+        expect(s3Objects.Contents?.length).toBeGreaterThan(0);
+        expect(s3Objects.Contents?.[0].Key).toContain(wallpaperId);
+
+        // Verify: Database record created with correct MIME type
+        const dbResult = await dbPool.query(
+            'SELECT id, user_id, upload_state, file_type, mime_type, storage_key FROM wallpapers WHERE id = $1',
+            [wallpaperId]
+        );
+        expect(dbResult.rows).toHaveLength(1);
+        expect(dbResult.rows[0]).toMatchObject({
+            id: wallpaperId,
+            user_id: userId,
+            file_type: 'image',
+            mime_type: 'image/webp',
+        });
+        expect(['stored', 'processing', 'completed']).toContain(dbResult.rows[0].upload_state);
+    });
+
+    test('upload image below minimum dimensions returns 400 error', async () => {
+        // Arrange: Create test image below minimum dimensions (640x480, need 1280x720)
+        const smallImage = await createSmallTestJpeg();
+        const userId = generateTestUserId();
+        const filename = `small-wallpaper-${Date.now()}.jpg`;
+
+        const formData = new FormData();
+        formData.append('file', new Blob([smallImage], { type: 'image/jpeg' }), filename);
+        formData.append('userId', userId);
+
+        // Act: Attempt upload via HTTP
+        const response = await request(`${baseUrl}/upload`, {
+            method: 'POST',
+            body: formData as any,
+        });
+
+        // Assert: HTTP error response
+        expect(response.statusCode).toBe(400);
+
+        // Verify: No S3 object created
+        const s3Objects = await s3Client.send(
+            new ListObjectsV2Command({ Bucket: s3Bucket })
+        );
+        expect(s3Objects.Contents?.length || 0).toBe(0);
+
+        // Verify: No database record in successful state
+        const dbResult = await dbPool.query(
+            'SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)',
+            [userId, 'stored', 'processing', 'completed']
+        );
+        expect(dbResult.rows).toHaveLength(0);
     });
 });

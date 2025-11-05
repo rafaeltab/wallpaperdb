@@ -5,13 +5,12 @@ export default defineConfig({
     setupFiles: ['./test/setup.ts'],
     testTimeout: 60000,
     hookTimeout: 60000,
-    pool: 'threads',
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        minThreads: 1,
-        maxThreads: 5,
+      forks: {
+        singleFork: true,
       },
     },
-    maxConcurrency: 5,
+    fileParallelism: false,
   },
 });

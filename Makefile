@@ -164,5 +164,8 @@ format:
 lint:
 	@turbo run lint
 
+lint-fix:
+	@turbo run lint:fix
+
 install:
 	pnpm install

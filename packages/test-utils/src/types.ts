@@ -5,63 +5,51 @@
 type TupleToUnion<T extends readonly unknown[]> = T[number];
 
 export type TupleToIntersection<T extends readonly unknown[]> = T extends [
-    infer Head,
-    ...infer Tail,
+  infer Head,
+  ...infer Tail,
 ]
-    ? Head & TupleToIntersection<Tail>
-    : unknown;
-export type TupleToIntersectionOfConstructors<T extends readonly unknown[]> =
-    T extends [infer Head, ...infer Tail]
-    ? AnyConstructorFor<Head> & TupleToIntersectionOfConstructors<Tail>
-    : {};
+  ? Head & TupleToIntersection<Tail>
+  : unknown;
+export type TupleToIntersectionOfConstructors<T extends readonly unknown[]> = T extends [
+  infer Head,
+  ...infer Tail,
+]
+  ? AnyConstructorFor<Head> & TupleToIntersectionOfConstructors<Tail>
+  : {};
 export type AnyConstructorFor<T> = {
-    new(...args: any[]): T;
-    prototype: T;
+  new (...args: any[]): T;
+  prototype: T;
 };
 
 // Helper: check if a value V is included in tuple T (by type)
-type Includes<T extends readonly unknown[], V> = V extends TupleToUnion<T>
-    ? true
-    : false;
+type Includes<T extends readonly unknown[], V> = V extends TupleToUnion<T> ? true : false;
 
 // Helper: push unique values into an accumulator (set semantics)
-type PushIfNotIncluded<Acc extends readonly unknown[], V> = Includes<
-    Acc,
-    V
-> extends true
-    ? Acc
-    : [...Acc, V];
+type PushIfNotIncluded<Acc extends readonly unknown[], V> = Includes<Acc, V> extends true
+  ? Acc
+  : [...Acc, V];
 
 // Main: RightMinusLeft — elements in Right that are not in Left (set difference)
 export type RightMinusLeft<
-    Left extends readonly unknown[],
-    Right extends readonly unknown[],
-    Acc extends readonly unknown[] = [],
+  Left extends readonly unknown[],
+  Right extends readonly unknown[],
+  Acc extends readonly unknown[] = [],
 > = Right extends readonly [infer RHead, ...infer RTail]
-    ? Includes<Left, RHead> extends true
+  ? Includes<Left, RHead> extends true
     ? RightMinusLeft<Left, RTail, Acc>
     : RightMinusLeft<Left, RTail, PushIfNotIncluded<Acc, RHead>>
-    : Acc;
+  : Acc;
 
-export type JoinStrings<
-    T extends readonly string[],
-    Sep extends string = ", ",
-> = T extends []
-    ? ""
-    : T extends [infer Head extends string]
+export type JoinStrings<T extends readonly string[], Sep extends string = ', '> = T extends []
+  ? ''
+  : T extends [infer Head extends string]
     ? Head
     : T extends [infer Head extends string, ...infer Tail extends string[]]
-    ? `${Head}${Sep}${JoinStrings<Tail, Sep>}`
-    : string;
+      ? `${Head}${Sep}${JoinStrings<Tail, Sep>}`
+      : string;
 
 export type AnyConstructor = new (...args: any[]) => { prototype: never };
 export type Constructor<T> = new () => T;
 export type ReturnTypeOf<F> = F extends (...args: any[]) => infer R ? R : never;
-export type AsyncReturnTypeof<F> = F extends (
-    ...args: any[]
-) => Promise<infer R>
-    ? R
-    : never;
-export type ExtractPrototype<T> = T extends { prototype: any }
-    ? T["prototype"]
-    : never;
+export type AsyncReturnTypeof<F> = F extends (...args: any[]) => Promise<infer R> ? R : never;
+export type ExtractPrototype<T> = T extends { prototype: any } ? T['prototype'] : never;

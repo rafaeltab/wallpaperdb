@@ -1,0 +1,25 @@
+{
+  "name": "@wallpaperdb/test-utils",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures/index.ts",
+    "./helpers": "./src/helpers/index.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@testcontainers/postgresql": "^11.7.2",
+    "@testcontainers/minio": "^11.7.2",
+    "@testcontainers/redis": "^11.7.2",
+    "@wallpaperdb/testcontainers": "workspace:*",
+    "testcontainers": "^11.7.2",
+    "postgres": "^3.4.3",
+    "nats": "^2.29.1",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3"
+  }
+}

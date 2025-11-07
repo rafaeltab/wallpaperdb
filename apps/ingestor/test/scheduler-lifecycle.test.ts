@@ -346,7 +346,9 @@ describe('Scheduler Lifecycle Tests', () => {
     const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
     const wallpaperId = `wlpr_error_recovery_${ulid()}`;
     const storageKey = `${wallpaperId}/original.jpg`;
-    const contentHash = await generateContentHash(Buffer.concat([testImage, Buffer.from('_first')]));
+    const contentHash = await generateContentHash(
+      Buffer.concat([testImage, Buffer.from('_first')])
+    );
 
     await s3Client.send(
       new PutObjectCommand({
@@ -380,7 +382,9 @@ describe('Scheduler Lifecycle Tests', () => {
     const wallpaperId2 = `wlpr_error_recovery_2_${ulid()}`;
     const storageKey2 = `${wallpaperId2}/original.jpg`;
     const testImage2 = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
-    const contentHash2 = await generateContentHash(Buffer.concat([testImage2, Buffer.from('_second')]));
+    const contentHash2 = await generateContentHash(
+      Buffer.concat([testImage2, Buffer.from('_second')])
+    );
 
     await s3Client.send(
       new PutObjectCommand({
@@ -418,7 +422,9 @@ describe('Scheduler Lifecycle Tests', () => {
       const wallpaperId = `wlpr_stored_${i}_${ulid()}`;
       const storageKey = `${wallpaperId}/original.jpg`;
       // Generate unique content hash for each record to avoid constraint violation
-      const contentHash = await generateContentHash(Buffer.concat([testImage, Buffer.from(`_${i}`)]));
+      const contentHash = await generateContentHash(
+        Buffer.concat([testImage, Buffer.from(`_${i}`)])
+      );
 
       await db.insert(wallpapers).values({
         id: wallpaperId,
@@ -478,7 +484,10 @@ describe('Scheduler Lifecycle Tests', () => {
     }
 
     // Verify initial count
-    const initial = await db.select().from(wallpapers).where(eq(wallpapers.uploadState, 'initiated'));
+    const initial = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'initiated'));
     expect(initial.length).toBe(8);
 
     // Start scheduler
@@ -488,7 +497,10 @@ describe('Scheduler Lifecycle Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Verify all orphaned intents were deleted
-    const remaining = await db.select().from(wallpapers).where(eq(wallpapers.uploadState, 'initiated'));
+    const remaining = await db
+      .select()
+      .from(wallpapers)
+      .where(eq(wallpapers.uploadState, 'initiated'));
     expect(remaining.length).toBe(0);
 
     await stopSchedulerAndWait();

@@ -28,12 +28,24 @@ const configSchema = z.object({
   otelServiceName: z.string().default('ingestor'),
 
   // Reconciliation
-  reconciliationIntervalMs: z.number().int().positive().default(5 * 60 * 1000), // 5 minutes
-  minioCleanupIntervalMs: z.number().int().positive().default(24 * 60 * 60 * 1000), // 24 hours
+  reconciliationIntervalMs: z
+    .number()
+    .int()
+    .positive()
+    .default(5 * 60 * 1000), // 5 minutes
+  minioCleanupIntervalMs: z
+    .number()
+    .int()
+    .positive()
+    .default(24 * 60 * 60 * 1000), // 24 hours
 
   // Rate Limiting
   rateLimitMax: z.number().int().positive().default(100), // Max uploads per window
-  rateLimitWindowMs: z.number().int().positive().default(60 * 60 * 1000), // 1 hour
+  rateLimitWindowMs: z
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000), // 1 hour
 
   // Redis (for distributed rate limiting)
   redisHost: z.string().default('localhost'),

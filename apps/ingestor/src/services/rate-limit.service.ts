@@ -35,12 +35,13 @@ export class RateLimitService {
 
       return {
         remaining: Math.max(0, max - count),
-        reset
+        reset,
       };
     } else {
       // In-memory fallback (not distributed, for testing only)
       // This is a simplified implementation
-      const inMemoryStore = (global as any).__rateLimitStore || ((global as any).__rateLimitStore = new Map());
+      const inMemoryStore =
+        (global as any).__rateLimitStore || ((global as any).__rateLimitStore = new Map());
 
       const record = inMemoryStore.get(key) || { count: 0, resetTime: now + windowMs };
 
@@ -54,12 +55,17 @@ export class RateLimitService {
       inMemoryStore.set(key, record);
 
       if (record.count > max) {
-        throw new RateLimitExceededError(max, windowMs, Math.ceil((record.resetTime - now) / 1000), record.resetTime);
+        throw new RateLimitExceededError(
+          max,
+          windowMs,
+          Math.ceil((record.resetTime - now) / 1000),
+          record.resetTime
+        );
       }
 
       return {
         remaining: Math.max(0, max - record.count),
-        reset: record.resetTime
+        reset: record.resetTime,
       };
     }
   }

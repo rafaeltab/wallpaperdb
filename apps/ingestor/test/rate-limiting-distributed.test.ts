@@ -291,7 +291,10 @@ describe('E2E Multi-Instance Rate Limiting', () => {
       color: { r: 90, g: 90, b: 90 },
     });
     const formA11 = new FormData();
-    formA11.append('file', testImageA11, { filename: 'userA-exceed.jpg', contentType: 'image/jpeg' });
+    formA11.append('file', testImageA11, {
+      filename: 'userA-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     formA11.append('userId', 'user_a_isolated');
 
     const responseA11 = await app2.inject({
@@ -356,7 +359,10 @@ describe('E2E Multi-Instance Rate Limiting', () => {
       color: { r: 130, g: 130, b: 130 },
     });
     const formExceed = new FormData();
-    formExceed.append('file', testImageExceed, { filename: 'test-exceed.jpg', contentType: 'image/jpeg' });
+    formExceed.append('file', testImageExceed, {
+      filename: 'test-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     formExceed.append('userId', userId);
 
     const responseExceed = await app1.inject({

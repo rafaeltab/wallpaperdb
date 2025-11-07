@@ -92,7 +92,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 10 + i, g: 10 + i, b: 10 + i }
+        color: { r: 10 + i, g: 10 + i, b: 10 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -124,7 +124,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 20 + i, g: 20 + i, b: 20 + i }
+        color: { r: 20 + i, g: 20 + i, b: 20 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -145,7 +145,7 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 30, g: 30, b: 30 }
+      color: { r: 30, g: 30, b: 30 },
     });
     const form = new FormData();
     form.append('file', testImage11, { filename: 'test-11.jpg', contentType: 'image/jpeg' });
@@ -174,7 +174,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 40 + i, g: 40 + i, b: 40 + i }
+        color: { r: 40 + i, g: 40 + i, b: 40 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -193,10 +193,13 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 50, g: 50, b: 50 }
+      color: { r: 50, g: 50, b: 50 },
     });
     const form = new FormData();
-    form.append('file', testImageExceed, { filename: 'test-exceed.jpg', contentType: 'image/jpeg' });
+    form.append('file', testImageExceed, {
+      filename: 'test-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     form.append('userId', userId);
 
     const response = await app.inject({
@@ -230,7 +233,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 60 + i, g: 60 + i, b: 60 + i }
+        color: { r: 60 + i, g: 60 + i, b: 60 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `userA-${i}.jpg`, contentType: 'image/jpeg' });
@@ -251,7 +254,7 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 70, g: 70, b: 70 }
+      color: { r: 70, g: 70, b: 70 },
     });
     const formA11 = new FormData();
     formA11.append('file', testImageA11, { filename: 'userA-11.jpg', contentType: 'image/jpeg' });
@@ -271,7 +274,7 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 80, g: 80, b: 80 }
+      color: { r: 80, g: 80, b: 80 },
     });
     const formB1 = new FormData();
     formB1.append('file', testImageB1, { filename: 'userB-1.jpg', contentType: 'image/jpeg' });
@@ -300,7 +303,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 90 + i, g: 90 + i, b: 90 + i }
+        color: { r: 90 + i, g: 90 + i, b: 90 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -321,10 +324,13 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 100, g: 100, b: 100 }
+      color: { r: 100, g: 100, b: 100 },
     });
     const formExceed = new FormData();
-    formExceed.append('file', testImageExceed, { filename: 'test-exceed.jpg', contentType: 'image/jpeg' });
+    formExceed.append('file', testImageExceed, {
+      filename: 'test-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     formExceed.append('userId', userId);
 
     const responseExceed = await app.inject({
@@ -344,7 +350,7 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 110, g: 110, b: 110 }
+      color: { r: 110, g: 110, b: 110 },
     });
     const formAfterReset = new FormData();
     formAfterReset.append('file', testImageAfterReset, {
@@ -369,7 +375,7 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 120, g: 120, b: 120 }
+      color: { r: 120, g: 120, b: 120 },
     });
 
     const form = new FormData();
@@ -404,7 +410,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 130 + i, g: 130 + i, b: 130 + i }
+        color: { r: 130 + i, g: 130 + i, b: 130 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -423,10 +429,13 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 140, g: 140, b: 140 }
+      color: { r: 140, g: 140, b: 140 },
     });
     const formExceed = new FormData();
-    formExceed.append('file', testImageExceed, { filename: 'test-exceed.jpg', contentType: 'image/jpeg' });
+    formExceed.append('file', testImageExceed, {
+      filename: 'test-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     formExceed.append('userId', userId);
 
     const uploadResponse = await app.inject({
@@ -463,7 +472,7 @@ describe('Rate Limiting', () => {
         width: 1920,
         height: 1080,
         format: 'jpeg',
-        color: { r: 150 + i, g: 150 + i, b: 150 + i }
+        color: { r: 150 + i, g: 150 + i, b: 150 + i },
       });
       const form = new FormData();
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
@@ -482,10 +491,13 @@ describe('Rate Limiting', () => {
       width: 1920,
       height: 1080,
       format: 'jpeg',
-      color: { r: 160, g: 160, b: 160 }
+      color: { r: 160, g: 160, b: 160 },
     });
     const form = new FormData();
-    form.append('file', testImageExceed, { filename: 'test-exceed.jpg', contentType: 'image/jpeg' });
+    form.append('file', testImageExceed, {
+      filename: 'test-exceed.jpg',
+      contentType: 'image/jpeg',
+    });
     form.append('userId', userId);
 
     const response = await app.inject({

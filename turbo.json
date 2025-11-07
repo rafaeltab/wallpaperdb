@@ -1,47 +1,65 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "tasks": {
-    "start": {
-      "cache": false,
-      "persistent": true
-    },
-    "stop": {
-      "cache": false
-    },
-    "reset": {
-      "cache": false
-    },
-    "logs": {
-      "cache": false,
-      "persistent": true
-    },
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**", "build/**"]
-    },
-    "build:docker": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "outputs": []
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "format": {
-      "cache": false
-    },
-    "format:check": {
-      "cache": false
-    },
-    "check": {
-      "cache": false
-    },
-    "test": {
-      "dependsOn": ["^build", "^build:docker"]
+    "$schema": "https://turbo.build/schema.json",
+    "tasks": {
+        "start": {
+            "cache": false,
+            "persistent": true
+        },
+        "stop": {
+            "cache": false
+        },
+        "reset": {
+            "cache": false
+        },
+        "logs": {
+            "cache": false,
+            "persistent": true
+        },
+        "build": {
+            "dependsOn": [
+                "^build"
+            ],
+            "outputs": [
+                "dist/**",
+                ".next/**",
+                "build/**"
+            ]
+        },
+        "build:docker": {
+            "dependsOn": [
+                "build"
+            ],
+            "cache": false,
+            "outputs": []
+        },
+        "dev": {
+            "cache": false,
+            "persistent": true
+        },
+        "lint": {
+            "dependsOn": [
+                "^build"
+            ]
+        },
+        "lint:fix": {
+            "dependsOn": [
+                "^build"
+            ]
+        },
+        "format": {
+            "cache": false
+        },
+        "format:check": {
+            "cache": false
+        },
+        "check": {
+            "cache": false
+        },
+        "test": {
+            "dependsOn": [
+                "^build",
+                "^build:docker"
+            ]
+        }
     }
-  }
 }

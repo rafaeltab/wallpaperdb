@@ -163,3 +163,6 @@ format:
 
 lint:
 	@turbo run lint
+
+install:
+	pnpm install

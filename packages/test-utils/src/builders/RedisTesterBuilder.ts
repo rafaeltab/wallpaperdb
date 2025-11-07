@@ -1,6 +1,9 @@
-import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
-import { AddMethodsType, BaseTesterBuilder } from '../framework.js';
-import { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import {
+    RedisContainer,
+    type StartedRedisContainer,
+} from "@testcontainers/redis";
+import { type AddMethodsType, BaseTesterBuilder } from "../framework.js";
+import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 
 export interface RedisOptions {
     image?: string;
@@ -8,8 +11,8 @@ export interface RedisOptions {
 }
 
 class RedisBuilder {
-    private image: string = "redis:7-alpine";
-    private networkAlias: string = "redis";
+    private image = "redis:7-alpine";
+    private networkAlias = "redis";
 
     withImage(image: string) {
         this.image = image;
@@ -35,18 +38,21 @@ export interface RedisConfig {
     options: RedisOptions;
 }
 
-export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTesterBuilder]> {
-    name = 'redis' as const;
+export class RedisTesterBuilder extends BaseTesterBuilder<
+    "redis",
+    [DockerTesterBuilder]
+> {
+    name = "redis" as const;
 
     addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
         return class Redis extends Base {
             redis: RedisConfig | undefined;
             withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {
                 const options = configure(new RedisBuilder()).build();
-                const { image = 'redis:7-alpine', networkAlias = 'redis' } = options;
+                const { image = "redis:7-alpine", networkAlias = "redis" } = options;
 
                 this.addSetupHook(async () => {
-                    console.log('Starting Redis container...');
+                    console.log("Starting Redis container...");
 
                     // Auto-detect if network is available
                     const dockerNetwork = this.docker.network;
@@ -54,7 +60,9 @@ export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTester
                     let container = new RedisContainer(image);
 
                     if (dockerNetwork) {
-                        container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
+                        container = container
+                            .withNetwork(dockerNetwork)
+                            .withNetworkAliases(networkAlias);
                     }
 
                     const started = await container.start();
@@ -66,15 +74,15 @@ export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTester
                     this.redis = {
                         container: started,
                         endpoint: url,
-                        options: options
-                    }
+                        options: options,
+                    };
 
                     console.log(`Redis started: ${url}`);
                 });
 
                 this.addDestroyHook(async () => {
                     if (this.redis) {
-                        console.log('Stopping Redis container...');
+                        console.log("Stopping Redis container...");
                         await this.redis.container.stop();
                     }
                 });
@@ -84,7 +92,9 @@ export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTester
 
             getRedis() {
                 if (!this.redis) {
-                    throw new Error('Redis not initialized. Call withRedis() and setup() first.');
+                    throw new Error(
+                        "Redis not initialized. Call withRedis() and setup() first.",
+                    );
                 }
                 return this.redis;
             }

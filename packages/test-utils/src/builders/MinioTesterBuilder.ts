@@ -1,7 +1,10 @@
-import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
-import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
-import { AddMethodsType, BaseTesterBuilder } from '../framework.js';
-import { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+    MinioContainer,
+    type StartedMinioContainer,
+} from "@testcontainers/minio";
+import { type AddMethodsType, BaseTesterBuilder } from "../framework.js";
+import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 
 export interface MinioOptions {
     image: string;
@@ -11,10 +14,10 @@ export interface MinioOptions {
 }
 
 class MinioBuilder {
-    private image: string = 'minio/minio:latest';
-    private accessKey: string = 'minioadmin';
-    private secretKey: string = 'minioadmin';
-    private networkAlias: string = 'minio';
+    private image = "minio/minio:latest";
+    private accessKey = "minioadmin";
+    private secretKey = "minioadmin";
+    private networkAlias = "minio";
 
     withImage(image: string) {
         this.image = image;
@@ -42,7 +45,7 @@ class MinioBuilder {
             accessKey: this.accessKey,
             secretKey: this.secretKey,
             networkAlias: this.networkAlias,
-        }
+        };
     }
 }
 
@@ -53,11 +56,14 @@ export interface MinioConfig {
     buckets: string[];
 }
 
-export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTesterBuilder]> {
-    name = 'minio' as const;
+export class MinioTesterBuilder extends BaseTesterBuilder<
+    "minio",
+    [DockerTesterBuilder]
+> {
+    name = "minio" as const;
 
     addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
-        let desiredBuckets: string[] = [];
+        const desiredBuckets: string[] = [];
 
         return class Minio extends Base {
             minio: MinioConfig | undefined;
@@ -68,15 +74,10 @@ export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTester
 
             withMinio(configure: (minio: MinioBuilder) => MinioBuilder = (a) => a) {
                 const options = configure(new MinioBuilder()).build();
-                const {
-                    image,
-                    accessKey,
-                    secretKey,
-                    networkAlias,
-                } = options;
+                const { image, accessKey, secretKey, networkAlias } = options;
 
                 this.addSetupHook(async () => {
-                    console.log('Starting MinIO container...');
+                    console.log("Starting MinIO container...");
 
                     let container = new MinioContainer(image);
 
@@ -85,7 +86,9 @@ export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTester
 
                     const dockerNetwork = this.docker.network;
                     if (dockerNetwork) {
-                        container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
+                        container = container
+                            .withNetwork(dockerNetwork)
+                            .withNetworkAliases(networkAlias);
                     }
 
                     const started = await container.start();
@@ -106,7 +109,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTester
                         // Create bucket if specified
                         const s3Client = new S3Client({
                             endpoint: this.minio.endpoint,
-                            region: 'us-east-1',
+                            region: "us-east-1",
                             credentials: {
                                 accessKeyId: this.minio.options.accessKey,
                                 secretAccessKey: this.minio.options.secretKey,
@@ -115,26 +118,26 @@ export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTester
                         });
 
                         for (const bucket of desiredBuckets) {
-
                             try {
-                                await s3Client.send(new CreateBucketCommand({ Bucket: bucket }));
+                                await s3Client.send(
+                                    new CreateBucketCommand({ Bucket: bucket }),
+                                );
                                 console.log(`Created S3 bucket: ${bucket}`);
                                 this.minio.buckets.push(bucket);
                             } catch (error) {
-                                if ((error as Error).name !== 'BucketAlreadyOwnedByYou') {
+                                if ((error as Error).name !== "BucketAlreadyOwnedByYou") {
                                     throw error;
                                 }
                             }
                         }
                     }
 
-
                     console.log(`MinIO started: ${endpoint}`);
                 });
 
                 this.addDestroyHook(async () => {
                     if (this.minio) {
-                        console.log('Stopping MinIO container...');
+                        console.log("Stopping MinIO container...");
                         await this.minio.container.stop();
                     }
                 });
@@ -144,7 +147,9 @@ export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTester
 
             getMinio() {
                 if (!this.minio) {
-                    throw new Error('MinIO not initialized. Call withMinio() and setup() first.');
+                    throw new Error(
+                        "MinIO not initialized. Call withMinio() and setup() first.",
+                    );
                 }
                 return this.minio;
             }

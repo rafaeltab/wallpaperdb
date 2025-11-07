@@ -24,7 +24,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "testcontainers": "^11.7.2"
+    "testcontainers": "^11.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

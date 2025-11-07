@@ -9,7 +9,7 @@ import { processFile, sanitizeFilename } from '../services/file-processor.servic
 import { uploadToStorage } from '../services/storage.service.js';
 import { publishWallpaperUploadedEvent } from '../services/events.service.js';
 import { ProblemDetailsError, MissingFileError, MissingUserId } from '../errors/problem-details.js';
-import { MultipartFile } from '@fastify/multipart';
+import type { MultipartFile } from '@fastify/multipart';
 import { RateLimitExceededError } from '../services/rate-limit.service.js';
 
 const validationLimitsService = new DefaultValidationLimitsService();

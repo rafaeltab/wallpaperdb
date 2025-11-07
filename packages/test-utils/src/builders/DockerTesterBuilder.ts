@@ -1,43 +1,43 @@
 import { Network, type StartedNetwork } from 'testcontainers';
-import { AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
 
 export interface DockerConfig {
-    network?: StartedNetwork;
+  network?: StartedNetwork;
 }
 
 export class DockerTesterBuilder extends BaseTesterBuilder<'docker', []> {
-    name = 'docker' as const;
+  name = 'docker' as const;
 
-    addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
-        return class Docker extends Base {
-            docker: DockerConfig = {};
+  addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
+    return class Docker extends Base {
+      docker: DockerConfig = {};
 
-            withNetwork() {
-                this.addSetupHook(async () => {
-                    console.log('Creating Docker network...');
+      withNetwork() {
+        this.addSetupHook(async () => {
+          console.log('Creating Docker network...');
 
-                    const network = await new Network().start();
+          const network = await new Network().start();
 
-                    this.docker.network = network;
-                    console.log(`Docker network created: ${network.getName()}`);
-                });
+          this.docker.network = network;
+          console.log(`Docker network created: ${network.getName()}`);
+        });
 
-                this.addDestroyHook(async () => {
-                    if (this.docker.network) {
-                        console.log('Stopping Docker network...');
-                        await this.docker.network.stop();
-                    }
-                });
+        this.addDestroyHook(async () => {
+          if (this.docker.network) {
+            console.log('Stopping Docker network...');
+            await this.docker.network.stop();
+          }
+        });
 
-                return this;
-            }
+        return this;
+      }
 
-            getNetwork(): StartedNetwork {
-                if (!this.docker.network) {
-                    throw new Error('Docker network not initialized. Call withNetwork() and setup() first.');
-                }
-                return this.docker.network;
-            }
-        };
-    }
+      getNetwork(): StartedNetwork {
+        if (!this.docker.network) {
+          throw new Error('Docker network not initialized. Call withNetwork() and setup() first.');
+        }
+        return this.docker.network;
+      }
+    };
+  }
 }

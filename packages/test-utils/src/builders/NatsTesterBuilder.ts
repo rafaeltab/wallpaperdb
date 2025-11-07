@@ -1,7 +1,11 @@
-import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
-import { connect, type StreamConfig } from 'nats';
-import { AddMethodsType, BaseTesterBuilder } from '../framework.js';
-import { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import {
+    createNatsContainer,
+    type NatsContainerOptions,
+    type StartedNatsContainer,
+} from "@wallpaperdb/testcontainers";
+import { connect, type StreamConfig } from "nats";
+import { type AddMethodsType, BaseTesterBuilder } from "../framework.js";
+import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 
 export interface NatsOptions {
     image?: string;
@@ -10,9 +14,9 @@ export interface NatsOptions {
 }
 
 class NatsBuilder {
-    private image: string = 'nats:2.10-alpine';
-    private enableJetStream: boolean = false;
-    private networkAlias: string = "nats";
+    private image = "nats:2.10-alpine";
+    private enableJetStream = false;
+    private networkAlias = "nats";
 
     withImage(image: string) {
         this.image = image;
@@ -34,7 +38,7 @@ class NatsBuilder {
             image: this.image,
             jetStream: this.enableJetStream,
             networkAlias: this.networkAlias,
-        }
+        };
     }
 }
 
@@ -45,11 +49,14 @@ export interface NatsConfig {
     streams: string[];
 }
 
-export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBuilder]> {
-    name = 'nats' as const;
+export class NatsTesterBuilder extends BaseTesterBuilder<
+    "nats",
+    [DockerTesterBuilder]
+> {
+    name = "nats" as const;
 
     addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
-        let desiredStreams: string[] = [];
+        const desiredStreams: string[] = [];
         return class Nats extends Base {
             nats: NatsConfig | undefined;
             withStream(name: string) {
@@ -60,18 +67,18 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
             withNats(configure: (nats: NatsBuilder) => NatsBuilder = (a) => a) {
                 const options = configure(new NatsBuilder()).build();
                 const {
-                    image = 'nats:2.10-alpine',
+                    image = "nats:2.10-alpine",
                     jetStream = true,
-                    networkAlias = 'nats',
+                    networkAlias = "nats",
                 } = options;
 
                 this.addSetupHook(async () => {
-                    console.log('Starting NATS container...');
+                    console.log("Starting NATS container...");
 
                     // Auto-detect if network is available
                     const dockerNetwork = this.docker.network;
 
-                    const containerOptions: any = {
+                    const containerOptions: NatsContainerOptions = {
                         image,
                         enableJetStream: jetStream,
                     };
@@ -91,7 +98,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
                         endpoint: url,
                         options: options,
                         streams: [],
-                    }
+                    };
 
                     // Create JetStream stream if specified
                     if (jetStream && desiredStreams.length > 0) {
@@ -109,12 +116,11 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
                                 this.nats?.streams.push(stream);
                                 console.log(`Created NATS stream: ${stream}`);
                             } catch (error) {
-                                if (!(error as Error).message.includes('already exists')) {
+                                if (!(error as Error).message.includes("already exists")) {
                                     throw error;
                                 }
                             }
                         }
-
 
                         await nc.close();
                     }
@@ -124,7 +130,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
 
                 this.addDestroyHook(async () => {
                     if (this.nats) {
-                        console.log('Stopping NATS container...');
+                        console.log("Stopping NATS container...");
                         await this.nats.container.stop();
                     }
                 });
@@ -134,7 +140,9 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
 
             getNats() {
                 if (!this.nats) {
-                    throw new Error('NATS not initialized. Call withNats() and setup() first.');
+                    throw new Error(
+                        "NATS not initialized. Call withNats() and setup() first.",
+                    );
                 }
                 return this.nats;
             }

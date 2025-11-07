@@ -159,13 +159,13 @@ test-watch:
 	@turbo run test:watch
 
 format:
-	@turbo run format
+	@turbo run format --log-order grouped
 
 lint:
-	@turbo run lint
+	@turbo run lint --log-order grouped
 
 lint-fix:
-	@turbo run lint:fix
+	@turbo run lint:fix --log-order grouped
 
 install:
 	pnpm install

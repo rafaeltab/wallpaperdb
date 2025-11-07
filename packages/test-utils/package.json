@@ -12,7 +12,9 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
-    "lint:fix": "biome lint --write ."
+    "lint:fix": "biome lint --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.709.0",
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@types/node": "^20.11.5",
     "typescript": "^5.3.3",
-    "@biomejs/biome": "^2.3.4"
+    "@biomejs/biome": "^2.3.4",
+    "vitest": "^2.1.8"
   }
 }

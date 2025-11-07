@@ -187,13 +187,13 @@ importers:
         specifier: ^3.709.0
         version: 3.922.0
       '@testcontainers/minio':
-        specifier: ^11.7.2
-        version: 11.7.2
+        specifier: ^11.8.0
+        version: 11.8.0
       '@testcontainers/postgresql':
-        specifier: ^11.7.2
-        version: 11.7.2
+        specifier: ^11.8.0
+        version: 11.8.0
       '@testcontainers/redis':
-        specifier: ^11.7.2
+        specifier: ^11.8.0
         version: 11.8.0
       '@wallpaperdb/testcontainers':
         specifier: workspace:*
@@ -208,8 +208,8 @@ importers:
         specifier: ^0.33.5
         version: 0.33.5
       testcontainers:
-        specifier: ^11.7.2
-        version: 11.7.2
+        specifier: ^11.8.0
+        version: 11.8.0
     devDependencies:
       '@types/node':
         specifier: ^20.11.5
@@ -2152,8 +2152,14 @@ packages:
   '@testcontainers/minio@11.7.2':
     resolution: {integrity: sha512-gGNLpRc+VMeC43/JPBQajkybCgJmY5UcqXkK9tQAG0C88ZrQOyFNKRUMifOuZb61KG0W6QexI6Lnyf3UChWUWQ==}
 
+  '@testcontainers/minio@11.8.0':
+    resolution: {integrity: sha512-cNmXLqCKthCYXXc65VDtP7APswV08XHheqtfRzow44ND75MVIyJAJaUHsMIINM/UKwzk+0opD6KEQMWJ2FeTXA==}
+
   '@testcontainers/postgresql@11.7.2':
     resolution: {integrity: sha512-sG0J/q/i2XWToDzoGhwNT+z1ae/65wvINg4t171rGRYdtW777w5rvin4hkT7poe5thsTrs6zBkrlF+r55Zt5/g==}
+
+  '@testcontainers/postgresql@11.8.0':
+    resolution: {integrity: sha512-JTMBEoLbi1eYvbsQTqbQlPVED07EB4xhB1tAkmvmirmLsjT0IH6YPKZdZD5y91KKR/FDvSbhPsYmDtByGyGqwg==}
 
   '@testcontainers/redis@11.8.0':
     resolution: {integrity: sha512-MCizqK0oaRZi4zW+UCR5u4e3TDWuN+fQITT51VM5BSOXKgbBHL2DRKMFl6y7HRMT0XKFJnVayAeoWTe9rzj3FQ==}
@@ -5886,9 +5892,27 @@ snapshots:
       - react-native-b4a
       - supports-color
 
+  '@testcontainers/minio@11.8.0':
+    dependencies:
+      testcontainers: 11.8.0
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
   '@testcontainers/postgresql@11.7.2':
     dependencies:
       testcontainers: 11.7.2
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
+  '@testcontainers/postgresql@11.8.0':
+    dependencies:
+      testcontainers: 11.8.0
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer

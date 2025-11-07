@@ -24,14 +24,14 @@ type MergeTester<TTester extends AnyTester, TTesters extends TupleOfTesters> = a
 class Tester {
     constructor(...args: any) { }
 
-    private setupHooks: (() => Promise<void>)[] = [];
-    private destroyHooks: (() => Promise<void>)[] = [];
+    setupHooks: (() => Promise<void>)[] = [];
+    destroyHooks: (() => Promise<void>)[] = [];
 
-    protected addSetupHook(hook: () => Promise<void>) {
+    addSetupHook(hook: () => Promise<void>) {
         this.setupHooks.push(hook);
     }
 
-    protected addDestroyHook(hook: () => Promise<void>) {
+    addDestroyHook(hook: () => Promise<void>) {
         this.destroyHooks.push(hook);
     }
 
@@ -83,7 +83,6 @@ export function createTesterBuilder(): TesterBuilder<[]> {
 }
 
 export abstract class BaseTesterBuilder<TName extends string, TRequiredTesters extends TupleOfTesters = []> {
-    private e: TRequiredTesters = [] as any;
     abstract name: TName;
 
     abstract addMethods<TBase extends AddMethodsType<TRequiredTesters>>(Base: TBase): AnyConstructorFor<any>;

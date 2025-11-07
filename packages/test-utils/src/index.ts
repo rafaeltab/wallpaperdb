@@ -1,66 +1,20 @@
-import { AddMethodsType, BaseTesterBuilder, createTesterBuilder } from "./framework";
-import { AsyncReturnTypeof } from "./types";
+// Re-export framework
+export { createTesterBuilder, BaseTesterBuilder } from './framework.js';
+export type { AddMethodsType } from './framework.js';
+export type { AsyncReturnTypeof } from './types.js';
 
-/// Testing code
-let tester: AsyncReturnTypeof<typeof setup>;
+// Export infrastructure builders
+export { DockerTesterBuilder } from './builders/DockerTesterBuilder.js';
+export type { DockerConfig } from './builders/DockerTesterBuilder.js';
 
-async function setup() {
-    return await new MyTester()
-        .withNetwork()
-        .withPostgres((pg: any) => pg
-            .withDatabase("db")
-            .withUsername("db")
-            .withPassword("pw")
-        )
-        .withNats()
-        .setup();
-}
+export { PostgresTesterBuilder } from './builders/PostgresTesterBuilder.js';
+export type { PostgresOptions, PostgresConfig } from './builders/PostgresTesterBuilder.js';
 
-class DockerTesterBuilder extends BaseTesterBuilder<"docker", []> {
-    name = "docker" as const;
+export { MinioTesterBuilder } from './builders/MinioTesterBuilder.js';
+export type { MinioOptions, MinioConfig } from './builders/MinioTesterBuilder.js';
 
-    addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
-        return class Docker extends Base {
-            constructor(...args: any[]) {
-                super(...args);
-            }
+export { NatsTesterBuilder } from './builders/NatsTesterBuilder.js';
+export type { NatsOptions, NatsConfig } from './builders/NatsTesterBuilder.js';
 
-            withNetwork() {
-                this.addSetupHook(async () => {
-                    console.log("Setting up docker")
-                });
-                return this;
-            }
-        }
-    }
-}
-
-class PostgresTesterBuilder extends BaseTesterBuilder<"postgres", [DockerTesterBuilder]> {
-    name = "postgres" as const;
-
-    addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
-        return class Postgres extends Base {
-            withPostgres(configure: (a: any) => any) {
-                return this;
-            }
-        }
-    }
-}
-
-class NatsTesterBuilder extends BaseTesterBuilder<"nats", [DockerTesterBuilder]> {
-    name = "nats" as const;
-
-    addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
-        return class Nats extends Base {
-            withNats() {
-                return this;
-            }
-        }
-    }
-}
-
-const MyTester = createTesterBuilder()
-    .with(DockerTesterBuilder)
-    .with(PostgresTesterBuilder)
-    .with(NatsTesterBuilder)
-    .build();
+export { RedisTesterBuilder } from './builders/RedisTesterBuilder.js';
+export type { RedisOptions, RedisConfig } from './builders/RedisTesterBuilder.js';

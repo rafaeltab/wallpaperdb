@@ -24,6 +24,7 @@
 		"@wallpaperdb/testcontainers": "workspace:*",
 		"nats": "^2.29.1",
 		"postgres": "^3.4.3",
+		"redis": "^4.7.0",
 		"sharp": "^0.33.5",
 		"testcontainers": "^11.8.0"
 	},

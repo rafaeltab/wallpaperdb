@@ -82,7 +82,11 @@ class Tester {
   }
 
   public async destroy() {
-    for (const destroyHook of this.destroyHooks) {
+    // Execute destroy hooks in reverse order (LIFO - Last In First Out)
+    // This ensures that dependencies are destroyed after their dependents
+    // e.g., containers are stopped before networks are removed
+    const reversedHooks = [...this.destroyHooks].reverse();
+    for (const destroyHook of reversedHooks) {
       await destroyHook();
     }
     return this;

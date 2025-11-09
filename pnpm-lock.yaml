@@ -160,6 +160,9 @@ importers:
       '@wallpaperdb/ingestor':
         specifier: workspace:*
         version: link:../ingestor
+      '@wallpaperdb/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
       '@wallpaperdb/testcontainers':
         specifier: workspace:*
         version: link:../../packages/testcontainers

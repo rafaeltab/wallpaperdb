@@ -9,13 +9,13 @@ import {
 import {
 	IngestorMigrationsTesterBuilder,
 	InProcessIngestorTesterBuilder,
-} from "./mixins/index.js";
+} from "./builders/index.js";
 
-describe("Health Endpoint (Mixin-Based)", () => {
+describe("Health Endpoint (Builder-Based)", () => {
 	let tester: InstanceType<ReturnType<ReturnType<typeof createTesterBuilder>["build"]>>;
 
 	beforeAll(async () => {
-		// Build test environment with mixin composition
+		// Build test environment with builder composition
 		// Note: DockerTesterBuilder is required by infrastructure builders,
 		// but we DON'T call withNetwork() - containers run standalone with exposed ports
 		const TesterClass = createTesterBuilder()

@@ -21,6 +21,7 @@
     "@types/node": "^22.10.2",
     "@types/pg": "^8.15.6",
     "@wallpaperdb/ingestor": "workspace:*",
+    "@wallpaperdb/test-utils": "workspace:*",
     "@wallpaperdb/testcontainers": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "nats": "^2.29.1",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-    createTesterBuilder,
+    createDefaultTesterBuilder,
     DockerTesterBuilder,
     PostgresTesterBuilder,
 } from "../src/index";
@@ -14,14 +14,14 @@ const docker = new Docker({
 
 describe("PostgresTesterBuilder", () => {
     it("should create a container", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         // Act
         const tester = await new Tester().withPostgres().setup();
-        const containerId = tester.postgres?.container.getId();
+        const containerId = tester.postgres.config.container.getId();
         const existingContainers = await docker.listContainers();
 
         // Assert
@@ -29,7 +29,7 @@ describe("PostgresTesterBuilder", () => {
     });
 
     it("should create a container in the correct network", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -37,7 +37,7 @@ describe("PostgresTesterBuilder", () => {
         // Act
         const tester = await new Tester().withNetwork().withPostgres().setup();
         const networkName = tester.docker.network?.getName();
-        const containerId = tester.postgres?.container.getId();
+        const containerId = tester.postgres.config.container.getId();
 
         expect(networkName).not.toBeNull();
         expect(containerId).not.toBeNull();
@@ -50,14 +50,14 @@ describe("PostgresTesterBuilder", () => {
     });
 
     it("should create a fully ready postgres instance", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         // Act
         const tester = await new Tester().withPostgres().setup();
-        const connectionString = tester.postgres?.connectionString;
+        const connectionString = tester.postgres.config.connectionString;
 
         expect(connectionString).not.toBeNull();
 
@@ -79,7 +79,7 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should use custom image when configured", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -89,7 +89,7 @@ ORDER BY schemaname, tablename;`);
             .withPostgres((builder) => builder.withImage(customImage))
             .setup();
 
-        const containerId = tester.postgres?.container.getId();
+        const containerId = tester.postgres.config.container.getId();
         const containers = await docker.listContainers();
         const container = containers.find((x) => x.Id === containerId);
 
@@ -99,7 +99,7 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should use custom database name", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -110,7 +110,7 @@ ORDER BY schemaname, tablename;`);
             .setup();
 
         const pool = new Pool({
-            connectionString: tester.postgres?.connectionString,
+            connectionString: tester.postgres.config.connectionString,
             ssl: false,
         });
         const client = await pool.connect();
@@ -124,7 +124,7 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should use custom credentials", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -139,7 +139,7 @@ ORDER BY schemaname, tablename;`);
             .setup();
 
         const pool = new Pool({
-            connectionString: tester.postgres?.connectionString,
+            connectionString: tester.postgres.config.connectionString,
             ssl: false,
         });
         const client = await pool.connect();
@@ -153,7 +153,7 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should use custom network alias", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -165,25 +165,25 @@ ORDER BY schemaname, tablename;`);
             .setup();
 
         // Verify the configuration was applied
-        expect(tester.postgres?.options.networkAlias).toBe(customAlias);
+        expect(tester.postgres.config.options.networkAlias).toBe(customAlias);
 
         // The network alias is only resolvable inside the Docker network
         // We can verify that postgres started successfully and the config was set
-        expect(tester.postgres?.container).toBeDefined();
-        expect(tester.postgres?.connectionString).toContain(customAlias);
+        expect(tester.postgres.config.container).toBeDefined();
+        expect(tester.postgres.config.connectionString).toContain(customAlias);
 
         await tester.destroy();
     });
 
     it("should generate correct connection string with network", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         const tester = await new Tester().withNetwork().withPostgres().setup();
 
-        const connectionString = tester.postgres?.connectionString;
+        const connectionString = tester.postgres.config.connectionString;
         expect(connectionString).toBeDefined();
         expect(connectionString).toMatch(/^postgresql:\/\/.+:.+@.+:5432\/.+$/);
 
@@ -191,14 +191,14 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should generate correct connection string without network", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         const tester = await new Tester().withPostgres().setup();
 
-        const connectionString = tester.postgres?.connectionString;
+        const connectionString = tester.postgres.config.connectionString;
         expect(connectionString).toBeDefined();
         expect(connectionString).toMatch(/^postgres(ql)?:\/\/.+:.+@.+:\d+\/.+$/);
 
@@ -206,29 +206,29 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should provide correct host and port", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         const tester = await new Tester().withPostgres().setup();
 
-        expect(tester.postgres?.host).toBeDefined();
-        expect(tester.postgres?.port).toBeDefined();
-        expect(typeof tester.postgres?.host).toBe("string");
-        expect(typeof tester.postgres?.port).toBe("number");
+        expect(tester.postgres.config.host).toBeDefined();
+        expect(tester.postgres.config.port).toBeDefined();
+        expect(typeof tester.postgres.config.host).toBe("string");
+        expect(typeof tester.postgres.config.port).toBe("number");
 
         await tester.destroy();
     });
 
     it("should remove container on destroy", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         const tester = await new Tester().withPostgres().setup();
-        const containerId = tester.postgres?.container.getId();
+        const containerId = tester.postgres.config.container.getId();
 
         // Verify container exists
         const containersBefore = await docker.listContainers();
@@ -242,18 +242,18 @@ ORDER BY schemaname, tablename;`);
     });
 
     it("should have undefined postgres before setup", () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
 
         const tester = new Tester().withPostgres();
 
-        expect(tester.postgres).toBeUndefined();
+        expect(() => tester.postgres.config).toThrow('PostgreSQL not initialized');
     });
 
     it("should allow multiple instances with different configs", async () => {
-        const Tester = createTesterBuilder()
+        const Tester = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .build();
@@ -266,17 +266,17 @@ ORDER BY schemaname, tablename;`);
             .setup();
 
         // Both should have different connection strings
-        expect(tester1.postgres?.connectionString).not.toBe(
-            tester2.postgres?.connectionString
+        expect(tester1.postgres.config.connectionString).not.toBe(
+            tester2.postgres.config.connectionString
         );
 
         // Both should be functional
         const pool1 = new Pool({
-            connectionString: tester1.postgres?.connectionString,
+            connectionString: tester1.postgres.config.connectionString,
             ssl: false,
         });
         const pool2 = new Pool({
-            connectionString: tester2.postgres?.connectionString,
+            connectionString: tester2.postgres.config.connectionString,
             ssl: false,
         });
 

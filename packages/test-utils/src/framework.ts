@@ -62,35 +62,26 @@ type MergeTester<
   TTesters extends TupleOfTesters,
 > = any[] extends TTesters ? [TTester] : [TTester, ...TTesters];
 
+/**
+ * Base Tester class.
+ * This class is now empty - all lifecycle methods are provided by lifecycle builders.
+ *
+ * IMPORTANT: All tests must include SetupTesterBuilder, CleanupTesterBuilder, and DestroyTesterBuilder
+ * to enable the setup(), cleanup(), and destroy() methods.
+ *
+ * @example
+ * ```typescript
+ * const TesterClass = createTesterBuilder()
+ *   .with(SetupTesterBuilder)      // Provides setup()
+ *   .with(CleanupTesterBuilder)    // Provides cleanup()
+ *   .with(DestroyTesterBuilder)    // Provides destroy()
+ *   .with(DockerTesterBuilder)
+ *   // ... other builders
+ *   .build();
+ * ```
+ */
 class Tester {
-  setupHooks: (() => Promise<void>)[] = [];
-  destroyHooks: (() => Promise<void>)[] = [];
-
-  addSetupHook(hook: () => Promise<void>) {
-    this.setupHooks.push(hook);
-  }
-
-  addDestroyHook(hook: () => Promise<void>) {
-    this.destroyHooks.push(hook);
-  }
-
-  public async setup() {
-    for (const setupHook of this.setupHooks) {
-      await setupHook();
-    }
-    return this;
-  }
-
-  public async destroy() {
-    // Execute destroy hooks in reverse order (LIFO - Last In First Out)
-    // This ensures that dependencies are destroyed after their dependents
-    // e.g., containers are stopped before networks are removed
-    const reversedHooks = [...this.destroyHooks].reverse();
-    for (const destroyHook of reversedHooks) {
-      await destroyHook();
-    }
-    return this;
-  }
+  // Empty base class - all functionality from builders
 }
 
 class TesterBuilder<TTesters extends TupleOfTesters = []> {
@@ -123,6 +114,22 @@ class TesterBuilder<TTesters extends TupleOfTesters = []> {
   }
 }
 
+/**
+ * Create a new empty TesterBuilder.
+ * This is the low-level API - consider using createDefaultTesterBuilder() instead.
+ *
+ * @returns Empty TesterBuilder
+ *
+ * @example
+ * ```typescript
+ * const TesterClass = createTesterBuilder()
+ *   .with(SetupTesterBuilder)
+ *   .with(CleanupTesterBuilder)
+ *   .with(DestroyTesterBuilder)
+ *   .with(DockerTesterBuilder)
+ *   .build();
+ * ```
+ */
 export function createTesterBuilder(): TesterBuilder<[]> {
   return new TesterBuilder<[]>([]);
 }

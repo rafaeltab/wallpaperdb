@@ -4,7 +4,7 @@ import { ListBucketsCommand, S3Client } from "@aws-sdk/client-s3";
 import Docker from "dockerode";
 import { describe, expect, it } from "vitest";
 import {
-	createTesterBuilder,
+	createDefaultTesterBuilder,
 	DockerTesterBuilder,
 	MinioTesterBuilder,
 } from "../src/index";
@@ -16,14 +16,14 @@ const docker = new Docker({
 
 describe("MinioTesterBuilder", () => {
 	it("should create a container", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
 
 		// Act
 		const tester = await new Tester().withNetwork().withMinio().setup();
-		const containerId = tester.minio?.container.getId();
+		const containerId = tester.minio.config.container.getId();
 		const existingContainers = await docker.listContainers();
 
 		// Assert
@@ -31,7 +31,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should create a container in the correct network", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -39,7 +39,7 @@ describe("MinioTesterBuilder", () => {
 		// Act
 		const tester = await new Tester().withNetwork().withMinio().setup();
 		const networkName = tester.docker.network?.getName();
-		const containerId = tester.minio?.container.getId();
+		const containerId = tester.minio.config.container.getId();
 
 		expect(networkName).not.toBeNull();
 		expect(containerId).not.toBeNull();
@@ -55,7 +55,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should create a bucket when requested", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -65,13 +65,13 @@ describe("MinioTesterBuilder", () => {
 			.withMinio()
 			.withMinioBucket("bananas")
 			.setup();
-		const config = tester.minio;
+		const config = tester.minio.config;
 
 		expect(config).not.toBeNull();
 
-		const endpoint = config!.endpoint;
+		const endpoint = config.endpoint;
 
-		const { accessKey, secretKey } = config!.options;
+		const { accessKey, secretKey } = config.options;
 
 		const s3Client = new S3Client({
 			endpoint: endpoint,
@@ -91,7 +91,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should create multiple buckets", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -103,7 +103,7 @@ describe("MinioTesterBuilder", () => {
 			.withMinioBucket("bucket3")
 			.setup();
 
-		const config = tester.minio!;
+		const config = tester.minio.config;
 		const s3Client = new S3Client({
 			endpoint: config.endpoint,
 			region: "us-east-1",
@@ -125,7 +125,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should use custom image when configured", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -137,13 +137,13 @@ describe("MinioTesterBuilder", () => {
 			.setup();
 
 		// Verify the configuration was applied
-		expect(tester.minio?.options.image).toBe(customImage);
+		expect(tester.minio.config.options.image).toBe(customImage);
 
 		await tester.destroy();
 	});
 
 	it("should use custom credentials", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -157,7 +157,7 @@ describe("MinioTesterBuilder", () => {
 			)
 			.setup();
 
-		const config = tester.minio!;
+		const config = tester.minio.config;
 
 		expect(config.options.accessKey).toBe(customAccessKey);
 		expect(config.options.secretKey).toBe(customSecretKey);
@@ -180,7 +180,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should use custom network alias", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -192,25 +192,25 @@ describe("MinioTesterBuilder", () => {
 			.setup();
 
 		// Verify the configuration was applied
-		expect(tester.minio?.options.networkAlias).toBe(customAlias);
+		expect(tester.minio.config.options.networkAlias).toBe(customAlias);
 
 		// The network alias is only resolvable inside the Docker network
 		// We can verify that MinIO started successfully and the config was set
-		expect(tester.minio?.container).toBeDefined();
-		expect(tester.minio?.endpoint).toContain(customAlias);
+		expect(tester.minio.config.container).toBeDefined();
+		expect(tester.minio.config.endpoint).toContain(customAlias);
 
 		await tester.destroy();
 	});
 
 	it("should generate correct endpoint with network", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNetwork().withMinio().setup();
 
-		const endpoint = tester.minio?.endpoint;
+		const endpoint = tester.minio.config.endpoint;
 		expect(endpoint).toBeDefined();
 		expect(endpoint).toMatch(/^http:\/\/.+:9000$/);
 
@@ -218,14 +218,14 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should generate correct endpoint without network", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withMinio().setup();
 
-		const endpoint = tester.minio?.endpoint;
+		const endpoint = tester.minio.config.endpoint;
 		expect(endpoint).toBeDefined();
 		expect(endpoint).toMatch(/^http:\/\/.+:\d+$/);
 
@@ -233,13 +233,13 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should remove container on destroy", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withMinio().setup();
-		const containerId = tester.minio?.container.getId();
+		const containerId = tester.minio.config.container.getId();
 
 		// Verify container exists
 		const containersBefore = await docker.listContainers();
@@ -253,18 +253,18 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should have undefined minio before setup", () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
 
 		const tester = new Tester().withMinio();
 
-		expect(tester.minio).toBeUndefined();
+		expect(() => tester.minio.config).toThrow('MinIO not initialized');
 	});
 
 	it("should allow S3 operations with configured credentials", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -274,7 +274,7 @@ describe("MinioTesterBuilder", () => {
 			.withMinioBucket("test-bucket")
 			.setup();
 
-		const config = tester.minio!;
+		const config = tester.minio.config;
 		const s3Client = new S3Client({
 			endpoint: config.endpoint,
 			region: "us-east-1",
@@ -313,7 +313,7 @@ describe("MinioTesterBuilder", () => {
 	});
 
 	it("should handle bucket creation errors gracefully", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(MinioTesterBuilder)
 			.build();
@@ -323,7 +323,7 @@ describe("MinioTesterBuilder", () => {
 			.withMinioBucket("test-bucket")
 			.setup();
 
-		const config = tester.minio!;
+		const config = tester.minio.config;
 		const s3Client = new S3Client({
 			endpoint: config.endpoint,
 			region: "us-east-1",

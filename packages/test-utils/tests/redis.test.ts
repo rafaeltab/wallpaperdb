@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	createTesterBuilder,
+	createDefaultTesterBuilder,
 	DockerTesterBuilder,
 	RedisTesterBuilder,
 } from "../src/index";
@@ -14,13 +14,13 @@ const docker = new Docker({
 
 describe("RedisTesterBuilder", () => {
 	it("should create a container", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withRedis().setup();
-		const containerId = tester.redis?.container.getId();
+		const containerId = tester.redis.config.container.getId();
 		const existingContainers = await docker.listContainers();
 
 		expect(existingContainers.map((x) => x.Id)).toContain(containerId);
@@ -29,14 +29,14 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should create a container in the correct network", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNetwork().withRedis().setup();
 		const networkName = tester.docker.network?.getName();
-		const containerId = tester.redis?.container.getId();
+		const containerId = tester.redis.config.container.getId();
 
 		expect(networkName).not.toBeNull();
 		expect(containerId).not.toBeNull();
@@ -52,13 +52,13 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should create a fully ready Redis instance", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withRedis().setup();
-		const endpoint = tester.redis?.endpoint;
+		const endpoint = tester.redis.config.endpoint;
 
 		expect(endpoint).not.toBeNull();
 
@@ -73,7 +73,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should use custom image when configured", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -83,13 +83,13 @@ describe("RedisTesterBuilder", () => {
 			.withRedis((builder) => builder.withImage(customImage))
 			.setup();
 
-		expect(tester.redis?.options.image).toBe(customImage);
+		expect(tester.redis.config.options.image).toBe(customImage);
 
 		await tester.destroy();
 	});
 
 	it("should allow basic Redis operations (SET/GET)", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -97,7 +97,7 @@ describe("RedisTesterBuilder", () => {
 		const tester = await new Tester().withRedis().setup();
 
 		const client: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 		await client.connect();
 
@@ -113,7 +113,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should support complex data types (hashes)", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -121,7 +121,7 @@ describe("RedisTesterBuilder", () => {
 		const tester = await new Tester().withRedis().setup();
 
 		const client: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 		await client.connect();
 
@@ -143,7 +143,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should support lists", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -151,7 +151,7 @@ describe("RedisTesterBuilder", () => {
 		const tester = await new Tester().withRedis().setup();
 
 		const client: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 		await client.connect();
 
@@ -171,7 +171,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should support key expiration", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -179,7 +179,7 @@ describe("RedisTesterBuilder", () => {
 		const tester = await new Tester().withRedis().setup();
 
 		const client: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 		await client.connect();
 
@@ -202,7 +202,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should support pub/sub", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -211,10 +211,10 @@ describe("RedisTesterBuilder", () => {
 
 		// Create publisher and subscriber clients
 		const publisher: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 		const subscriber: RedisClientType = createClient({
-			url: tester.redis!.endpoint,
+			url: tester.redis.config.endpoint,
 		});
 
 		await publisher.connect();
@@ -244,7 +244,7 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should use custom network alias", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
@@ -255,21 +255,21 @@ describe("RedisTesterBuilder", () => {
 			.withRedis((builder) => builder.withNetworkAlias(customAlias))
 			.setup();
 
-		expect(tester.redis?.options.networkAlias).toBe(customAlias);
-		expect(tester.redis?.container).toBeDefined();
+		expect(tester.redis.config.options.networkAlias).toBe(customAlias);
+		expect(tester.redis.config.container).toBeDefined();
 
 		await tester.destroy();
 	});
 
 	it("should generate correct endpoint format", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withRedis().setup();
 
-		const endpoint = tester.redis?.endpoint;
+		const endpoint = tester.redis.config.endpoint;
 		expect(endpoint).toBeDefined();
 		expect(endpoint).toMatch(/^redis:\/\/.+:\d+$/);
 
@@ -277,13 +277,13 @@ describe("RedisTesterBuilder", () => {
 	});
 
 	it("should remove container on destroy", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withRedis().setup();
-		const containerId = tester.redis?.container.getId();
+		const containerId = tester.redis.config.container.getId();
 
 		// Verify container exists
 		const containersBefore = await docker.listContainers();
@@ -296,19 +296,19 @@ describe("RedisTesterBuilder", () => {
 		expect(containersAfter.map((x) => x.Id)).not.toContain(containerId);
 	});
 
-	it("should have undefined redis before setup", () => {
-		const Tester = createTesterBuilder()
+	it("should throw error when accessing config before setup", () => {
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();
 
 		const tester = new Tester().withRedis();
 
-		expect(tester.redis).toBeUndefined();
+		expect(() => tester.redis.config).toThrow("Redis not initialized");
 	});
 
 	it("should handle connection errors gracefully", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(RedisTesterBuilder)
 			.build();

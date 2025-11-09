@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { createTesterBuilder, DockerTesterBuilder } from "../src/index";
+import { createDefaultTesterBuilder, createTesterBuilder, DockerTesterBuilder } from "../src/index";
 import Docker from "dockerode";
 
 const docker = new Docker({
@@ -9,7 +9,7 @@ const docker = new Docker({
 
 describe("DockerTesterBuilder", () => {
     it("should start a network when needed", async () => {
-        const Tester = createTesterBuilder().with(DockerTesterBuilder).build();
+        const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).build();
 
         // Act
         const tester = await new Tester().withNetwork().setup();
@@ -23,7 +23,7 @@ describe("DockerTesterBuilder", () => {
     });
 
     it("should remove network on destroy", async () => {
-        const Tester = createTesterBuilder().with(DockerTesterBuilder).build();
+        const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).build();
 
         // Setup
         const tester = await new Tester().withNetwork().setup();
@@ -42,14 +42,14 @@ describe("DockerTesterBuilder", () => {
     });
 
     it("should have undefined network before setup", () => {
-        const Tester = createTesterBuilder().with(DockerTesterBuilder).build();
+        const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).build();
         const tester = new Tester().withNetwork();
 
         expect(tester.docker.network).toBeUndefined();
     });
 
     it("should create isolated networks for multiple testers", async () => {
-        const Tester = createTesterBuilder().with(DockerTesterBuilder).build();
+        const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).build();
 
         // Create two separate testers
         const tester1 = await new Tester().withNetwork().setup();
@@ -73,7 +73,7 @@ describe("DockerTesterBuilder", () => {
     });
 
     it("should handle setup without network", async () => {
-        const Tester = createTesterBuilder().with(DockerTesterBuilder).build();
+        const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).build();
 
         // Setup without calling withNetwork()
         const tester = await new Tester().setup();

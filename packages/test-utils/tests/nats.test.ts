@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-	createTesterBuilder,
+	createDefaultTesterBuilder,
 	DockerTesterBuilder,
 	NatsTesterBuilder,
 } from "../src/index";
@@ -14,13 +14,13 @@ const docker = new Docker({
 
 describe("NatsTesterBuilder", () => {
 	it("should create a container", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNats().setup();
-		const containerId = tester.nats?.container.getContainer().getId();
+		const containerId = tester.nats.config.container.getContainer().getId();
 		const existingContainers = await docker.listContainers();
 
 		expect(existingContainers.map((x) => x.Id)).toContain(containerId);
@@ -29,14 +29,14 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should create a container in the correct network", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNetwork().withNats().setup();
 		const networkName = tester.docker.network?.getName();
-		const containerId = tester.nats?.container.getContainer().getId();
+		const containerId = tester.nats.config.container.getContainer().getId();
 
 		expect(networkName).not.toBeNull();
 		expect(containerId).not.toBeNull();
@@ -52,13 +52,13 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should create a fully ready NATS instance", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNats().setup();
-		const endpoint = tester.nats?.endpoint;
+		const endpoint = tester.nats.config.endpoint;
 
 		expect(endpoint).not.toBeNull();
 
@@ -72,7 +72,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should use custom image when configured", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -82,13 +82,13 @@ describe("NatsTesterBuilder", () => {
 			.withNats((builder) => builder.withImage(customImage))
 			.setup();
 
-		expect(tester.nats?.options.image).toBe(customImage);
+		expect(tester.nats.config.options.image).toBe(customImage);
 
 		await tester.destroy();
 	});
 
 	it("should enable JetStream when requested", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -97,10 +97,10 @@ describe("NatsTesterBuilder", () => {
 			.withNats((builder) => builder.withJetstream())
 			.setup();
 
-		expect(tester.nats?.options.jetStream).toBe(true);
+		expect(tester.nats.config.options.jetStream).toBe(true);
 
 		// Verify JetStream is actually enabled
-		const nc: NatsConnection = await connect({ servers: tester.nats!.endpoint });
+		const nc: NatsConnection = await connect({ servers: tester.nats.config.endpoint });
 		const jsm = await nc.jetstreamManager();
 
 		// Should be able to list streams without error
@@ -112,7 +112,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should create a stream when requested", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -123,10 +123,10 @@ describe("NatsTesterBuilder", () => {
 			.withStream(streamName)
 			.setup();
 
-		expect(tester.nats?.streams).toContain(streamName);
+		expect(tester.nats.config.streams).toContain(streamName);
 
 		// Verify stream exists
-		const nc: NatsConnection = await connect({ servers: tester.nats!.endpoint });
+		const nc: NatsConnection = await connect({ servers: tester.nats.config.endpoint });
 		const jsm = await nc.jetstreamManager();
 
 		const streamInfo = await jsm.streams.info(streamName);
@@ -138,7 +138,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should create multiple streams", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -150,13 +150,13 @@ describe("NatsTesterBuilder", () => {
 			.withStream("STREAM_3")
 			.setup();
 
-		expect(tester.nats?.streams).toHaveLength(3);
-		expect(tester.nats?.streams).toContain("STREAM_1");
-		expect(tester.nats?.streams).toContain("STREAM_2");
-		expect(tester.nats?.streams).toContain("STREAM_3");
+		expect(tester.nats.config.streams).toHaveLength(3);
+		expect(tester.nats.config.streams).toContain("STREAM_1");
+		expect(tester.nats.config.streams).toContain("STREAM_2");
+		expect(tester.nats.config.streams).toContain("STREAM_3");
 
 		// Verify all streams exist
-		const nc: NatsConnection = await connect({ servers: tester.nats!.endpoint });
+		const nc: NatsConnection = await connect({ servers: tester.nats.config.endpoint });
 		const jsm = await nc.jetstreamManager();
 
 		const stream1 = await jsm.streams.info("STREAM_1");
@@ -172,7 +172,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should allow publishing to created stream", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -183,7 +183,7 @@ describe("NatsTesterBuilder", () => {
 			.withStream(streamName)
 			.setup();
 
-		const nc: NatsConnection = await connect({ servers: tester.nats!.endpoint });
+		const nc: NatsConnection = await connect({ servers: tester.nats.config.endpoint });
 		const js = nc.jetstream();
 
 		// Publish a message
@@ -199,7 +199,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should allow subscribing to created stream", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -210,7 +210,7 @@ describe("NatsTesterBuilder", () => {
 			.withStream(streamName)
 			.setup();
 
-		const nc: NatsConnection = await connect({ servers: tester.nats!.endpoint });
+		const nc: NatsConnection = await connect({ servers: tester.nats.config.endpoint });
 		const js = nc.jetstream();
 
 		// Publish a message
@@ -237,7 +237,7 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should use custom network alias", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
@@ -248,21 +248,21 @@ describe("NatsTesterBuilder", () => {
 			.withNats((builder) => builder.withNetworkAlias(customAlias))
 			.setup();
 
-		expect(tester.nats?.options.networkAlias).toBe(customAlias);
-		expect(tester.nats?.container).toBeDefined();
+		expect(tester.nats.config.options.networkAlias).toBe(customAlias);
+		expect(tester.nats.config.container).toBeDefined();
 
 		await tester.destroy();
 	});
 
 	it("should generate correct endpoint format", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNats().setup();
 
-		const endpoint = tester.nats?.endpoint;
+		const endpoint = tester.nats.config.endpoint;
 		expect(endpoint).toBeDefined();
 		expect(endpoint).toMatch(/^nats:\/\/.+:\d+$/);
 
@@ -270,13 +270,13 @@ describe("NatsTesterBuilder", () => {
 	});
 
 	it("should remove container on destroy", async () => {
-		const Tester = createTesterBuilder()
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = await new Tester().withNats().setup();
-		const containerId = tester.nats?.container.getContainer().getId();
+		const containerId = tester.nats.config.container.getContainer().getId();
 
 		// Verify container exists
 		const containersBefore = await docker.listContainers();
@@ -289,14 +289,15 @@ describe("NatsTesterBuilder", () => {
 		expect(containersAfter.map((x) => x.Id)).not.toContain(containerId);
 	});
 
-	it("should have undefined nats before setup", () => {
-		const Tester = createTesterBuilder()
+	it("should have undefined config before setup", () => {
+		const Tester = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(NatsTesterBuilder)
 			.build();
 
 		const tester = new Tester().withNats();
 
-		expect(tester.nats).toBeUndefined();
+		// The nats helper is always defined, but config should throw before setup
+		expect(() => tester.nats.config).toThrow('NATS not initialized');
 	});
 });

@@ -1,5 +1,5 @@
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
-import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 
 export interface RedisOptions {
@@ -35,12 +35,35 @@ export interface RedisConfig {
   options: RedisOptions;
 }
 
+/**
+ * Helper class providing namespaced Redis operations.
+ * Currently minimal, but provides a consistent structure for future expansion.
+ */
+class RedisHelpers {
+  constructor(private tester: TesterInstance<RedisTesterBuilder>) {}
+
+  /**
+   * Get the Redis configuration.
+   * @throws Error if Redis not initialized
+   */
+  get config(): RedisConfig {
+    // biome-ignore lint/suspicious/noExplicitAny: Need to access private property from parent tester instance
+    const config = (this.tester as any)._redisConfig;
+    if (!config) {
+      throw new Error('Redis not initialized. Call withRedis() and setup() first.');
+    }
+    return config;
+  }
+}
+
 export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTesterBuilder]> {
   name = 'redis' as const;
 
   addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
     return class Redis extends Base {
-      redis: RedisConfig | undefined;
+      private _redisConfig: RedisConfig | undefined;
+      readonly redis = new RedisHelpers(this as TesterInstance<RedisTesterBuilder>);
+
       withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {
         const options = configure(new RedisBuilder()).build();
         const { image = 'redis:7-alpine', networkAlias = 'redis' } = options;
@@ -63,7 +86,7 @@ export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTester
           const port = dockerNetwork ? 6379 : started.getPort();
           const url = `redis://${host}:${port}`;
 
-          this.redis = {
+          this._redisConfig = {
             container: started,
             endpoint: url,
             options: options,
@@ -73,20 +96,13 @@ export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTester
         });
 
         this.addDestroyHook(async () => {
-          if (this.redis) {
+          if (this._redisConfig) {
             console.log('Stopping Redis container...');
-            await this.redis.container.stop();
+            await this._redisConfig.container.stop();
           }
         });
 
         return this;
-      }
-
-      getRedis() {
-        if (!this.redis) {
-          throw new Error('Redis not initialized. Call withRedis() and setup() first.');
-        }
-        return this.redis;
       }
     };
   }

@@ -1,5 +1,6 @@
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import createPostgresClient, { type Sql as PostgresType } from 'postgres';
+import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 
 export interface PostgresOptions {
@@ -62,12 +63,147 @@ export interface PostgresConfig {
   options: PostgresOptions;
 }
 
+/**
+ * Helper class providing namespaced PostgreSQL operations.
+ * Manages a cached postgres.js client connection and provides query/cleanup helpers.
+ */
+class PostgresHelpers {
+  private client: PostgresType | undefined;
+
+  constructor(private tester: TesterInstance<PostgresTesterBuilder>) {}
+
+  /**
+   * Get the PostgreSQL configuration.
+   * @throws Error if PostgreSQL not initialized
+   */
+  get config(): PostgresConfig {
+    // biome-ignore lint/suspicious/noExplicitAny: Need to access private property from parent tester instance
+    const config = (this.tester as any)._postgresConfig;
+    if (!config) {
+      throw new Error('PostgreSQL not initialized. Call withPostgres() and setup() first.');
+    }
+    return config;
+  }
+
+  /**
+   * Get a cached postgres.js client connection.
+   * Creates the connection on first access and reuses it.
+   *
+   * @returns postgres.js client
+   *
+   * @example
+   * ```typescript
+   * const client = tester.postgres.getClient();
+   * const result = await client`SELECT * FROM users`;
+   * ```
+   */
+  getClient(): PostgresType {
+    if (!this.client) {
+      this.client = createPostgresClient(this.config.connectionString, { max: 10 });
+    }
+    return this.client;
+  }
+
+  /**
+   * Execute a SQL query with optional parameters.
+   * Provides a simpler interface than the tagged template syntax.
+   *
+   * @param sql - SQL query string
+   * @param params - Optional query parameters
+   * @returns Query results
+   *
+   * @example
+   * ```typescript
+   * const users = await tester.postgres.query('SELECT * FROM users WHERE id = $1', [userId]);
+   * const allUsers = await tester.postgres.query('SELECT * FROM users');
+   * ```
+   */
+  async query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+    if (params) {
+      return this.getClient().unsafe<T>(sql, params);
+    }
+    return this.getClient().unsafe<T>(sql);
+  }
+
+  /**
+   * Truncate a single table with CASCADE.
+   * Useful for cleaning up test data between tests.
+   *
+   * @param tableName - Name of the table to truncate
+   *
+   * @example
+   * ```typescript
+   * await tester.postgres.truncateTable('wallpapers');
+   * ```
+   */
+  async truncateTable(tableName: string): Promise<void> {
+    await this.query(`TRUNCATE TABLE ${tableName} CASCADE`);
+  }
+
+  /**
+   * Truncate all tables in the public schema.
+   * This is a comprehensive cleanup operation.
+   *
+   * @example
+   * ```typescript
+   * await tester.postgres.truncateAllTables();
+   * ```
+   */
+  async truncateAllTables(): Promise<void> {
+    const tables = await this.query<{ tablename: string }>(`
+      SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+    `);
+    if (tables.length > 0) {
+      const tableNames = tables.map((t) => t.tablename).join(', ');
+      await this.query(`TRUNCATE TABLE ${tableNames} CASCADE`);
+    }
+  }
+
+  /**
+   * Close the postgres.js client connection.
+   * This is called automatically during the destroy phase.
+   *
+   * @example
+   * ```typescript
+   * await tester.postgres.close();
+   * ```
+   */
+  async close(): Promise<void> {
+    if (this.client) {
+      await this.client.end();
+      this.client = undefined;
+    }
+  }
+}
+
 export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [DockerTesterBuilder]> {
   name = 'postgres' as const;
 
   addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
     return class Postgres extends Base {
-      postgres: PostgresConfig | undefined;
+      // Private: internal config storage (renamed to avoid conflict)
+      _postgresConfig: PostgresConfig | undefined;
+
+      // Private: cleanup tracking
+      private postgresCleanupTables: string[] = [];
+
+      // Public: helper instance
+      readonly postgres = new PostgresHelpers(this);
+      /**
+       * Configure and start a PostgreSQL container.
+       *
+       * @param configure - Optional configuration callback
+       * @returns this for chaining
+       *
+       * @example
+       * ```typescript
+       * tester.withPostgres(b =>
+       *   b.withDatabase('test_db')
+       *    .withUser('testuser')
+       *    .withPassword('testpass')
+       * );
+       * ```
+       */
       withPostgres(configure: (pg: PostgresBuilder) => PostgresBuilder = (a) => a) {
         const options = configure(new PostgresBuilder()).build();
         const { image, database, username, password, networkAlias } = options;
@@ -97,7 +233,7 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [Docker
             ? `postgresql://${username}:${password}@${host}:5432/${database}`
             : started.getConnectionUri();
 
-          this.postgres = {
+          this._postgresConfig = {
             container: started,
             connectionString: connectionString,
             host: host,
@@ -110,20 +246,57 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [Docker
         });
 
         this.addDestroyHook(async () => {
-          if (this.postgres) {
+          await this.postgres.close(); // Close client before stopping container
+          if (this._postgresConfig) {
             console.log('Stopping PostgreSQL container...');
-            await this.postgres.container.stop();
+            await this._postgresConfig.container.stop();
           }
         });
 
         return this;
       }
 
-      getPostgres() {
-        if (!this.postgres) {
-          throw new Error('PostgreSQL not initialized. Call withPostgres() and setup() first.');
-        }
-        return this.postgres;
+      /**
+       * Enable automatic cleanup of specified tables in cleanup phase.
+       * Tables are truncated when tester.cleanup() is called.
+       *
+       * @param tables - Array of table names to truncate
+       * @returns this for chaining
+       *
+       * @example
+       * ```typescript
+       * tester.withPostgres()
+       *       .withAutoCleanup(['wallpapers', 'users']);
+       *
+       * // In beforeEach:
+       * await tester.cleanup(); // Truncates wallpapers and users tables
+       * ```
+       */
+      withAutoCleanup(tables: string[]) {
+        this.postgresCleanupTables = tables;
+        this.addCleanupHook(async () => {
+          for (const table of this.postgresCleanupTables) {
+            await this.postgres.truncateTable(table);
+          }
+        });
+        return this;
+      }
+
+      /**
+       * Get PostgreSQL configuration.
+       * Backward compatibility method - prefer using tester.postgres.config
+       *
+       * @returns PostgreSQL configuration object
+       * @throws Error if PostgreSQL not initialized
+       *
+       * @example
+       * ```typescript
+       * const config = tester.getPostgres();
+       * console.log(config.connectionString);
+       * ```
+       */
+      getPostgres(): PostgresConfig {
+        return this.postgres.config;
       }
     };
   }

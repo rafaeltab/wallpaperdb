@@ -3,8 +3,14 @@ import {
   type NatsContainerOptions,
   type StartedNatsContainer,
 } from '@wallpaperdb/testcontainers';
-import { connect, type StreamConfig } from 'nats';
-import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import {
+  connect,
+  type JetStreamClient,
+  type NatsConnection,
+  type StreamConfig,
+  type StreamInfo,
+} from 'nats';
+import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 
 export interface NatsOptions {
@@ -49,18 +55,197 @@ export interface NatsConfig {
   streams: string[];
 }
 
+/**
+ * Helper class providing namespaced NATS operations.
+ * Manages cached NATS connections and provides JetStream helpers.
+ */
+class NatsHelpers {
+  private connection: NatsConnection | undefined;
+  private jsClient: JetStreamClient | undefined;
+
+  constructor(private tester: TesterInstance<NatsTesterBuilder>) {}
+
+  /**
+   * Get the NATS configuration.
+   * @throws Error if NATS not initialized
+   */
+  get config(): NatsConfig {
+    // biome-ignore lint/suspicious/noExplicitAny: Need to access private property from parent tester instance
+    const config = (this.tester as any)._natsConfig;
+    if (!config) {
+      throw new Error('NATS not initialized. Call withNats() and setup() first.');
+    }
+    return config;
+  }
+
+  /**
+   * Get a cached NATS connection.
+   * Creates the connection on first access and reuses it.
+   *
+   * @returns NATS connection
+   *
+   * @example
+   * ```typescript
+   * const nc = tester.nats.getConnection();
+   * await nc.publish('subject', JSON.stringify({ foo: 'bar' }));
+   * ```
+   */
+  async getConnection(): Promise<NatsConnection> {
+    if (!this.connection) {
+      this.connection = await connect({ servers: this.config.endpoint });
+    }
+    return this.connection;
+  }
+
+  /**
+   * Get a cached JetStream client.
+   * Creates the client on first access and reuses it.
+   *
+   * @returns JetStream client
+   *
+   * @example
+   * ```typescript
+   * const js = await tester.nats.getJsClient();
+   * await js.publish('wallpaper.uploaded', JSON.stringify({ id: 'wlpr_123' }));
+   * ```
+   */
+  async getJsClient(): Promise<JetStreamClient> {
+    if (!this.jsClient) {
+      const nc = await this.getConnection();
+      this.jsClient = nc.jetstream();
+    }
+    return this.jsClient;
+  }
+
+  /**
+   * Publish an event to a JetStream subject.
+   * Automatically JSON-stringifies the data.
+   *
+   * @param subject - Subject name
+   * @param data - Data to publish (will be JSON-stringified)
+   *
+   * @example
+   * ```typescript
+   * await tester.nats.publishEvent('wallpaper.uploaded', { id: 'wlpr_123', userId: 'user_456' });
+   * ```
+   */
+  async publishEvent(subject: string, data: unknown): Promise<void> {
+    const js = await this.getJsClient();
+    await js.publish(subject, JSON.stringify(data));
+  }
+
+  /**
+   * Get information about a JetStream stream.
+   *
+   * @param streamName - Stream name
+   * @returns Stream information
+   *
+   * @example
+   * ```typescript
+   * const info = await tester.nats.getStreamInfo('WALLPAPERS');
+   * console.log(info.state.messages); // Number of messages in stream
+   * ```
+   */
+  async getStreamInfo(streamName: string): Promise<StreamInfo> {
+    const nc = await this.getConnection();
+    const jsm = await nc.jetstreamManager();
+    return jsm.streams.info(streamName);
+  }
+
+  /**
+   * Purge all messages from a JetStream stream.
+   * Useful for cleanup between tests.
+   *
+   * @param streamName - Stream name
+   *
+   * @example
+   * ```typescript
+   * await tester.nats.purgeStream('WALLPAPERS');
+   * ```
+   */
+  async purgeStream(streamName: string): Promise<void> {
+    const nc = await this.getConnection();
+    const jsm = await nc.jetstreamManager();
+    await jsm.streams.purge(streamName);
+  }
+
+  /**
+   * Purge all configured streams.
+   * Useful for cleanup between tests.
+   *
+   * @example
+   * ```typescript
+   * await tester.nats.purgeAllStreams();
+   * ```
+   */
+  async purgeAllStreams(): Promise<void> {
+    for (const stream of this.config.streams) {
+      await this.purgeStream(stream);
+    }
+  }
+
+  /**
+   * Close the NATS connection.
+   * This is called automatically during the destroy phase.
+   *
+   * @example
+   * ```typescript
+   * await tester.nats.close();
+   * ```
+   */
+  async close(): Promise<void> {
+    if (this.connection) {
+      await this.connection.close();
+      this.connection = undefined;
+      this.jsClient = undefined;
+    }
+  }
+}
+
 export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBuilder]> {
   name = 'nats' as const;
 
   addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
     const desiredStreams: string[] = [];
     return class Nats extends Base {
-      nats: NatsConfig | undefined;
+      // Private: internal config storage
+      _natsConfig: NatsConfig | undefined;
+
+      // Public: helper instance
+      readonly nats = new NatsHelpers(this);
+      /**
+       * Add a JetStream stream to be created during setup.
+       * Can be called multiple times to create multiple streams.
+       *
+       * @param name - Stream name
+       * @returns this for chaining
+       *
+       * @example
+       * ```typescript
+       * tester.withNats(b => b.withJetstream())
+       *       .withStream('WALLPAPERS')
+       *       .withStream('EVENTS');
+       * ```
+       */
       withStream(name: string) {
         desiredStreams.push(name);
         return this;
       }
 
+      /**
+       * Configure and start a NATS container.
+       *
+       * @param configure - Optional configuration callback
+       * @returns this for chaining
+       *
+       * @example
+       * ```typescript
+       * tester.withNats(b =>
+       *   b.withJetstream()
+       *    .withNetworkAlias('nats')
+       * );
+       * ```
+       */
       withNats(configure: (nats: NatsBuilder) => NatsBuilder = (a) => a) {
         const options = configure(new NatsBuilder()).build();
         const { image = 'nats:2.10-alpine', jetStream = true, networkAlias = 'nats' } = options;
@@ -86,7 +271,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
           const host = dockerNetwork ? networkAlias : undefined;
           const url = started.getConnectionUrl(host);
 
-          this.nats = {
+          this._natsConfig = {
             container: started,
             endpoint: url,
             options: options,
@@ -106,7 +291,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
 
               try {
                 await jsm.streams.add(streamConfig);
-                this.nats?.streams.push(stream);
+                this._natsConfig?.streams.push(stream);
                 console.log(`Created NATS stream: ${stream}`);
               } catch (error) {
                 if (!(error as Error).message.includes('already exists')) {
@@ -122,20 +307,54 @@ export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBu
         });
 
         this.addDestroyHook(async () => {
-          if (this.nats) {
+          await this.nats.close(); // Close connection before stopping container
+          if (this._natsConfig) {
             console.log('Stopping NATS container...');
-            await this.nats.container.stop();
+            await this._natsConfig.container.stop();
           }
         });
 
         return this;
       }
 
-      getNats() {
-        if (!this.nats) {
-          throw new Error('NATS not initialized. Call withNats() and setup() first.');
-        }
-        return this.nats;
+      /**
+       * Enable automatic cleanup of all streams in cleanup phase.
+       * All messages are purged when tester.cleanup() is called.
+       *
+       * @returns this for chaining
+       *
+       * @example
+       * ```typescript
+       * tester.withNats(b => b.withJetstream())
+       *       .withStream('WALLPAPERS')
+       *       .withAutoCleanup();
+       *
+       * // In beforeEach:
+       * await tester.cleanup(); // Purges all streams
+       * ```
+       */
+      withAutoCleanup() {
+        this.addCleanupHook(async () => {
+          await this.nats.purgeAllStreams();
+        });
+        return this;
+      }
+
+      /**
+       * Get NATS configuration.
+       * Backward compatibility method - prefer using tester.nats.config
+       *
+       * @returns NATS configuration object
+       * @throws Error if NATS not initialized
+       *
+       * @example
+       * ```typescript
+       * const config = tester.getNats();
+       * console.log(config.endpoint);
+       * ```
+       */
+      getNats(): NatsConfig {
+        return this.nats.config;
       }
     };
   }

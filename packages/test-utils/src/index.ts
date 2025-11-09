@@ -1,6 +1,6 @@
 // Re-export framework
 export { createTesterBuilder, BaseTesterBuilder } from './framework.js';
-export type { AddMethodsType } from './framework.js';
+export type { AddMethodsType, TesterInstance } from './framework.js';
 export type { AsyncReturnTypeof } from './types.js';
 
 // Export infrastructure builders

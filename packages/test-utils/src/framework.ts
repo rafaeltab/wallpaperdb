@@ -142,3 +142,21 @@ export type AddMethodsType<TRequiredTesters extends TupleOfTesters> =
   AnyTester[] extends TRequiredTesters
     ? any
     : TupleToIntersectionOfConstructors<[...InferAddMethodClasses<TRequiredTesters>, Tester]>;
+
+/**
+ * Extracts the class type created by a builder's addMethods() function.
+ * This is useful for creating helper classes that need access to the parent tester instance.
+ *
+ * @example
+ * ```typescript
+ * class PostgresHelpers {
+ *   constructor(private tester: TesterInstance<PostgresTesterBuilder>) {}
+ *
+ *   async query(sql: string) {
+ *     const config = this.tester.getPostgresConfig();
+ *     // ... use config
+ *   }
+ * }
+ * ```
+ */
+export type TesterInstance<TTester extends AnyTester> = InferAddMethodClass<TTester>;

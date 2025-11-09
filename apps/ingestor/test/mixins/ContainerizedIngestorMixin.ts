@@ -1,0 +1,196 @@
+import { GenericContainer, Wait, type StartedTestContainer } from "testcontainers";
+import {
+	BaseTesterBuilder,
+	type DockerTesterBuilder,
+	type PostgresTesterBuilder,
+	type MinioTesterBuilder,
+	type NatsTesterBuilder,
+	type RedisTesterBuilder,
+	type AddMethodsType,
+} from "@wallpaperdb/test-utils";
+
+/**
+ * Options for ContainerizedIngestorMixin
+ */
+export interface ContainerizedIngestorOptions {
+	/** Number of ingestor instances to start */
+	instances?: number;
+	/** Docker image name (must be built beforehand) */
+	image?: string;
+	/** Config overrides passed as environment variables */
+	config?: Record<string, unknown>;
+	/** Enable Redis for distributed rate limiting */
+	enableRedis?: boolean;
+}
+
+/**
+ * Mixin that starts the Ingestor service as Docker container(s).
+ * This is ideal for E2E tests that require full containerization.
+ *
+ * @example
+ * ```typescript
+ * const tester = await createTesterBuilder()
+ *   .with(DockerTesterBuilder)
+ *   .with(PostgresTesterBuilder, (b) => b.withNetworkAlias('postgres'))
+ *   .with(MinioTesterBuilder, (b) => b.withNetworkAlias('minio'))
+ *   .with(NatsTesterBuilder, (b) => b.withNetworkAlias('nats'))
+ *   .with(IngestorMigrationsTesterBuilder)
+ *   .with(ContainerizedIngestorTesterBuilder, { instances: 3 })
+ *   .build();
+ *
+ * const baseUrl = tester.getBaseUrl();
+ * const response = await fetch(`${baseUrl}/health`);
+ * ```
+ */
+export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
+	"ContainerizedIngestor",
+	[DockerTesterBuilder, PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+> {
+	readonly name = "ContainerizedIngestor" as const;
+	private options: ContainerizedIngestorOptions;
+	private containers: StartedTestContainer[] = [];
+	private baseUrl: string | null = null;
+
+	constructor(options: ContainerizedIngestorOptions = {}) {
+		super();
+		this.options = options;
+	}
+
+	addMethods<
+		TBase extends AddMethodsType<
+			[DockerTesterBuilder, PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+		>,
+	>(Base: TBase) {
+		const options = this.options;
+
+		return class extends Base {
+			private containers: StartedTestContainer[] = [];
+			private baseUrl: string | null = null;
+
+			override async setup(): Promise<void> {
+				await super.setup();
+
+				const network = this.getNetwork();
+				const postgres = this.getPostgres();
+				const minio = this.getMinio();
+				const nats = this.getNats();
+
+				if (!network || !postgres || !minio || !nats) {
+					throw new Error(
+						"ContainerizedIngestorTesterBuilder requires DockerTesterBuilder, PostgresTesterBuilder, MinioTesterBuilder, and NatsTesterBuilder",
+					);
+				}
+
+				// Check for optional Redis
+				let redis = null;
+				try {
+					redis = this.getRedis();
+				} catch {
+					// Redis is optional
+				}
+
+				const instances = options.instances ?? 1;
+				const image = options.image ?? "wallpaperdb-ingestor:latest";
+
+				console.log(`Starting ${instances} ingestor container(s)...`);
+
+				for (let i = 0; i < instances; i++) {
+					const environment: Record<string, string> = {
+						NODE_ENV: "test",
+						DATABASE_URL: postgres.connectionString,
+						S3_ENDPOINT: minio.endpoint,
+						S3_ACCESS_KEY_ID: minio.options.accessKey,
+						S3_SECRET_ACCESS_KEY: minio.options.secretKey,
+						S3_BUCKET:
+							minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers",
+						NATS_URL: nats.endpoint,
+						NATS_STREAM:
+							nats.streams.length > 0 ? nats.streams[0] : "WALLPAPERS",
+						OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318/v1/traces",
+						PORT: "3001",
+					};
+
+					// Add Redis if enabled
+					if (redis && options.enableRedis) {
+						environment.REDIS_HOST = redis.options.host;
+						environment.REDIS_PORT = String(redis.options.port);
+						environment.REDIS_ENABLED = "true";
+					} else {
+						environment.REDIS_ENABLED = "false";
+					}
+
+					// Apply custom config overrides
+					if (options.config) {
+						for (const [key, value] of Object.entries(options.config)) {
+							// Convert camelCase to SCREAMING_SNAKE_CASE
+							const envKey = key
+								.replace(/([A-Z])/g, "_$1")
+								.toUpperCase()
+								.replace(/^_/, "");
+							environment[envKey] = String(value);
+						}
+					}
+
+					const container = await new GenericContainer(image)
+						.withNetwork(network)
+						.withNetworkAliases(`ingestor-${i}`)
+						.withEnvironment(environment)
+						.withExposedPorts(3001)
+						.withWaitStrategy(
+							Wait.forLogMessage(/Server is running on port/i),
+						)
+						.start();
+
+					const host = container.getHost();
+					const port = container.getMappedPort(3001);
+
+					console.log(
+						`Ingestor instance ${i} started at ${host}:${port}`,
+					);
+
+					this.containers.push(container);
+
+					// Set base URL to first instance
+					if (i === 0) {
+						this.baseUrl = `http://${host}:${port}`;
+					}
+				}
+
+				console.log(`All ${instances} ingestor instances ready`);
+			}
+
+			override async destroy(): Promise<void> {
+				if (this.containers.length > 0) {
+					console.log("Stopping ingestor containers...");
+					await Promise.all(this.containers.map((c) => c.stop()));
+					this.containers = [];
+				}
+				await super.destroy();
+			}
+
+			/**
+			 * Get all ingestor container instances
+			 */
+			getIngestorContainers(): StartedTestContainer[] {
+				if (this.containers.length === 0) {
+					throw new Error(
+						"Containers not initialized. Did you call setup() first?",
+					);
+				}
+				return this.containers;
+			}
+
+			/**
+			 * Get the base URL for the first ingestor instance
+			 */
+			getBaseUrl(): string {
+				if (!this.baseUrl) {
+					throw new Error(
+						"Base URL not initialized. Did you call setup() first?",
+						);
+				}
+				return this.baseUrl;
+			}
+		};
+	}
+}

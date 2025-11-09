@@ -2,11 +2,9 @@
 
 The ingestor service is the entry point for wallpapers into the system. It handles file uploads, validation, storage, and event publishing for downstream processing.
 
-## Status
+## Overview
 
-**Step 1: Project Setup - COMPLETED ✓**
-
-The ingestor service workspace has been created and configured with all necessary connections to the infrastructure services.
+The ingestor service workspace is configured with all necessary connections to the infrastructure services (PostgreSQL, MinIO, NATS, Redis).
 
 ## Quick Start
 
@@ -27,28 +25,28 @@ pnpm format            # Format code
 pnpm lint              # Lint code
 ```
 
-## Features (Step 1)
+## Features
 
-- ✅ Turborepo workspace configuration
-- ✅ TypeScript project setup with ES modules
-- ✅ Fastify HTTP server
-- ✅ Connection utilities for all required services:
+- Turborepo workspace configuration
+- TypeScript project setup with ES modules
+- Fastify HTTP server
+- Connection utilities for all required services:
   - PostgreSQL (with connection pooling)
   - MinIO (S3-compatible object storage)
-  - NATS (message queue)
+  - NATS (message queue with JetStream)
+  - Redis (rate limiting and caching)
   - OpenTelemetry (observability)
-- ✅ `/health` endpoint with connection verification
-- ✅ `/ready` endpoint for readiness checks
-- ✅ Graceful shutdown handlers
-- ✅ Environment variable configuration
+- `/health` endpoint with connection verification
+- `/ready` endpoint for readiness checks
+- Graceful shutdown handlers
+- Environment variable configuration with Zod validation
 
 ## Prerequisites
 
 Ensure the local infrastructure is running:
 
 ```bash
-cd /Users/rafaelbieze/source/rafael/wallpaperdb/infra
-docker compose up -d
+make infra-start
 ```
 
 ## Configuration
@@ -230,14 +228,13 @@ apps/ingestor/
 - `vitest` - Testing framework (for future use)
 - `pino-pretty` - Pretty logging in development
 
-## Next Steps
+## Architecture
 
-Step 2 will implement the core upload functionality:
-- File upload endpoint (`POST /upload`)
-- File validation (format, size, dimensions)
-- MinIO storage
-- PostgreSQL metadata recording
-- NATS event publishing
-- Error handling with RFC 7807 Problem Details
+See the main [CLAUDE.md](../../CLAUDE.md) for detailed architecture documentation including:
+- Upload state machine pattern
+- Reconciliation system
+- Database schema
+- Service interactions
+- Security considerations
 
-See `plans/ingestor.md` for the full implementation plan.
+See `plans/ingestor.md` for the implementation plan.

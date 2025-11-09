@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Command Execution Policy
+
+**CRITICAL: Always use Make commands for all operations.**
+
+- **Primary interface:** All commands should go through the `Makefile`
+- **Add new commands:** If a command is needed frequently, add it to the Makefile instead of running direct pnpm/turbo commands
+- **Never use absolute paths:** Always use relative paths or Make targets
+- **Check Makefile first:** Run `make help` to see available commands before suggesting alternatives
+
+**Why:** This ensures consistency, discoverability, and a single source of truth for all operations.
+
 ## Project Overview
 
 WallpaperDB is a wallpaper management system built as a Turborepo monorepo. The **Ingestor Service** is the main application - a Fastify-based HTTP service that receives wallpaper uploads, validates them, stores them in MinIO (S3), records metadata in PostgreSQL, and publishes events to NATS for downstream processing.
@@ -18,8 +29,18 @@ WallpaperDB is a wallpaper management system built as a Turborepo monorepo. The 
 
 ## Common Commands
 
+**Always check `make help` for the complete list of available commands.**
+
+### Quick Start
+
+```bash
+make infra-start    # Start infrastructure (PostgreSQL, MinIO, NATS, Redis, Grafana)
+make dev            # Start all services in development mode
+```
+
 ### Infrastructure Management
-The local infrastructure stack (PostgreSQL, MinIO, NATS, OpenSearch, Grafana) must be running before developing or testing:
+
+The local infrastructure stack (PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana) must be running before developing or testing:
 
 ```bash
 make infra-start      # Start all infrastructure (first-time setup takes ~2 min)
@@ -28,33 +49,7 @@ make infra-reset      # Delete all data and restart (WARNING: destructive)
 make infra-logs       # Tail logs from all services
 ```
 
-### Ingestor Development
-
-```bash
-# Development
-make ingestor-dev     # Start with hot-reload (tsx watch)
-
-# Building
-make ingestor-build   # TypeScript compilation (outputs to dist/)
-make ingestor-start   # Run production build
-
-# Testing
-make ingestor-test    # Run all tests (requires infra running)
-make ingestor-test-watch  # Run tests in watch mode
-
-# Code Quality
-make ingestor-format  # Format code with Biome
-make ingestor-lint    # Lint code with Biome
-make ingestor-check   # Run Biome check (format + lint + fixes)
-
-# Database
-pnpm --filter @wallpaperdb/ingestor db:generate   # Generate migrations from schema
-pnpm --filter @wallpaperdb/ingestor db:push       # Push schema directly (dev only)
-pnpm --filter @wallpaperdb/ingestor db:migrate    # Run migrations
-pnpm --filter @wallpaperdb/ingestor db:studio     # Open Drizzle Studio
-```
-
-### All Services Commands
+### All Services (Use These for Multi-Service Development)
 
 ```bash
 make dev          # Start all services in development mode
@@ -65,7 +60,59 @@ make format       # Format all code
 make lint         # Lint all code
 ```
 
-### Running Single Tests
+### Single Service Commands (Ingestor)
+
+Use these when working on a single service:
+
+```bash
+# Development
+make ingestor-dev          # Start with hot-reload (tsx watch)
+make ingestor-build        # TypeScript compilation (outputs to dist/)
+make ingestor-start        # Run production build
+
+# Testing
+make ingestor-test         # Run all tests (requires infra running)
+make ingestor-test-watch   # Run tests in watch mode
+
+# E2E Testing (Docker-based)
+make ingestor-e2e-test         # Run E2E tests against Docker container
+make ingestor-e2e-test-watch   # Run E2E tests in watch mode
+make ingestor-e2e-verify       # Verify no app code imports in E2E tests
+
+# Code Quality
+make ingestor-format       # Format code with Biome
+make ingestor-lint         # Lint code with Biome
+make ingestor-check        # Run Biome check (format + lint + fixes)
+
+# Docker (for E2E testing)
+make ingestor-docker-build # Build Docker image
+make ingestor-docker-run   # Run Docker container
+make ingestor-docker-stop  # Stop Docker container
+make ingestor-docker-logs  # View Docker container logs
+```
+
+### Database Commands
+
+**Note:** Database commands are not yet in Makefile. If used frequently, add them to Makefile.
+
+```bash
+pnpm --filter @wallpaperdb/ingestor db:generate   # Generate migrations from schema
+pnpm --filter @wallpaperdb/ingestor db:push       # Push schema directly (dev only)
+pnpm --filter @wallpaperdb/ingestor db:migrate    # Run migrations
+pnpm --filter @wallpaperdb/ingestor db:studio     # Open Drizzle Studio
+```
+
+### Redis Commands
+
+```bash
+make redis-cli       # Connect to Redis CLI
+make redis-flush     # Flush all Redis data (WARNING: deletes all data)
+make redis-info      # Show Redis server info
+```
+
+### Running Specific Tests
+
+**Note:** If these patterns are used frequently, consider adding them to the Makefile.
 
 ```bash
 # Run specific test file
@@ -232,6 +279,28 @@ Key variables:
 **Infrastructure Defaults:**
 The `infra/.env` file (auto-generated from `.env.example`) contains all local development credentials. Default values work out of the box.
 
+## Testing Documentation
+
+Comprehensive testing guides are available in the `docs/testing/` directory:
+
+- **[Testing Overview](docs/testing/README.md)** - Start here for quick links and decision tree
+- **[TesterBuilder Pattern](docs/testing/test-builder-pattern.md)** - Core concepts, quick start, and infrastructure builders
+- **[Creating Custom Builders](docs/testing/creating-custom-builders.md)** - Step-by-step guide for application-specific builders
+- **[Integration vs E2E](docs/testing/integration-vs-e2e.md)** - Choosing the right test type for your needs
+- **[Migration Guide](docs/testing/migration-guide.md)** - Converting from manual Testcontainers setup
+- **[API Reference](docs/testing/api-reference.md)** - Complete API documentation for all builders
+- **[Troubleshooting](docs/testing/troubleshooting.md)** - Common issues and solutions
+
+**Example Test Files:**
+- Integration: `apps/ingestor/test/health-builder.test.ts` - In-process app testing (fast)
+- E2E: `apps/ingestor-e2e/test/health-builder.e2e.test.ts` - Containerized app testing (comprehensive)
+
+**Key Concepts:**
+- **TesterBuilder Pattern**: Composable, type-safe test infrastructure setup
+- **Integration Tests**: App runs in-process (same Node.js), fast (~2-5 seconds)
+- **E2E Tests**: App runs in Docker container, slower (~10-30 seconds) but tests deployment artifact
+- **Builders Available**: Docker, Postgres, MinIO, NATS, Redis (infrastructure) + custom application builders
+
 ## Infrastructure Services
 
 After `make infra-start`, access:
@@ -255,6 +324,13 @@ After `make infra-start`, access:
 
 ## Common Development Workflows
 
+### Starting Development
+
+```bash
+make infra-start    # Start infrastructure (first time takes ~2 min)
+make dev            # Start all services
+```
+
 ### Adding a New Route
 1. Create route file in `apps/ingestor/src/routes/`
 2. Register in `apps/ingestor/src/routes/index.ts`
@@ -268,11 +344,20 @@ After `make infra-start`, access:
 4. Apply migration: `pnpm --filter @wallpaperdb/ingestor db:migrate`
 5. Update tests as needed
 
+**Consider adding frequently used db commands to Makefile** (e.g., `make db-migrate`, `make db-studio`)
+
 ### Adding a New Service
 1. Create service file in `apps/ingestor/src/services/`
 2. Inject dependencies via constructor (connections, other services)
 3. Add corresponding tests using Testcontainers
 4. Register in `app.ts` if needed for route handlers
+
+### Adding a New Workspace/App
+1. Create new workspace directory under `apps/` or `packages/`
+2. Add to `pnpm-workspace.yaml` (usually automatic with pattern matching)
+3. Create `package.json` with `@wallpaperdb/` scope
+4. Add Make targets to `Makefile` following existing patterns
+5. Update `turbo.json` if needed for build pipelines
 
 ### Debugging Tests
 1. Ensure infrastructure is running: `make infra-start`
@@ -280,3 +365,17 @@ After `make infra-start`, access:
 3. Use Drizzle Studio to inspect database: `pnpm --filter @wallpaperdb/ingestor db:studio`
 4. Check MinIO console for uploaded files: http://localhost:9001
 5. View NATS monitoring for published events: http://localhost:8222
+
+### Adding New Make Commands
+
+When you find yourself running the same pnpm/turbo commands repeatedly, add them to the Makefile:
+
+1. Edit `Makefile` at repository root
+2. Add command following existing patterns:
+   ```makefile
+   service-command:
+       @turbo run command --filter=@wallpaperdb/service
+   ```
+3. Add to `.PHONY` declaration at top
+4. Add to `make help` output
+5. Test the command: `make service-command`

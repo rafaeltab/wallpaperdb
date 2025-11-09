@@ -1,8 +1,14 @@
 # Test Infrastructure Refactoring Plan
 
+> **Note**: This document describes the original plan and has been updated to reflect the actual implementation. For up-to-date usage instructions, see:
+> - [Testing Overview](../docs/testing/README.md)
+> - [TesterBuilder Pattern Guide](../docs/testing/test-builder-pattern.md)
+> - [Creating Custom Builders](../docs/testing/creating-custom-builders.md)
+> - [API Reference](../docs/testing/api-reference.md)
+
 ## Overview
 
-This plan addresses the test setup duplication and complexity across the `apps/ingestor` and `apps/ingestor-e2e` workspaces by introducing a **mixin-based test builder pattern** that provides a unified, flexible API for test environment setup.
+This plan addresses the test setup duplication and complexity across the `apps/ingestor` and `apps/ingestor-e2e` workspaces by introducing a **TesterBuilder pattern** that provides a unified, flexible API for test environment setup through composable class-based builders.
 
 ## Problem Statement
 
@@ -27,60 +33,98 @@ This plan addresses the test setup duplication and complexity across the `apps/i
 | Parallelism | Yes (5 threads) | Sequential | Sequential |
 | Network | None | Shared Docker | Shared Docker |
 
-## Solution: Mixin-Based Test Builder
+## Solution: TesterBuilder Pattern
 
 ### Architecture Overview
 
-**Core Concept**: Use TypeScript mixins to compose test environments from reusable building blocks. Each mixin adds specific capabilities and can declare dependencies on other mixins.
+**Core Concept**: Use composable TypeScript class builders to create test environments from reusable building blocks. Each builder adds specific capabilities and can declare compile-time dependencies on other builders.
+
+**The actual implementation uses a two-phase pattern:**
+1. **Composition Phase**: Define which builders to use (`.with()` + `.build()`)
+2. **Configuration Phase**: Configure each builder via fluent methods
+3. **Execution Phase**: Start infrastructure with `await tester.setup()`
 
 ```typescript
-// Example: Integration test setup
-const env = await new TestEnvironmentBuilder()
-  .with(PostgresMixin())
-  .with(MinioMixin())
-  .with(NatsMixin({ jetStream: true }))
-  .with(IngestorMigrationsMixin())  // Requires PostgresMixin
-  .with(InProcessIngestorMixin())   // Requires Postgres, Minio, Nats
+// Example: Integration test setup (in-process app)
+const TesterClass = createTesterBuilder()
+  .with(DockerTesterBuilder)               // Required base
+  .with(PostgresTesterBuilder)             // Database
+  .with(MinioTesterBuilder)                // Storage
+  .with(NatsTesterBuilder)                 // Messaging
+  .with(IngestorMigrationsTesterBuilder)   // Requires PostgresTesterBuilder
+  .with(InProcessIngestorTesterBuilder)    // Requires Postgres, Minio, Nats
   .build();
 
-// Example: E2E test setup
-const env = await new TestEnvironmentBuilder()
-  .with(DockerNetworkMixin())
-  .with(PostgresMixin({ network: true }))
-  .with(MinioMixin({ network: true }))
-  .with(NatsMixin({ network: true }))
-  .with(IngestorMigrationsMixin())
-  .with(ContainerizedIngestorMixin({ instances: 1 }))
+const tester = new TesterClass();
+tester
+  .withPostgres(b => b.withDatabase('test_db'))
+  .withMinio()
+  .withMinioBucket('wallpapers')
+  .withNats(b => b.withJetstream())
+  .withStream('WALLPAPERS');
+
+await tester.setup();
+
+// Example: E2E test setup (containerized app)
+const TesterClass = createTesterBuilder()
+  .with(DockerTesterBuilder)                    // Creates network
+  .with(PostgresTesterBuilder)
+  .with(MinioTesterBuilder)
+  .with(NatsTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
+  .with(ContainerizedIngestorTesterBuilder)     // Requires network
   .build();
+
+const tester = new TesterClass();
+tester
+  .withNetwork()                                 // Enable Docker network
+  .withPostgres()                                // Uses default alias 'postgres'
+  .withMinio()                                   // Uses default alias 'minio'
+  .withNats(b => b.withJetstream())              // Uses default alias 'nats'
+  .withStream('WALLPAPERS');
+
+await tester.setup();
 
 // Example: Distributed rate limiting test
-const env = await new TestEnvironmentBuilder()
-  .with(DockerNetworkMixin())
-  .with(PostgresMixin({ network: true }))
-  .with(MinioMixin({ network: true }))
-  .with(NatsMixin({ network: true }))
-  .with(RedisMixin({ network: true }))
-  .with(IngestorMigrationsMixin())
-  .with(ContainerizedIngestorMixin({
-    instances: 3,
-    config: { redis: { enabled: true } }
-  }))
+const TesterClass = createTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(PostgresTesterBuilder)
+  .with(MinioTesterBuilder)
+  .with(NatsTesterBuilder)
+  .with(RedisTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
+  .with(ContainerizedIngestorTesterBuilder)
   .build();
+
+const tester = new TesterClass();
+tester
+  .withNetwork()
+  .withPostgres()                                // Default aliases used automatically
+  .withMinio()
+  .withNats(b => b.withJetstream())
+  .withRedis()
+  .withIngestorInstances(3);
+
+await tester.setup();
 ```
 
 ### Key Design Principles
 
 1. **Separation of Concerns**: Infrastructure, workspace-specific logic, and utilities are separate
-2. **Type-Safe Dependencies**: Mixins can require other mixins (enforced at compile-time)
+2. **Type-Safe Dependencies**: Builders declare dependencies enforced at compile-time (TypeScript type system)
 3. **Composability**: Mix and match components for any test scenario
 4. **No Duplication**: Each concern implemented once and reused everywhere
 5. **Backward Compatible**: Existing tests continue working during gradual migration
+6. **Two-Phase API**: Separate composition from configuration for flexibility
+7. **Compile-Time Safety**: Catch missing dependencies before runtime
 
 ---
 
-## Phase 1: Core Builder and Infrastructure Mixins
+## Phase 1: Core Builder and Infrastructure Builders
 
-**Goal**: Create the foundation - the builder pattern implementation and base infrastructure mixins that work for any workspace.
+**Goal**: Create the foundation - the TesterBuilder pattern implementation and base infrastructure builders that work for any workspace.
+
+> **Implementation Note**: The actual implementation uses class-based builders, not function-based mixins. See Phase 1 sections below for the planned interface vs. actual implementation notes.
 
 ### 1.1 Create `packages/test-utils` Package
 
@@ -127,831 +171,448 @@ const env = await new TestEnvironmentBuilder()
 
 ---
 
-### 1.2 Implement Core Builder
+### 1.2 Implement Core Builder Framework
 
-**File**: `packages/test-utils/src/builder/types.ts`
+**File**: `packages/test-utils/src/framework.ts`
 
-```typescript
-import type { StartedNetwork, StartedPostgreSqlContainer } from 'testcontainers';
-import type { StartedMinioContainer } from '@testcontainers/minio';
-import type { StartedRedisContainer } from '@testcontainers/redis';
-import type { StartedNatsContainer } from '@wallpaperdb/testcontainers';
-import type { GenericContainer, StartedTestContainer } from 'testcontainers';
-
-/**
- * Context shared across all mixins
- * Mixins populate this during their setup phase
- */
-export interface TestEnvironmentContext {
-  // Infrastructure containers
-  network?: StartedNetwork;
-  postgres?: {
-    container: StartedPostgreSqlContainer;
-    connectionString: string;
-    host: string;
-    port: number;
-    database: string;
-  };
-  minio?: {
-    container: StartedMinioContainer;
-    endpoint: string;
-    accessKey: string;
-    secretKey: string;
-    bucket?: string;
-  };
-  nats?: {
-    container: StartedNatsContainer;
-    url: string;
-    streamName?: string;
-  };
-  redis?: {
-    container: StartedRedisContainer;
-    url: string;
-    host: string;
-    port: number;
-  };
-
-  // Application containers (workspace-specific)
-  ingestorContainers?: StartedTestContainer[];
-  ingestorBaseUrl?: string;
-
-  // Cleanup functions registered by mixins
-  cleanupFunctions: Array<() => Promise<void>>;
-
-  // Custom data (for workspace-specific mixins)
-  custom: Record<string, unknown>;
-}
-
-/**
- * Mixin interface - all mixins implement this
- */
-export interface TestEnvironmentMixin {
-  /** Unique identifier for this mixin */
-  readonly name: string;
-
-  /** Mixins that must be applied before this one */
-  readonly dependencies?: string[];
-
-  /** Setup logic - mutates context */
-  setup(context: TestEnvironmentContext): Promise<void>;
-
-  /** Optional teardown logic */
-  teardown?(context: TestEnvironmentContext): Promise<void>;
-}
-
-/**
- * Built test environment - returned by builder.build()
- */
-export interface TestEnvironment {
-  /** Access to the shared context */
-  readonly context: Readonly<TestEnvironmentContext>;
-
-  /** Clean up resources (per-test cleanup) */
-  cleanup(): Promise<void>;
-
-  /** Tear down all infrastructure (after all tests) */
-  teardown(): Promise<void>;
-}
-```
-
----
-
-**File**: `packages/test-utils/src/builder/TestEnvironmentBuilder.ts`
+The actual implementation uses a sophisticated TypeScript mixin system with compile-time type checking:
 
 ```typescript
-import type {
-  TestEnvironmentContext,
-  TestEnvironmentMixin,
-  TestEnvironment,
-} from './types.js';
+/**
+ * Base Tester class - provides lifecycle hooks
+ */
+class Tester {
+  setupHooks: (() => Promise<void>)[] = [];
+  destroyHooks: (() => Promise<void>)[] = [];
 
-export class TestEnvironmentBuilder {
-  private mixins: TestEnvironmentMixin[] = [];
+  addSetupHook(hook: () => Promise<void>) {
+    this.setupHooks.push(hook);
+  }
 
-  /**
-   * Add a mixin to the builder
-   * Mixins are applied in the order they're added
-   */
-  with(mixin: TestEnvironmentMixin): this {
-    this.mixins.push(mixin);
+  addDestroyHook(hook: () => Promise<void>) {
+    this.destroyHooks.push(hook);
+  }
+
+  public async setup() {
+    for (const setupHook of this.setupHooks) {
+      await setupHook();
+    }
     return this;
   }
 
-  /**
-   * Build the test environment
-   * - Validates mixin dependencies
-   * - Runs setup in order
-   * - Returns TestEnvironment with cleanup/teardown
-   */
-  async build(): Promise<TestEnvironment> {
-    // Initialize empty context
-    const context: TestEnvironmentContext = {
-      cleanupFunctions: [],
-      custom: {},
-    };
-
-    // Validate dependencies
-    this.validateDependencies();
-
-    // Run setup for each mixin in order
-    for (const mixin of this.mixins) {
-      console.log(`Setting up mixin: ${mixin.name}`);
-      await mixin.setup(context);
+  public async destroy() {
+    // Execute destroy hooks in reverse order (LIFO)
+    // This ensures dependencies are destroyed after dependents
+    const reversedHooks = [...this.destroyHooks].reverse();
+    for (const destroyHook of reversedHooks) {
+      await destroyHook();
     }
+    return this;
+  }
+}
 
-    console.log('Test environment ready');
+/**
+ * TesterBuilder - composes builders into a final class
+ */
+class TesterBuilder<TTesters extends TupleOfTesters = []> {
+  private testers: TupleOfTesters = [];
 
-    // Return environment with cleanup/teardown
-    return {
-      context: context as Readonly<TestEnvironmentContext>,
-
-      async cleanup() {
-        // Run cleanup functions in reverse order
-        for (const cleanupFn of context.cleanupFunctions.reverse()) {
-          await cleanupFn();
-        }
-        // Reset cleanup array
-        context.cleanupFunctions = [];
-      },
-
-      async teardown() {
-        // Run mixin teardown in reverse order
-        for (const mixin of [...this.mixins].reverse()) {
-          if (mixin.teardown) {
-            console.log(`Tearing down mixin: ${mixin.name}`);
-            await mixin.teardown(context);
-          }
-        }
-        console.log('Test environment torn down');
-      },
-    };
+  constructor(testers: TupleOfTesters) {
+    this.testers = testers;
   }
 
   /**
-   * Validate that all mixin dependencies are satisfied
-   * Throws error if dependencies missing or circular
+   * Add a builder to the composition
+   * TypeScript enforces that required dependencies are present
    */
-  private validateDependencies(): void {
-    const mixinNames = new Set(this.mixins.map(m => m.name));
+  public with<TTester extends AnyTester>(
+    testerConstructor: RequireTesters<TTesterConstructor, TRequiredTesters, TTesters>
+  ): TesterBuilder<MergeTester<TTester, TTesters>> {
+    return new TesterBuilder([new testerConstructor(), ...this.testers]);
+  }
 
-    for (const mixin of this.mixins) {
-      if (!mixin.dependencies) continue;
-
-      for (const dep of mixin.dependencies) {
-        if (!mixinNames.has(dep)) {
-          throw new Error(
-            `Mixin "${mixin.name}" requires "${dep}" but it was not added to the builder. ` +
-            `Add it with: .with(${dep}Mixin())`
-          );
-        }
-
-        // Check that dependency comes before dependent
-        const depIndex = this.mixins.findIndex(m => m.name === dep);
-        const mixinIndex = this.mixins.findIndex(m => m.name === mixin.name);
-
-        if (depIndex > mixinIndex) {
-          throw new Error(
-            `Mixin "${mixin.name}" depends on "${dep}" but "${dep}" was added after. ` +
-            `Add mixins in dependency order.`
-          );
-        }
-      }
+  /**
+   * Build final tester class
+   * Applies all builder addMethods() to create composed class
+   */
+  public build(): AddMethodsType<[...TTesters]> {
+    let ctor = Tester;
+    for (const tester of this.testers) {
+      ctor = tester.addMethods(ctor);  // Apply mixin
     }
+    return ctor as any as AddMethodsType<[...TTesters]>;
   }
 }
-```
 
----
-
-### 1.3 Implement Infrastructure Mixins
-
-**File**: `packages/test-utils/src/mixins/DockerNetworkMixin.ts`
-
-```typescript
-import { Network } from 'testcontainers';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '../builder/types.js';
-
-export interface DockerNetworkOptions {
-  name?: string;
+/**
+ * Factory function - entry point for test setup
+ */
+export function createTesterBuilder(): TesterBuilder<[]> {
+  return new TesterBuilder<[]>([]);
 }
 
-export function DockerNetworkMixin(options: DockerNetworkOptions = {}): TestEnvironmentMixin {
-  return {
-    name: 'DockerNetwork',
+/**
+ * Base class for all builders
+ * Builders extend this and implement addMethods()
+ */
+export abstract class BaseTesterBuilder<
+  TName extends string,
+  TRequiredTesters extends TupleOfTesters = [],
+> {
+  abstract name: TName;
 
-    async setup(context) {
-      console.log('Creating Docker network...');
-
-      const network = await new Network({
-        name: options.name || `test-network-${Date.now()}`,
-      }).start();
-
-      context.network = network;
-      console.log(`Docker network created: ${network.getName()}`);
-    },
-
-    async teardown(context) {
-      if (context.network) {
-        console.log('Stopping Docker network...');
-        await context.network.stop();
-      }
-    },
-  };
+  /**
+   * Add methods and properties to the base class
+   * This is where the "mixin" happens - extending the class
+   */
+  abstract addMethods<TBase extends AddMethodsType<TRequiredTesters>>(
+    Base: TBase
+  ): AnyConstructorFor<any>;
 }
 ```
 
----
+**Key Features**:
 
-**File**: `packages/test-utils/src/mixins/PostgresMixin.ts`
-
-```typescript
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '../builder/types.js';
-
-export interface PostgresOptions {
-  image?: string;
-  database?: string;
-  username?: string;
-  password?: string;
-  network?: boolean;  // If true, requires DockerNetworkMixin
-  networkAlias?: string;
-}
-
-export function PostgresMixin(options: PostgresOptions = {}): TestEnvironmentMixin {
-  const {
-    image = 'postgres:16-alpine',
-    database = `test_db_${Date.now()}`,
-    username = 'test',
-    password = 'test',
-    network = false,
-    networkAlias = 'postgres',
-  } = options;
-
-  return {
-    name: 'Postgres',
-    dependencies: network ? ['DockerNetwork'] : undefined,
-
-    async setup(context) {
-      console.log('Starting PostgreSQL container...');
-
-      let container = new PostgreSqlContainer(image)
-        .withDatabase(database)
-        .withUsername(username)
-        .withPassword(password);
-
-      if (network && context.network) {
-        container = container
-          .withNetwork(context.network)
-          .withNetworkAliases(networkAlias);
-      }
-
-      const started = await container.start();
-
-      // Build connection strings
-      const host = network ? networkAlias : started.getHost();
-      const port = network ? 5432 : started.getPort();
-
-      const connectionString = network
-        ? `postgresql://${username}:${password}@${networkAlias}:5432/${database}`
-        : started.getConnectionUri();
-
-      context.postgres = {
-        container: started,
-        connectionString,
-        host,
-        port,
-        database,
-      };
-
-      console.log(`PostgreSQL started: ${connectionString}`);
-    },
-
-    async teardown(context) {
-      if (context.postgres) {
-        console.log('Stopping PostgreSQL container...');
-        await context.postgres.container.stop();
-      }
-    },
-  };
-}
-```
+1. **Compile-Time Type Safety**: TypeScript enforces builder dependencies at compile time
+2. **Class Composition**: Each builder adds methods via `addMethods()`
+3. **Hook-Based Lifecycle**: Builders register setup/destroy hooks
+4. **LIFO Destroy Order**: Resources cleaned up in reverse order
+5. **Type Inference**: Return type automatically includes all builder methods
 
 ---
 
-**File**: `packages/test-utils/src/mixins/MinioMixin.ts`
+### 1.3 Implement Infrastructure Builders
+
+**File**: `packages/test-utils/src/builders/DockerTesterBuilder.ts`
 
 ```typescript
-import { MinioContainer } from '@testcontainers/minio';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '../builder/types.js';
+import { Network, type StartedNetwork } from 'testcontainers';
+import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
 
-export interface MinioOptions {
-  image?: string;
-  accessKey?: string;
-  secretKey?: string;
-  bucket?: string;  // Auto-create bucket if provided
-  network?: boolean;
-  networkAlias?: string;
+export interface DockerConfig {
+  network?: StartedNetwork;
 }
 
-export function MinioMixin(options: MinioOptions = {}): TestEnvironmentMixin {
-  const {
-    image = 'minio/minio:latest',
-    accessKey = 'minioadmin',
-    secretKey = 'minioadmin',
-    bucket,
-    network = false,
-    networkAlias = 'minio',
-  } = options;
+export class DockerTesterBuilder extends BaseTesterBuilder<'docker', []> {
+  name = 'docker' as const;
 
-  return {
-    name: 'Minio',
-    dependencies: network ? ['DockerNetwork'] : undefined,
+  addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
+    return class Docker extends Base {
+      docker: DockerConfig = {};
 
-    async setup(context) {
-      console.log('Starting MinIO container...');
-
-      let container = new MinioContainer(image)
-        .withUsername(accessKey)
-        .withUserPassword(secretKey);
-
-      if (network && context.network) {
-        container = container
-          .withNetwork(context.network)
-          .withNetworkAliases(networkAlias);
-      }
-
-      const started = await container.start();
-
-      const endpoint = network
-        ? `http://${networkAlias}:9000`
-        : `http://${started.getHost()}:${started.getPort()}`;
-
-      context.minio = {
-        container: started,
-        endpoint,
-        accessKey,
-        secretKey,
-      };
-
-      // Create bucket if specified
-      if (bucket) {
-        const { S3Client, CreateBucketCommand } = await import('@aws-sdk/client-s3');
-        const s3Client = new S3Client({
-          endpoint: `http://127.0.0.1:${started.getPort()}`,
-          region: 'us-east-1',
-          credentials: {
-            accessKeyId: accessKey,
-            secretAccessKey: secretKey,
-          },
-          forcePathStyle: true,
+      withNetwork() {
+        this.addSetupHook(async () => {
+          console.log('Creating Docker network...');
+          const network = await new Network().start();
+          this.docker.network = network;
+          console.log(`Docker network created: ${network.getName()}`);
         });
 
-        try {
-          await s3Client.send(new CreateBucketCommand({ Bucket: bucket }));
-          console.log(`Created S3 bucket: ${bucket}`);
-          context.minio.bucket = bucket;
-        } catch (error) {
-          if ((error as Error).name !== 'BucketAlreadyOwnedByYou') {
-            throw error;
+        this.addDestroyHook(async () => {
+          if (this.docker.network) {
+            console.log('Stopping Docker network...');
+            await this.docker.network.stop();
           }
+        });
+
+        return this;
+      }
+
+      getNetwork(): StartedNetwork {
+        if (!this.docker.network) {
+          throw new Error('Docker network not initialized. Call withNetwork() and setup() first.');
         }
+        return this.docker.network;
       }
-
-      console.log(`MinIO started: ${endpoint}`);
-    },
-
-    async teardown(context) {
-      if (context.minio) {
-        console.log('Stopping MinIO container...');
-        await context.minio.container.stop();
-      }
-    },
-  };
+    };
+  }
 }
 ```
 
----
+**Pattern**: Each builder extends `BaseTesterBuilder` and:
+1. Declares its name (e.g., `'docker'`)
+2. Declares dependencies as type parameter (e.g., `[]` means no dependencies)
+3. Implements `addMethods()` which returns a class that:
+   - Extends the base class
+   - Adds configuration properties
+   - Provides `with*()` methods that register hooks
+   - Provides `get*()` methods for accessing resources
 
-**File**: `packages/test-utils/src/mixins/NatsMixin.ts`
+**File**: `packages/test-utils/src/builders/PostgresTesterBuilder.ts`
 
 ```typescript
-import { createNatsContainer } from '@wallpaperdb/testcontainers';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '../builder/types.js';
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 
-export interface NatsOptions {
-  image?: string;
-  jetStream?: boolean;
-  streamName?: string;  // Auto-create stream if provided
-  network?: boolean;
-  networkAlias?: string;
+export interface PostgresOptions {
+  image: string;
+  database: string;
+  username: string;
+  password: string;
+  networkAlias: string;
 }
 
-export function NatsMixin(options: NatsOptions = {}): TestEnvironmentMixin {
-  const {
-    image = 'nats:2.10-alpine',
-    jetStream = true,
-    streamName,
-    network = false,
-    networkAlias = 'nats',
-  } = options;
+// Internal builder for configuration
+class PostgresBuilder {
+  private image = 'postgres:16-alpine';
+  private database = `test_db_${Date.now()}`;
+  private username = 'test';
+  private password = 'test';
+  private networkAlias = 'postgres';
 
-  return {
-    name: 'Nats',
-    dependencies: network ? ['DockerNetwork'] : undefined,
+  withImage(image: string) { this.image = image; return this; }
+  withDatabase(db: string) { this.database = db; return this; }
+  withUser(username: string) { this.username = username; return this; }
+  withPassword(password: string) { this.password = password; return this; }
+  withNetworkAlias(alias: string) { this.networkAlias = alias; return this; }
 
-    async setup(context) {
-      console.log('Starting NATS container...');
+  build(): PostgresOptions {
+    return {
+      image: this.image,
+      database: this.database,
+      username: this.username,
+      password: this.password,
+      networkAlias: this.networkAlias,
+    };
+  }
+}
 
-      const started = await createNatsContainer({
-        image,
-        enableJetStream: jetStream,
-        network: network ? context.network : undefined,
-        networkAliases: network ? [networkAlias] : undefined,
-      });
+export interface PostgresConfig {
+  container: StartedPostgreSqlContainer;
+  connectionString: string;
+  host: string;
+  port: number;
+  database: string;
+  options: PostgresOptions;
+}
 
-      const url = network
-        ? `nats://${networkAlias}:4222`
-        : started.getConnectionUrl();
+export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [DockerTesterBuilder]> {
+  name = 'postgres' as const;
 
-      context.nats = {
-        container: started,
-        url,
-      };
+  addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
+    return class Postgres extends Base {
+      postgres: PostgresConfig | undefined;
 
-      // Create JetStream stream if specified
-      if (jetStream && streamName) {
-        const { connect, StreamConfig } = await import('nats');
-        const nc = await connect({ servers: started.getConnectionUrl() });
-        const jsm = await nc.jetstreamManager();
+      withPostgres(configure: (pg: PostgresBuilder) => PostgresBuilder = (a) => a) {
+        const options = configure(new PostgresBuilder()).build();
+        const { image, database, username, password, networkAlias } = options;
 
-        const streamConfig: Partial<StreamConfig> = {
-          name: streamName,
-          subjects: [`${streamName.toLowerCase()}.*`],
-        };
+        this.addSetupHook(async () => {
+          console.log('Starting PostgreSQL container...');
 
-        try {
-          await jsm.streams.add(streamConfig);
-          console.log(`Created NATS stream: ${streamName}`);
-          context.nats.streamName = streamName;
-        } catch (error) {
-          if (!(error as Error).message.includes('already exists')) {
-            throw error;
+          // Check if network is available
+          const dockerNetwork = this.docker.network;
+
+          let container = new PostgreSqlContainer(image)
+            .withDatabase(database)
+            .withUsername(username)
+            .withPassword(password);
+
+          if (dockerNetwork) {
+            container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
           }
+
+          const started = await container.start();
+
+          // Build connection strings
+          const host = dockerNetwork ? networkAlias : started.getHost();
+          const port = dockerNetwork ? 5432 : started.getPort();
+
+          const connectionString = dockerNetwork
+            ? `postgresql://${username}:${password}@${host}:5432/${database}`
+            : started.getConnectionUri();
+
+          this.postgres = {
+            container: started,
+            connectionString,
+            host,
+            port,
+            database,
+            options,
+          };
+
+          console.log(`PostgreSQL started: ${connectionString}`);
+        });
+
+        this.addDestroyHook(async () => {
+          if (this.postgres) {
+            console.log('Stopping PostgreSQL container...');
+            await this.postgres.container.stop();
+          }
+        });
+
+        return this;
+      }
+
+      getPostgres(): PostgresConfig {
+        if (!this.postgres) {
+          throw new Error('Postgres not initialized. Call withPostgres() and setup() first.');
         }
-
-        await nc.close();
+        return this.postgres;
       }
-
-      console.log(`NATS started: ${url}`);
-    },
-
-    async teardown(context) {
-      if (context.nats) {
-        console.log('Stopping NATS container...');
-        await context.nats.container.stop();
-      }
-    },
-  };
+    };
+  }
 }
 ```
 
----
+**Note**: The nested `PostgresBuilder` class provides type-safe configuration via callback pattern.
 
-**File**: `packages/test-utils/src/mixins/RedisMixin.ts`
+**Other Infrastructure Builders** (MinIO, NATS, Redis) follow the same pattern:
 
-```typescript
-import { RedisContainer } from '@testcontainers/redis';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '../builder/types.js';
+- **MinioTesterBuilder**: Provides `withMinio()` and `withMinioBucket(name)` methods
+- **NatsTesterBuilder**: Provides `withNats()` and `withStream(name)` methods
+- **RedisTesterBuilder**: Provides `withRedis()` method
 
-export interface RedisOptions {
-  image?: string;
-  network?: boolean;
-  networkAlias?: string;
-}
+Each builder:
+- Declares `[DockerTesterBuilder]` as dependency
+- Uses nested builder class for configuration options
+- Auto-detects network via `this.docker.network`
+- Uses default network aliases ('minio', 'nats', 'redis')
+- Registers setup/destroy hooks
+- Provides typed getter methods
 
-export function RedisMixin(options: RedisOptions = {}): TestEnvironmentMixin {
-  const {
-    image = 'redis:7-alpine',
-    network = false,
-    networkAlias = 'redis',
-  } = options;
-
-  return {
-    name: 'Redis',
-    dependencies: network ? ['DockerNetwork'] : undefined,
-
-    async setup(context) {
-      console.log('Starting Redis container...');
-
-      let container = new RedisContainer(image);
-
-      if (network && context.network) {
-        container = container
-          .withNetwork(context.network)
-          .withNetworkAliases(networkAlias);
-      }
-
-      const started = await container.start();
-
-      const host = network ? networkAlias : started.getHost();
-      const port = network ? 6379 : started.getPort();
-      const url = `redis://${host}:${port}`;
-
-      context.redis = {
-        container: started,
-        url,
-        host,
-        port,
-      };
-
-      console.log(`Redis started: ${url}`);
-    },
-
-    async teardown(context) {
-      if (context.redis) {
-        console.log('Stopping Redis container...');
-        await context.redis.container.stop();
-      }
-    },
-  };
-}
-```
+See actual implementation in `packages/test-utils/src/builders/*.ts`
 
 ---
 
-### 1.4 Export Core Builder
+### 1.4 Export Infrastructure Builders
 
 **File**: `packages/test-utils/src/index.ts`
 
 ```typescript
-// Builder
-export { TestEnvironmentBuilder } from './builder/TestEnvironmentBuilder.js';
-export type {
-  TestEnvironment,
-  TestEnvironmentContext,
-  TestEnvironmentMixin,
-} from './builder/types.js';
+// Core framework
+export { createTesterBuilder, BaseTesterBuilder } from './framework.js';
+export type { AddMethodsType } from './framework.js';
 
-// Infrastructure mixins
-export { DockerNetworkMixin } from './mixins/DockerNetworkMixin.js';
-export type { DockerNetworkOptions } from './mixins/DockerNetworkMixin.js';
+// Infrastructure builders
+export { DockerTesterBuilder } from './builders/DockerTesterBuilder.js';
+export type { DockerConfig } from './builders/DockerTesterBuilder.js';
 
-export { PostgresMixin } from './mixins/PostgresMixin.js';
-export type { PostgresOptions } from './mixins/PostgresMixin.js';
+export { PostgresTesterBuilder } from './builders/PostgresTesterBuilder.js';
+export type { PostgresOptions, PostgresConfig } from './builders/PostgresTesterBuilder.js';
 
-export { MinioMixin } from './mixins/MinioMixin.js';
-export type { MinioOptions } from './mixins/MinioMixin.js';
+export { MinioTesterBuilder } from './builders/MinioTesterBuilder.js';
+export type { MinioOptions, MinioConfig } from './builders/MinioTesterBuilder.js';
 
-export { NatsMixin } from './mixins/NatsMixin.js';
-export type { NatsOptions } from './mixins/NatsMixin.js';
+export { NatsTesterBuilder } from './builders/NatsTesterBuilder.js';
+export type { NatsOptions, NatsConfig } from './builders/NatsTesterBuilder.js';
 
-export { RedisMixin } from './mixins/RedisMixin.js';
-export type { RedisOptions } from './mixins/RedisMixin.js';
+export { RedisTesterBuilder } from './builders/RedisTesterBuilder.js';
+export type { RedisOptions, RedisConfig } from './builders/RedisTesterBuilder.js';
 ```
 
 ---
 
-## Phase 2: Workspace-Specific Mixins
+## Phase 2: Workspace-Specific Builders
 
-**Goal**: Add workspace-specific mixins that depend on infrastructure mixins (e.g., database migrations, application deployment).
+**Goal**: Add workspace-specific builders that depend on infrastructure builders (e.g., database migrations, application deployment).
 
-### 2.1 Create Ingestor-Specific Mixins
+### 2.1 Create Ingestor-Specific Builders
 
-These mixins live in the **workspace** (not shared package) because they depend on workspace-specific code.
+These builders live in the **workspace** (not shared package) because they depend on workspace-specific code.
 
-**File**: `apps/ingestor/test/mixins/IngestorMigrationsMixin.ts`
+**File**: `apps/ingestor/test/builders/IngestorMigrationsBuilder.ts`
 
 ```typescript
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
-import postgres from 'postgres';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '@wallpaperdb/test-utils';
+import createPostgresClient from 'postgres';
+import {
+  BaseTesterBuilder,
+  type PostgresTesterBuilder,
+  type AddMethodsType,
+} from '@wallpaperdb/test-utils';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface IngestorMigrationsOptions {
-  /** Path to migration SQL file (relative to workspace root) */
   migrationPath?: string;
 }
 
-export function IngestorMigrationsMixin(
-  options: IngestorMigrationsOptions = {}
-): TestEnvironmentMixin {
-  const {
-    migrationPath = join(__dirname, '../../drizzle/0000_left_starjammers.sql'),
-  } = options;
+export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
+  'IngestorMigrations',
+  [PostgresTesterBuilder]
+> {
+  readonly name = 'IngestorMigrations' as const;
+  private options: IngestorMigrationsOptions;
 
-  return {
-    name: 'IngestorMigrations',
-    dependencies: ['Postgres'],
+  constructor(options: IngestorMigrationsOptions = {}) {
+    super();
+    this.options = options;
+  }
 
-    async setup(context) {
-      if (!context.postgres) {
-        throw new Error('PostgresMixin must be applied before IngestorMigrationsMixin');
-      }
+  addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+    const migrationPath =
+      this.options.migrationPath ??
+      join(__dirname, '../../drizzle/0000_left_starjammers.sql');
 
-      console.log('Applying ingestor database migrations...');
+    return class extends Base {
+      override async setup(): Promise<void> {
+        await super.setup();
 
-      const sql = postgres(context.postgres.connectionString, { max: 1 });
+        const postgres = this.getPostgres();
 
-      try {
-        const migrationSql = readFileSync(migrationPath, 'utf-8');
-        await sql.unsafe(migrationSql);
-        console.log('Database migrations applied');
-      } finally {
-        await sql.end();
-      }
-    },
-  };
-}
-```
+        console.log('Applying ingestor database migrations...');
 
----
+        const sql = createPostgresClient(postgres.connectionString, { max: 1 });
 
-**File**: `apps/ingestor/test/mixins/InProcessIngestorMixin.ts`
-
-```typescript
-import type { FastifyInstance } from 'fastify';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '@wallpaperdb/test-utils';
-import { createApp } from '../../src/app.js';
-import { loadConfig } from '../../src/config.js';
-
-export interface InProcessIngestorOptions {
-  /** Config overrides (e.g., rate limits, reconciliation intervals) */
-  configOverrides?: Record<string, unknown>;
-}
-
-export function InProcessIngestorMixin(
-  options: InProcessIngestorOptions = {}
-): TestEnvironmentMixin {
-  return {
-    name: 'InProcessIngestor',
-    dependencies: ['Postgres', 'Minio', 'Nats'],
-
-    async setup(context) {
-      if (!context.postgres || !context.minio || !context.nats) {
-        throw new Error('InProcessIngestorMixin requires Postgres, Minio, and Nats');
-      }
-
-      console.log('Creating in-process Fastify app...');
-
-      // Set environment variables for loadConfig()
-      process.env.NODE_ENV = 'test';
-      process.env.DATABASE_URL = context.postgres.connectionString;
-      process.env.S3_ENDPOINT = context.minio.endpoint;
-      process.env.S3_ACCESS_KEY = context.minio.accessKey;
-      process.env.S3_SECRET_KEY = context.minio.secretKey;
-      process.env.S3_BUCKET = context.minio.bucket || 'wallpapers';
-      process.env.NATS_URL = context.nats.url;
-
-      // Apply config overrides
-      if (options.configOverrides) {
-        for (const [key, value] of Object.entries(options.configOverrides)) {
-          process.env[key] = String(value);
+        try {
+          const migrationSql = readFileSync(migrationPath, 'utf-8');
+          await sql.unsafe(migrationSql);
+          console.log('Database migrations applied successfully');
+        } finally {
+          await sql.end();
         }
       }
-
-      const config = loadConfig();
-      const app = await createApp(config);
-
-      // Store app in custom context
-      context.custom.ingestorApp = app;
-
-      console.log('In-process Fastify app ready');
-    },
-
-    async teardown(context) {
-      const app = context.custom.ingestorApp as FastifyInstance | undefined;
-      if (app) {
-        console.log('Closing in-process Fastify app...');
-        await app.close();
-      }
-    },
-  };
+    };
+  }
 }
 ```
 
+**Pattern**: Workspace builders can:
+- Accept configuration via constructor (not callback)
+- Override `setup()` to run logic after infrastructure is ready
+- Access infrastructure via typed getters (`this.getPostgres()`)
+- No need for destroy hooks if no cleanup needed
+
+**Other Workspace Builders**:
+
+- **InProcessIngestorTesterBuilder**: Starts Fastify app in-process for integration tests
+  - Provides `getApp()` method to access FastifyInstance
+  - Sets up environment variables from infrastructure configs
+
+- **ContainerizedIngestorTesterBuilder**: Starts Fastify app in Docker for E2E tests
+  - Provides `withIngestorInstances(count)` method
+  - Provides `getBaseUrl()` to access HTTP endpoint
+  - Requires `DockerTesterBuilder` with network
+
+See actual implementations in `apps/ingestor/test/builders/`
+
 ---
 
-**File**: `apps/ingestor/test/mixins/ContainerizedIngestorMixin.ts`
+### 2.2 Export Workspace Builders
+
+**File**: `apps/ingestor/test/builders/index.ts`
 
 ```typescript
-import { GenericContainer, Wait } from 'testcontainers';
-import type { TestEnvironmentMixin, TestEnvironmentContext } from '@wallpaperdb/test-utils';
+export { IngestorMigrationsTesterBuilder } from './IngestorMigrationsBuilder.js';
+export type { IngestorMigrationsOptions } from './IngestorMigrationsBuilder.js';
 
-export interface ContainerizedIngestorOptions {
-  /** Number of ingestor instances to start */
-  instances?: number;
+export { InProcessIngestorTesterBuilder } from './InProcessIngestorBuilder.js';
 
-  /** Docker image name (must be built beforehand) */
-  image?: string;
-
-  /** Config overrides passed as environment variables */
-  config?: Record<string, unknown>;
-}
-
-export function ContainerizedIngestorMixin(
-  options: ContainerizedIngestorOptions = {}
-): TestEnvironmentMixin {
-  const {
-    instances = 1,
-    image = 'wallpaperdb-ingestor:latest',
-    config = {},
-  } = options;
-
-  return {
-    name: 'ContainerizedIngestor',
-    dependencies: ['DockerNetwork', 'Postgres', 'Minio', 'Nats'],
-
-    async setup(context) {
-      if (!context.network || !context.postgres || !context.minio || !context.nats) {
-        throw new Error('ContainerizedIngestorMixin requires DockerNetwork, Postgres, Minio, and Nats');
-      }
-
-      console.log(`Starting ${instances} ingestor container(s)...`);
-
-      const containers = [];
-
-      for (let i = 0; i < instances; i++) {
-        const container = await new GenericContainer(image)
-          .withNetwork(context.network)
-          .withNetworkAliases(`ingestor-${i}`)
-          .withEnvironment({
-            NODE_ENV: 'test',
-            DATABASE_URL: context.postgres.connectionString,
-            S3_ENDPOINT: context.minio.endpoint,
-            S3_ACCESS_KEY: context.minio.accessKey,
-            S3_SECRET_KEY: context.minio.secretKey,
-            S3_BUCKET: context.minio.bucket || 'wallpapers',
-            NATS_URL: context.nats.url,
-            // Redis if present
-            ...(context.redis ? { REDIS_URL: context.redis.url } : {}),
-            // Custom config overrides
-            ...Object.fromEntries(
-              Object.entries(config).map(([k, v]) => [k, String(v)])
-            ),
-          })
-          .withExposedPorts(3000)
-          .withWaitStrategy(Wait.forHttp('/health', 3000))
-          .start();
-
-        console.log(`Ingestor instance ${i} started at ${container.getHost()}:${container.getMappedPort(3000)}`);
-        containers.push(container);
-      }
-
-      // Store containers and base URL (first instance)
-      context.ingestorContainers = containers;
-      context.ingestorBaseUrl = `http://${containers[0].getHost()}:${containers[0].getMappedPort(3000)}`;
-
-      console.log(`All ${instances} ingestor instances ready`);
-    },
-
-    async teardown(context) {
-      if (context.ingestorContainers) {
-        console.log('Stopping ingestor containers...');
-        await Promise.all(
-          context.ingestorContainers.map(c => c.stop())
-        );
-      }
-    },
-  };
-}
+export { ContainerizedIngestorTesterBuilder } from './ContainerizedIngestorBuilder.js';
 ```
 
----
-
-### 2.2 Export Ingestor Mixins
-
-**File**: `apps/ingestor/test/mixins/index.ts`
+**File**: `apps/ingestor-e2e/test/builders/index.ts`
 
 ```typescript
-export { IngestorMigrationsMixin } from './IngestorMigrationsMixin.js';
-export type { IngestorMigrationsOptions } from './IngestorMigrationsMixin.js';
-
-export { InProcessIngestorMixin } from './InProcessIngestorMixin.js';
-export type { InProcessIngestorOptions } from './InProcessIngestorMixin.js';
-
-export { ContainerizedIngestorMixin } from './ContainerizedIngestorMixin.js';
-export type { ContainerizedIngestorOptions } from './ContainerizedIngestorMixin.js';
-```
-
----
-
-### 2.3 Re-Export for E2E Tests
-
-E2E tests can import from the main ingestor workspace:
-
-**File**: `apps/ingestor-e2e/test/mixins/index.ts`
-
-```typescript
-// Re-export ingestor mixins for E2E tests
+// Re-export for E2E tests
 export {
-  IngestorMigrationsMixin,
-  ContainerizedIngestorMixin,
-} from '../../../ingestor/test/mixins/index.js';
-
-// Note: E2E tests don't use InProcessIngestorMixin
+  IngestorMigrationsTesterBuilder,
+  ContainerizedIngestorTesterBuilder,
+} from '../../../ingestor/test/builders/index.js';
 ```
 
 ---
@@ -1166,34 +827,53 @@ describe('Upload Flow', () => {
 });
 ```
 
-**After** (with builder):
+**After** (with TesterBuilder - ACTUAL implementation):
 ```typescript
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { TestEnvironmentBuilder, PostgresMixin, MinioMixin, NatsMixin } from '@wallpaperdb/test-utils';
-import { IngestorMigrationsMixin, InProcessIngestorMixin } from './mixins/index.js';
-import type { FastifyInstance } from 'fastify';
+import {
+  createTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  IngestorMigrationsTesterBuilder,
+  InProcessIngestorTesterBuilder,
+} from './builders/index.js';
 
 describe('Upload Flow (Builder)', () => {
-  let env: Awaited<ReturnType<typeof TestEnvironmentBuilder.prototype.build>>;
-  let app: FastifyInstance;
+  let tester: InstanceType<ReturnType<ReturnType<typeof createTesterBuilder>['build']>>;
 
   beforeAll(async () => {
-    env = await new TestEnvironmentBuilder()
-      .with(PostgresMixin({ database: 'upload_flow_test' }))
-      .with(MinioMixin({ bucket: 'test-bucket' }))
-      .with(NatsMixin({ jetStream: true, streamName: 'WALLPAPERS' }))
-      .with(IngestorMigrationsMixin())
-      .with(InProcessIngestorMixin())
+    const TesterClass = createTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(InProcessIngestorTesterBuilder)
       .build();
 
-    app = env.context.custom.ingestorApp as FastifyInstance;
+    tester = new TesterClass();
+    tester
+      .withPostgres(b => b.withDatabase('upload_flow_test'))
+      .withMinio()
+      .withMinioBucket('test-bucket')
+      .withNats(b => b.withJetstream())
+      .withStream('WALLPAPERS');
+
+    await tester.setup();
   });
 
   afterAll(async () => {
-    await env.teardown();
+    await tester.destroy();
   });
 
-  // ... tests (no changes needed!)
+  it('uploads a file', async () => {
+    const app = tester.getApp();
+    // ... test code
+  });
 });
 ```
 
@@ -1218,7 +898,7 @@ describe('Upload Flow (Builder)', () => {
 - [ ] Migrate `apps/ingestor/test/scheduler.test.ts`
 
 **Phase 4.3: Distributed Tests**
-- [ ] Migrate `apps/ingestor/test/rate-limiting-distributed.test.ts` (add RedisMixin)
+- [ ] Migrate `apps/ingestor/test/rate-limiting-distributed.test.ts` (add RedisTesterBuilder)
 - [ ] Remove `vitest.distributed.config.ts` (no longer needed!)
 
 **Phase 4.4: E2E Tests**
@@ -1239,17 +919,17 @@ describe('Upload Flow (Builder)', () => {
 
 ### Step 1: Foundational Work (Phase 1)
 1. Create `packages/test-utils` package
-2. Implement `TestEnvironmentBuilder` and type definitions
-3. Implement infrastructure mixins (Postgres, MinIO, NATS, Redis, DockerNetwork)
-4. Write unit tests for builder (dependency validation, setup order)
-5. **Commit**: "Add test-utils package with mixin-based builder"
+2. Implement `createTesterBuilder()` and `BaseTesterBuilder`
+3. Implement infrastructure builders (Docker, Postgres, MinIO, NATS, Redis)
+4. Write unit tests for builder (type safety, dependency validation)
+5. **Commit**: "Add test-utils package with TesterBuilder pattern"
 
-### Step 2: Workspace Mixins (Phase 2)
-1. Create `apps/ingestor/test/mixins/` directory
-2. Implement `IngestorMigrationsMixin`
-3. Implement `InProcessIngestorMixin`
-4. Implement `ContainerizedIngestorMixin`
-5. **Commit**: "Add ingestor-specific test mixins"
+### Step 2: Workspace Builders (Phase 2)
+1. Create `apps/ingestor/test/builders/` directory
+2. Implement `IngestorMigrationsTesterBuilder`
+3. Implement `InProcessIngestorTesterBuilder`
+4. Implement `ContainerizedIngestorTesterBuilder`
+5. **Commit**: "Add ingestor-specific test builders"
 
 ### Step 3: Fixtures and Helpers (Phase 3)
 1. Implement `packages/test-utils/src/fixtures/images.ts`
@@ -1281,14 +961,14 @@ describe('Upload Flow (Builder)', () => {
 
 ### Functionality
 ✅ All existing tests pass with new builder
-✅ Builder validates mixin dependencies at compile-time and runtime
+✅ Builder validates dependencies at compile-time (TypeScript) and runtime
 ✅ Distributed tests work without separate config
 ✅ E2E tests work with containerized deployment
 
 ### Developer Experience
 ✅ New test scenarios require <10 lines of setup code
-✅ Adding new infrastructure (e.g., Kafka) = 1 new mixin, reused everywhere
-✅ Clear error messages when dependencies missing
+✅ Adding new infrastructure (e.g., Kafka) = 1 new builder, reused everywhere
+✅ Clear compile-time error messages when dependencies missing
 ✅ Documentation includes examples for common scenarios
 
 ### Performance
@@ -1302,15 +982,15 @@ describe('Upload Flow (Builder)', () => {
 ### Immediate Benefits
 1. **Zero Duplication**: Each infrastructure concern implemented once
 2. **Composability**: Mix and match components for any test scenario
-3. **Type Safety**: Mixin dependencies enforced at compile-time
+3. **Type Safety**: Builder dependencies enforced at compile-time
 4. **Clarity**: Declarative setup reads like documentation
 5. **No Workarounds**: Distributed tests no longer need separate configs
 
 ### Future Benefits
-1. **Extensibility**: New workspaces (e.g., `apps/processor`) can reuse infrastructure mixins
+1. **Extensibility**: New workspaces (e.g., `apps/processor`) can reuse infrastructure builders
 2. **Optimization**: Shared container pools across tests (advanced)
-3. **Testability**: Each mixin tested in isolation
-4. **Maintainability**: Change database schema? Update one mixin, all tests benefit
+3. **Testability**: Each builder tested in isolation
+4. **Maintainability**: Change database schema? Update one builder, all tests benefit
 
 ---
 
@@ -1360,89 +1040,113 @@ describe('Distributed Rate Limiting', () => {
 
 ---
 
-### After (Mixin-Based)
+### After (TesterBuilder - ACTUAL implementation)
 
 **Required**:
-- Test file with builder setup (12 lines)
+- Test file with builder setup (~20 lines)
 - No separate config needed!
 
-**Total**: ~12 lines of setup code
+**Total**: ~20 lines of setup code
 
 ```typescript
 // apps/ingestor-e2e/test/rate-limiting-distributed.e2e.test.ts (AFTER)
 import { describe, it, beforeAll, afterAll } from 'vitest';
-import { TestEnvironmentBuilder, PostgresMixin, MinioMixin, NatsMixin, RedisMixin, DockerNetworkMixin } from '@wallpaperdb/test-utils';
-import { IngestorMigrationsMixin, ContainerizedIngestorMixin } from './mixins/index.js';
+import {
+  createTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  RedisTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  IngestorMigrationsTesterBuilder,
+  ContainerizedIngestorTesterBuilder,
+} from './builders/index.js';
 
 describe('Distributed Rate Limiting', () => {
-  let env: Awaited<ReturnType<typeof TestEnvironmentBuilder.prototype.build>>;
+  let tester: InstanceType<ReturnType<ReturnType<typeof createTesterBuilder>['build']>>;
 
   beforeAll(async () => {
-    env = await new TestEnvironmentBuilder()
-      .with(DockerNetworkMixin())
-      .with(PostgresMixin({ network: true }))
-      .with(MinioMixin({ network: true, bucket: 'test' }))
-      .with(NatsMixin({ network: true, jetStream: true }))
-      .with(RedisMixin({ network: true }))
-      .with(IngestorMigrationsMixin())
-      .with(ContainerizedIngestorMixin({ instances: 3, config: { redis: { enabled: true } } }))
+    const TesterClass = createTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(RedisTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(ContainerizedIngestorTesterBuilder)
       .build();
-  });
+
+    tester = new TesterClass();
+    tester
+      .withNetwork()
+      .withPostgres()
+      .withMinio()
+      .withMinioBucket('test')
+      .withNats(b => b.withJetstream())
+      .withRedis()
+      .withIngestorInstances(3);
+
+    await tester.setup();
+  }, 120000);
 
   afterAll(async () => {
-    await env.teardown();
+    await tester.destroy();
   });
 
   // ... tests (no changes!)
 });
 ```
 
-**Reduction**: ~230 lines → ~12 lines (95% reduction)
+**Reduction**: ~230 lines → ~20 lines (91% reduction)
 **No separate config file needed!**
 
 ---
 
 ## Notes
 
-### Why Mixins Over Single Builder?
+### Why TesterBuilder Pattern Over Alternatives?
 
-**Mixins** provide:
-1. **Workspace Isolation**: Ingestor-specific logic stays in `apps/ingestor/test/mixins/`
-2. **Dependency Declaration**: `IngestorMigrationsMixin` explicitly requires `PostgresMixin`
-3. **Reusability**: Infrastructure mixins shared, workspace mixins stay local
-4. **Testability**: Each mixin tested independently
-5. **Discoverability**: IDE autocomplete shows available mixins
+**The TesterBuilder Pattern** provides:
+1. **Workspace Isolation**: Ingestor-specific logic stays in `apps/ingestor/test/builders/`
+2. **Compile-Time Dependencies**: `IngestorMigrationsTesterBuilder` type-checks dependencies at compile time
+3. **Reusability**: Infrastructure builders shared via `@wallpaperdb/test-utils`, workspace builders stay local
+4. **Testability**: Each builder tested independently
+5. **Discoverability**: IDE autocomplete shows available builders and their configuration methods
+6. **Type Safety**: TypeScript enforces correct builder composition before runtime
 
 **Alternatives Considered**:
 - Single builder with methods: Would require all workspaces to depend on shared package
+- Functional mixins (original plan): Less type-safe, runtime validation only
 - Factory functions: Less composable, harder to express dependencies
 - Plugins: More complex, overkill for this use case
 
-### Mixin Dependency Resolution
+### Builder Dependency Resolution
 
-The builder validates dependencies at **build time**:
-- Checks that required mixins are present
-- Checks that dependencies are added in correct order
+The builder validates dependencies at **compile time** (TypeScript) and **runtime**:
+- TypeScript type system checks that required builders are present
+- Compile-time errors show which builders are missing
 - Provides clear error messages with fix suggestions
 
-Example error:
+Example compile-time error:
+```typescript
+// ❌ Type error: PostgresTesterBuilder requires DockerTesterBuilder
+createTesterBuilder()
+  .with(PostgresTesterBuilder)  // Missing DockerTesterBuilder!
 ```
-Error: Mixin "IngestorMigrations" requires "Postgres" but it was not added to the builder.
-Add it with: .with(PostgresMixin())
-```
 
-### Cleanup vs Teardown
+### Actual Implementation: Single Destroy Method
 
-**Cleanup**: Per-test cleanup (e.g., delete S3 objects, truncate tables)
-- Called after each test
-- Leaves infrastructure running
-- Fast (no container restarts)
+> **Note**: The actual implementation differs from the plan here.
 
-**Teardown**: Full infrastructure teardown
-- Called once after all tests
-- Stops containers
-- Used in `afterAll()`
+The actual implementation has a single `destroy()` method that:
+- Stops all containers
+- Cleans up all resources
+- Called once in `afterAll()`
+
+There is **no separate cleanup method** for per-test cleanup. If needed, tests can manually truncate tables or clear buckets between tests using the helper functions in `@wallpaperdb/test-utils/helpers`.
 
 ---
 
-This mixin-based architecture provides the flexibility, composability, and maintainability needed for a growing test suite across multiple workspaces. 🚀
+This TesterBuilder architecture provides the flexibility, composability, compile-time safety, and maintainability needed for a growing test suite across multiple workspaces. 🚀

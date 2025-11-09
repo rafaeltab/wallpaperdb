@@ -174,16 +174,11 @@ describe("Upload Flow E2E", () => {
       .withNetwork()                         // Create network
       .withPostgres((b) =>
         b.withDatabase("test_e2e_db")
-         .withNetworkAlias("postgres")       // Network alias
+        // Default alias 'postgres' automatically used
       )
-      .withMinio((b) =>
-        b.withNetworkAlias("minio")          // Network alias
-      )
+      .withMinio()                           // Default alias 'minio'
       .withMinioBucket("uploads")
-      .withNats((b) =>
-        b.withNetworkAlias("nats")           // Network alias
-         .withJetstream()
-      )
+      .withNats((b) => b.withJetstream())    // Default alias 'nats'
       .withStream("EVENTS");
 
     await tester.setup();
@@ -361,10 +356,9 @@ apps/ingestor-e2e/
    tester.withNetwork()
    ```
 
-2. **Use network aliases**
+2. **Enable Docker network**
    ```typescript
-   .withPostgres((b) => b.withNetworkAlias("postgres"))
-   .withMinio((b) => b.withNetworkAlias("minio"))
+   .withNetwork()  // Default aliases ('postgres', 'minio', etc.) are automatically used
    ```
 
 3. **Run sequentially** (single fork)
@@ -410,7 +404,7 @@ tester.withNetwork()
 ```typescript
 tester
   .withNetwork()
-  .withPostgres((b) => b.withNetworkAlias("postgres"))
+  .withPostgres()  // Default alias 'postgres' is automatically used
 ```
 
 ### Slow Test Execution

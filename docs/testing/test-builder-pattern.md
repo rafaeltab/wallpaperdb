@@ -206,19 +206,12 @@ describe("Health Endpoint E2E", () => {
     tester
       .withNetwork()                                 // Create network
       .withPostgres((builder) =>
-        builder
-          .withDatabase(`test_e2e_${Date.now()}`)
-          .withNetworkAlias("postgres")             // Network alias
+        builder.withDatabase(`test_e2e_${Date.now()}`)
+        // Network alias 'postgres' is already the default
       )
-      .withMinio((builder) =>
-        builder.withNetworkAlias("minio")           // Network alias
-      )
+      .withMinio()                                   // Default alias 'minio'
       .withMinioBucket("wallpapers")
-      .withNats((builder) =>
-        builder
-          .withNetworkAlias("nats")                 // Network alias
-          .withJetstream()
-      )
+      .withNats((builder) => builder.withJetstream())  // Default alias 'nats'
       .withStream("WALLPAPERS");
 
     // 4. Start everything
@@ -309,7 +302,8 @@ tester.withPostgres((builder) =>
     .withDatabase("my_test_db")
     .withUser("test_user")
     .withPassword("secret")
-    .withNetworkAlias("postgres")  // Only for networked tests
+    // Note: Network alias defaults to 'postgres' when withNetwork() is called
+    // Only override if you need a custom alias
 );
 
 // Later, get connection info

@@ -241,9 +241,7 @@ createTesterBuilder()
 // ✅ Add network
 tester
   .withNetwork()  // ← Create network
-  .withPostgres((b) =>
-    b.withNetworkAlias("postgres")  // ← Use alias
-  )
+  .withPostgres()  // ← Default alias 'postgres' is automatically used
 ```
 
 ---

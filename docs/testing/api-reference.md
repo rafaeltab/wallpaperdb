@@ -224,7 +224,7 @@ tester.withPostgres((b) =>
   b.withDatabase("my_db")
    .withUser("admin")
    .withPassword("secret")
-   .withNetworkAlias("postgres")
+   // Network alias defaults to 'postgres' - only override if needed
 );
 
 const postgres = tester.getPostgres();
@@ -470,16 +470,11 @@ describe("Complete Example", () => {
         b.withDatabase("test_db")
          .withUser("test")
          .withPassword("test")
-         .withNetworkAlias("postgres")
+         // Default alias 'postgres' is automatically used
       )
-      .withMinio((b) =>
-        b.withNetworkAlias("minio")
-      )
+      .withMinio()  // Default alias 'minio'
       .withMinioBucket("uploads")
-      .withNats((b) =>
-        b.withJetstream()
-         .withNetworkAlias("nats")
-      )
+      .withNats((b) => b.withJetstream())  // Default alias 'nats'
       .withStream("EVENTS");
 
     // 4. Initialize

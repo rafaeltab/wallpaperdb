@@ -1,6 +1,8 @@
 import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 
 export interface RedisOptions {
   image?: string;
@@ -56,12 +58,18 @@ class RedisHelpers {
   }
 }
 
-export class RedisTesterBuilder extends BaseTesterBuilder<'redis', [DockerTesterBuilder]> {
+export class RedisTesterBuilder extends BaseTesterBuilder<
+  'redis',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder]
+> {
   name = 'redis' as const;
 
-  addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
+  addMethods<
+    TBase extends AddMethodsType<[DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder]>,
+  >(Base: TBase) {
     return class Redis extends Base {
-      private _redisConfig: RedisConfig | undefined;
+      /** @internal */
+      _redisConfig: RedisConfig | undefined;
       readonly redis = new RedisHelpers(this as TesterInstance<RedisTesterBuilder>);
 
       withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {

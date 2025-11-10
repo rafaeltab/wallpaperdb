@@ -25,7 +25,8 @@ export class DestroyTesterBuilder extends BaseTesterBuilder<'destroy', []> {
 
   addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
     return class extends Base {
-      private destroyHooks: (() => Promise<void>)[] = [];
+      /** @internal */
+      _destroyHooks: (() => Promise<void>)[] = [];
 
       /**
        * Register a hook to run during the destroy phase.
@@ -34,7 +35,7 @@ export class DestroyTesterBuilder extends BaseTesterBuilder<'destroy', []> {
        * @param hook - Async function to execute during destroy
        */
       addDestroyHook(hook: () => Promise<void>) {
-        this.destroyHooks.push(hook);
+        this._destroyHooks.push(hook);
       }
 
       /**
@@ -53,7 +54,7 @@ export class DestroyTesterBuilder extends BaseTesterBuilder<'destroy', []> {
       async destroy() {
         // Run in reverse order (LIFO) to respect dependencies
         // e.g., containers must be stopped before networks are removed
-        const reversed = [...this.destroyHooks].reverse();
+        const reversed = [...this._destroyHooks].reverse();
         for (const hook of reversed) {
           await hook();
         }

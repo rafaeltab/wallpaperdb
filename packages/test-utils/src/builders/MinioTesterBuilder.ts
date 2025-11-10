@@ -10,6 +10,9 @@ import {
 import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
+import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 
 export interface MinioOptions {
   image: string;
@@ -213,10 +216,17 @@ class MinioHelpers {
   }
 }
 
-export class MinioTesterBuilder extends BaseTesterBuilder<'minio', [DockerTesterBuilder]> {
+export class MinioTesterBuilder extends BaseTesterBuilder<
+  'minio',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+> {
   name = 'minio' as const;
 
-  addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
+  addMethods<
+    TBase extends AddMethodsType<
+      [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+    >,
+  >(Base: TBase) {
     const desiredBuckets: string[] = [];
 
     return class Minio extends Base {

@@ -17,7 +17,8 @@ export class SetupTesterBuilder extends BaseTesterBuilder<'setup', []> {
 
   addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
     return class extends Base {
-      private setupHooks: (() => Promise<void>)[] = [];
+      /** @internal */
+      _setupHooks: (() => Promise<void>)[] = [];
 
       /**
        * Register a hook to run during the setup phase.
@@ -26,7 +27,7 @@ export class SetupTesterBuilder extends BaseTesterBuilder<'setup', []> {
        * @param hook - Async function to execute during setup
        */
       addSetupHook(hook: () => Promise<void>) {
-        this.setupHooks.push(hook);
+        this._setupHooks.push(hook);
       }
 
       /**
@@ -36,7 +37,7 @@ export class SetupTesterBuilder extends BaseTesterBuilder<'setup', []> {
        * @returns The tester instance for chaining
        */
       async setup() {
-        for (const hook of this.setupHooks) {
+        for (const hook of this._setupHooks) {
           await hook();
         }
         return this;

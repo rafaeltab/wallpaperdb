@@ -1,14 +1,21 @@
-import { Network, type StartedNetwork } from 'testcontainers';
+import { Network, RandomUuid, randomUuid, type StartedNetwork } from 'testcontainers';
 import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 
 export interface DockerConfig {
   network?: StartedNetwork;
 }
 
-export class DockerTesterBuilder extends BaseTesterBuilder<'docker', []> {
+export class DockerTesterBuilder extends BaseTesterBuilder<
+  'docker',
+  [SetupTesterBuilder, DestroyTesterBuilder]
+> {
   name = 'docker' as const;
 
-  addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
+  addMethods<TBase extends AddMethodsType<[SetupTesterBuilder, DestroyTesterBuilder]>>(
+    Base: TBase
+  ) {
     return class Docker extends Base {
       docker: DockerConfig = {};
 
@@ -16,7 +23,7 @@ export class DockerTesterBuilder extends BaseTesterBuilder<'docker', []> {
         this.addSetupHook(async () => {
           console.log('Creating Docker network...');
 
-          const network = await new Network().start();
+          const network = await new Network(new RandomUuid()).start();
 
           this.docker.network = network;
           console.log(`Docker network created: ${network.getName()}`);

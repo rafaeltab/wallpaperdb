@@ -2,6 +2,9 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import createPostgresClient, { type Sql as PostgresType } from 'postgres';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
+import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 
 export interface PostgresOptions {
   image: string;
@@ -119,10 +122,14 @@ class PostgresHelpers {
    * ```
    */
   async query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+    const client = this.getClient();
     if (params) {
-      return this.getClient().unsafe<T>(sql, params);
+      // biome-ignore lint/suspicious/noExplicitAny: postgres.js has complex typing for parameters
+      const result = await client.unsafe(sql, params as any);
+      return Array.from(result) as T[];
     }
-    return this.getClient().unsafe<T>(sql);
+    const result = await client.unsafe(sql);
+    return Array.from(result) as T[];
   }
 
   /**
@@ -176,16 +183,23 @@ class PostgresHelpers {
   }
 }
 
-export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [DockerTesterBuilder]> {
+export class PostgresTesterBuilder extends BaseTesterBuilder<
+  'postgres',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+> {
   name = 'postgres' as const;
 
-  addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
+  addMethods<
+    TBase extends AddMethodsType<
+      [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+    >,
+  >(Base: TBase) {
     return class Postgres extends Base {
-      // Private: internal config storage (renamed to avoid conflict)
+      /** @internal - internal config storage (renamed to avoid conflict) */
       _postgresConfig: PostgresConfig | undefined;
 
-      // Private: cleanup tracking
-      private postgresCleanupTables: string[] = [];
+      /** @internal - cleanup tracking */
+      _postgresCleanupTables: string[] = [];
 
       // Public: helper instance
       readonly postgres = new PostgresHelpers(this);
@@ -273,9 +287,9 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<'postgres', [Docker
        * ```
        */
       withAutoCleanup(tables: string[]) {
-        this.postgresCleanupTables = tables;
+        this._postgresCleanupTables = tables;
         this.addCleanupHook(async () => {
-          for (const table of this.postgresCleanupTables) {
+          for (const table of this._postgresCleanupTables) {
             await this.postgres.truncateTable(table);
           }
         });

@@ -25,7 +25,8 @@ export class CleanupTesterBuilder extends BaseTesterBuilder<'cleanup', []> {
 
   addMethods<TBase extends AddMethodsType<[]>>(Base: TBase) {
     return class extends Base {
-      private cleanupHooks: (() => Promise<void>)[] = [];
+      /** @internal */
+      _cleanupHooks: (() => Promise<void>)[] = [];
 
       /**
        * Register a hook to run during the cleanup phase.
@@ -34,7 +35,7 @@ export class CleanupTesterBuilder extends BaseTesterBuilder<'cleanup', []> {
        * @param hook - Async function to execute during cleanup
        */
       addCleanupHook(hook: () => Promise<void>) {
-        this.cleanupHooks.push(hook);
+        this._cleanupHooks.push(hook);
       }
 
       /**
@@ -51,7 +52,7 @@ export class CleanupTesterBuilder extends BaseTesterBuilder<'cleanup', []> {
        */
       async cleanup() {
         // Run in reverse order (LIFO) to respect dependencies
-        const reversed = [...this.cleanupHooks].reverse();
+        const reversed = [...this._cleanupHooks].reverse();
         for (const hook of reversed) {
           await hook();
         }

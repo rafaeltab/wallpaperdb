@@ -12,6 +12,9 @@ import {
 } from 'nats';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
+import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 
 export interface NatsOptions {
   image?: string;
@@ -202,10 +205,17 @@ class NatsHelpers {
   }
 }
 
-export class NatsTesterBuilder extends BaseTesterBuilder<'nats', [DockerTesterBuilder]> {
+export class NatsTesterBuilder extends BaseTesterBuilder<
+  'nats',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+> {
   name = 'nats' as const;
 
-  addMethods<TBase extends AddMethodsType<[DockerTesterBuilder]>>(Base: TBase) {
+  addMethods<
+    TBase extends AddMethodsType<
+      [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+    >,
+  >(Base: TBase) {
     const desiredStreams: string[] = [];
     return class Nats extends Base {
       // Private: internal config storage

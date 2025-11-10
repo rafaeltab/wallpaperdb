@@ -85,10 +85,11 @@ class Tester {
 }
 
 class TesterBuilder<TTesters extends TupleOfTesters = []> {
-  private testers: TupleOfTesters = [];
+  /** @internal */
+  _testers: TupleOfTesters = [];
 
   constructor(testers: TupleOfTesters) {
-    this.testers = testers;
+    this._testers = testers;
   }
 
   public with<
@@ -102,12 +103,12 @@ class TesterBuilder<TTesters extends TupleOfTesters = []> {
       throw '';
     }
 
-    return new TesterBuilder([new testerConstructor(), ...this.testers]);
+    return new TesterBuilder([new testerConstructor(), ...this._testers]);
   }
 
   public build(): AddMethodsType<[...TTesters]> {
     let ctor = Tester;
-    for (const tester of this.testers) {
+    for (const tester of this._testers) {
       ctor = tester.addMethods(ctor);
     }
     return ctor as any as AddMethodsType<[...TTesters]>;

@@ -1,7 +1,8 @@
-import { Network, RandomUuid, randomUuid, type StartedNetwork } from 'testcontainers';
+import { Network, RandomUuid, type StartedNetwork } from 'testcontainers';
 import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
+import { dockerStartSemaphore } from '../utils/semaphore.js';
 
 export interface DockerConfig {
   network?: StartedNetwork;
@@ -21,12 +22,15 @@ export class DockerTesterBuilder extends BaseTesterBuilder<
 
       withNetwork() {
         this.addSetupHook(async () => {
-          console.log('Creating Docker network...');
+          // Use semaphore to limit concurrent network creation
+          await dockerStartSemaphore.run(async () => {
+            console.log('Creating Docker network...');
 
-          const network = await new Network(new RandomUuid()).start();
+            const network = await new Network(new RandomUuid()).start();
 
-          this.docker.network = network;
-          console.log(`Docker network created: ${network.getName()}`);
+            this.docker.network = network;
+            console.log(`Docker network created: ${network.getName()}`);
+          });
         });
 
         this.addDestroyHook(async () => {

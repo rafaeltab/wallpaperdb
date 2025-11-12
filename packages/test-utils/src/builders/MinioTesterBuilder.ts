@@ -13,6 +13,7 @@ import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
+import { dockerStartSemaphore } from '../utils/semaphore.js';
 
 export interface MinioOptions {
   image: string;
@@ -273,33 +274,42 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
         const { image, accessKey, secretKey, networkAlias } = options;
 
         this.addSetupHook(async () => {
-          console.log('Starting MinIO container...');
+          // Use semaphore to limit concurrent container starts
+          await dockerStartSemaphore.run(async () => {
+            console.log('Starting MinIO container...');
 
-          let container = new MinioContainer(image);
+            let container = new MinioContainer(image);
 
-          container.withPassword(secretKey);
-          container.withUsername(accessKey);
+            container.withPassword(secretKey);
+            container.withUsername(accessKey);
 
-          const dockerNetwork = this.docker.network;
-          if (dockerNetwork) {
-            container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
-          }
+            // Aggressive timeout for concurrent testing - MinIO starts quickly when resources available
+            container.withStartupTimeout(20000);
 
-          const started = await container.start();
+            const dockerNetwork = this.docker.network;
+            if (dockerNetwork) {
+              container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
+            }
 
-          const host = dockerNetwork ? networkAlias : started.getHost();
-          const port = dockerNetwork ? 9000 : started.getPort();
+            const started = await container.start();
 
-          const endpoint = `http://${host}:${port}`;
+            const host = dockerNetwork ? networkAlias : started.getHost();
+            const port = dockerNetwork ? 9000 : started.getPort();
 
-          this._minioConfig = {
-            container: started,
-            endpoint: endpoint,
-            options: options,
-            buckets: [],
-          };
+            const endpoint = `http://${host}:${port}`;
 
-          if (desiredBuckets.length > 0) {
+            this._minioConfig = {
+              container: started,
+              endpoint: endpoint,
+              options: options,
+              buckets: [],
+            };
+
+            console.log(`MinIO started: ${endpoint}`);
+          });
+
+          // Create buckets outside semaphore - these don't strain Docker daemon
+          if (desiredBuckets.length > 0 && this._minioConfig) {
             // Create buckets using the helper's S3 client
             for (const bucket of desiredBuckets) {
               try {
@@ -313,8 +323,6 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
               }
             }
           }
-
-          console.log(`MinIO started: ${endpoint}`);
         });
 
         this.addDestroyHook(async () => {

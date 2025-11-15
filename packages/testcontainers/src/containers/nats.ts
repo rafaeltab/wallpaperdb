@@ -126,7 +126,7 @@ export async function createNatsContainer(
   let containerBuilder = new GenericContainer(image)
     .withExposedPorts(4222)
     .withCommand(command)
-    .withWaitStrategy(Wait.forLogMessage('Server is ready'));
+    .withWaitStrategy(Wait.forLogMessage('Server is ready').withStartupTimeout(60000));
 
   // Add network if specified
   if (network) {

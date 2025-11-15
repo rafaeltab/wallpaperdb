@@ -61,6 +61,7 @@ class MinioBuilder {
 export interface MinioConfig {
   container: StartedMinioContainer;
   endpoint: string;
+  externalEndpoint: string;
   options: MinioOptions;
   buckets: string[];
 }
@@ -91,6 +92,9 @@ class MinioHelpers {
    * Get a cached S3Client instance.
    * Creates the client on first access and reuses it.
    *
+   * Uses the external endpoint (host-accessible) for operations initiated from test code.
+   * This ensures compatibility with Docker networks where internal aliases aren't resolvable from host.
+   *
    * @returns AWS SDK S3Client
    *
    * @example
@@ -102,7 +106,7 @@ class MinioHelpers {
   getS3Client(): S3Client {
     if (!this.s3Client) {
       this.s3Client = new S3Client({
-        endpoint: this.config.endpoint,
+        endpoint: this.config.externalEndpoint,
         region: 'us-east-1',
         credentials: {
           accessKeyId: this.config.options.accessKey,
@@ -283,8 +287,8 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
             container.withPassword(secretKey);
             container.withUsername(accessKey);
 
-            // Aggressive timeout for concurrent testing - MinIO starts quickly when resources available
-            container.withStartupTimeout(20000);
+            // Longer timeout when using Docker networks - health check may be slower
+            container.withStartupTimeout(90000);
 
             const dockerNetwork = this.docker.network;
             if (dockerNetwork) {
@@ -296,16 +300,22 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
             const host = dockerNetwork ? networkAlias : started.getHost();
             const port = dockerNetwork ? 9000 : started.getPort();
 
+            // Internal endpoint: used for container-to-container communication
             const endpoint = `http://${host}:${port}`;
+
+            // External endpoint: used for host-to-container communication
+            // Always uses mapped port accessible from host
+            const externalEndpoint = `http://${started.getHost()}:${started.getPort()}`;
 
             this._minioConfig = {
               container: started,
               endpoint: endpoint,
+              externalEndpoint: externalEndpoint,
               options: options,
               buckets: [],
             };
 
-            console.log(`MinIO started: ${endpoint}`);
+            console.log(`MinIO started: ${endpoint} (internal), ${externalEndpoint} (external)`);
           });
 
           // Create buckets outside semaphore - these don't strain Docker daemon

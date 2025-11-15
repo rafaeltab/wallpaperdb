@@ -187,6 +187,12 @@ export class FixturesTesterBuilder extends BaseTesterBuilder<'fixtures', []> {
         },
 
         /**
+         * Invalid file buffer (not an image)
+         * Useful for testing validation errors
+         */
+        INVALID_FILE: Buffer.from('This is not an image file'),
+
+        /**
          * Generate SHA256 content hash of a buffer.
          * This matches the hash algorithm used in the application for deduplication.
          *

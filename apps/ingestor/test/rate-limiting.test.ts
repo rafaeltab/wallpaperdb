@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
-import type { FastifyInstance } from 'fastify';
-import { Pool } from 'pg';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
 import FormData from 'form-data';
-import { createApp } from '../src/app.js';
-import { getTestConfig } from './setup.js';
-import * as schema from '../src/db/schema.js';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
+import { InProcessIngestorTesterBuilder } from './builders/InProcessIngestorBuilder.js';
+import { IngestorMigrationsTesterBuilder } from './builders/IngestorMigrationsBuilder.js';
 import { wallpapers } from '../src/db/schema.js';
 import { createTestImage } from './fixtures.js';
 
@@ -25,61 +28,65 @@ import { createTestImage } from './fixtures.js';
 let testIdCounter = 0;
 
 describe('Rate Limiting', () => {
-  let app: FastifyInstance;
-  let config: ReturnType<typeof getTestConfig>;
-  let pool: Pool;
-  let db: NodePgDatabase<typeof schema>;
+  /**
+   * Subclass pattern for custom rate limit configuration.
+   * The InProcessIngestorTesterBuilder requires constructor options,
+   * so we create a subclass that passes the desired config.
+   */
+  class RateLimitIngestorTesterBuilder extends InProcessIngestorTesterBuilder {
+    constructor() {
+      super({
+        configOverrides: {
+          rateLimitMax: 15,
+          rateLimitWindowMs: 5000,
+        },
+        logger: false,
+      });
+    }
+  }
+
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+    | typeof IngestorMigrationsTesterBuilder
+    | typeof RateLimitIngestorTesterBuilder
+  >;
+
+  let tester: TesterType;
 
   beforeAll(async () => {
-    // Get test config from setup
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(RateLimitIngestorTesterBuilder)
+      .build();
 
-    // Create S3 client
-    const s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester = new TesterClass();
 
-    // Create MinIO bucket
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket might already exist
-    }
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_ratelimit_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS')
+      .withMigrations()
+      .withInProcessApp();
 
-    // Setup database connection
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
-
-    // Create app with test configuration
-    // Override rate limit config for faster testing
-    const testConfig = {
-      ...config,
-      rateLimitMax: 15, // Per-user rate limit for testing
-      rateLimitWindowMs: 5000, // 5 seconds
-    };
-
-    app = await createApp(testConfig, { logger: false, enableOtel: false });
-    await app.ready();
+    await tester.setup();
   });
 
   afterAll(async () => {
-    await app.close();
-    await pool.end();
+    await tester.destroy();
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
   });
 
   it('should allow uploads within rate limit', async () => {
@@ -98,7 +105,7 @@ describe('Rate Limiting', () => {
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
       form.append('userId', userId);
 
-      const response = await app.inject({
+      const response = await tester.getApp().inject({
         method: 'POST',
         url: '/upload',
         headers: form.getHeaders(),
@@ -130,7 +137,7 @@ describe('Rate Limiting', () => {
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
       form.append('userId', userId);
 
-      const response = await app.inject({
+      const response = await tester.getApp().inject({
         method: 'POST',
         url: '/upload',
         headers: form.getHeaders(),
@@ -151,7 +158,7 @@ describe('Rate Limiting', () => {
     form.append('file', testImage11, { filename: 'test-11.jpg', contentType: 'image/jpeg' });
     form.append('userId', userId);
 
-    const response = await app.inject({
+    const response = await tester.getApp().inject({
       method: 'POST',
       url: '/upload',
       headers: form.getHeaders(),
@@ -202,7 +209,7 @@ describe('Rate Limiting', () => {
     });
     form.append('userId', userId);
 
-    const response = await app.inject({
+    const response = await tester.getApp().inject({
       method: 'POST',
       url: '/upload',
       headers: form.getHeaders(),
@@ -239,7 +246,7 @@ describe('Rate Limiting', () => {
       form.append('file', testImage, { filename: `userA-${i}.jpg`, contentType: 'image/jpeg' });
       form.append('userId', userA);
 
-      const response = await app.inject({
+      const response = await tester.getApp().inject({
         method: 'POST',
         url: '/upload',
         headers: form.getHeaders(),
@@ -309,7 +316,7 @@ describe('Rate Limiting', () => {
       form.append('file', testImage, { filename: `test-${i}.jpg`, contentType: 'image/jpeg' });
       form.append('userId', userId);
 
-      const response = await app.inject({
+      const response = await tester.getApp().inject({
         method: 'POST',
         url: '/upload',
         headers: form.getHeaders(),
@@ -382,7 +389,7 @@ describe('Rate Limiting', () => {
     form.append('file', testImage, { filename: 'test-headers.jpg', contentType: 'image/jpeg' });
     form.append('userId', userId);
 
-    const response = await app.inject({
+    const response = await tester.getApp().inject({
       method: 'POST',
       url: '/upload',
       headers: form.getHeaders(),
@@ -500,7 +507,7 @@ describe('Rate Limiting', () => {
     });
     form.append('userId', userId);
 
-    const response = await app.inject({
+    const response = await tester.getApp().inject({
       method: 'POST',
       url: '/upload',
       headers: form.getHeaders(),

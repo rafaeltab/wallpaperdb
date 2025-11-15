@@ -1,47 +1,48 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { getTestConfig } from './setup.js';
-import { createApp } from '../src/app.js';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  IngestorMigrationsTesterBuilder,
+  InProcessIngestorTesterBuilder,
+} from './builders/index.js';
 
 describe('Health Endpoint', () => {
+  let tester: InstanceType<ReturnType<ReturnType<typeof createDefaultTesterBuilder>['build']>>;
   let fastify: FastifyInstance;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(InProcessIngestorTesterBuilder)
+      .build();
 
-    // Create MinIO bucket before starting the app
-    const s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester = new TesterClass();
 
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket might already exist, that's okay
-      if (error instanceof Error && !error.message.includes('BucketAlreadyOwnedByYou')) {
-        console.error('Failed to create bucket:', error);
-      }
-    }
+    tester
+      .withPostgres((b) => b.withDatabase(`test_health_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((b) => b.withJetstream())
+      .withMigrations()
+      .withInProcessApp();
 
-    // Create the actual app using the real implementation
-    fastify = await createApp(config, { logger: false });
-  }, 60000); // 60 second timeout for beforeAll
+    await tester.setup();
+    fastify = tester.getApp();
+  }, 60000);
 
   afterAll(async () => {
-    if (fastify) {
-      await fastify.close();
+    if (tester) {
+      await tester.destroy();
     }
   });
 

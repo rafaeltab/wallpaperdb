@@ -1,23 +1,19 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import type { JetStreamClient } from 'nats';
 import {
-  S3Client,
-  PutObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  CreateBucketCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import type { NatsConnection, JetStreamClient } from 'nats';
-import { getTestConfig } from './setup.js';
-import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
-import * as schema from '../src/db/schema.js';
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
 import { wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 
-// Import reconciliation functions (will fail - not implemented yet)
+// Import reconciliation functions
 import {
   reconcileStuckUploads,
   reconcileMissingEvents,
@@ -47,82 +43,59 @@ interface WallpaperUploadedEvent {
 }
 
 describe('Reconciliation Service Tests', () => {
-  let pool: Pool;
-  let db: ReturnType<typeof drizzle>;
-  let s3Client: S3Client;
-  let natsClient: NatsConnection;
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+  >;
+
+  let tester: TesterType;
   let js: JetStreamClient;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .build();
 
-    // Setup database connection (reused across all tests)
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
+    tester = new TesterClass();
 
-    // Setup MinIO client (reused across all tests)
-    s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_reconciliation_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS');
 
-    // Create MinIO bucket if it doesn't exist
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket already exists, ignore error
-    }
+    await tester.setup();
 
-    // Initialize global NATS connection (used by reconciliation service)
-    natsClient = await createNatsConnection(config);
+    // Get NATS JetStream client for message count checks
+    const natsClient = tester.nats.getConnection();
     js = natsClient.jetstream();
-
-    // Create JetStream stream for testing
-    const jsm = await natsClient.jetstreamManager();
-    try {
-      await jsm.streams.add({
-        name: config.natsStream,
-        subjects: ['wallpaper.>'],
-      });
-    } catch (error) {
-      // Stream might already exist, ignore error
-    }
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
 
     // Clean up MinIO bucket before each test
-    const listResponse = await s3Client.send(new ListObjectsV2Command({ Bucket: config.s3Bucket }));
-    if (listResponse.Contents) {
-      for (const object of listResponse.Contents) {
-        if (object.Key) {
-          await s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: config.s3Bucket,
-              Key: object.Key,
-            })
-          );
-        }
-      }
+    await tester.minio.cleanupBuckets();
+
+    // Clean up NATS stream before each test
+    try {
+      const natsClient = tester.nats.getConnection();
+      const jsm = await natsClient.jetstreamManager();
+      await jsm.streams.purge('WALLPAPERS');
+    } catch (error) {
+      // Stream might not exist, ignore
     }
   });
 
   afterAll(async () => {
-    // Close all connections after all tests complete
-    await pool.end();
-    await closeNatsConnection();
+    await tester.destroy();
   });
 
   /**
@@ -144,7 +117,7 @@ describe('Reconciliation Service Tests', () => {
     const oldTimestamp = new Date(now.getTime() - minutesAgo * 60 * 1000);
 
     // Create database record
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id,
       userId,
       contentHash: `hash_${id}`,
@@ -168,10 +141,9 @@ describe('Reconciliation Service Tests', () => {
 
     // Optionally create MinIO file
     if (options.hasMinioFile) {
-      const config = getTestConfig();
-      await s3Client.send(
+      await tester.minio.getS3Client().send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: tester.minio.config.buckets[0],
           Key: `${id}/original.jpg`,
           Body: Buffer.from('test image data'),
           ContentType: 'image/jpeg',
@@ -187,11 +159,10 @@ describe('Reconciliation Service Tests', () => {
    */
   async function createOrphanedMinioObject(id?: string) {
     const wallpaperId = id || `wlpr_${ulid()}`;
-    const config = getTestConfig();
 
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: `${wallpaperId}/original.jpg`,
         Body: Buffer.from('orphaned file data'),
         ContentType: 'image/jpeg',
@@ -206,10 +177,9 @@ describe('Reconciliation Service Tests', () => {
    */
   async function minioObjectExists(wallpaperId: string): Promise<boolean> {
     try {
-      const config = getTestConfig();
-      await s3Client.send(
+      await tester.minio.getS3Client().send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: tester.minio.config.buckets[0],
           Key: `${wallpaperId}/original.jpg`,
         })
       );
@@ -223,6 +193,7 @@ describe('Reconciliation Service Tests', () => {
    * Test Helper: Get wallpaper record state from database
    */
   async function getRecordState(id: string) {
+    const db = tester.postgres.getDrizzle();
     const record = await db.query.wallpapers.findFirst({
       where: eq(wallpapers.id, id),
     });
@@ -233,6 +204,7 @@ describe('Reconciliation Service Tests', () => {
    * Test Helper: Wait for NATS event on a subject
    */
   async function waitForNatsEvent(subject: string, timeoutMs = 5000): Promise<unknown> {
+    const natsClient = tester.nats.getConnection();
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         sub.unsubscribe();
@@ -263,8 +235,7 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+      await reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Record should be marked as 'failed'
       const record = await getRecordState(id);
@@ -282,8 +253,7 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+      await reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Record should be moved to 'stored' state
       const record = await getRecordState(id);
@@ -299,8 +269,7 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+      await reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Upload attempts should be incremented
       const record = await getRecordState(id);
@@ -318,8 +287,7 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+      await reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Record should be marked as 'failed'
       const record = await getRecordState(id);
@@ -335,8 +303,7 @@ describe('Reconciliation Service Tests', () => {
       });
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+      await reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Record should remain unchanged
       const record = await getRecordState(id);
@@ -354,7 +321,7 @@ describe('Reconciliation Service Tests', () => {
       const eventPromise = waitForNatsEvent('wallpaper.uploaded');
 
       // Run reconciliation
-      await reconcileMissingEvents(db);
+      await reconcileMissingEvents(tester.postgres.getDrizzle());
 
       // Verify: NATS event was published
       const event = (await eventPromise) as WallpaperUploadedEvent;
@@ -379,7 +346,7 @@ describe('Reconciliation Service Tests', () => {
       ]);
 
       // Run reconciliation
-      await reconcileMissingEvents(db);
+      await reconcileMissingEvents(tester.postgres.getDrizzle());
 
       // Verify: All records moved to 'processing'
       for (const id of ids) {
@@ -396,7 +363,7 @@ describe('Reconciliation Service Tests', () => {
       await closeNatsConnection();
 
       // Run reconciliation (should handle NATS error gracefully)
-      await reconcileMissingEvents(db);
+      await reconcileMissingEvents(tester.postgres.getDrizzle());
 
       // Reconnect for subsequent tests (restore shared connection)
       natsClient = await createNatsConnection(config);
@@ -413,7 +380,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('stored', 3);
 
       // Run reconciliation
-      await reconcileMissingEvents(db);
+      await reconcileMissingEvents(tester.postgres.getDrizzle());
 
       // Verify: Record remains in 'stored' state
       const record = await getRecordState(id);
@@ -428,7 +395,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('initiated', 90); // 90 minutes
 
       // Run reconciliation
-      await reconcileOrphanedIntents(db);
+      await reconcileOrphanedIntents(tester.postgres.getDrizzle());
 
       // Verify: Record should be deleted
       const record = await getRecordState(id);
@@ -440,7 +407,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createStuckUpload('initiated', 30); // 30 minutes
 
       // Run reconciliation
-      await reconcileOrphanedIntents(db);
+      await reconcileOrphanedIntents(tester.postgres.getDrizzle());
 
       // Verify: Record should still exist
       const record = await getRecordState(id);
@@ -455,7 +422,7 @@ describe('Reconciliation Service Tests', () => {
       const storedId = await createStuckUpload('stored', 90);
 
       // Run reconciliation
-      await reconcileOrphanedIntents(db);
+      await reconcileOrphanedIntents(tester.postgres.getDrizzle());
 
       // Verify: Only initiated record deleted
       expect(await getRecordState(initiatedId)).toBeUndefined();
@@ -470,7 +437,7 @@ describe('Reconciliation Service Tests', () => {
       );
 
       // Run reconciliation
-      await reconcileOrphanedIntents(db);
+      await reconcileOrphanedIntents(tester.postgres.getDrizzle());
 
       // Verify: All records deleted
       for (const id of ids) {
@@ -489,8 +456,7 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+      await reconcileOrphanedMinioObjects(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: MinIO object should be deleted
       expect(await minioObjectExists(id)).toBe(false);
@@ -501,7 +467,7 @@ describe('Reconciliation Service Tests', () => {
       const id = await createOrphanedMinioObject();
 
       // Create corresponding 'failed' DB record
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id,
         userId: 'test-user',
         contentHash: `hash_${id}`,
@@ -515,8 +481,7 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+      await reconcileOrphanedMinioObjects(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: MinIO object should be deleted
       expect(await minioObjectExists(id)).toBe(false);
@@ -532,8 +497,7 @@ describe('Reconciliation Service Tests', () => {
       expect(await minioObjectExists(id)).toBe(true);
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+      await reconcileOrphanedMinioObjects(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: MinIO object should still exist
       expect(await minioObjectExists(id)).toBe(true);
@@ -544,8 +508,7 @@ describe('Reconciliation Service Tests', () => {
       const ids = await Promise.all(Array.from({ length: 20 }, () => createOrphanedMinioObject()));
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+      await reconcileOrphanedMinioObjects(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: All orphaned objects deleted
       for (const id of ids) {
@@ -567,8 +530,7 @@ describe('Reconciliation Service Tests', () => {
       ]);
 
       // Run reconciliation
-      const config = getTestConfig();
-      await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+      await reconcileOrphanedMinioObjects(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client());
 
       // Verify: Valid object preserved
       expect(await minioObjectExists(validId)).toBe(true);

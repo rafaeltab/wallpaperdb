@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
-import { Pool } from 'pg';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import type { JetStreamClient } from 'nats';
 import {
-  S3Client,
-  PutObjectCommand,
-  CreateBucketCommand,
-  DeleteObjectCommand,
-  ListObjectsV2Command,
-} from '@aws-sdk/client-s3';
-import type { NatsConnection, JetStreamClient } from 'nats';
-import { getTestConfig } from './setup.js';
-import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
 import { type NewWallpaper, wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 import {
@@ -38,95 +36,56 @@ import * as schema from '../src/db/schema.js';
  */
 
 describe('Multi-Instance Safety Tests', () => {
-  let pool: Pool;
-  let db: NodePgDatabase<typeof schema>;
-  let s3Client: S3Client;
-  let natsClient: NatsConnection;
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+  >;
+
+  let tester: TesterType;
   let js: JetStreamClient;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .build();
 
-    // Setup database connection
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
+    tester = new TesterClass();
 
-    // Setup MinIO client
-    s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_multi_instance_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS');
 
-    // Create MinIO bucket if it doesn't exist
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket already exists, ignore
-    }
+    await tester.setup();
 
-    // Initialize NATS connection
-    natsClient = await createNatsConnection(config);
+    // Get NATS JetStream client for message count checks
+    const natsClient = tester.nats.getConnection();
     js = natsClient.jetstream();
-
-    // Create JetStream stream for testing
-    const jsm = await natsClient.jetstreamManager();
-    try {
-      await jsm.streams.add({
-        name: config.natsStream,
-        subjects: ['wallpaper.>'],
-      });
-    } catch (error) {
-      // Stream might already exist, ignore
-    }
   });
 
   afterAll(async () => {
-    await closeNatsConnection();
-    await pool.end();
+    await tester.destroy();
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
 
     // Clean up MinIO bucket
-    try {
-      const listResponse = await s3Client.send(
-        new ListObjectsV2Command({
-          Bucket: config.s3Bucket,
-        })
-      );
-
-      if (listResponse.Contents && listResponse.Contents.length > 0) {
-        for (const object of listResponse.Contents) {
-          if (object.Key) {
-            await s3Client.send(
-              new DeleteObjectCommand({
-                Bucket: config.s3Bucket,
-                Key: object.Key,
-              })
-            );
-          }
-        }
-      }
-    } catch (error) {
-      // Ignore cleanup errors
-    }
+    await tester.minio.cleanupBuckets();
 
     // Clean up NATS stream before each test
     try {
+      const natsClient = tester.nats.getConnection();
       const jsm = await natsClient.jetstreamManager();
-      await jsm.streams.purge(config.natsStream);
+      await jsm.streams.purge('WALLPAPERS');
     } catch (error) {
       // Stream might not exist, ignore
     }
@@ -136,6 +95,9 @@ describe('Multi-Instance Safety Tests', () => {
     // Create 20 stuck uploads (in 'uploading' state for >10 minutes)
     const stuckUploads: string[] = [];
     const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const bucket = tester.minio.config.buckets[0];
+    const db = tester.postgres.getDrizzle();
+    const s3Client = tester.minio.getS3Client();
 
     for (let i = 0; i < 20; i++) {
       const id = `wlpr_test_stuck_${i}_${ulid()}`;
@@ -144,7 +106,7 @@ describe('Multi-Instance Safety Tests', () => {
       // Upload file to MinIO first
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: bucket,
           Key: storageKey,
           Body: testImage,
           ContentType: 'image/jpeg',
@@ -166,9 +128,9 @@ describe('Multi-Instance Safety Tests', () => {
 
     // Simulate 3 instances running reconciliation concurrently
     const workers = [
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
     ];
 
     await Promise.all(workers);
@@ -198,6 +160,8 @@ describe('Multi-Instance Safety Tests', () => {
   it('should handle concurrent missing event publishing without duplicates', async () => {
     // Create 30 records in 'stored' state (awaiting NATS publish)
     const storedRecords: string[] = [];
+    const bucket = tester.minio.config.buckets[0];
+    const db = tester.postgres.getDrizzle();
 
     for (let i = 0; i < 30; i++) {
       const id = `wlpr_test_stored_${i}_${ulid()}`;
@@ -216,7 +180,7 @@ describe('Multi-Instance Safety Tests', () => {
         width: 1920,
         height: 1080,
         storageKey,
-        storageBucket: config.s3Bucket,
+        storageBucket: bucket,
         originalFilename: `test_${i}.jpg`,
       });
 
@@ -258,8 +222,9 @@ describe('Multi-Instance Safety Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Get stream info to count total messages
+    const natsClient = tester.nats.getConnection();
     const jsm = await natsClient.jetstreamManager();
-    const streamInfo = await jsm.streams.info(config.natsStream);
+    const streamInfo = await jsm.streams.info('WALLPAPERS');
     const totalMessages = streamInfo.state.messages;
 
     // Should have exactly 30 messages, NOT 90 (30 * 3 workers)
@@ -270,6 +235,7 @@ describe('Multi-Instance Safety Tests', () => {
   it('should handle concurrent orphaned intent cleanup without errors', async () => {
     // Create 15 orphaned intents (in 'initiated' state for >1 hour)
     const orphanedIntents: string[] = [];
+    const db = tester.postgres.getDrizzle();
 
     for (let i = 0; i < 15; i++) {
       const id = `wlpr_test_intent_${i}_${ulid()}`;
@@ -306,6 +272,9 @@ describe('Multi-Instance Safety Tests', () => {
 
   it('should handle race conditions with 5 concurrent workers (stress test)', async () => {
     const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const bucket = tester.minio.config.buckets[0];
+    const db = tester.postgres.getDrizzle();
+    const s3Client = tester.minio.getS3Client();
 
     // Create 50 stuck uploads (in 'uploading' state)
     const uploadingIds: string[] = [];
@@ -316,7 +285,7 @@ describe('Multi-Instance Safety Tests', () => {
       // Upload file to MinIO
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: bucket,
           Key: storageKey,
           Body: testImage,
           ContentType: 'image/jpeg',
@@ -355,7 +324,7 @@ describe('Multi-Instance Safety Tests', () => {
         width: 1920,
         height: 1080,
         storageKey,
-        storageBucket: config.s3Bucket,
+        storageBucket: bucket,
         originalFilename: `test_${i}.jpg`,
       });
 
@@ -384,7 +353,7 @@ describe('Multi-Instance Safety Tests', () => {
     for (let i = 0; i < 5; i++) {
       workers.push(
         (async () => {
-          await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+          await reconcileStuckUploads(bucket, db, s3Client);
           await reconcileMissingEvents(db);
           await reconcileOrphanedIntents(db);
         })()
@@ -440,8 +409,9 @@ describe('Multi-Instance Safety Tests', () => {
     // NOT 150 (30 * 5 workers)
     await new Promise((resolve) => setTimeout(resolve, 500));
 
+    const natsClient = tester.nats.getConnection();
     const jsm = await natsClient.jetstreamManager();
-    const streamInfo = await jsm.streams.info(config.natsStream);
+    const streamInfo = await jsm.streams.info('WALLPAPERS');
     const totalMessages = streamInfo.state.messages;
 
     // Should have exactly 30 messages, NOT 150 (30 * 5 workers)
@@ -450,6 +420,9 @@ describe('Multi-Instance Safety Tests', () => {
 
   it('should not create duplicate records when multiple instances process same upload', async () => {
     const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const bucket = tester.minio.config.buckets[0];
+    const db = tester.postgres.getDrizzle();
+    const s3Client = tester.minio.getS3Client();
 
     // Create 10 stuck uploads
     for (let i = 0; i < 10; i++) {
@@ -458,7 +431,7 @@ describe('Multi-Instance Safety Tests', () => {
 
       await s3Client.send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: bucket,
           Key: storageKey,
           Body: testImage,
           ContentType: 'image/jpeg',
@@ -477,10 +450,10 @@ describe('Multi-Instance Safety Tests', () => {
 
     // Run 4 workers simultaneously (high concurrency)
     const workers = [
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
-      reconcileStuckUploads(config.s3Bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
+      reconcileStuckUploads(bucket, db, s3Client),
     ];
 
     await Promise.all(workers);
@@ -502,6 +475,9 @@ describe('Multi-Instance Safety Tests', () => {
     ];
 
     const testImage = await createTestImage({ width: 1920, height: 1080, format: 'jpeg' });
+    const bucket = tester.minio.config.buckets[0];
+    const db = tester.postgres.getDrizzle();
+    const s3Client = tester.minio.getS3Client();
     let recordCount = 0;
 
     for (const { state, count, stateAge } of states) {
@@ -513,7 +489,7 @@ describe('Multi-Instance Safety Tests', () => {
           // Upload to MinIO for stuck uploads
           await s3Client.send(
             new PutObjectCommand({
-              Bucket: config.s3Bucket,
+              Bucket: bucket,
               Key: storageKey,
               Body: testImage,
               ContentType: 'image/jpeg',
@@ -538,7 +514,7 @@ describe('Multi-Instance Safety Tests', () => {
           values.width = 1920;
           values.height = 1080;
           values.storageKey = storageKey;
-          values.storageBucket = config.s3Bucket;
+          values.storageBucket = bucket;
           values.originalFilename = `test_${i}.jpg`;
         }
 
@@ -552,7 +528,7 @@ describe('Multi-Instance Safety Tests', () => {
     for (let i = 0; i < 3; i++) {
       workers.push(
         (async () => {
-          await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+          await reconcileStuckUploads(bucket, db, s3Client);
           await reconcileMissingEvents(db);
           await reconcileOrphanedIntents(db);
         })()

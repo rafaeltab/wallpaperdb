@@ -1,61 +1,65 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { CreateBucketCommand } from '@aws-sdk/client-s3';
-import { getTestConfig } from './setup.js';
-import { createApp } from '../src/app.js';
-import { TEST_IMAGES, INVALID_FILE, generateTestUserId, generateTestFilename } from './fixtures.js';
-import { uploadFile, cleanupMinio } from './helpers.js';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  FixturesTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  IngestorMigrationsTesterBuilder,
+  InProcessIngestorTesterBuilder,
+} from './builders/index.js';
+import { uploadFile } from './helpers.js';
 
 describe('Validation Integration Tests', () => {
+  let tester: InstanceType<ReturnType<ReturnType<typeof createDefaultTesterBuilder>['build']>>;
   let fastify: FastifyInstance;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(FixturesTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(InProcessIngestorTesterBuilder)
+      .build();
 
-    // Create MinIO bucket
-    const { S3Client } = await import('@aws-sdk/client-s3');
-    const s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester = new TesterClass();
 
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket might already exist
-    }
+    tester
+      .withPostgres((b) => b.withDatabase(`test_validation_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((b) => b.withJetstream())
+      .withMigrations()
+      .withInProcessApp();
 
-    // Create the app
-    fastify = await createApp(config, { logger: false });
+    await tester.setup();
+    fastify = tester.getApp();
   }, 60000);
 
   afterAll(async () => {
-    if (fastify) {
-      await fastify.close();
+    if (tester) {
+      await tester.destroy();
     }
   });
 
   beforeEach(async () => {
-    await cleanupMinio(config);
+    await tester.minio.cleanupBuckets();
   });
 
   describe('File Format Validation', () => {
     it('should reject invalid file format with RFC 7807 error', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'invalid.txt';
 
       const response = await uploadFile(fastify, {
-        file: INVALID_FILE,
+        file: tester.fixtures.INVALID_FILE,
         filename,
         userId,
         mimeType: 'text/plain',
@@ -80,9 +84,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept valid JPEG format', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -95,9 +99,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept valid PNG format', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('png');
-      const imageBuffer = await TEST_IMAGES.validPng();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('png');
+      const imageBuffer = await tester.fixtures.images.validPng();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -110,9 +114,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept valid WebP format', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('webp');
-      const imageBuffer = await TEST_IMAGES.validWebp();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('webp');
+      const imageBuffer = await tester.fixtures.images.validWebp();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -125,9 +129,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should detect MIME type from content, not extension', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'fake.jpg'; // Wrong extension
-      const imageBuffer = await TEST_IMAGES.validPng(); // But actually PNG
+      const imageBuffer = await tester.fixtures.images.validPng(); // But actually PNG
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -146,8 +150,8 @@ describe('Validation Integration Tests', () => {
 
   describe('File Size Validation', () => {
     it('should reject file larger than limit with RFC 7807 error', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
 
       // Create a large buffer to simulate >50MB file
       // Note: We'll mock this as creating a real 50MB+ file is slow
@@ -180,9 +184,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept file within size limit', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -197,9 +201,9 @@ describe('Validation Integration Tests', () => {
 
   describe('Dimension Validation', () => {
     it('should reject image with dimensions too small', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.tooSmall(); // 800x600
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.tooSmall(); // 800x600
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -231,9 +235,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should reject image with dimensions too large', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.tooLarge(); // 8000x5000
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.tooLarge(); // 8192x8192
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -249,16 +253,16 @@ describe('Validation Integration Tests', () => {
       expect(body.type).toContain('dimensions-out-of-bounds');
       expect(body.title).toBe('Dimensions Out of Bounds');
       expect(body.status).toBe(400);
-      expect(body.width).toBe(8000);
-      expect(body.height).toBe(5000);
+      expect(body.width).toBe(8192);
+      expect(body.height).toBe(8192);
       expect(body.maxWidth).toBe(7680);
       expect(body.maxHeight).toBe(4320);
     });
 
     it('should accept image with valid dimensions', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg(); // 1920x1080
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg(); // 1920x1080
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -271,12 +275,11 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept minimum valid dimensions (1280x720)', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
 
       // Create image with minimum dimensions
-      const { createTestImage } = await import('./fixtures.js');
-      const imageBuffer = await createTestImage({
+      const imageBuffer = await tester.fixtures.createTestImage({
         width: 1280,
         height: 720,
         format: 'jpeg',
@@ -293,12 +296,11 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept maximum valid dimensions (7680x4320)', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
 
       // Create image with maximum dimensions (8K)
-      const { createTestImage } = await import('./fixtures.js');
-      const imageBuffer = await createTestImage({
+      const imageBuffer = await tester.fixtures.createTestImage({
         width: 7680,
         height: 4320,
         format: 'jpeg',
@@ -317,9 +319,9 @@ describe('Validation Integration Tests', () => {
 
   describe('Filename Sanitization', () => {
     it('should accept upload with path traversal characters in filename', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const maliciousFilename = '../../../etc/passwd.jpg';
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -334,9 +336,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept upload with special characters in filename', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'test<script>alert(1)</script>.jpg';
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -351,9 +353,9 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should accept upload with very long filename', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const longFilename = `${'a'.repeat(300)}.jpg`; // >255 chars
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -370,7 +372,7 @@ describe('Validation Integration Tests', () => {
 
   describe('Missing File Validation', () => {
     it('should reject request without file', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
 
       // Create a request without file
       const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
@@ -402,9 +404,9 @@ describe('Validation Integration Tests', () => {
 
   describe('User-Specific Validation Limits', () => {
     it('should apply validation limits from ValidationLimitsService', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -423,7 +425,7 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should respect allowed formats from user limits', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'test.bmp'; // BMP not in allowed formats
 
       // Create a fake BMP buffer
@@ -445,11 +447,11 @@ describe('Validation Integration Tests', () => {
 
   describe('RFC 7807 Problem Details Format', () => {
     it('should return proper content-type for all errors', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'invalid.txt';
 
       const response = await uploadFile(fastify, {
-        file: INVALID_FILE,
+        file: tester.fixtures.INVALID_FILE,
         filename,
         userId,
         mimeType: 'text/plain',
@@ -460,11 +462,11 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should include all required RFC 7807 fields', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'invalid.txt';
 
       const response = await uploadFile(fastify, {
-        file: INVALID_FILE,
+        file: tester.fixtures.INVALID_FILE,
         filename,
         userId,
         mimeType: 'text/plain',
@@ -490,8 +492,8 @@ describe('Validation Integration Tests', () => {
     });
 
     it('should include extension fields for context', async () => {
-      const userId = generateTestUserId();
-      const imageBuffer = await TEST_IMAGES.tooSmall();
+      const userId = tester.fixtures.generateTestUserId();
+      const imageBuffer = await tester.fixtures.images.tooSmall();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,

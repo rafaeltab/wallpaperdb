@@ -60,6 +60,7 @@ class PostgresBuilder {
 export interface PostgresConfig {
   container: StartedPostgreSqlContainer;
   connectionString: string;
+  externalConnectionString: string;
   host: string;
   port: number;
   database: string;
@@ -92,6 +93,9 @@ class PostgresHelpers {
    * Get a cached postgres.js client connection.
    * Creates the connection on first access and reuses it.
    *
+   * Uses the external connection string (host-accessible) for operations initiated from test code.
+   * This ensures compatibility with Docker networks where internal aliases aren't resolvable from host.
+   *
    * @returns postgres.js client
    *
    * @example
@@ -102,7 +106,7 @@ class PostgresHelpers {
    */
   getClient(): PostgresType {
     if (!this.client) {
-      this.client = createPostgresClient(this.config.connectionString, { max: 10 });
+      this.client = createPostgresClient(this.config.externalConnectionString, { max: 10 });
     }
     return this.client;
   }
@@ -226,7 +230,7 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<
           console.log('Starting PostgreSQL container...');
 
           // Check if network is available (properly typed now!)
-          const dockerNetwork = this.docker.network;
+          const dockerNetwork = this.docker?.network;
 
           let container = new PostgreSqlContainer(image)
             .withDatabase(database)
@@ -243,20 +247,26 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<
           const host = dockerNetwork ? networkAlias : started.getHost();
           const port = dockerNetwork ? 5432 : started.getPort();
 
+          // Internal connection string: used for container-to-container communication
           const connectionString = dockerNetwork
             ? `postgresql://${username}:${password}@${host}:5432/${database}`
             : started.getConnectionUri();
 
+          // External connection string: used for host-to-container communication
+          // Always uses mapped port accessible from host
+          const externalConnectionString = started.getConnectionUri();
+
           this._postgresConfig = {
             container: started,
             connectionString: connectionString,
+            externalConnectionString: externalConnectionString,
             host: host,
             port: port,
             database: database,
             options: options,
           };
 
-          console.log(`PostgreSQL started: ${connectionString}`);
+          console.log(`PostgreSQL started: ${connectionString} (internal), ${externalConnectionString} (external)`);
         });
 
         this.addDestroyHook(async () => {

@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../src/app.js';
-import { getTestConfig } from './setup.js';
 import FormData from 'form-data';
 import { createTestImage } from './fixtures.js';
-import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
-import { Pool } from 'pg';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import * as schema from '../src/db/schema.js';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  RedisTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
+import { IngestorMigrationsTesterBuilder } from './builders/IngestorMigrationsBuilder.js';
 import { wallpapers } from '../src/db/schema.js';
+import { loadConfig } from '../src/config.js';
 
 /**
  * E2E Multi-Instance Rate Limiting Tests
@@ -26,77 +31,74 @@ import { wallpapers } from '../src/db/schema.js';
  */
 
 describe('E2E Multi-Instance Rate Limiting', () => {
-  let redisContainer: StartedTestContainer;
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+    | typeof RedisTesterBuilder
+    | typeof IngestorMigrationsTesterBuilder
+  >;
+
+  let tester: TesterType;
   let app1: FastifyInstance;
   let app2: FastifyInstance;
   let app3: FastifyInstance;
-  let config: ReturnType<typeof getTestConfig>;
-  let pool: Pool;
-  let db: NodePgDatabase<typeof schema>;
 
   beforeAll(async () => {
-    // Get base test config
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(RedisTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .build();
 
-    // Create S3 client
-    const s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester = new TesterClass();
 
-    // Create MinIO bucket
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket might already exist
-    }
+    tester
+      .withPostgres((builder) =>
+        builder.withDatabase(`test_ratelimit_distributed_${Date.now()}`)
+      )
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS')
+      .withRedis()
+      .withMigrations();
 
-    // Setup database connection
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
+    await tester.setup();
 
-    // Start Redis container
-    console.log('Starting Redis container...');
-    redisContainer = await new GenericContainer('redis:7-alpine')
-      .withExposedPorts(6379)
-      .withHealthCheck({
-        test: ['CMD', 'redis-cli', 'ping'],
-        interval: 1000,
-        timeout: 3000,
-        retries: 5,
-      })
-      .start();
-
-    const redisHost = redisContainer.getHost();
-    const redisPort = redisContainer.getMappedPort(6379);
-
-    console.log(`Redis started at ${redisHost}:${redisPort}`);
-
-    // Create test config with Redis and low rate limits
-    const testConfig = {
-      ...config,
-      redisHost,
-      redisPort,
-      redisEnabled: true,
-      rateLimitMax: 10, // Low limit for testing
-      rateLimitWindowMs: 10000, // 10 seconds
-    };
-
-    // Start 3 app instances on different ports
     console.log('Starting app instances...');
 
-    const config1 = { ...testConfig, port: 0 }; // Use random port
-    const config2 = { ...testConfig, port: 0 };
-    const config3 = { ...testConfig, port: 0 };
+    // Get infrastructure endpoints
+    const postgres = tester.postgres;
+    const minio = tester.minio;
+    const nats = tester.nats;
+    const redis = tester.redis;
+
+    // Set environment variables for all app instances
+    process.env.NODE_ENV = 'test';
+    process.env.DATABASE_URL = postgres.connectionString;
+    process.env.S3_ENDPOINT = minio.endpoint;
+    process.env.S3_ACCESS_KEY_ID = minio.options.accessKey;
+    process.env.S3_SECRET_ACCESS_KEY = minio.options.secretKey;
+    process.env.S3_BUCKET = minio.buckets[0];
+    process.env.NATS_URL = nats.endpoint;
+    process.env.NATS_STREAM = nats.streams[0];
+    process.env.REDIS_HOST = redis.host;
+    process.env.REDIS_PORT = String(redis.port);
+    process.env.REDIS_ENABLED = 'true';
+    process.env.RATE_LIMIT_MAX = '10';
+    process.env.RATE_LIMIT_WINDOW_MS = '10000';
+
+    const config = loadConfig();
+
+    // Start 3 app instances
+    const config1 = { ...config, port: 0 }; // Use random port
+    const config2 = { ...config, port: 0 };
+    const config3 = { ...config, port: 0 };
 
     app1 = await createApp(config1, { logger: false, enableOtel: false });
     app2 = await createApp(config2, { logger: false, enableOtel: false });
@@ -113,15 +115,14 @@ describe('E2E Multi-Instance Rate Limiting', () => {
     await app1.close();
     await app2.close();
     await app3.close();
-    await pool.end();
-    await redisContainer.stop();
+    await tester.destroy();
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
     // Flush Redis before each test
-    await redisContainer.exec(['redis-cli', 'FLUSHALL']);
+    await tester.redis.flush();
   });
 
   it('should enforce rate limit across all instances (not per-instance)', async () => {

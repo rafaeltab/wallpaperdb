@@ -1,8 +1,59 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import { request } from 'undici';
-import { baseUrl } from './setup.js';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  ContainerizedIngestorTesterBuilder,
+  IngestorMigrationsTesterBuilder,
+} from './builders/index.js';
 
 describe('Health Endpoint E2E', () => {
+  let tester: InstanceType<ReturnType<ReturnType<typeof createDefaultTesterBuilder>['build']>>;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(ContainerizedIngestorTesterBuilder)
+      .build();
+
+    tester = new TesterClass();
+
+    tester
+      .withNetwork()
+      .withPostgres((builder) =>
+        builder
+          .withDatabase(`test_e2e_health_${Date.now()}`)
+          .withNetworkAlias('postgres')
+      )
+      .withMinio((builder) => builder.withNetworkAlias('minio'))
+      .withMinioBucket('wallpapers')
+      .withNats((builder) =>
+        builder.withNetworkAlias('nats').withJetstream()
+      )
+      .withStream('WALLPAPERS')
+      .withMigrations()
+      .withContainerizedApp();
+
+    await tester.setup();
+    baseUrl = tester.getBaseUrl();
+  }, 120000);
+
+  afterAll(async () => {
+    if (tester) {
+      await tester.destroy();
+    }
+  });
+
   test('GET /health returns healthy status', async () => {
     // Act: Make HTTP request to Docker container
     const response = await request(`${baseUrl}/health`, {

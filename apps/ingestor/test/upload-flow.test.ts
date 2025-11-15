@@ -1,67 +1,70 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { S3Client, GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { getTestConfig } from './setup.js';
-import { createApp } from '../src/app.js';
+import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import {
-  TEST_IMAGES,
-  generateTestUserId,
-  generateTestFilename,
-  generateContentHash,
-} from './fixtures.js';
-import { uploadFile, cleanupMinio } from './helpers.js';
-import { CreateBucketCommand } from '@aws-sdk/client-s3';
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  FixturesTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  IngestorMigrationsTesterBuilder,
+  InProcessIngestorTesterBuilder,
+} from './builders/index.js';
+import { uploadFile } from './helpers.js';
 
 describe('Upload Flow Integration Tests', () => {
+  let tester: InstanceType<ReturnType<ReturnType<typeof createDefaultTesterBuilder>['build']>>;
   let fastify: FastifyInstance;
-  let config: ReturnType<typeof getTestConfig>;
-  let s3Client: S3Client;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    // Build test environment with TesterBuilder pattern
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(FixturesTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(InProcessIngestorTesterBuilder)
+      .build();
 
-    // Create S3 client
-    s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester = new TesterClass();
 
-    // Create MinIO bucket
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket might already exist
-    }
+    // Configure infrastructure
+    tester
+      .withPostgres((b) => b.withDatabase(`test_upload_flow_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((b) => b.withJetstream())
+      .withStream('WALLPAPERS')
+      .withMigrations()        // Apply database migrations
+      .withInProcessApp();     // Create Fastify app
 
-    // Create the app
-    fastify = await createApp(config, { logger: false });
+    await tester.setup();
+
+    // Get the Fastify app instance
+    fastify = tester.getApp();
   }, 60000);
 
   afterAll(async () => {
-    if (fastify) {
-      await fastify.close();
+    if (tester) {
+      await tester.destroy();
     }
   });
 
   beforeEach(async () => {
-    // Clean up before each test
-    await cleanupMinio(config);
+    // Clean up MinIO before each test
+    await tester.minio.cleanupBuckets();
   });
 
   describe('Happy Path - Upload Valid Image', () => {
     it('should successfully upload a valid JPEG image', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -86,9 +89,11 @@ describe('Upload Flow Integration Tests', () => {
 
       // Verify file is stored in MinIO
       const storageKey = `${body.id}/original.jpg`;
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const headResponse = await s3Client.send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: storageKey,
         })
       );
@@ -97,9 +102,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should successfully upload a valid PNG image', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('png');
-      const imageBuffer = await TEST_IMAGES.validPng();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('png');
+      const imageBuffer = await tester.fixtures.images.validPng();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -118,9 +123,11 @@ describe('Upload Flow Integration Tests', () => {
 
       // Verify storage
       const storageKey = `${body.id}/original.png`;
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const headResponse = await s3Client.send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: storageKey,
         })
       );
@@ -128,9 +135,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should successfully upload a valid WebP image', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('webp');
-      const imageBuffer = await TEST_IMAGES.validWebp();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('webp');
+      const imageBuffer = await tester.fixtures.images.validWebp();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -147,9 +154,11 @@ describe('Upload Flow Integration Tests', () => {
 
       // Verify storage
       const storageKey = `${body.id}/original.webp`;
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const headResponse = await s3Client.send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: storageKey,
         })
       );
@@ -159,9 +168,9 @@ describe('Upload Flow Integration Tests', () => {
 
   describe('Idempotency & Deduplication', () => {
     it('should return existing upload when same file is uploaded twice', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.duplicate();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       // First upload
       const response1 = await uploadFile(fastify, {
@@ -192,10 +201,10 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should allow same file to be uploaded by different users', async () => {
-      const user1 = generateTestUserId();
-      const user2 = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.duplicate();
+      const user1 = tester.fixtures.generateTestUserId();
+      const user2 = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       // Upload by user 1
       const response1 = await uploadFile(fastify, {
@@ -224,10 +233,10 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should calculate correct content hash for uploaded files', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
-      const expectedHash = generateContentHash(imageBuffer);
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
+      const expectedHash = await tester.fixtures.generateContentHash(imageBuffer);
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -247,9 +256,9 @@ describe('Upload Flow Integration Tests', () => {
 
   describe('Database State Machine', () => {
     it('should record wallpaper with correct state transitions', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -268,9 +277,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should store all required metadata in database', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -295,9 +304,9 @@ describe('Upload Flow Integration Tests', () => {
 
   describe('File Metadata Extraction', () => {
     it('should extract correct dimensions from image', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -314,9 +323,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should calculate correct aspect ratio', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -334,9 +343,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should detect correct MIME type from file content', async () => {
-      const userId = generateTestUserId();
+      const userId = tester.fixtures.generateTestUserId();
       const filename = 'fake.jpg'; // Wrong extension
-      const imageBuffer = await TEST_IMAGES.validPng(); // But actual PNG
+      const imageBuffer = await tester.fixtures.images.validPng(); // But actual PNG
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -355,9 +364,9 @@ describe('Upload Flow Integration Tests', () => {
 
   describe('Storage Organization', () => {
     it('should store file in correct MinIO path structure', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -372,9 +381,11 @@ describe('Upload Flow Integration Tests', () => {
       // Should be stored as: wlpr_<ulid>/original.jpg
       const expectedKey = `${body.id}/original.jpg`;
 
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const headResponse = await s3Client.send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: expectedKey,
         })
       );
@@ -383,9 +394,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should set correct content type in MinIO', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('png');
-      const imageBuffer = await TEST_IMAGES.validPng();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('png');
+      const imageBuffer = await tester.fixtures.images.validPng();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -398,9 +409,11 @@ describe('Upload Flow Integration Tests', () => {
       const body = JSON.parse(response.body);
 
       const storageKey = `${body.id}/original.png`;
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const headResponse = await s3Client.send(
         new HeadObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: storageKey,
         })
       );
@@ -409,9 +422,9 @@ describe('Upload Flow Integration Tests', () => {
     });
 
     it('should store file content correctly in MinIO', async () => {
-      const userId = generateTestUserId();
-      const filename = generateTestFilename('jpg');
-      const imageBuffer = await TEST_IMAGES.validJpeg();
+      const userId = tester.fixtures.generateTestUserId();
+      const filename = tester.fixtures.generateTestFilename('jpg');
+      const imageBuffer = await tester.fixtures.images.validJpeg();
 
       const response = await uploadFile(fastify, {
         file: imageBuffer,
@@ -425,9 +438,11 @@ describe('Upload Flow Integration Tests', () => {
 
       // Retrieve the file from MinIO
       const storageKey = `${body.id}/original.jpg`;
+      const s3Client = tester.minio.getS3Client();
+      const minioConfig = tester.getMinio();
       const getResponse = await s3Client.send(
         new GetObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: minioConfig.buckets[0],
           Key: storageKey,
         })
       );
@@ -442,8 +457,8 @@ describe('Upload Flow Integration Tests', () => {
       const storedBuffer = Buffer.concat(chunks);
 
       // Content hashes should match
-      const originalHash = generateContentHash(imageBuffer);
-      const storedHash = generateContentHash(storedBuffer);
+      const originalHash = await tester.fixtures.generateContentHash(imageBuffer);
+      const storedHash = await tester.fixtures.generateContentHash(storedBuffer);
       expect(storedHash).toBe(originalHash);
     });
   });

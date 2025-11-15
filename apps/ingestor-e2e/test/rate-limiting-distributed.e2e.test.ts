@@ -9,18 +9,18 @@
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { request } from 'undici';
-import { S3Client, CreateBucketCommand } from '@aws-sdk/client-s3';
-import { Pool } from 'pg';
 import sharp from 'sharp';
-import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers/containers';
-import type { StartedMinioContainer } from '@testcontainers/minio';
-import { GenericContainer, Network, type StartedNetwork, type StartedTestContainer, Wait } from 'testcontainers';
-import { readFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import {
+	createDefaultTesterBuilder,
+	DockerTesterBuilder,
+	PostgresTesterBuilder,
+	MinioTesterBuilder,
+	NatsTesterBuilder,
+	RedisTesterBuilder,
+	type TesterInstance,
+} from '@wallpaperdb/test-utils';
+import { ContainerizedIngestorTesterBuilder } from './builders/ContainerizedIngestorBuilder.js';
+import { IngestorMigrationsTesterBuilder } from './builders/IngestorMigrationsTesterBuilder.js';
 
 /**
  * Test Scenarios:
@@ -74,199 +74,98 @@ function createFormData(imageBuffer: Buffer, userId: string, filename = 'test.jp
 }
 
 describe('E2E Multi-Instance Rate Limiting', () => {
-    let network: StartedNetwork;
-    let postgresContainer: StartedPostgreSqlContainer;
-    let minioContainer: StartedMinioContainer;
-    let natsContainer: StartedNatsContainer;
-    let redisContainer: StartedTestContainer;
-    let ingestor1: StartedTestContainer;
-    let ingestor2: StartedTestContainer;
-    let ingestor3: StartedTestContainer;
+    type TesterType = TesterInstance<
+        | typeof DockerTesterBuilder
+        | typeof PostgresTesterBuilder
+        | typeof MinioTesterBuilder
+        | typeof NatsTesterBuilder
+        | typeof RedisTesterBuilder
+        | typeof IngestorMigrationsTesterBuilder
+        | typeof ContainerizedIngestorTesterBuilder
+    >;
 
+    let tester: TesterType;
     let baseUrl1: string;
     let baseUrl2: string;
     let baseUrl3: string;
-    let databaseUrl: string;
-    let s3Bucket: string;
 
     beforeAll(async () => {
-        console.log('Starting infrastructure containers...');
-
-        // Create shared Docker network
-        network = await new Network().start();
-        console.log('Docker network created');
-
-        // Start PostgreSQL
-        postgresContainer = await new PostgreSqlContainer('postgres:16-alpine')
-            .withDatabase('wallpaperdb_e2e_rate_limit_test')
-            .withUsername('test')
-            .withPassword('test')
-            .withNetwork(network)
-            .withNetworkAliases('postgres')
-            .start();
-        console.log('PostgreSQL container started');
-
-        // Start MinIO
-        const { MinioContainer } = await import('@testcontainers/minio');
-        minioContainer = await new MinioContainer('minio/minio:latest')
-            .withNetwork(network)
-            .withNetworkAliases('minio')
-            .start();
-        console.log('MinIO container started');
-
-        // Start NATS with JetStream
-        natsContainer = await createNatsContainer({
-            networkAliases: ['nats'],
-            enableJetStream: true,
-            network: network,
-        });
-        console.log('NATS container started');
-
-        // Start Redis container
-        redisContainer = await new GenericContainer('redis:7-alpine')
-            .withExposedPorts(6379)
-            .withNetwork(network)
-            .withNetworkAliases('redis')
-            .withCommand(['redis-server', '--appendonly', 'yes'])
-            .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
-            .start();
-        console.log('Redis container started');
-
-        // Initialize JetStream stream
-        const { connect } = await import('nats');
-        const nc = await connect({ servers: natsContainer.getConnectionUrl() });
-        const jsm = await nc.jetstreamManager();
-
-        try {
-            await jsm.streams.add({
-                name: 'WALLPAPERS_E2E_RATE_LIMIT_TEST',
-                subjects: ['wallpaper.>'],
-            });
-            console.log('JetStream stream created');
-        } catch (error: any) {
-            if (!error.message?.includes('stream name already in use')) {
-                console.error('Failed to create JetStream stream:', error);
+        /**
+         * Pattern: Subclassing to Pass Constructor Options
+         *
+         * The TesterBuilder framework's `.with()` method instantiates builders with no arguments.
+         * When a builder requires constructor parameters (like ContainerizedIngestorTesterBuilder),
+         * create a subclass that calls super() with the desired configuration.
+         *
+         * This approach maintains type safety while working within the framework's constraints.
+         */
+        class DistributedIngestorTesterBuilder extends ContainerizedIngestorTesterBuilder {
+            constructor() {
+                super({
+                    instances: 3,
+                    enableRedis: true,
+                    config: {
+                        rateLimitMax: 10,
+                        rateLimitWindowMs: 10000,
+                        reconciliationIntervalMs: 60000,
+                        minioCleanupIntervalMs: 60000,
+                    },
+                });
             }
         }
 
-        await nc.close();
+        const TesterClass = createDefaultTesterBuilder()
+            .with(DockerTesterBuilder)
+            .with(PostgresTesterBuilder)
+            .with(MinioTesterBuilder)
+            .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
+            .with(IngestorMigrationsTesterBuilder)
+            .with(DistributedIngestorTesterBuilder)
+            .build();
 
-        // Store configuration
-        databaseUrl = postgresContainer.getConnectionUri();
-        s3Bucket = 'wallpapers-rate-limit-test';
+        tester = new TesterClass();
 
-        // Initialize database schema
-        const pool = new Pool({ connectionString: databaseUrl });
+        tester
+            .withNetwork()
+            .withPostgres((builder) =>
+                builder
+                    .withDatabase(`test_e2e_rate_limit_${Date.now()}`)
+                    .withNetworkAlias('postgres')
+            )
+            .withMinio((builder) => builder.withNetworkAlias('minio'))
+            .withMinioBucket('wallpapers-rate-limit-test')
+            .withNats((builder) =>
+                builder.withNetworkAlias('nats').withJetstream()
+            )
+            .withStream('WALLPAPERS_E2E_RATE_LIMIT_TEST')
+            .withRedis((builder) => builder.withNetworkAlias('redis'))
+            .withMigrations()
+            .withContainerizedApp();
 
-        try {
-            const migrationPath = join(__dirname, '../../ingestor/drizzle/0000_left_starjammers.sql');
-            const migrationSQL = readFileSync(migrationPath, 'utf-8');
-            await pool.query(migrationSQL);
-            console.log('Database schema created');
-        } finally {
-            await pool.end();
-        }
+        await tester.setup();
 
-        // Create S3 bucket
-        const s3Client = new S3Client({
-            endpoint: `http://${minioContainer.getHost()}:${minioContainer.getPort()}`,
-            region: 'us-east-1',
-            credentials: {
-                accessKeyId: minioContainer.getUsername(),
-                secretAccessKey: minioContainer.getPassword(),
-            },
-            forcePathStyle: true,
-        });
+        // Get base URLs for all 3 instances
+        const containers = tester.getIngestorContainers();
+        baseUrl1 = `http://${containers[0].getHost()}:${containers[0].getMappedPort(3001)}`;
+        baseUrl2 = `http://${containers[1].getHost()}:${containers[1].getMappedPort(3001)}`;
+        baseUrl3 = `http://${containers[2].getHost()}:${containers[2].getMappedPort(3001)}`;
 
-        try {
-            await s3Client.send(new CreateBucketCommand({ Bucket: s3Bucket }));
-            console.log(`S3 bucket '${s3Bucket}' created`);
-        } catch (error: any) {
-            if (error.name !== 'BucketAlreadyOwnedByYou') {
-                console.warn('Failed to create S3 bucket:', error);
-            }
-        }
-
-        // Container environment (using network aliases)
-        const containerDatabaseUrl = `postgresql://test:test@postgres:5432/wallpaperdb_e2e_rate_limit_test`;
-        const containerS3Endpoint = 'http://minio:9000';
-        const containerNatsUrl = 'nats://nats:4222';
-        const containerRedisHost = 'redis';
-
-        const baseEnvironment = {
-            NODE_ENV: 'production',
-            DATABASE_URL: containerDatabaseUrl,
-            S3_ENDPOINT: containerS3Endpoint,
-            S3_ACCESS_KEY_ID: minioContainer.getUsername(),
-            S3_SECRET_ACCESS_KEY: minioContainer.getPassword(),
-            S3_BUCKET: s3Bucket,
-            S3_REGION: 'us-east-1',
-            NATS_URL: containerNatsUrl,
-            NATS_STREAM: 'WALLPAPERS_E2E_RATE_LIMIT_TEST',
-            REDIS_HOST: containerRedisHost,
-            REDIS_PORT: '6379',
-            REDIS_ENABLED: 'true',
-            RATE_LIMIT_MAX: '10', // Low limit for testing
-            RATE_LIMIT_WINDOW_MS: '10000', // 10 seconds
-            OTEL_EXPORTER_OTLP_ENDPOINT: 'http://localhost:4318',
-            RECONCILIATION_INTERVAL_MS: '60000', // 1 minute (not needed for these tests)
-            MINIO_CLEANUP_INTERVAL_MS: '60000', // 1 minute (not needed for these tests)
-        };
-
-        console.log('Starting 3 ingestor instances...');
-
-        // Start instance 1
-        ingestor1 = await new GenericContainer('wallpaperdb-ingestor:latest')
-            .withNetwork(network)
-            .withExposedPorts(3001)
-            .withEnvironment({ ...baseEnvironment, PORT: '3001', OTEL_SERVICE_NAME: 'ingestor-e2e-instance-1' })
-            .withWaitStrategy(Wait.forLogMessage('Server is running on port'))
-            .withStartupTimeout(60000)
-            .start();
-        baseUrl1 = `http://${ingestor1.getHost()}:${ingestor1.getMappedPort(3001)}`;
-        console.log(`Instance 1 started at ${baseUrl1}`);
-
-        // Start instance 2
-        ingestor2 = await new GenericContainer('wallpaperdb-ingestor:latest')
-            .withNetwork(network)
-            .withExposedPorts(3001)
-            .withEnvironment({ ...baseEnvironment, PORT: '3001', OTEL_SERVICE_NAME: 'ingestor-e2e-instance-2' })
-            .withWaitStrategy(Wait.forLogMessage('Server is running on port'))
-            .withStartupTimeout(60000)
-            .start();
-        baseUrl2 = `http://${ingestor2.getHost()}:${ingestor2.getMappedPort(3001)}`;
-        console.log(`Instance 2 started at ${baseUrl2}`);
-
-        // Start instance 3
-        ingestor3 = await new GenericContainer('wallpaperdb-ingestor:latest')
-            .withNetwork(network)
-            .withExposedPorts(3001)
-            .withEnvironment({ ...baseEnvironment, PORT: '3001', OTEL_SERVICE_NAME: 'ingestor-e2e-instance-3' })
-            .withWaitStrategy(Wait.forLogMessage('Server is running on port'))
-            .withStartupTimeout(60000)
-            .start();
-        baseUrl3 = `http://${ingestor3.getHost()}:${ingestor3.getMappedPort(3001)}`;
-        console.log(`Instance 3 started at ${baseUrl3}`);
+        console.log(`Instance 1: ${baseUrl1}`);
+        console.log(`Instance 2: ${baseUrl2}`);
+        console.log(`Instance 3: ${baseUrl3}`);
 
         // Give instances a moment to fully initialize
         await new Promise((resolve) => setTimeout(resolve, 2000));
     }, 180000); // 3 minute timeout for startup
 
     afterAll(async () => {
-        console.log('Stopping containers...');
-        if (ingestor1) await ingestor1.stop();
-        if (ingestor2) await ingestor2.stop();
-        if (ingestor3) await ingestor3.stop();
-        if (redisContainer) await redisContainer.stop();
-        if (natsContainer) await natsContainer.stop();
-        if (minioContainer) await minioContainer.stop();
-        if (postgresContainer) await postgresContainer.stop();
-        if (network) await network.stop();
-        console.log('All containers stopped');
-    }, 60000);
+        await tester.destroy();
+    });
 
     beforeEach(async () => {
         // Flush Redis before each test to start fresh
+        const redisContainer = tester.redis.config.container;
         await redisContainer.exec(['redis-cli', 'FLUSHALL']);
         console.log('Redis flushed');
     });

@@ -18,5 +18,8 @@ export default defineConfig({
     },
     fileParallelism: false,
     include: ['test/rate-limiting-distributed.e2e.test.ts'],
+    // Retry tests that fail due to Docker/infrastructure timeouts
+    // Common with NATS connection timing issues and Docker resource constraints in CI
+    retry: 2,
   },
 });

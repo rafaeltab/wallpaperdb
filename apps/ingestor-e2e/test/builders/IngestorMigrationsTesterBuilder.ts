@@ -1,7 +1,7 @@
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
-import createPostgresClient from "postgres";
+import { Pool } from "pg";
 import {
 	BaseTesterBuilder,
 	type PostgresTesterBuilder,
@@ -19,11 +19,11 @@ export interface IngestorMigrationsOptions {
 }
 
 /**
- * Mixin that applies Ingestor database migrations to PostgreSQL.
+ * Mixin that applies Ingestor database migrations to PostgreSQL (E2E version).
  *
  * @example
  * ```typescript
- * const tester = await createTesterBuilder()
+ * const tester = await createDefaultTesterBuilder()
  *   .with(DockerTesterBuilder)
  *   .with(PostgresTesterBuilder)
  *   .with(IngestorMigrationsTesterBuilder)
@@ -47,7 +47,7 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
 	) {
 		const migrationPath =
 			this.options.migrationPath ??
-			join(__dirname, "../../drizzle/0000_left_starjammers.sql");
+			join(__dirname, "../../../ingestor/drizzle/0000_left_starjammers.sql");
 
 		return class extends Base {
 			private _migrationsApplied = false;
@@ -74,14 +74,16 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
 
 					console.log("Applying ingestor database migrations...");
 
-					const sql = createPostgresClient(postgres.connectionString, { max: 1 });
+					// Use externalConnectionString for host-to-container communication
+					// postgres.connectionString uses network alias which isn't accessible from host
+					const pool = new Pool({ connectionString: postgres.externalConnectionString });
 
 					try {
 						const migrationSql = readFileSync(migrationPath, "utf-8");
-						await sql.unsafe(migrationSql);
+						await pool.query(migrationSql);
 						console.log("Database migrations applied successfully");
 					} finally {
-						await sql.end();
+						await pool.end();
 					}
 				});
 

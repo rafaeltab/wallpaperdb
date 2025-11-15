@@ -1,23 +1,19 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq, and, lt } from 'drizzle-orm';
+import { PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import type { JetStreamClient } from 'nats';
 import {
-  S3Client,
-  PutObjectCommand,
-  HeadObjectCommand,
-  ListObjectsV2Command,
-  CreateBucketCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import type { NatsConnection, JetStreamClient } from 'nats';
-import { getTestConfig } from './setup.js';
-import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
-import * as schema from '../src/db/schema.js';
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
 import { wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 
-// Import scheduler functions (THESE WILL FAIL - scheduler not implemented yet)
+// Import scheduler functions
 import {
   startScheduler,
   stopScheduler,
@@ -33,75 +29,54 @@ import {
 } from '../src/services/reconciliation.service.js';
 
 describe('Scheduler Service Tests', () => {
-  let pool: Pool;
-  let db: ReturnType<typeof drizzle>;
-  let s3Client: S3Client;
-  let natsClient: NatsConnection;
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+  >;
+
+  let tester: TesterType;
   let js: JetStreamClient;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .build();
 
-    // Setup database connection
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
+    tester = new TesterClass();
 
-    // Setup MinIO client
-    s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_scheduler_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS');
 
-    // Create MinIO bucket if it doesn't exist
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket already exists, ignore error
-    }
+    await tester.setup();
 
-    // Initialize NATS connection
-    natsClient = await createNatsConnection(config);
+    // Get NATS JetStream client for message count checks
+    const natsClient = tester.nats.getConnection();
     js = natsClient.jetstream();
-
-    // Create JetStream stream for testing
-    const jsm = await natsClient.jetstreamManager();
-    try {
-      await jsm.streams.add({
-        name: config.natsStream,
-        subjects: ['wallpaper.>'],
-      });
-    } catch (error) {
-      // Stream might already exist, ignore error
-    }
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
 
     // Clean up MinIO bucket before each test
-    const listResponse = await s3Client.send(new ListObjectsV2Command({ Bucket: config.s3Bucket }));
-    if (listResponse.Contents) {
-      for (const object of listResponse.Contents) {
-        if (object.Key) {
-          await s3Client.send(
-            new DeleteObjectCommand({
-              Bucket: config.s3Bucket,
-              Key: object.Key,
-            })
-          );
-        }
-      }
+    await tester.minio.cleanupBuckets();
+
+    // Clean up NATS stream before each test
+    try {
+      const natsClient = tester.nats.getConnection();
+      const jsm = await natsClient.jetstreamManager();
+      await jsm.streams.purge('WALLPAPERS');
+    } catch (error) {
+      // Stream might not exist, ignore
     }
   });
 
@@ -115,9 +90,7 @@ describe('Scheduler Service Tests', () => {
   });
 
   afterAll(async () => {
-    // Close all connections after all tests complete
-    await pool.end();
-    await closeNatsConnection();
+    await tester.destroy();
   });
 
   /**
@@ -139,7 +112,7 @@ describe('Scheduler Service Tests', () => {
     const oldTimestamp = new Date(now.getTime() - minutesAgo * 60 * 1000);
 
     // Create database record
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id,
       userId,
       contentHash: `hash_${id}`,
@@ -155,7 +128,7 @@ describe('Scheduler Service Tests', () => {
             width: 1920,
             height: 1080,
             storageKey: `${id}/original.jpg`,
-            storageBucket: config.s3Bucket,
+            storageBucket: tester.minio.config.buckets[0],
             originalFilename: 'test.jpg',
           }
         : {}),
@@ -163,9 +136,9 @@ describe('Scheduler Service Tests', () => {
 
     // Optionally create MinIO file
     if (options.hasMinioFile) {
-      await s3Client.send(
+      await tester.minio.getS3Client().send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: tester.minio.config.buckets[0],
           Key: `${id}/original.jpg`,
           Body: Buffer.from('test image data'),
           ContentType: 'image/jpeg',
@@ -182,9 +155,9 @@ describe('Scheduler Service Tests', () => {
   async function createOrphanedMinioObject(id?: string) {
     const wallpaperId = id || `wlpr_${ulid()}`;
 
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: `${wallpaperId}/original.jpg`,
         Body: Buffer.from('orphaned file data'),
         ContentType: 'image/jpeg',
@@ -198,7 +171,7 @@ describe('Scheduler Service Tests', () => {
    * Test Helper: Get wallpaper record state from database
    */
   async function getRecordState(id: string) {
-    const record = await db.query.wallpapers.findFirst({
+    const record = await tester.postgres.getDrizzle().query.wallpapers.findFirst({
       where: eq(wallpapers.id, id),
     });
     return record;
@@ -215,7 +188,7 @@ describe('Scheduler Service Tests', () => {
    * Test Helper: Count records in a specific state
    */
   async function countRecordsInState(state: string): Promise<number> {
-    const records = await db.query.wallpapers.findMany({
+    const records = await tester.postgres.getDrizzle().query.wallpapers.findMany({
       where: eq(wallpapers.uploadState, state),
     });
     return records.length;
@@ -412,10 +385,10 @@ describe('Scheduler Service Tests', () => {
 
       // Verify object exists
       const headCommand = new HeadObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: `${orphanedId}/original.jpg`,
       });
-      await expect(s3Client.send(headCommand)).resolves.toBeDefined();
+      await expect(tester.minio.getS3Client().send(headCommand)).resolves.toBeDefined();
 
       // Start scheduler
       // Note: Implementation should have a way to trigger MinIO cleanup
@@ -427,7 +400,7 @@ describe('Scheduler Service Tests', () => {
       await wait(1000);
 
       // Verify orphaned object was deleted
-      await expect(s3Client.send(headCommand)).rejects.toThrow();
+      await expect(tester.minio.getS3Client().send(headCommand)).rejects.toThrow();
     });
 
     it('should not run MinIO cleanup on regular reconciliation cycles', async () => {
@@ -450,10 +423,10 @@ describe('Scheduler Service Tests', () => {
 
       // Verify orphaned object still exists (not cleaned up yet)
       const headCommand = new HeadObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: `${orphanedId}/original.jpg`,
       });
-      await expect(s3Client.send(headCommand)).resolves.toBeDefined();
+      await expect(tester.minio.getS3Client().send(headCommand)).resolves.toBeDefined();
     });
   });
 
@@ -511,7 +484,7 @@ describe('Scheduler Service Tests', () => {
 
       // Create invalid data that might cause errors
       // For example, a record with missing required fields
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id: `wlpr_${ulid()}`,
         userId: 'test-user',
         contentHash: 'hash_invalid',
@@ -664,7 +637,7 @@ describe('Scheduler Service Tests', () => {
       expect(failedCount).toBe(1);
 
       // Should have 2 orphaned intents deleted (total count should be 5)
-      const totalCount = await db.query.wallpapers.findMany();
+      const totalCount = await tester.postgres.getDrizzle().query.wallpapers.findMany();
       expect(totalCount.length).toBe(5); // 2 stored + 2 processing + 1 failed
     });
 
@@ -694,9 +667,9 @@ describe('Scheduler Service Tests', () => {
       // Simulate multiple instances by calling reconciliation directly
       // (The scheduler itself will call these, but we can test the underlying safety)
       await Promise.all([
-        reconcileStuckUploads(config.s3Bucket, db, s3Client),
-        reconcileStuckUploads(config.s3Bucket, db, s3Client),
-        reconcileStuckUploads(config.s3Bucket, db, s3Client),
+        reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client()),
+        reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client()),
+        reconcileStuckUploads(tester.minio.config.buckets[0], tester.postgres.getDrizzle(), tester.minio.getS3Client()),
       ]);
 
       // Verify all were processed exactly once (no duplicates)

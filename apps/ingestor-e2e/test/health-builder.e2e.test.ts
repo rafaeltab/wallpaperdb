@@ -1,13 +1,16 @@
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { request } from "undici";
 import {
-	createTesterBuilder,
+	createDefaultTesterBuilder,
 	DockerTesterBuilder,
 	PostgresTesterBuilder,
 	MinioTesterBuilder,
 	NatsTesterBuilder,
 } from "@wallpaperdb/test-utils";
-import { ContainerizedIngestorTesterBuilder } from "./builders/index.js";
+import {
+	ContainerizedIngestorTesterBuilder,
+	IngestorMigrationsTesterBuilder,
+} from "./builders/index.js";
 
 /**
  * Proof-of-concept E2E test using the builder pattern.
@@ -17,16 +20,17 @@ import { ContainerizedIngestorTesterBuilder } from "./builders/index.js";
  */
 describe("Health Endpoint E2E (Builder-Based)", () => {
 	let tester: InstanceType<
-		ReturnType<ReturnType<typeof createTesterBuilder>["build"]>
+		ReturnType<ReturnType<typeof createDefaultTesterBuilder>["build"]>
 	>;
 
 	beforeAll(async () => {
 		// Build test environment with builder composition
-		const TesterClass = createTesterBuilder()
+		const TesterClass = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(PostgresTesterBuilder)
 			.with(MinioTesterBuilder)
 			.with(NatsTesterBuilder)
+			.with(IngestorMigrationsTesterBuilder)
 			.with(ContainerizedIngestorTesterBuilder)
 			.build();
 
@@ -45,7 +49,9 @@ describe("Health Endpoint E2E (Builder-Based)", () => {
 			.withNats((builder) =>
 				builder.withNetworkAlias("nats").withJetstream(),
 			)
-			.withStream("WALLPAPERS");
+			.withStream("WALLPAPERS")
+			.withMigrations()
+			.withContainerizedApp();
 
 		await tester.setup();
 	}, 120000); // 2 minute timeout for full E2E setup (includes Docker build)

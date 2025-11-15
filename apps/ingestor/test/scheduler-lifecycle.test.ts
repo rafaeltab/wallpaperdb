@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from 'vitest';
-import { Pool } from 'pg';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
+import type { JetStreamClient } from 'nats';
 import {
-  S3Client,
-  PutObjectCommand,
-  CreateBucketCommand,
-  DeleteObjectCommand,
-  ListObjectsV2Command,
-} from '@aws-sdk/client-s3';
-import type { NatsConnection, JetStreamClient } from 'nats';
-import { getTestConfig } from './setup.js';
-import { createNatsConnection, closeNatsConnection } from '../src/connections/nats.js';
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  type TesterInstance,
+} from '@wallpaperdb/test-utils';
 import { wallpapers } from '../src/db/schema.js';
 import { ulid } from 'ulid';
 import {
@@ -20,7 +18,6 @@ import {
   runReconciliationNow,
 } from '../src/services/scheduler.service.js';
 import { createTestImage, generateContentHash } from './fixtures.js';
-import * as schema from '../src/db/schema.js';
 
 /**
  * Scheduler Lifecycle Tests
@@ -37,95 +34,56 @@ import * as schema from '../src/db/schema.js';
  */
 
 describe('Scheduler Lifecycle Tests', () => {
-  let pool: Pool;
-  let db: NodePgDatabase<typeof schema>;
-  let s3Client: S3Client;
-  let natsClient: NatsConnection;
+  type TesterType = TesterInstance<
+    | typeof DockerTesterBuilder
+    | typeof PostgresTesterBuilder
+    | typeof MinioTesterBuilder
+    | typeof NatsTesterBuilder
+  >;
+
+  let tester: TesterType;
   let js: JetStreamClient;
-  let config: ReturnType<typeof getTestConfig>;
 
   beforeAll(async () => {
-    config = getTestConfig();
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .build();
 
-    // Setup database connection
-    pool = new Pool({ connectionString: config.databaseUrl });
-    db = drizzle(pool, { schema: schema });
+    tester = new TesterClass();
 
-    // Setup MinIO client
-    s3Client = new S3Client({
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      credentials: {
-        accessKeyId: config.s3AccessKeyId,
-        secretAccessKey: config.s3SecretAccessKey,
-      },
-      forcePathStyle: true,
-    });
+    tester
+      .withPostgres((builder) => builder.withDatabase(`test_scheduler_lifecycle_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPERS');
 
-    // Create MinIO bucket if it doesn't exist
-    try {
-      await s3Client.send(
-        new CreateBucketCommand({
-          Bucket: config.s3Bucket,
-        })
-      );
-    } catch (error) {
-      // Bucket already exists, ignore
-    }
+    await tester.setup();
 
-    // Initialize NATS connection
-    natsClient = await createNatsConnection(config);
+    // Get NATS JetStream client for message count checks
+    const natsClient = tester.nats.getConnection();
     js = natsClient.jetstream();
-
-    // Create JetStream stream for testing
-    const jsm = await natsClient.jetstreamManager();
-    try {
-      await jsm.streams.add({
-        name: config.natsStream,
-        subjects: ['wallpaper.>'],
-      });
-    } catch (error) {
-      // Stream might already exist, ignore
-    }
   });
 
   afterAll(async () => {
-    await closeNatsConnection();
-    await pool.end();
+    await tester.destroy();
   });
 
   beforeEach(async () => {
     // Clean up database before each test
-    await db.delete(wallpapers);
+    await tester.postgres.getDrizzle().delete(wallpapers);
 
     // Clean up MinIO bucket
-    try {
-      const listResponse = await s3Client.send(
-        new ListObjectsV2Command({
-          Bucket: config.s3Bucket,
-        })
-      );
+    await tester.minio.cleanupBuckets();
 
-      if (listResponse.Contents && listResponse.Contents.length > 0) {
-        for (const object of listResponse.Contents) {
-          if (object.Key) {
-            await s3Client.send(
-              new DeleteObjectCommand({
-                Bucket: config.s3Bucket,
-                Key: object.Key,
-              })
-            );
-          }
-        }
-      }
-    } catch (error) {
-      // Ignore cleanup errors
-    }
-
-    // Clean up NATS stream
+    // Clean up NATS stream before each test
     try {
+      const natsClient = tester.nats.getConnection();
       const jsm = await natsClient.jetstreamManager();
-      await jsm.streams.purge(config.natsStream);
+      await jsm.streams.purge('WALLPAPERS');
     } catch (error) {
       // Stream might not exist, ignore
     }
@@ -144,9 +102,9 @@ describe('Scheduler Lifecycle Tests', () => {
     const contentHash = await generateContentHash(testImage);
 
     // Upload file to MinIO
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: storageKey,
         Body: testImage,
         ContentType: 'image/jpeg',
@@ -154,7 +112,7 @@ describe('Scheduler Lifecycle Tests', () => {
     );
 
     // Create stuck upload record (stuck in 'uploading' state for >10 minutes)
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id: wallpaperId,
       userId: 'user_lifecycle_test',
       uploadState: 'uploading',
@@ -164,7 +122,7 @@ describe('Scheduler Lifecycle Tests', () => {
     });
 
     // Verify initial state
-    const [initial] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    const [initial] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
     expect(initial.uploadState).toBe('uploading');
 
     // Start scheduler (uses 100ms interval in test mode)
@@ -176,7 +134,7 @@ describe('Scheduler Lifecycle Tests', () => {
     // Verify record was reconciled to 'stored' state
     // Note: Reconciliation only changes state, it doesn't extract metadata
     // Metadata extraction happens during initial upload flow
-    const [reconciled] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    const [reconciled] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
     expect(reconciled.uploadState).toBe('stored');
     expect(reconciled.stateChangedAt.getTime()).toBeGreaterThan(initial.stateChangedAt.getTime());
 
@@ -193,16 +151,16 @@ describe('Scheduler Lifecycle Tests', () => {
       const wallpaperId = `wlpr_shutdown_${i}_${ulid()}`;
       const storageKey = `${wallpaperId}/original.jpg`;
 
-      await s3Client.send(
+      await tester.minio.getS3Client().send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: tester.minio.config.buckets[0],
           Key: storageKey,
           Body: testImage,
           ContentType: 'image/jpeg',
         })
       );
 
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id: wallpaperId,
         userId: 'user_shutdown_test',
         uploadState: 'uploading',
@@ -250,16 +208,16 @@ describe('Scheduler Lifecycle Tests', () => {
     const storageKey = `${wallpaperId}/original.jpg`;
     const contentHash = await generateContentHash(testImage);
 
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: storageKey,
         Body: testImage,
         ContentType: 'image/jpeg',
       })
     );
 
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id: wallpaperId,
       userId: 'user_interval_test',
       uploadState: 'uploading',
@@ -274,12 +232,12 @@ describe('Scheduler Lifecycle Tests', () => {
     // Test interval is 100ms, so we should see reconciliation happen
     // Check at 50ms (should not be processed yet)
     await new Promise((resolve) => setTimeout(resolve, 50));
-    let [record] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    let [record] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
     expect(record.uploadState).toBe('uploading'); // Not yet processed
 
     // Check at 150ms (should be processed by now)
     await new Promise((resolve) => setTimeout(resolve, 100));
-    [record] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    [record] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
     expect(record.uploadState).toBe('stored'); // Processed
 
     await stopSchedulerAndWait();
@@ -294,16 +252,16 @@ describe('Scheduler Lifecycle Tests', () => {
       const storageKey = `${wallpaperId}/original.jpg`;
       const contentHash = await generateContentHash(testImage);
 
-      await s3Client.send(
+      await tester.minio.getS3Client().send(
         new PutObjectCommand({
-          Bucket: config.s3Bucket,
+          Bucket: tester.minio.config.buckets[0],
           Key: storageKey,
           Body: testImage,
           ContentType: 'image/jpeg',
         })
       );
 
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id: wallpaperId,
         userId: 'user_concurrent_test',
         uploadState: 'uploading',
@@ -350,16 +308,16 @@ describe('Scheduler Lifecycle Tests', () => {
       Buffer.concat([testImage, Buffer.from('_first')])
     );
 
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: storageKey,
         Body: testImage,
         ContentType: 'image/jpeg',
       })
     );
 
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id: wallpaperId,
       userId: 'user_error_test',
       uploadState: 'uploading',
@@ -375,7 +333,7 @@ describe('Scheduler Lifecycle Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     // Verify record was processed
-    const [processed] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
+    const [processed] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId));
     expect(processed.uploadState).toBe('stored');
 
     // Now create another record to verify scheduler continues after potential errors
@@ -386,16 +344,16 @@ describe('Scheduler Lifecycle Tests', () => {
       Buffer.concat([testImage2, Buffer.from('_second')])
     );
 
-    await s3Client.send(
+    await tester.minio.getS3Client().send(
       new PutObjectCommand({
-        Bucket: config.s3Bucket,
+        Bucket: tester.minio.config.buckets[0],
         Key: storageKey2,
         Body: testImage2,
         ContentType: 'image/jpeg',
       })
     );
 
-    await db.insert(wallpapers).values({
+    await tester.postgres.getDrizzle().insert(wallpapers).values({
       id: wallpaperId2,
       userId: 'user_error_test',
       uploadState: 'uploading',
@@ -408,7 +366,7 @@ describe('Scheduler Lifecycle Tests', () => {
     await new Promise((resolve) => setTimeout(resolve, 250));
 
     // Verify second record was also processed (scheduler still running)
-    const [processed2] = await db.select().from(wallpapers).where(eq(wallpapers.id, wallpaperId2));
+    const [processed2] = await tester.postgres.getDrizzle().select().from(wallpapers).where(eq(wallpapers.id, wallpaperId2));
     expect(processed2.uploadState).toBe('stored');
 
     await stopSchedulerAndWait();
@@ -426,7 +384,7 @@ describe('Scheduler Lifecycle Tests', () => {
         Buffer.concat([testImage, Buffer.from(`_${i}`)])
       );
 
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id: wallpaperId,
         userId: 'user_stored_test',
         uploadState: 'stored',
@@ -440,7 +398,7 @@ describe('Scheduler Lifecycle Tests', () => {
         height: 1080,
         aspectRatio: '1.7778',
         storageKey,
-        storageBucket: config.s3Bucket,
+        storageBucket: tester.minio.config.buckets[0],
         originalFilename: `test_${i}.jpg`,
       });
     }
@@ -473,7 +431,7 @@ describe('Scheduler Lifecycle Tests', () => {
       const wallpaperId = `wlpr_orphan_${i}_${ulid()}`;
       const contentHash = await generateContentHash(Buffer.from(`test_orphan_${i}`));
 
-      await db.insert(wallpapers).values({
+      await tester.postgres.getDrizzle().insert(wallpapers).values({
         id: wallpaperId,
         userId: 'user_orphan_test',
         uploadState: 'initiated',

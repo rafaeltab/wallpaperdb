@@ -34,6 +34,11 @@ class RedisBuilder {
 export interface RedisConfig {
   container: StartedRedisContainer;
   endpoint: string;
+  externalEndpoint: string;
+  host: string;
+  externalHost: string;
+  port: number;
+  externalPort: number;
   options: RedisOptions;
 }
 
@@ -92,15 +97,28 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
 
           const host = dockerNetwork ? networkAlias : started.getHost();
           const port = dockerNetwork ? 6379 : started.getPort();
-          const url = `redis://${host}:${port}`;
+
+          // Internal endpoint: used for container-to-container communication
+          const endpoint = `redis://${host}:${port}`;
+
+          // External endpoint: used for host-to-container communication
+          // Always uses mapped port accessible from host
+          const externalHost = started.getHost();
+          const externalPort = started.getPort();
+          const externalEndpoint = `redis://${externalHost}:${externalPort}`;
 
           this._redisConfig = {
             container: started,
-            endpoint: url,
+            endpoint: endpoint,
+            externalEndpoint: externalEndpoint,
+            host: host,
+            externalHost: externalHost,
+            port: port,
+            externalPort: externalPort,
             options: options,
           };
 
-          console.log(`Redis started: ${url}`);
+          console.log(`Redis started: ${endpoint} (internal), ${externalEndpoint} (external)`);
         });
 
         this.addDestroyHook(async () => {
@@ -111,6 +129,23 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
         });
 
         return this;
+      }
+
+      /**
+       * Get Redis configuration.
+       * Backward compatibility method - prefer using tester.redis.config
+       *
+       * @returns Redis configuration object
+       * @throws Error if Redis not initialized
+       *
+       * @example
+       * ```typescript
+       * const config = tester.getRedis();
+       * console.log(config.endpoint);
+       * ```
+       */
+      getRedis(): RedisConfig {
+        return this.redis.config;
       }
     };
   }

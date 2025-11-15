@@ -4,9 +4,10 @@ import {
     MinioTesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import { request } from "undici";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import {
     ContainerizedIngestorTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -19,6 +20,7 @@ describe("Health Endpoint E2E", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(ContainerizedIngestorTesterBuilder)
             .build();
@@ -32,6 +34,7 @@ describe("Health Endpoint E2E", () => {
                     .withDatabase(`test_e2e_health_${Date.now()}`)
                     .withNetworkAlias("postgres"),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio((builder) => builder.withNetworkAlias("minio"))
             .withMinioBucket("wallpapers")
             .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
@@ -52,9 +55,11 @@ describe("Health Endpoint E2E", () => {
     }, 120000);
 
     afterAll(async () => {
-        if (tester) {
-            await tester.destroy();
-        }
+        await tester.destroy();
+    });
+
+    afterEach(async () => {
+        await tester.cleanup();
     });
 
     test("GET /health returns healthy status", async () => {

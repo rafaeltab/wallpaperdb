@@ -4,17 +4,11 @@ import {
     MinioTesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import sharp from "sharp";
 import { request } from "undici";
-import {
-    afterAll,
-    beforeAll,
-    beforeEach,
-    describe,
-    expect,
-    test,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import {
     ContainerizedIngestorTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -89,6 +83,7 @@ describe("Upload E2E", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(ContainerizedIngestorTesterBuilder)
             .build();
@@ -103,11 +98,13 @@ describe("Upload E2E", () => {
                     .withDatabase(`test_e2e_upload_${Date.now()}`)
                     .withNetworkAlias("postgres"),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio((builder) => builder.withNetworkAlias("minio"))
             .withMinioBucket("wallpapers")
-            .withAutoCleanup() // Enable automatic MinIO cleanup
+            .withMinioAutoCleanup() // Enable automatic MinIO cleanup
             .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withMigrations()
             .withContainerizedApp();
         return tester;
@@ -123,15 +120,11 @@ describe("Upload E2E", () => {
     }, 180000); // 3 minute timeout for full E2E setup
 
     afterAll(async () => {
-        if (tester) {
-            await tester.destroy();
-        }
+        await tester.destroy();
     });
 
-    beforeEach(async () => {
-        // Clean up between tests using tester helpers
-        await tester.minio.cleanupBuckets(); // Clean MinIO
-        await tester.postgres.query("DELETE FROM wallpapers"); // Clean database
+    afterEach(async () => {
+        await tester.cleanup();
     });
 
     test("upload JPEG wallpaper creates S3 object and database record", async () => {

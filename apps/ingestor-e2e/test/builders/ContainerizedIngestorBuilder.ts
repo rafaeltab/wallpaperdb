@@ -131,12 +131,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                     }
 
                     // Check for optional Redis
-                    let redis = null;
-                    try {
-                        redis = this.getRedis();
-                    } catch {
-                        // Redis is optional
-                    }
+                    const redis = this.redis.tryGetConfig();
 
                     const instances = options.instances ?? 1;
                     const image = options.image ?? "wallpaperdb-ingestor:latest";

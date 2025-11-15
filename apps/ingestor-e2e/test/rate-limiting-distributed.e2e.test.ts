@@ -8,23 +8,16 @@
  */
 
 import {
-    describe,
-    test,
-    expect,
-    beforeAll,
-    afterAll,
-    beforeEach,
-} from "vitest";
-import { request } from "undici";
-import sharp from "sharp";
-import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
+    PostgresTesterBuilder,
     RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import sharp from "sharp";
+import { request } from "undici";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { ContainerizedIngestorTesterBuilder } from "./builders/ContainerizedIngestorBuilder.js";
 import { IngestorMigrationsTesterBuilder } from "./builders/IngestorMigrationsTesterBuilder.js";
 
@@ -56,8 +49,7 @@ function createFormData(
     userId: string,
     filename = "test.jpg",
 ): { body: Buffer; headers: Record<string, string> } {
-    const boundary =
-        "----WebKitFormBoundary" + Math.random().toString(36).substring(2);
+    const boundary = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
     const parts: Buffer[] = [];
 
     // Add userId field
@@ -133,10 +125,13 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                     .withDatabase(`test_e2e_rate_limit_${Date.now()}`)
                     .withNetworkAlias("postgres"),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio((builder) => builder.withNetworkAlias("minio"))
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withRedis((builder) => builder.withNetworkAlias("redis"))
             .withMigrations()
             .withContainerizedApp();
@@ -170,11 +165,13 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         await tester.destroy();
     });
 
-    beforeEach(async () => {
+    afterEach(async () => {
         // Flush Redis before each test to start fresh
         const redisContainer = tester.redis.config.container;
         await redisContainer.exec(["redis-cli", "FLUSHALL"]);
         console.log("Redis flushed");
+
+        await tester.cleanup();
     });
 
     test("should enforce rate limit across all instances (not per-instance)", async () => {
@@ -217,7 +214,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         console.log(`✓ 11th request correctly rejected with 429`);
 
         // Verify error format (RFC 7807)
-        const body = await response11.body.json() as object;
+        const body = (await response11.body.json()) as object;
         expect(body).toMatchObject({
             type: "https://wallpaperdb.example/problems/rate-limit-exceeded",
             status: 429,

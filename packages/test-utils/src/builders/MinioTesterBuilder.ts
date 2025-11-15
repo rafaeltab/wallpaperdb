@@ -5,7 +5,7 @@ import {
     HeadObjectCommand,
     ListObjectsV2Command,
     PutObjectCommand,
-    PutObjectCommandInput,
+    type PutObjectCommandInput,
     S3Client,
 } from "@aws-sdk/client-s3";
 import {
@@ -17,11 +17,11 @@ import {
     BaseTesterBuilder,
     type TesterInstance,
 } from "../framework.js";
+import { dockerStartSemaphore } from "../utils/semaphore.js";
+import type { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
+import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
 import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 import type { SetupTesterBuilder } from "./SetupTesterBuilder.js";
-import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
-import type { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
-import { dockerStartSemaphore } from "../utils/semaphore.js";
 
 export interface MinioOptions {
     image: string;

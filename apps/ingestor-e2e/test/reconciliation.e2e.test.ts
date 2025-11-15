@@ -5,16 +5,10 @@ import {
     MinioTesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import { ulid } from "ulid";
-import {
-    afterAll,
-    beforeAll,
-    beforeEach,
-    describe,
-    expect,
-    test,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { ContainerizedIngestorTesterBuilder } from "./builders/ContainerizedIngestorBuilder.js";
 import { IngestorMigrationsTesterBuilder } from "./builders/IngestorMigrationsTesterBuilder.js";
 
@@ -40,6 +34,7 @@ describe("Reconciliation E2E", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(ContainerizedIngestorTesterBuilder)
             .build();
@@ -53,11 +48,13 @@ describe("Reconciliation E2E", () => {
                     .withDatabase(`test_e2e_reconciliation_${Date.now()}`)
                     .withNetworkAlias("postgres"),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio((builder) => builder.withNetworkAlias("minio"))
             .withMinioBucket("wallpapers")
-            .withAutoCleanup()
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withMigrations()
             .withContainerizedApp();
         return tester;
@@ -74,10 +71,8 @@ describe("Reconciliation E2E", () => {
         await tester.destroy();
     });
 
-    beforeEach(async () => {
-        // Clean up MinIO and database before each test
-        await tester.minio.cleanupBuckets();
-        await tester.postgres.query("DELETE FROM wallpapers");
+    afterEach(async () => {
+        await tester.cleanup();
     });
 
     test("reconciliation recovers stuck upload and transitions to stored", async () => {

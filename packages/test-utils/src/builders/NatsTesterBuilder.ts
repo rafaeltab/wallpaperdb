@@ -359,7 +359,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
        * await tester.cleanup(); // Purges all streams
        * ```
        */
-      withAutoCleanup() {
+      withNatsAutoCleanup() {
         this.addCleanupHook(async () => {
           await this.nats.purgeAllStreams();
         });

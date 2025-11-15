@@ -403,7 +403,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
              * await tester.cleanup(); // Deletes all objects from all buckets
              * ```
              */
-            withAutoCleanup() {
+            withMinioAutoCleanup() {
                 this.addCleanupHook(async () => {
                     await this.minio.cleanupBuckets();
                 });

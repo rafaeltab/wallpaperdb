@@ -4,6 +4,7 @@ import {
     MinioTesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import FormData from "form-data";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -53,6 +54,7 @@ describe("Rate Limiting", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(RateLimitIngestorTesterBuilder)
@@ -66,6 +68,7 @@ describe("Rate Limiting", () => {
             )
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withMigrations()

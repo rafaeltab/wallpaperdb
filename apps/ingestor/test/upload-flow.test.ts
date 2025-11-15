@@ -1,14 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import type { FastifyInstance } from "fastify";
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
+    FixturesTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
-    FixturesTesterBuilder,
+    PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
@@ -23,6 +24,7 @@ describe("Upload Flow Integration Tests", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(FixturesTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
@@ -33,10 +35,13 @@ describe("Upload Flow Integration Tests", () => {
         // Configure infrastructure
         tester
             .withPostgres((b) => b.withDatabase(`test_upload_flow_${Date.now()}`))
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((b) => b.withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withMigrations() // Apply database migrations
             .withInProcessApp(); // Create Fastify app
         return tester;

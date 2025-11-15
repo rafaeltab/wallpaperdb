@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
-    createTesterBuilder,
+    createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
+    PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
@@ -13,11 +14,12 @@ import {
 
 describe("Health Endpoint (Builder-Based)", () => {
     const setup = () => {
-        const TesterClass = createTesterBuilder()
+        const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
             .build();
@@ -29,10 +31,12 @@ describe("Health Endpoint (Builder-Based)", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_health_${Date.now()}`),
             )
+            .withRedis()
             .withMinio()
             .withMinioBucket("wallpapers")
             .withNats((builder) => builder.withJetstream())
-            .withStream("WALLPAPER");
+            .withStream("WALLPAPER")
+            .withInProcessApp();
         return tester;
     };
 
@@ -48,9 +52,7 @@ describe("Health Endpoint (Builder-Based)", () => {
     }, 60000); // 60 second timeout for container startup
 
     afterAll(async () => {
-        if (tester) {
-            await tester.destroy();
-        }
+        await tester.destroy();
     });
 
     it("should return healthy status when all services are up", async () => {
@@ -84,6 +86,6 @@ describe("Health Endpoint (Builder-Based)", () => {
         expect(response.statusCode).toBe(200);
 
         const body = JSON.parse(response.body);
-        expect(body.status).toBe("ready");
+        expect(body.ready).toBeTruthy();
     });
 });

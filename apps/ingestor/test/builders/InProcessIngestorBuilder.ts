@@ -1,11 +1,13 @@
-import type { FastifyInstance } from "fastify";
 import {
+    type AddMethodsType,
     BaseTesterBuilder,
-    type PostgresTesterBuilder,
     type MinioTesterBuilder,
     type NatsTesterBuilder,
-    type AddMethodsType,
+    type PostgresTesterBuilder,
+    type RedisConfig,
+    type RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import type { FastifyInstance } from "fastify";
 import { createApp } from "../../src/app.js";
 import type { Config } from "../../src/config.js";
 
@@ -40,11 +42,15 @@ export interface InProcessIngestorOptions {
  */
 export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
     "InProcessIngestor",
-    [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+    [
+        PostgresTesterBuilder,
+        MinioTesterBuilder,
+        NatsTesterBuilder,
+        RedisTesterBuilder,
+    ]
 > {
     readonly name = "InProcessIngestor" as const;
     private options: InProcessIngestorOptions;
-    private app: FastifyInstance | null = null;
 
     constructor(options: InProcessIngestorOptions = {}) {
         super();
@@ -53,7 +59,12 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
 
     addMethods<
         TBase extends AddMethodsType<
-            [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+            [
+                PostgresTesterBuilder,
+                MinioTesterBuilder,
+                NatsTesterBuilder,
+                RedisTesterBuilder,
+            ]
         >,
     >(Base: TBase) {
         const options = this.options;
@@ -62,21 +73,13 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
             private app: FastifyInstance | null = null;
             private _appInitialized = false;
 
-            /**
-             * Enable in-process Fastify app creation during setup.
-             * The app will be created after all infrastructure is ready.
-             */
-            withInProcessApp() {
-                if (this._appInitialized) {
-                    return this; // Already registered
-                }
-                this._appInitialized = true;
-
+            withIngestorEnvironment() {
                 this.addSetupHook(async () => {
-                    console.log("[InProcessIngestor] Creating app via setup hook");
+                    console.log("[InProcessIngestor] Setting up environment variables");
                     const postgres = this.getPostgres();
                     const minio = this.getMinio();
                     const nats = this.getNats();
+                    const redis: RedisConfig | undefined = this.redis.tryGetConfig();
 
                     if (!postgres || !minio || !nats) {
                         throw new Error(
@@ -99,7 +102,16 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                         nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";
                     process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
                         "http://localhost:4318/v1/traces";
-                    process.env.REDIS_ENABLED = "false"; // Disable Redis by default
+
+                    if (redis === undefined) {
+                        process.env.REDIS_ENABLED = "false"; // Disable Redis by default
+                    } else {
+                        process.env.REDIS_HOST = redis.host;
+                        process.env.REDIS_PORT = String(redis.port);
+                        process.env.REDIS_ENABLED = "true";
+                        process.env.RATE_LIMIT_MAX = "10";
+                        process.env.RATE_LIMIT_WINDOW_MS = "10000";
+                    }
 
                     // Apply config overrides
                     if (options.configOverrides) {
@@ -116,6 +128,25 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                             }
                         }
                     }
+
+                    console.log("[InProcessIngestor] Environment variables set up");
+                });
+                return this;
+            }
+
+            /**
+             * Enable in-process Fastify app creation during setup.
+             * The app will be created after all infrastructure is ready.
+             */
+            withInProcessApp() {
+                if (this._appInitialized) {
+                    return this; // Already registered
+                }
+                this._appInitialized = true;
+                this.withIngestorEnvironment();
+
+                this.addSetupHook(async () => {
+                    console.log("[InProcessIngestor] Creating app via setup hook");
 
                     // Import config at runtime to pick up environment variables
                     const { loadConfig } = await import("../../src/config.js");

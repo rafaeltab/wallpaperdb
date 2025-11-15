@@ -296,7 +296,7 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<
        * await tester.cleanup(); // Truncates wallpapers and users tables
        * ```
        */
-      withAutoCleanup(tables: string[]) {
+      withPostgresAutoCleanup(tables: string[]) {
         this._postgresCleanupTables = tables;
         this.addCleanupHook(async () => {
           for (const table of this._postgresCleanupTables) {

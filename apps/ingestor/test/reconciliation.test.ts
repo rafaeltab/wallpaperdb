@@ -1,30 +1,28 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
-import { PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import type { JetStreamClient } from "nats";
+import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
-    type TesterInstance,
+    PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import { eq } from "drizzle-orm";
+import { ulid } from "ulid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { wallpapers } from "../src/db/schema.js";
+// Import reconciliation functions
+import {
+    reconcileMissingEvents,
+    reconcileOrphanedIntents,
+    reconcileOrphanedMinioObjects,
+    reconcileStuckUploads,
+} from "../src/services/reconciliation.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
 } from "./builders/index.js";
-import { wallpapers } from "../src/db/schema.js";
-import { ulid } from "ulid";
-
-// Import reconciliation functions
-import {
-    reconcileStuckUploads,
-    reconcileMissingEvents,
-    reconcileOrphanedIntents,
-    reconcileOrphanedMinioObjects,
-} from "../src/services/reconciliation.service.js";
 
 // Type for NATS wallpaper.uploaded event
 interface WallpaperUploadedEvent {
@@ -52,6 +50,7 @@ describe("Reconciliation Service Tests", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(MinioTesterBuilder)
@@ -65,10 +64,13 @@ describe("Reconciliation Service Tests", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_reconciliation_${Date.now()}`),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withJetstream())
+            .withNatsAutoCleanup()
             .withStream("WALLPAPER")
             .withInProcessApp();
         return tester;

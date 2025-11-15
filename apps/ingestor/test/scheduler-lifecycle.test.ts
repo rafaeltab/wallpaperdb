@@ -5,6 +5,7 @@ import {
     MinioTesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import { eq } from "drizzle-orm";
 import { ulid } from "ulid";
@@ -49,6 +50,7 @@ describe("Scheduler Lifecycle Tests", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(MinioTesterBuilder)
@@ -62,11 +64,14 @@ describe("Scheduler Lifecycle Tests", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_scheduler_lifecycle_${Date.now()}`),
             )
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withInProcessApp();
         return tester;
     };

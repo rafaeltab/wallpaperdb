@@ -15,6 +15,7 @@ import { wallpapers } from "../src/db/schema.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
+    InProcessIngestorTesterBuilder,
 } from "./builders/index.js";
 import { createTestImage } from "./fixtures.js";
 
@@ -32,7 +33,7 @@ import { createTestImage } from "./fixtures.js";
  * 5. Rate limit resets after time window expires
  */
 
-describe("E2E Multi-Instance Rate Limiting", () => {
+describe("Multi-Instance Rate Limiting", () => {
     const setup = () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
@@ -42,6 +43,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
             .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
+            .with(InProcessIngestorTesterBuilder)
             .build();
 
         const tester = new TesterClass();
@@ -52,10 +54,13 @@ describe("E2E Multi-Instance Rate Limiting", () => {
             )
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
+            .withNatsAutoCleanup()
             .withRedis()
-            .withMigrations();
+            .withMigrations()
+            .withIngestorEnvironment();
         return tester;
     };
 
@@ -69,27 +74,6 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         await tester.setup();
 
         console.log("Starting app instances...");
-
-        // Get infrastructure endpoints
-        const postgres = tester.postgres.config;
-        const minio = tester.minio.config;
-        const nats = tester.nats.config;
-        const redis = tester.redis.config;
-
-        // Set environment variables for all app instances
-        process.env.NODE_ENV = "test";
-        process.env.DATABASE_URL = postgres.connectionString;
-        process.env.S3_ENDPOINT = minio.endpoint;
-        process.env.S3_ACCESS_KEY_ID = minio.options.accessKey;
-        process.env.S3_SECRET_ACCESS_KEY = minio.options.secretKey;
-        process.env.S3_BUCKET = minio.buckets[0];
-        process.env.NATS_URL = nats.endpoint;
-        process.env.NATS_STREAM = nats.streams[0];
-        process.env.REDIS_HOST = redis.host;
-        process.env.REDIS_PORT = String(redis.port);
-        process.env.REDIS_ENABLED = "true";
-        process.env.RATE_LIMIT_MAX = "10";
-        process.env.RATE_LIMIT_WINDOW_MS = "10000";
 
         const config = loadConfig();
 
@@ -114,11 +98,6 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         await app2.close();
         await app3.close();
         await tester.destroy();
-    });
-
-    beforeEach(async () => {
-        // Clean up database before each test
-        await tester.getDrizzle().delete(wallpapers);
     });
 
     it("should enforce rate limit across all instances (not per-instance)", async () => {

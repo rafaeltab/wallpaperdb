@@ -1,13 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import type { FastifyInstance } from "fastify";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
+    FixturesTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
-    FixturesTesterBuilder,
+    PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
@@ -21,6 +22,7 @@ describe("Validation Integration Tests", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(FixturesTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
@@ -30,9 +32,12 @@ describe("Validation Integration Tests", () => {
 
         tester
             .withPostgres((b) => b.withDatabase(`test_validation_${Date.now()}`))
+            .withPostgresAutoCleanup(["wallpapers"])
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats((b) => b.withJetstream())
+            .withNatsAutoCleanup()
             .withMigrations()
             .withInProcessApp();
         return tester;

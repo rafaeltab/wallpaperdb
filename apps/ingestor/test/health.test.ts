@@ -1,12 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import type { FastifyInstance } from "fastify";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    PostgresTesterBuilder,
     MinioTesterBuilder,
     NatsTesterBuilder,
+    PostgresTesterBuilder,
+    RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
@@ -19,6 +20,7 @@ describe("Health Endpoint", () => {
             .with(PostgresTesterBuilder)
             .with(MinioTesterBuilder)
             .with(NatsTesterBuilder)
+            .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
             .build();
@@ -46,9 +48,7 @@ describe("Health Endpoint", () => {
     }, 60000);
 
     afterAll(async () => {
-        if (tester) {
-            await tester.destroy();
-        }
+        await tester.destroy();
     });
 
     it("should return healthy status when all services are up", async () => {

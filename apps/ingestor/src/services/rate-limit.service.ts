@@ -2,10 +2,14 @@ import type Redis from 'ioredis';
 import type { Config } from '../config.js';
 
 export class RateLimitService {
+  public readonly config: Config;
+
   constructor(
-    private config: Config,
+    config: Config,
     private redis?: Redis
-  ) {}
+  ) {
+    this.config = config;
+  }
 
   /**
    * Check if a user has exceeded their rate limit
@@ -40,8 +44,13 @@ export class RateLimitService {
     } else {
       // In-memory fallback (not distributed, for testing only)
       // This is a simplified implementation
-      const inMemoryStore =
-        (global as any).__rateLimitStore || ((global as any).__rateLimitStore = new Map());
+      const globalWithStore = global as typeof global & {
+        __rateLimitStore?: Map<string, { count: number; resetTime: number }>;
+      };
+      if (!globalWithStore.__rateLimitStore) {
+        globalWithStore.__rateLimitStore = new Map();
+      }
+      const inMemoryStore = globalWithStore.__rateLimitStore;
 
       const record = inMemoryStore.get(key) || { count: 0, resetTime: now + windowMs };
 

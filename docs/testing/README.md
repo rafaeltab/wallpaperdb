@@ -142,7 +142,7 @@ describe("Health Check", () => {
       .withMinio()
       .withMinioBucket("wallpapers")
       .withNats((b) => b.withJetstream())
-      .withStream("WALLPAPERS");
+      .withStream("WALLPAPER");
 
     await tester.setup();
   }, 60000);

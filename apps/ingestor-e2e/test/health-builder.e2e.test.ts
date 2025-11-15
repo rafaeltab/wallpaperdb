@@ -49,7 +49,7 @@ describe("Health Endpoint E2E (Builder-Based)", () => {
 			.withNats((builder) =>
 				builder.withNetworkAlias("nats").withJetstream(),
 			)
-			.withStream("WALLPAPERS")
+			.withStream("WALLPAPER")
 			.withMigrations()
 			.withContainerizedApp();
 

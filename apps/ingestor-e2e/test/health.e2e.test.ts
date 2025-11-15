@@ -40,7 +40,7 @@ describe('Health Endpoint E2E', () => {
       .withNats((builder) =>
         builder.withNetworkAlias('nats').withJetstream()
       )
-      .withStream('WALLPAPERS')
+      .withStream('WALLPAPER')
       .withMigrations()
       .withContainerizedApp();
 

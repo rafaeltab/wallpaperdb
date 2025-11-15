@@ -61,7 +61,7 @@ tester
   .withMinio()
   .withMinioBucket('wallpapers')
   .withNats(b => b.withJetstream())
-  .withStream('WALLPAPERS');
+  .withStream('WALLPAPER');
 
 await tester.setup();
 
@@ -81,7 +81,7 @@ tester
   .withPostgres()                                // Uses default alias 'postgres'
   .withMinio()                                   // Uses default alias 'minio'
   .withNats(b => b.withJetstream())              // Uses default alias 'nats'
-  .withStream('WALLPAPERS');
+  .withStream('WALLPAPER');
 
 await tester.setup();
 
@@ -861,7 +861,7 @@ describe('Upload Flow (Builder)', () => {
       .withMinio()
       .withMinioBucket('test-bucket')
       .withNats(b => b.withJetstream())
-      .withStream('WALLPAPERS');
+      .withStream('WALLPAPER');
 
     await tester.setup();
   });

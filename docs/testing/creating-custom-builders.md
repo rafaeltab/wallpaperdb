@@ -322,7 +322,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
           minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers";
         process.env.NATS_URL = nats.endpoint;
         process.env.NATS_STREAM =
-          nats.streams.length > 0 ? nats.streams[0] : "WALLPAPERS";
+          nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";
         process.env.REDIS_ENABLED = "false";  // Disable Redis by default
 
         // Apply config overrides
@@ -462,7 +462,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
             S3_SECRET_ACCESS_KEY: minio.options.secretKey,
             S3_BUCKET: minio.buckets[0] ?? "wallpapers",
             NATS_URL: nats.endpoint,
-            NATS_STREAM: nats.streams[0] ?? "WALLPAPERS",
+            NATS_STREAM: nats.streams[0] ?? "WALLPAPER",
             PORT: "3001",
           };
 

@@ -21,7 +21,7 @@ const configSchema = z.object({
 
   // NATS
   natsUrl: z.string().url(),
-  natsStream: z.string().default('WALLPAPERS'),
+  natsStream: z.string().default('WALLPAPER'),
 
   // OpenTelemetry
   otelEndpoint: z.string().url(),
@@ -70,7 +70,7 @@ export function loadConfig(): Config {
     s3Bucket: process.env.S3_BUCKET || 'wallpapers',
     s3Region: process.env.S3_REGION || 'us-east-1',
     natsUrl: process.env.NATS_URL,
-    natsStream: process.env.NATS_STREAM || 'WALLPAPERS',
+    natsStream: process.env.NATS_STREAM || 'WALLPAPER',
     otelEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     otelServiceName: process.env.OTEL_SERVICE_NAME || 'ingestor',
     reconciliationIntervalMs: process.env.RECONCILIATION_INTERVAL_MS

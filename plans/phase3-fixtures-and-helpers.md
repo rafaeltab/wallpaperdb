@@ -745,10 +745,10 @@ const connectionString = tester.nats.config.url;
 await tester.nats.publishEvent('wallpaper.uploaded', { id: 'wlpr_123' });
 
 // Get stream info
-const info = await tester.nats.getStreamInfo('WALLPAPERS');
+const info = await tester.nats.getStreamInfo('WALLPAPER');
 
 // Manual cleanup
-await tester.nats.purgeStream('WALLPAPERS');
+await tester.nats.purgeStream('WALLPAPER');
 
 // Backward compatible
 const config = tester.getNats(); // Same as tester.nats.config
@@ -1033,7 +1033,7 @@ describe('Upload Flow (Phase 3 Pattern)', () => {
       .withMinioBucket('test-bucket')
       .withAutoCleanup() // Auto-cleanup bucket on tester.cleanup()
       .withNats(b => b.withJetstream())
-      .withStream('WALLPAPERS')
+      .withStream('WALLPAPER')
       .withAutoCleanup(); // Auto-purge streams on tester.cleanup()
 
     await tester.setup();
@@ -1082,7 +1082,7 @@ describe('Upload Flow (Phase 3 Pattern)', () => {
     expect(wallpapers[0].upload_state).toBe('completed');
 
     // Verify NATS event
-    const streamInfo = await tester.nats.getStreamInfo('WALLPAPERS');
+    const streamInfo = await tester.nats.getStreamInfo('WALLPAPER');
     expect(streamInfo.state.messages).toBe(1);
   });
 
@@ -1172,7 +1172,7 @@ describe('Upload E2E (Phase 3 Pattern)', () => {
       .withMinioBucket('test-bucket')
       .withAutoCleanup()
       .withNats(b => b.withJetstream())
-      .withStream('WALLPAPERS')
+      .withStream('WALLPAPER')
       .withAutoCleanup();
 
     await tester.setup();

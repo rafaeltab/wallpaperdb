@@ -71,7 +71,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       // Return existing upload (idempotency) with rate limit headers
       return reply
         .code(200)
-        .header('X-RateLimit-Limit', String(request.server.rateLimitService['config'].rateLimitMax))
+        .header('X-RateLimit-Limit', String(request.server.rateLimitService.config.rateLimitMax))
         .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
         .header('X-RateLimit-Reset', String(rateLimitResult.reset))
         .send({
@@ -168,7 +168,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       // Step 9: Return success response with rate limit headers
       return reply
         .code(200)
-        .header('X-RateLimit-Limit', String(request.server.rateLimitService['config'].rateLimitMax))
+        .header('X-RateLimit-Limit', String(request.server.rateLimitService.config.rateLimitMax))
         .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
         .header('X-RateLimit-Reset', String(rateLimitResult.reset))
         .send({

@@ -149,7 +149,7 @@ class NatsHelpers {
    *
    * @example
    * ```typescript
-   * const info = await tester.nats.getStreamInfo('WALLPAPERS');
+   * const info = await tester.nats.getStreamInfo('WALLPAPER');
    * console.log(info.state.messages); // Number of messages in stream
    * ```
    */
@@ -167,7 +167,7 @@ class NatsHelpers {
    *
    * @example
    * ```typescript
-   * await tester.nats.purgeStream('WALLPAPERS');
+   * await tester.nats.purgeStream('WALLPAPER');
    * ```
    */
   async purgeStream(streamName: string): Promise<void> {
@@ -237,7 +237,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
        * @example
        * ```typescript
        * tester.withNats(b => b.withJetstream())
-       *       .withStream('WALLPAPERS')
+       *       .withStream('WALLPAPER')
        *       .withStream('EVENTS');
        * ```
        */
@@ -352,7 +352,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
        * @example
        * ```typescript
        * tester.withNats(b => b.withJetstream())
-       *       .withStream('WALLPAPERS')
+       *       .withStream('WALLPAPER')
        *       .withAutoCleanup();
        *
        * // In beforeEach:

@@ -136,7 +136,7 @@ describe("Health Endpoint", () => {
       .withMinio()
       .withMinioBucket("wallpapers")
       .withNats((builder) => builder.withJetstream())
-      .withStream("WALLPAPERS");
+      .withStream("WALLPAPER");
 
     // 4. Start everything
     await tester.setup();
@@ -212,7 +212,7 @@ describe("Health Endpoint E2E", () => {
       .withMinio()                                   // Default alias 'minio'
       .withMinioBucket("wallpapers")
       .withNats((builder) => builder.withJetstream())  // Default alias 'nats'
-      .withStream("WALLPAPERS");
+      .withStream("WALLPAPER");
 
     // 4. Start everything
     await tester.setup();

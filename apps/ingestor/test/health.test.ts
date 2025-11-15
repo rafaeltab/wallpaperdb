@@ -1,66 +1,71 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import type { FastifyInstance } from 'fastify';
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import type { FastifyInstance } from "fastify";
 import {
-  createDefaultTesterBuilder,
-  DockerTesterBuilder,
-  PostgresTesterBuilder,
-  MinioTesterBuilder,
-  NatsTesterBuilder,
-} from '@wallpaperdb/test-utils';
+    createDefaultTesterBuilder,
+    DockerTesterBuilder,
+    PostgresTesterBuilder,
+    MinioTesterBuilder,
+    NatsTesterBuilder,
+} from "@wallpaperdb/test-utils";
 import {
-  IngestorMigrationsTesterBuilder,
-  InProcessIngestorTesterBuilder,
-} from './builders/index.js';
+    IngestorMigrationsTesterBuilder,
+    InProcessIngestorTesterBuilder,
+} from "./builders/index.js";
 
-describe('Health Endpoint', () => {
-  let tester: InstanceType<ReturnType<ReturnType<typeof createDefaultTesterBuilder>['build']>>;
-  let fastify: FastifyInstance;
+describe("Health Endpoint", () => {
+    const setup = () => {
+        const TesterClass = createDefaultTesterBuilder()
+            .with(DockerTesterBuilder)
+            .with(PostgresTesterBuilder)
+            .with(MinioTesterBuilder)
+            .with(NatsTesterBuilder)
+            .with(IngestorMigrationsTesterBuilder)
+            .with(InProcessIngestorTesterBuilder)
+            .build();
 
-  beforeAll(async () => {
-    const TesterClass = createDefaultTesterBuilder()
-      .with(DockerTesterBuilder)
-      .with(PostgresTesterBuilder)
-      .with(MinioTesterBuilder)
-      .with(NatsTesterBuilder)
-      .with(IngestorMigrationsTesterBuilder)
-      .with(InProcessIngestorTesterBuilder)
-      .build();
+        const tester = new TesterClass();
 
-    tester = new TesterClass();
+        tester
+            .withPostgres((b) => b.withDatabase(`test_health_${Date.now()}`))
+            .withMinio()
+            .withMinioBucket("wallpapers")
+            .withNats((b) => b.withJetstream())
+            .withMigrations()
+            .withInProcessApp();
 
-    tester
-      .withPostgres((b) => b.withDatabase(`test_health_${Date.now()}`))
-      .withMinio()
-      .withMinioBucket('wallpapers')
-      .withNats((b) => b.withJetstream())
-      .withMigrations()
-      .withInProcessApp();
+        return tester;
+    };
 
-    await tester.setup();
-    fastify = tester.getApp();
-  }, 60000);
+    let tester: ReturnType<typeof setup>;
+    let fastify: FastifyInstance;
 
-  afterAll(async () => {
-    if (tester) {
-      await tester.destroy();
-    }
-  });
+    beforeAll(async () => {
+        tester = setup();
+        await tester.setup();
+        fastify = tester.getApp();
+    }, 60000);
 
-  it('should return healthy status when all services are up', async () => {
-    const response = await fastify.inject({
-      method: 'GET',
-      url: '/health',
+    afterAll(async () => {
+        if (tester) {
+            await tester.destroy();
+        }
     });
 
-    expect(response.statusCode).toBe(200);
+    it("should return healthy status when all services are up", async () => {
+        const response = await fastify.inject({
+            method: "GET",
+            url: "/health",
+        });
 
-    const body = JSON.parse(response.body);
-    expect(body.status).toBe('healthy');
-    expect(body.checks).toBeDefined();
-    expect(body.checks.database).toBe(true);
-    expect(body.checks.minio).toBe(true);
-    expect(body.checks.nats).toBe(true);
-    expect(body.checks.otel).toBe(true);
-    expect(body.timestamp).toBeDefined();
-  });
+        expect(response.statusCode).toBe(200);
+
+        const body = JSON.parse(response.body);
+        expect(body.status).toBe("healthy");
+        expect(body.checks).toBeDefined();
+        expect(body.checks.database).toBe(true);
+        expect(body.checks.minio).toBe(true);
+        expect(body.checks.nats).toBe(true);
+        expect(body.checks.otel).toBe(true);
+        expect(body.timestamp).toBeDefined();
+    });
 });

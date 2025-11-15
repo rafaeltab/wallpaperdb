@@ -56,6 +56,14 @@
             "cache": false
         },
         "test": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "test/**",
+                "vitest.*.ts",
+                "package.json",
+                "package-lock.json"
+            ],
             "dependsOn": [
                 "^build",
                 "^build:docker"

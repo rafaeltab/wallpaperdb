@@ -138,7 +138,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
 								minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers",
 							NATS_URL: nats.endpoint,
 							NATS_STREAM:
-								nats.streams.length > 0 ? nats.streams[0] : "WALLPAPERS",
+								nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER",
 							OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318/v1/traces",
 							PORT: "3001",
 						};

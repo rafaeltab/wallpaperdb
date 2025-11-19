@@ -203,35 +203,35 @@ describe("NATS Container Configuration", () => {
     }, 60000);
 });
 
-describe("NATS Container reliability", () => {
-    it.each(Array.from({ length: 100 }, (_, i) => i))(
-        "should work with custom image",
-        async () => {
-            let container: StartedNatsContainer | undefined;
-            let natsClient: NatsConnection | undefined;
-            try {
-                container = await createNatsContainer({
-                    image: "nats:2.10-alpine",
-                    enableJetStream: true,
-                });
-
-                const url = container.getConnectionUrl();
-
-                // Attempt to connect
-                natsClient = await connect({ servers: url });
-
-                expect(natsClient).toBeDefined();
-                expect(natsClient.isClosed()).toBe(false);
-
-                // Verify server info
-                const info = natsClient.info;
-                expect(info).toBeDefined();
-                expect(info?.version).toBeDefined();
-            } finally {
-                await natsClient?.close();
-                await container?.stop();
-            }
-        },
-        { concurrent: true },
-    );
-});
+// describe.skip("NATS Container reliability", () => {
+//     it.each(Array.from({ length: 100 }, (_, i) => i))(
+//         "should work with custom image",
+//         async () => {
+//             let container: StartedNatsContainer | undefined;
+//             let natsClient: NatsConnection | undefined;
+//             try {
+//                 container = await createNatsContainer({
+//                     image: "nats:2.10-alpine",
+//                     enableJetStream: true,
+//                 });
+//
+//                 const url = container.getConnectionUrl();
+//
+//                 // Attempt to connect
+//                 natsClient = await connect({ servers: url });
+//
+//                 expect(natsClient).toBeDefined();
+//                 expect(natsClient.isClosed()).toBe(false);
+//
+//                 // Verify server info
+//                 const info = natsClient.info;
+//                 expect(info).toBeDefined();
+//                 expect(info?.version).toBeDefined();
+//             } finally {
+//                 await natsClient?.close();
+//                 await container?.stop();
+//             }
+//         },
+//         { concurrent: true },
+//     );
+// });

@@ -137,6 +137,8 @@ export async function reconcileMissingEvents(db?: DbType): Promise<void> {
                     .limit(1)
                     .for("update", { skipLocked: true }); // CRITICAL for multi-instance
 
+                console.log(record);
+
                 if (!record) return;
 
                 recordFound = true;

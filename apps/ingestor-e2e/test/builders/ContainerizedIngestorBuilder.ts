@@ -156,8 +156,11 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                                 : nats.endpoints.fromHostDockerInternal,
                             NATS_STREAM:
                                 nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER",
-                            OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318/v1/traces",
+                            OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces",
                             PORT: "3001",
+                            // Explicitly set fast reconciliation intervals for E2E tests
+                            RECONCILIATION_INTERVAL_MS: "1000", // 1 second for E2E tests
+                            MINIO_CLEANUP_INTERVAL_MS: "2000", // 2 seconds for E2E tests
                         };
 
                         // Add Redis if enabled
@@ -188,6 +191,15 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                         const containerDefinition = new GenericContainer(image)
                             .withEnvironment(environment)
                             .withExposedPorts(3001)
+                            .withLogConsumer((stream) =>
+                                stream
+                                    .on("data", (line) =>
+                                        console.log(`[Ingestor] ${line}`.trimEnd()),
+                                    )
+                                    .on("err", (line) =>
+                                        console.error(`[Ingestor] ${line}`.trimEnd()),
+                                    ),
+                            )
                             .withWaitStrategy(
                                 Wait.forHttp("/health", 3001)
                                     .forStatusCode(200)

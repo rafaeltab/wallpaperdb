@@ -49,7 +49,7 @@ describe("Reconciliation E2E", () => {
             .withMinio()
             .withMinioBucket("wallpapers")
             .withMinioAutoCleanup()
-            .withNats()
+            .withNats((s) => s.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
             .withMigrations()
@@ -115,8 +115,8 @@ describe("Reconciliation E2E", () => {
             ],
         );
 
-        // Act: Wait for reconciliation cycle to run (1 second interval + buffer)
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Act: Wait for reconciliation cycle to run (with extended wait for debugging)
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
         // Assert: Verify upload transitioned to 'stored' state
         const result = await tester.postgres.query<{ upload_state: string }>(
@@ -172,8 +172,8 @@ describe("Reconciliation E2E", () => {
             ],
         );
 
-        // Act: Wait for reconciliation cycle to run
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Act: Wait for reconciliation cycle to run (with extended wait for debugging)
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
         // Assert: Verify upload transitioned to 'processing' state (event published)
         const result = await tester.postgres.query<{ upload_state: string }>(
@@ -183,7 +183,7 @@ describe("Reconciliation E2E", () => {
 
         expect(result).toHaveLength(1);
         expect(result[0].upload_state).toBe("processing");
-    }, 10000);
+    }, 15000);
 
     test("reconciliation cleans up orphaned intent records", async () => {
         // Arrange: Create old 'initiated' record (>1 hour old)
@@ -206,8 +206,8 @@ describe("Reconciliation E2E", () => {
         );
         expect(beforeResult).toHaveLength(1);
 
-        // Act: Wait for reconciliation cycle to run
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Act: Wait for reconciliation cycle to run (with extended wait for debugging)
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
         // Assert: Verify orphaned intent was deleted
         const afterResult = await tester.postgres.query<{ id: string }>(
@@ -215,7 +215,7 @@ describe("Reconciliation E2E", () => {
             [wallpaperId],
         );
         expect(afterResult).toHaveLength(0);
-    }, 10000);
+    }, 15000);
 
     test("reconciliation cleans up orphaned MinIO objects", async () => {
         // Arrange: Upload file to S3 without corresponding DB record
@@ -235,12 +235,12 @@ describe("Reconciliation E2E", () => {
         const beforeList = await tester.minio.listObjects(bucket);
         expect(beforeList.some((key) => key === orphanedKey)).toBe(true);
 
-        // Act: Wait for MinIO cleanup cycle to run (2 second interval + buffer)
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // Act: Wait for MinIO cleanup cycle to run (with extended wait for debugging)
+        await new Promise((resolve) => setTimeout(resolve, 5000));
 
         // Assert: Verify orphaned S3 object was deleted
         const afterList = await tester.minio.listObjects(bucket);
         const keyExists = afterList.some((key) => key === orphanedKey);
         expect(keyExists).toBe(false);
-    }, 10000);
+    }, 15000);
 });

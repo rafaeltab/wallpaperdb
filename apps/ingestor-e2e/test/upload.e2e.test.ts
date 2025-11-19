@@ -6,6 +6,7 @@ import {
     PostgresTesterBuilder,
     RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import { randomInt } from "crypto";
 import sharp from "sharp";
 import { request } from "undici";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
@@ -21,7 +22,7 @@ async function createTestJpeg(): Promise<Buffer> {
             width: 1280,
             height: 720,
             channels: 3,
-            background: { r: 100, g: 150, b: 200 },
+            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
         },
     })
         .jpeg()
@@ -35,7 +36,7 @@ async function createTestPng(): Promise<Buffer> {
             width: 1280,
             height: 720,
             channels: 3,
-            background: { r: 150, g: 100, b: 200 },
+            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
         },
     })
         .png()
@@ -49,7 +50,7 @@ async function createTestWebP(): Promise<Buffer> {
             width: 1280,
             height: 720,
             channels: 3,
-            background: { r: 200, g: 150, b: 100 },
+            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
         },
     })
         .webp()
@@ -63,7 +64,7 @@ async function createSmallTestJpeg(): Promise<Buffer> {
             width: 640,
             height: 480,
             channels: 3,
-            background: { r: 50, g: 50, b: 50 },
+            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
         },
     })
         .jpeg()
@@ -145,12 +146,13 @@ describe("Upload E2E", () => {
         });
 
         // Verify: HTTP response
-        expect(response.statusCode).toBe(200);
         const body = await response.body.json();
         expect(body).toMatchObject({
             id: expect.stringMatching(/^wlpr_/),
             status: expect.stringMatching(/^(stored|processing|completed)$/),
         });
+
+        expect(response.statusCode).toBe(200);
 
         const wallpaperId = (body as { id: string }).id;
 
@@ -269,12 +271,12 @@ describe("Upload E2E", () => {
         });
 
         // Assert: Second upload returns 200 with already_uploaded status (idempotency)
-        expect(response2.statusCode).toBe(200);
         const body2 = await response2.body.json();
         expect(body2).toMatchObject({
             id: wallpaperId, // Same ID as first upload
             status: "already_uploaded",
         });
+        expect(response2.statusCode).toBe(200);
 
         // Verify: Only one S3 object exists
         const s3Objects = await tester.minio.listObjects(
@@ -316,12 +318,12 @@ describe("Upload E2E", () => {
         });
 
         // Assert: HTTP response
-        expect(response.statusCode).toBe(200);
         const body = await response.body.json();
         expect(body).toMatchObject({
             id: expect.stringMatching(/^wlpr_/),
             status: expect.stringMatching(/^(stored|processing|completed)$/),
         });
+        expect(response.statusCode).toBe(200);
 
         const wallpaperId = (body as { id: string }).id;
 

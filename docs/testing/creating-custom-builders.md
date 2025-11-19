@@ -165,7 +165,8 @@ export { MyCustomTesterBuilder } from "./MyCustomBuilder.js";
 // Use in tests
 import { MyCustomTesterBuilder } from "./builders/index.js";
 
-const TesterClass = createTesterBuilder()
+const TesterClass = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)       // Required by infrastructure builders
   .with(PostgresTesterBuilder)
   .with(MinioTesterBuilder)
   .with(MyCustomTesterBuilder)  // Your custom builder
@@ -246,7 +247,8 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
 **Usage:**
 
 ```typescript
-createTesterBuilder()
+createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
   .with(PostgresTesterBuilder)
   .with(IngestorMigrationsTesterBuilder)  // Migrations run automatically
   .build();
@@ -374,10 +376,13 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
 **Usage:**
 
 ```typescript
-const TesterClass = createTesterBuilder()
+const TesterClass = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
   .with(PostgresTesterBuilder)
   .with(MinioTesterBuilder)
   .with(NatsTesterBuilder)
+  .with(RedisTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
   .with(InProcessIngestorTesterBuilder, { logger: false })
   .build();
 
@@ -521,20 +526,22 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
 **Usage:**
 
 ```typescript
-const TesterClass = createTesterBuilder()
+const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(PostgresTesterBuilder)
   .with(MinioTesterBuilder)
   .with(NatsTesterBuilder)
+  .with(RedisTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
   .with(ContainerizedIngestorTesterBuilder, { instances: 3 })
   .build();
 
 const tester = new TesterClass();
-tester.withNetwork();  // Network required for E2E
+// NO withNetwork() needed - uses host.docker.internal
 await tester.setup();
 
 const baseUrl = tester.getBaseUrl();
-const response = await fetch(`${baseUrl}/health`);
+const response = await request(`${baseUrl}/health`);  // Use undici.request
 ```
 
 **Key Points:**
@@ -669,6 +676,51 @@ export class ComplexSetupTesterBuilder extends BaseTesterBuilder<
   }
 }
 ```
+
+### Pattern: Subclassing for Configuration Variants
+
+When you need different configurations of the same builder, subclass instead of duplicating code:
+
+**Real Example: Rate-Limited Ingestor (from `rate-limiting.test.ts`)**
+
+```typescript
+// Subclass InProcessIngestorTesterBuilder with custom config
+class RateLimitIngestorTesterBuilder extends InProcessIngestorTesterBuilder {
+  constructor() {
+    super({
+      configOverrides: {
+        rateLimitMax: 15,           // Custom rate limit
+        rateLimitWindowMs: 5000,    // Custom window
+      },
+      logger: false,                // Disable logging for tests
+    });
+  }
+}
+
+// Use the subclass in your test
+const TesterClass = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(PostgresTesterBuilder)
+  .with(MinioTesterBuilder)
+  .with(NatsTesterBuilder)
+  .with(RedisTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
+  .with(RateLimitIngestorTesterBuilder)  // Use custom subclass
+  .build();
+```
+
+**Benefits of Subclassing:**
+- ✅ No code duplication
+- ✅ Type-safe configuration
+- ✅ Reusable across tests
+- ✅ Clear intent (class name explains the variant)
+
+**When to Subclass:**
+- Different rate limits
+- Different feature flags
+- Different timeouts
+- Different authentication modes
+- Any configuration variant you use in multiple tests
 
 ## Next Steps
 

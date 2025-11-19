@@ -4,9 +4,32 @@ Complete reference for the TesterBuilder pattern and all available builders.
 
 ## Core API
 
+### createDefaultTesterBuilder()
+
+**Recommended:** Factory function to create a new tester builder with common defaults included.
+
+```typescript
+function createDefaultTesterBuilder(): TesterBuilder<[DockerTesterBuilder]>
+```
+
+**Returns:** `TesterBuilder` with `DockerTesterBuilder` already included
+
+**Example:**
+```typescript
+const builder = createDefaultTesterBuilder()
+  .with(PostgresTesterBuilder)  // DockerTesterBuilder already included!
+  .with(MinioTesterBuilder);
+```
+
+**When to use:**
+- Most tests (recommended default)
+- Any test using infrastructure builders (Postgres, MinIO, NATS, Redis)
+
+---
+
 ### createTesterBuilder()
 
-Factory function to create a new tester builder.
+Factory function to create a new tester builder with no defaults.
 
 ```typescript
 function createTesterBuilder(): TesterBuilder<[]>
@@ -16,8 +39,14 @@ function createTesterBuilder(): TesterBuilder<[]>
 
 **Example:**
 ```typescript
-const builder = createTesterBuilder();
+const builder = createTesterBuilder()
+  .with(DockerTesterBuilder)     // Must add manually
+  .with(PostgresTesterBuilder);
 ```
+
+**When to use:**
+- Only when you need minimal dependencies
+- Custom builder composition scenarios
 
 ---
 
@@ -137,27 +166,175 @@ export class MyBuilder extends BaseTesterBuilder<
 }
 ```
 
+## Auto-Cleanup Features
+
+### withPostgresAutoCleanup()
+
+Automatically truncate tables after each test.
+
+```typescript
+withPostgresAutoCleanup(tables: string[]): this
+```
+
+**Parameters:**
+- `tables`: Array of table names to truncate
+
+**Usage:**
+```typescript
+tester.withPostgresAutoCleanup(["wallpapers", "users"]);
+
+// Trigger in afterEach
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+---
+
+### withMinioAutoCleanup()
+
+Automatically empty all buckets after each test.
+
+```typescript
+withMinioAutoCleanup(): this
+```
+
+**Usage:**
+```typescript
+tester.withMinioAutoCleanup();
+
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+---
+
+### withNatsAutoCleanup()
+
+Automatically purge all JetStream streams after each test.
+
+```typescript
+withNatsAutoCleanup(): this
+```
+
+**Usage:**
+```typescript
+tester.withNatsAutoCleanup();
+
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+---
+
+### tester.cleanup()
+
+Triggers all registered auto-cleanup operations.
+
+```typescript
+async cleanup(): Promise<void>
+```
+
+**Usage:**
+```typescript
+afterEach(async () => {
+  await tester.cleanup();  // Runs all auto-cleanup
+});
+```
+
+---
+
+## Helper Methods
+
+### tester.postgres.query()
+
+Execute SQL queries directly.
+
+```typescript
+async query<T>(sql: string, params?: any[]): Promise<T[]>
+```
+
+**Usage:**
+```typescript
+const wallpapers = await tester.postgres.query(
+  "SELECT * FROM wallpapers WHERE user_id = $1",
+  [userId]
+);
+```
+
+---
+
+### tester.minio.listObjects()
+
+List objects in a bucket.
+
+```typescript
+async listObjects(bucket: string): Promise<string[]>
+```
+
+**Usage:**
+```typescript
+const objects = await tester.minio.listObjects("wallpapers");
+console.log(objects);  // ["wlpr_123/original.jpg", ...]
+```
+
+---
+
+### tester.minio.getS3Client()
+
+Get the underlying S3 client for advanced operations.
+
+```typescript
+getS3Client(): S3Client
+```
+
+**Usage:**
+```typescript
+const s3 = tester.minio.getS3Client();
+await s3.send(new DeleteObjectCommand({ ... }));
+```
+
+---
+
+### tester.nats.getConnection()
+
+Get the underlying NATS connection.
+
+```typescript
+getConnection(): NatsConnection
+```
+
+**Usage:**
+```typescript
+const nats = tester.nats.getConnection();
+const js = nats.jetstream();
+```
+
+---
+
 ## Infrastructure Builders
 
 ### DockerTesterBuilder
 
-Manages Docker networks for inter-container communication.
+Provides Docker container management foundation for infrastructure builders.
 
 ```typescript
-class DockerTesterBuilder extends BaseTesterBuilder<'docker', []>
+class DockerTesterBuilder extends BaseTesterBuilder<'Docker', []>
 ```
 
 **Dependencies:** None
 
+**Note:** Required by all infrastructure builders (PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder, RedisTesterBuilder).
+
 **Methods:**
 
-#### withNetwork()
+#### ~~withNetwork()~~ (Deprecated)
 
-Create an isolated Docker network.
+~~Create an isolated Docker network.~~ **Removed due to reliability issues.**
 
-```typescript
-withNetwork(): this
-```
+Use `host.docker.internal` for container-to-container communication instead.
 
 **Returns:** `DockerConfig`
 ```typescript

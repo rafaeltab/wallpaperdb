@@ -8,9 +8,10 @@ Understanding when to use integration tests (in-process) vs E2E tests (container
 |--------|------------------|-----------|
 | **Application** | Runs in-process (same Node.js) | Runs in Docker container |
 | **Speed** | Fast (~2-5 seconds) | Slower (~10-30 seconds) |
-| **Docker Network** | ❌ Not used | ✅ Required |
+| **Docker Network** | ❌ Not used (containers expose ports) | ❌ Not used (`host.docker.internal`) |
 | **HTTP Calls** | `app.inject()` (no network) | `undici.request()` (real network) |
 | **Builders** | `InProcessIngestorTesterBuilder` | `ContainerizedIngestorTesterBuilder` |
+| **Auto-Cleanup** | Optional (cleaner without) | Recommended (`withPostgresAutoCleanup`, etc.) |
 | **Test Execution** | Can run in parallel | Often sequential (single fork) |
 | **What It Tests** | Business logic, APIs, database interactions | Deployment artifact, networking, container config |
 | **Best For** | Unit/integration testing | End-to-end scenarios, deployment validation |
@@ -39,35 +40,52 @@ Understanding when to use integration tests (in-process) vs E2E tests (container
 
 ```typescript
 import {
-  createTesterBuilder,
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
   PostgresTesterBuilder,
   MinioTesterBuilder,
   NatsTesterBuilder,
+  RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
-import { InProcessIngestorTesterBuilder } from "./builders/index.js";
+import {
+  InProcessIngestorTesterBuilder,
+  IngestorMigrationsTesterBuilder,
+} from "./builders/index.js";
+import type { FastifyInstance } from "fastify";
 
 describe("Upload Flow", () => {
-  let tester: InstanceType<ReturnType<ReturnType<typeof createTesterBuilder>["build"]>>;
-
-  beforeAll(async () => {
-    const TesterClass = createTesterBuilder()
-      .with(PostgresTesterBuilder)          // No DockerTesterBuilder!
+  const setup = () => {
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)              // Required by infrastructure builders
+      .with(PostgresTesterBuilder)
       .with(MinioTesterBuilder)
       .with(NatsTesterBuilder)
+      .with(RedisTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
       .with(InProcessIngestorTesterBuilder)
       .build();
 
-    tester = new TesterClass();
+    const tester = new TesterClass();
 
     // NO withNetwork() call
     tester
-      .withPostgres((b) => b.withDatabase("test_db"))
+      .withPostgres((b) => b.withDatabase(`test_upload_${Date.now()}`))
       .withMinio()
-      .withMinioBucket("uploads")
+      .withMinioBucket("wallpapers")
       .withNats((b) => b.withJetstream())
-      .withStream("EVENTS");
+      .withMigrations()
+      .withInProcessApp();
 
+    return tester;
+  };
+
+  let tester: ReturnType<typeof setup>;
+  let fastify: FastifyInstance;
+
+  beforeAll(async () => {
+    tester = setup();
     await tester.setup();
+    fastify = tester.getApp();
   }, 60000);
 
   afterAll(async () => {
@@ -75,10 +93,8 @@ describe("Upload Flow", () => {
   });
 
   it("uploads a file", async () => {
-    const app = tester.getApp();
-
     // Fast in-process HTTP call
-    const response = await app.inject({
+    const response = await fastify.inject({
       method: "POST",
       url: "/upload",
       payload: fileData,
@@ -130,15 +146,16 @@ describe("Upload Flow", () => {
 │  ├─ Vitest Test Runner               │
 │  └─ Test Code (HTTP client)          │
 └──────────────────────────────────────┘
-           ↓ HTTP requests
+           ↓ HTTP requests (exposed port)
 ┌──────────────────────────────────────┐
-│  Docker Network                      │
+│  Docker Containers                   │
 │  ├─ Your Application Container       │
 │  │   (ingestor:latest)               │
+│  │   └─ connects via host.docker.internal
 │  ├─ Postgres Container               │
 │  ├─ MinIO Container                  │
 │  └─ NATS Container                   │
-│  (communicate via network aliases)   │
+│  (containers on host network)        │
 └──────────────────────────────────────┘
 ```
 
@@ -147,50 +164,65 @@ describe("Upload Flow", () => {
 ```typescript
 import { request } from "undici";
 import {
-  createTesterBuilder,
+  createDefaultTesterBuilder,
   DockerTesterBuilder,
   PostgresTesterBuilder,
   MinioTesterBuilder,
   NatsTesterBuilder,
+  RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
-import { ContainerizedIngestorTesterBuilder } from "./builders/index.js";
+import {
+  ContainerizedIngestorTesterBuilder,
+  IngestorMigrationsTesterBuilder,
+} from "./builders/index.js";
 
 describe("Upload Flow E2E", () => {
-  let tester: InstanceType<ReturnType<ReturnType<typeof createTesterBuilder>["build"]>>;
-
-  beforeAll(async () => {
-    const TesterClass = createTesterBuilder()
-      .with(DockerTesterBuilder)            // Network required
+  const setup = () => {
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)              // Required by infrastructure builders
       .with(PostgresTesterBuilder)
       .with(MinioTesterBuilder)
       .with(NatsTesterBuilder)
+      .with(RedisTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
       .with(ContainerizedIngestorTesterBuilder)
       .build();
 
-    tester = new TesterClass();
+    const tester = new TesterClass();
 
-    // WITH withNetwork() - containers need to communicate
+    // NO withNetwork() - uses host.docker.internal
     tester
-      .withNetwork()                         // Create network
-      .withPostgres((b) =>
-        b.withDatabase("test_e2e_db")
-        // Default alias 'postgres' automatically used
-      )
-      .withMinio()                           // Default alias 'minio'
-      .withMinioBucket("uploads")
-      .withNats((b) => b.withJetstream())    // Default alias 'nats'
-      .withStream("EVENTS");
+      .withPostgres((b) => b.withDatabase(`test_e2e_upload_${Date.now()}`))
+      .withPostgresAutoCleanup(["wallpapers"])  // Auto-cleanup
+      .withMinio()
+      .withMinioBucket("wallpapers")
+      .withMinioAutoCleanup()                   // Auto-cleanup
+      .withNats((b) => b.withJetstream())
+      .withNatsAutoCleanup()                    // Auto-cleanup
+      .withMigrations()
+      .withContainerizedApp();
 
+    return tester;
+  };
+
+  let tester: ReturnType<typeof setup>;
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    tester = setup();
     await tester.setup();
+    baseUrl = tester.getBaseUrl();
   }, 120000);  // Longer timeout for Docker build
 
   afterAll(async () => {
     await tester.destroy();
   });
 
-  it("uploads a file", async () => {
-    const baseUrl = tester.getBaseUrl();
+  afterEach(async () => {
+    await tester.cleanup();  // Triggers auto-cleanup
+  });
 
+  it("uploads a file", async () => {
     // Real HTTP request over network
     const response = await request(`${baseUrl}/upload`, {
       method: "POST",
@@ -329,16 +361,7 @@ apps/ingestor-e2e/
    .withPostgres((b) => b.withDatabase(`test_${Date.now()}`))
    ```
 
-2. **Don't create Docker networks**
-   ```typescript
-   // ❌ Bad
-   tester.withNetwork()
-
-   // ✅ Good
-   // (don't call withNetwork at all)
-   ```
-
-3. **Run in parallel** when possible
+2. **Run in parallel** when possible
    ```typescript
    // vitest.config.ts
    export default {
@@ -350,18 +373,19 @@ apps/ingestor-e2e/
 
 ### For E2E Tests
 
-1. **Always create Docker networks**
+1. **Use auto-cleanup for test isolation**
    ```typescript
-   // ✅ Required
-   tester.withNetwork()
+   tester
+     .withPostgresAutoCleanup(["wallpapers"])
+     .withMinioAutoCleanup()
+     .withNatsAutoCleanup();
+
+   afterEach(async () => {
+     await tester.cleanup();  // Triggers all auto-cleanup
+   });
    ```
 
-2. **Enable Docker network**
-   ```typescript
-   .withNetwork()  // Default aliases ('postgres', 'minio', etc.) are automatically used
-   ```
-
-3. **Run sequentially** (single fork)
+2. **Run sequentially** (single fork)
    ```typescript
    // vitest.config.ts
    export default {
@@ -372,7 +396,7 @@ apps/ingestor-e2e/
    };
    ```
 
-4. **Set longer timeouts**
+3. **Set longer timeouts**
    ```typescript
    beforeAll(async () => {
      // ...setup
@@ -381,30 +405,29 @@ apps/ingestor-e2e/
 
 ## Troubleshooting
 
-### "ECONNREFUSED" in Integration Tests
+### "ECONNREFUSED" in E2E Tests
 
-❌ **Problem**: App can't connect to containers
+❌ **Problem**: Containerized app can't connect to infrastructure containers
 
-✅ **Solution**: Don't use Docker network for integration tests
+✅ **Solution**: Ensure your app uses `host.docker.internal` for container-to-container communication
 
 ```typescript
-// ❌ Bad
-tester.withNetwork()
-
-// ✅ Good
-// Let containers expose ports
+// In your application's config
+const DATABASE_URL = process.env.DATABASE_URL ||
+  "postgresql://user:pass@host.docker.internal:5432/db";
 ```
 
-### "Container not found" in E2E Tests
+### "Container not found" Errors
 
 ❌ **Problem**: Containers can't find each other
 
-✅ **Solution**: Create network and use aliases
+✅ **Solution**: Use `host.docker.internal` instead of localhost or network aliases
 
 ```typescript
-tester
-  .withNetwork()
-  .withPostgres()  // Default alias 'postgres' is automatically used
+// ✅ Good - uses host.docker.internal
+DATABASE_URL=postgresql://user:pass@host.docker.internal:5432/db
+MINIO_ENDPOINT=http://host.docker.internal:9000
+NATS_URL=nats://host.docker.internal:4222
 ```
 
 ### Slow Test Execution

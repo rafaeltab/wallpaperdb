@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,

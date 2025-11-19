@@ -1,12 +1,13 @@
-import type { S3Client } from '@aws-sdk/client-s3';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { getDatabase } from '../connections/database.js';
-import { getMinioClient } from '../connections/minio.js';
-import type * as schema from '../db/schema.js';
-import { StuckUploadsReconciliation } from './reconciliation/stuck-uploads-reconciliation.service.js';
-import { MissingEventsReconciliation } from './reconciliation/missing-events-reconciliation.service.js';
-import { OrphanedIntentsReconciliation } from './reconciliation/orphaned-intents-reconciliation.service.js';
-import { OrphanedMinioReconciliation } from './reconciliation/orphaned-minio-reconciliation.service.js';
+import type { S3Client } from "@aws-sdk/client-s3";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { container } from "tsyringe";
+import { DatabaseConnection } from "../connections/database.js";
+import { getMinioClient } from "../connections/minio.js";
+import type * as schema from "../db/schema.js";
+import { MissingEventsReconciliation } from "./reconciliation/missing-events-reconciliation.service.js";
+import { OrphanedIntentsReconciliation } from "./reconciliation/orphaned-intents-reconciliation.service.js";
+import { OrphanedMinioReconciliation } from "./reconciliation/orphaned-minio-reconciliation.service.js";
+import { StuckUploadsReconciliation } from "./reconciliation/stuck-uploads-reconciliation.service.js";
 
 type DbType = NodePgDatabase<typeof schema>;
 
@@ -19,16 +20,19 @@ type DbType = NodePgDatabase<typeof schema>;
  * @param s3Client - S3 client (defaults to singleton)
  */
 export async function reconcileStuckUploads(
-  bucket?: string,
-  db?: DbType,
-  s3Client?: S3Client
+    bucket?: string,
+    db?: DbType,
+    s3Client?: S3Client,
 ): Promise<void> {
-  const database = db || getDatabase();
-  const minioClient = s3Client || getMinioClient();
-  const storageBucket = bucket || process.env.S3_BUCKET || 'wallpapers';
+    const database = db || container.resolve(DatabaseConnection).getClient().db;
+    const minioClient = s3Client || getMinioClient();
+    const storageBucket = bucket || process.env.S3_BUCKET || "wallpapers";
 
-  const reconciliation = new StuckUploadsReconciliation(storageBucket, minioClient);
-  await reconciliation.reconcile(database);
+    const reconciliation = new StuckUploadsReconciliation(
+        storageBucket,
+        minioClient,
+    );
+    await reconciliation.reconcile(database);
 }
 
 /**
@@ -38,10 +42,10 @@ export async function reconcileStuckUploads(
  * @param db - Database connection (defaults to singleton)
  */
 export async function reconcileMissingEvents(db?: DbType): Promise<void> {
-  const database = db || getDatabase();
+    const database = db || container.resolve(DatabaseConnection).getClient().db;
 
-  const reconciliation = new MissingEventsReconciliation();
-  await reconciliation.reconcile(database);
+    const reconciliation = new MissingEventsReconciliation();
+    await reconciliation.reconcile(database);
 }
 
 /**
@@ -51,10 +55,10 @@ export async function reconcileMissingEvents(db?: DbType): Promise<void> {
  * @param db - Database connection (defaults to singleton)
  */
 export async function reconcileOrphanedIntents(db?: DbType): Promise<void> {
-  const database = db || getDatabase();
+    const database = db || container.resolve(DatabaseConnection).getClient().db;
 
-  const reconciliation = new OrphanedIntentsReconciliation();
-  await reconciliation.reconcile(database);
+    const reconciliation = new OrphanedIntentsReconciliation();
+    await reconciliation.reconcile(database);
 }
 
 /**
@@ -65,14 +69,18 @@ export async function reconcileOrphanedIntents(db?: DbType): Promise<void> {
  * @param s3Client - S3 client (defaults to singleton)
  */
 export async function reconcileOrphanedMinioObjects(
-  bucket?: string,
-  db?: DbType,
-  s3Client?: S3Client
+    bucket?: string,
+    db?: DbType,
+    s3Client?: S3Client,
 ): Promise<void> {
-  const database = db || getDatabase();
-  const minioClient = s3Client || getMinioClient();
-  const storageBucket = bucket || process.env.S3_BUCKET || 'wallpapers';
+    const database = db || container.resolve(DatabaseConnection).getClient().db;
+    const minioClient = s3Client || getMinioClient();
+    const storageBucket = bucket || process.env.S3_BUCKET || "wallpapers";
 
-  const reconciliation = new OrphanedMinioReconciliation(database, minioClient, storageBucket);
-  await reconciliation.reconcile();
+    const reconciliation = new OrphanedMinioReconciliation(
+        database,
+        minioClient,
+        storageBucket,
+    );
+    await reconciliation.reconcile();
 }

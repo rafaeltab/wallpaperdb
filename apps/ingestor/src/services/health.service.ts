@@ -1,5 +1,6 @@
+import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
-import { checkDatabaseHealth } from '../connections/database.js';
+import { DatabaseConnection } from '../connections/database.js';
 import { checkMinioHealth } from '../connections/minio.js';
 import { checkNatsHealth } from '../connections/nats.js';
 import { checkOtelHealth } from '../connections/otel.js';
@@ -23,8 +24,12 @@ export interface ReadyResponse {
   timestamp: string;
 }
 
+@injectable()
 export class HealthService {
-  constructor(private config: Config) {}
+  constructor(
+      @inject("config") private readonly config: Config,
+      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection
+  ) {}
 
   async checkHealth(isShuttingDown: boolean): Promise<HealthResponse> {
     if (isShuttingDown) {
@@ -43,7 +48,7 @@ export class HealthService {
 
     try {
       // Check all connections
-      checks.database = await checkDatabaseHealth();
+      checks.database = await this.databaseConnection.checkHealth();
       checks.minio = await checkMinioHealth(this.config);
       checks.nats = await checkNatsHealth();
       // OTEL is optional in tests - if disabled, consider it healthy

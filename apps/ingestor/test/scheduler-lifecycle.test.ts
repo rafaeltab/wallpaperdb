@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,

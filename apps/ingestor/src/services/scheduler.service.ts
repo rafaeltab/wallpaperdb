@@ -1,25 +1,18 @@
-import type { S3Client } from '@aws-sdk/client-s3';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { loadConfig } from '../config.js';
+import type { S3Client } from "@aws-sdk/client-s3";
+import { container } from "tsyringe";
+import { loadConfig } from "../config.js";
+import { DatabaseConnection } from "../connections/database.js";
 import {
-  getDatabase,
-  createDatabaseConnection,
-  closeDatabaseConnection,
-} from '../connections/database.js';
+    closeMinioConnection,
+    createMinioConnection,
+    getMinioClient,
+} from "../connections/minio.js";
 import {
-  getMinioClient,
-  createMinioConnection,
-  closeMinioConnection,
-} from '../connections/minio.js';
-import type * as schema from '../db/schema.js';
-import {
-  reconcileStuckUploads,
-  reconcileMissingEvents,
-  reconcileOrphanedIntents,
-  reconcileOrphanedMinioObjects,
-} from './reconciliation.service.js';
-
-type DbType = NodePgDatabase<typeof schema>;
+    reconcileMissingEvents,
+    reconcileOrphanedIntents,
+    reconcileOrphanedMinioObjects,
+    reconcileStuckUploads,
+} from "./reconciliation.service.js";
 
 // Interval timers
 let reconciliationInterval: NodeJS.Timeout | null = null;
@@ -35,31 +28,19 @@ let isReconciling = false;
 let schedulerCreatedConnections = false;
 
 /**
- * Helper to get or create database connection
- */
-function ensureDatabaseConnection(config: ReturnType<typeof loadConfig>): DbType {
-  try {
-    return getDatabase();
-  } catch {
-    // Database not initialized, create connection
-    const { db } = createDatabaseConnection(config);
-    schedulerCreatedConnections = true;
-    return db;
-  }
-}
-
-/**
  * Helper to get or create MinIO connection
  */
-function ensureMinioConnection(config: ReturnType<typeof loadConfig>): S3Client {
-  try {
-    return getMinioClient();
-  } catch {
-    // MinIO not initialized, create connection
-    const client = createMinioConnection(config);
-    schedulerCreatedConnections = true;
-    return client;
-  }
+function ensureMinioConnection(
+    config: ReturnType<typeof loadConfig>,
+): S3Client {
+    try {
+        return getMinioClient();
+    } catch {
+        // MinIO not initialized, create connection
+        const client = createMinioConnection(config);
+        schedulerCreatedConnections = true;
+        return client;
+    }
 }
 
 /**
@@ -68,12 +49,12 @@ function ensureMinioConnection(config: ReturnType<typeof loadConfig>): S3Client 
  * with sensible defaults based on NODE_ENV
  */
 function getIntervalConfig() {
-  const config = loadConfig();
+    const config = loadConfig();
 
-  return {
-    reconciliationInterval: config.reconciliationIntervalMs,
-    minioCleanupInterval: config.minioCleanupIntervalMs,
-  };
+    return {
+        reconciliationInterval: config.reconciliationIntervalMs,
+        minioCleanupInterval: config.minioCleanupIntervalMs,
+    };
 }
 
 /**
@@ -81,52 +62,53 @@ function getIntervalConfig() {
  * Runs all three main reconciliation functions sequentially
  */
 async function runReconciliationCycle(): Promise<void> {
-  // Prevent concurrent reconciliation cycles
-  if (isReconciling) {
-    console.log('Reconciliation cycle already in progress, skipping...');
-    return;
-  }
-
-  isReconciling = true;
-
-  try {
-    const config = loadConfig();
-    const db = ensureDatabaseConnection(config);
-    const s3Client = ensureMinioConnection(config);
-
-    console.log('Starting reconciliation cycle...');
-
-    // Run all three reconciliation functions sequentially
-    // Each function handles its own errors internally, but we catch any unexpected ones
-
-    try {
-      await reconcileStuckUploads(config.s3Bucket, db, s3Client);
-    } catch (error) {
-      console.error('Error in reconcileStuckUploads:', error);
-      // Continue to next reconciliation function
+    // Prevent concurrent reconciliation cycles
+    if (isReconciling) {
+        console.log("Reconciliation cycle already in progress, skipping...");
+        return;
     }
 
-    try {
-      await reconcileMissingEvents(db);
-    } catch (error) {
-      console.error('Error in reconcileMissingEvents:', error);
-      // Continue to next reconciliation function
-    }
+    isReconciling = true;
 
     try {
-      await reconcileOrphanedIntents(db);
-    } catch (error) {
-      console.error('Error in reconcileOrphanedIntents:', error);
-      // Continue (no more functions, but we don't crash)
-    }
+        const config = loadConfig();
+        const db = (await container.resolve(DatabaseConnection).initialize(config))
+            .db;
+        const s3Client = ensureMinioConnection(config);
 
-    console.log('Reconciliation cycle complete');
-  } catch (error) {
-    console.error('Unexpected error in reconciliation cycle:', error);
-    // Don't throw - scheduler should continue running
-  } finally {
-    isReconciling = false;
-  }
+        console.log("Starting reconciliation cycle...");
+
+        // Run all three reconciliation functions sequentially
+        // Each function handles its own errors internally, but we catch any unexpected ones
+
+        try {
+            await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+        } catch (error) {
+            console.error("Error in reconcileStuckUploads:", error);
+            // Continue to next reconciliation function
+        }
+
+        try {
+            await reconcileMissingEvents(db);
+        } catch (error) {
+            console.error("Error in reconcileMissingEvents:", error);
+            // Continue to next reconciliation function
+        }
+
+        try {
+            await reconcileOrphanedIntents(db);
+        } catch (error) {
+            console.error("Error in reconcileOrphanedIntents:", error);
+            // Continue (no more functions, but we don't crash)
+        }
+
+        console.log("Reconciliation cycle complete");
+    } catch (error) {
+        console.error("Unexpected error in reconciliation cycle:", error);
+        // Don't throw - scheduler should continue running
+    } finally {
+        isReconciling = false;
+    }
 }
 
 /**
@@ -134,20 +116,21 @@ async function runReconciliationCycle(): Promise<void> {
  * Removes orphaned objects from MinIO storage
  */
 async function runMinioCleanupCycle(): Promise<void> {
-  try {
-    const config = loadConfig();
-    const db = ensureDatabaseConnection(config);
-    const s3Client = ensureMinioConnection(config);
+    try {
+        const config = loadConfig();
+        const db = (await container.resolve(DatabaseConnection).initialize(config))
+            .db;
+        const s3Client = ensureMinioConnection(config);
 
-    console.log('Starting MinIO orphaned object cleanup...');
+        console.log("Starting MinIO orphaned object cleanup...");
 
-    await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+        await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
 
-    console.log('MinIO cleanup complete');
-  } catch (error) {
-    console.error('Error in MinIO cleanup cycle:', error);
-    // Don't throw - scheduler should continue running
-  }
+        console.log("MinIO cleanup complete");
+    } catch (error) {
+        console.error("Error in MinIO cleanup cycle:", error);
+        // Don't throw - scheduler should continue running
+    }
 }
 
 /**
@@ -156,35 +139,35 @@ async function runMinioCleanupCycle(): Promise<void> {
  * Runs MinIO cleanup every 24 hours (or 500ms in test mode)
  */
 export function startScheduler(): void {
-  if (isRunning) {
-    console.log('Scheduler already running, ignoring start request');
-    return;
-  }
+    if (isRunning) {
+        console.log("Scheduler already running, ignoring start request");
+        return;
+    }
 
-  console.log('Starting reconciliation scheduler...');
+    console.log("Starting reconciliation scheduler...");
 
-  const intervals = getIntervalConfig();
+    const intervals = getIntervalConfig();
 
-  // Run reconciliation on regular interval
-  reconciliationInterval = setInterval(() => {
-    runReconciliationCycle().catch((error) => {
-      console.error('Fatal error in reconciliation interval:', error);
-      // Interval continues even if there's an error
-    });
-  }, intervals.reconciliationInterval);
+    // Run reconciliation on regular interval
+    reconciliationInterval = setInterval(() => {
+        runReconciliationCycle().catch((error) => {
+            console.error("Fatal error in reconciliation interval:", error);
+            // Interval continues even if there's an error
+        });
+    }, intervals.reconciliationInterval);
 
-  // Run MinIO cleanup on separate interval
-  minioCleanupInterval = setInterval(() => {
-    runMinioCleanupCycle().catch((error) => {
-      console.error('Fatal error in MinIO cleanup interval:', error);
-      // Interval continues even if there's an error
-    });
-  }, intervals.minioCleanupInterval);
+    // Run MinIO cleanup on separate interval
+    minioCleanupInterval = setInterval(() => {
+        runMinioCleanupCycle().catch((error) => {
+            console.error("Fatal error in MinIO cleanup interval:", error);
+            // Interval continues even if there's an error
+        });
+    }, intervals.minioCleanupInterval);
 
-  isRunning = true;
-  console.log(
-    `Scheduler started (reconciliation: ${intervals.reconciliationInterval}ms, MinIO cleanup: ${intervals.minioCleanupInterval}ms)`
-  );
+    isRunning = true;
+    console.log(
+        `Scheduler started (reconciliation: ${intervals.reconciliationInterval}ms, MinIO cleanup: ${intervals.minioCleanupInterval}ms)`,
+    );
 }
 
 /**
@@ -195,43 +178,43 @@ export function startScheduler(): void {
  * Call stopSchedulerAndWait() if you need to wait for cleanup to complete.
  */
 export function stopScheduler(): void {
-  if (!isRunning) {
-    console.log('Scheduler not running, nothing to stop');
-    return;
-  }
+    if (!isRunning) {
+        console.log("Scheduler not running, nothing to stop");
+        return;
+    }
 
-  console.log('Stopping reconciliation scheduler...');
+    console.log("Stopping reconciliation scheduler...");
 
-  if (reconciliationInterval) {
-    clearInterval(reconciliationInterval);
-    reconciliationInterval = null;
-  }
+    if (reconciliationInterval) {
+        clearInterval(reconciliationInterval);
+        reconciliationInterval = null;
+    }
 
-  if (minioCleanupInterval) {
-    clearInterval(minioCleanupInterval);
-    minioCleanupInterval = null;
-  }
+    if (minioCleanupInterval) {
+        clearInterval(minioCleanupInterval);
+        minioCleanupInterval = null;
+    }
 
-  isRunning = false;
+    isRunning = false;
 
-  // Clean up connections if scheduler created them
-  // This runs asynchronously but we don't block the caller
-  if (schedulerCreatedConnections) {
-    (async () => {
-      try {
-        await closeDatabaseConnection();
-        closeMinioConnection();
-        schedulerCreatedConnections = false;
-      } catch (error) {
-        // Silently ignore connection termination errors (happens during test teardown)
-        if (error && !String(error).includes('terminating connection')) {
-          console.error('Error closing scheduler connections:', error);
-        }
-      }
-    })();
-  }
+    // Clean up connections if scheduler created them
+    // This runs asynchronously but we don't block the caller
+    if (schedulerCreatedConnections) {
+        (async () => {
+            try {
+                await container.resolve(DatabaseConnection).close();
+                closeMinioConnection();
+                schedulerCreatedConnections = false;
+            } catch (error) {
+                // Silently ignore connection termination errors (happens during test teardown)
+                if (error && !String(error).includes("terminating connection")) {
+                    console.error("Error closing scheduler connections:", error);
+                }
+            }
+        })();
+    }
 
-  console.log('Scheduler stopped');
+    console.log("Scheduler stopped");
 }
 
 /**
@@ -239,40 +222,40 @@ export function stopScheduler(): void {
  * Use this in tests or when you need to ensure connections are fully closed
  */
 export async function stopSchedulerAndWait(): Promise<void> {
-  if (!isRunning) {
-    console.log('Scheduler not running, nothing to stop');
-    return;
-  }
-
-  console.log('Stopping reconciliation scheduler...');
-
-  if (reconciliationInterval) {
-    clearInterval(reconciliationInterval);
-    reconciliationInterval = null;
-  }
-
-  if (minioCleanupInterval) {
-    clearInterval(minioCleanupInterval);
-    minioCleanupInterval = null;
-  }
-
-  isRunning = false;
-
-  // Clean up connections if scheduler created them
-  if (schedulerCreatedConnections) {
-    try {
-      await closeDatabaseConnection();
-      closeMinioConnection();
-      schedulerCreatedConnections = false;
-    } catch (error) {
-      // Silently ignore connection termination errors (happens during test teardown)
-      if (error && !String(error).includes('terminating connection')) {
-        console.error('Error closing scheduler connections:', error);
-      }
+    if (!isRunning) {
+        console.log("Scheduler not running, nothing to stop");
+        return;
     }
-  }
 
-  console.log('Scheduler stopped');
+    console.log("Stopping reconciliation scheduler...");
+
+    if (reconciliationInterval) {
+        clearInterval(reconciliationInterval);
+        reconciliationInterval = null;
+    }
+
+    if (minioCleanupInterval) {
+        clearInterval(minioCleanupInterval);
+        minioCleanupInterval = null;
+    }
+
+    isRunning = false;
+
+    // Clean up connections if scheduler created them
+    if (schedulerCreatedConnections) {
+        try {
+            await container.resolve(DatabaseConnection).close();
+            closeMinioConnection();
+            schedulerCreatedConnections = false;
+        } catch (error) {
+            // Silently ignore connection termination errors (happens during test teardown)
+            if (error && !String(error).includes("terminating connection")) {
+                console.error("Error closing scheduler connections:", error);
+            }
+        }
+    }
+
+    console.log("Scheduler stopped");
 }
 
 /**
@@ -280,7 +263,7 @@ export async function stopSchedulerAndWait(): Promise<void> {
  * This can be called independently of the scheduler
  */
 export async function runReconciliationNow(): Promise<void> {
-  console.log('Running manual reconciliation...');
-  await runReconciliationCycle();
-  console.log('Manual reconciliation complete');
+    console.log("Running manual reconciliation...");
+    await runReconciliationCycle();
+    console.log("Manual reconciliation complete");
 }

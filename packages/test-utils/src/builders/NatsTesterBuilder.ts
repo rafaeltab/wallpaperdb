@@ -57,8 +57,11 @@ class NatsBuilder {
 
 export interface NatsConfig {
     container: StartedNatsContainer;
-    endpoint: string;
-    externalEndpoint: string;
+    endpoints: {
+        networked: string;
+        fromHost: string;
+        fromHostDockerInternal: string;
+    };
     options: NatsOptions;
     streams: string[];
 }
@@ -106,7 +109,7 @@ class NatsHelpers {
     async getConnection(): Promise<NatsConnection> {
         if (!this.connection) {
             this.connection = await connect({
-                servers: this.config.externalEndpoint,
+                servers: this.config.endpoints.fromHost,
             });
         }
         return this.connection;
@@ -304,20 +307,17 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
 
                     const started = await createNatsContainer(containerOptions);
 
-                    const host = dockerNetwork ? networkAlias : undefined;
-                    const port = dockerNetwork ? 4222 : undefined;
-
-                    // Internal endpoint: used for container-to-container communication
-                    const endpoint = started.getConnectionUrl(host, port);
-
-                    // External endpoint: used for host-to-container communication
-                    // Always uses mapped port accessible from host
-                    const externalEndpoint = started.getConnectionUrl();
+                    const endpoints = {
+                        networked: started.getConnectionUrl(networkAlias, 4222),
+                        fromHost: started.getConnectionUrl(),
+                        fromHostDockerInternal: started.getConnectionUrl(
+                            "host.docker.internal",
+                        ),
+                    };
 
                     this._natsConfig = {
                         container: started,
-                        endpoint: endpoint,
-                        externalEndpoint: externalEndpoint,
+                        endpoints: endpoints,
                         options: options,
                         streams: [],
                     };
@@ -329,7 +329,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
                         await new Promise((resolve) => setTimeout(resolve, 2000));
 
                         const nc = await connect({
-                            servers: externalEndpoint,
+                            servers: endpoints.fromHost,
                             timeout: 30000,
                         });
                         const jsm = await nc.jetstreamManager();
@@ -355,7 +355,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
                     }
 
                     console.log(
-                        `NATS started: ${endpoint} (internal), ${externalEndpoint} (external)`,
+                        `NATS started: ${endpoints.networked} (networked) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (host.docker.internal)`,
                     );
                 });
 

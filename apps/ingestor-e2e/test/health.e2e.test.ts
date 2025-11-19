@@ -28,16 +28,13 @@ describe("Health Endpoint E2E", () => {
         const tester = new TesterClass();
 
         tester
-            .withNetwork()
             .withPostgres((builder) =>
-                builder
-                    .withDatabase(`test_e2e_health_${Date.now()}`)
-                    .withNetworkAlias("postgres"),
+                builder.withDatabase(`test_e2e_health_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio((builder) => builder.withNetworkAlias("minio"))
+            .withMinio()
             .withMinioBucket("wallpapers")
-            .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
+            .withNats()
             .withStream("WALLPAPER")
             .withMigrations()
             .withContainerizedApp();

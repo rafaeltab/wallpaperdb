@@ -77,7 +77,7 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
                     // Use externalConnectionString for host-to-container communication
                     // postgres.connectionString uses network alias which isn't accessible from host
                     const pool = new Pool({
-                        connectionString: postgres.externalConnectionString,
+                        connectionString: postgres.connectionStrings.fromHost,
                     });
 
                     try {

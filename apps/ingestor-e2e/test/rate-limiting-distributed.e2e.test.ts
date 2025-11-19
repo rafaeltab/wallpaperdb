@@ -119,20 +119,17 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         const tester = new TesterClass();
 
         tester
-            .withNetwork()
             .withPostgres((builder) =>
-                builder
-                    .withDatabase(`test_e2e_rate_limit_${Date.now()}`)
-                    .withNetworkAlias("postgres"),
+                builder.withDatabase(`test_e2e_rate_limit_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio((builder) => builder.withNetworkAlias("minio"))
+            .withMinio()
             .withMinioBucket("wallpapers")
             .withMinioAutoCleanup()
-            .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
+            .withNats()
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
-            .withRedis((builder) => builder.withNetworkAlias("redis"))
+            .withRedis()
             .withMigrations()
             .withContainerizedApp();
         return tester;

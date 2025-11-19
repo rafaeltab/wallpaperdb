@@ -68,8 +68,11 @@ class MinioBuilder {
 
 export interface MinioConfig {
     container: StartedMinioContainer;
-    endpoint: string;
-    externalEndpoint: string;
+    endpoints: {
+        networked: string;
+        fromHost: string;
+        fromHostDockerInternal: string;
+    };
     options: MinioOptions;
     buckets: string[];
 }
@@ -116,7 +119,7 @@ class MinioHelpers {
     getS3Client(): S3Client {
         if (!this.s3Client) {
             this.s3Client = new S3Client({
-                endpoint: this.config.externalEndpoint,
+                endpoint: this.config.endpoints.fromHost,
                 region: "us-east-1",
                 credentials: {
                     accessKeyId: this.config.options.accessKey,
@@ -334,27 +337,25 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
                         }
 
                         const started = await container.start();
-
-                        const host = dockerNetwork ? networkAlias : started.getHost();
-                        const port = dockerNetwork ? 9000 : started.getPort();
-
-                        // Internal endpoint: used for container-to-container communication
-                        const endpoint = `http://${host}:${port}`;
-
-                        // External endpoint: used for host-to-container communication
-                        // Always uses mapped port accessible from host
-                        const externalEndpoint = `http://${started.getHost()}:${started.getPort()}`;
+                        const endpoints = {
+                            networked: `http://${networkAlias}:9000`,
+                            fromHost:
+                                `http://${started.getHost()}:${started.getPort()}`.replace(
+                                    "localhost",
+                                    "127.0.0.1",
+                                ),
+                            fromHostDockerInternal: `http://host.docker.internal:${started.getPort()}`,
+                        };
 
                         this._minioConfig = {
                             container: started,
-                            endpoint: endpoint,
-                            externalEndpoint: externalEndpoint,
+                            endpoints: endpoints,
                             options: options,
                             buckets: [],
                         };
 
                         console.log(
-                            `MinIO started: ${endpoint} (internal), ${externalEndpoint} (external)`,
+                            `MinIO started: ${endpoints.networked} (networked) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (host.docker.internal)`,
                         );
                     });
 

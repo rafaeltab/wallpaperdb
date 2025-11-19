@@ -119,12 +119,12 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                     console.log(
                         "[ContainerizedIngestor] Starting containers via setup hook",
                     );
-                    const network = this.getNetwork();
+                    const network = this.docker.network;
                     const postgres = this.getPostgres();
                     const minio = this.getMinio();
                     const nats = this.getNats();
 
-                    if (!network || !postgres || !minio || !nats) {
+                    if (!postgres || !minio || !nats) {
                         throw new Error(
                             "ContainerizedIngestorTesterBuilder requires DockerTesterBuilder, PostgresTesterBuilder, MinioTesterBuilder, and NatsTesterBuilder",
                         );
@@ -141,13 +141,19 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                     for (let i = 0; i < instances; i++) {
                         const environment: Record<string, string> = {
                             NODE_ENV: "test",
-                            DATABASE_URL: postgres.connectionString,
-                            S3_ENDPOINT: minio.endpoint,
+                            DATABASE_URL: network
+                                ? postgres.connectionStrings.networked
+                                : postgres.connectionStrings.fromHostDockerInternal,
+                            S3_ENDPOINT: network
+                                ? minio.endpoints.networked
+                                : minio.endpoints.fromHostDockerInternal,
                             S3_ACCESS_KEY_ID: minio.options.accessKey,
                             S3_SECRET_ACCESS_KEY: minio.options.secretKey,
                             S3_BUCKET:
                                 minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers",
-                            NATS_URL: nats.endpoint,
+                            NATS_URL: network
+                                ? nats.endpoints.networked
+                                : nats.endpoints.fromHostDockerInternal,
                             NATS_STREAM:
                                 nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER",
                             OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4318/v1/traces",
@@ -156,8 +162,12 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
 
                         // Add Redis if enabled
                         if (redis && options.enableRedis) {
-                            environment.REDIS_HOST = redis.host;
-                            environment.REDIS_PORT = String(redis.port);
+                            environment.REDIS_HOST = network
+                                ? redis.host.networked
+                                : redis.host.fromHostDockerInternal;
+                            environment.REDIS_PORT = network
+                                ? redis.port.networked
+                                : redis.port.fromHostDockerInternal;
                             environment.REDIS_ENABLED = "true";
                         } else {
                             environment.REDIS_ENABLED = "false";
@@ -175,17 +185,22 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                             }
                         }
 
-                        const container = await new GenericContainer(image)
-                            .withNetwork(network)
-                            .withNetworkAliases(`ingestor-${i}`)
+                        const containerDefinition = new GenericContainer(image)
                             .withEnvironment(environment)
                             .withExposedPorts(3001)
                             .withWaitStrategy(
                                 Wait.forHttp("/health", 3001)
                                     .forStatusCode(200)
                                     .withStartupTimeout(90000),
-                            )
-                            .start();
+                            );
+
+                        if (network !== undefined) {
+                            containerDefinition
+                                .withNetwork(network)
+                                .withNetworkAliases(`ingestor-${i}`);
+                        }
+
+                        const container = await containerDefinition.start();
 
                         const host = container.getHost();
                         const port = container.getMappedPort(3001);

@@ -40,12 +40,21 @@ class RedisBuilder {
 
 export interface RedisConfig {
     container: StartedRedisContainer;
-    endpoint: string;
-    externalEndpoint: string;
-    host: string;
-    externalHost: string;
-    port: number;
-    externalPort: number;
+    endpoints: {
+        networked: string;
+        fromHost: string;
+        fromHostDockerInternal: string;
+    };
+    host: {
+        networked: string;
+        fromHost: string;
+        fromHostDockerInternal: string;
+    };
+    port: {
+        networked: string;
+        fromHost: string;
+        fromHostDockerInternal: string;
+    };
     options: RedisOptions;
 }
 
@@ -115,32 +124,37 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
                     }
 
                     const started = await container.start();
+                    const host = {
+                        networked: networkAlias,
+                        fromHost: started.getHost(),
+                        fromHostDockerInternal: "host.docker.internal",
+                    };
+                    const port = {
+                        networked: "6379",
+                        fromHost: started.getPort().toString(),
+                        fromHostDockerInternal: started.getPort().toString(),
+                    };
 
-                    const host = dockerNetwork ? networkAlias : started.getHost();
-                    const port = dockerNetwork ? 6379 : started.getPort();
-
-                    // Internal endpoint: used for container-to-container communication
-                    const endpoint = `redis://${host}:${port}`;
-
-                    // External endpoint: used for host-to-container communication
-                    // Always uses mapped port accessible from host
-                    const externalHost = started.getHost();
-                    const externalPort = started.getPort();
-                    const externalEndpoint = `redis://${externalHost}:${externalPort}`;
+                    const endpoints = {
+                        networked: `redis://${networkAlias}:${6379}`,
+                        fromHost:
+                            `redis://${started.getHost()}:${started.getPort()}`.replace(
+                                "localhost",
+                                "127.0.0.1",
+                            ),
+                        fromHostDockerInternal: `redis://host.docker.internal:${started.getPort()}`,
+                    };
 
                     this._redisConfig = {
                         container: started,
-                        endpoint: endpoint,
-                        externalEndpoint: externalEndpoint,
+                        endpoints: endpoints,
                         host: host,
-                        externalHost: externalHost,
                         port: port,
-                        externalPort: externalPort,
                         options: options,
                     };
 
                     console.log(
-                        `Redis started: ${endpoint} (internal), ${externalEndpoint} (external)`,
+                        `Redis started: ${endpoints.networked} (internal) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (from host.docker.internal)`,
                     );
                 });
 

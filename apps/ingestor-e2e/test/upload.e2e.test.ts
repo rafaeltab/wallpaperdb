@@ -92,17 +92,14 @@ describe("Upload E2E", () => {
 
         // Configure infrastructure WITH network - containers communicate via network
         tester
-            .withNetwork()
             .withPostgres((builder) =>
-                builder
-                    .withDatabase(`test_e2e_upload_${Date.now()}`)
-                    .withNetworkAlias("postgres"),
+                builder.withDatabase(`test_e2e_upload_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio((builder) => builder.withNetworkAlias("minio"))
+            .withMinio()
             .withMinioBucket("wallpapers")
             .withMinioAutoCleanup() // Enable automatic MinIO cleanup
-            .withNats((builder) => builder.withNetworkAlias("nats").withJetstream())
+            .withNats()
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
             .withMigrations()

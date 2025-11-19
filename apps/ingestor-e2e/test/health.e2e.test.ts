@@ -34,7 +34,9 @@ describe("Health Endpoint E2E", () => {
             .withPostgresAutoCleanup(["wallpapers"])
             .withMinio()
             .withMinioBucket("wallpapers")
+            .withMinioAutoCleanup()
             .withNats()
+            .withNatsAutoCleanup()
             .withStream("WALLPAPER")
             .withMigrations()
             .withContainerizedApp();

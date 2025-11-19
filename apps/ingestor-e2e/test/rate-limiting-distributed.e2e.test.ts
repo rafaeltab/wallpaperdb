@@ -130,6 +130,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
             .withRedis()
+            .withRedisAutoCleanup()
             .withMigrations()
             .withContainerizedApp();
         return tester;

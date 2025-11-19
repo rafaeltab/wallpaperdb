@@ -10,6 +10,7 @@ import {
 import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
 import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 import type { SetupTesterBuilder } from "./SetupTesterBuilder.js";
+import { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
 
 export interface RedisOptions {
     image?: string;
@@ -89,13 +90,23 @@ class RedisHelpers {
 
 export class RedisTesterBuilder extends BaseTesterBuilder<
     "redis",
-    [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder]
+    [
+        DockerTesterBuilder,
+        SetupTesterBuilder,
+        DestroyTesterBuilder,
+        CleanupTesterBuilder,
+    ]
 > {
     name = "redis" as const;
 
     addMethods<
         TBase extends AddMethodsType<
-            [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder]
+            [
+                DockerTesterBuilder,
+                SetupTesterBuilder,
+                DestroyTesterBuilder,
+                CleanupTesterBuilder,
+            ]
         >,
     >(Base: TBase) {
         return class Redis extends Base {
@@ -104,6 +115,14 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
             readonly redis = new RedisHelpers(
                 this as TesterInstance<RedisTesterBuilder>,
             );
+
+            withRedisAutoCleanup() {
+                this.addCleanupHook(async () => {
+                    const redisContainer = this.redis.config.container;
+                    await redisContainer.exec(["redis-cli", "FLUSHALL"]);
+                });
+                return this;
+            }
 
             withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {
                 const options = configure(new RedisBuilder()).build();

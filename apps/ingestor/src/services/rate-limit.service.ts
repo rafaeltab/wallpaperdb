@@ -23,18 +23,42 @@ export class RateLimitService {
     const redis = this.redisConnection.isInitialized() ? this.redisConnection.getClient() : undefined;
 
     if (redis) {
-      // Use Redis for distributed rate limiting
-      const count = await redis.incr(key);
+      // Use Redis for distributed rate limiting with atomic Lua script
+      // This ensures the increment, expiry, and limit check are all atomic to prevent race conditions
+      const luaScript = `
+        local key = KEYS[1]
+        local max = tonumber(ARGV[1])
+        local windowMs = tonumber(ARGV[2])
 
-      // Set expiry on first request
-      if (count === 1) {
-        await redis.pexpire(key, windowMs);
-      }
+        -- Get current count (without incrementing yet)
+        local current = redis.call('GET', key)
+        local count = current and tonumber(current) or 0
 
-      const ttl = await redis.pttl(key);
+        -- Check if limit exceeded BEFORE incrementing
+        if count >= max then
+          local ttl = redis.call('PTTL', key)
+          return {-1, ttl}  -- Return -1 to indicate rate limit exceeded
+        end
+
+        -- Increment the counter
+        count = redis.call('INCR', key)
+
+        -- Set expiry on first request
+        if count == 1 then
+          redis.call('PEXPIRE', key, windowMs)
+        end
+
+        local ttl = redis.call('PTTL', key)
+        return {count, ttl}
+      `;
+
+      const result = await redis.eval(luaScript, 1, key, max, windowMs) as [number, number];
+      const [count, ttl] = result;
+
       const reset = now + (ttl > 0 ? ttl : windowMs);
 
-      if (count > max) {
+      // Count of -1 means rate limit exceeded
+      if (count === -1) {
         throw new RateLimitExceededError(max, windowMs, Math.ceil((reset - now) / 1000), reset);
       }
 

@@ -12,13 +12,11 @@ import { eq } from "drizzle-orm";
 import { ulid } from "ulid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { wallpapers } from "../src/db/schema.js";
-// Import reconciliation functions
-import {
-    reconcileMissingEvents,
-    reconcileOrphanedIntents,
-    reconcileOrphanedMinioObjects,
-    reconcileStuckUploads,
-} from "../src/services/reconciliation.service.js";
+// Import reconciliation service classes
+import { StuckUploadsReconciliation } from "../src/services/reconciliation/stuck-uploads-reconciliation.service.js";
+import { MissingEventsReconciliation } from "../src/services/reconciliation/missing-events-reconciliation.service.js";
+import { OrphanedIntentsReconciliation } from "../src/services/reconciliation/orphaned-intents-reconciliation.service.js";
+import { OrphanedMinioReconciliation } from "../src/services/reconciliation/orphaned-minio-reconciliation.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -249,11 +247,8 @@ describe("Reconciliation Service Tests", () => {
             });
 
             // Run reconciliation
-            await reconcileStuckUploads(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+            await stuckUploadsService.reconcile();
 
             // Verify: Record should be marked as 'failed'
             const record = await getRecordState(id);
@@ -271,11 +266,8 @@ describe("Reconciliation Service Tests", () => {
             });
 
             // Run reconciliation
-            await reconcileStuckUploads(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+            await stuckUploadsService.reconcile();
 
             // Verify: Record should be moved to 'stored' state
             const record = await getRecordState(id);
@@ -291,11 +283,8 @@ describe("Reconciliation Service Tests", () => {
             });
 
             // Run reconciliation
-            await reconcileStuckUploads(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+            await stuckUploadsService.reconcile();
 
             // Verify: Upload attempts should be incremented
             const record = await getRecordState(id);
@@ -313,11 +302,8 @@ describe("Reconciliation Service Tests", () => {
             });
 
             // Run reconciliation
-            await reconcileStuckUploads(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+            await stuckUploadsService.reconcile();
 
             // Verify: Record should be marked as 'failed'
             const record = await getRecordState(id);
@@ -333,11 +319,8 @@ describe("Reconciliation Service Tests", () => {
             });
 
             // Run reconciliation
-            await reconcileStuckUploads(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+            await stuckUploadsService.reconcile();
 
             // Verify: Record should remain unchanged
             const record = await getRecordState(id);
@@ -355,7 +338,8 @@ describe("Reconciliation Service Tests", () => {
             const eventPromise = waitForNatsEvent("wallpaper.uploaded");
 
             // Run reconciliation
-            await reconcileMissingEvents(tester.getDrizzle());
+            const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+            await missingEventsService.reconcile();
 
             // Verify: NATS event was published
             const event = (await eventPromise) as WallpaperUploadedEvent;
@@ -380,7 +364,8 @@ describe("Reconciliation Service Tests", () => {
             ]);
 
             // Run reconciliation
-            await reconcileMissingEvents(tester.getDrizzle());
+            const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+            await missingEventsService.reconcile();
 
             // Verify: All records moved to 'processing'
             for (const id of ids) {
@@ -396,7 +381,8 @@ describe("Reconciliation Service Tests", () => {
             // Note: This test is simplified - NATS connection errors are handled gracefully
             // In a real scenario where NATS is unavailable, records stay in 'stored' state
             // Run reconciliation (NATS connection is available in test environment)
-            await reconcileMissingEvents(tester.getDrizzle());
+            const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+            await missingEventsService.reconcile();
 
             // Verify: Record moves to 'processing' state (NATS connection is available)
             const record = await getRecordState(id);
@@ -409,7 +395,8 @@ describe("Reconciliation Service Tests", () => {
             const id = await createStuckUpload("stored", 3);
 
             // Run reconciliation
-            await reconcileMissingEvents(tester.getDrizzle());
+            const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+            await missingEventsService.reconcile();
 
             // Verify: Record remains in 'stored' state
             const record = await getRecordState(id);
@@ -424,7 +411,8 @@ describe("Reconciliation Service Tests", () => {
             const id = await createStuckUpload("initiated", 90); // 90 minutes
 
             // Run reconciliation
-            await reconcileOrphanedIntents(tester.getDrizzle());
+            const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+            await orphanedIntentsService.reconcile();
 
             // Verify: Record should be deleted
             const record = await getRecordState(id);
@@ -436,7 +424,8 @@ describe("Reconciliation Service Tests", () => {
             const id = await createStuckUpload("initiated", 30); // 30 minutes
 
             // Run reconciliation
-            await reconcileOrphanedIntents(tester.getDrizzle());
+            const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+            await orphanedIntentsService.reconcile();
 
             // Verify: Record should still exist
             const record = await getRecordState(id);
@@ -451,7 +440,8 @@ describe("Reconciliation Service Tests", () => {
             const storedId = await createStuckUpload("stored", 90);
 
             // Run reconciliation
-            await reconcileOrphanedIntents(tester.getDrizzle());
+            const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+            await orphanedIntentsService.reconcile();
 
             // Verify: Only initiated record deleted
             expect(await getRecordState(initiatedId)).toBeUndefined();
@@ -466,7 +456,8 @@ describe("Reconciliation Service Tests", () => {
             );
 
             // Run reconciliation
-            await reconcileOrphanedIntents(tester.getDrizzle());
+            const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+            await orphanedIntentsService.reconcile();
 
             // Verify: All records deleted
             for (const id of ids) {
@@ -485,11 +476,8 @@ describe("Reconciliation Service Tests", () => {
             expect(await minioObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            await reconcileOrphanedMinioObjects(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
+            await orphanedMinioService.reconcile();
 
             // Verify: MinIO object should be deleted
             expect(await minioObjectExists(id)).toBe(false);
@@ -517,11 +505,8 @@ describe("Reconciliation Service Tests", () => {
             expect(await minioObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            await reconcileOrphanedMinioObjects(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
+            await orphanedMinioService.reconcile();
 
             // Verify: MinIO object should be deleted
             expect(await minioObjectExists(id)).toBe(false);
@@ -537,11 +522,8 @@ describe("Reconciliation Service Tests", () => {
             expect(await minioObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            await reconcileOrphanedMinioObjects(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
+            await orphanedMinioService.reconcile();
 
             // Verify: MinIO object should still exist
             expect(await minioObjectExists(id)).toBe(true);
@@ -554,11 +536,8 @@ describe("Reconciliation Service Tests", () => {
             );
 
             // Run reconciliation
-            await reconcileOrphanedMinioObjects(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
+            await orphanedMinioService.reconcile();
 
             // Verify: All orphaned objects deleted
             for (const id of ids) {
@@ -580,11 +559,8 @@ describe("Reconciliation Service Tests", () => {
             ]);
 
             // Run reconciliation
-            await reconcileOrphanedMinioObjects(
-                tester.minio.config.buckets[0],
-                tester.getDrizzle(),
-                tester.minio.getS3Client(),
-            );
+            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
+            await orphanedMinioService.reconcile();
 
             // Verify: Valid object preserved
             expect(await minioObjectExists(validId)).toBe(true);

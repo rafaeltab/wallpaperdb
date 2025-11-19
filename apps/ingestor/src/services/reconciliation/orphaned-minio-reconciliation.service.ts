@@ -1,6 +1,6 @@
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { eq } from 'drizzle-orm';
-import { inject, injectable } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import type { Config } from '../../config.js';
 import { DatabaseConnection } from '../../connections/database.js';
 import { MinioConnection } from '../../connections/minio.js';
@@ -21,7 +21,7 @@ import { StorageService } from '../storage.service.js';
  * NOTE: This implementation does not currently support pagination.
  * TODO: Add pagination support for buckets with large numbers of objects.
  */
-@injectable()
+@singleton()
 export class OrphanedMinioReconciliation {
   constructor(
       @inject(StorageService) private readonly storageService: StorageService,
@@ -90,7 +90,7 @@ export class OrphanedMinioReconciliation {
 
     // Delete if no DB record OR DB record has uploadState = 'failed'
     if (!dbRecord || dbRecord.uploadState === 'failed') {
-        this.storageService.delete(this.config.s3Bucket, objectKey);
+        await this.storageService.delete(this.config.s3Bucket, objectKey);
       console.log(`Deleted orphaned MinIO object: ${objectKey}`);
     }
   }

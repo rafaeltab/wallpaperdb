@@ -1,5 +1,5 @@
 import { and, eq, lt } from "drizzle-orm";
-import { inject, injectable } from "tsyringe";
+import { inject, injectable, singleton } from "tsyringe";
 import type { Config } from "../../config.js";
 import { DatabaseConnection } from "../../connections/database.js";
 import { ReconciliationConstants } from "../../constants/reconciliation.constants.js";
@@ -20,7 +20,7 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * - If file missing and retries < MAX: increment retry count
  * - If file missing and retries >= MAX: mark as 'failed'
  */
-@injectable()
+@singleton()
 export class StuckUploadsReconciliation extends BaseReconciliation<WallpaperRecord> {
     constructor(
         @inject(StorageService) private readonly storageService: StorageService,

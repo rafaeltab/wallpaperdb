@@ -23,6 +23,7 @@ declare module "fastify" {
     interface FastifyInstance {
         connectionsState: ConnectionsState;
         rateLimitService: RateLimitService;
+        container: typeof container;
     }
 }
 
@@ -34,7 +35,8 @@ export async function createApp(
     container.register("ValidationLimitsService", {
         useClass: DefaultValidationLimitsService,
     });
-    container.register("TimeService", { useClass: SystemTimeService });
+    // Register TimeService as singleton instance for testability
+    container.register("TimeService", { useValue: new SystemTimeService() });
 
     // Initialize OpenTelemetry first (for instrumentation) - skip in tests by default
     if (options?.enableOtel !== false && config.nodeEnv !== "test") {
@@ -62,6 +64,9 @@ export async function createApp(
     });
 
     container.register("Logger", { useValue: new FastifyLogger(fastify.log) });
+
+    // Decorate Fastify with container for access in routes
+    fastify.decorate("container", container);
 
     // Initialize connection state
     fastify.decorate("connectionsState", {

@@ -1,5 +1,5 @@
 import { and, eq, lt } from 'drizzle-orm';
-import { inject, injectable } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../../connections/database.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
 import { wallpapers } from '../../db/schema.js';
@@ -18,7 +18,7 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * - Publish NATS event
  * - Transition to 'processing' state
  */
-@injectable()
+@singleton()
 export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRecord> {
     constructor(
         @inject(EventsService) private readonly eventsService: EventsService, 

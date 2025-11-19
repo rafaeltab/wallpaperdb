@@ -5,7 +5,7 @@ import {
   BaseReconciliation,
   type TransactionType,
 } from './base-reconciliation.service.js';
-import { inject, injectable } from 'tsyringe';
+import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../../connections/database.js';
 
 type WallpaperRecord = typeof wallpapers.$inferSelect;
@@ -16,7 +16,7 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * These are orphaned intent records where the upload was never completed.
  * Recovery logic: Delete the record
  */
-@injectable()
+@singleton()
 export class OrphanedIntentsReconciliation extends BaseReconciliation<WallpaperRecord> {
     constructor(
         @inject(DatabaseConnection) databaseConnection: DatabaseConnection,

@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
+import { inject, injectable } from "tsyringe";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "../../db/schema.js";
 import { wallpapers } from "../../db/schema.js";
 import type { TimeService } from "../core/time.service.js";
+import { DatabaseConnection } from "../../connections/database.js";
 
 type DbType = NodePgDatabase<typeof schema>;
 type UploadState =
@@ -26,6 +28,7 @@ type WallpaperUpdate = Partial<typeof wallpapers.$inferInsert>;
  * - completed → (terminal state)
  * - failed → (terminal state)
  */
+@injectable()
 export class WallpaperStateMachine {
     private readonly validTransitions: Record<UploadState, UploadState[]> = {
         initiated: ["uploading", "failed"],
@@ -36,10 +39,14 @@ export class WallpaperStateMachine {
         failed: [], // Terminal state
     };
 
+    private readonly db: DbType;
+
     constructor(
-        private readonly db: DbType,
-        private readonly timeService: TimeService,
-    ) { }
+        @inject(DatabaseConnection) databaseConnection: DatabaseConnection,
+        @inject("TimeService") private readonly timeService: TimeService,
+    ) {
+        this.db = databaseConnection.getClient().db;
+    }
 
     /**
      * Transition a wallpaper to a new state with optional metadata updates.

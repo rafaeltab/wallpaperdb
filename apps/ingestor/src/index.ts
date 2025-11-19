@@ -2,18 +2,18 @@ import "reflect-metadata";
 import type { FastifyInstance } from "fastify";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
-import { startScheduler, stopScheduler } from "./services/scheduler.service.js";
+import { SchedulerService } from "./services/scheduler.service.js";
 
 // Load configuration
 const config = loadConfig();
 
 // Graceful shutdown handler
-async function gracefulShutdown(signal: string, fastify: FastifyInstance) {
+async function gracefulShutdown(signal: string, fastify: FastifyInstance, schedulerService: SchedulerService) {
     fastify.log.info(`Received ${signal}, starting graceful shutdown...`);
 
     try {
-        // Stop scheduler first to prevent new reconciliation cycles
-        stopScheduler();
+        // Stop scheduler first and wait for current cycle to complete
+        await schedulerService.stopAndWait();
 
         await fastify.close();
         fastify.log.info("Graceful shutdown complete");
@@ -29,9 +29,12 @@ async function start() {
     try {
         const fastify = await createApp(config);
 
+        // Resolve scheduler service from container
+        const schedulerService = fastify.container.resolve(SchedulerService);
+
         // Register shutdown handlers
-        process.on("SIGTERM", () => gracefulShutdown("SIGTERM", fastify));
-        process.on("SIGINT", () => gracefulShutdown("SIGINT", fastify));
+        process.on("SIGTERM", () => gracefulShutdown("SIGTERM", fastify, schedulerService));
+        process.on("SIGINT", () => gracefulShutdown("SIGINT", fastify, schedulerService));
 
         // Start Fastify server
         await fastify.listen({
@@ -48,7 +51,7 @@ async function start() {
         );
 
         // Start reconciliation scheduler
-        startScheduler();
+        schedulerService.start();
         fastify.log.info("Reconciliation scheduler started");
     } catch (error) {
         console.error("Failed to start server:", error);

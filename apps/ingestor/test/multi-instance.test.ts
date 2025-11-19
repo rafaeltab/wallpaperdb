@@ -12,11 +12,9 @@ import { eq } from "drizzle-orm";
 import { ulid } from "ulid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type NewWallpaper, wallpapers } from "../src/db/schema.js";
-import {
-    reconcileMissingEvents,
-    reconcileOrphanedIntents,
-    reconcileStuckUploads,
-} from "../src/services/reconciliation.service.js";
+import { StuckUploadsReconciliation } from "../src/services/reconciliation/stuck-uploads-reconciliation.service.js";
+import { MissingEventsReconciliation } from "../src/services/reconciliation/missing-events-reconciliation.service.js";
+import { OrphanedIntentsReconciliation } from "../src/services/reconciliation/orphaned-intents-reconciliation.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -83,6 +81,8 @@ describe("Multi-Instance Safety Tests", () => {
     });
 
     it("should handle concurrent stuck upload recovery without duplicates", async () => {
+        const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+
         // Create 20 stuck uploads (in 'uploading' state for >10 minutes)
         const stuckUploads: string[] = [];
         const testImage = await createTestImage({
@@ -123,9 +123,9 @@ describe("Multi-Instance Safety Tests", () => {
 
         // Simulate 3 instances running reconciliation concurrently
         const workers = [
-            reconcileStuckUploads(bucket, db, s3Client),
-            reconcileStuckUploads(bucket, db, s3Client),
-            reconcileStuckUploads(bucket, db, s3Client),
+            stuckUploadsService.reconcile(),
+            stuckUploadsService.reconcile(),
+            stuckUploadsService.reconcile(),
         ];
 
         await Promise.all(workers);
@@ -153,6 +153,8 @@ describe("Multi-Instance Safety Tests", () => {
     });
 
     // it("should handle concurrent missing event publishing without duplicates", async () => {
+    //     const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+    //
     //     // Create 30 records in 'stored' state (awaiting NATS publish)
     //     const storedRecords: string[] = [];
     //     const bucket = tester.minio.config.buckets[0];
@@ -184,9 +186,9 @@ describe("Multi-Instance Safety Tests", () => {
     //
     //     // Simulate 3 instances running event publishing concurrently
     //     const workers = [
-    //         reconcileMissingEvents(db),
-    //         reconcileMissingEvents(db),
-    //         reconcileMissingEvents(db),
+    //         missingEventsService.reconcile(),
+    //         missingEventsService.reconcile(),
+    //         missingEventsService.reconcile(),
     //     ];
     //
     //     await Promise.all(workers);
@@ -228,6 +230,8 @@ describe("Multi-Instance Safety Tests", () => {
     // });
     //
     // it("should handle concurrent orphaned intent cleanup without errors", async () => {
+    //     const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+    //
     //     // Create 15 orphaned intents (in 'initiated' state for >1 hour)
     //     const orphanedIntents: string[] = [];
     //     const db = tester.getDrizzle();
@@ -249,8 +253,8 @@ describe("Multi-Instance Safety Tests", () => {
     //
     //     // Simulate 2 instances running cleanup concurrently
     //     const workers = [
-    //         reconcileOrphanedIntents(db),
-    //         reconcileOrphanedIntents(db),
+    //         orphanedIntentsService.reconcile(),
+    //         orphanedIntentsService.reconcile(),
     //     ];
     //
     //     await Promise.all(workers);
@@ -346,13 +350,17 @@ describe("Multi-Instance Safety Tests", () => {
     //     }
     //
     //     // Simulate 5 workers running ALL reconciliation functions concurrently
+    //     const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+    //     const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+    //     const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+    //
     //     const workers: Promise<void>[] = [];
     //     for (let i = 0; i < 5; i++) {
     //         workers.push(
     //             (async () => {
-    //                 await reconcileStuckUploads(bucket, db, s3Client);
-    //                 await reconcileMissingEvents(db);
-    //                 await reconcileOrphanedIntents(db);
+    //                 await stuckUploadsService.reconcile();
+    //                 await missingEventsService.reconcile();
+    //                 await orphanedIntentsService.reconcile();
     //             })(),
     //         );
     //     }
@@ -450,11 +458,13 @@ describe("Multi-Instance Safety Tests", () => {
     //     }
     //
     //     // Run 4 workers simultaneously (high concurrency)
+    //     const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+    //
     //     const workers = [
-    //         reconcileStuckUploads(bucket, db, s3Client),
-    //         reconcileStuckUploads(bucket, db, s3Client),
-    //         reconcileStuckUploads(bucket, db, s3Client),
-    //         reconcileStuckUploads(bucket, db, s3Client),
+    //         stuckUploadsService.reconcile(),
+    //         stuckUploadsService.reconcile(),
+    //         stuckUploadsService.reconcile(),
+    //         stuckUploadsService.reconcile(),
     //     ];
     //
     //     await Promise.all(workers);
@@ -527,13 +537,17 @@ describe("Multi-Instance Safety Tests", () => {
     //     }
     //
     //     // Run 3 workers doing all reconciliation tasks
+    //     const stuckUploadsService = tester.getApp().container.resolve(StuckUploadsReconciliation);
+    //     const missingEventsService = tester.getApp().container.resolve(MissingEventsReconciliation);
+    //     const orphanedIntentsService = tester.getApp().container.resolve(OrphanedIntentsReconciliation);
+    //
     //     const workers: Promise<void>[] = [];
     //     for (let i = 0; i < 3; i++) {
     //         workers.push(
     //             (async () => {
-    //                 await reconcileStuckUploads(bucket, db, s3Client);
-    //                 await reconcileMissingEvents(db);
-    //                 await reconcileOrphanedIntents(db);
+    //                 await stuckUploadsService.reconcile();
+    //                 await missingEventsService.reconcile();
+    //                 await orphanedIntentsService.reconcile();
     //             })(),
     //         );
     //     }

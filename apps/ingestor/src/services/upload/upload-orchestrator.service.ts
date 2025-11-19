@@ -6,7 +6,7 @@ import { wallpapers } from '../../db/schema.js';
 import type { Logger } from '../core/logger.service.js';
 import type { TimeService } from '../core/time.service.js';
 import { EventsService } from '../events.service.js';
-import { processFile, sanitizeFilename } from '../file-processor.service.js';
+import { FileProcessorService } from '../file-processor.service.js';
 import { WallpaperStateMachine } from '../state-machine/wallpaper-state-machine.service.js';
 import { StorageService } from '../storage.service.js';
 import type { ValidationLimitsService } from '../validation-limits.service.js';
@@ -41,18 +41,16 @@ export interface UploadResult {
  */
 @injectable()
 export class UploadOrchestrator {
-  private readonly stateMachine: WallpaperStateMachine;
-
   constructor(
     @inject(StorageService) private readonly storageService: StorageService,
     @inject(EventsService) private readonly eventService: EventsService,
     @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+    @inject(FileProcessorService) private readonly fileProcessorService: FileProcessorService,
+    @inject(WallpaperStateMachine) private readonly stateMachine: WallpaperStateMachine,
     @inject("ValidationLimitsService") private readonly validationLimitsService: ValidationLimitsService,
     @inject("Logger") private readonly logger: Logger,
     @inject("TimeService") private readonly timeService: TimeService
-  ) {
-    this.stateMachine = new WallpaperStateMachine(databaseConnection.getClient().db, timeService);
-  }
+  ) {}
 
   /**
    * Execute the full upload workflow.
@@ -64,7 +62,7 @@ export class UploadOrchestrator {
     const limits = await this.validationLimitsService.getLimitsForUser(userId);
 
     // Step 2: Process file (hash, validate, extract metadata)
-    const fileMetadata = await processFile(buffer, originalFilename, limits, providedMimeType);
+    const fileMetadata = await this.fileProcessorService.process(buffer, originalFilename, limits, providedMimeType);
 
     // Step 3: Check for duplicate upload (by content hash)
     const existing = await this.checkDuplicate(userId, fileMetadata.contentHash);
@@ -145,7 +143,7 @@ export class UploadOrchestrator {
   private async executeUpload(
     wallpaperId: string,
     params: UploadParams,
-    fileMetadata: Awaited<ReturnType<typeof processFile>>
+    fileMetadata: Awaited<ReturnType<FileProcessorService['process']>>
   ): Promise<UploadResult> {
     // Step 5: Transition to 'uploading' and upload to MinIO
     await this.stateMachine.transitionToUploading(wallpaperId);
@@ -168,7 +166,7 @@ export class UploadOrchestrator {
       aspectRatio: (fileMetadata.width / fileMetadata.height).toFixed(4),
       storageKey: storageResult.storageKey,
       storageBucket: storageResult.storageBucket,
-      originalFilename: sanitizeFilename(params.originalFilename),
+      originalFilename: this.fileProcessorService.sanitizeFilename(params.originalFilename),
     });
 
     // Step 7: Publish event to NATS (non-blocking failure)

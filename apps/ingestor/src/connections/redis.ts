@@ -9,7 +9,7 @@ export class RedisConnection extends BaseConnection<Redis> {
         super(config);
     }
 
-    public createClient(): Redis {
+    public async createClient(): Promise<Redis> {
         if (!this.config.redisEnabled) {
             throw new Error("Redis is not enabled");
         }
@@ -41,11 +41,31 @@ export class RedisConnection extends BaseConnection<Redis> {
             console.log("Redis connection closed");
         });
 
+        // Explicitly connect since we use lazyConnect: true
+        await client.connect();
+
         return client;
     }
 
     protected async closeClient(client: Redis): Promise<void> {
-        await client.quit();
+        // Check if client is in a state where it can be closed
+        if (client.status === "end" || client.status === "close") {
+            return; // Already closed
+        }
+
+        try {
+            // Only quit if connected or ready
+            if (client.status === "ready" || client.status === "connecting") {
+                await client.quit();
+            } else {
+                // Force disconnect for other states
+                client.disconnect();
+            }
+        } catch (error) {
+            // If quit fails, force disconnect
+            console.warn("Redis quit failed, forcing disconnect:", error);
+            client.disconnect();
+        }
     }
 
     async checkHealth(): Promise<boolean> {

@@ -20,11 +20,7 @@ import {
     it,
 } from "vitest";
 import { wallpapers } from "../src/db/schema.js";
-import {
-    runReconciliationNow,
-    startScheduler,
-    stopSchedulerAndWait,
-} from "../src/services/scheduler.service.js";
+import { SchedulerService } from "../src/services/scheduler.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -108,7 +104,9 @@ describe("Scheduler Lifecycle Tests", () => {
 
     afterEach(async () => {
         // Ensure scheduler is stopped after each test
-        await stopSchedulerAndWait();
+        const app = tester.getApp();
+        const schedulerService = app.container.resolve(SchedulerService);
+        await schedulerService.stopAndWait();
     });
 
     it("should start scheduler and run reconciliation automatically", async () => {
@@ -154,7 +152,8 @@ describe("Scheduler Lifecycle Tests", () => {
         expect(initial.uploadState).toBe("uploading");
 
         // Start scheduler (uses 100ms interval in test mode)
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Wait for reconciliation to run (250ms to ensure completion)
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -173,7 +172,7 @@ describe("Scheduler Lifecycle Tests", () => {
         );
 
         // Clean up
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 
     it("should stop scheduler cleanly during graceful shutdown", async () => {
@@ -212,7 +211,8 @@ describe("Scheduler Lifecycle Tests", () => {
         }
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Wait for at least one reconciliation cycle
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -226,7 +226,7 @@ describe("Scheduler Lifecycle Tests", () => {
         const reconciledBeforeShutdown = beforeShutdown.length;
 
         // Stop scheduler
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
 
         // Wait a bit more (another interval would occur at ~200ms)
         await new Promise((resolve) => setTimeout(resolve, 150));
@@ -277,7 +277,8 @@ describe("Scheduler Lifecycle Tests", () => {
             });
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Test interval is 100ms, so we should see reconciliation happen
         // Check at 50ms (should not be processed yet)
@@ -298,7 +299,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(record.uploadState).toBe("stored"); // Processed
 
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 
     it("should prevent concurrent reconciliation cycles", async () => {
@@ -337,10 +338,11 @@ describe("Scheduler Lifecycle Tests", () => {
         }
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Manually trigger reconciliation to force concurrent attempt
-        const reconciliationPromise = runReconciliationNow();
+        const reconciliationPromise = schedulerService.runReconciliationNow();
 
         // Wait a bit for manual reconciliation to start
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -362,7 +364,7 @@ describe("Scheduler Lifecycle Tests", () => {
         // All 30 should be processed (no duplicates or errors)
         expect(processedCount.length).toBe(30);
 
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 
     it("should handle reconciliation errors gracefully and continue running", async () => {
@@ -400,7 +402,8 @@ describe("Scheduler Lifecycle Tests", () => {
             });
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Wait for first reconciliation cycle
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -457,7 +460,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId2));
         expect(processed2.uploadState).toBe("stored");
 
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 
     it("should handle missing event publishing during scheduled reconciliation", async () => {
@@ -499,7 +502,8 @@ describe("Scheduler Lifecycle Tests", () => {
         }
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Wait for reconciliation to run
         await new Promise((resolve) => setTimeout(resolve, 250));
@@ -519,7 +523,7 @@ describe("Scheduler Lifecycle Tests", () => {
         const streamInfo = await jsm.streams.info("WALLPAPER");
         expect(streamInfo.state.messages).toBe(5);
 
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 
     it("should handle orphaned intent cleanup during scheduled reconciliation", async () => {
@@ -550,7 +554,8 @@ describe("Scheduler Lifecycle Tests", () => {
         expect(initial.length).toBe(8);
 
         // Start scheduler
-        startScheduler();
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
 
         // Wait for reconciliation to run multiple cycles to process all 8 records
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -563,6 +568,6 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.uploadState, "initiated"));
         expect(remaining.length).toBe(0);
 
-        await stopSchedulerAndWait();
+        await schedulerService.stopAndWait();
     });
 });

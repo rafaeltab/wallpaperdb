@@ -6,6 +6,3 @@ export { IngestorDrizzleTesterBuilder } from "./IngestorDrizzleBuilder.js";
 
 export { InProcessIngestorTesterBuilder } from "./InProcessIngestorBuilder.js";
 export type { InProcessIngestorOptions } from "./InProcessIngestorBuilder.js";
-
-export { ContainerizedIngestorTesterBuilder } from "./ContainerizedIngestorBuilder.js";
-export type { ContainerizedIngestorOptions } from "./ContainerizedIngestorBuilder.js";

@@ -91,13 +91,13 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
 
                     // Set environment variables for loadConfig()
                     process.env.NODE_ENV = "test";
-                    process.env.DATABASE_URL = postgres.connectionString;
-                    process.env.S3_ENDPOINT = minio.endpoint;
+                    process.env.DATABASE_URL = postgres.connectionStrings.fromHost;
+                    process.env.S3_ENDPOINT = minio.endpoints.fromHost;
                     process.env.S3_ACCESS_KEY_ID = minio.options.accessKey;
                     process.env.S3_SECRET_ACCESS_KEY = minio.options.secretKey;
                     process.env.S3_BUCKET =
                         minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers";
-                    process.env.NATS_URL = nats.endpoint;
+                    process.env.NATS_URL = nats.endpoints.fromHost;
                     process.env.NATS_STREAM =
                         nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";
                     process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
@@ -106,8 +106,8 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                     if (redis === undefined) {
                         process.env.REDIS_ENABLED = "false"; // Disable Redis by default
                     } else {
-                        process.env.REDIS_HOST = redis.host;
-                        process.env.REDIS_PORT = String(redis.port);
+                        process.env.REDIS_HOST = redis.host.fromHost;
+                        process.env.REDIS_PORT = redis.port.fromHost;
                         process.env.REDIS_ENABLED = "true";
                         process.env.RATE_LIMIT_MAX = "10";
                         process.env.RATE_LIMIT_WINDOW_MS = "10000";

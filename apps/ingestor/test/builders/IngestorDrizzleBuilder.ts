@@ -1,11 +1,11 @@
+import {
+    type AddMethodsType,
+    BaseTesterBuilder,
+    type DestroyTesterBuilder,
+    type PostgresTesterBuilder,
+} from "@wallpaperdb/test-utils";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import {
-    BaseTesterBuilder,
-    type PostgresTesterBuilder,
-    type AddMethodsType,
-    DestroyTesterBuilder,
-} from "@wallpaperdb/test-utils";
 import * as schema from "../../src/db/schema.js";
 
 const { Pool } = pg;
@@ -58,7 +58,7 @@ export class IngestorDrizzleTesterBuilder extends BaseTesterBuilder<
                 if (!this._drizzleInstance) {
                     // Create a node-postgres pool (not postgres.js)
                     this._drizzlePool = new Pool({
-                        connectionString: postgres.externalConnectionString,
+                        connectionString: postgres.connectionStrings.fromHost,
                         max: 10,
                     });
 

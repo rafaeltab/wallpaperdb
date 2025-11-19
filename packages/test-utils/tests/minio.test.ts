@@ -62,7 +62,7 @@ describe(
 
             expect(config).not.toBeNull();
 
-            const endpoint = config.endpoint;
+            const endpoint = config.endpoints.fromHost;
 
             const { accessKey, secretKey } = config.options;
 
@@ -98,7 +98,7 @@ describe(
 
             const config = tester.minio.config;
             const s3Client = new S3Client({
-                endpoint: config.endpoint,
+                endpoint: config.endpoints.fromHost,
                 region: "us-east-1",
                 credentials: {
                     accessKeyId: config.options.accessKey,
@@ -157,7 +157,7 @@ describe(
 
             // Verify credentials work
             const s3Client = new S3Client({
-                endpoint: config.endpoint,
+                endpoint: config.endpoints.fromHost,
                 region: "us-east-1",
                 credentials: {
                     accessKeyId: customAccessKey,
@@ -190,7 +190,7 @@ describe(
             // The network alias is only resolvable inside the Docker network
             // We can verify that MinIO started successfully and the config was set
             expect(tester.minio.config.container).toBeDefined();
-            expect(tester.minio.config.endpoint).toContain(customAlias);
+            expect(tester.minio.config.endpoints.networked).toContain(customAlias);
 
             await tester.destroy();
         });
@@ -205,7 +205,7 @@ describe(
 
                 const tester = await new Tester().withNetwork().withMinio().setup();
 
-                const endpoint = tester.minio.config.endpoint;
+                const endpoint = tester.minio.config.endpoints.networked;
                 expect(endpoint).toBeDefined();
                 expect(endpoint).toMatch(/^http:\/\/.+:9000$/);
 
@@ -222,7 +222,7 @@ describe(
 
             const tester = await new Tester().withMinio().setup();
 
-            const endpoint = tester.minio.config.endpoint;
+            const endpoint = tester.minio.config.endpoints.fromHost;
             expect(endpoint).toBeDefined();
             expect(endpoint).toMatch(/^http:\/\/.+:\d+$/);
 
@@ -273,7 +273,7 @@ describe(
 
             const config = tester.minio.config;
             const s3Client = new S3Client({
-                endpoint: config.endpoint,
+                endpoint: config.endpoints.fromHost,
                 region: "us-east-1",
                 credentials: {
                     accessKeyId: config.options.accessKey,
@@ -322,7 +322,7 @@ describe(
 
             const config = tester.minio.config;
             const s3Client = new S3Client({
-                endpoint: config.endpoint,
+                endpoint: config.endpoints.fromHost,
                 region: "us-east-1",
                 credentials: {
                     accessKeyId: config.options.accessKey,

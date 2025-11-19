@@ -1,11 +1,11 @@
+import Docker from "dockerode";
+import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     PostgresTesterBuilder,
 } from "../src/index";
-import Docker from "dockerode";
-import { Pool } from "pg";
 
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.
@@ -45,10 +45,11 @@ describe(
             expect(containerId).not.toBeNull();
 
             const containers = await docker.listContainers();
-            const container = containers.find((x) => x.Id == containerId);
+            const container = containers.find((x) => x.Id === containerId);
 
             // Assert
-            expect(Object.keys(container!.NetworkSettings.Networks)).toContain(
+            expect(container).not.toBeNull();
+            expect(Object.keys(container?.NetworkSettings.Networks ?? {})).toContain(
                 networkName,
             );
         });
@@ -61,7 +62,8 @@ describe(
 
             // Act
             const tester = await new Tester().withPostgres().setup();
-            const connectionString = tester.postgres.config.connectionString;
+            const connectionString =
+                tester.postgres.config.connectionStrings.fromHost;
 
             expect(connectionString).not.toBeNull();
 
@@ -77,7 +79,7 @@ ORDER BY schemaname, tablename;`);
             // Assert
             expect(res.rowCount).toBeGreaterThan(0);
 
-            await client.release();
+            client.release();
             await pool.end();
             await tester.destroy();
         });
@@ -114,7 +116,7 @@ ORDER BY schemaname, tablename;`);
                 .setup();
 
             const pool = new Pool({
-                connectionString: tester.postgres.config.connectionString,
+                connectionString: tester.postgres.config.connectionStrings.fromHost,
                 ssl: false,
             });
             const client = await pool.connect();
@@ -122,7 +124,7 @@ ORDER BY schemaname, tablename;`);
 
             expect(res.rows[0].current_database).toBe(customDb);
 
-            await client.release();
+            client.release();
             await pool.end();
             await tester.destroy();
         });
@@ -143,7 +145,7 @@ ORDER BY schemaname, tablename;`);
                 .setup();
 
             const pool = new Pool({
-                connectionString: tester.postgres.config.connectionString,
+                connectionString: tester.postgres.config.connectionStrings.fromHost,
                 ssl: false,
             });
             const client = await pool.connect();
@@ -151,7 +153,7 @@ ORDER BY schemaname, tablename;`);
 
             expect(res.rows[0].current_user).toBe(customUser);
 
-            await client.release();
+            client.release();
             await pool.end();
             await tester.destroy();
         });
@@ -174,7 +176,9 @@ ORDER BY schemaname, tablename;`);
             // The network alias is only resolvable inside the Docker network
             // We can verify that postgres started successfully and the config was set
             expect(tester.postgres.config.container).toBeDefined();
-            expect(tester.postgres.config.connectionString).toContain(customAlias);
+            expect(tester.postgres.config.connectionStrings.networked).toContain(
+                customAlias,
+            );
 
             await tester.destroy();
         });
@@ -187,7 +191,8 @@ ORDER BY schemaname, tablename;`);
 
             const tester = await new Tester().withNetwork().withPostgres().setup();
 
-            const connectionString = tester.postgres.config.connectionString;
+            const connectionString =
+                tester.postgres.config.connectionStrings.networked;
             expect(connectionString).toBeDefined();
             expect(connectionString).toMatch(/^postgresql:\/\/.+:.+@.+:5432\/.+$/);
 
@@ -202,25 +207,10 @@ ORDER BY schemaname, tablename;`);
 
             const tester = await new Tester().withPostgres().setup();
 
-            const connectionString = tester.postgres.config.connectionString;
+            const connectionString =
+                tester.postgres.config.connectionStrings.fromHost;
             expect(connectionString).toBeDefined();
             expect(connectionString).toMatch(/^postgres(ql)?:\/\/.+:.+@.+:\d+\/.+$/);
-
-            await tester.destroy();
-        });
-
-        it("should provide correct host and port", async () => {
-            const Tester = createDefaultTesterBuilder()
-                .with(DockerTesterBuilder)
-                .with(PostgresTesterBuilder)
-                .build();
-
-            const tester = await new Tester().withPostgres().setup();
-
-            expect(tester.postgres.config.host).toBeDefined();
-            expect(tester.postgres.config.port).toBeDefined();
-            expect(typeof tester.postgres.config.host).toBe("string");
-            expect(typeof tester.postgres.config.port).toBe("number");
 
             await tester.destroy();
         });
@@ -272,17 +262,17 @@ ORDER BY schemaname, tablename;`);
                 .setup();
 
             // Both should have different connection strings
-            expect(tester1.postgres.config.connectionString).not.toBe(
-                tester2.postgres.config.connectionString,
+            expect(tester1.postgres.config.connectionStrings.fromHost).not.toBe(
+                tester2.postgres.config.connectionStrings.fromHost,
             );
 
             // Both should be functional
             const pool1 = new Pool({
-                connectionString: tester1.postgres.config.connectionString,
+                connectionString: tester1.postgres.config.connectionStrings.fromHost,
                 ssl: false,
             });
             const pool2 = new Pool({
-                connectionString: tester2.postgres.config.connectionString,
+                connectionString: tester2.postgres.config.connectionStrings.fromHost,
                 ssl: false,
             });
 
@@ -295,8 +285,8 @@ ORDER BY schemaname, tablename;`);
             expect(res1.rows[0].current_database).toBe("db1");
             expect(res2.rows[0].current_database).toBe("db2");
 
-            await client1.release();
-            await client2.release();
+            client1.release();
+            client2.release();
             await pool1.end();
             await pool2.end();
             await tester1.destroy();

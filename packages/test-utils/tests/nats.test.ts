@@ -1,11 +1,11 @@
+import Docker from "dockerode";
+import { connect, type JsMsg, type NatsConnection } from "nats";
 import { describe, expect, it } from "vitest";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     NatsTesterBuilder,
 } from "../src/index";
-import Docker from "dockerode";
-import { connect, type NatsConnection } from "nats";
 
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.
@@ -46,7 +46,8 @@ describe(
             const containers = await docker.listContainers();
             const container = containers.find((x) => x.Id === containerId);
 
-            expect(Object.keys(container!.NetworkSettings.Networks)).toContain(
+            expect(container).not.toBeNull();
+            expect(Object.keys(container?.NetworkSettings.Networks ?? {})).toContain(
                 networkName,
             );
 
@@ -60,7 +61,7 @@ describe(
                 .build();
 
             const tester = await new Tester().withNats().setup();
-            const endpoint = tester.nats.config.endpoint;
+            const endpoint = tester.nats.config.endpoints.fromHost;
 
             expect(endpoint).not.toBeNull();
 
@@ -103,7 +104,7 @@ describe(
 
             // Verify JetStream is actually enabled
             const nc: NatsConnection = await connect({
-                servers: tester.nats.config.endpoint,
+                servers: tester.nats.config.endpoints.fromHost,
             });
             const jsm = await nc.jetstreamManager();
 
@@ -131,7 +132,7 @@ describe(
 
             // Verify stream exists
             const nc: NatsConnection = await connect({
-                servers: tester.nats.config.endpoint,
+                servers: tester.nats.config.endpoints.fromHost,
             });
             const jsm = await nc.jetstreamManager();
 
@@ -163,7 +164,7 @@ describe(
 
             // Verify all streams exist
             const nc: NatsConnection = await connect({
-                servers: tester.nats.config.endpoint,
+                servers: tester.nats.config.endpoints.fromHost,
             });
             const jsm = await nc.jetstreamManager();
 
@@ -192,7 +193,7 @@ describe(
                 .setup();
 
             const nc: NatsConnection = await connect({
-                servers: tester.nats.config.endpoint,
+                servers: tester.nats.config.endpoints.fromHost,
             });
             const js = nc.jetstream();
 
@@ -221,7 +222,7 @@ describe(
                 .setup();
 
             const nc: NatsConnection = await connect({
-                servers: tester.nats.config.endpoint,
+                servers: tester.nats.config.endpoints.fromHost,
             });
             const js = nc.jetstream();
 
@@ -235,7 +236,7 @@ describe(
             const consumer = await js.consumers.get(streamName);
             const messages = await consumer.fetch({ max_messages: 1 });
 
-            const msgs = [];
+            const msgs: JsMsg[] = [];
             for await (const msg of messages) {
                 msgs.push(msg);
                 msg.ack();
@@ -274,7 +275,7 @@ describe(
 
             const tester = await new Tester().withNats().setup();
 
-            const endpoint = tester.nats.config.endpoint;
+            const endpoint = tester.nats.config.endpoints.fromHost;
             expect(endpoint).toBeDefined();
             expect(endpoint).toMatch(/^nats:\/\/.+:\d+$/);
 

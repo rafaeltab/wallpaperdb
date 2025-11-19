@@ -1,11 +1,11 @@
+import Docker from "dockerode";
+import { createClient, type RedisClientType } from "redis";
 import { describe, expect, it } from "vitest";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     RedisTesterBuilder,
 } from "../src/index";
-import Docker from "dockerode";
-import { createClient, type RedisClientType } from "redis";
 
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.
@@ -46,7 +46,8 @@ describe(
             const containers = await docker.listContainers();
             const container = containers.find((x) => x.Id === containerId);
 
-            expect(Object.keys(container!.NetworkSettings.Networks)).toContain(
+            expect(container).not.toBeNull();
+            expect(Object.keys(container?.NetworkSettings.Networks ?? {})).toContain(
                 networkName,
             );
 
@@ -60,7 +61,7 @@ describe(
                 .build();
 
             const tester = await new Tester().withRedis().setup();
-            const endpoint = tester.redis.config.endpoint;
+            const endpoint = tester.redis.config.endpoints.fromHost;
 
             expect(endpoint).not.toBeNull();
 
@@ -99,7 +100,7 @@ describe(
             const tester = await new Tester().withRedis().setup();
 
             const client: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
             await client.connect();
 
@@ -123,7 +124,7 @@ describe(
             const tester = await new Tester().withRedis().setup();
 
             const client: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
             await client.connect();
 
@@ -153,7 +154,7 @@ describe(
             const tester = await new Tester().withRedis().setup();
 
             const client: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
             await client.connect();
 
@@ -181,7 +182,7 @@ describe(
             const tester = await new Tester().withRedis().setup();
 
             const client: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
             await client.connect();
 
@@ -213,10 +214,10 @@ describe(
 
             // Create publisher and subscriber clients
             const publisher: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
             const subscriber: RedisClientType = createClient({
-                url: tester.redis.config.endpoint,
+                url: tester.redis.config.endpoints.fromHost,
             });
 
             await publisher.connect();
@@ -271,7 +272,7 @@ describe(
 
             const tester = await new Tester().withRedis().setup();
 
-            const endpoint = tester.redis.config.endpoint;
+            const endpoint = tester.redis.config.endpoints.fromHost;
             expect(endpoint).toBeDefined();
             expect(endpoint).toMatch(/^redis:\/\/.+:\d+$/);
 

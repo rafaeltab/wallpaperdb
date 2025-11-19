@@ -1,10 +1,6 @@
-import { describe, expect, it, afterEach } from "vitest";
-import {
-    createDefaultTesterBuilder,
-    createTesterBuilder,
-    DockerTesterBuilder,
-} from "../src/index";
 import Docker from "dockerode";
+import { describe, expect, it } from "vitest";
+import { createDefaultTesterBuilder, DockerTesterBuilder } from "../src/index";
 
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.

@@ -35,6 +35,34 @@ let isReconciling = false;
 let schedulerCreatedConnections = false;
 
 /**
+ * Helper to get or create database connection
+ */
+function ensureDatabaseConnection(config: ReturnType<typeof loadConfig>): DbType {
+  try {
+    return getDatabase();
+  } catch {
+    // Database not initialized, create connection
+    const { db } = createDatabaseConnection(config);
+    schedulerCreatedConnections = true;
+    return db;
+  }
+}
+
+/**
+ * Helper to get or create MinIO connection
+ */
+function ensureMinioConnection(config: ReturnType<typeof loadConfig>): S3Client {
+  try {
+    return getMinioClient();
+  } catch {
+    // MinIO not initialized, create connection
+    const client = createMinioConnection(config);
+    schedulerCreatedConnections = true;
+    return client;
+  }
+}
+
+/**
  * Get interval configuration from environment
  * Uses RECONCILIATION_INTERVAL_MS and MINIO_CLEANUP_INTERVAL_MS environment variables,
  * with sensible defaults based on NODE_ENV
@@ -63,28 +91,8 @@ async function runReconciliationCycle(): Promise<void> {
 
   try {
     const config = loadConfig();
-
-    // Initialize connections if not already initialized
-    // This is needed for tests where singletons aren't pre-initialized
-    let db: DbType;
-    let s3Client: S3Client;
-
-    try {
-      db = getDatabase();
-    } catch {
-      // Database not initialized, create connection
-      const { db: dbInstance } = createDatabaseConnection(config);
-      db = dbInstance;
-      schedulerCreatedConnections = true;
-    }
-
-    try {
-      s3Client = getMinioClient();
-    } catch {
-      // MinIO not initialized, create connection
-      s3Client = createMinioConnection(config);
-      schedulerCreatedConnections = true;
-    }
+    const db = ensureDatabaseConnection(config);
+    const s3Client = ensureMinioConnection(config);
 
     console.log('Starting reconciliation cycle...');
 
@@ -128,25 +136,8 @@ async function runReconciliationCycle(): Promise<void> {
 async function runMinioCleanupCycle(): Promise<void> {
   try {
     const config = loadConfig();
-
-    // Initialize connections if not already initialized
-    let db: DbType;
-    let s3Client: S3Client;
-
-    try {
-      db = getDatabase();
-    } catch {
-      const { db: dbInstance } = createDatabaseConnection(config);
-      db = dbInstance;
-      schedulerCreatedConnections = true;
-    }
-
-    try {
-      s3Client = getMinioClient();
-    } catch {
-      s3Client = createMinioConnection(config);
-      schedulerCreatedConnections = true;
-    }
+    const db = ensureDatabaseConnection(config);
+    const s3Client = ensureMinioConnection(config);
 
     console.log('Starting MinIO orphaned object cleanup...');
 

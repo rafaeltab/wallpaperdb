@@ -1,47 +1,56 @@
 import { type NatsConnection, connect } from 'nats';
 import type { Config } from '../config.js';
+import { BaseConnection } from './base/base-connection.js';
 
-let natsClient: NatsConnection | null = null;
+class NatsConnectionManager extends BaseConnection<NatsConnection> {
+  protected async createClient(config: Config): Promise<NatsConnection> {
+    const client = await connect({
+      servers: config.natsUrl,
+      name: config.otelServiceName,
+    });
 
-export async function createNatsConnection(config: Config): Promise<NatsConnection> {
-  if (natsClient) {
-    return natsClient;
+    console.log(`Connected to NATS at '${config.natsUrl}'`);
+    return client;
   }
 
-  natsClient = await connect({
-    servers: config.natsUrl,
-    name: config.otelServiceName,
-  });
+  protected async closeClient(client: NatsConnection): Promise<void> {
+    await client.close();
+  }
 
-  console.log(`Connected to NATS at '${config.natsUrl}'`);
+  async checkHealth(client: NatsConnection, _config: Config): Promise<boolean> {
+    try {
+      const info = client.info;
+      return info !== null && !client.isClosed();
+    } catch (error) {
+      console.error('NATS health check failed:', error);
+      return false;
+    }
+  }
+}
 
-  return natsClient;
+// Singleton instance
+const natsConnectionManager = new NatsConnectionManager();
+
+// Legacy API for backward compatibility
+export async function createNatsConnection(config: Config): Promise<NatsConnection> {
+  return await natsConnectionManager.initialize(config);
 }
 
 export async function checkNatsHealth(): Promise<boolean> {
-  if (!natsClient) {
+  if (!natsConnectionManager.isInitialized()) {
     return false;
   }
-
-  try {
-    const info = natsClient.info;
-    return info !== null && !natsClient.isClosed();
-  } catch (error) {
-    console.error('NATS health check failed:', error);
-    return false;
-  }
+  // Pass empty config since health check doesn't use it
+  return await natsConnectionManager.checkHealth(natsConnectionManager.getClient(), {} as Config);
 }
 
 export function getNatsClient(): NatsConnection {
-  if (!natsClient) {
-    throw new Error('NATS client not initialized. Call createNatsConnection first.');
-  }
-  return natsClient;
+  return natsConnectionManager.getClient();
 }
 
 export async function closeNatsConnection(): Promise<void> {
-  if (natsClient) {
-    await natsClient.close();
-    natsClient = null;
-  }
+  await natsConnectionManager.close();
 }
+
+// Export the connection instance for DI usage
+export { natsConnectionManager };

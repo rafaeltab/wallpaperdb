@@ -1,16 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { ulid } from 'ulid';
-import { eq, and, inArray } from 'drizzle-orm';
 import type { Config } from '../config.js';
 import { getDatabase } from '../connections/database.js';
-import { wallpapers } from '../db/schema.js';
 import { DefaultValidationLimitsService } from '../services/validation-limits.service.js';
-import { processFile, sanitizeFilename } from '../services/file-processor.service.js';
-import { uploadToStorage } from '../services/storage.service.js';
-import { publishWallpaperUploadedEvent } from '../services/events.service.js';
 import { ProblemDetailsError, MissingFileError, MissingUserId } from '../errors/problem-details.js';
 import type { MultipartFile } from '@fastify/multipart';
 import { RateLimitExceededError } from '../services/rate-limit.service.js';
+import { UploadOrchestrator } from '../services/upload/upload-orchestrator.service.js';
 
 interface CachedMultipartData {
   buffer: Buffer;
@@ -31,6 +26,12 @@ let config: Config;
 
 async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
   const db = getDatabase();
+  const orchestrator = new UploadOrchestrator(
+    db,
+    validationLimitsService,
+    config.s3Bucket,
+    request.log
+  );
 
   try {
     // Use cached multipart data from preHandler
@@ -61,150 +62,24 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
       providedMimeType = data.mimetype;
     }
 
-    // Step 1: Check rate limit for user
+    // Check rate limit for user
     const rateLimitResult = await request.server.rateLimitService.checkRateLimit(userId);
 
-    // Step 2: Get user validation limits
-    const limits = await validationLimitsService.getLimitsForUser(userId);
-
-    // Step 3: Process file (hash, validate, extract metadata)
-    const fileMetadata = await processFile(buffer, originalFilename, limits, providedMimeType);
-
-    // Step 4: Check for duplicate upload (by content hash)
-    const existing = await db.query.wallpapers.findFirst({
-      where: and(
-        eq(wallpapers.userId, userId),
-        eq(wallpapers.contentHash, fileMetadata.contentHash),
-        inArray(wallpapers.uploadState, ['stored', 'processing', 'completed'])
-      ),
-    });
-
-    if (existing) {
-      // Return existing upload (idempotency) with rate limit headers
-      return reply
-        .code(200)
-        .header('X-RateLimit-Limit', String(request.server.rateLimitService.config.rateLimitMax))
-        .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
-        .header('X-RateLimit-Reset', String(rateLimitResult.reset))
-        .send({
-          id: existing.id,
-          status: 'already_uploaded',
-          uploadedAt: existing.uploadedAt.toISOString(),
-          fileType: existing.fileType,
-          mimeType: existing.mimeType,
-          width: existing.width,
-          height: existing.height,
-          fileSizeBytes: existing.fileSizeBytes,
-        });
-    }
-
-    // Step 5: Generate ID and record intent (write-ahead)
-    const id = `wlpr_${ulid()}`;
-
-    await db.insert(wallpapers).values({
-      id,
+    // Execute upload workflow through orchestrator
+    const result = await orchestrator.handleUpload({
+      buffer,
+      originalFilename,
+      providedMimeType,
       userId,
-      contentHash: fileMetadata.contentHash,
-      uploadState: 'initiated',
-      uploadAttempts: 0,
     });
 
-    try {
-      // Step 6: Update state to 'uploading' and upload to MinIO
-      await db
-        .update(wallpapers)
-        .set({
-          uploadState: 'uploading',
-          stateChangedAt: new Date(),
-        })
-        .where(eq(wallpapers.id, id));
-
-      const storageResult = await uploadToStorage(
-        id,
-        buffer,
-        fileMetadata.mimeType,
-        fileMetadata.extension,
-        config.s3Bucket,
-        userId
-      );
-
-      // Step 7: Update to 'stored' with full metadata
-      await db
-        .update(wallpapers)
-        .set({
-          uploadState: 'stored',
-          stateChangedAt: new Date(),
-          fileType: fileMetadata.fileType,
-          mimeType: fileMetadata.mimeType,
-          fileSizeBytes: fileMetadata.fileSizeBytes,
-          width: fileMetadata.width,
-          height: fileMetadata.height,
-          aspectRatio: (fileMetadata.width / fileMetadata.height).toFixed(4),
-          storageKey: storageResult.storageKey,
-          storageBucket: storageResult.storageBucket,
-          originalFilename: sanitizeFilename(originalFilename),
-        })
-        .where(eq(wallpapers.id, id));
-
-      // Step 8: Publish event to NATS (non-blocking failure)
-      try {
-        // Fetch the complete wallpaper record for event publishing
-        const wallpaper = await db.query.wallpapers.findFirst({
-          where: eq(wallpapers.id, id),
-        });
-
-        if (!wallpaper) {
-          throw new Error('Wallpaper not found after insertion');
-        }
-
-        await publishWallpaperUploadedEvent(wallpaper);
-
-        // Event published successfully
-        await db
-          .update(wallpapers)
-          .set({
-            uploadState: 'processing',
-            stateChangedAt: new Date(),
-          })
-          .where(eq(wallpapers.id, id));
-      } catch (natsError) {
-        // NATS publish failed, but file is uploaded
-        // Don't fail the request - reconciliation will retry
-        request.log.warn(
-          { id, error: natsError },
-          'NATS publish failed, will be retried by reconciliation'
-        );
-        // Leave state as 'stored' - reconciliation will republish
-      }
-
-      // Step 9: Return success response with rate limit headers
-      return reply
-        .code(200)
-        .header('X-RateLimit-Limit', String(request.server.rateLimitService.config.rateLimitMax))
-        .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
-        .header('X-RateLimit-Reset', String(rateLimitResult.reset))
-        .send({
-          id,
-          status: 'processing',
-          uploadedAt: new Date().toISOString(),
-          fileType: fileMetadata.fileType,
-          mimeType: fileMetadata.mimeType,
-          width: fileMetadata.width,
-          height: fileMetadata.height,
-          fileSizeBytes: fileMetadata.fileSizeBytes,
-        });
-    } catch (error) {
-      // Upload or processing failed, mark as failed in DB
-      await db
-        .update(wallpapers)
-        .set({
-          uploadState: 'failed',
-          processingError: error instanceof Error ? error.message : 'Unknown error',
-        })
-        .where(eq(wallpapers.id, id));
-
-      throw error;
-    }
+    // Return success response with rate limit headers
+    return reply
+      .code(200)
+      .header('X-RateLimit-Limit', String(request.server.rateLimitService.config.rateLimitMax))
+      .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
+      .header('X-RateLimit-Reset', String(rateLimitResult.reset))
+      .send(result);
   } catch (error) {
     // Handle rate limit exceeded
     if (error instanceof RateLimitExceededError) {

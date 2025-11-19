@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import { singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import type { Config } from "../config.js";
 import * as schema from "../db/schema.js";
 import { BaseConnection } from "./base/base-connection.js";
@@ -14,9 +14,13 @@ export type DatabaseClient = {
 
 @singleton()
 export class DatabaseConnection extends BaseConnection<DatabaseClient> {
-    protected createClient(config: Config): DatabaseClient {
+    constructor(@inject("config") config: Config) {
+        super(config);
+    }
+    
+    protected createClient(): DatabaseClient {
         const pool = new Pool({
-            connectionString: config.databaseUrl,
+            connectionString: this.config.databaseUrl,
             max: 20, // Maximum connections in pool
             idleTimeoutMillis: 30000, // Close idle connections after 30s
             connectionTimeoutMillis: 2000, // Fail fast if can't get connection

@@ -3,32 +3,32 @@
  * Abstracts time-related operations to enable time-based testing.
  */
 export interface TimeService {
-  /**
-   * Get the current date and time.
-   * @returns Current Date
-   */
-  now(): Date;
+    /**
+     * Get the current date and time.
+     * @returns Current Date
+     */
+    now(): Date;
 
-  /**
-   * Get a date that is a specified number of milliseconds ago.
-   * @param ms - Milliseconds in the past
-   * @returns Date in the past
-   */
-  msAgo(ms: number): Date;
+    /**
+     * Get a date that is a specified number of milliseconds ago.
+     * @param ms - Milliseconds in the past
+     * @returns Date in the past
+     */
+    msAgo(ms: number): Date;
 
-  /**
-   * Get a date that is a specified number of minutes ago.
-   * @param minutes - Minutes in the past
-   * @returns Date in the past
-   */
-  minutesAgo(minutes: number): Date;
+    /**
+     * Get a date that is a specified number of minutes ago.
+     * @param minutes - Minutes in the past
+     * @returns Date in the past
+     */
+    minutesAgo(minutes: number): Date;
 
-  /**
-   * Get a date that is a specified number of hours ago.
-   * @param hours - Hours in the past
-   * @returns Date in the past
-   */
-  hoursAgo(hours: number): Date;
+    /**
+     * Get a date that is a specified number of hours ago.
+     * @param hours - Hours in the past
+     * @returns Date in the past
+     */
+    hoursAgo(hours: number): Date;
 }
 
 /**
@@ -36,21 +36,21 @@ export interface TimeService {
  * This is the default implementation for production use.
  */
 export class SystemTimeService implements TimeService {
-  now(): Date {
-    return new Date();
-  }
+    now(): Date {
+        return new Date();
+    }
 
-  msAgo(ms: number): Date {
-    return new Date(Date.now() - ms);
-  }
+    msAgo(ms: number): Date {
+        return new Date(Date.now() - ms);
+    }
 
-  minutesAgo(minutes: number): Date {
-    return new Date(Date.now() - minutes * 60 * 1000);
-  }
+    minutesAgo(minutes: number): Date {
+        return new Date(Date.now() - minutes * 60 * 1000);
+    }
 
-  hoursAgo(hours: number): Date {
-    return new Date(Date.now() - hours * 60 * 60 * 1000);
-  }
+    hoursAgo(hours: number): Date {
+        return new Date(Date.now() - hours * 60 * 60 * 1000);
+    }
 }
 
 /**
@@ -58,34 +58,29 @@ export class SystemTimeService implements TimeService {
  * Allows tests to control the current time.
  */
 export class MockTimeService implements TimeService {
-  constructor(private currentTime: Date = new Date()) {}
+    constructor(private currentTime: Date = new Date()) { }
 
-  /**
-   * Set the current time for testing.
-   * @param time - The time to set
-   */
-  setTime(time: Date): void {
-    this.currentTime = time;
-  }
+    /**
+     * Set the current time for testing.
+     * @param time - The time to set
+     */
+    setTime(time: Date): void {
+        this.currentTime = time;
+    }
 
-  now(): Date {
-    return this.currentTime;
-  }
+    now(): Date {
+        return this.currentTime;
+    }
 
-  msAgo(ms: number): Date {
-    return new Date(this.currentTime.getTime() - ms);
-  }
+    msAgo(ms: number): Date {
+        return new Date(this.currentTime.getTime() - ms);
+    }
 
-  minutesAgo(minutes: number): Date {
-    return new Date(this.currentTime.getTime() - minutes * 60 * 1000);
-  }
+    minutesAgo(minutes: number): Date {
+        return new Date(this.currentTime.getTime() - minutes * 60 * 1000);
+    }
 
-  hoursAgo(hours: number): Date {
-    return new Date(this.currentTime.getTime() - hours * 60 * 60 * 1000);
-  }
+    hoursAgo(hours: number): Date {
+        return new Date(this.currentTime.getTime() - hours * 60 * 60 * 1000);
+    }
 }
-
-/**
- * Default system time service instance.
- */
-export const systemTimeService = new SystemTimeService();

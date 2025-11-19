@@ -1,12 +1,7 @@
-import type { S3Client } from "@aws-sdk/client-s3";
 import { container } from "tsyringe";
 import { loadConfig } from "../config.js";
 import { DatabaseConnection } from "../connections/database.js";
-import {
-    closeMinioConnection,
-    createMinioConnection,
-    getMinioClient,
-} from "../connections/minio.js";
+import { MinioConnection } from "../connections/minio.js";
 import {
     reconcileMissingEvents,
     reconcileOrphanedIntents,
@@ -26,22 +21,6 @@ let isReconciling = false;
 
 // Track if scheduler created its own connections (so we can clean them up)
 let schedulerCreatedConnections = false;
-
-/**
- * Helper to get or create MinIO connection
- */
-function ensureMinioConnection(
-    config: ReturnType<typeof loadConfig>,
-): S3Client {
-    try {
-        return getMinioClient();
-    } catch {
-        // MinIO not initialized, create connection
-        const client = createMinioConnection(config);
-        schedulerCreatedConnections = true;
-        return client;
-    }
-}
 
 /**
  * Get interval configuration from environment
@@ -71,32 +50,27 @@ async function runReconciliationCycle(): Promise<void> {
     isReconciling = true;
 
     try {
-        const config = loadConfig();
-        const db = (await container.resolve(DatabaseConnection).initialize(config))
-            .db;
-        const s3Client = ensureMinioConnection(config);
-
         console.log("Starting reconciliation cycle...");
 
         // Run all three reconciliation functions sequentially
         // Each function handles its own errors internally, but we catch any unexpected ones
 
         try {
-            await reconcileStuckUploads(config.s3Bucket, db, s3Client);
+            await reconcileStuckUploads();
         } catch (error) {
             console.error("Error in reconcileStuckUploads:", error);
             // Continue to next reconciliation function
         }
 
         try {
-            await reconcileMissingEvents(db);
+            await reconcileMissingEvents();
         } catch (error) {
             console.error("Error in reconcileMissingEvents:", error);
             // Continue to next reconciliation function
         }
 
         try {
-            await reconcileOrphanedIntents(db);
+            await reconcileOrphanedIntents();
         } catch (error) {
             console.error("Error in reconcileOrphanedIntents:", error);
             // Continue (no more functions, but we don't crash)
@@ -117,14 +91,9 @@ async function runReconciliationCycle(): Promise<void> {
  */
 async function runMinioCleanupCycle(): Promise<void> {
     try {
-        const config = loadConfig();
-        const db = (await container.resolve(DatabaseConnection).initialize(config))
-            .db;
-        const s3Client = ensureMinioConnection(config);
-
         console.log("Starting MinIO orphaned object cleanup...");
 
-        await reconcileOrphanedMinioObjects(config.s3Bucket, db, s3Client);
+        await reconcileOrphanedMinioObjects();
 
         console.log("MinIO cleanup complete");
     } catch (error) {
@@ -203,7 +172,7 @@ export function stopScheduler(): void {
         (async () => {
             try {
                 await container.resolve(DatabaseConnection).close();
-                closeMinioConnection();
+                await container.resolve(MinioConnection).close();
                 schedulerCreatedConnections = false;
             } catch (error) {
                 // Silently ignore connection termination errors (happens during test teardown)
@@ -245,7 +214,7 @@ export async function stopSchedulerAndWait(): Promise<void> {
     if (schedulerCreatedConnections) {
         try {
             await container.resolve(DatabaseConnection).close();
-            closeMinioConnection();
+            await container.resolve(MinioConnection).close();
             schedulerCreatedConnections = false;
         } catch (error) {
             // Silently ignore connection termination errors (happens during test teardown)

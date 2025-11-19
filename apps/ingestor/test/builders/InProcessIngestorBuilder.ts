@@ -10,6 +10,9 @@ import {
 import type { FastifyInstance } from "fastify";
 import { createApp } from "../../src/app.js";
 import type { Config } from "../../src/config.js";
+import { container } from "tsyringe";
+import { DefaultValidationLimitsService } from "../../src/services/validation-limits.service.js";
+import { SystemTimeService } from "../../src/services/core/time.service.js";
 
 /**
  * Options for InProcessIngestorMixin
@@ -142,6 +145,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                 if (this._appInitialized) {
                     return this; // Already registered
                 }
+
                 this._appInitialized = true;
                 this.withIngestorEnvironment();
 
@@ -151,6 +155,12 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                     // Import config at runtime to pick up environment variables
                     const { loadConfig } = await import("../../src/config.js");
                     const config = loadConfig();
+                    container.registerInstance("config", config);
+                    container.registerType(
+                        "ValidationLimitsService",
+                        DefaultValidationLimitsService,
+                    );
+                    container.registerType("TimeService", SystemTimeService);
 
                     // Create Fastify app
                     this.app = await createApp(config, {

@@ -1,9 +1,9 @@
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
-import { checkMinioHealth } from '../connections/minio.js';
-import { checkNatsHealth } from '../connections/nats.js';
-import { checkOtelHealth } from '../connections/otel.js';
+import { MinioConnection } from '../connections/minio.js';
+import { NatsConnectionManager } from '../connections/nats.js';
+import { OpenTelemetryConnection } from '../connections/otel.js';
 
 export interface HealthCheckResult {
   database: boolean;
@@ -28,7 +28,10 @@ export interface ReadyResponse {
 export class HealthService {
   constructor(
       @inject("config") private readonly config: Config,
-      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection
+      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+      @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+      @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager,
+      @inject(OpenTelemetryConnection) private readonly otelConnection: OpenTelemetryConnection,
   ) {}
 
   async checkHealth(isShuttingDown: boolean): Promise<HealthResponse> {
@@ -49,10 +52,10 @@ export class HealthService {
     try {
       // Check all connections
       checks.database = await this.databaseConnection.checkHealth();
-      checks.minio = await checkMinioHealth(this.config);
-      checks.nats = await checkNatsHealth();
+      checks.minio = await this.minioConnection.checkHealth();
+      checks.nats = await this.natsConnection.checkHealth();
       // OTEL is optional in tests - if disabled, consider it healthy
-      checks.otel = this.config.nodeEnv === 'test' ? true : await checkOtelHealth();
+      checks.otel = this.config.nodeEnv === 'test' ? true : await this.otelConnection.checkHealth();
 
       const allHealthy = Object.values(checks).every((check) => check === true);
 

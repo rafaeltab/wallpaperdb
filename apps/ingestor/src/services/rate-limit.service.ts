@@ -1,14 +1,13 @@
-import type Redis from 'ioredis';
+import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
+import { RedisConnection } from '../connections/redis.js';
 
+@injectable()
 export class RateLimitService {
-  public readonly config: Config;
-
   constructor(
-    config: Config,
-    private redis?: Redis
+    @inject("config") private readonly config: Config,
+    @inject(RedisConnection) private readonly redisConnection: RedisConnection
   ) {
-    this.config = config;
   }
 
   /**
@@ -21,16 +20,18 @@ export class RateLimitService {
     const windowMs = this.config.rateLimitWindowMs;
     const max = this.config.rateLimitMax;
 
-    if (this.redis) {
+    const redis = this.redisConnection.isInitialized() ? this.redisConnection.getClient() : undefined;
+
+    if (redis) {
       // Use Redis for distributed rate limiting
-      const count = await this.redis.incr(key);
+      const count = await redis.incr(key);
 
       // Set expiry on first request
       if (count === 1) {
-        await this.redis.pexpire(key, windowMs);
+        await redis.pexpire(key, windowMs);
       }
 
-      const ttl = await this.redis.pttl(key);
+      const ttl = await redis.pttl(key);
       const reset = now + (ttl > 0 ? ttl : windowMs);
 
       if (count > max) {

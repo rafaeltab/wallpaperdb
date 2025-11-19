@@ -1,18 +1,15 @@
+import { and, eq, inArray} from 'drizzle-orm';
+import { inject, injectable } from 'tsyringe';
 import { ulid } from 'ulid';
-import { eq, and, inArray } from 'drizzle-orm';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { FastifyBaseLogger } from 'fastify';
+import { DatabaseConnection } from '../../connections/database.js';
 import { wallpapers } from '../../db/schema.js';
-import type * as schema from '../../db/schema.js';
-import type { ValidationLimitsService } from '../validation-limits.service.js';
-import { processFile, sanitizeFilename } from '../file-processor.service.js';
-import { uploadToStorage } from '../storage.service.js';
-import { publishWallpaperUploadedEvent } from '../events.service.js';
-import { WallpaperStateMachine } from '../state-machine/wallpaper-state-machine.service.js';
+import type { Logger } from '../core/logger.service.js';
 import type { TimeService } from '../core/time.service.js';
-import { systemTimeService } from '../core/time.service.js';
-
-type DbType = NodePgDatabase<typeof schema>;
+import { EventsService } from '../events.service.js';
+import { processFile, sanitizeFilename } from '../file-processor.service.js';
+import { WallpaperStateMachine } from '../state-machine/wallpaper-state-machine.service.js';
+import { StorageService } from '../storage.service.js';
+import type { ValidationLimitsService } from '../validation-limits.service.js';
 
 export interface UploadParams {
   buffer: Buffer;
@@ -42,17 +39,19 @@ export interface UploadResult {
  * 5. Update metadata
  * 6. Publish NATS event
  */
+@injectable()
 export class UploadOrchestrator {
   private readonly stateMachine: WallpaperStateMachine;
 
   constructor(
-    private readonly db: DbType,
-    private readonly validationLimitsService: ValidationLimitsService,
-    private readonly storageBucket: string,
-    private readonly logger: FastifyBaseLogger,
-    private readonly timeService: TimeService = systemTimeService
+    @inject(StorageService) private readonly storageService: StorageService,
+    @inject(EventsService) private readonly eventService: EventsService,
+    @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+    @inject("ValidationLimitsService") private readonly validationLimitsService: ValidationLimitsService,
+    @inject("Logger") private readonly logger: Logger,
+    @inject("TimeService") private readonly timeService: TimeService
   ) {
-    this.stateMachine = new WallpaperStateMachine(db, timeService);
+    this.stateMachine = new WallpaperStateMachine(databaseConnection.getClient().db, timeService);
   }
 
   /**
@@ -94,7 +93,7 @@ export class UploadOrchestrator {
     userId: string,
     contentHash: string
   ): Promise<typeof wallpapers.$inferSelect | null> {
-    const existing = await this.db.query.wallpapers.findFirst({
+    const existing = await this.databaseConnection.getClient().db.query.wallpapers.findFirst({
       where: and(
         eq(wallpapers.userId, userId),
         eq(wallpapers.contentHash, contentHash),
@@ -131,7 +130,7 @@ export class UploadOrchestrator {
     userId: string,
     contentHash: string
   ): Promise<void> {
-    await this.db.insert(wallpapers).values({
+    await this.databaseConnection.getClient().db.insert(wallpapers).values({
       id: wallpaperId,
       userId,
       contentHash,
@@ -151,12 +150,11 @@ export class UploadOrchestrator {
     // Step 5: Transition to 'uploading' and upload to MinIO
     await this.stateMachine.transitionToUploading(wallpaperId);
 
-    const storageResult = await uploadToStorage(
+    const storageResult = await this.storageService.upload(
       wallpaperId,
       params.buffer,
       fileMetadata.mimeType,
       fileMetadata.extension,
-      this.storageBucket,
       params.userId
     );
 
@@ -180,8 +178,8 @@ export class UploadOrchestrator {
       // NATS publish failed, but file is uploaded
       // Don't fail the request - reconciliation will retry
       this.logger.warn(
+        'NATS publish failed, will be retried by reconciliation',
         { id: wallpaperId, error: natsError },
-        'NATS publish failed, will be retried by reconciliation'
       );
       // Leave state as 'stored' - reconciliation will republish
     }
@@ -204,7 +202,7 @@ export class UploadOrchestrator {
    */
   private async publishEvent(wallpaperId: string): Promise<void> {
     // Fetch the complete wallpaper record for event publishing
-    const wallpaper = await this.db.query.wallpapers.findFirst({
+    const wallpaper = await this.databaseConnection.getClient().db.query.wallpapers.findFirst({
       where: eq(wallpapers.id, wallpaperId),
     });
 
@@ -212,7 +210,7 @@ export class UploadOrchestrator {
       throw new Error('Wallpaper not found after insertion');
     }
 
-    await publishWallpaperUploadedEvent(wallpaper);
+    await this.eventService.publishUploadedEvent(wallpaper);
 
     // Event published successfully - transition to 'processing'
     await this.stateMachine.transitionToProcessing(wallpaperId);

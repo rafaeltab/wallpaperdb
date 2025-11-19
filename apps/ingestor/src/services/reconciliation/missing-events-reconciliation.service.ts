@@ -1,7 +1,9 @@
-import { eq, and, lt } from 'drizzle-orm';
-import { wallpapers } from '../../db/schema.js';
-import { publishWallpaperUploadedEvent } from '../events.service.js';
+import { and, eq, lt } from 'drizzle-orm';
+import { inject, injectable } from 'tsyringe';
+import { DatabaseConnection } from '../../connections/database.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
+import { wallpapers } from '../../db/schema.js';
+import { EventsService } from '../events.service.js';
 import {
   BaseReconciliation,
   type TransactionType,
@@ -16,7 +18,15 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * - Publish NATS event
  * - Transition to 'processing' state
  */
+@injectable()
 export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRecord> {
+    constructor(
+        @inject(EventsService) private readonly eventsService: EventsService, 
+        @inject(DatabaseConnection) databaseConnection: DatabaseConnection,
+    ) {
+        super(databaseConnection.getClient().db);
+    }
+
   protected getOperationName(): string {
     return 'Missing Events Reconciliation';
   }
@@ -45,7 +55,7 @@ export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRec
     console.log(record);
 
     // Publish NATS event
-    await publishWallpaperUploadedEvent(record);
+    await this.eventsService.publishUploadedEvent(record);
 
     // Update state to 'processing'
     await tx
@@ -71,10 +81,10 @@ export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRec
   /**
    * Override to handle NATS publish failures - return false to break on error
    */
-  async reconcile(database: Parameters<BaseReconciliation<WallpaperRecord>['reconcile']>[0]): Promise<void> {
+  async reconcile(): Promise<void> {
     while (true) {
       try {
-        const processed = await database.transaction(async (tx) => {
+        const processed = await this.database.transaction(async (tx) => {
           const records = await this.getRecordsToProcess(tx);
 
           if (records.length === 0) {

@@ -2,7 +2,6 @@ import type { MultipartFile } from "@fastify/multipart";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { container } from "tsyringe";
 import type { Config } from "../config.js";
-import { DatabaseConnection } from "../connections/database.js";
 import {
     MissingFileError,
     MissingUserId,
@@ -10,7 +9,6 @@ import {
 } from "../errors/problem-details.js";
 import { RateLimitExceededError } from "../services/rate-limit.service.js";
 import { UploadOrchestrator } from "../services/upload/upload-orchestrator.service.js";
-import { DefaultValidationLimitsService } from "../services/validation-limits.service.js";
 
 interface CachedMultipartData {
     buffer: Buffer;
@@ -24,19 +22,8 @@ interface RequestWithCache extends FastifyRequest {
     rateLimitUserId?: string;
 }
 
-const validationLimitsService = new DefaultValidationLimitsService();
-
-// Store config as a closure variable
-let config: Config;
-
 async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
-    const db = container.resolve(DatabaseConnection).getClient();
-    const orchestrator = new UploadOrchestrator(
-        db.db,
-        validationLimitsService,
-        config.s3Bucket,
-        request.log,
-    );
+    const orchestrator = container.resolve(UploadOrchestrator);
 
     try {
         // Use cached multipart data from preHandler
@@ -84,7 +71,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
             .code(200)
             .header(
                 "X-RateLimit-Limit",
-                String(request.server.rateLimitService.config.rateLimitMax),
+                String(container.resolve<Config>("config").rateLimitMax),
             )
             .header("X-RateLimit-Remaining", String(rateLimitResult.remaining))
             .header("X-RateLimit-Reset", String(rateLimitResult.reset))
@@ -132,13 +119,7 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     }
 }
 
-export default async function uploadRoutes(
-    fastify: FastifyInstance,
-    options: { config: Config },
-) {
-    // Store config in closure
-    config = options.config;
-
+export default async function uploadRoutes(fastify: FastifyInstance) {
     // Register multipart plugin with size limits
     await fastify.register(import("@fastify/multipart"), {
         limits: {

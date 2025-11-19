@@ -1,19 +1,23 @@
 import Redis from "ioredis";
-import { singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import type { Config } from "../config.js";
 import { BaseConnection } from "./base/base-connection.js";
 
 @singleton()
 export class RedisConnection extends BaseConnection<Redis> {
-    public createClient(config: Config): Redis {
-        if (!config.redisEnabled) {
+    constructor(@inject("config") config: Config) {
+        super(config);
+    }
+
+    public createClient(): Redis {
+        if (!this.config.redisEnabled) {
             throw new Error("Redis is not enabled");
         }
 
         const client = new Redis({
-            host: config.redisHost,
-            port: config.redisPort,
-            password: config.redisPassword,
+            host: this.config.redisHost,
+            port: this.config.redisPort,
+            password: this.config.redisPassword,
             maxRetriesPerRequest: 3,
             enableOfflineQueue: false, // Fail fast if Redis unavailable
             retryStrategy: (times) => {
@@ -44,9 +48,9 @@ export class RedisConnection extends BaseConnection<Redis> {
         await client.quit();
     }
 
-    async checkHealth(client: Redis, _config: Config): Promise<boolean> {
+    async checkHealth(): Promise<boolean> {
         try {
-            await client.ping();
+            await this.getClient().ping();
             return true;
         } catch (error) {
             console.error("Redis health check failed:", error);
@@ -55,29 +59,3 @@ export class RedisConnection extends BaseConnection<Redis> {
     }
 }
 
-// Singleton instance
-const redisConnection = new RedisConnection();
-
-/**
- * Create Redis connection for distributed rate limiting
- */
-export function createRedisConnection(config: Config): Redis {
-    if (redisConnection.isInitialized()) {
-        return redisConnection.getClient();
-    }
-
-    const client = redisConnection["createClient"](config);
-    redisConnection["client"] = client;
-    return client;
-}
-
-export function getRedis(): Redis {
-    return redisConnection.getClient();
-}
-
-export async function closeRedisConnection(): Promise<void> {
-    await redisConnection.close();
-}
-
-// Export the connection instance for DI usage
-export { redisConnection };

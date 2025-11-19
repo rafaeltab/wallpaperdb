@@ -1,8 +1,10 @@
-import type { S3Client } from "@aws-sdk/client-s3";
 import { and, eq, lt } from "drizzle-orm";
+import { inject, injectable } from "tsyringe";
+import type { Config } from "../../config.js";
+import { DatabaseConnection } from "../../connections/database.js";
 import { ReconciliationConstants } from "../../constants/reconciliation.constants.js";
 import { wallpapers } from "../../db/schema.js";
-import { objectExists } from "../storage.service.js";
+import { StorageService } from "../storage.service.js";
 import {
     BaseReconciliation,
     type TransactionType,
@@ -18,12 +20,14 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * - If file missing and retries < MAX: increment retry count
  * - If file missing and retries >= MAX: mark as 'failed'
  */
+@injectable()
 export class StuckUploadsReconciliation extends BaseReconciliation<WallpaperRecord> {
     constructor(
-        private readonly storageBucket: string,
-        private readonly s3Client: S3Client,
+        @inject(StorageService) private readonly storageService: StorageService,
+        @inject(DatabaseConnection) databaseConnection: DatabaseConnection,
+        @inject("config") private readonly config: Config
     ) {
-        super();
+        super(databaseConnection.getClient().db);
     }
 
     protected getOperationName(): string {
@@ -61,10 +65,9 @@ export class StuckUploadsReconciliation extends BaseReconciliation<WallpaperReco
         const storageKey = `${record.id}/original.jpg`;
 
         // Check if file exists in MinIO
-        const fileExists = await objectExists(
-            this.storageBucket,
+        const fileExists = await this.storageService.objectExists(
+            this.config.s3Bucket,
             storageKey,
-            this.s3Client,
         );
 
         if (fileExists) {

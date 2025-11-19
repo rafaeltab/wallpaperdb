@@ -1,17 +1,21 @@
-import { type NatsConnection, connect } from "nats";
-import { singleton } from "tsyringe";
+import { connect, type NatsConnection } from "nats";
+import { inject, singleton } from "tsyringe";
 import type { Config } from "../config.js";
 import { BaseConnection } from "./base/base-connection.js";
 
 @singleton()
 export class NatsConnectionManager extends BaseConnection<NatsConnection> {
-    protected async createClient(config: Config): Promise<NatsConnection> {
+    constructor(@inject("config") config: Config) {
+        super(config);
+    }
+
+    protected async createClient(): Promise<NatsConnection> {
         const client = await connect({
-            servers: config.natsUrl,
-            name: config.otelServiceName,
+            servers: this.config.natsUrl,
+            name: this.config.otelServiceName,
         });
 
-        console.log(`Connected to NATS at '${config.natsUrl}'`);
+        console.log(`Connected to NATS at '${this.config.natsUrl}'`);
         return client;
     }
 
@@ -19,10 +23,10 @@ export class NatsConnectionManager extends BaseConnection<NatsConnection> {
         await client.close();
     }
 
-    async checkHealth(client: NatsConnection, _config: Config): Promise<boolean> {
+    async checkHealth(): Promise<boolean> {
         try {
-            const info = client.info;
-            return info !== null && !client.isClosed();
+            const info = this.getClient().info;
+            return info !== null && !this.getClient().isClosed();
         } catch (error) {
             console.error("NATS health check failed:", error);
             return false;
@@ -30,34 +34,3 @@ export class NatsConnectionManager extends BaseConnection<NatsConnection> {
     }
 }
 
-// Singleton instance
-const natsConnectionManager = new NatsConnectionManager();
-
-// Legacy API for backward compatibility
-export async function createNatsConnection(
-    config: Config,
-): Promise<NatsConnection> {
-    return await natsConnectionManager.initialize(config);
-}
-
-export async function checkNatsHealth(): Promise<boolean> {
-    if (!natsConnectionManager.isInitialized()) {
-        return false;
-    }
-    // Pass empty config since health check doesn't use it
-    return await natsConnectionManager.checkHealth(
-        natsConnectionManager.getClient(),
-        {} as Config,
-    );
-}
-
-export function getNatsClient(): NatsConnection {
-    return natsConnectionManager.getClient();
-}
-
-export async function closeNatsConnection(): Promise<void> {
-    await natsConnectionManager.close();
-}
-
-// Export the connection instance for DI usage
-export { natsConnectionManager };

@@ -1,9 +1,12 @@
+import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { eq } from 'drizzle-orm';
-import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
-import { wallpapers } from '../../db/schema.js';
-import { deleteFromStorage } from '../storage.service.js';
+import { inject, injectable } from 'tsyringe';
+import type { Config } from '../../config.js';
+import { DatabaseConnection } from '../../connections/database.js';
+import { MinioConnection } from '../../connections/minio.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
-import type { DbType } from './base-reconciliation.service.js';
+import { wallpapers } from '../../db/schema.js';
+import { StorageService } from '../storage.service.js';
 
 /**
  * Reconciles orphaned MinIO objects - files that exist in storage but not in the database.
@@ -18,11 +21,13 @@ import type { DbType } from './base-reconciliation.service.js';
  * NOTE: This implementation does not currently support pagination.
  * TODO: Add pagination support for buckets with large numbers of objects.
  */
+@injectable()
 export class OrphanedMinioReconciliation {
   constructor(
-    private readonly database: DbType,
-    private readonly s3Client: S3Client,
-    private readonly storageBucket: string
+      @inject(StorageService) private readonly storageService: StorageService,
+      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+      @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+      @inject("config") private readonly config: Config
   ) {}
 
   /**
@@ -38,9 +43,9 @@ export class OrphanedMinioReconciliation {
       // TODO: Add pagination support here
       // Current implementation: list all objects at once (potential memory issue)
       const listCommand = new ListObjectsV2Command({
-        Bucket: this.storageBucket,
+        Bucket: this.config.s3Bucket,
       });
-      const listResponse = await this.s3Client.send(listCommand);
+      const listResponse = await this.minioConnection.getClient().send(listCommand);
 
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
         return;
@@ -79,13 +84,13 @@ export class OrphanedMinioReconciliation {
     const wallpaperId = objectKey.split('/')[0];
 
     // Query database for corresponding record
-    const dbRecord = await this.database.query.wallpapers.findFirst({
+    const dbRecord = await this.databaseConnection.getClient().db.query.wallpapers.findFirst({
       where: eq(wallpapers.id, wallpaperId),
     });
 
     // Delete if no DB record OR DB record has uploadState = 'failed'
     if (!dbRecord || dbRecord.uploadState === 'failed') {
-      await deleteFromStorage(this.storageBucket, objectKey, this.s3Client);
+        this.storageService.delete(this.config.s3Bucket, objectKey);
       console.log(`Deleted orphaned MinIO object: ${objectKey}`);
     }
   }

@@ -2,16 +2,19 @@ import {
     PostgreSqlContainer,
     type StartedPostgreSqlContainer,
 } from "@testcontainers/postgresql";
-import createPostgresClient, { type Sql as PostgresType } from "postgres";
+import createPostgresClient, {
+    type ParameterOrJSON,
+    type Sql as PostgresType,
+} from "postgres";
 import {
     type AddMethodsType,
     BaseTesterBuilder,
     type TesterInstance,
 } from "../framework.js";
+import type { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
+import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
 import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
 import type { SetupTesterBuilder } from "./SetupTesterBuilder.js";
-import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
-import type { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
 
 export interface PostgresOptions {
     image: string;
@@ -89,8 +92,7 @@ class PostgresHelpers {
      * @throws Error if PostgreSQL not initialized
      */
     get config(): PostgresConfig {
-        // biome-ignore lint/suspicious/noExplicitAny: Need to access private property from parent tester instance
-        const config = (this.tester as any)._postgresConfig;
+        const config = this.tester._postgresConfig;
         if (!config) {
             throw new Error(
                 "PostgreSQL not initialized. Call withPostgres() and setup() first.",
@@ -140,11 +142,13 @@ class PostgresHelpers {
      * const allUsers = await tester.postgres.query('SELECT * FROM users');
      * ```
      */
-    async query<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+    async query<T = unknown>(
+        sql: string,
+        params?: ParameterOrJSON<never>[],
+    ): Promise<T[]> {
         const client = this.getClient();
         if (params) {
-            // biome-ignore lint/suspicious/noExplicitAny: postgres.js has complex typing for parameters
-            const result = await client.unsafe(sql, params as any);
+            const result = await client.unsafe(sql, params);
             return Array.from(result) as T[];
         }
         const result = await client.unsafe(sql);

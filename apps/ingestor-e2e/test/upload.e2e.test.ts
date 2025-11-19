@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
@@ -6,7 +7,6 @@ import {
     PostgresTesterBuilder,
     RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
-import { randomInt } from "crypto";
 import sharp from "sharp";
 import { request } from "undici";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";

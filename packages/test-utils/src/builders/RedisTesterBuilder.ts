@@ -1,62 +1,55 @@
-import {
-    RedisContainer,
-    type StartedRedisContainer,
-} from "@testcontainers/redis";
-import {
-    type AddMethodsType,
-    BaseTesterBuilder,
-    type TesterInstance,
-} from "../framework.js";
-import type { DestroyTesterBuilder } from "./DestroyTesterBuilder.js";
-import type { DockerTesterBuilder } from "./DockerTesterBuilder.js";
-import type { SetupTesterBuilder } from "./SetupTesterBuilder.js";
-import { CleanupTesterBuilder } from "./CleanupTesterBuilder.js";
+import { RedisContainer, type StartedRedisContainer } from '@testcontainers/redis';
+import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
+import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
+import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
+import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 
 export interface RedisOptions {
-    image?: string;
-    networkAlias?: string;
+  image?: string;
+  networkAlias?: string;
 }
 
 class RedisBuilder {
-    private image = "redis:7-alpine";
-    private networkAlias = "redis";
+  private image = 'redis:7-alpine';
+  private networkAlias = 'redis';
 
-    withImage(image: string) {
-        this.image = image;
-        return this;
-    }
+  withImage(image: string) {
+    this.image = image;
+    return this;
+  }
 
-    withNetworkAlias(alias: string) {
-        this.networkAlias = alias;
-        return this;
-    }
+  withNetworkAlias(alias: string) {
+    this.networkAlias = alias;
+    return this;
+  }
 
-    build(): RedisOptions {
-        return {
-            image: this.image,
-            networkAlias: this.networkAlias,
-        };
-    }
+  build(): RedisOptions {
+    return {
+      image: this.image,
+      networkAlias: this.networkAlias,
+    };
+  }
 }
 
 export interface RedisConfig {
-    container: StartedRedisContainer;
-    endpoints: {
-        networked: string;
-        fromHost: string;
-        fromHostDockerInternal: string;
-    };
-    host: {
-        networked: string;
-        fromHost: string;
-        fromHostDockerInternal: string;
-    };
-    port: {
-        networked: string;
-        fromHost: string;
-        fromHostDockerInternal: string;
-    };
-    options: RedisOptions;
+  container: StartedRedisContainer;
+  endpoints: {
+    networked: string;
+    fromHost: string;
+    fromHostDockerInternal: string;
+  };
+  host: {
+    networked: string;
+    fromHost: string;
+    fromHostDockerInternal: string;
+  };
+  port: {
+    networked: string;
+    fromHost: string;
+    fromHostDockerInternal: string;
+  };
+  options: RedisOptions;
 }
 
 /**
@@ -64,128 +57,111 @@ export interface RedisConfig {
  * Currently minimal, but provides a consistent structure for future expansion.
  */
 class RedisHelpers {
-    constructor(private tester: TesterInstance<RedisTesterBuilder>) { }
+  constructor(private tester: TesterInstance<RedisTesterBuilder>) {}
 
-    /**
-     * Get the Redis configuration.
-     * @throws Error if Redis not initialized
-     */
-    get config(): RedisConfig {
-        const config = this.tester._redisConfig;
-        if (!config) {
-            throw new Error(
-                "Redis not initialized. Call withRedis() and setup() first.",
-            );
-        }
-        return config;
+  /**
+   * Get the Redis configuration.
+   * @throws Error if Redis not initialized
+   */
+  get config(): RedisConfig {
+    const config = this.tester._redisConfig;
+    if (!config) {
+      throw new Error('Redis not initialized. Call withRedis() and setup() first.');
     }
+    return config;
+  }
 
-    /**
-     * Get the Redis configuration.
-     */
-    tryGetConfig(): RedisConfig | undefined {
-        return this.tester._redisConfig;
-    }
+  /**
+   * Get the Redis configuration.
+   */
+  tryGetConfig(): RedisConfig | undefined {
+    return this.tester._redisConfig;
+  }
 }
 
 export class RedisTesterBuilder extends BaseTesterBuilder<
-    "redis",
-    [
-        DockerTesterBuilder,
-        SetupTesterBuilder,
-        DestroyTesterBuilder,
-        CleanupTesterBuilder,
-    ]
+  'redis',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
 > {
-    name = "redis" as const;
+  name = 'redis' as const;
 
-    addMethods<
-        TBase extends AddMethodsType<
-            [
-                DockerTesterBuilder,
-                SetupTesterBuilder,
-                DestroyTesterBuilder,
-                CleanupTesterBuilder,
-            ]
-        >,
-    >(Base: TBase) {
-        return class Redis extends Base {
-            /** @internal */
-            _redisConfig: RedisConfig | undefined;
-            readonly redis = new RedisHelpers(
-                this as TesterInstance<RedisTesterBuilder>,
-            );
+  addMethods<
+    TBase extends AddMethodsType<
+      [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
+    >,
+  >(Base: TBase) {
+    return class Redis extends Base {
+      /** @internal */
+      _redisConfig: RedisConfig | undefined;
+      readonly redis = new RedisHelpers(this as TesterInstance<RedisTesterBuilder>);
 
-            withRedisAutoCleanup() {
-                this.addCleanupHook(async () => {
-                    const redisContainer = this.redis.config.container;
-                    await redisContainer.exec(["redis-cli", "FLUSHALL"]);
-                });
-                return this;
-            }
+      withRedisAutoCleanup() {
+        this.addCleanupHook(async () => {
+          const redisContainer = this.redis.config.container;
+          await redisContainer.exec(['redis-cli', 'FLUSHALL']);
+        });
+        return this;
+      }
 
-            withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {
-                const options = configure(new RedisBuilder()).build();
-                const { image = "redis:7-alpine", networkAlias = "redis" } = options;
+      withRedis(configure: (redis: RedisBuilder) => RedisBuilder = (a) => a) {
+        const options = configure(new RedisBuilder()).build();
+        const { image = 'redis:7-alpine', networkAlias = 'redis' } = options;
 
-                this.addSetupHook(async () => {
-                    console.log("Starting Redis container...");
+        this.addSetupHook(async () => {
+          console.log('Starting Redis container...');
 
-                    // Auto-detect if network is available
-                    const dockerNetwork = this.docker.network;
+          // Auto-detect if network is available
+          const dockerNetwork = this.docker.network;
 
-                    let container = new RedisContainer(image);
+          let container = new RedisContainer(image);
 
-                    if (dockerNetwork) {
-                        container = container
-                            .withNetwork(dockerNetwork)
-                            .withNetworkAliases(networkAlias);
-                    }
+          if (dockerNetwork) {
+            container = container.withNetwork(dockerNetwork).withNetworkAliases(networkAlias);
+          }
 
-                    const started = await container.start();
-                    const host = {
-                        networked: networkAlias,
-                        fromHost: started.getHost(),
-                        fromHostDockerInternal: "host.docker.internal",
-                    };
-                    const port = {
-                        networked: "6379",
-                        fromHost: started.getPort().toString(),
-                        fromHostDockerInternal: started.getPort().toString(),
-                    };
+          const started = await container.start();
+          const host = {
+            networked: networkAlias,
+            fromHost: started.getHost(),
+            fromHostDockerInternal: 'host.docker.internal',
+          };
+          const port = {
+            networked: '6379',
+            fromHost: started.getPort().toString(),
+            fromHostDockerInternal: started.getPort().toString(),
+          };
 
-                    const endpoints = {
-                        networked: `redis://${networkAlias}:${6379}`,
-                        fromHost:
-                            `redis://${started.getHost()}:${started.getPort()}`.replace(
-                                "localhost",
-                                "127.0.0.1",
-                            ),
-                        fromHostDockerInternal: `redis://host.docker.internal:${started.getPort()}`,
-                    };
+          const endpoints = {
+            networked: `redis://${networkAlias}:${6379}`,
+            fromHost: `redis://${started.getHost()}:${started.getPort()}`.replace(
+              'localhost',
+              '127.0.0.1'
+            ),
+            fromHostDockerInternal: `redis://host.docker.internal:${started.getPort()}`,
+          };
 
-                    this._redisConfig = {
-                        container: started,
-                        endpoints: endpoints,
-                        host: host,
-                        port: port,
-                        options: options,
-                    };
+          this._redisConfig = {
+            container: started,
+            endpoints: endpoints,
+            host: host,
+            port: port,
+            options: options,
+          };
 
-                    console.log(
-                        `Redis started: ${endpoints.networked} (internal) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (from host.docker.internal)`,
-                    );
-                });
+          console.log(
+            `Redis started: ${endpoints.networked} (internal) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (from host.docker.internal)`
+          );
+        });
 
-                this.addDestroyHook(async () => {
-                    if (this._redisConfig) {
-                        console.log("Stopping Redis container...");
-                        await this._redisConfig.container.stop();
-                    }
-                });
+        this.addDestroyHook(async () => {
+          if (this._redisConfig) {
+            console.log('Stopping Redis container...');
+            await this._redisConfig.container.stop();
+          }
+        });
 
-                return this;
-            }
-        };
-    }
+        return this;
+      }
+    };
+  }
 }

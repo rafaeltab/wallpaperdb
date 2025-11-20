@@ -1,0 +1,22 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+    patch:
+      default:
+        target: 70%
+
+flags:
+  apps:
+    paths:
+      - apps/
+  packages:
+    paths:
+      - packages/
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false

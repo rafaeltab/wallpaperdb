@@ -3,7 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
-        dev build test test-watch format lint help
+        dev build test test-watch test-packages test-apps test-coverage test-ui coverage-summary format lint help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -46,6 +46,13 @@ help:
 	@echo "  make test-watch - Run all tests in watch mode"
 	@echo "  make format     - Format all code"
 	@echo "  make lint       - Lint all code"
+	@echo ""
+	@echo "Testing (Workspace):"
+	@echo "  make test-packages     - Run package tests (fast, no infrastructure)"
+	@echo "  make test-apps         - Run app tests (uses Testcontainers, self-contained)"
+	@echo "  make test-coverage     - Run all tests with coverage"
+	@echo "  make test-ui           - Run tests with Vitest UI"
+	@echo "  make coverage-summary  - Display AI-friendly coverage summary"
 	@echo ""
 
 infra-start:
@@ -157,6 +164,26 @@ test:
 
 test-watch:
 	@turbo run test:watch
+
+# Workspace test commands
+test-packages:
+	@echo "Testing packages (fast, no infrastructure)..."
+	@pnpm test:packages
+
+test-apps:
+	@echo "Testing apps (uses Testcontainers, self-contained)..."
+	@pnpm test:apps
+
+test-coverage:
+	@echo "Running tests with coverage..."
+	@pnpm test:coverage
+
+test-ui:
+	@echo "Starting Vitest UI..."
+	@pnpm test:ui
+
+coverage-summary:
+	@node scripts/coverage-summary.js
 
 format:
 	@turbo run format --log-order grouped

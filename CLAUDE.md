@@ -124,6 +124,23 @@ make format       # Format all code
 make lint         # Lint all code
 ```
 
+### Testing (Workspace)
+
+Separate package and app tests for faster feedback:
+
+```bash
+make test-packages     # Run package tests (fast, no infrastructure needed)
+make test-apps         # Run app tests (requires infrastructure)
+make test-coverage     # Run all tests with coverage
+make test-ui           # Run tests with Vitest UI
+make coverage-summary  # Display AI-friendly coverage summary
+```
+
+**Coverage Reports:**
+- HTML: `open coverage/index.html`
+- JSON: `coverage/coverage-summary.json`
+- LCOV: `coverage/lcov.info`
+
 ### Single Service Commands (Ingestor)
 
 Use these when working on a single service:
@@ -321,13 +338,25 @@ apps/ingestor/src/
 
 **Test Coverage:**
 
-Setup in progress - see [plans/test-infrastructure-setup.md](plans/test-infrastructure-setup.md)
+✅ **Setup Complete** - Full coverage tracking enabled
 
 ```bash
 make test-coverage          # Run with coverage
 make coverage-summary       # AI-friendly summary
 open coverage/index.html    # View HTML report
 ```
+
+**Coverage Reporters:**
+- `text`: Console output during test runs
+- `json`: Machine-readable format (`coverage/coverage-summary.json`)
+- `html`: Interactive browser report (`coverage/index.html`)
+- `lcov`: For Codecov integration (`coverage/lcov.info`)
+- `json-summary`: For the AI-friendly summary script
+
+**CI/CD Integration:**
+- GitHub Actions runs tests on push/PR
+- Coverage tracked via Codecov
+- Separate jobs for package tests (fast) and app tests (with infrastructure)
 
 **Current Test Approach:**
 

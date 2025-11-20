@@ -132,12 +132,12 @@ describe("Upload E2E", () => {
         const filename = `test-wallpaper-${Date.now()}.jpg`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Upload via HTTP to Docker container
         const response = await request(`${baseUrl}/upload`, {
@@ -193,12 +193,12 @@ describe("Upload E2E", () => {
         const userId = generateTestUserId();
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([invalidFile], { type: "text/plain" }),
             "invalid.txt",
         );
-        formData.append("userId", userId);
 
         // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
@@ -236,12 +236,12 @@ describe("Upload E2E", () => {
 
         // Act: Upload the same image twice
         const formData1 = new FormData();
+        formData1.append("userId", userId);
         formData1.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
             filename,
         );
-        formData1.append("userId", userId);
 
         const response1 = await request(`${baseUrl}/upload`, {
             method: "POST",
@@ -258,12 +258,12 @@ describe("Upload E2E", () => {
 
         // Upload the same file again with the same user
         const formData2 = new FormData();
+        formData2.append("userId", userId);
         formData2.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
             filename,
         );
-        formData2.append("userId", userId);
 
         const response2 = await request(`${baseUrl}/upload`, {
             method: "POST",
@@ -304,12 +304,12 @@ describe("Upload E2E", () => {
         const filename = `test-wallpaper-${Date.now()}.png`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/png" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
@@ -365,12 +365,12 @@ describe("Upload E2E", () => {
         const filename = `test-wallpaper-${Date.now()}.webp`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/webp" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
@@ -426,12 +426,12 @@ describe("Upload E2E", () => {
         const filename = `small-wallpaper-${Date.now()}.jpg`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([smallImage], { type: "image/jpeg" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
@@ -503,12 +503,12 @@ describe("Upload E2E", () => {
         const filename = `empty-file-${Date.now()}.jpg`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([emptyFile], { type: "image/jpeg" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
@@ -600,12 +600,12 @@ describe("Upload E2E", () => {
         const filename = `test-video-${Date.now()}.mp4`;
 
         const formData = new FormData();
+        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([mp4Header], { type: "video/mp4" }),
             filename,
         );
-        formData.append("userId", userId);
 
         // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {

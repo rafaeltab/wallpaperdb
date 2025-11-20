@@ -2,6 +2,70 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## Development Principles
+
+**CRITICAL RULES - ALWAYS FOLLOW:**
+
+### 1. Test-First Development (TDD)
+- **Write tests before implementation**
+- Every change must have corresponding tests
+- Tests validate the change works
+- See [Development Guidelines](docs/development-guidelines.md) for detailed TDD workflow
+
+### 2. Incremental Changes
+- **Make small, focused changes**
+- Never big-bang refactoring
+- Test after each increment
+- Example: Extract ONE connection at a time, not all connections
+- See [Development Guidelines](docs/development-guidelines.md) for migration patterns
+
+### 3. Document As You Go
+- Update `docs/` when architecture changes
+- Update `plans/` when decisions are made
+- Keep CLAUDE.md current with workflows
+- Create ADRs for architectural decisions in `docs/architecture/decisions/`
+
+### 4. Migration Strategy
+- Create new structure alongside old
+- Migrate piece by piece
+- Verify tests pass after each piece
+- Remove old structure only when fully migrated
+
+**Full guidelines:** [docs/development-guidelines.md](docs/development-guidelines.md)
+
+---
+
+## Multi-Service Architecture
+
+**Current Status:** Single service (ingestor) completed. Planning multi-service architecture.
+
+**Strategic Direction:**
+- Continue with **Fastify + TSyringe** (NOT migrating to NestJS)
+- Extract shared packages (`@wallpaperdb/core`, `@wallpaperdb/events`)
+- Build service templates for rapid development
+- Target: ~1 week per new service
+
+**Why Fastify over NestJS:**
+- 4-6 weeks migration cost vs 2 weeks for shared packages
+- Excellent test infrastructure (TesterBuilder)
+- Maximum flexibility per service
+- See [ADR-001: Fastify over NestJS](docs/architecture/decisions/001-fastify-over-nestjs.md)
+
+**Master Plan:** [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
+
+**Planned Services:**
+1. ✅ **Ingestor** - Upload and validation (complete)
+2. 📋 **Media Service** - Retrieval and resizing
+3. 📋 **Thumbnail Extractor** - Video thumbnail generation
+4. 📋 **Quality Enrichment** - Image quality analysis
+5. 📋 **Color Enrichment** - Color extraction
+6. 📋 **Tagging Service** - Tag management
+7. 📋 **Gateway** - GraphQL API
+
+---
+
 ## Command Execution Policy
 
 **CRITICAL: Always use Make commands for all operations.**
@@ -236,20 +300,51 @@ apps/ingestor/src/
 
 ### Testing Strategy
 
-**Testcontainers-Based Integration Tests:**
-- Tests run against **real infrastructure** (PostgreSQL, MinIO, NATS containers)
-- Shared setup in `test/setup.ts` starts containers once, runs migrations
-- Custom `@wallpaperdb/testcontainers` package provides reusable container utilities
-- Uses `127.0.0.1` instead of `localhost` to avoid DNS lookup delays (~5s per test)
+**Package vs Service Tests:**
 
-**Test Categories:**
-- Upload flow (happy path for JPEG, PNG, WebP)
-- Validation (format, size, dimensions, MIME detection)
-- Idempotency and deduplication
-- Reconciliation (stuck uploads, missing events, orphaned objects)
-- Multi-instance concurrency
+- **Package Tests** (`make test-packages`)
+  - Fast, no infrastructure needed
+  - Test shared code in `packages/`
+  - Run frequently during development
+  - Example: `@wallpaperdb/core`, `@wallpaperdb/events`
 
-**Important:** Tests require infrastructure running. Start with `make infra-start` before running tests.
+- **Service/App Tests** (`make test-apps`)
+  - Integration tests with Testcontainers
+  - Test full workflows with real infrastructure
+  - Require `make infra-start` first
+  - Example: `apps/ingestor`
+
+- **E2E Tests** (`make <service>-e2e-test`)
+  - Docker-based, test deployment artifacts
+  - Slowest but most comprehensive
+  - Example: `make ingestor-e2e-test`
+
+**Test Coverage:**
+
+Setup in progress - see [plans/test-infrastructure-setup.md](plans/test-infrastructure-setup.md)
+
+```bash
+make test-coverage          # Run with coverage
+make coverage-summary       # AI-friendly summary
+open coverage/index.html    # View HTML report
+```
+
+**Current Test Approach:**
+
+- **Testcontainers-Based Integration Tests:**
+  - Tests run against **real infrastructure** (PostgreSQL, MinIO, NATS containers)
+  - Shared setup in `test/setup.ts` starts containers once, runs migrations
+  - Custom `@wallpaperdb/testcontainers` package provides reusable container utilities
+  - Uses `127.0.0.1` instead of `localhost` to avoid DNS lookup delays (~5s per test)
+
+- **Test Categories:**
+  - Upload flow (happy path for JPEG, PNG, WebP)
+  - Validation (format, size, dimensions, MIME detection)
+  - Idempotency and deduplication
+  - Reconciliation (stuck uploads, missing events, orphaned objects)
+  - Multi-instance concurrency
+
+**Important:** Service tests require infrastructure running. Start with `make infra-start` before running tests.
 
 ### Security Considerations
 
@@ -316,11 +411,46 @@ After `make infra-start`, access:
 
 ## Observability
 
+**Current Status:** Basic OTEL setup. Advanced instrumentation planned.
+
 **OpenTelemetry Integration:**
 - Auto-instrumentation for Fastify, PostgreSQL, HTTP clients
 - Traces and metrics exported to Grafana LGTM stack via OTLP
 - Service name: `wallpaperdb-ingestor` (configurable via `SERVICE_NAME` env var)
 - Access dashboards in Grafana (port 3000)
+
+**Planned Enhancements:**
+
+See [plans/observability-implementation.md](plans/observability-implementation.md) for full details.
+
+- **Telemetry Module** (in `@wallpaperdb/core`)
+  - No DI coupling - static imports
+  - Helper functions: `withSpan()`, `recordMetric()`, `addEvent()`
+  - Pre-defined metrics and attributes
+  - Easy to add to any service
+
+- **Pattern:**
+  ```typescript
+  import { withSpan } from '@wallpaperdb/core/telemetry';
+  import { Attributes } from '@wallpaperdb/core/telemetry/attributes';
+
+  async myOperation(userId: string) {
+    return await withSpan(
+      'my.operation',
+      { [Attributes.USER_ID]: userId },
+      async (span) => {
+        // business logic
+        span.setAttribute(Attributes.CUSTOM_ATTR, value);
+        return result;
+      }
+    );
+  }
+  ```
+
+- **Distributed Tracing:**
+  - Trace context propagation to NATS headers
+  - End-to-end tracing across services
+  - Critical for multi-service debugging
 
 ## Common Development Workflows
 
@@ -352,12 +482,29 @@ make dev            # Start all services
 3. Add corresponding tests using Testcontainers
 4. Register in `app.ts` if needed for route handlers
 
-### Adding a New Workspace/App
-1. Create new workspace directory under `apps/` or `packages/`
+### Creating a New Service
+
+**Future:** Service template generator (planned)
+
+**For now (manual):**
+1. Create service directory under `apps/`
+2. Copy structure from `apps/ingestor`
+3. Use shared packages: `@wallpaperdb/core`, `@wallpaperdb/events` (after Phase 0)
+4. Add Make targets to `Makefile`
+5. Add to CI/CD workflows
+6. Update `plans/services.md`
+
+**Target time:** ~1 week per service (after templates exist)
+
+See: [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
+
+### Adding a New Workspace/Package
+1. Create new workspace directory under `packages/`
 2. Add to `pnpm-workspace.yaml` (usually automatic with pattern matching)
 3. Create `package.json` with `@wallpaperdb/` scope
-4. Add Make targets to `Makefile` following existing patterns
-5. Update `turbo.json` if needed for build pipelines
+4. Add tests with Vitest
+5. Add Make targets if needed
+6. Document in `docs/architecture/shared-packages.md`
 
 ### Debugging Tests
 1. Ensure infrastructure is running: `make infra-start`

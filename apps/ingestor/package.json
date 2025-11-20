@@ -12,7 +12,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
-    "check-types": "tsc --no-emit",
+    "check-types": "tsc --noEmit",
     "check": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",

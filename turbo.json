@@ -68,6 +68,15 @@
                 "^build",
                 "^build:docker"
             ]
+        },
+        "check-types": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "package.json",
+                "package-lock.json",
+                "tsconfig.json"
+            ]
         }
     }
 }

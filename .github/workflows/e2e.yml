@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build
+        run: make build
+
       - name: Run E2E tests
         run: make ingestor-e2e-test
 

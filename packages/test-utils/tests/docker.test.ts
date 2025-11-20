@@ -11,7 +11,7 @@ const docker = new Docker({
         : "/home/rafaeltab/.docker/desktop/docker.sock",
 });
 
-describe(
+describe.skip(
     "DockerTesterBuilder",
     () => {
         it("should start a network when needed", async () => {

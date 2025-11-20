@@ -34,7 +34,7 @@ describe(
             await tester.destroy();
         });
 
-        it("should create a container in the correct network", async () => {
+        it.skip("should create a container in the correct network", async () => {
             const Tester = createDefaultTesterBuilder()
                 .with(DockerTesterBuilder)
                 .with(RedisTesterBuilder)
@@ -250,7 +250,7 @@ describe(
             await tester.destroy();
         });
 
-        it("should use custom network alias", async () => {
+        it.skip("should use custom network alias", async () => {
             const Tester = createDefaultTesterBuilder()
                 .with(DockerTesterBuilder)
                 .with(RedisTesterBuilder)

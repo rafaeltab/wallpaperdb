@@ -28,8 +28,5 @@ jobs:
       - name: Install turbo
         run: pnpm add -g turbo
 
-      - name: Build all services
-        run: make build
-
-      - name: Check TypeScript types
-        run: pnpm --filter @wallpaperdb/ingestor check-types
+      - name: Build, lint and check types
+        run: turbo run build lint check-types

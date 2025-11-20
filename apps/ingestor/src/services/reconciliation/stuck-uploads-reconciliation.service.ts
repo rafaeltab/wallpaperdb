@@ -1,5 +1,5 @@
 import { and, eq, lt } from "drizzle-orm";
-import { inject, injectable, singleton } from "tsyringe";
+import { inject, singleton } from "tsyringe";
 import type { Config } from "../../config.js";
 import { DatabaseConnection } from "../../connections/database.js";
 import { ReconciliationConstants } from "../../constants/reconciliation.constants.js";

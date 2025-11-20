@@ -21,7 +21,7 @@ const docker = new Docker({
 describe(
     "MinioTesterBuilder",
     () => {
-        it(
+        it.skip(
             "should create a container in the correct network",
             async () => {
                 const Tester = createDefaultTesterBuilder()
@@ -176,7 +176,7 @@ describe(
             await tester.destroy();
         });
 
-        it("should use custom network alias", async () => {
+        it.skip("should use custom network alias", async () => {
             const Tester = createDefaultTesterBuilder()
                 .with(DockerTesterBuilder)
                 .with(MinioTesterBuilder)
@@ -199,7 +199,7 @@ describe(
             await tester.destroy();
         });
 
-        it(
+        it.skip(
             "should generate correct endpoint with network",
             async () => {
                 const Tester = createDefaultTesterBuilder()

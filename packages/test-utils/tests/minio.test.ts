@@ -9,9 +9,13 @@ import {
     MinioTesterBuilder,
 } from "../src/index";
 
+const IS_GITHUB = process.env.GITHUB_ACTIONS === "true";
+
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.
-    socketPath: "/home/rafaeltab/.docker/desktop/docker.sock",
+    socketPath: IS_GITHUB
+        ? undefined
+        : "/home/rafaeltab/.docker/desktop/docker.sock",
 });
 
 describe(

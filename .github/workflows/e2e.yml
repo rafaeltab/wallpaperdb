@@ -19,24 +19,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: "20"
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Start infrastructure
-        run: make infra-start
-
-      - name: Wait for infrastructure
-        run: sleep 10
 
       - name: Run E2E tests
         run: make ingestor-e2e-test
 
       - name: Verify E2E test isolation
         run: make ingestor-e2e-verify
-
-      - name: Stop infrastructure
-        if: always()
-        run: make infra-stop

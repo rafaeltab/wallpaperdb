@@ -53,6 +53,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Install turbo
+        run: pnpm add -g turbo
+
+      - name: Build code
+        run: make build
+
       - name: Run app tests with coverage
         run: pnpm test:apps --coverage
 

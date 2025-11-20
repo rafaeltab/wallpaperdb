@@ -10,6 +10,7 @@ export class MinioConnection extends BaseConnection<S3Client> {
     }
 
     protected createClient(): S3Client {
+        console.log(`Connecting to minio at ${this.config.s3Endpoint}`);
         return new S3Client({
             endpoint: this.config.s3Endpoint,
             region: this.config.s3Region,

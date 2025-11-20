@@ -14,6 +14,8 @@ export class RedisConnection extends BaseConnection<Redis> {
             throw new Error("Redis is not enabled");
         }
 
+        console.log(`Connecting to Redis at '${this.config.redisHost}:${this.config.redisPort}'`);
+
         const client = new Redis({
             host: this.config.redisHost,
             port: this.config.redisPort,

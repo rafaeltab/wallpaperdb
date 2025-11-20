@@ -10,12 +10,13 @@ export class NatsConnectionManager extends BaseConnection<NatsConnection> {
     }
 
     protected async createClient(): Promise<NatsConnection> {
+        console.log(`Connecting to NATS at '${this.config.natsUrl}'`)
         const client = await connect({
             servers: this.config.natsUrl,
             name: this.config.otelServiceName,
         });
 
-        console.log(`Connected to NATS at '${this.config.natsUrl}'`);
+        console.log(`Connected to NATS`);
         return client;
     }
 

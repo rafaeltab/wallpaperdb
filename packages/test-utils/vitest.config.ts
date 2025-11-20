@@ -8,7 +8,7 @@ export default defineConfig({
         include: ['tests/**/*.test.ts'],
         testTimeout: 30000, // 60 seconds for testcontainers
         hookTimeout: 30000,
-        maxConcurrency: 3,
+        maxConcurrency: 1,
         fileParallelism: true, // Disabled - with 80GB Docker memory, parallel execution should work
         retry: 3,
         coverage: {

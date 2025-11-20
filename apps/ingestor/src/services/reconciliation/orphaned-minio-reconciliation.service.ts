@@ -24,10 +24,10 @@ import { StorageService } from '../storage.service.js';
 @singleton()
 export class OrphanedMinioReconciliation {
   constructor(
-      @inject(StorageService) private readonly storageService: StorageService,
-      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
-      @inject(MinioConnection) private readonly minioConnection: MinioConnection,
-      @inject("config") private readonly config: Config
+    @inject(StorageService) private readonly storageService: StorageService,
+    @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+    @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+    @inject('config') private readonly config: Config
   ) {}
 
   /**
@@ -90,7 +90,7 @@ export class OrphanedMinioReconciliation {
 
     // Delete if no DB record OR DB record has uploadState = 'failed'
     if (!dbRecord || dbRecord.uploadState === 'failed') {
-        await this.storageService.delete(this.config.s3Bucket, objectKey);
+      await this.storageService.delete(this.config.s3Bucket, objectKey);
       console.log(`Deleted orphaned MinIO object: ${objectKey}`);
     }
   }

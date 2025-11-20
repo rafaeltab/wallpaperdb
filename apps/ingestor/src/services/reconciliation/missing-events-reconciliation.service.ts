@@ -4,10 +4,7 @@ import { DatabaseConnection } from '../../connections/database.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
 import { wallpapers } from '../../db/schema.js';
 import { EventsService } from '../events.service.js';
-import {
-  BaseReconciliation,
-  type TransactionType,
-} from './base-reconciliation.service.js';
+import { BaseReconciliation, type TransactionType } from './base-reconciliation.service.js';
 
 type WallpaperRecord = typeof wallpapers.$inferSelect;
 
@@ -20,30 +17,25 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  */
 @singleton()
 export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRecord> {
-    constructor(
-        @inject(EventsService) private readonly eventsService: EventsService, 
-        @inject(DatabaseConnection) databaseConnection: DatabaseConnection,
-    ) {
-        super(databaseConnection.getClient().db);
-    }
+  constructor(
+    @inject(EventsService) private readonly eventsService: EventsService,
+    @inject(DatabaseConnection) databaseConnection: DatabaseConnection
+  ) {
+    super(databaseConnection.getClient().db);
+  }
 
   protected getOperationName(): string {
     return 'Missing Events Reconciliation';
   }
 
   protected async getRecordsToProcess(tx: TransactionType): Promise<WallpaperRecord[]> {
-    const thresholdDate = new Date(
-      Date.now() - ReconciliationConstants.MISSING_EVENT_THRESHOLD_MS
-    );
+    const thresholdDate = new Date(Date.now() - ReconciliationConstants.MISSING_EVENT_THRESHOLD_MS);
 
     const records = await tx
       .select()
       .from(wallpapers)
       .where(
-        and(
-          eq(wallpapers.uploadState, 'stored'),
-          lt(wallpapers.stateChangedAt, thresholdDate)
-        )
+        and(eq(wallpapers.uploadState, 'stored'), lt(wallpapers.stateChangedAt, thresholdDate))
       )
       .limit(1)
       .for('update', { skipLocked: true }); // CRITICAL for multi-instance safety

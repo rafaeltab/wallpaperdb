@@ -133,10 +133,7 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
 
           const endpoints = {
             networked: `redis://${networkAlias}:${6379}`,
-            fromHost: `redis://${started.getHost()}:${started.getPort()}`.replace(
-              'localhost',
-              '127.0.0.1'
-            ),
+            fromHost: `redis://${started.getHost()}:${started.getPort()}`,
             fromHostDockerInternal: `redis://host.docker.internal:${started.getPort()}`,
           };
 

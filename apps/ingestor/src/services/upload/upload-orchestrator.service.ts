@@ -1,4 +1,4 @@
-import { and, eq, inArray} from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { inject, injectable } from 'tsyringe';
 import { ulid } from 'ulid';
 import { DatabaseConnection } from '../../connections/database.js';
@@ -47,9 +47,10 @@ export class UploadOrchestrator {
     @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
     @inject(FileProcessorService) private readonly fileProcessorService: FileProcessorService,
     @inject(WallpaperStateMachine) private readonly stateMachine: WallpaperStateMachine,
-    @inject("ValidationLimitsService") private readonly validationLimitsService: ValidationLimitsService,
-    @inject("Logger") private readonly logger: Logger,
-    @inject("TimeService") private readonly timeService: TimeService
+    @inject('ValidationLimitsService')
+    private readonly validationLimitsService: ValidationLimitsService,
+    @inject('Logger') private readonly logger: Logger,
+    @inject('TimeService') private readonly timeService: TimeService
   ) {}
 
   /**
@@ -62,7 +63,12 @@ export class UploadOrchestrator {
     const limits = await this.validationLimitsService.getLimitsForUser(userId);
 
     // Step 2: Process file (hash, validate, extract metadata)
-    const fileMetadata = await this.fileProcessorService.process(buffer, originalFilename, limits, providedMimeType);
+    const fileMetadata = await this.fileProcessorService.process(
+      buffer,
+      originalFilename,
+      limits,
+      providedMimeType
+    );
 
     // Step 3: Check for duplicate upload (by content hash)
     const existing = await this.checkDuplicate(userId, fileMetadata.contentHash);
@@ -105,9 +111,7 @@ export class UploadOrchestrator {
   /**
    * Create idempotent response for duplicate upload.
    */
-  private createIdempotentResponse(
-    existing: typeof wallpapers.$inferSelect
-  ): UploadResult {
+  private createIdempotentResponse(existing: typeof wallpapers.$inferSelect): UploadResult {
     return {
       id: existing.id,
       status: 'already_uploaded',
@@ -175,10 +179,10 @@ export class UploadOrchestrator {
     } catch (natsError) {
       // NATS publish failed, but file is uploaded
       // Don't fail the request - reconciliation will retry
-      this.logger.warn(
-        'NATS publish failed, will be retried by reconciliation',
-        { id: wallpaperId, error: natsError },
-      );
+      this.logger.warn('NATS publish failed, will be retried by reconciliation', {
+        id: wallpaperId,
+        error: natsError,
+      });
       // Leave state as 'stored' - reconciliation will republish
     }
 

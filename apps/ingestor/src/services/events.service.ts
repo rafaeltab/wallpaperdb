@@ -25,10 +25,7 @@ export interface WallpaperUploadedEvent {
 
 @injectable()
 export class EventsService {
-  constructor(
-    @inject(NatsConnectionManager) private readonly natsClient: NatsConnectionManager,
-  ) {
-  }
+  constructor(@inject(NatsConnectionManager) private readonly natsClient: NatsConnectionManager) {}
 
   /**
    * Publish wallpaper.uploaded event to NATS
@@ -72,4 +69,3 @@ export class EventsService {
     await js.publish('wallpaper.uploaded', JSON.stringify(event));
   }
 }
-

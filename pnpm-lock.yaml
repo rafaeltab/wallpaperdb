@@ -53,6 +53,9 @@ importers:
       '@opentelemetry/sdk-node':
         specifier: ^0.56.0
         version: 0.56.0(@opentelemetry/api@1.9.0)
+      '@wallpaperdb/url-ipv4-resolver':
+        specifier: workspace:*
+        version: link:../../packages/url-ipv4-resolver
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -268,6 +271,24 @@ importers:
       testcontainers:
         specifier: ^11.8.0
         version: 11.8.0
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.3.4
+        version: 2.3.4
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.18.13
+      nats:
+        specifier: ^2.29.1
+        version: 2.29.3
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.18.13)(@vitest/ui@2.1.9)
+
+  packages/url-ipv4-resolver:
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.3.4
@@ -6303,14 +6324,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 1.2.0
 
-  '@vitest/mocker@2.1.9(vite@5.4.21(@types/node@20.19.24))':
-    dependencies:
-      '@vitest/spy': 2.1.9
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 5.4.21(@types/node@20.19.24)
-
   '@vitest/mocker@2.1.9(vite@5.4.21(@types/node@22.18.13))':
     dependencies:
       '@vitest/spy': 2.1.9
@@ -7841,7 +7854,7 @@ snapshots:
   vitest@2.1.9(@types/node@20.19.24)(@vitest/ui@2.1.9):
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@20.19.24))
+      '@vitest/mocker': 2.1.9(vite@5.4.21(@types/node@22.18.13))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9

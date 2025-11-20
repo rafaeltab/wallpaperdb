@@ -1,10 +1,7 @@
 import { eq, and, lt } from 'drizzle-orm';
 import { wallpapers } from '../../db/schema.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
-import {
-  BaseReconciliation,
-  type TransactionType,
-} from './base-reconciliation.service.js';
+import { BaseReconciliation, type TransactionType } from './base-reconciliation.service.js';
 import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../../connections/database.js';
 
@@ -18,11 +15,9 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  */
 @singleton()
 export class OrphanedIntentsReconciliation extends BaseReconciliation<WallpaperRecord> {
-    constructor(
-        @inject(DatabaseConnection) databaseConnection: DatabaseConnection,
-    ) {
-        super(databaseConnection.getClient().db);
-    }
+  constructor(@inject(DatabaseConnection) databaseConnection: DatabaseConnection) {
+    super(databaseConnection.getClient().db);
+  }
 
   protected getOperationName(): string {
     return 'Orphaned Intents Reconciliation';
@@ -37,10 +32,7 @@ export class OrphanedIntentsReconciliation extends BaseReconciliation<WallpaperR
       .select()
       .from(wallpapers)
       .where(
-        and(
-          eq(wallpapers.uploadState, 'initiated'),
-          lt(wallpapers.stateChangedAt, thresholdDate)
-        )
+        and(eq(wallpapers.uploadState, 'initiated'), lt(wallpapers.stateChangedAt, thresholdDate))
       )
       .limit(1)
       .for('update', { skipLocked: true }); // CRITICAL for multi-instance safety

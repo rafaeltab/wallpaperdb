@@ -27,11 +27,11 @@ export interface ReadyResponse {
 @injectable()
 export class HealthService {
   constructor(
-      @inject("config") private readonly config: Config,
-      @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
-      @inject(MinioConnection) private readonly minioConnection: MinioConnection,
-      @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager,
-      @inject(OpenTelemetryConnection) private readonly otelConnection: OpenTelemetryConnection,
+    @inject('config') private readonly config: Config,
+    @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
+    @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+    @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager,
+    @inject(OpenTelemetryConnection) private readonly otelConnection: OpenTelemetryConnection
   ) {}
 
   async checkHealth(isShuttingDown: boolean): Promise<HealthResponse> {

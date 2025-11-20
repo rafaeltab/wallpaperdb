@@ -1,9 +1,9 @@
-import { inject, singleton } from "tsyringe";
-import type { Config } from "../config.js";
-import { StuckUploadsReconciliation } from "./reconciliation/stuck-uploads-reconciliation.service.js";
-import { MissingEventsReconciliation } from "./reconciliation/missing-events-reconciliation.service.js";
-import { OrphanedIntentsReconciliation } from "./reconciliation/orphaned-intents-reconciliation.service.js";
-import { OrphanedMinioReconciliation } from "./reconciliation/orphaned-minio-reconciliation.service.js";
+import { inject, singleton } from 'tsyringe';
+import type { Config } from '../config.js';
+import { StuckUploadsReconciliation } from './reconciliation/stuck-uploads-reconciliation.service.js';
+import { MissingEventsReconciliation } from './reconciliation/missing-events-reconciliation.service.js';
+import { OrphanedIntentsReconciliation } from './reconciliation/orphaned-intents-reconciliation.service.js';
+import { OrphanedMinioReconciliation } from './reconciliation/orphaned-minio-reconciliation.service.js';
 
 /**
  * Scheduler service for running background reconciliation tasks.
@@ -20,11 +20,15 @@ export class SchedulerService {
   private isReconciling = false;
 
   constructor(
-    @inject("config") private readonly config: Config,
-    @inject(StuckUploadsReconciliation) private readonly stuckUploadsReconciliation: StuckUploadsReconciliation,
-    @inject(MissingEventsReconciliation) private readonly missingEventsReconciliation: MissingEventsReconciliation,
-    @inject(OrphanedIntentsReconciliation) private readonly orphanedIntentsReconciliation: OrphanedIntentsReconciliation,
-    @inject(OrphanedMinioReconciliation) private readonly orphanedMinioReconciliation: OrphanedMinioReconciliation
+    @inject('config') private readonly config: Config,
+    @inject(StuckUploadsReconciliation)
+    private readonly stuckUploadsReconciliation: StuckUploadsReconciliation,
+    @inject(MissingEventsReconciliation)
+    private readonly missingEventsReconciliation: MissingEventsReconciliation,
+    @inject(OrphanedIntentsReconciliation)
+    private readonly orphanedIntentsReconciliation: OrphanedIntentsReconciliation,
+    @inject(OrphanedMinioReconciliation)
+    private readonly orphanedMinioReconciliation: OrphanedMinioReconciliation
   ) {}
 
   /**
@@ -34,29 +38,29 @@ export class SchedulerService {
    */
   start(): void {
     if (this.isRunning) {
-      console.log("Scheduler already running, ignoring start request");
+      console.log('Scheduler already running, ignoring start request');
       return;
     }
 
-    console.log("Starting reconciliation scheduler...");
+    console.log('Starting reconciliation scheduler...');
 
     // Run reconciliation on regular interval
     this.reconciliationInterval = setInterval(() => {
       this.runReconciliationCycle().catch((error) => {
-        console.error("Fatal error in reconciliation interval:", error);
+        console.error('Fatal error in reconciliation interval:', error);
       });
     }, this.config.reconciliationIntervalMs);
 
     // Run MinIO cleanup on separate interval
     this.minioCleanupInterval = setInterval(() => {
       this.runMinioCleanupCycle().catch((error) => {
-        console.error("Fatal error in MinIO cleanup interval:", error);
+        console.error('Fatal error in MinIO cleanup interval:', error);
       });
     }, this.config.minioCleanupIntervalMs);
 
     this.isRunning = true;
     console.log(
-      `Scheduler started (reconciliation: ${this.config.reconciliationIntervalMs}ms, MinIO cleanup: ${this.config.minioCleanupIntervalMs}ms)`,
+      `Scheduler started (reconciliation: ${this.config.reconciliationIntervalMs}ms, MinIO cleanup: ${this.config.minioCleanupIntervalMs}ms)`
     );
   }
 
@@ -66,11 +70,11 @@ export class SchedulerService {
    */
   stop(): void {
     if (!this.isRunning) {
-      console.log("Scheduler not running, nothing to stop");
+      console.log('Scheduler not running, nothing to stop');
       return;
     }
 
-    console.log("Stopping reconciliation scheduler...");
+    console.log('Stopping reconciliation scheduler...');
 
     if (this.reconciliationInterval) {
       clearInterval(this.reconciliationInterval);
@@ -83,7 +87,7 @@ export class SchedulerService {
     }
 
     this.isRunning = false;
-    console.log("Scheduler stopped");
+    console.log('Scheduler stopped');
   }
 
   /**
@@ -95,7 +99,7 @@ export class SchedulerService {
 
     // Wait for any in-progress reconciliation to complete
     while (this.isReconciling) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 
@@ -104,9 +108,9 @@ export class SchedulerService {
    * This can be called independently of the scheduler
    */
   async runReconciliationNow(): Promise<void> {
-    console.log("Running manual reconciliation...");
+    console.log('Running manual reconciliation...');
     await this.runReconciliationCycle();
-    console.log("Manual reconciliation complete");
+    console.log('Manual reconciliation complete');
   }
 
   /**
@@ -116,14 +120,14 @@ export class SchedulerService {
   private async runReconciliationCycle(): Promise<void> {
     // Prevent concurrent reconciliation cycles
     if (this.isReconciling) {
-      console.log("Reconciliation cycle already in progress, skipping...");
+      console.log('Reconciliation cycle already in progress, skipping...');
       return;
     }
 
     this.isReconciling = true;
 
     try {
-      console.log("Starting reconciliation cycle...");
+      console.log('Starting reconciliation cycle...');
 
       // Run all reconciliation functions sequentially
       // Each function handles its own errors internally, but we catch any unexpected ones
@@ -131,24 +135,24 @@ export class SchedulerService {
       try {
         await this.stuckUploadsReconciliation.reconcile();
       } catch (error) {
-        console.error("Error in reconcileStuckUploads:", error);
+        console.error('Error in reconcileStuckUploads:', error);
       }
 
       try {
         await this.missingEventsReconciliation.reconcile();
       } catch (error) {
-        console.error("Error in reconcileMissingEvents:", error);
+        console.error('Error in reconcileMissingEvents:', error);
       }
 
       try {
         await this.orphanedIntentsReconciliation.reconcile();
       } catch (error) {
-        console.error("Error in reconcileOrphanedIntents:", error);
+        console.error('Error in reconcileOrphanedIntents:', error);
       }
 
-      console.log("Reconciliation cycle complete");
+      console.log('Reconciliation cycle complete');
     } catch (error) {
-      console.error("Unexpected error in reconciliation cycle:", error);
+      console.error('Unexpected error in reconciliation cycle:', error);
     } finally {
       this.isReconciling = false;
     }
@@ -160,11 +164,11 @@ export class SchedulerService {
    */
   private async runMinioCleanupCycle(): Promise<void> {
     try {
-      console.log("Starting MinIO orphaned object cleanup...");
+      console.log('Starting MinIO orphaned object cleanup...');
       await this.orphanedMinioReconciliation.reconcile();
-      console.log("MinIO cleanup complete");
+      console.log('MinIO cleanup complete');
     } catch (error) {
-      console.error("Error in MinIO cleanup cycle:", error);
+      console.error('Error in MinIO cleanup cycle:', error);
     }
   }
 }

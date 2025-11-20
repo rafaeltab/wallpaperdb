@@ -55,12 +55,7 @@ export class StartedNatsContainer {
   }
 
   getHost(): string {
-    let host = this.container.getHost();
-    // Replace localhost with 127.0.0.1 to avoid DNS resolution delays
-    if (host === 'localhost') {
-      host = '127.0.0.1';
-    }
-    return host;
+    return this.container.getHost();
   }
 
   getPort(): number {

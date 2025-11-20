@@ -317,10 +317,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
             const started = await container.start();
             const endpoints = {
               networked: `http://${networkAlias}:9000`,
-              fromHost: `http://${started.getHost()}:${started.getPort()}`.replace(
-                'localhost',
-                '127.0.0.1'
-              ),
+              fromHost: `http://${started.getHost()}:${started.getPort()}`,
               fromHostDockerInternal: `http://host.docker.internal:${started.getPort()}`,
             };
 

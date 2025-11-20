@@ -5,10 +5,9 @@ import { RedisConnection } from '../connections/redis.js';
 @injectable()
 export class RateLimitService {
   constructor(
-    @inject("config") private readonly config: Config,
+    @inject('config') private readonly config: Config,
     @inject(RedisConnection) private readonly redisConnection: RedisConnection
-  ) {
-  }
+  ) {}
 
   /**
    * Check if a user has exceeded their rate limit
@@ -20,7 +19,9 @@ export class RateLimitService {
     const windowMs = this.config.rateLimitWindowMs;
     const max = this.config.rateLimitMax;
 
-    const redis = this.redisConnection.isInitialized() ? this.redisConnection.getClient() : undefined;
+    const redis = this.redisConnection.isInitialized()
+      ? this.redisConnection.getClient()
+      : undefined;
 
     if (redis) {
       // Use Redis for distributed rate limiting with atomic Lua script
@@ -52,7 +53,7 @@ export class RateLimitService {
         return {count, ttl}
       `;
 
-      const result = await redis.eval(luaScript, 1, key, max, windowMs) as [number, number];
+      const result = (await redis.eval(luaScript, 1, key, max, windowMs)) as [number, number];
       const [count, ttl] = result;
 
       const reset = now + (ttl > 0 ? ttl : windowMs);

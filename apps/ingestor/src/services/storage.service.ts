@@ -16,13 +16,13 @@ export interface UploadResult {
 
 @injectable()
 export class StorageService {
-    private readonly s3Client: S3Client;
+  private readonly s3Client: S3Client;
 
   constructor(
     @inject(MinioConnection) minioConnection: MinioConnection,
     @inject('config') private readonly config: Config
   ) {
-      this.s3Client = minioConnection.getClient();
+    this.s3Client = minioConnection.getClient();
   }
 
   /**
@@ -98,4 +98,3 @@ export class StorageService {
     }
   }
 }
-

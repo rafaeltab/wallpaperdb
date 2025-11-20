@@ -290,7 +290,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
           const endpoints = {
             networked: started.getConnectionUrl(networkAlias, 4222),
             fromHost: started.getConnectionUrl(),
-            fromHostDockerInternal: started.getConnectionUrl('192.168.65.254'),
+            fromHostDockerInternal: started.getConnectionUrl('host.docker.internal'),
           };
 
           this._natsConfig = {

@@ -14,7 +14,7 @@ const IS_GITHUB = process.env.GITHUB_ACTIONS === "true";
 const docker = new Docker({
     // TODO figure out how to do this correctly, it doesn't work with the default.
     socketPath: IS_GITHUB
-        ? undefined
+        ? "/var/run/docker.sock"
         : "/home/rafaeltab/.docker/desktop/docker.sock",
 });
 

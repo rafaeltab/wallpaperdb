@@ -146,14 +146,14 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                                 : postgres.connectionStrings.fromHostDockerInternal,
                             S3_ENDPOINT: network
                                 ? minio.endpoints.networked
-                                : minio.endpoints.fromHostDockerInternal,
+                                : minio.endpoints.directIp,
                             S3_ACCESS_KEY_ID: minio.options.accessKey,
                             S3_SECRET_ACCESS_KEY: minio.options.secretKey,
                             S3_BUCKET:
                                 minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers",
                             NATS_URL: network
                                 ? nats.endpoints.networked
-                                : nats.endpoints.fromHostDockerInternal,
+                                : nats.endpoints.directIp,
                             NATS_STREAM:
                                 nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER",
                             OTEL_EXPORTER_OTLP_ENDPOINT: "http://127.0.0.1:4318/v1/traces",
@@ -167,10 +167,10 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                         if (redis && options.enableRedis) {
                             environment.REDIS_HOST = network
                                 ? redis.host.networked
-                                : redis.host.fromHostDockerInternal;
+                                : redis.host.directIp;
                             environment.REDIS_PORT = network
                                 ? redis.port.networked
-                                : redis.port.fromHostDockerInternal;
+                                : redis.port.directIp;
                             environment.REDIS_ENABLED = "true";
                         } else {
                             environment.REDIS_ENABLED = "false";

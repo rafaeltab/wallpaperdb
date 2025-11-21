@@ -143,7 +143,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                             NODE_ENV: "test",
                             DATABASE_URL: network
                                 ? postgres.connectionStrings.networked
-                                : postgres.connectionStrings.fromHostDockerInternal,
+                                : postgres.connectionStrings.directIp,
                             S3_ENDPOINT: network
                                 ? minio.endpoints.networked
                                 : minio.endpoints.directIp,

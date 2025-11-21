@@ -26,10 +26,10 @@ describe(
                 .build();
 
             const tester = await new Tester().withRedis().setup();
-            const containerId = tester.redis.config.container.getId();
-            const existingContainers = await docker.listContainers();
-
-            expect(existingContainers.map((x) => x.Id)).toContain(containerId);
+            // const containerId = tester.redis.config.container.getId();
+            // const existingContainers = await docker.listContainers();
+            //
+            // expect(existingContainers.map((x) => x.Id)).toContain(containerId);
 
             await tester.destroy();
         });

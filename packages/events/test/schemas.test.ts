@@ -38,7 +38,7 @@ describe("Event Schemas", () => {
     });
 
     it("should reject event with missing eventId", () => {
-      const { eventId, ...invalid } = validEvent;
+      const { eventId: _eventId, ...invalid } = validEvent;
       const result = WallpaperUploadedEventSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });

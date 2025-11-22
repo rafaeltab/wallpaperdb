@@ -34,6 +34,14 @@ export const Attributes = {
   RECONCILIATION_TYPE: "reconciliation.type",
   RECONCILIATION_RECORDS_FOUND: "reconciliation.records_found",
   RECONCILIATION_RECORDS_PROCESSED: "reconciliation.records_processed",
+
+  // Event context
+  EVENT_TYPE: "event.type",
+  EVENT_ID: "event.id",
+  EVENT_SUBJECT: "event.subject",
+  EVENT_STREAM: "event.stream",
+  EVENT_CONSUMER: "event.consumer",
+  EVENT_DELIVERY_ATTEMPT: "event.delivery_attempt",
 } as const;
 
 export type AttributeKey = (typeof Attributes)[keyof typeof Attributes];

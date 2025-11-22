@@ -1,21 +1,48 @@
 import { inject, injectable } from 'tsyringe';
-import { ulid } from 'ulid';
-import {
-  type WallpaperUploadedEvent,
-  WALLPAPER_UPLOADED_SUBJECT,
-} from '@wallpaperdb/events/schemas';
+import type { Config } from '../config.js';
 import type { Wallpaper } from '../db/schema.js';
 import { NatsConnectionManager } from '../connections/nats.js';
+import { WallpaperUploadedPublisher } from './publishers/wallpaper-uploaded.publisher.js';
 
 // Re-export for backwards compatibility
 export type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
 
+/**
+ * Service for publishing wallpaper-related events to NATS.
+ *
+ * Uses the new BaseEventPublisher infrastructure which provides:
+ * - Zod schema validation before publishing
+ * - OpenTelemetry trace context propagation
+ * - Automatic telemetry spans and metrics
+ */
 @injectable()
 export class EventsService {
-  constructor(@inject(NatsConnectionManager) private readonly natsClient: NatsConnectionManager) {}
+  private publisher: WallpaperUploadedPublisher | null = null;
+
+  constructor(
+    @inject(NatsConnectionManager) private readonly natsClient: NatsConnectionManager,
+    @inject('config') private readonly config: Config
+  ) {}
 
   /**
-   * Publish wallpaper.uploaded event to NATS
+   * Get or create the publisher instance.
+   * Lazy initialization to ensure NatsConnection is ready.
+   */
+  private getPublisher(): WallpaperUploadedPublisher {
+    if (!this.publisher) {
+      this.publisher = new WallpaperUploadedPublisher({
+        natsConnection: this.natsClient.getClient(),
+        serviceName: this.config.otelServiceName,
+      });
+    }
+    return this.publisher;
+  }
+
+  /**
+   * Publish wallpaper.uploaded event to NATS.
+   *
+   * The event is validated against the schema before publishing.
+   * Trace context is automatically propagated via NATS headers.
    */
   async publishUploadedEvent(wallpaper: Wallpaper): Promise<void> {
     if (
@@ -31,10 +58,8 @@ export class EventsService {
       throw new Error('Wallpaper data incomplete for event publishing');
     }
 
-    const event: WallpaperUploadedEvent = {
-      eventId: ulid(),
-      eventType: 'wallpaper.uploaded',
-      timestamp: new Date().toISOString(),
+    // Use the new publisher with full telemetry and validation
+    await this.getPublisher().publishNew({
       wallpaper: {
         id: wallpaper.id,
         userId: wallpaper.userId,
@@ -49,10 +74,6 @@ export class EventsService {
         originalFilename: wallpaper.originalFilename,
         uploadedAt: wallpaper.uploadedAt.toISOString(),
       },
-    };
-
-    // Publish to NATS JetStream
-    const js = this.natsClient.getClient().jetstream();
-    await js.publish(WALLPAPER_UPLOADED_SUBJECT, JSON.stringify(event));
+    });
   }
 }

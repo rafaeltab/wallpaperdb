@@ -1,27 +1,14 @@
 import { inject, injectable } from 'tsyringe';
 import { ulid } from 'ulid';
+import {
+  type WallpaperUploadedEvent,
+  WALLPAPER_UPLOADED_SUBJECT,
+} from '@wallpaperdb/events/schemas';
 import type { Wallpaper } from '../db/schema.js';
 import { NatsConnectionManager } from '../connections/nats.js';
 
-export interface WallpaperUploadedEvent {
-  eventId: string;
-  eventType: 'wallpaper.uploaded';
-  timestamp: string;
-  wallpaper: {
-    id: string;
-    userId: string;
-    fileType: 'image' | 'video';
-    mimeType: string;
-    fileSizeBytes: number;
-    width: number;
-    height: number;
-    aspectRatio: number;
-    storageKey: string;
-    storageBucket: string;
-    originalFilename: string;
-    uploadedAt: string;
-  };
-}
+// Re-export for backwards compatibility
+export type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
 
 @injectable()
 export class EventsService {
@@ -66,6 +53,6 @@ export class EventsService {
 
     // Publish to NATS JetStream
     const js = this.natsClient.getClient().jetstream();
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    await js.publish(WALLPAPER_UPLOADED_SUBJECT, JSON.stringify(event));
   }
 }

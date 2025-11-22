@@ -46,6 +46,7 @@
     "ulid": "^2.3.0",
     "zod": "^3.24.1",
     "@wallpaperdb/core": "workspace:*",
+    "@wallpaperdb/events": "workspace:*",
     "@wallpaperdb/url-ipv4-resolver": "workspace:*"
   },
   "devDependencies": {

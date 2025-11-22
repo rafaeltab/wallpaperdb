@@ -1,4 +1,8 @@
-// Re-export all application errors from core package
+export {
+  ProblemDetailsError,
+  type ProblemDetails,
+} from "./problem-details.js";
+
 export {
   ApplicationError,
   InternalError,
@@ -8,4 +12,4 @@ export {
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
-} from "@wallpaperdb/core/errors";
+} from "./application-error.js";

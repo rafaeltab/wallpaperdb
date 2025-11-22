@@ -18,6 +18,10 @@
     "./connections/base": {
       "import": "./dist/connections/base/index.js",
       "types": "./dist/connections/base/index.d.ts"
+    },
+    "./errors": {
+      "import": "./dist/errors/index.js",
+      "types": "./dist/errors/index.d.ts"
     }
   },
   "scripts": {
@@ -31,8 +35,19 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.709.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.56.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
+    "@opentelemetry/sdk-metrics": "^1.29.0",
+    "@opentelemetry/sdk-node": "^0.56.0",
+    "ioredis": "^5.8.2",
+    "nats": "^2.29.1",
+    "pg": "^8.13.1"
+  },
   "devDependencies": {
+    "@types/pg": "^8.11.10",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "@biomejs/biome": "^2.3.4",

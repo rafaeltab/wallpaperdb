@@ -1,62 +1,59 @@
 {
-  "name": "@wallpaperdb/core",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "description": "Shared infrastructure patterns for WallpaperDB services",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "exports": {
-    ".": {
-      "import": "./src/index.ts",
-      "types": "./src/index.ts"
+    "name": "@wallpaperdb/core",
+    "version": "0.1.0",
+    "type": "module",
+    "private": true,
+    "description": "Shared infrastructure patterns for WallpaperDB services",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "import": "./src/index.ts",
+            "types": "./src/index.ts"
+        },
+        "./connections": {
+            "import": "./src/connections/index.ts",
+            "types": "./src/connections/index.ts"
+        },
+        "./connections/base": {
+            "import": "./src/connections/base/index.ts",
+            "types": "./src/connections/base/index.ts"
+        },
+        "./errors": {
+            "import": "./src/errors/index.ts",
+            "types": "./src/errors/index.ts"
+        },
+        "./telemetry": {
+            "import": "./src/telemetry/index.ts",
+            "types": "./src/telemetry/index.ts"
+        }
     },
-    "./connections": {
-      "import": "./src/connections/index.ts",
-      "types": "./src/connections/index.ts"
+    "scripts": {
+        "format": "biome format --write .",
+        "format:check": "biome format .",
+        "lint": "biome lint .",
+        "lint:fix": "biome lint --write .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "check-types": "tsc --noEmit"
     },
-    "./connections/base": {
-      "import": "./src/connections/base/index.ts",
-      "types": "./src/connections/base/index.ts"
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.709.0",
+        "@opentelemetry/api": "^1.9.0",
+        "@opentelemetry/auto-instrumentations-node": "^0.52.1",
+        "@opentelemetry/exporter-metrics-otlp-http": "^0.56.0",
+        "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
+        "@opentelemetry/sdk-metrics": "^1.29.0",
+        "@opentelemetry/sdk-node": "^0.56.0",
+        "ioredis": "^5.8.2",
+        "nats": "^2.29.1",
+        "pg": "^8.13.1"
     },
-    "./errors": {
-      "import": "./src/errors/index.ts",
-      "types": "./src/errors/index.ts"
-    },
-    "./telemetry": {
-      "import": "./src/telemetry/index.ts",
-      "types": "./src/telemetry/index.ts"
+    "devDependencies": {
+        "@types/pg": "^8.11.10",
+        "@types/node": "^22.10.2",
+        "typescript": "^5.7.2",
+        "@biomejs/biome": "^2.3.4",
+        "vitest": "^2.1.8"
     }
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "check-types": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.709.0",
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.56.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
-    "@opentelemetry/sdk-metrics": "^1.29.0",
-    "@opentelemetry/sdk-node": "^0.56.0",
-    "ioredis": "^5.8.2",
-    "nats": "^2.29.1",
-    "pg": "^8.13.1"
-  },
-  "devDependencies": {
-    "@types/pg": "^8.11.10",
-    "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
-    "@biomejs/biome": "^2.3.4",
-    "vitest": "^2.1.8"
-  }
 }

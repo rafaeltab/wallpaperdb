@@ -1,41 +1,39 @@
 {
-  "name": "@wallpaperdb/testcontainers",
-  "version": "0.0.1",
-  "type": "module",
-  "private": true,
-  "description": "Shared testcontainer utilities for WallpaperDB tests",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+    "name": "@wallpaperdb/testcontainers",
+    "version": "0.0.1",
+    "type": "module",
+    "private": true,
+    "description": "Shared testcontainer utilities for WallpaperDB tests",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "import": "./src/index.ts",
+            "types": "./src/index.ts"
+        },
+        "./containers": {
+            "import": "./src/containers/index.ts",
+            "types": "./src/containers/index.ts"
+        }
     },
-    "./containers": {
-      "import": "./dist/containers/index.js",
-      "types": "./dist/containers/index.d.ts"
+    "scripts": {
+        "clean": "rm -rf dist",
+        "format": "biome format --write .",
+        "format:check": "biome format .",
+        "lint": "biome lint .",
+        "lint:fix": "biome lint --write .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "check-types": "tsc --noEmit"
+    },
+    "dependencies": {
+        "testcontainers": "^11.8.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "nats": "^2.29.1",
+        "typescript": "^5.7.2",
+        "@biomejs/biome": "^2.3.4",
+        "vitest": "^2.1.8"
     }
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "clean": "rm -rf dist",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "check-types": "tsc --noEmit"
-  },
-  "dependencies": {
-    "testcontainers": "^11.8.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.2",
-    "nats": "^2.29.1",
-    "typescript": "^5.7.2",
-    "@biomejs/biome": "^2.3.4",
-    "vitest": "^2.1.8"
-  }
 }

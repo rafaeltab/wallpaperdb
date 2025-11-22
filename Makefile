@@ -3,7 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
-        dev build test test-watch test-packages test-apps test-apps-coverage test-coverage test-ui coverage-summary format lint check-types ci help
+        dev build test test-watch test-packages test-apps test-apps-coverage test-coverage test-ui coverage-summary format lint check-types ci ci-force help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -57,6 +57,7 @@ help:
 	@echo ""
 	@echo "CI/Local Parity:"
 	@echo "  make ci                - Run full CI pipeline locally"
+	@echo "  make ci-force          - Run full CI pipeline (skip turbo cache)"
 	@echo "  make check-types       - Run type checking on all packages"
 	@echo ""
 
@@ -215,6 +216,16 @@ ci:
 	@$(MAKE) build
 	@$(MAKE) lint
 	@$(MAKE) check-types
+	@$(MAKE) test-packages
+	@$(MAKE) test-apps
+	@echo ""
+	@echo "✓ All CI checks passed!"
+
+ci-force:
+	@echo "Running full CI checks locally (no cache)..."
+	@turbo run build --force
+	@turbo run lint --force
+	@turbo run check-types --force
 	@$(MAKE) test-packages
 	@$(MAKE) test-apps
 	@echo ""

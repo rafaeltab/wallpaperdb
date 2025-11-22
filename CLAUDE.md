@@ -141,6 +141,25 @@ make coverage-summary  # Display AI-friendly coverage summary
 - JSON: `coverage/coverage-summary.json`
 - LCOV: `coverage/lcov.info`
 
+### Replicating CI Locally
+
+Run the full CI pipeline locally before pushing:
+
+```bash
+make ci
+```
+
+This runs: build → lint → check-types → test-packages → test-apps
+
+Individual CI steps:
+```bash
+make build           # Build all packages
+make lint            # Lint all code
+make check-types     # Type check all packages
+make test-packages   # Fast package tests (no infra)
+make test-apps       # App tests with Testcontainers
+```
+
 ### Single Service Commands (Ingestor)
 
 Use these when working on a single service:

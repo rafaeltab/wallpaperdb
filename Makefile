@@ -3,7 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
-        dev build test test-watch test-packages test-apps test-coverage test-ui coverage-summary format lint help
+        dev build test test-watch test-packages test-apps test-apps-coverage test-coverage test-ui coverage-summary format lint check-types ci help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -50,9 +50,14 @@ help:
 	@echo "Testing (Workspace):"
 	@echo "  make test-packages     - Run package tests (fast, no infrastructure)"
 	@echo "  make test-apps         - Run app tests (uses Testcontainers, self-contained)"
+	@echo "  make test-apps-coverage - Run app tests with coverage"
 	@echo "  make test-coverage     - Run all tests with coverage"
 	@echo "  make test-ui           - Run tests with Vitest UI"
 	@echo "  make coverage-summary  - Display AI-friendly coverage summary"
+	@echo ""
+	@echo "CI/Local Parity:"
+	@echo "  make ci                - Run full CI pipeline locally"
+	@echo "  make check-types       - Run type checking on all packages"
 	@echo ""
 
 infra-start:
@@ -196,3 +201,21 @@ lint-fix:
 
 install:
 	pnpm install
+
+# CI/Local Parity commands
+check-types:
+	@turbo run check-types
+
+test-apps-coverage:
+	@echo "Testing apps with coverage..."
+	@pnpm test:apps --coverage
+
+ci:
+	@echo "Running full CI checks locally..."
+	@$(MAKE) build
+	@$(MAKE) lint
+	@$(MAKE) check-types
+	@$(MAKE) test-packages
+	@$(MAKE) test-apps
+	@echo ""
+	@echo "✓ All CI checks passed!"

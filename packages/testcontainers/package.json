@@ -23,7 +23,7 @@
         "lint": "biome lint .",
         "lint:fix": "biome lint --write .",
         "test": "vitest run",
-        "test:e2e": "vitest run",
+        "test:e2e": "vitest run --coverage",
         "test:watch": "vitest",
         "check-types": "tsc --noEmit"
     },

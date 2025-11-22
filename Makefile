@@ -3,7 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
-        dev build test test-watch test-unit test-integration test-e2e test-coverage test-ui coverage-summary format lint check-types ci ci-force help
+        dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -51,7 +51,6 @@ help:
 	@echo "  make test-unit         - Run unit tests (fast, no containers)"
 	@echo "  make test-integration  - Run integration tests (uses Testcontainers)"
 	@echo "  make test-e2e          - Run E2E tests (heavy container usage, sequential)"
-	@echo "  make test-coverage     - Run all tests with coverage"
 	@echo "  make test-ui           - Run tests with Vitest UI"
 	@echo "  make coverage-summary  - Display AI-friendly coverage summary"
 	@echo ""
@@ -184,10 +183,6 @@ test-e2e:
 	@echo "Running E2E tests (heavy container usage, sequential)..."
 	@turbo run test:e2e --concurrency=1
 
-test-coverage:
-	@echo "Running tests with coverage..."
-	@pnpm test:coverage
-
 test-ui:
 	@echo "Starting Vitest UI..."
 	@pnpm test:ui
@@ -216,17 +211,21 @@ ci:
 	@start_time=$$(date +%s); \
 	turbo run build lint check-types test:unit test:integration && \
 	turbo run test:e2e --concurrency=1 && \
+	pnpm coverage:merge && \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \
-	echo "✓ All CI checks passed in $${duration}s"
+	echo "✓ All CI checks passed in $${duration}s"; \
+	echo "✓ Coverage report: coverage/lcov.info"
 
 ci-force:
 	@echo "Running full CI checks locally (no cache)..."
 	@start_time=$$(date +%s); \
 	turbo run build lint check-types test:unit test:integration --force && \
 	turbo run test:e2e --concurrency=1 --force && \
+	pnpm coverage:merge && \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
 	echo ""; \
-	echo "✓ All CI checks passed in $${duration}s"
+	echo "✓ All CI checks passed in $${duration}s"; \
+	echo "✓ Coverage report: coverage/lcov.info"

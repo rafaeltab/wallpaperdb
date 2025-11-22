@@ -30,7 +30,7 @@
         "lint": "biome lint .",
         "lint:fix": "biome lint --write .",
         "test": "vitest run",
-        "test:unit": "vitest run",
+        "test:unit": "vitest run --coverage",
         "test:watch": "vitest",
         "check-types": "tsc --noEmit"
     },

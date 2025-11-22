@@ -6,7 +6,8 @@
     "scripts": {
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
-        "test:ui": "vitest --ui"
+        "test:ui": "vitest --ui",
+        "coverage:merge": "mkdir -p coverage && cat packages/*/coverage/lcov.info apps/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || cat packages/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || echo 'No coverage files found'"
     },
     "devDependencies": {
         "@vitest/coverage-v8": "^2.1.8",

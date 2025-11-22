@@ -80,6 +80,9 @@
                 "vitest.*.ts",
                 "package.json"
             ],
+            "outputs": [
+                "coverage/**"
+            ],
             "dependsOn": [
                 "^build"
             ]
@@ -92,6 +95,9 @@
                 "vitest.*.ts",
                 "package.json"
             ],
+            "outputs": [
+                "coverage/**"
+            ],
             "dependsOn": [
                 "^build"
             ]
@@ -103,6 +109,9 @@
                 "test/**",
                 "vitest.*.ts",
                 "package.json"
+            ],
+            "outputs": [
+                "coverage/**"
             ],
             "dependsOn": [
                 "^build",

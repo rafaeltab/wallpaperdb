@@ -28,8 +28,14 @@ jobs:
       - name: Install turbo
         run: pnpm add -g turbo
 
-      - name: Build, lint, type-check, and run unit/integration tests
-        run: turbo run build lint check-types test:unit test:integration
+      - name: Build, lint, and type-check
+        run: turbo run build lint check-types
+
+      - name: Run unit and integration tests
+        run: turbo run test:unit test:integration
+
+      - name: Merge coverage reports
+        run: pnpm coverage:merge
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

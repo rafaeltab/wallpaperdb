@@ -69,6 +69,43 @@
                 "^build:docker"
             ]
         },
+        "test:unit": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "test/**",
+                "vitest.*.ts",
+                "package.json"
+            ],
+            "dependsOn": [
+                "^build"
+            ]
+        },
+        "test:integration": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "test/**",
+                "vitest.*.ts",
+                "package.json"
+            ],
+            "dependsOn": [
+                "^build"
+            ]
+        },
+        "test:e2e": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "test/**",
+                "vitest.*.ts",
+                "package.json"
+            ],
+            "dependsOn": [
+                "^build",
+                "^build:docker"
+            ]
+        },
         "check-types": {
             "cache": true,
             "inputs": [

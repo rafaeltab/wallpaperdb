@@ -124,17 +124,20 @@ make format       # Format all code
 make lint         # Lint all code
 ```
 
-### Testing (Workspace)
+### Testing (by intensity)
 
-Separate package and app tests for faster feedback:
+Tests are organized by resource intensity for efficient local development:
 
 ```bash
-make test-packages     # Run package tests (fast, no infrastructure needed)
-make test-apps         # Run app tests (requires infrastructure)
+make test-unit         # Unit tests (fast, no containers) - core, events, url-ipv4-resolver
+make test-integration  # Integration tests (Testcontainers) - ingestor
+make test-e2e          # E2E tests (heavy containers, sequential) - testcontainers, test-utils, ingestor-e2e
 make test-coverage     # Run all tests with coverage
 make test-ui           # Run tests with Vitest UI
 make coverage-summary  # Display AI-friendly coverage summary
 ```
+
+**Turbo Caching:** All test commands use Turbo, so unchanged packages are skipped automatically.
 
 **Coverage Reports:**
 - HTML: `open coverage/index.html`
@@ -149,15 +152,16 @@ Run the full CI pipeline locally before pushing:
 make ci
 ```
 
-This runs: build → lint → check-types → test-packages → test-apps
+This runs: `turbo run build lint check-types test:unit test:integration` → `turbo run test:e2e --concurrency=1`
 
 Individual CI steps:
 ```bash
-make build           # Build all packages
-make lint            # Lint all code
-make check-types     # Type check all packages
-make test-packages   # Fast package tests (no infra)
-make test-apps       # App tests with Testcontainers
+make build            # Build all packages
+make lint             # Lint all code
+make check-types      # Type check all packages
+make test-unit        # Fast unit tests (no containers)
+make test-integration # Integration tests with Testcontainers
+make test-e2e         # E2E tests (sequential to avoid Docker overload)
 ```
 
 ### Single Service Commands (Ingestor)
@@ -336,24 +340,25 @@ apps/ingestor/src/
 
 ### Testing Strategy
 
-**Package vs Service Tests:**
+**Tests by Intensity:**
 
-- **Package Tests** (`make test-packages`)
-  - Fast, no infrastructure needed
-  - Test shared code in `packages/`
+- **Unit Tests** (`make test-unit`)
+  - Fast, no containers needed
+  - Pure logic tests in `packages/`
+  - Packages: `core`, `events`, `url-ipv4-resolver`
   - Run frequently during development
-  - Example: `@wallpaperdb/core`, `@wallpaperdb/events`
 
-- **Service/App Tests** (`make test-apps`)
-  - Integration tests with Testcontainers
-  - Test full workflows with real infrastructure
-  - Require `make infra-start` first
-  - Example: `apps/ingestor`
+- **Integration Tests** (`make test-integration`)
+  - Uses Testcontainers for real infrastructure
+  - Tests full workflows with PostgreSQL, MinIO, NATS
+  - Apps: `ingestor`
+  - Runs with `--concurrency=1` to avoid Docker overload
 
-- **E2E Tests** (`make <service>-e2e-test`)
-  - Docker-based, test deployment artifacts
+- **E2E Tests** (`make test-e2e`)
+  - Heavy container usage, tests deployment artifacts
+  - Packages: `testcontainers`, `test-utils`, `ingestor-e2e`
+  - Runs with `--concurrency=1` (sequential)
   - Slowest but most comprehensive
-  - Example: `make ingestor-e2e-test`
 
 **Test Coverage:**
 
@@ -375,7 +380,7 @@ open coverage/index.html    # View HTML report
 **CI/CD Integration:**
 - GitHub Actions runs tests on push/PR
 - Coverage tracked via Codecov
-- Separate jobs for package tests (fast) and app tests (with infrastructure)
+- Two workflows: `ci.yml` (build, lint, types, unit, integration) and `e2e.yml` (E2E tests)
 
 **Current Test Approach:**
 

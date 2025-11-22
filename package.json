@@ -5,8 +5,6 @@
     "packageManager": "pnpm@10.18.3",
     "scripts": {
         "test": "vitest",
-        "test:packages": "vitest run --project test-utils --project testcontainers",
-        "test:apps": "vitest run --project ingestor",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui"
     },

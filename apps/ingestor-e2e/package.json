@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "test": "vitest run",
+        "test:e2e": "vitest run",
         "test:watch": "vitest",
         "test:distributed": "vitest run --config vitest.distributed.config.ts",
         "test:distributed:watch": "vitest --config vitest.distributed.config.ts",

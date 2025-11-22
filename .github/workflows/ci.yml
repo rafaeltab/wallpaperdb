@@ -1,4 +1,4 @@
-name: Build
+name: CI
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  build:
-    name: Build All Services
+  ci:
+    name: Build, Lint, and Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -28,5 +28,12 @@ jobs:
       - name: Install turbo
         run: pnpm add -g turbo
 
-      - name: Build, lint and check types
-        run: turbo run build lint check-types
+      - name: Build, lint, type-check, and run unit/integration tests
+        run: turbo run build lint check-types test:unit test:integration
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: ci
+          token: ${{ secrets.CODECOV_TOKEN }}

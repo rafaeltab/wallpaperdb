@@ -3,7 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
-        dev build test test-watch test-packages test-apps test-apps-coverage test-coverage test-ui coverage-summary format lint check-types ci ci-force help
+        dev build test test-watch test-unit test-integration test-e2e test-coverage test-ui coverage-summary format lint check-types ci ci-force help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -47,10 +47,10 @@ help:
 	@echo "  make format     - Format all code"
 	@echo "  make lint       - Lint all code"
 	@echo ""
-	@echo "Testing (Workspace):"
-	@echo "  make test-packages     - Run package tests (fast, no infrastructure)"
-	@echo "  make test-apps         - Run app tests (uses Testcontainers, self-contained)"
-	@echo "  make test-apps-coverage - Run app tests with coverage"
+	@echo "Testing (by intensity):"
+	@echo "  make test-unit         - Run unit tests (fast, no containers)"
+	@echo "  make test-integration  - Run integration tests (uses Testcontainers)"
+	@echo "  make test-e2e          - Run E2E tests (heavy container usage, sequential)"
 	@echo "  make test-coverage     - Run all tests with coverage"
 	@echo "  make test-ui           - Run tests with Vitest UI"
 	@echo "  make coverage-summary  - Display AI-friendly coverage summary"
@@ -171,14 +171,18 @@ test:
 test-watch:
 	@turbo run test:watch
 
-# Workspace test commands
-test-packages:
-	@echo "Testing packages (fast, no infrastructure)..."
-	@pnpm test:packages
+# Test commands by intensity
+test-unit:
+	@echo "Running unit tests (fast, no containers)..."
+	@turbo run test:unit
 
-test-apps:
-	@echo "Testing apps (uses Testcontainers, self-contained)..."
-	@pnpm test:apps
+test-integration:
+	@echo "Running integration tests (uses Testcontainers)..."
+	@turbo run test:integration --concurrency=1
+
+test-e2e:
+	@echo "Running E2E tests (heavy container usage, sequential)..."
+	@turbo run test:e2e --concurrency=1
 
 test-coverage:
 	@echo "Running tests with coverage..."
@@ -207,26 +211,22 @@ install:
 check-types:
 	@turbo run check-types
 
-test-apps-coverage:
-	@echo "Testing apps with coverage..."
-	@pnpm test:apps --coverage
-
 ci:
 	@echo "Running full CI checks locally..."
-	@$(MAKE) build
-	@$(MAKE) lint
-	@$(MAKE) check-types
-	@$(MAKE) test-packages
-	@$(MAKE) test-apps
-	@echo ""
-	@echo "✓ All CI checks passed!"
+	@start_time=$$(date +%s); \
+	turbo run build lint check-types test:unit test:integration && \
+	turbo run test:e2e --concurrency=1 && \
+	end_time=$$(date +%s); \
+	duration=$$((end_time - start_time)); \
+	echo ""; \
+	echo "✓ All CI checks passed in $${duration}s"
 
 ci-force:
 	@echo "Running full CI checks locally (no cache)..."
-	@turbo run build --force
-	@turbo run lint --force
-	@turbo run check-types --force
-	@$(MAKE) test-packages
-	@$(MAKE) test-apps
-	@echo ""
-	@echo "✓ All CI checks passed!"
+	@start_time=$$(date +%s); \
+	turbo run build lint check-types test:unit test:integration --force && \
+	turbo run test:e2e --concurrency=1 --force && \
+	end_time=$$(date +%s); \
+	duration=$$((end_time - start_time)); \
+	echo ""; \
+	echo "✓ All CI checks passed in $${duration}s"

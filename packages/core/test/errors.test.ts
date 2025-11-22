@@ -15,10 +15,6 @@ class TestProblemError extends ProblemDetailsError {
   readonly title = "Test Error";
   readonly status = 400;
   readonly instance = "/test";
-
-  constructor(message: string, extensions?: Record<string, unknown>) {
-    super(message, extensions);
-  }
 }
 
 describe("ProblemDetailsError", () => {

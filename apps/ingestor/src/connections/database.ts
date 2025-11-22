@@ -13,7 +13,7 @@ export type DatabaseClient = {
 };
 
 @singleton()
-export class DatabaseConnection extends BaseConnection<DatabaseClient> {
+export class DatabaseConnection extends BaseConnection<DatabaseClient, Config> {
   constructor(@inject('config') config: Config) {
     super(config);
   }

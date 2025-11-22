@@ -4,7 +4,7 @@ import type { Config } from '../config.js';
 import { BaseConnection } from './base/base-connection.js';
 
 @singleton()
-export class RedisConnection extends BaseConnection<Redis> {
+export class RedisConnection extends BaseConnection<Redis, Config> {
   constructor(@inject('config') config: Config) {
     super(config);
   }

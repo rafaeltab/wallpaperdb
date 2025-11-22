@@ -4,7 +4,7 @@ import type { Config } from '../config.js';
 import { BaseConnection } from './base/base-connection.js';
 
 @singleton()
-export class MinioConnection extends BaseConnection<S3Client> {
+export class MinioConnection extends BaseConnection<S3Client, Config> {
   constructor(@inject('config') config: Config) {
     super(config);
   }

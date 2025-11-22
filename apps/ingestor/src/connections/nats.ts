@@ -5,7 +5,7 @@ import type { Config } from '../config.js';
 import { BaseConnection } from './base/base-connection.js';
 
 @singleton()
-export class NatsConnectionManager extends BaseConnection<NatsConnection> {
+export class NatsConnectionManager extends BaseConnection<NatsConnection, Config> {
   constructor(@inject('config') config: Config) {
     super(config);
   }

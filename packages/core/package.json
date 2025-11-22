@@ -1,0 +1,41 @@
+{
+  "name": "@wallpaperdb/core",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Shared infrastructure patterns for WallpaperDB services",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./connections": {
+      "import": "./dist/connections/index.js",
+      "types": "./dist/connections/index.d.ts"
+    },
+    "./connections/base": {
+      "import": "./dist/connections/base/index.js",
+      "types": "./dist/connections/base/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "@biomejs/biome": "^2.3.4",
+    "vitest": "^2.1.8"
+  }
+}

@@ -8,7 +8,7 @@ import type { Config } from '../config.js';
 import { BaseConnection } from './base/base-connection.js';
 
 @singleton()
-export class OpenTelemetryConnection extends BaseConnection<NodeSDK> {
+export class OpenTelemetryConnection extends BaseConnection<NodeSDK, Config> {
   constructor(@inject('config') config: Config) {
     super(config);
   }

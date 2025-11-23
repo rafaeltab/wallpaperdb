@@ -18,6 +18,28 @@ export interface OpenAPIServer {
 }
 
 /**
+ * Error response definition for OpenAPI documentation.
+ */
+export interface ErrorResponseDefinition {
+	/** HTTP status code */
+	statusCode: number;
+	/** Description of when this error occurs */
+	description: string;
+}
+
+/**
+ * Multipart body schema configuration for OpenAPI documentation.
+ */
+export interface MultipartBodySchema {
+	/** Route URL pattern (e.g., '/upload') */
+	url: string;
+	/** JSON Schema for the multipart body */
+	schema: JsonSchema;
+	/** Error responses to document (optional) */
+	errorResponses?: ErrorResponseDefinition[];
+}
+
+/**
  * Options for registering OpenAPI documentation.
  */
 export interface OpenAPIOptions {
@@ -33,6 +55,14 @@ export interface OpenAPIOptions {
 	routePrefix?: string;
 	/** Whether to expose the JSON spec at /documentation/json (default: true) */
 	exposeRoute?: boolean;
+	/** Additional schemas to register in components.schemas */
+	additionalSchemas?: Record<string, JsonSchema>;
+	/**
+	 * Multipart body schemas for documentation.
+	 * These are injected into the OpenAPI spec for routes that use multipart/form-data.
+	 * Fastify doesn't validate multipart bodies, so these are for docs only.
+	 */
+	multipartBodies?: MultipartBodySchema[];
 }
 
 /**
@@ -64,6 +94,43 @@ export async function registerOpenAPI(
 ): Promise<void> {
 	const routePrefix = options.routePrefix ?? "/documentation";
 
+	// Register shared schemas with Fastify (for both serialization and OpenAPI)
+	// These schemas can be referenced via $ref: '#/components/schemas/SchemaName'
+	app.addSchema({
+		$id: "HealthResponse",
+		...(HealthResponseJsonSchema as object),
+	});
+	app.addSchema({
+		$id: "ReadyResponse",
+		...(ReadyResponseJsonSchema as object),
+	});
+	app.addSchema({
+		$id: "ProblemDetails",
+		...(ProblemDetailsJsonSchema as object),
+	});
+	app.addSchema({
+		$id: "ValidationProblemDetails",
+		...(ValidationProblemDetailsJsonSchema as object),
+	});
+
+	// Register additional schemas from the service
+	if (options.additionalSchemas) {
+		for (const [name, schema] of Object.entries(options.additionalSchemas)) {
+			app.addSchema({
+				$id: name,
+				...(schema as object),
+			});
+		}
+	}
+
+	// Build multipart body lookup map
+	const multipartBodyMap = new Map<string, JsonSchema>();
+	if (options.multipartBodies) {
+		for (const { url, schema } of options.multipartBodies) {
+			multipartBodyMap.set(url, schema);
+		}
+	}
+
 	// Register @fastify/swagger for OpenAPI spec generation
 	const swaggerOptions: SwaggerOptions = {
 		openapi: {
@@ -75,14 +142,6 @@ export async function registerOpenAPI(
 			},
 			servers: options.servers,
 			components: {
-				schemas: {
-					// Register shared schemas (cast to any for OpenAPI compatibility)
-					HealthResponse: HealthResponseJsonSchema as JsonSchema,
-					ReadyResponse: ReadyResponseJsonSchema as JsonSchema,
-					ProblemDetails: ProblemDetailsJsonSchema as JsonSchema,
-					ValidationProblemDetails:
-						ValidationProblemDetailsJsonSchema as JsonSchema,
-				},
 				securitySchemes: {
 					// Common auth scheme (can be extended per-service)
 					userId: {
@@ -94,8 +153,63 @@ export async function registerOpenAPI(
 				},
 			},
 		},
+		// refResolver tells swagger to use the schemas we added via addSchema
+		refResolver: {
+			buildLocalReference(json, _baseUri, _fragment, _i) {
+				// Use the $id as the reference name
+				return json.$id as string;
+			},
+		},
+		// Transform hook to inject multipart body schemas into OpenAPI spec
+		transform: ({ schema, url }) => {
+			// Check if this route has a multipart body schema to inject
+			const multipartSchema = multipartBodyMap.get(url);
+			if (multipartSchema) {
+				// Clone the schema and add the body for OpenAPI docs only
+				return {
+					...schema,
+					body: multipartSchema,
+				};
+			}
+			return schema;
+		},
 	};
 	await app.register(fastifySwagger, swaggerOptions);
+
+	// Add hook to modify OpenAPI spec after generation for multipart endpoints
+	if (options.multipartBodies && options.multipartBodies.length > 0) {
+		app.addHook("onReady", async () => {
+			const swagger = app.swagger();
+			for (const { url, schema, errorResponses } of options.multipartBodies) {
+				// Find the path in the generated spec
+				const pathItem = swagger.paths?.[url];
+				if (pathItem?.post) {
+					// Add requestBody for multipart
+					pathItem.post.requestBody = {
+						required: true,
+						content: {
+							"multipart/form-data": {
+								schema: schema as Record<string, unknown>,
+							},
+						},
+					};
+					// Add error responses if defined
+					if (errorResponses) {
+						for (const { statusCode, description } of errorResponses) {
+							pathItem.post.responses[statusCode] = {
+								description,
+								content: {
+									"application/problem+json": {
+										schema: { $ref: "#/components/schemas/ProblemDetails" },
+									},
+								},
+							};
+						}
+					}
+				}
+			}
+		});
+	}
 
 	// Register @fastify/swagger-ui for serving Swagger UI
 	await app.register(fastifySwaggerUi, {

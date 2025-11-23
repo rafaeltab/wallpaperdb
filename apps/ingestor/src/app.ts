@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
+import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import type { Config } from './config.js';
 import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
@@ -64,6 +65,16 @@ export async function createApp(
   });
 
   container.register('Logger', { useValue: new FastifyLogger(fastify.log) });
+
+  // Register OpenAPI documentation
+  await registerOpenAPI(fastify, {
+    title: 'WallpaperDB Ingestor API',
+    version: '1.0.0',
+    description: 'Wallpaper upload and ingestion service. Accepts wallpaper uploads, validates files, stores them in object storage, and publishes events for downstream processing.',
+    servers: config.nodeEnv === 'production'
+      ? undefined
+      : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
+  });
 
   // Decorate Fastify with container for access in routes
   fastify.decorate('container', container);

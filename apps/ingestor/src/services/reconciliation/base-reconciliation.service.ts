@@ -1,9 +1,4 @@
-import {
-  Attributes,
-  recordCounter,
-  recordHistogram,
-  withSpan,
-} from '@wallpaperdb/core/telemetry';
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../db/schema.js';
 

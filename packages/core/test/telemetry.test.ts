@@ -87,11 +87,7 @@ describe("Telemetry", () => {
     });
 
     it("should create a histogram", () => {
-      const histogram = createHistogram(
-        "test.histogram",
-        "Test histogram",
-        "ms"
-      );
+      const histogram = createHistogram("test.histogram", "Test histogram", "ms");
       expect(histogram).toBeDefined();
       // Should not throw when recording
       histogram.record(100);

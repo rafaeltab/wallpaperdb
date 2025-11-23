@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import { container } from 'tsyringe';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import type { Config } from './config.js';
@@ -8,7 +9,10 @@ import { NatsConnectionManager } from './connections/nats.js';
 import { OpenTelemetryConnection } from './connections/otel.js';
 import { RedisConnection } from './connections/redis.js';
 import { registerRoutes } from './routes/index.js';
-import { UploadSuccessResponseJsonSchema, uploadBodySchemaForDocs } from './routes/schemas/upload.schema.js';
+import {
+  UploadSuccessResponseJsonSchema,
+  uploadBodySchemaForDocs,
+} from './routes/schemas/upload.schema.js';
 import { RateLimitService } from './services/rate-limit.service.js';
 import { DefaultValidationLimitsService } from './services/validation-limits.service.js';
 import { SystemTimeService } from './services/core/time.service.js';
@@ -67,14 +71,24 @@ export async function createApp(
 
   container.register('Logger', { useValue: new FastifyLogger(fastify.log) });
 
+  // Register CORS for development (allow docs site to access API)
+  await fastify.register(cors, {
+    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
+
   // Register OpenAPI documentation
   await registerOpenAPI(fastify, {
     title: 'WallpaperDB Ingestor API',
     version: '1.0.0',
-    description: 'Wallpaper upload and ingestion service. Accepts wallpaper uploads, validates files, stores them in object storage, and publishes events for downstream processing.',
-    servers: config.nodeEnv === 'production'
-      ? undefined
-      : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
+    description:
+      'Wallpaper upload and ingestion service. Accepts wallpaper uploads, validates files, stores them in object storage, and publishes events for downstream processing.',
+    servers:
+      config.nodeEnv === 'production'
+        ? undefined
+        : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
     additionalSchemas: {
       UploadSuccessResponse: UploadSuccessResponseJsonSchema,
     },
@@ -83,11 +97,27 @@ export async function createApp(
         url: '/upload',
         schema: uploadBodySchemaForDocs,
         errorResponses: [
-          { statusCode: 400, description: 'Validation error. The file format, size, or dimensions are invalid.' },
-          { statusCode: 409, description: 'Duplicate file. A file with the same content hash already exists for this user.' },
-          { statusCode: 413, description: 'File too large. The file exceeds the maximum allowed size.' },
-          { statusCode: 429, description: 'Rate limit exceeded. Too many upload requests in a short period.' },
-          { statusCode: 500, description: 'Internal server error. An unexpected error occurred during processing.' },
+          {
+            statusCode: 400,
+            description: 'Validation error. The file format, size, or dimensions are invalid.',
+          },
+          {
+            statusCode: 409,
+            description:
+              'Duplicate file. A file with the same content hash already exists for this user.',
+          },
+          {
+            statusCode: 413,
+            description: 'File too large. The file exceeds the maximum allowed size.',
+          },
+          {
+            statusCode: 429,
+            description: 'Rate limit exceeded. Too many upload requests in a short period.',
+          },
+          {
+            statusCode: 500,
+            description: 'Internal server error. An unexpected error occurred during processing.',
+          },
         ],
       },
     ],

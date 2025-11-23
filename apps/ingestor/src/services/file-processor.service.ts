@@ -1,10 +1,5 @@
 import crypto from 'node:crypto';
-import {
-  Attributes,
-  recordHistogram,
-  withSpan,
-  withSpanSync,
-} from '@wallpaperdb/core/telemetry';
+import { Attributes, recordHistogram, withSpan, withSpanSync } from '@wallpaperdb/core/telemetry';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { injectable } from 'tsyringe';
@@ -211,7 +206,8 @@ export class FileProcessorService {
 
           // Check file size BEFORE throwing format error
           // This ensures large invalid files get 413 instead of 400
-          const maxSize = fileCategory === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
+          const maxSize =
+            fileCategory === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
           if (fileSizeBytes > maxSize) {
             throw new FileTooLargeError(fileSizeBytes, maxSize, fileCategory);
           }

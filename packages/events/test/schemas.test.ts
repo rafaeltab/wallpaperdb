@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  WallpaperUploadedEventSchema,
-  WALLPAPER_UPLOADED_SUBJECT,
-} from "../src/schemas/index.js";
+import { WallpaperUploadedEventSchema, WALLPAPER_UPLOADED_SUBJECT } from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
   describe("WallpaperUploadedEventSchema", () => {

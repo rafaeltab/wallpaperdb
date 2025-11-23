@@ -18,7 +18,8 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         summary: 'Health check',
-        description: 'Returns health status of the service and its dependencies. Checks database, object storage, message queue, and cache connectivity.',
+        description:
+          'Returns health status of the service and its dependencies. Checks database, object storage, message queue, and cache connectivity.',
         tags: ['Health'],
         response: {
           200: {
@@ -46,7 +47,8 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         summary: 'Readiness check',
-        description: 'Returns 200 if service is ready to handle requests, 503 otherwise. Use for Kubernetes readiness probes.',
+        description:
+          'Returns 200 if service is ready to handle requests, 503 otherwise. Use for Kubernetes readiness probes.',
         tags: ['Health'],
         response: {
           200: {

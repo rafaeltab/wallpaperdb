@@ -68,9 +68,7 @@ describe("BaseConnection", () => {
     it("should propagate errors from createClient", async () => {
       const failingConnection = new FailingConnection(testConfig);
 
-      await expect(failingConnection.initialize()).rejects.toThrow(
-        "Connection failed"
-      );
+      await expect(failingConnection.initialize()).rejects.toThrow("Connection failed");
     });
   });
 

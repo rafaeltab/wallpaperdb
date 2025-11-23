@@ -26,10 +26,7 @@ export interface PoolOptions {
  * const db = drizzle(pool, { schema });
  * ```
  */
-export function createPool(
-  config: DatabaseConfig,
-  options: PoolOptions = {}
-): pg.Pool {
+export function createPool(config: DatabaseConfig, options: PoolOptions = {}): pg.Pool {
   return new Pool({
     connectionString: config.databaseUrl,
     max: options.max ?? 20,

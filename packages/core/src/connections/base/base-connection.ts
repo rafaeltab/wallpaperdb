@@ -38,9 +38,7 @@ export abstract class BaseConnection<TClient, TConfig> {
    */
   getClient(): TClient {
     if (!this.client) {
-      throw new Error(
-        `${this.constructor.name} not initialized. Call initialize() first.`
-      );
+      throw new Error(`${this.constructor.name} not initialized. Call initialize() first.`);
     }
     return this.client;
   }

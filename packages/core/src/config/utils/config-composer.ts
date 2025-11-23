@@ -4,10 +4,10 @@ import type { z } from "zod";
  * Options for loading configuration.
  */
 export interface LoadConfigOptions {
-	/** Override values for testing */
-	overrides?: Record<string, unknown>;
-	/** Skip validation (useful for partial configs in tests) */
-	skipValidation?: boolean;
+  /** Override values for testing */
+  overrides?: Record<string, unknown>;
+  /** Skip validation (useful for partial configs in tests) */
+  skipValidation?: boolean;
 }
 
 /**
@@ -24,18 +24,18 @@ export interface LoadConfigOptions {
  * ```
  */
 export function createConfigLoader<T extends z.ZodType>(
-	schema: T,
-	envMapper: () => Record<string, unknown>,
+  schema: T,
+  envMapper: () => Record<string, unknown>
 ): (options?: LoadConfigOptions) => z.infer<T> {
-	return (options?: LoadConfigOptions) => {
-		const raw = { ...envMapper(), ...options?.overrides };
+  return (options?: LoadConfigOptions) => {
+    const raw = { ...envMapper(), ...options?.overrides };
 
-		if (options?.skipValidation) {
-			return raw as z.infer<T>;
-		}
+    if (options?.skipValidation) {
+      return raw as z.infer<T>;
+    }
 
-		return schema.parse(raw);
-	};
+    return schema.parse(raw);
+  };
 }
 
 /**

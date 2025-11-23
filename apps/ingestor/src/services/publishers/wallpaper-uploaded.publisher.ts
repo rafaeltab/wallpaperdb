@@ -29,7 +29,9 @@ import { BaseEventPublisher } from '@wallpaperdb/events/publisher';
  * });
  * ```
  */
-export class WallpaperUploadedPublisher extends BaseEventPublisher<typeof WallpaperUploadedEventSchema> {
+export class WallpaperUploadedPublisher extends BaseEventPublisher<
+  typeof WallpaperUploadedEventSchema
+> {
   protected readonly schema = WallpaperUploadedEventSchema;
   protected readonly subject = WALLPAPER_UPLOADED_SUBJECT;
   protected readonly eventType = 'wallpaper.uploaded';

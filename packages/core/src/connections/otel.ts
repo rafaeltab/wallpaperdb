@@ -25,10 +25,7 @@ export interface OtelOptions {
  * });
  * ```
  */
-export function createOtelSdk(
-  config: OtelConfig,
-  options: OtelOptions = {}
-): NodeSDK {
+export function createOtelSdk(config: OtelConfig, options: OtelOptions = {}): NodeSDK {
   const traceExporter = new OTLPTraceExporter({
     url: `${config.otelEndpoint}/v1/traces`,
   });

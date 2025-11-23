@@ -181,7 +181,9 @@ describe("BaseEventPublisher", () => {
 
       await publisher.publish(event);
 
-      const options = publishedMessages[0].options as { headers?: { get: (key: string) => string } };
+      const options = publishedMessages[0].options as {
+        headers?: { get: (key: string) => string };
+      };
       expect(options).toBeDefined();
       // The mock injects traceparent header
     });

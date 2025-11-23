@@ -106,7 +106,10 @@ describe("BaseEventConsumer", () => {
   let mockNatsConnection: NatsConnection;
   let consumer: TestEventConsumer;
 
-  function createMockMessage(data: unknown, options?: { redelivered?: boolean; redeliveryCount?: number }): JsMsg {
+  function createMockMessage(
+    data: unknown,
+    options?: { redelivered?: boolean; redeliveryCount?: number }
+  ): JsMsg {
     const encodedData = new TextEncoder().encode(JSON.stringify(data));
     return {
       data: encodedData,
@@ -143,11 +146,13 @@ describe("BaseEventConsumer", () => {
   beforeEach(() => {
     const mockConsumer = {
       consume: vi.fn(),
-      info: vi.fn(() => Promise.resolve({
-        name: "test-consumer",
-        stream_name: "test-stream",
-        config: { durable_name: "test-consumer" },
-      } as unknown as ConsumerInfo)),
+      info: vi.fn(() =>
+        Promise.resolve({
+          name: "test-consumer",
+          stream_name: "test-stream",
+          config: { durable_name: "test-consumer" },
+        } as unknown as ConsumerInfo)
+      ),
     } as unknown as Consumer;
 
     const mockConsumers: Consumers = {
@@ -161,9 +166,11 @@ describe("BaseEventConsumer", () => {
 
     const mockJsm: JetStreamManager = {
       streams: {
-        info: vi.fn(() => Promise.resolve({
-          config: { name: "test-stream" },
-        } as unknown as StreamInfo)),
+        info: vi.fn(() =>
+          Promise.resolve({
+            config: { name: "test-stream" },
+          } as unknown as StreamInfo)
+        ),
       },
     } as unknown as JetStreamManager;
 

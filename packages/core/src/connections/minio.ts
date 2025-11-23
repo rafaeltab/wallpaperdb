@@ -22,10 +22,7 @@ export interface S3ClientOptions {
  * });
  * ```
  */
-export function createS3Client(
-  config: MinioConfig,
-  options: S3ClientOptions = {}
-): S3Client {
+export function createS3Client(config: MinioConfig, options: S3ClientOptions = {}): S3Client {
   return new S3Client({
     endpoint: config.s3Endpoint,
     region: config.s3Region,
@@ -40,10 +37,7 @@ export function createS3Client(
 /**
  * Checks if an S3/MinIO client can access the specified bucket.
  */
-export async function checkS3Health(
-  client: S3Client,
-  bucket: string
-): Promise<boolean> {
+export async function checkS3Health(client: S3Client, bucket: string): Promise<boolean> {
   try {
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
     return true;

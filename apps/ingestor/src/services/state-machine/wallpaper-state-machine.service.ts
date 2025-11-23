@@ -1,8 +1,4 @@
-import {
-  Attributes,
-  recordCounter,
-  withSpan,
-} from '@wallpaperdb/core/telemetry';
+import { Attributes, recordCounter, withSpan } from '@wallpaperdb/core/telemetry';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import { inject, injectable } from 'tsyringe';

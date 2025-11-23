@@ -8,4 +8,4 @@ export {
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
-} from "@wallpaperdb/core/errors";
+} from '@wallpaperdb/core/errors';

@@ -1,9 +1,4 @@
-import {
-  Attributes,
-  recordCounter,
-  recordHistogram,
-  withSpan,
-} from '@wallpaperdb/core/telemetry';
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { and, eq, inArray } from 'drizzle-orm';
 import { inject, injectable } from 'tsyringe';
 import { ulid } from 'ulid';
@@ -92,7 +87,12 @@ export class UploadOrchestrator {
           // Step 3: Check for duplicate upload (by content hash)
           const existing = await this.checkDuplicate(userId, fileMetadata.contentHash);
           if (existing) {
-            this.recordUploadMetrics('duplicate', fileMetadata.fileType, fileMetadata.fileSizeBytes, startTime);
+            this.recordUploadMetrics(
+              'duplicate',
+              fileMetadata.fileType,
+              fileMetadata.fileSizeBytes,
+              startTime
+            );
             return this.createIdempotentResponse(existing);
           }
 
@@ -104,7 +104,12 @@ export class UploadOrchestrator {
           try {
             // Step 5-7: Execute upload workflow
             const result = await this.executeUpload(wallpaperId, params, fileMetadata);
-            this.recordUploadMetrics('success', fileMetadata.fileType, fileMetadata.fileSizeBytes, startTime);
+            this.recordUploadMetrics(
+              'success',
+              fileMetadata.fileType,
+              fileMetadata.fileSizeBytes,
+              startTime
+            );
             return result;
           } catch (error) {
             // Mark as failed and rethrow

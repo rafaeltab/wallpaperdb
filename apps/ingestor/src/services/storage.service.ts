@@ -4,12 +4,7 @@ import {
   PutObjectCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
-import {
-  Attributes,
-  recordCounter,
-  recordHistogram,
-  withSpan,
-} from '@wallpaperdb/core/telemetry';
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
 import { MinioConnection } from '../connections/minio.js';
@@ -154,11 +149,7 @@ export class StorageService {
   /**
    * Record storage operation metrics.
    */
-  private recordStorageMetrics(
-    operation: string,
-    success: boolean,
-    startTime: number
-  ): void {
+  private recordStorageMetrics(operation: string, success: boolean, startTime: number): void {
     const durationMs = Date.now() - startTime;
     const attributes = {
       [Attributes.OPERATION_NAME]: operation,

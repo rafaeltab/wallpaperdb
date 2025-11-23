@@ -1,1 +1,4 @@
-export { WallpaperUploadedPublisher, type WallpaperUploadedEvent } from './wallpaper-uploaded.publisher.js';
+export {
+  WallpaperUploadedPublisher,
+  type WallpaperUploadedEvent,
+} from './wallpaper-uploaded.publisher.js';

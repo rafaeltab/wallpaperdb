@@ -18,11 +18,7 @@ export function getMeter(name = DEFAULT_METER_NAME, version = DEFAULT_METER_VERS
  * recordCounter('upload.requests', 1, { [Attributes.USER_ID]: userId });
  * ```
  */
-export function recordCounter(
-  name: string,
-  value: number,
-  attributes?: Attributes
-): void {
+export function recordCounter(name: string, value: number, attributes?: Attributes): void {
   const meter = getMeter();
   const counter = meter.createCounter(name);
   counter.add(value, attributes);
@@ -36,11 +32,7 @@ export function recordCounter(
  * recordHistogram('upload.duration_ms', durationMs, { [Attributes.FILE_TYPE]: 'image' });
  * ```
  */
-export function recordHistogram(
-  name: string,
-  value: number,
-  attributes?: Attributes
-): void {
+export function recordHistogram(name: string, value: number, attributes?: Attributes): void {
   const meter = getMeter();
   const histogram = meter.createHistogram(name);
   histogram.record(value, attributes);

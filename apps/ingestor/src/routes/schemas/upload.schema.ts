@@ -75,7 +75,8 @@ export const uploadBodySchemaForDocs = {
     file: {
       type: 'string',
       format: 'binary',
-      description: 'The wallpaper file to upload. Must be a valid image (JPEG, PNG, WebP) or video (MP4, WebM).',
+      description:
+        'The wallpaper file to upload. Must be a valid image (JPEG, PNG, WebP) or video (MP4, WebM).',
     },
     userId: {
       type: 'string',

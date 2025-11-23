@@ -1,10 +1,15 @@
+import {
+  Attributes,
+  recordCounter,
+  withSpan,
+} from '@wallpaperdb/core/telemetry';
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
 import { inject, injectable } from 'tsyringe';
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { DatabaseConnection } from '../../connections/database.js';
 import type * as schema from '../../db/schema.js';
 import { wallpapers } from '../../db/schema.js';
 import type { TimeService } from '../core/time.service.js';
-import { DatabaseConnection } from '../../connections/database.js';
 
 type DbType = NodePgDatabase<typeof schema>;
 type UploadState = 'initiated' | 'uploading' | 'stored' | 'processing' | 'completed' | 'failed';
@@ -55,33 +60,56 @@ export class WallpaperStateMachine {
     newState: UploadState,
     metadata?: WallpaperUpdate
   ): Promise<void> {
-    // Get current state for validation
-    const current = await this.db.query.wallpapers.findFirst({
-      where: eq(wallpapers.id, wallpaperId),
-      columns: { uploadState: true },
-    });
+    return await withSpan(
+      `state_machine.transition_to_${newState}`,
+      {
+        [Attributes.WALLPAPER_ID]: wallpaperId,
+        [Attributes.WALLPAPER_STATE]: newState,
+      },
+      async (span) => {
+        // Get current state for validation
+        const current = await this.db.query.wallpapers.findFirst({
+          where: eq(wallpapers.id, wallpaperId),
+          columns: { uploadState: true },
+        });
 
-    if (!current) {
-      throw new Error(`Wallpaper ${wallpaperId} not found`);
-    }
+        if (!current) {
+          throw new Error(`Wallpaper ${wallpaperId} not found`);
+        }
 
-    // Validate transition
-    const currentState = current.uploadState as UploadState;
-    if (!this.canTransition(currentState, newState)) {
-      throw new Error(
-        `Invalid state transition from '${currentState}' to '${newState}' for wallpaper ${wallpaperId}`
-      );
-    }
+        // Validate transition
+        const currentState = current.uploadState as UploadState;
+        span.setAttribute('from_state', currentState);
 
-    // Perform the update
-    await this.db
-      .update(wallpapers)
-      .set({
-        uploadState: newState,
-        stateChangedAt: this.timeService.now(),
-        ...metadata,
-      })
-      .where(eq(wallpapers.id, wallpaperId));
+        if (!this.canTransition(currentState, newState)) {
+          recordCounter('upload.state_transitions.total', 1, {
+            from_state: currentState,
+            to_state: newState,
+            success: false,
+          });
+          throw new Error(
+            `Invalid state transition from '${currentState}' to '${newState}' for wallpaper ${wallpaperId}`
+          );
+        }
+
+        // Perform the update
+        await this.db
+          .update(wallpapers)
+          .set({
+            uploadState: newState,
+            stateChangedAt: this.timeService.now(),
+            ...metadata,
+          })
+          .where(eq(wallpapers.id, wallpaperId));
+
+        // Record successful transition metric
+        recordCounter('upload.state_transitions.total', 1, {
+          from_state: currentState,
+          to_state: newState,
+          success: true,
+        });
+      }
+    );
   }
 
   /**

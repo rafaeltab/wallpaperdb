@@ -1,0 +1,21 @@
+meta {
+  name: Readiness Check
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/ready
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the service is ready to accept requests.
+
+  Returns 200 if ready, 503 if not ready.
+
+  Checks:
+  - initialized: connections are established
+  - shuttingDown: service is not shutting down
+}

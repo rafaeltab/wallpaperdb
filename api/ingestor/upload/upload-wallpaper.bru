@@ -1,0 +1,58 @@
+meta {
+  name: Upload Wallpaper
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/upload
+  body: multipartForm
+  auth: none
+}
+
+body:multipart-form {
+  userId: {{userId}}
+  file: @file()
+}
+
+docs {
+  Upload a wallpaper image or video file.
+
+  ## Request
+  - Content-Type: multipart/form-data
+  - Fields:
+    - file (required): Binary file data (select via file picker)
+    - userId (required): User identifier
+
+  ## Supported Formats
+  - Images: JPEG, PNG, WebP (max 50 MB)
+  - Videos: WebM, MP4 (max 200 MB)
+
+  ## Image Dimension Limits
+  - Minimum: 320x240
+  - Maximum: 16384x16384
+
+  ## Response (200 OK)
+  ```json
+  {
+    "id": "wlpr_01ARZ3NDEKTSV4RRFFQ69G5FAV",
+    "status": "processing",
+    "uploadedAt": "2024-11-23T10:30:45.123Z",
+    "fileType": "image",
+    "mimeType": "image/jpeg",
+    "width": 1920,
+    "height": 1080,
+    "fileSizeBytes": 245678
+  }
+  ```
+
+  ## Rate Limiting
+  - Default: 100 uploads per hour per user
+  - Headers: X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset
+
+  ## Error Responses (RFC 7807)
+  - 400: Missing userId, missing file, invalid format, dimensions out of bounds
+  - 413: File too large
+  - 429: Rate limit exceeded
+  - 500: Storage/database/event publishing errors
+}

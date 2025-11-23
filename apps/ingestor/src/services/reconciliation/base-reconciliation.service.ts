@@ -1,3 +1,9 @@
+import {
+  Attributes,
+  recordCounter,
+  recordHistogram,
+  withSpan,
+} from '@wallpaperdb/core/telemetry';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '../../db/schema.js';
 
@@ -54,10 +60,36 @@ export abstract class BaseReconciliation<TRecord> {
    * @param database - Database connection
    */
   async reconcile(): Promise<void> {
-    while (true) {
-      const processed = await this.processNextBatch();
-      if (!processed) break;
-    }
+    const operationName = this.getOperationName();
+
+    return await withSpan(
+      `reconciliation.${operationName}.cycle`,
+      { [Attributes.RECONCILIATION_TYPE]: operationName },
+      async (span) => {
+        const startTime = Date.now();
+        let recordsProcessed = 0;
+
+        while (true) {
+          const processed = await this.processNextBatch();
+          if (!processed) break;
+          recordsProcessed++;
+        }
+
+        const durationMs = Date.now() - startTime;
+
+        span.setAttribute(Attributes.RECONCILIATION_RECORDS_PROCESSED, recordsProcessed);
+
+        recordCounter('reconciliation.cycles.total', 1, {
+          [Attributes.RECONCILIATION_TYPE]: operationName,
+        });
+        recordCounter('reconciliation.records_processed.total', recordsProcessed, {
+          [Attributes.RECONCILIATION_TYPE]: operationName,
+        });
+        recordHistogram('reconciliation.cycle_duration_ms', durationMs, {
+          [Attributes.RECONCILIATION_TYPE]: operationName,
+        });
+      }
+    );
   }
 
   /**
@@ -98,6 +130,14 @@ export abstract class BaseReconciliation<TRecord> {
    * @param error - The error that occurred
    */
   protected handleError(error: unknown): void {
-    console.error(`Error in ${this.getOperationName()}:`, error);
+    const operationName = this.getOperationName();
+    const errorType = error instanceof Error ? error.constructor.name : 'UnknownError';
+
+    recordCounter('reconciliation.errors.total', 1, {
+      [Attributes.RECONCILIATION_TYPE]: operationName,
+      [Attributes.ERROR_TYPE]: errorType,
+    });
+
+    console.error(`Error in ${operationName}:`, error);
   }
 }

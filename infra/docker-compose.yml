@@ -122,6 +122,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # pgAdmin - Database Administration
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: wallpaperdb-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./postgres/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # Redis - Distributed Rate Limiting
   redis:
     image: redis:7-alpine
@@ -152,6 +170,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
       - lgtm-data:/data
+      - ./grafana/dashboards:/otel-lgtm/custom-dashboards
+      - ./grafana/provisioning/dashboards/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/wallpaperdb.yaml
+      - ./grafana/provisioning/alerting:/otel-lgtm/grafana/conf/provisioning/alerting
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
       interval: 10s
@@ -165,6 +186,7 @@ volumes:
   nats-data:
   lgtm-data:
   redis-data:
+  pgadmin-data:
 
 networks:
   default:

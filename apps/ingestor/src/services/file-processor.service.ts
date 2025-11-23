@@ -1,13 +1,19 @@
 import crypto from 'node:crypto';
-import sharp from 'sharp';
-import { fileTypeFromBuffer } from 'file-type';
-import { injectable } from 'tsyringe';
-import type { ValidationLimits } from './validation-limits.service.js';
 import {
-  InvalidFileFormatError,
-  FileTooLargeError,
+  Attributes,
+  recordHistogram,
+  withSpan,
+  withSpanSync,
+} from '@wallpaperdb/core/telemetry';
+import { fileTypeFromBuffer } from 'file-type';
+import sharp from 'sharp';
+import { injectable } from 'tsyringe';
+import {
   DimensionsOutOfBoundsError,
+  FileTooLargeError,
+  InvalidFileFormatError,
 } from '../errors/problem-details.js';
+import type { ValidationLimits } from './validation-limits.service.js';
 
 export interface FileMetadata {
   mimeType: string;
@@ -36,37 +42,83 @@ export class FileProcessorService {
    * Calculate SHA256 hash of buffer content
    */
   calculateContentHash(buffer: Buffer): string {
-    const hash = crypto.createHash('sha256');
-    hash.update(buffer);
-    return hash.digest('hex');
+    return withSpanSync(
+      'file_processor.calculate_hash',
+      { [Attributes.FILE_SIZE_BYTES]: buffer.length },
+      (span) => {
+        const startTime = Date.now();
+        const hash = crypto.createHash('sha256');
+        hash.update(buffer);
+        const result = hash.digest('hex');
+        const durationMs = Date.now() - startTime;
+
+        span.setAttribute(Attributes.FILE_HASH, result);
+        recordHistogram('file_processor.hash_duration_ms', durationMs, {
+          [Attributes.FILE_SIZE_BYTES]: buffer.length,
+        });
+
+        return result;
+      }
+    );
   }
 
   /**
    * Detect MIME type from file content (not from extension/filename)
    */
   async detectMimeType(buffer: Buffer): Promise<{ mime: string; ext: string } | null> {
-    const result = await fileTypeFromBuffer(buffer);
-    return result ? { mime: result.mime, ext: result.ext } : null;
+    return await withSpan(
+      'file_processor.detect_mime_type',
+      { [Attributes.FILE_SIZE_BYTES]: buffer.length },
+      async (span) => {
+        const result = await fileTypeFromBuffer(buffer);
+        if (result) {
+          span.setAttribute(Attributes.FILE_MIME_TYPE, result.mime);
+          span.setAttribute('detected', true);
+        } else {
+          span.setAttribute('detected', false);
+        }
+        return result ? { mime: result.mime, ext: result.ext } : null;
+      }
+    );
   }
 
   /**
    * Extract image metadata using Sharp
    */
   private async extractImageMetadata(buffer: Buffer): Promise<{ width: number; height: number }> {
-    const metadata = await sharp(buffer, {
-      limitInputPixels: 268402689, // 16384 x 16384, prevents decompression bombs
-      sequentialRead: true, // Memory efficient for large files
-      failOnError: false, // Don't crash on corrupt images
-    }).metadata();
+    return await withSpan(
+      'file_processor.extract_metadata',
+      { [Attributes.FILE_SIZE_BYTES]: buffer.length },
+      async (span) => {
+        const startTime = Date.now();
 
-    if (!metadata.width || !metadata.height) {
-      throw new Error('Could not extract image dimensions');
-    }
+        const metadata = await sharp(buffer, {
+          limitInputPixels: 268402689, // 16384 x 16384, prevents decompression bombs
+          sequentialRead: true, // Memory efficient for large files
+          failOnError: false, // Don't crash on corrupt images
+        }).metadata();
 
-    return {
-      width: metadata.width,
-      height: metadata.height,
-    };
+        const durationMs = Date.now() - startTime;
+        recordHistogram('file_processor.metadata_extraction_duration_ms', durationMs, {
+          [Attributes.FILE_SIZE_BYTES]: buffer.length,
+        });
+
+        if (!metadata.width || !metadata.height) {
+          throw new Error('Could not extract image dimensions');
+        }
+
+        span.setAttribute(Attributes.FILE_WIDTH, metadata.width);
+        span.setAttribute(Attributes.FILE_HEIGHT, metadata.height);
+        if (metadata.format) {
+          span.setAttribute('image_format', metadata.format);
+        }
+
+        return {
+          width: metadata.width,
+          height: metadata.height,
+        };
+      }
+    );
   }
 
   /**
@@ -124,80 +176,101 @@ export class FileProcessorService {
     limits: ValidationLimits,
     providedMimeType?: string
   ): Promise<FileMetadata> {
-    // Calculate content hash for idempotency
-    const contentHash = this.calculateContentHash(buffer);
+    return await withSpan(
+      'file_processor.process',
+      { [Attributes.FILE_SIZE_BYTES]: buffer.length },
+      async (span) => {
+        const startTime = Date.now();
 
-    // Get file size
-    const fileSizeBytes = buffer.length;
+        // Calculate content hash for idempotency
+        const contentHash = this.calculateContentHash(buffer);
 
-    // Detect actual MIME type from content (not from filename)
-    const fileType = await this.detectMimeType(buffer);
+        // Get file size
+        const fileSizeBytes = buffer.length;
 
-    let mimeType: string;
-    let extension: string;
-    let fileCategory: 'image' | 'video';
+        // Detect actual MIME type from content (not from filename)
+        const fileType = await this.detectMimeType(buffer);
 
-    if (!fileType) {
-      // If file-type can't detect it, use provided MIME type if available
-      if (providedMimeType) {
-        mimeType = providedMimeType;
-        // Extract extension from mime type (e.g., 'text/plain' -> 'txt')
-        extension = mimeType.split('/')[1] || 'bin';
-      } else {
-        mimeType = 'unknown';
-        extension = 'bin';
+        let mimeType: string;
+        let extension: string;
+        let fileCategory: 'image' | 'video';
+
+        if (!fileType) {
+          // If file-type can't detect it, use provided MIME type if available
+          if (providedMimeType) {
+            mimeType = providedMimeType;
+            // Extract extension from mime type (e.g., 'text/plain' -> 'txt')
+            extension = mimeType.split('/')[1] || 'bin';
+          } else {
+            mimeType = 'unknown';
+            extension = 'bin';
+          }
+
+          // Determine file category from provided MIME type for proper size validation
+          fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
+
+          // Check file size BEFORE throwing format error
+          // This ensures large invalid files get 413 instead of 400
+          const maxSize = fileCategory === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
+          if (fileSizeBytes > maxSize) {
+            throw new FileTooLargeError(fileSizeBytes, maxSize, fileCategory);
+          }
+
+          // Now throw format error (file is within size limit but invalid format)
+          throw new InvalidFileFormatError(mimeType);
+        }
+
+        mimeType = fileType.mime;
+        extension = fileType.ext;
+
+        // Validate file format against allowed formats
+        this.validateFileFormat(mimeType, limits);
+
+        // Determine if it's image or video
+        fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
+
+        // Validate file size (precise check based on actual file type)
+        this.validateFileSize(fileSizeBytes, fileCategory, limits);
+
+        // Extract metadata based on file type
+        let width: number;
+        let height: number;
+
+        if (fileCategory === 'image') {
+          const dimensions = await this.extractImageMetadata(buffer);
+          width = dimensions.width;
+          height = dimensions.height;
+        } else {
+          // For now, skip video support
+          throw new InvalidFileFormatError(mimeType);
+        }
+
+        // Validate dimensions
+        this.validateDimensions(width, height, limits);
+
+        // Record total processing time
+        const durationMs = Date.now() - startTime;
+        recordHistogram('file_processor.total_duration_ms', durationMs, {
+          [Attributes.FILE_TYPE]: fileCategory,
+        });
+
+        // Add result attributes to span
+        span.setAttribute(Attributes.FILE_TYPE, fileCategory);
+        span.setAttribute(Attributes.FILE_MIME_TYPE, mimeType);
+        span.setAttribute(Attributes.FILE_WIDTH, width);
+        span.setAttribute(Attributes.FILE_HEIGHT, height);
+        span.setAttribute(Attributes.FILE_HASH, contentHash);
+
+        return {
+          mimeType,
+          fileType: fileCategory,
+          width,
+          height,
+          fileSizeBytes,
+          contentHash,
+          extension,
+        };
       }
-
-      // Determine file category from provided MIME type for proper size validation
-      fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
-
-      // Check file size BEFORE throwing format error
-      // This ensures large invalid files get 413 instead of 400
-      const maxSize = fileCategory === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
-      if (fileSizeBytes > maxSize) {
-        throw new FileTooLargeError(fileSizeBytes, maxSize, fileCategory);
-      }
-
-      // Now throw format error (file is within size limit but invalid format)
-      throw new InvalidFileFormatError(mimeType);
-    }
-
-    mimeType = fileType.mime;
-    extension = fileType.ext;
-
-    // Validate file format against allowed formats
-    this.validateFileFormat(mimeType, limits);
-
-    // Determine if it's image or video
-    fileCategory = mimeType.startsWith('image/') ? 'image' : 'video';
-
-    // Validate file size (precise check based on actual file type)
-    this.validateFileSize(fileSizeBytes, fileCategory, limits);
-
-    // Extract metadata based on file type
-    let width: number;
-    let height: number;
-
-    if (fileCategory === 'image') {
-      const dimensions = await this.extractImageMetadata(buffer);
-      width = dimensions.width;
-      height = dimensions.height;
-    } else {
-      // For now, skip video support
-      throw new InvalidFileFormatError(mimeType);
-    }
-
-    // Validate dimensions
-    this.validateDimensions(width, height, limits);
-
-    return {
-      mimeType,
-      fileType: fileCategory,
-      width,
-      height,
-      fileSizeBytes,
-      contentHash,
-      extension,
-    };
+    );
   }
 }

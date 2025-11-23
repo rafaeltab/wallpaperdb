@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "WallpaperDB",
+      "Group": "Local",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "wallpaperdb",
+      "Username": "wallpaperdb",
+      "SSLMode": "prefer"
+    }
+  }
+}

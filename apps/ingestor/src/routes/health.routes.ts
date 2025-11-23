@@ -2,10 +2,6 @@ import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import fp from 'fastify-plugin';
 import { container } from 'tsyringe';
 import { getHealthStatusCode, getReadyStatusCode } from '@wallpaperdb/core/health';
-import {
-  HealthResponseJsonSchema,
-  ReadyResponseJsonSchema,
-} from '@wallpaperdb/core/openapi';
 import type { Config } from '../config.js';
 import { HealthService } from '../services/health.service.js';
 
@@ -22,11 +18,17 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         summary: 'Health check',
-        description: 'Returns health status of the service and its dependencies',
+        description: 'Returns health status of the service and its dependencies. Checks database, object storage, message queue, and cache connectivity.',
         tags: ['Health'],
         response: {
-          200: HealthResponseJsonSchema,
-          503: HealthResponseJsonSchema,
+          200: {
+            description: 'Service is healthy',
+            $ref: 'HealthResponse#',
+          },
+          503: {
+            description: 'Service is unhealthy or degraded',
+            $ref: 'HealthResponse#',
+          },
         },
       },
     },
@@ -44,11 +46,17 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
     {
       schema: {
         summary: 'Readiness check',
-        description: 'Returns 200 if service is ready to handle requests, 503 otherwise',
+        description: 'Returns 200 if service is ready to handle requests, 503 otherwise. Use for Kubernetes readiness probes.',
         tags: ['Health'],
         response: {
-          200: ReadyResponseJsonSchema,
-          503: ReadyResponseJsonSchema,
+          200: {
+            description: 'Service is ready to accept traffic',
+            $ref: 'ReadyResponse#',
+          },
+          503: {
+            description: 'Service is not ready (shutting down or connections not initialized)',
+            $ref: 'ReadyResponse#',
+          },
         },
       },
     },

@@ -1,8 +1,8 @@
 # Multi-Service Architecture Plan
 
-**Status:** Planning
+**Status:** In Progress (Phase 0 & 1 Complete)
 **Decision Date:** 2025-01-20
-**Implementation Start:** TBD
+**Last Updated:** 2025-11-23
 
 ---
 
@@ -249,78 +249,86 @@ apps/<service-name>/
 
 ## Implementation Roadmap
 
-### Phase 0: Foundation (2 weeks)
+### Phase 0: Foundation (2 weeks) ✅ COMPLETE
 
 **Goal:** Establish shared packages and patterns
 
-**Tasks:**
-1. Extract `@wallpaperdb/core` package
-   - BaseConnection and connection managers
-   - RFC 7807 errors
-   - OTEL telemetry module
-   - Config patterns
-   - Health utilities
+**Status:** ✅ Complete (as of 2025-11-23)
 
-2. Extract `@wallpaperdb/events` package
+**Completed Tasks:**
+1. ✅ Extract `@wallpaperdb/core` package
+   - Config schemas (Database, S3, NATS, Redis, OTEL, Server)
+   - Health aggregator and formatters
+   - Telemetry module (withSpan, recordCounter, recordHistogram)
+   - Attribute constants
+
+2. ✅ Extract `@wallpaperdb/events` package
    - Event schemas (Zod)
    - BaseEventConsumer
-   - BaseEventPublisher
+   - BaseEventPublisher with trace context propagation
 
-3. Migrate ingestor incrementally
-   - Use shared packages
-   - Validate all tests pass
+3. ✅ Migrate ingestor to shared packages
+   - Uses @wallpaperdb/core for config and telemetry
+   - Uses @wallpaperdb/events for event publishing
+   - All tests passing
 
-4. Create service template generator
-   - `scripts/create-service.sh`
-   - Template files
+4. ⏳ Service template generator (deferred to Phase 3)
+   - Will create when building Service #2
 
-5. Documentation
-   - Architecture docs
-   - Migration guides
-   - ADRs
+5. ✅ Documentation
+   - Testing documentation complete
+   - Architecture patterns documented
 
-**Deliverable:** Shared packages ready, ingestor using them, template exists
-
-**See:** [Shared Packages Migration Plan](./shared-packages-migration.md)
+**Deliverable:** ✅ Shared packages ready, ingestor using them
 
 ---
 
-### Phase 1: Observability (2 weeks)
+### Phase 1: Observability (2 weeks) 🔶 ~80% COMPLETE
 
 **Goal:** Production-grade telemetry and monitoring
 
-**Tasks:**
-1. Create telemetry module in `@wallpaperdb/core`
-   - Static helpers (withSpan, recordMetric)
-   - Pre-defined metrics
-   - Attribute constants
+**Status:** ~80% Complete - minor gaps remaining
 
-2. Instrument ingestor
-   - Upload workflow (spans + metrics)
-   - Storage operations (S3 not auto-instrumented)
-   - Events service (NATS + trace propagation)
-   - File processor
-   - State machine
+**Completed Tasks:**
+1. ✅ Telemetry module in `@wallpaperdb/core`
+   - `withSpan()`, `withSpanSync()` helpers
+   - `recordCounter()`, `recordHistogram()` helpers
+   - Comprehensive attribute constants
 
-3. Create Grafana dashboards
-   - Upload Overview
-   - Infrastructure Health
-   - Service template (reusable)
+2. ✅ Instrument ingestor (mostly complete)
+   - ✅ Upload orchestrator (spans + metrics)
+   - ✅ Storage operations (S3 instrumented)
+   - ✅ File processor (hash calculation spans)
+   - ✅ Events service (NATS + trace propagation in BaseEventPublisher)
+   - ✅ State machine instrumentation
+   - ✅ Reconciliation instrumentation
 
-4. Setup alerts
-   - Failure rates
-   - Latency thresholds
-   - Infrastructure health
+3. 🔶 Grafana dashboards (partial)
+   - ✅ Upload Overview dashboard
+   - ❌ Infrastructure Health dashboard (missing)
+   - ❌ Service template dashboard (defer to Phase 3)
 
-**Deliverable:** Full observability for ingestor, reusable patterns
+4. ✅ Alerts configured
+   - ✅ High Upload Failure Rate (>5%)
+   - ✅ Slow Upload Response Time (p95 >10s)
+   - ✅ Storage Operation Failures
+   - ✅ Reconciliation Errors
 
-**See:** [Observability Implementation Plan](./observability-implementation.md)
+**Remaining Work:**
+- [ ] Create Infrastructure Health dashboard (MinIO, NATS, DB, Redis metrics)
+- [ ] Observability documentation for new services
+
+**Deliverable:** 80% complete - core observability working
+
+**See:** [Observability Implementation Plan (done)](./done/observability-implementation.md)
 
 ---
 
-### Phase 2: Architecture Refinement (1 week)
+### Phase 2: Architecture Refinement (1 week) 📋 NOT STARTED
 
 **Goal:** Clean up ingestor architecture
+
+**Status:** Not started - can be done in parallel with Phase 3 or deferred
 
 **Tasks:**
 1. Repository pattern
@@ -339,23 +347,29 @@ apps/<service-name>/
    - UploadController
    - HealthController
 
+**Note:** This is optional polish. Ingestor works well as-is. Consider doing this when revisiting ingestor or as patterns are needed for Service #2.
+
 **Deliverable:** Clean, maintainable ingestor architecture
 
-**See:** [Architecture Refinement Plan](./architecture-refinement.md)
+**See:** [Architecture Refinement Plan](./architecture-refinement.md) (if exists)
 
 ---
 
-### Phase 3: Service #2 Proof of Concept (1 week)
+### Phase 3: Service #2 Proof of Concept (1 week) 📋 READY TO START
 
 **Goal:** Validate multi-service patterns work
 
+**Status:** Ready to start - all prerequisites complete
+
 **Service Choice:** TBD (Thumbnail Extractor OR Media Service)
+- **Media Service**: Image retrieval and resizing - higher user value
+- **Thumbnail Extractor**: Video thumbnails - simpler scope, good proving ground
 
 **Tasks:**
-1. Generate service skeleton
+1. Generate service skeleton (or create manually as template)
 2. Implement business logic
-3. Add observability
-4. Integration tests
+3. Add observability using @wallpaperdb/core/telemetry
+4. Integration tests using TesterBuilder pattern
 5. Deploy alongside ingestor
 
 **Success Criteria:**
@@ -366,6 +380,12 @@ apps/<service-name>/
 - Patterns are clear and documented
 
 **Deliverable:** Working service #2, validated patterns
+
+**Prerequisites (all met):**
+- ✅ @wallpaperdb/core with config and telemetry
+- ✅ @wallpaperdb/events with BaseEventConsumer
+- ✅ TesterBuilder pattern for tests
+- ✅ NATS JetStream for event consumption
 
 ---
 
@@ -579,12 +599,24 @@ Consider migrating to NestJS if:
 
 | Phase | Duration | Status |
 |-------|----------|--------|
-| Phase 0: Foundation | 2 weeks | 📋 Planned |
-| Phase 1: Observability | 2 weeks | 📋 Planned |
-| Phase 2: Architecture | 1 week | 📋 Planned |
-| Phase 3: Service #2 | 1 week | 📋 Planned |
-| **Total to Service #2** | **6 weeks** | 📋 Planned |
+| Phase 0: Foundation | 2 weeks | ✅ Complete |
+| Phase 1: Observability | 2 weeks | 🔶 ~80% Complete |
+| Phase 2: Architecture | 1 week | 📋 Not Started (optional) |
+| Phase 3: Service #2 | 1 week | 📋 **READY TO START** |
 | Phase 4+: Services 3-7 | ~1 week each | 📋 Future |
 
-**Next Action:** Begin Phase 0 - Extract shared packages
-**See:** [Shared Packages Migration Plan](./shared-packages-migration.md)
+---
+
+## Next Action
+
+**👉 Phase 3: Build Service #2**
+
+The foundation is ready. Choose either:
+1. **Media Service** - Wallpaper retrieval and resizing (higher user value)
+2. **Thumbnail Extractor** - Video thumbnail generation (simpler scope)
+
+See: [services.md](./services.md) for service details
+
+**Optional parallel work:**
+- Complete Phase 1: Create Infrastructure Health dashboard
+- Start Phase 2: Architecture refinement (if patterns needed for Service #2)

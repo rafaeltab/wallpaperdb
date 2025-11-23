@@ -1,8 +1,23 @@
 # Phase 3: Fixtures and Helpers Integration
 
-> **Status**: Planning
-> **Dependencies**: Phase 1 (Core Builder), Phase 2 (Workspace Builders)
-> **Related Docs**: [Test Infrastructure Refactoring Plan](./test-infrastructure-refactoring.md)
+> **Status**: Low Priority / Partial
+> **Dependencies**: Phase 1 (Core Builder) ✅, Phase 2 (Workspace Builders) ✅
+> **Related Docs**: [Test Infrastructure Refactoring Plan (done)](./done/test-infrastructure-refactoring.md)
+> **Last Updated**: 2025-11-23
+
+## Current State
+
+The TesterBuilder pattern is fully implemented. Basic fixtures and helpers exist but are not fully integrated into the builder pattern:
+
+- ✅ **Implemented**: `tester.minio.uploadObject()` helper in MinioTesterBuilder
+- ⏳ **Not Migrated**: `createTestImage()` helper (still in `apps/ingestor/test/fixtures.ts`)
+- ⏳ **Not Migrated**: Other test utilities
+
+**This is low priority** - the current setup works well. Consider migrating helpers when:
+1. Building Service #2 and needing shared test fixtures
+2. Test setup becomes repetitive across services
+
+---
 
 ## Overview
 

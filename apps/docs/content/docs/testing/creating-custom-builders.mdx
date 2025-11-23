@@ -1,0 +1,274 @@
+---
+title: Creating Custom Builders
+description: Build application-specific test helpers using the TesterBuilder pattern with step-by-step tutorials and real examples.
+---
+
+Custom builders encapsulate application-specific test setup, making tests cleaner and more maintainable.
+
+## Why Create Custom Builders
+
+Custom builders help you:
+
+- **Encapsulate setup logic** - Keep test files clean
+- **Reuse across tests** - Write once, use everywhere
+- **Maintain type safety** - Catch errors at compile time
+- **Express dependencies** - Declare what infrastructure you need
+- **Follow DRY principle** - Don't repeat setup code
+
+### When to Create a Custom Builder
+
+Create a custom builder when you have:
+
+- Database migrations or schema setup
+- Application lifecycle management
+- Test data fixtures
+- Custom container configurations
+- Multi-step setup procedures
+
+## Step-by-Step Tutorial
+
+### Step 1: Extend BaseTesterBuilder
+
+```typescript
+import { BaseTesterBuilder, type AddMethodsType } from "@wallpaperdb/test-utils";
+
+export class MyCustomTesterBuilder extends BaseTesterBuilder<
+  "MyCustom",              // Unique name
+  [/* Dependencies */]     // Array of required builders
+> {
+  readonly name = "MyCustom" as const;
+
+  constructor() {
+    super();
+  }
+}
+```
+
+### Step 2: Declare Dependencies
+
+```typescript
+export class MyCustomTesterBuilder extends BaseTesterBuilder<
+  "MyCustom",
+  [PostgresTesterBuilder, MinioTesterBuilder]  // Requires both
+> {
+  readonly name = "MyCustom" as const;
+}
+```
+
+### Step 3: Implement addMethods
+
+```typescript
+addMethods<
+  TBase extends AddMethodsType<[PostgresTesterBuilder, MinioTesterBuilder]>
+>(Base: TBase) {
+  return class extends Base {
+    override async setup(): Promise<void> {
+      await super.setup();  // IMPORTANT: Call parent setup first
+      console.log("Running custom setup...");
+    }
+
+    override async destroy(): Promise<void> {
+      console.log("Running custom cleanup...");
+      await super.destroy();  // IMPORTANT: Call parent destroy last
+    }
+  };
+}
+```
+
+### Step 4: Add Accessor Methods
+
+```typescript
+addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+  return class extends Base {
+    private myResource: SomeResource | null = null;
+
+    override async setup(): Promise<void> {
+      await super.setup();
+      this.myResource = await createResource();
+    }
+
+    override async destroy(): Promise<void> {
+      if (this.myResource) {
+        await this.myResource.close();
+        this.myResource = null;
+      }
+      await super.destroy();
+    }
+
+    getMyResource(): SomeResource {
+      if (!this.myResource) {
+        throw new Error("Resource not initialized. Call setup() first.");
+      }
+      return this.myResource;
+    }
+  };
+}
+```
+
+## Real Example: Database Migrations
+
+```typescript
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
+import createPostgresClient from "postgres";
+import {
+  BaseTesterBuilder,
+  type PostgresTesterBuilder,
+  type AddMethodsType,
+} from "@wallpaperdb/test-utils";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
+  "IngestorMigrations",
+  [PostgresTesterBuilder]
+> {
+  readonly name = "IngestorMigrations" as const;
+
+  addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+    const migrationPath = join(__dirname, "../../drizzle/0000_left_starjammers.sql");
+
+    return class extends Base {
+      override async setup(): Promise<void> {
+        await super.setup();
+
+        const postgres = this.getPostgres();
+        const sql = createPostgresClient(postgres.connectionString, { max: 1 });
+
+        try {
+          const migrationSql = readFileSync(migrationPath, "utf-8");
+          await sql.unsafe(migrationSql);
+          console.log("Database migrations applied successfully");
+        } finally {
+          await sql.end();
+        }
+      }
+    };
+  }
+}
+```
+
+## Real Example: In-Process Application
+
+```typescript
+import type { FastifyInstance } from "fastify";
+import {
+  BaseTesterBuilder,
+  type PostgresTesterBuilder,
+  type MinioTesterBuilder,
+  type NatsTesterBuilder,
+  type AddMethodsType,
+} from "@wallpaperdb/test-utils";
+import { createApp } from "../../src/app.js";
+
+export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
+  "InProcessIngestor",
+  [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+> {
+  readonly name = "InProcessIngestor" as const;
+
+  addMethods<
+    TBase extends AddMethodsType<
+      [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+    >,
+  >(Base: TBase) {
+    return class extends Base {
+      private app: FastifyInstance | null = null;
+
+      override async setup(): Promise<void> {
+        await super.setup();
+
+        const postgres = this.getPostgres();
+        const minio = this.getMinio();
+        const nats = this.getNats();
+
+        // Set environment variables
+        process.env.DATABASE_URL = postgres.connectionString;
+        process.env.S3_ENDPOINT = minio.endpoint;
+        process.env.NATS_URL = nats.endpoint;
+
+        // Create app
+        const { loadConfig } = await import("../../src/config.js");
+        const config = loadConfig();
+        this.app = await createApp(config, { logger: false });
+      }
+
+      override async destroy(): Promise<void> {
+        if (this.app) {
+          await this.app.close();
+          this.app = null;
+        }
+        await super.destroy();
+      }
+
+      getApp(): FastifyInstance {
+        if (!this.app) {
+          throw new Error("App not initialized. Did you call setup() first?");
+        }
+        return this.app;
+      }
+    };
+  }
+}
+```
+
+## Pattern: Subclassing for Configuration Variants
+
+When you need different configurations of the same builder:
+
+```typescript
+class RateLimitIngestorTesterBuilder extends InProcessIngestorTesterBuilder {
+  constructor() {
+    super({
+      configOverrides: {
+        rateLimitMax: 15,
+        rateLimitWindowMs: 5000,
+      },
+      logger: false,
+    });
+  }
+}
+
+// Use in test
+const TesterClass = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(PostgresTesterBuilder)
+  .with(MinioTesterBuilder)
+  .with(NatsTesterBuilder)
+  .with(RedisTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
+  .with(RateLimitIngestorTesterBuilder)  // Custom subclass
+  .build();
+```
+
+## Type Safety Patterns
+
+### Capture Options in Closure
+
+```typescript
+addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+  const options = this.options;  // Capture options
+
+  return class extends Base {
+    override async setup(): Promise<void> {
+      await super.setup();
+      console.log(options.someValue);  // Works
+    }
+  };
+}
+```
+
+### Access Parent Builder Methods
+
+```typescript
+override async setup(): Promise<void> {
+  await super.setup();
+
+  const postgres = this.getPostgres();
+  const minio = this.getMinio();
+  const nats = this.getNats();
+
+  console.log(postgres.connectionString);
+}
+```

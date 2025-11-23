@@ -1,0 +1,303 @@
+---
+title: API Reference
+description: Complete API documentation for the TesterBuilder pattern and all available builders.
+---
+
+Complete reference for the TesterBuilder pattern and all available builders.
+
+## Core API
+
+### createDefaultTesterBuilder()
+
+**Recommended:** Factory function to create a new tester builder with common defaults included.
+
+```typescript
+function createDefaultTesterBuilder(): TesterBuilder<[DockerTesterBuilder]>
+```
+
+**Returns:** `TesterBuilder` with `DockerTesterBuilder` already included
+
+```typescript
+const builder = createDefaultTesterBuilder()
+  .with(PostgresTesterBuilder)  // DockerTesterBuilder already included!
+  .with(MinioTesterBuilder);
+```
+
+### createTesterBuilder()
+
+Factory function to create a new tester builder with no defaults.
+
+```typescript
+function createTesterBuilder(): TesterBuilder<[]>
+```
+
+**Use when:** You need minimal dependencies or custom builder composition.
+
+### TesterBuilder.with()
+
+Add a builder to the composition.
+
+```typescript
+.with<TTesterBuilder>(
+  testerConstructor: Constructor<TTesterBuilder>,
+  options?: BuilderOptions
+): TesterBuilder<[TTesterBuilder, ...Previous]>
+```
+
+**Type Safety:** Enforces that all dependencies of `TTesterBuilder` are already added.
+
+### TesterBuilder.build()
+
+Build the final Tester class with all composed builders.
+
+```typescript
+.build(): Constructor<Tester>
+```
+
+### Tester.setup()
+
+Initialize all builders and start containers.
+
+```typescript
+async setup(): Promise<void>
+```
+
+**Execution Order:** Builders run in the order they were added.
+
+### Tester.destroy()
+
+Clean up all resources in reverse order (LIFO).
+
+```typescript
+async destroy(): Promise<void>
+```
+
+## Auto-Cleanup Features
+
+### withPostgresAutoCleanup()
+
+Automatically truncate tables after each test.
+
+```typescript
+withPostgresAutoCleanup(tables: string[]): this
+```
+
+### withMinioAutoCleanup()
+
+Automatically empty all buckets after each test.
+
+```typescript
+withMinioAutoCleanup(): this
+```
+
+### withNatsAutoCleanup()
+
+Automatically purge all JetStream streams after each test.
+
+```typescript
+withNatsAutoCleanup(): this
+```
+
+### tester.cleanup()
+
+Triggers all registered auto-cleanup operations.
+
+```typescript
+async cleanup(): Promise<void>
+```
+
+**Usage:**
+```typescript
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+## Helper Methods
+
+### tester.postgres.query()
+
+Execute SQL queries directly.
+
+```typescript
+async query<T>(sql: string, params?: any[]): Promise<T[]>
+```
+
+### tester.minio.listObjects()
+
+List objects in a bucket.
+
+```typescript
+async listObjects(bucket: string): Promise<string[]>
+```
+
+### tester.minio.getS3Client()
+
+Get the underlying S3 client for advanced operations.
+
+```typescript
+getS3Client(): S3Client
+```
+
+### tester.nats.getConnection()
+
+Get the underlying NATS connection.
+
+```typescript
+getConnection(): NatsConnection
+```
+
+## Infrastructure Builders
+
+### DockerTesterBuilder
+
+Provides Docker container management foundation.
+
+```typescript
+class DockerTesterBuilder extends BaseTesterBuilder<'Docker', []>
+```
+
+**Dependencies:** None
+
+**Note:** Required by all infrastructure builders.
+
+### PostgresTesterBuilder
+
+Manages PostgreSQL database containers.
+
+```typescript
+class PostgresTesterBuilder extends BaseTesterBuilder<
+  'postgres',
+  [DockerTesterBuilder]
+>
+```
+
+**Configuration Methods:**
+- `withImage(image: string)`: Docker image (default: `postgres:16-alpine`)
+- `withDatabase(name: string)`: Database name (default: `test`)
+- `withUser(user: string)`: Username (default: `test`)
+- `withPassword(password: string)`: Password (default: `test`)
+
+**Returns:**
+```typescript
+{
+  container: StartedPostgreSqlContainer,
+  connectionString: string,
+  host: string,
+  port: number,
+  database: string,
+  options: PostgresOptions
+}
+```
+
+### MinioTesterBuilder
+
+Manages MinIO (S3-compatible) containers.
+
+```typescript
+class MinioTesterBuilder extends BaseTesterBuilder<
+  'minio',
+  [DockerTesterBuilder]
+>
+```
+
+**Configuration Methods:**
+- `withImage(image: string)`: Docker image (default: `minio/minio:latest`)
+- `withAccessKey(key: string)`: Access key (default: `minioadmin`)
+- `withSecretKey(key: string)`: Secret key (default: `minioadmin`)
+
+**Methods:**
+- `withMinioBucket(name)`: Create bucket (can call multiple times)
+
+**Returns:**
+```typescript
+{
+  container: StartedMinioContainer,
+  endpoint: string,
+  options: MinioOptions,
+  buckets: string[]
+}
+```
+
+### NatsTesterBuilder
+
+Manages NATS messaging containers with JetStream support.
+
+```typescript
+class NatsTesterBuilder extends BaseTesterBuilder<
+  'nats',
+  [DockerTesterBuilder]
+>
+```
+
+**Configuration Methods:**
+- `withImage(image: string)`: Docker image (default: `nats:2.10-alpine`)
+- `withJetstream()`: Enable JetStream
+
+**Methods:**
+- `withStream(name)`: Create JetStream stream
+
+**Returns:**
+```typescript
+{
+  container: StartedNatsContainer,
+  endpoint: string,
+  options: NatsOptions,
+  streams: string[]
+}
+```
+
+### RedisTesterBuilder
+
+Manages Redis cache containers.
+
+```typescript
+class RedisTesterBuilder extends BaseTesterBuilder<
+  'redis',
+  [DockerTesterBuilder]
+>
+```
+
+**Returns:**
+```typescript
+{
+  container: StartedRedisContainer,
+  endpoint: string,
+  options: RedisOptions
+}
+```
+
+## BaseTesterBuilder
+
+Base class for creating custom builders.
+
+```typescript
+abstract class BaseTesterBuilder<
+  TName extends string,
+  TRequiredTesters extends TupleOfTesters = []
+>
+```
+
+**Abstract Members:**
+```typescript
+abstract name: TName;
+abstract addMethods<TBase extends AddMethodsType<TRequiredTesters>>(
+  Base: TBase
+): AnyConstructorFor<any>;
+```
+
+**Example:**
+```typescript
+export class MyBuilder extends BaseTesterBuilder<
+  "MyBuilder",
+  [PostgresTesterBuilder]
+> {
+  readonly name = "MyBuilder" as const;
+
+  addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+    return class extends Base {
+      // Implementation
+    };
+  }
+}
+```

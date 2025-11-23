@@ -1,0 +1,84 @@
+---
+title: WallpaperDB Documentation
+description: Welcome to the WallpaperDB documentation! A wallpaper management system built as a Turborepo monorepo.
+---
+
+Welcome to the WallpaperDB documentation! This guide will help you navigate the documentation structure and find what you need.
+
+## Quick Start
+
+**New to the project?** Start here:
+1. Read [Development Guidelines](/docs/development-guidelines) - Critical rules (TDD, incremental changes)
+2. Review the [Architecture](/docs/architecture) section - How the system is built
+
+**Implementing something?** Go to:
+- [Testing Documentation](/docs/testing) - How-to guides for testing
+- [Architecture](/docs/architecture) - Patterns and decisions
+- [Observability](/docs/observability) - Monitoring and telemetry
+
+## By Role
+
+### AI Agent implementing features
+
+1. Read [Development Guidelines](/docs/development-guidelines) - TDD, incremental changes
+2. Follow step-by-step instructions
+3. Refer to architecture patterns and decisions
+4. Update documentation as you learn
+
+### Developer joining the project
+
+1. Read [Development Guidelines](/docs/development-guidelines) - Workflow and standards
+2. Review [Architecture Decisions](/docs/architecture/decisions) - Why things are the way they are
+3. Explore [Testing Documentation](/docs/testing) - How testing works
+4. Start with a task and follow the guidelines!
+
+## Key Principles (Always Follow)
+
+### 1. Test-First Development
+- Write tests BEFORE implementation
+- Every change must have tests
+- See [Development Guidelines](/docs/development-guidelines)
+
+### 2. Incremental Changes
+- Small, focused changes
+- NEVER big-bang refactoring
+- Test after each increment
+- See [Development Guidelines](/docs/development-guidelines)
+
+### 3. Document As You Go
+- Update docs when architecture changes
+- Create ADRs for architectural choices
+- See [Development Guidelines](/docs/development-guidelines)
+
+## Current Status
+
+### Completed
+- Ingestor service (production-ready)
+- TesterBuilder pattern (exceptional test infrastructure)
+- State machine pattern for uploads
+- Reconciliation system
+- RFC 7807 error handling
+- Basic OTEL integration
+
+### In Progress
+- Multi-service architecture planning
+- Shared packages extraction
+- Observability enhancements
+- Test infrastructure setup
+
+### Planned
+- Service #2 (Media or Thumbnail Extractor)
+- Additional enrichment services
+- GraphQL gateway
+
+## Common Questions
+
+### Why Fastify instead of NestJS?
+See [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs). Migration cost exceeds benefit - current stack is excellent.
+
+### How do I create a new service?
+After shared packages are ready, services take ~1 week to build using established patterns.
+
+### What's the testing strategy?
+TDD always. Package tests (fast), integration tests (Testcontainers), E2E tests (Docker).
+See [Testing Documentation](/docs/testing)

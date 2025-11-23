@@ -1,0 +1,15 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "development-guidelines",
+    "---API Reference---",
+    "openapi",
+    "---Architecture---",
+    "architecture",
+    "---Testing---",
+    "testing",
+    "---Observability---",
+    "observability"
+  ]
+}

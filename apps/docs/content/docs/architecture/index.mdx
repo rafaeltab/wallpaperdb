@@ -1,0 +1,48 @@
+---
+title: Architecture
+description: Architectural patterns, shared packages, and design decisions for WallpaperDB.
+---
+
+This section covers the architectural patterns and decisions for WallpaperDB.
+
+## Overview
+
+WallpaperDB uses a monorepo structure with shared packages that provide common infrastructure patterns. This allows new services to be built quickly (~1 week) by reusing tested, production-ready code.
+
+## Package Structure
+
+```
+packages/
+├── core/                    # Infrastructure patterns
+│   ├── connections/         # Database, MinIO, NATS, Redis, OTEL
+│   ├── config/             # Zod-based configuration
+│   ├── health/             # Health check aggregation
+│   ├── errors/             # RFC 7807 error handling
+│   └── telemetry/          # OpenTelemetry helpers
+├── events/                  # Event schemas and pub/sub
+│   ├── schemas/            # Zod event schemas
+│   ├── publisher/          # BaseEventPublisher
+│   └── consumer/           # BaseEventConsumer
+├── testcontainers/         # Test infrastructure
+└── test-utils/             # Test utilities
+```
+
+## Key Principles
+
+1. **No DI Coupling** - All utilities use static imports, not dependency injection
+2. **Factory Functions** - Connections are created via factory functions
+3. **Composable Config** - Services compose their config from shared schemas
+4. **Testable** - All utilities have comprehensive unit tests
+
+## Architecture Decisions
+
+All major architectural decisions are documented as ADRs:
+
+- [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs) - Framework choice
+
+### When to Create an ADR
+
+- Choosing between technologies (framework, database, etc.)
+- Major architectural patterns (event sourcing, CQRS, etc.)
+- Significant deviations from established patterns
+- Decisions that affect multiple services

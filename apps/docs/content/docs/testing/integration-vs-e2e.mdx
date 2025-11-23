@@ -1,0 +1,171 @@
+---
+title: Integration vs E2E Tests
+description: Understanding when to use integration tests (in-process) vs E2E tests (containerized) for effective testing.
+---
+
+Understanding when to use integration tests (in-process) vs E2E tests (containerized) is crucial for effective testing.
+
+## Quick Comparison
+
+| Aspect | Integration Tests | E2E Tests |
+|--------|------------------|-----------|
+| **Application** | Runs in-process (same Node.js) | Runs in Docker container |
+| **Speed** | Fast (~2-5 seconds) | Slower (~10-30 seconds) |
+| **HTTP Calls** | `app.inject()` (no network) | `undici.request()` (real network) |
+| **Auto-Cleanup** | Optional | Recommended |
+| **Test Execution** | Can run in parallel | Often sequential |
+| **Best For** | Business logic, API testing | Deployment validation |
+
+## Integration Tests (In-Process)
+
+### Architecture
+
+```
+┌──────────────────────────────────────┐
+│  Test Process (Node.js)              │
+│  ├─ Vitest Test Runner               │
+│  ├─ Your Application (Fastify)       │
+│  └─ Test Code                        │
+└──────────────────────────────────────┘
+           ↓ connects to (exposed ports)
+┌──────────────────────────────────────┐
+│  Docker Containers                   │
+│  ├─ Postgres (port 55432)            │
+│  ├─ MinIO (port 55433)               │
+│  └─ NATS (port 55434)                │
+└──────────────────────────────────────┘
+```
+
+### When to Use
+
+**Use for:**
+- Testing business logic
+- API endpoint behavior
+- Database interactions
+- Service integrations
+- Error handling
+- Input validation
+- Most development work
+
+**Don't use for:**
+- Docker networking issues
+- Container configuration
+- Deployment validation
+
+### Advantages
+
+- **Fast**: No Docker build, quick startup
+- **Easy Debugging**: Can use debugger, see stack traces
+- **Resource Efficient**: Lower memory/CPU usage
+- **Quick Feedback**: Ideal for TDD
+
+## E2E Tests (Containerized)
+
+### Architecture
+
+```
+┌──────────────────────────────────────┐
+│  Test Process (Node.js)              │
+│  ├─ Vitest Test Runner               │
+│  └─ Test Code (HTTP client)          │
+└──────────────────────────────────────┘
+           ↓ HTTP requests (exposed port)
+┌──────────────────────────────────────┐
+│  Docker Containers                   │
+│  ├─ Your Application Container       │
+│  │   └─ connects via host.docker.internal
+│  ├─ Postgres Container               │
+│  ├─ MinIO Container                  │
+│  └─ NATS Container                   │
+└──────────────────────────────────────┘
+```
+
+### When to Use
+
+**Use for:**
+- Testing the actual Docker image
+- Verifying deployment configuration
+- Testing container networking
+- Multi-instance scenarios
+- Performance/load testing
+- Pre-release validation
+
+**Don't use for:**
+- Rapid development iteration
+- Debugging specific logic
+- Most day-to-day testing
+
+### Advantages
+
+- **Tests Real Artifact**: Actual Docker image you deploy
+- **Full Stack**: Tests entire deployment setup
+- **Networking**: Catches network configuration issues
+- **Environment Parity**: Closer to production
+
+## Decision Matrix
+
+```
+What are you testing?
+├─ Business logic / API behavior?
+│  └─ → Use Integration Tests
+│
+├─ Database queries / transactions?
+│  └─ → Use Integration Tests
+│
+├─ Service integration (Postgres/MinIO/NATS)?
+│  └─ → Use Integration Tests
+│
+├─ Docker image / deployment?
+│  └─ → Use E2E Tests
+│
+├─ Container networking?
+│  └─ → Use E2E Tests
+│
+└─ Multi-instance scenarios?
+   └─ → Use E2E Tests
+```
+
+## Testing Pyramid
+
+```
+    ╱╲
+   ╱  ╲       E2E Tests (Few)
+  ╱────╲      ← Containerized, slow, comprehensive
+ ╱      ╲
+╱────────╲    Integration Tests (Many)
+           ← In-process, fast, focused
+```
+
+## Best Practices
+
+### For Integration Tests
+
+```typescript
+// Use unique database names
+.withPostgres((b) => b.withDatabase(`test_${Date.now()}`))
+
+// Run in parallel when possible
+// vitest.config.ts
+export default {
+  test: { maxConcurrency: 5 },
+};
+```
+
+### For E2E Tests
+
+```typescript
+// Use auto-cleanup for test isolation
+tester
+  .withPostgresAutoCleanup(["wallpapers"])
+  .withMinioAutoCleanup()
+  .withNatsAutoCleanup();
+
+afterEach(async () => {
+  await tester.cleanup();
+});
+
+// Set longer timeouts
+beforeAll(async () => {
+  // ...setup
+}, 120000);  // 2 minutes for E2E
+```

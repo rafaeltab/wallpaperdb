@@ -3,6 +3,7 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
+        docs-dev docs-build docs-start \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
 
 help:
@@ -38,6 +39,11 @@ help:
 	@echo "  make ingestor-e2e-test       - Run E2E tests against Docker container"
 	@echo "  make ingestor-e2e-test-watch - Run E2E tests in watch mode"
 	@echo "  make ingestor-e2e-verify     - Verify no app code imports in E2E tests"
+	@echo ""
+	@echo "Documentation:"
+	@echo "  make docs-dev   - Start documentation dev server (http://localhost:3000)"
+	@echo "  make docs-build - Build documentation for production"
+	@echo "  make docs-start - Start documentation production server"
 	@echo ""
 	@echo "All Services:"
 	@echo "  make dev        - Start all services in development mode"
@@ -156,6 +162,19 @@ ingestor-e2e-verify:
 	@echo "Verifying E2E tests don't import application code..."
 	@pnpm --filter @wallpaperdb/ingestor-e2e verify-no-imports
 	@echo "✓ Verification passed - E2E tests are properly isolated"
+
+# Documentation commands
+docs-dev:
+	@echo "Starting documentation dev server..."
+	@turbo run dev --filter=@wallpaperdb/docs
+
+docs-build:
+	@echo "Building documentation..."
+	@turbo run build --filter=@wallpaperdb/docs
+
+docs-start:
+	@echo "Starting documentation production server..."
+	@turbo run start --filter=@wallpaperdb/docs
 
 # All services commands
 dev:

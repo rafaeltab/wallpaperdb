@@ -1,0 +1,177 @@
+---
+title: Observability Guide
+description: How to add telemetry to WallpaperDB services and use the monitoring infrastructure.
+---
+
+This guide covers how to add telemetry to WallpaperDB services and use the monitoring infrastructure.
+
+## Overview
+
+WallpaperDB uses OpenTelemetry for distributed tracing and metrics, with the Grafana LGTM stack for visualization:
+
+- **Loki** - Log aggregation
+- **Grafana** - Dashboards and alerting
+- **Tempo** - Distributed tracing
+- **Mimir** - Metrics storage (Prometheus-compatible)
+
+## Quick Start
+
+```bash
+# Start infrastructure (includes LGTM stack)
+make infra-start
+
+# Access Grafana
+open http://localhost:3000
+# Default credentials: admin/admin
+```
+
+## Adding Telemetry to Services
+
+### Import Telemetry Utilities
+
+```typescript
+import {
+  Attributes,
+  withSpan,
+  withSpanSync,
+  recordCounter,
+  recordHistogram,
+} from '@wallpaperdb/core/telemetry';
+```
+
+### Wrapping Async Operations with Spans
+
+```typescript
+async myAsyncOperation(userId: string, data: SomeData): Promise<Result> {
+  return await withSpan(
+    'service.operation_name',
+    {
+      [Attributes.USER_ID]: userId,
+    },
+    async (span) => {
+      // Your business logic here
+      span.setAttribute('custom_attr', someValue);
+      span.addEvent('processing_complete');
+      return result;
+    }
+  );
+}
+```
+
+### Wrapping Sync Operations
+
+```typescript
+calculateSomething(data: Buffer): string {
+  return withSpanSync(
+    'service.calculate_something',
+    { [Attributes.FILE_SIZE_BYTES]: data.length },
+    (span) => {
+      const result = doCalculation(data);
+      span.setAttribute('result_length', result.length);
+      return result;
+    }
+  );
+}
+```
+
+### Recording Metrics
+
+```typescript
+// Counters (for counting events)
+recordCounter('upload.requests.total', 1, {
+  status: 'success',
+  [Attributes.FILE_TYPE]: 'image',
+});
+
+// Histograms (for durations, sizes)
+recordHistogram('upload.duration_ms', durationMs, {
+  status: 'success',
+});
+```
+
+## Available Attributes
+
+Standard attributes are defined in `@wallpaperdb/core/telemetry`:
+
+```typescript
+import { Attributes } from '@wallpaperdb/core/telemetry';
+
+// User context
+Attributes.USER_ID           // "user.id"
+
+// Wallpaper context
+Attributes.WALLPAPER_ID      // "wallpaper.id"
+Attributes.WALLPAPER_STATE   // "wallpaper.state"
+
+// File context
+Attributes.FILE_TYPE         // "file.type"
+Attributes.FILE_MIME_TYPE    // "file.mime_type"
+Attributes.FILE_SIZE_BYTES   // "file.size_bytes"
+
+// Storage context
+Attributes.STORAGE_BUCKET    // "storage.bucket"
+Attributes.STORAGE_KEY       // "storage.key"
+
+// Operation context
+Attributes.OPERATION_NAME    // "operation.name"
+Attributes.OPERATION_SUCCESS // "operation.success"
+
+// Error context
+Attributes.ERROR_TYPE        // "error.type"
+Attributes.ERROR_MESSAGE     // "error.message"
+```
+
+## Metrics Reference
+
+### Upload Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `upload.requests.total` | Counter | `status`, `file.type` | Total upload requests |
+| `upload.duration_ms` | Histogram | `status`, `file.type` | Upload duration |
+| `upload.file_size_bytes` | Histogram | `file.type` | Upload file sizes |
+
+### Storage Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `storage.operations.total` | Counter | `operation.name`, `operation.success` | S3 operations count |
+| `storage.operation_duration_ms` | Histogram | `operation.name` | S3 operation duration |
+
+### Reconciliation Metrics
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `reconciliation.cycles.total` | Counter | `reconciliation.type` | Reconciliation cycles |
+| `reconciliation.records_processed.total` | Counter | `reconciliation.type` | Records processed |
+
+## Best Practices
+
+1. **Use standard attributes** - Import from `Attributes` to ensure consistency
+2. **Add context progressively** - Start with known attributes, add more as you learn
+3. **Instrument at boundaries** - Focus on entry points and external calls
+4. **Use meaningful span names** - Format: `service.operation` (e.g., `storage.s3.put_object`)
+5. **Record metrics for aggregations** - Spans for debugging, metrics for dashboards
+6. **Handle errors gracefully** - `withSpan` automatically records exceptions
+
+## Troubleshooting
+
+### No metrics appearing in Grafana
+
+1. Check OTLP endpoint is configured:
+   ```
+   OTLP_ENDPOINT=http://localhost:4318
+   ```
+
+2. Verify LGTM container is running:
+   ```bash
+   docker ps | grep lgtm
+   ```
+
+### Traces not connecting
+
+Ensure trace context is propagated. The `@wallpaperdb/events` package automatically propagates context to NATS headers.
+
+### High cardinality warnings
+
+Avoid using high-cardinality values as metric labels (e.g., user IDs). Use spans for per-request debugging instead.

@@ -1,0 +1,166 @@
+---
+title: Testing Documentation
+description: Comprehensive testing infrastructure built on Testcontainers and the TesterBuilder pattern for WallpaperDB.
+---
+
+Welcome to the WallpaperDB testing documentation! This guide covers the composable test infrastructure built on Testcontainers and the TesterBuilder pattern.
+
+## Documentation Index
+
+### Getting Started
+- **[TesterBuilder Pattern](/docs/testing/test-builder-pattern)** - Core concepts, quick start, and available builders
+- **[Integration vs E2E](/docs/testing/integration-vs-e2e)** - Choose the right test type
+
+### Advanced Topics
+- **[Creating Custom Builders](/docs/testing/creating-custom-builders)** - Build application-specific test helpers
+- **[API Reference](/docs/testing/api-reference)** - Complete API documentation
+- **[Troubleshooting](/docs/testing/troubleshooting)** - Common issues and solutions
+
+## Quick Decision Tree
+
+**"Which guide do I need?"**
+
+```
+Are you new to this testing approach?
+├─ Yes → Start with test-builder-pattern
+└─ No
+   ├─ Writing a new test?
+   │  ├─ Standard infrastructure (Postgres/MinIO/NATS)?
+   │  │  └─ → test-builder-pattern (Quick Start section)
+   │  └─ Custom application setup needed?
+   │     └─ → creating-custom-builders
+   │
+   ├─ Choosing between integration and E2E?
+   │  └─ → integration-vs-e2e
+   │
+   └─ Something not working?
+      └─ → troubleshooting
+```
+
+## Testing Philosophy
+
+WallpaperDB uses **real infrastructure** for all tests:
+
+- Testcontainers for Postgres, MinIO, NATS, Redis
+- Actual Docker containers, not mocks
+- Production-like behavior
+- No in-memory databases
+- No service mocks
+- No fake implementations
+
+**Why?** This approach catches real-world issues and gives confidence that code works against actual services.
+
+## Architecture Overview
+
+```
+Testing Infrastructure Layers:
+
+┌─────────────────────────────────────────────────┐
+│  Application Tests                              │
+│  ├─ apps/ingestor/test/*.test.ts               │
+│  └─ apps/ingestor-e2e/test/*.e2e.test.ts       │
+└─────────────────────────────────────────────────┘
+                    ↓ uses
+┌─────────────────────────────────────────────────┐
+│  Application-Specific Builders                  │
+│  ├─ IngestorMigrationsTesterBuilder            │
+│  ├─ InProcessIngestorTesterBuilder             │
+│  └─ ContainerizedIngestorTesterBuilder         │
+└─────────────────────────────────────────────────┘
+                    ↓ uses
+┌─────────────────────────────────────────────────┐
+│  Core Test Infrastructure (packages/test-utils)│
+│  ├─ DockerTesterBuilder (network management)   │
+│  ├─ PostgresTesterBuilder (database)           │
+│  ├─ MinioTesterBuilder (S3 storage)            │
+│  ├─ NatsTesterBuilder (messaging)              │
+│  └─ RedisTesterBuilder (cache)                 │
+└─────────────────────────────────────────────────┘
+                    ↓ uses
+┌─────────────────────────────────────────────────┐
+│  Testcontainers                                 │
+│  ├─ packages/testcontainers (NATS setup)       │
+│  └─ @testcontainers/* (official packages)      │
+└─────────────────────────────────────────────────┘
+```
+
+## Quick Example: Integration Test
+
+```typescript
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  MinioTesterBuilder,
+  NatsTesterBuilder,
+  RedisTesterBuilder,
+} from "@wallpaperdb/test-utils";
+import {
+  IngestorMigrationsTesterBuilder,
+  InProcessIngestorTesterBuilder,
+} from "./builders/index.js";
+
+describe("Health Check", () => {
+  const setup = () => {
+    const TesterClass = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(PostgresTesterBuilder)
+      .with(MinioTesterBuilder)
+      .with(NatsTesterBuilder)
+      .with(RedisTesterBuilder)
+      .with(IngestorMigrationsTesterBuilder)
+      .with(InProcessIngestorTesterBuilder)
+      .build();
+
+    const tester = new TesterClass();
+
+    tester
+      .withPostgres((b) => b.withDatabase(`test_health_${Date.now()}`))
+      .withMinio()
+      .withMinioBucket("wallpapers")
+      .withNats((b) => b.withJetstream())
+      .withMigrations()
+      .withInProcessApp();
+
+    return tester;
+  };
+
+  let tester: ReturnType<typeof setup>;
+
+  beforeAll(async () => {
+    tester = setup();
+    await tester.setup();
+  }, 60000);
+
+  afterAll(async () => {
+    await tester.destroy();
+  });
+
+  it("returns healthy status", async () => {
+    const fastify = tester.getApp();
+    const response = await fastify.inject({ method: "GET", url: "/health" });
+    expect(response.statusCode).toBe(200);
+  });
+});
+```
+
+## Key Features
+
+### Auto-Cleanup
+
+Automatically clean test data between tests:
+
+```typescript
+tester
+  .withPostgresAutoCleanup(["wallpapers", "users"])
+  .withMinioAutoCleanup()
+  .withNatsAutoCleanup();
+
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+### Type-Safe Dependencies
+
+Builders declare dependencies - TypeScript prevents missing dependencies at compile time.

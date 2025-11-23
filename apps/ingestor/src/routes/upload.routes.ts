@@ -5,6 +5,7 @@ import type { Config } from '../config.js';
 import { MissingFileError, MissingUserId, ProblemDetailsError } from '../errors/problem-details.js';
 import { RateLimitExceededError } from '../services/rate-limit.service.js';
 import { UploadOrchestrator } from '../services/upload/upload-orchestrator.service.js';
+import { uploadRouteSchema } from './schemas/upload.schema.js';
 
 interface CachedMultipartData {
   buffer: Buffer;
@@ -147,7 +148,7 @@ export default async function uploadRoutes(fastify: FastifyInstance) {
   });
 
   // POST /upload - Upload a wallpaper
-  fastify.post('/upload', uploadHandler);
+  fastify.post('/upload', { schema: uploadRouteSchema }, uploadHandler);
 }
 
 function parseUserId(data: MultipartFile): string {

@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/github/rafaeltab/wallpaperdb/graph/badge.svg?token=E7C2BEISZR)](https://codecov.io/github/rafaeltab/wallpaperdb)
+
 # WallpaperDB
 
 A microservices-based wallpaper management system for uploading, processing, and serving wallpapers with intelligent enrichment.
@@ -85,3 +87,9 @@ plans/               # Architecture plans and design docs
 5. Format & lint: `make format && make lint`
 
 See [CLAUDE.md](CLAUDE.md) for detailed workflows, architecture explanations, and troubleshooting.
+
+## Coverage
+
+
+
+![codecov](https://codecov.io/github/rafaeltab/wallpaperdb/graphs/tree.svg?token=E7C2BEISZR)

@@ -20,7 +20,8 @@
         },
         "build": {
             "dependsOn": [
-                "^build"
+                "^build",
+                "gen:swagger-pages"
             ],
             "outputs": [
                 "dist/**",
@@ -125,6 +126,27 @@
                 "package.json",
                 "package-lock.json",
                 "tsconfig.json"
+            ]
+        },
+        "gen:swagger": {
+            "cache": true,
+            "inputs": [
+                "src/**",
+                "package.json",
+                "package-lock.json",
+                "tsconfig.json"
+            ],
+            "outputs": [
+                "swagger.json"
+            ]
+        },
+        "gen:swagger-pages": {
+            "cache": true,
+            "dependsOn": [
+                "^gen:swagger"
+            ],
+            "outputs": [
+                "content/docs/openapi/**"
             ]
         }
     }

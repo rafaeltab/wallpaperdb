@@ -7,21 +7,35 @@ import { zodToJsonSchema } from "../utils/zod-to-json-schema.js";
  */
 export const ProblemDetailsSchema = z
 	.object({
-		/** URI identifying the problem type */
-		type: z.string().url().describe("URI identifying the problem type"),
+		/** URI identifying the problem type (recommended, defaults to about:blank) */
+		type: z
+			.string()
+			.optional()
+			.describe("URI identifying the problem type"),
 		/** Short, human-readable summary */
-		title: z.string().describe("Short, human-readable summary of the problem"),
+		title: z
+			.string()
+			.optional()
+			.describe("Short, human-readable summary of the problem"),
 		/** HTTP status code */
-		status: z.number().int().min(100).max(599).describe("HTTP status code"),
+		status: z
+			.number()
+			.int()
+			.min(100)
+			.max(599)
+			.optional()
+			.describe("HTTP status code"),
 		/** Human-readable explanation specific to this occurrence */
 		detail: z
 			.string()
+			.optional()
 			.describe(
 				"Human-readable explanation specific to this occurrence of the problem"
 			),
 		/** URI of the endpoint that generated the error */
 		instance: z
 			.string()
+			.optional()
 			.describe("URI reference identifying the specific occurrence"),
 	})
 	.passthrough() // Allow extension fields

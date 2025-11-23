@@ -167,25 +167,33 @@ export async function registerOpenAPI(
 			if (multipartSchema) {
 				// Clone the schema and add the body for OpenAPI docs only
 				return {
-					...schema,
-					body: multipartSchema,
+					schema: {
+						...schema,
+						body: multipartSchema,
+					},
+					url,
 				};
 			}
-			return schema;
+			return { schema, url };
 		},
 	};
 	await app.register(fastifySwagger, swaggerOptions);
 
 	// Add hook to modify OpenAPI spec after generation for multipart endpoints
-	if (options.multipartBodies && options.multipartBodies.length > 0) {
+	const multipartBodies = options.multipartBodies;
+	if (multipartBodies && multipartBodies.length > 0) {
 		app.addHook("onReady", async () => {
 			const swagger = app.swagger();
-			for (const { url, schema, errorResponses } of options.multipartBodies) {
+			for (const { url, schema, errorResponses } of multipartBodies) {
 				// Find the path in the generated spec
 				const pathItem = swagger.paths?.[url];
 				if (pathItem?.post) {
-					// Add requestBody for multipart
-					pathItem.post.requestBody = {
+					// Add requestBody for multipart (cast to allow modification)
+					const postOp = pathItem.post as {
+						requestBody?: unknown;
+						responses: Record<string, unknown>;
+					};
+					postOp.requestBody = {
 						required: true,
 						content: {
 							"multipart/form-data": {
@@ -196,7 +204,7 @@ export async function registerOpenAPI(
 					// Add error responses if defined
 					if (errorResponses) {
 						for (const { statusCode, description } of errorResponses) {
-							pathItem.post.responses[statusCode] = {
+							postOp.responses[statusCode] = {
 								description,
 								content: {
 									"application/problem+json": {

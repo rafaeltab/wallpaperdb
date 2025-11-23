@@ -46,6 +46,11 @@ COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/dist ./dist
 COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/node_modules ./node_modules
 COPY --from=builder --chown=ingestor:nodejs /app/node_modules /app/node_modules
 
+# Copy workspace packages that ingestor depends on (with their node_modules for transitive deps)
+COPY --from=builder --chown=ingestor:nodejs /app/packages/core /app/packages/core
+COPY --from=builder --chown=ingestor:nodejs /app/packages/events /app/packages/events
+COPY --from=builder --chown=ingestor:nodejs /app/packages/url-ipv4-resolver /app/packages/url-ipv4-resolver
+
 USER ingestor
 
 EXPOSE 3000

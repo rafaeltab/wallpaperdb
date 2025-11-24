@@ -22,7 +22,7 @@ To create useful, consistent, and concise commits you always follow these steps:
 description
 ```
 
-And always include cluade code as a co-author
+And always include claude code as a co-author
 
 # Types
 

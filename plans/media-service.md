@@ -301,11 +301,11 @@ Feature: Readiness Check
 
 ### Acceptance Criteria
 
-- [ ] Service starts and listens on configured port
-- [ ] `GET /health` returns health status with all dependency checks
-- [ ] `GET /ready` returns 200 when healthy, 503 when not
-- [ ] All health tests pass
-- [ ] OpenTelemetry instrumentation is active
+- [x] Service starts and listens on configured port
+- [x] `GET /health` returns health status with all dependency checks
+- [x] `GET /ready` returns 200 when healthy, 503 when not
+- [x] All health tests pass
+- [x] OpenTelemetry instrumentation is active
 
 ---
 

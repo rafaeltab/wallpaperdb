@@ -359,11 +359,11 @@ apps/<service-name>/
 
 **Goal:** Validate multi-service patterns work
 
-**Status:** Ready to start - all prerequisites complete
+**Status:** ✅ Ready to start - ALL prerequisites complete (including OpenAPI)
 
-**Service Choice:** TBD (Thumbnail Extractor OR Media Service)
-- **Media Service**: Image retrieval and resizing - higher user value
-- **Thumbnail Extractor**: Video thumbnails - simpler scope, good proving ground
+**Service Choice:** Media Service (decided)
+- **Media Service**: Image retrieval and resizing - higher user value, clear requirements
+- Plan: [plans/media-service.md](./media-service.md)
 
 **Tasks:**
 1. Generate service skeleton (or create manually as template)
@@ -382,10 +382,11 @@ apps/<service-name>/
 **Deliverable:** Working service #2, validated patterns
 
 **Prerequisites (all met):**
-- ✅ @wallpaperdb/core with config and telemetry
+- ✅ @wallpaperdb/core with config, telemetry, and OpenAPI
 - ✅ @wallpaperdb/events with BaseEventConsumer
 - ✅ TesterBuilder pattern for tests
 - ✅ NATS JetStream for event consumption
+- ✅ OpenAPI integration complete (Swagger UI + auto-generated docs)
 
 ---
 
@@ -397,8 +398,8 @@ Services 3, 4, 5, etc. should take ~1 week each:
 - Observability
 - Deployment
 
-**Order (tentative):**
-1. Media Service (high priority - wallpaper retrieval)
+**Order:**
+1. **Media Service** (in progress - see [plans/media-service.md](./media-service.md))
 2. Thumbnail Extractor (video support)
 3. Quality Enrichment
 4. Color Enrichment
@@ -609,13 +610,15 @@ Consider migrating to NestJS if:
 
 ## Next Action
 
-**👉 Phase 3: Build Service #2**
+**👉 Phase 3: Build the Media Service**
 
-The foundation is ready. Choose either:
-1. **Media Service** - Wallpaper retrieval and resizing (higher user value)
-2. **Thumbnail Extractor** - Video thumbnail generation (simpler scope)
+The foundation is complete. All prerequisites met:
+- ✅ Shared packages (@wallpaperdb/core with OpenAPI, @wallpaperdb/events)
+- ✅ Test infrastructure (TesterBuilder pattern)
+- ✅ Observability (OTEL + Grafana)
+- ✅ API documentation (OpenAPI + Swagger UI)
 
-See: [services.md](./services.md) for service details
+**Next:** [plans/media-service.md](./media-service.md)
 
 **Optional parallel work:**
 - Complete Phase 1: Create Infrastructure Health dashboard

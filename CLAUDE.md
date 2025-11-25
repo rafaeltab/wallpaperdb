@@ -89,6 +89,7 @@ WallpaperDB is a wallpaper management system built as a Turborepo monorepo. The 
 - Messaging: NATS with JetStream
 - Testing: Vitest with Testcontainers (real infrastructure in tests)
 - Observability: OpenTelemetry with Grafana LGTM stack
+- API Documentation: OpenAPI 3.0 with Swagger UI + Fumadocs
 - Linting/Formatting: Biome
 
 ## Common Commands
@@ -213,6 +214,19 @@ make redis-flush     # Flush all Redis data (WARNING: deletes all data)
 make redis-info      # Show Redis server info
 ```
 
+### OpenAPI Commands
+
+```bash
+make openapi-generate  # Generate OpenAPI specs (swagger.json)
+make docs-generate     # Generate API documentation from OpenAPI specs
+make openapi-verify    # Verify OpenAPI spec generation
+```
+
+**Access Points:**
+- Swagger UI: http://localhost:3001/documentation (when ingestor is running)
+- Docs Site: http://localhost:3002 (run `make docs-dev`)
+- Generated Spec: `apps/ingestor/swagger.json`
+
 ### Running Specific Tests
 
 **Note:** If these patterns are used frequently, consider adding them to the Makefile.
@@ -232,8 +246,12 @@ pnpm --filter @wallpaperdb/ingestor test --grep "validation"
 ```
 apps/
   ingestor/         # Main wallpaper ingestion service (Fastify)
+  docs/             # Documentation site (Fumadocs, auto-generated API docs)
 packages/
+  core/             # Shared utilities (config, telemetry, OpenAPI, health)
+  events/           # Event schemas and base consumers/publishers
   testcontainers/   # Shared test utilities (custom NATS container setup)
+  test-utils/       # TesterBuilder pattern for testing
 infra/              # Docker Compose infrastructure for local dev
 ```
 
@@ -471,15 +489,19 @@ After `make infra-start`, access:
 - Service name: `wallpaperdb-ingestor` (configurable via `SERVICE_NAME` env var)
 - Access dashboards in Grafana (port 3000)
 
-**Planned Enhancements:**
+**Shared Packages:**
 
-See [plans/observability-implementation.md](plans/observability-implementation.md) for full details.
+- **`@wallpaperdb/core`** - Shared utilities for all services
+  - Config schemas (Database, S3, NATS, Redis, OTEL, Server)
+  - Telemetry module (`withSpan()`, `recordCounter()`, `recordHistogram()`)
+  - OpenAPI plugin (`registerOpenAPI()`) + shared schemas
+  - Health aggregator and formatters
+  - No DI coupling - static imports, easy to use
 
-- **Telemetry Module** (in `@wallpaperdb/core`)
-  - No DI coupling - static imports
-  - Helper functions: `withSpan()`, `recordMetric()`, `addEvent()`
-  - Pre-defined metrics and attributes
-  - Easy to add to any service
+- **`@wallpaperdb/events`** - Event-driven architecture utilities
+  - Event schemas (Zod) for all domain events
+  - BaseEventPublisher with trace context propagation
+  - BaseEventConsumer for service event handlers
 
 - **Pattern:**
   ```typescript
@@ -541,12 +563,15 @@ make dev            # Start all services
 **For now (manual):**
 1. Create service directory under `apps/`
 2. Copy structure from `apps/ingestor`
-3. Use shared packages: `@wallpaperdb/core`, `@wallpaperdb/events` (after Phase 0)
-4. Add Make targets to `Makefile`
-5. Add to CI/CD workflows
-6. Update `plans/services.md`
+3. Use shared packages:
+   - `@wallpaperdb/core` - Config, telemetry, OpenAPI, health
+   - `@wallpaperdb/events` - Event schemas, publishers, consumers
+4. Register OpenAPI: `import { registerOpenAPI } from '@wallpaperdb/core/openapi'`
+5. Add Make targets to `Makefile`
+6. Add to CI/CD workflows
+7. Update `plans/services.md`
 
-**Target time:** ~1 week per service (after templates exist)
+**Target time:** ~1 week per service (shared packages complete)
 
 See: [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
 

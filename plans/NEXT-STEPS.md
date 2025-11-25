@@ -7,17 +7,13 @@
 
 ## TL;DR - What to Do Next
 
-**👉 Step 1: OpenAPI Integration** (prerequisite)
-
-Detailed plan: **[plans/openapi-integration.md](./openapi-integration.md)**
-
-Add reusable OpenAPI support to `@wallpaperdb/core`, then integrate with Ingestor.
-
-**👉 Step 2: Build the Media Service**
+**👉 NEXT: Build the Media Service**
 
 Detailed plan: **[plans/media-service.md](./media-service.md)**
 
 Use **TDD approach**: Write tests first, then implement.
+
+All prerequisites are complete - OpenAPI integration is done, shared packages are ready, and TesterBuilder pattern is established.
 
 ---
 
@@ -29,11 +25,12 @@ Use **TDD approach**: Write tests first, then implement.
 |-----------|--------|
 | Local Infrastructure | ✅ Docker Compose with PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana |
 | Ingestor Service | ✅ Production-ready wallpaper upload with state machine |
-| @wallpaperdb/core | ✅ Config schemas, telemetry helpers, health utilities |
+| @wallpaperdb/core | ✅ Config schemas, telemetry helpers, health utilities, OpenAPI module |
 | @wallpaperdb/events | ✅ Event schemas, BaseEventPublisher, BaseEventConsumer |
 | Test Infrastructure | ✅ TesterBuilder pattern with Testcontainers |
 | CI/CD | ✅ `make ci` runs full pipeline locally |
 | Observability | ✅ OpenTelemetry instrumentation, Grafana dashboards, alerts |
+| OpenAPI | ✅ Reusable OpenAPI plugin, Swagger UI, auto-generated docs |
 
 ### What's Partially Done
 
@@ -46,8 +43,7 @@ Use **TDD approach**: Write tests first, then implement.
 
 | Plan | Priority | Description |
 |------|----------|-------------|
-| **[openapi-integration.md](./openapi-integration.md)** | 🔴 High | **START HERE** - Add OpenAPI to @wallpaperdb/core + Ingestor |
-| [media-service.md](./media-service.md) | 🔴 High | Service #2 - wallpaper retrieval & resizing (after OpenAPI) |
+| **[media-service.md](./media-service.md)** | 🔴 High | **START HERE** - Service #2: wallpaper retrieval & resizing |
 
 ---
 
@@ -118,7 +114,7 @@ make format
 - **[plans/media-service.md](./media-service.md)** - The detailed plan with test specs
 - `CLAUDE.md` - Development principles and commands
 - `apps/ingestor/` - Reference implementation to follow
-- `packages/core/src/` - Shared utilities to use
+- `packages/core/src/` - Shared utilities to use (config, telemetry, OpenAPI)
 - `packages/events/src/` - Event patterns to follow
 - `docs/testing/test-builder-pattern.md` - How to write tests
 

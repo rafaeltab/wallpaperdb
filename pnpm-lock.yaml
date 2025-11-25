@@ -282,6 +282,124 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.18.13)(@vitest/ui@2.1.9)(lightningcss@1.30.2)
 
+  apps/media:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.709.0
+        version: 3.922.0
+      '@fastify/cors':
+        specifier: ^10.0.1
+        version: 10.1.0
+      '@fastify/swagger':
+        specifier: ^9.0.0
+        version: 9.6.1
+      '@fastify/swagger-ui':
+        specifier: ^5.0.0
+        version: 5.2.3
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.0
+      '@opentelemetry/auto-instrumentations-node':
+        specifier: ^0.52.1
+        version: 0.52.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/exporter-metrics-otlp-http':
+        specifier: ^0.56.0
+        version: 0.56.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/exporter-trace-otlp-http':
+        specifier: ^0.56.0
+        version: 0.56.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-metrics':
+        specifier: ^1.29.0
+        version: 1.29.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-node':
+        specifier: ^0.56.0
+        version: 0.56.0(@opentelemetry/api@1.9.0)
+      '@wallpaperdb/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@wallpaperdb/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@types/react@19.2.6)(pg@8.16.3)(postgres@3.4.7)(react@19.2.0)
+      fastify:
+        specifier: ^5.2.0
+        version: 5.6.1
+      fastify-plugin:
+        specifier: ^5.1.0
+        version: 5.1.0
+      nats:
+        specifier: ^2.29.1
+        version: 2.29.3
+      pg:
+        specifier: ^8.13.1
+        version: 8.16.3
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      sharp:
+        specifier: ^0.33.5
+        version: 0.33.5
+      tsyringe:
+        specifier: ^4.10.0
+        version: 4.10.0
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+      zod-to-json-schema:
+        specifier: ^3.23.0
+        version: 3.25.0(zod@3.25.76)
+    devDependencies:
+      '@biomejs/biome':
+        specifier: ^2.3.4
+        version: 2.3.7
+      '@testcontainers/minio':
+        specifier: ^11.8.0
+        version: 11.8.0
+      '@testcontainers/postgresql':
+        specifier: ^11.8.0
+        version: 11.8.0
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.18.13
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.15.6
+      '@wallpaperdb/test-utils':
+        specifier: workspace:*
+        version: link:../../packages/test-utils
+      '@wallpaperdb/testcontainers':
+        specifier: workspace:*
+        version: link:../../packages/testcontainers
+      drizzle-kit:
+        specifier: ^0.30.1
+        version: 0.30.6
+      esbuild:
+        specifier: ^0.25.12
+        version: 0.25.12
+      pino-pretty:
+        specifier: ^13.0.0
+        version: 13.1.2
+      postgres:
+        specifier: ^3.4.3
+        version: 3.4.7
+      testcontainers:
+        specifier: ^11.8.0
+        version: 11.8.0
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.6
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.18.13)(@vitest/ui@2.1.9)(lightningcss@1.30.2)
+
   infra: {}
 
   packages/core:
@@ -9243,11 +9361,11 @@ snapshots:
 
   '@types/bunyan@1.8.9':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/connect@3.4.36':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/debug@4.1.12':
     dependencies:
@@ -9255,13 +9373,13 @@ snapshots:
 
   '@types/docker-modem@3.0.6':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
       '@types/ssh2': 1.15.5
 
   '@types/dockerode@3.3.45':
     dependencies:
       '@types/docker-modem': 3.0.6
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
       '@types/ssh2': 1.15.5
 
   '@types/estree-jsx@1.0.5':
@@ -9294,13 +9412,13 @@ snapshots:
 
   '@types/memcached@2.2.10':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/ms@2.1.0': {}
 
   '@types/mysql@2.15.26':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/node@18.19.130':
     dependencies:
@@ -9330,7 +9448,7 @@ snapshots:
 
   '@types/pg@8.6.1':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
       pg-protocol: 1.10.3
       pg-types: 2.2.0
 
@@ -9346,11 +9464,11 @@ snapshots:
 
   '@types/ssh2-streams@0.1.13':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/ssh2@0.5.52':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
       '@types/ssh2-streams': 0.1.13
 
   '@types/ssh2@1.15.5':
@@ -9359,7 +9477,7 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
 
   '@types/unist@2.0.11': {}
 
@@ -11452,7 +11570,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
-      '@types/node': 22.18.13
+      '@types/node': 24.10.1
       long: 5.3.2
 
   pump@3.0.3:

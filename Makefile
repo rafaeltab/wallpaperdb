@@ -3,7 +3,9 @@
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
+        media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         docs-dev docs-build docs-start \
+        openapi-generate docs-generate openapi-verify \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
 
 help:
@@ -29,6 +31,15 @@ help:
 	@echo "  make ingestor-format     - Format ingestor code"
 	@echo "  make ingestor-lint       - Lint ingestor code"
 	@echo ""
+	@echo "Media Service:"
+	@echo "  make media-dev        - Start media service in development mode"
+	@echo "  make media-build      - Build media service for production"
+	@echo "  make media-start      - Start media service in production mode"
+	@echo "  make media-test       - Run media service tests"
+	@echo "  make media-test-watch - Run media service tests in watch mode"
+	@echo "  make media-format     - Format media service code"
+	@echo "  make media-lint       - Lint media service code"
+	@echo ""
 	@echo "Ingestor Docker:"
 	@echo "  make ingestor-docker-build - Build ingestor Docker image"
 	@echo "  make ingestor-docker-run   - Run ingestor Docker container (uses infra/.env)"
@@ -41,9 +52,14 @@ help:
 	@echo "  make ingestor-e2e-verify     - Verify no app code imports in E2E tests"
 	@echo ""
 	@echo "Documentation:"
-	@echo "  make docs-dev   - Start documentation dev server (http://localhost:3000)"
-	@echo "  make docs-build - Build documentation for production"
-	@echo "  make docs-start - Start documentation production server"
+	@echo "  make docs-dev       - Start documentation dev server (http://localhost:3002)"
+	@echo "  make docs-build     - Build documentation for production"
+	@echo "  make docs-start     - Start documentation production server"
+	@echo ""
+	@echo "OpenAPI:"
+	@echo "  make openapi-generate - Generate OpenAPI specs (swagger.json) for all services"
+	@echo "  make docs-generate    - Generate API documentation from OpenAPI specs"
+	@echo "  make openapi-verify   - Verify OpenAPI specs can be generated"
 	@echo ""
 	@echo "All Services:"
 	@echo "  make dev        - Start all services in development mode"
@@ -113,6 +129,31 @@ ingestor-lint:
 ingestor-check:
 	@turbo run check --filter=@wallpaperdb/ingestor
 
+# Media service commands
+media-dev:
+	@turbo run dev --filter=@wallpaperdb/media
+
+media-build:
+	@turbo run build --filter=@wallpaperdb/media
+
+media-start:
+	@turbo run start --filter=@wallpaperdb/media
+
+media-test:
+	@turbo run test --filter=@wallpaperdb/media
+
+media-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/media
+
+media-format:
+	@turbo run format --filter=@wallpaperdb/media
+
+media-lint:
+	@turbo run lint --filter=@wallpaperdb/media
+
+media-check:
+	@turbo run check --filter=@wallpaperdb/media
+
 # Ingestor Docker commands
 ingestor-docker-build:
 	@echo "Building ingestor Docker image..."
@@ -175,6 +216,27 @@ docs-build:
 docs-start:
 	@echo "Starting documentation production server..."
 	@turbo run start --filter=@wallpaperdb/docs
+
+# OpenAPI commands
+openapi-generate:
+	@echo "Generating OpenAPI specs..."
+	@pnpm --filter @wallpaperdb/ingestor gen:swagger
+	@echo "✓ OpenAPI spec generated: apps/ingestor/swagger.json"
+
+docs-generate:
+	@echo "Generating API documentation from OpenAPI specs..."
+	@pnpm --filter @wallpaperdb/docs gen:swagger-pages
+	@echo "✓ API documentation generated in apps/docs/content/docs/openapi/"
+
+openapi-verify:
+	@echo "Verifying OpenAPI spec generation..."
+	@pnpm --filter @wallpaperdb/ingestor gen:swagger
+	@if [ -f apps/ingestor/swagger.json ]; then \
+		echo "✓ OpenAPI spec generated successfully"; \
+	else \
+		echo "✗ Failed to generate OpenAPI spec"; \
+		exit 1; \
+	fi
 
 # All services commands
 dev:

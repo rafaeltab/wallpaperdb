@@ -9,7 +9,7 @@ export default defineConfig({
   out: './drizzle',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/wallpaperdb',
+    url: process.env.DATABASE_URL || 'postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_ingestor',
   },
   verbose: true,
   strict: true,

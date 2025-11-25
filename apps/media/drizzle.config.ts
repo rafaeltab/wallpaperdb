@@ -7,6 +7,6 @@ export default defineConfig({
 	dbCredentials: {
 		url:
 			process.env.DATABASE_URL ??
-			"postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb",
+			"postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_media",
 	},
 });

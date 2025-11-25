@@ -47,7 +47,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 	) {
 		const migrationPath =
 			this.options.migrationPath ??
-			join(__dirname, "../../drizzle/0000_media_schema.sql");
+			join(__dirname, "../../drizzle/0000_mute_the_professor.sql");
 
 		return class extends Base {
 			private _migrationsApplied = false;

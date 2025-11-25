@@ -1,11 +1,12 @@
 -- WallpaperDB PostgreSQL Initialization Script
--- Simple example table for testing
+-- Creates separate databases for each service
 
-CREATE TABLE IF NOT EXISTS example_items (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Create database for the ingestor service
+CREATE DATABASE wallpaperdb_ingestor;
 
--- Insert a test record
-INSERT INTO example_items (name) VALUES ('example_item_1');
+-- Create database for the media service
+CREATE DATABASE wallpaperdb_media;
+
+-- Grant all privileges to the wallpaperdb user on both databases
+GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_ingestor TO wallpaperdb;
+GRANT ALL PRIVILEGES ON DATABASE wallpaperdb_media TO wallpaperdb;

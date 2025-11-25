@@ -37,7 +37,7 @@ export function loadConfig(): Config {
 
   const raw = {
     // Server
-    port: parseIntEnv(process.env.PORT, 3002), // Different port from ingestor
+    port: parseIntEnv(process.env.PORT, 3003), // Different port from ingestor (3001) and docs (3002)
     nodeEnv,
 
     // Database

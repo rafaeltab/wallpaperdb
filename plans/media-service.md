@@ -1,9 +1,9 @@
 # Media Service Plan
 
-> **Status**: Ready to Start (after OpenAPI Integration)
+> **Status**: Phase 2 & 3 Complete - Ready for Phase 4 (Resizing)
 > **Priority**: High (Service #2)
-> **Prerequisites**: [OpenAPI Integration](./openapi-integration.md) - must be completed first
-> **Last Updated**: 2025-11-23
+> **Prerequisites**: ~~[OpenAPI Integration](./openapi-integration.md)~~ ✅ Complete
+> **Last Updated**: 2025-11-26
 
 ---
 
@@ -394,13 +394,13 @@ Feature: Database Schema
 
 ### Acceptance Criteria
 
-- [ ] Database schema created with migrations
-- [ ] Consumer subscribes to `wallpaper.uploaded` stream
-- [ ] Events are processed and stored in `wallpapers` table
-- [ ] Duplicate events are handled idempotently
-- [ ] Malformed events don't crash the service
-- [ ] Trace context is propagated
-- [ ] All consumer tests pass
+- [x] Database schema created with migrations
+- [x] Consumer subscribes to `wallpaper.uploaded` stream
+- [x] Events are processed and stored in `wallpapers` table
+- [x] Duplicate events are handled idempotently (UPSERT)
+- [x] Malformed events don't crash the service
+- [x] Trace context is propagated
+- [x] All consumer tests pass (7/7 integration tests passing)
 
 ---
 
@@ -487,13 +487,13 @@ Feature: Input Validation
 
 ### Acceptance Criteria
 
-- [ ] `GET /wallpapers/:id` returns original file
-- [ ] Correct Content-Type based on stored mime_type
-- [ ] 404 returned for non-existent wallpapers
-- [ ] Response is streamed, not buffered
-- [ ] Cache headers are set correctly
-- [ ] Input validation prevents injection attacks
-- [ ] All retrieval tests pass
+- [x] `GET /wallpapers/:id` returns original file
+- [x] Correct Content-Type based on stored mime_type
+- [x] 404 returned for non-existent wallpapers (with RFC 7807 problem details)
+- [x] Response is streamed, not buffered
+- [x] Cache headers are set correctly (`Cache-Control: public, max-age=31536000, immutable`)
+- [x] Input validation prevents injection attacks (using Drizzle ORM parameterized queries)
+- [x] All retrieval tests pass (integrated with Phase 2 tests)
 
 ---
 

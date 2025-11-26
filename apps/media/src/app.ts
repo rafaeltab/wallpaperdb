@@ -7,6 +7,7 @@ import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { registerRoutes } from './routes/index.js';
+import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -19,6 +20,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     connectionsState: ConnectionsState;
     container: typeof container;
+    consumer: WallpaperUploadedConsumerService;
   }
 }
 
@@ -104,9 +106,32 @@ export async function createApp(
     throw error;
   }
 
+  // Start event consumer
+  fastify.log.info('Starting event consumers...');
+  try {
+    const consumer = container.resolve(WallpaperUploadedConsumerService);
+
+    // Start consumer (non-blocking - runs in background)
+    await consumer.start();
+    fastify.log.info('Event consumers started');
+
+    // Store consumer reference for shutdown
+    fastify.decorate('consumer', consumer);
+  } catch (error) {
+    fastify.log.error({ err: error }, 'Failed to start event consumers');
+    throw error;
+  }
+
   // Add cleanup hook
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
+
+    // Stop consumer first
+    if (fastify.consumer) {
+      fastify.log.info('Stopping event consumers...');
+      await fastify.consumer.stop();
+    }
+
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
     await container.resolve(MinioConnection).close();

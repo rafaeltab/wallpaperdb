@@ -1,4 +1,5 @@
 import type { NatsConnection, JetStreamClient, ConsumerMessages, JsMsg, Consumer } from "nats";
+import { AckPolicy } from "nats";
 import type { z } from "zod";
 import { propagation, context } from "@opentelemetry/api";
 import { withSpan, recordCounter, recordHistogram, Attributes } from "@wallpaperdb/core/telemetry";
@@ -163,14 +164,36 @@ export abstract class BaseEventConsumer<TSchema extends z.ZodType> {
 
     // Get or create consumer
     const consumers = this.js.consumers;
-    this.consumer = await consumers.get(this.streamName, this.durableName);
+
+    if (this.durableName) {
+      // Use JetStreamManager to create or get durable consumer
+      const jsm = await this.natsConnection.jetstreamManager();
+
+      try {
+        // Try to get existing consumer
+        await jsm.consumers.info(this.streamName, this.durableName);
+        this.consumer = await consumers.get(this.streamName, this.durableName);
+      } catch (_error) {
+        // Consumer doesn't exist, create it
+        await jsm.consumers.add(this.streamName, {
+          durable_name: this.durableName,
+          ack_policy: AckPolicy.Explicit,
+          ack_wait: this.ackWait * 1_000_000, // Convert ms to nanoseconds
+          max_deliver: this.maxRetries + 1, // Initial delivery + retries
+          filter_subject: this.subject,
+        });
+        this.consumer = await consumers.get(this.streamName, this.durableName);
+      }
+    } else {
+      // Use ordered consumer (ephemeral)
+      this.consumer = await consumers.get(this.streamName);
+    }
 
     // Start consuming
     this.consumerMessages = await this.consumer.consume();
 
-    // Process messages
+    // Process messages (don't await - let it run in background)
     this.processingPromise = this.processMessages();
-    await this.processingPromise;
   }
 
   /**

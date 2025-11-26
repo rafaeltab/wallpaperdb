@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import healthRoutes from './health.routes.js';
+import { registerMediaRoutes } from './media.routes.js';
 
 /**
  * Register all route plugins
@@ -7,4 +8,7 @@ import healthRoutes from './health.routes.js';
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // Health routes
   await app.register(healthRoutes);
+
+  // Media routes
+  await registerMediaRoutes(app);
 }

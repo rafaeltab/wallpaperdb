@@ -1,4 +1,4 @@
-import { bigint, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 /**
  * Wallpapers table - stores metadata from wallpaper.uploaded events
@@ -45,7 +45,12 @@ export const variants = pgTable('variants', {
 
   // Timestamps
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  // Composite index for efficient variant selection queries
+  // Used by VariantRepository.findSmallestSuitable() to find variants by dimensions
+  variantSelectionIdx: index('idx_variants_selection')
+    .on(table.wallpaperId, table.width, table.height),
+}));
 
 // Type exports for use in services
 export type Wallpaper = typeof wallpapers.$inferSelect;

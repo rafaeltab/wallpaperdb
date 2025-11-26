@@ -1,0 +1,68 @@
+import { eq, and, gte, sql } from "drizzle-orm";
+import { inject, injectable } from "tsyringe";
+import { DatabaseConnection } from "../connections/database.js";
+import { variants, type Variant } from "../db/schema.js";
+
+/**
+ * Repository for querying wallpaper variants.
+ */
+@injectable()
+export class VariantRepository {
+	constructor(
+		@inject(DatabaseConnection) private readonly db: DatabaseConnection,
+	) {}
+
+	/**
+	 * Find all variants for a wallpaper.
+	 *
+	 * @param wallpaperId - The wallpaper ID
+	 * @returns Array of variants (empty if none exist)
+	 */
+	async findByWallpaperId(wallpaperId: string): Promise<Variant[]> {
+		const client = this.db.getClient();
+
+		const results = await client.db
+			.select()
+			.from(variants)
+			.where(eq(variants.wallpaperId, wallpaperId));
+
+		return results;
+	}
+
+	/**
+	 * Find the smallest suitable variant that meets minimum dimensions.
+	 * Returns the variant that:
+	 * - Has width >= minWidth AND height >= minHeight
+	 * - Has the smallest total pixel count (width * height)
+	 *
+	 * This optimizes for efficiency - we want the smallest variant that's
+	 * still large enough to resize down from.
+	 *
+	 * @param wallpaperId - The wallpaper ID
+	 * @param minWidth - Minimum required width
+	 * @param minHeight - Minimum required height
+	 * @returns The smallest suitable variant, or null if none found
+	 */
+	async findSmallestSuitable(
+		wallpaperId: string,
+		minWidth: number,
+		minHeight: number,
+	): Promise<Variant | null> {
+		const client = this.db.getClient();
+
+		const results = await client.db
+			.select()
+			.from(variants)
+			.where(
+				and(
+					eq(variants.wallpaperId, wallpaperId),
+					gte(variants.width, minWidth),
+					gte(variants.height, minHeight),
+				),
+			)
+			.orderBy(sql`(${variants.width} * ${variants.height}) ASC`)
+			.limit(1);
+
+		return results[0] || null;
+	}
+}

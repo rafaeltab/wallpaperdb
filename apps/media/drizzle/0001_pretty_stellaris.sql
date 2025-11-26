@@ -1,0 +1,1 @@
+CREATE INDEX "idx_variants_selection" ON "variants" USING btree ("wallpaper_id","width","height");

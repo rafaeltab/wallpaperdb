@@ -148,6 +148,9 @@
             "outputs": [
                 "content/docs/openapi/**"
             ]
+        },
+        "db:migrate": {
+            "cache": false
         }
     }
 }

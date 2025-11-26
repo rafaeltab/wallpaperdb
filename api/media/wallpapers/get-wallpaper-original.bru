@@ -1,0 +1,31 @@
+meta {
+  name: Get Wallpaper (Original)
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:3003/wallpapers/:id
+  body: none
+  auth: none
+}
+
+params:path {
+  id: wlpr_01ARZ3NDEKTSV4RRFFQ69G5FAV
+}
+
+docs {
+  Retrieve the original wallpaper file without any resizing.
+
+  ## Request
+  - Path parameter: `id` (wallpaper ID, format: wlpr_<ulid>)
+
+  ## Response (200 OK)
+  - Content-Type: image/jpeg, image/png, image/webp, video/webm, or video/mp4
+  - Content-Length: Original file size
+  - Cache-Control: public, max-age=31536000, immutable
+  - Body: Binary file data (stream)
+
+  ## Error Responses (RFC 7807)
+  - 404: Wallpaper not found or file missing from storage
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: http://localhost:3003/health
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the media service is healthy (all dependencies operational).
+
+  Returns 200 if healthy, 503 if unhealthy.
+
+  Response includes status of:
+  - database (PostgreSQL)
+  - minio (S3 storage)
+  - nats (message queue)
+}

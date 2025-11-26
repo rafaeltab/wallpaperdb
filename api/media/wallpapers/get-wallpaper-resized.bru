@@ -1,0 +1,52 @@
+meta {
+  name: Get Wallpaper (Resized)
+  type: http
+  seq: 2
+}
+
+get {
+  url: http://localhost:3003/wallpapers/:id?w=1920&h=1080&fit=contain
+  body: none
+  auth: none
+}
+
+params:query {
+  w: 1920
+  h: 1080
+  fit: contain
+}
+
+params:path {
+  id: wlpr_01ARZ3NDEKTSV4RRFFQ69G5FAV
+}
+
+docs {
+  Retrieve a wallpaper file with optional resizing.
+
+  ## Request
+  - Path parameter: `id` (wallpaper ID, format: wlpr_<ulid>)
+  - Query parameters (all optional):
+    - `w`: Width in pixels (1-7680)
+    - `h`: Height in pixels (1-4320)
+    - `fit`: Resize mode (contain, cover, fill) - defaults to "contain"
+
+  ## Resize Modes
+  - `contain`: Maintain aspect ratio, fit within dimensions (default)
+  - `cover`: Maintain aspect ratio, crop to fill dimensions
+  - `fill`: Stretch to exact dimensions (ignores aspect ratio)
+
+  ## Response (200 OK)
+  - Content-Type: image/jpeg, image/png, image/webp (resized images are always returned as images)
+  - Cache-Control: public, max-age=31536000, immutable
+  - Body: Binary file data (stream)
+  - Note: Content-Length header is omitted for resized images
+
+  ## Error Responses (RFC 7807)
+  - 400: Invalid dimensions (w/h out of bounds or invalid fit mode)
+  - 404: Wallpaper not found or file missing from storage
+
+  ## Examples
+  - `/wallpapers/wlpr_123?w=1920&h=1080&fit=contain` - Resize to 1920x1080, maintain aspect ratio
+  - `/wallpapers/wlpr_123?w=800` - Resize to 800px width, maintain aspect ratio
+  - `/wallpapers/wlpr_123?h=600&fit=cover` - Resize to 600px height, crop to fill
+}

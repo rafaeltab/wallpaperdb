@@ -1,5 +1,6 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
         redis-cli redis-flush redis-info \
+        nats-setup-streams nats-stream-list nats-stream-info \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
@@ -21,6 +22,11 @@ help:
 	@echo "  make redis-cli      - Connect to Redis CLI"
 	@echo "  make redis-flush    - Flush all Redis data (WARNING: deletes all data)"
 	@echo "  make redis-info     - Show Redis server info"
+	@echo ""
+	@echo "NATS:"
+	@echo "  make nats-setup-streams - Setup all required NATS JetStream streams"
+	@echo "  make nats-stream-list   - List all NATS streams"
+	@echo "  make nats-stream-info   - Show info for WALLPAPER stream"
 	@echo ""
 	@echo "Ingestor Service:"
 	@echo "  make ingestor-dev        - Start ingestor in development mode"
@@ -103,6 +109,16 @@ redis-flush:
 
 redis-info:
 	@docker exec wallpaperdb-redis redis-cli INFO
+
+# NATS commands
+nats-setup-streams:
+	@./infra/nats/init/setup-streams.sh
+
+nats-stream-list:
+	@nats stream list --server nats://localhost:4222
+
+nats-stream-info:
+	@nats stream info WALLPAPER --server nats://localhost:4222
 
 # Ingestor service commands
 ingestor-dev:

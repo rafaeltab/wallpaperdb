@@ -7,12 +7,12 @@ import { BaseConnection } from "./base/base-connection.js";
 import type { OtelConfig } from "./types.js";
 
 export interface OtelConnectionOptions {
-    /** Metric export interval in ms (default: 60000) */
-    metricExportIntervalMs?: number;
-    /** Disable file system instrumentation (default: true - too noisy) */
-    disableFsInstrumentation?: boolean;
-    /** Log messages during initialization/shutdown (default: true) */
-    enableLogging?: boolean;
+  /** Metric export interval in ms (default: 60000) */
+  metricExportIntervalMs?: number;
+  /** Disable file system instrumentation (default: true - too noisy) */
+  disableFsInstrumentation?: boolean;
+  /** Log messages during initialization/shutdown (default: true) */
+  enableLogging?: boolean;
 }
 
 /**
@@ -35,63 +35,63 @@ export interface OtelConnectionOptions {
  * ```
  */
 export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
-    private options: OtelConnectionOptions;
+  private options: OtelConnectionOptions;
 
-    constructor(config: OtelConfig, options: OtelConnectionOptions = {}) {
-        super(config);
-        this.options = {
-            metricExportIntervalMs: 60000,
-            disableFsInstrumentation: true,
-            enableLogging: true,
-            ...options,
-        };
+  constructor(config: OtelConfig, options: OtelConnectionOptions = {}) {
+    super(config);
+    this.options = {
+      metricExportIntervalMs: 60000,
+      disableFsInstrumentation: true,
+      enableLogging: true,
+      ...options,
+    };
+  }
+
+  protected createClient(): NodeSDK {
+    const traceExporter = new OTLPTraceExporter({
+      url: `${this.config.otelEndpoint}/v1/traces`,
+    });
+
+    const metricExporter = new OTLPMetricExporter({
+      url: `${this.config.otelEndpoint}/v1/metrics`,
+    });
+
+    const sdk = new NodeSDK({
+      serviceName: this.config.otelServiceName,
+      traceExporter,
+      metricReader: new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: this.options.metricExportIntervalMs,
+      }),
+      instrumentations: [
+        getNodeAutoInstrumentations({
+          "@opentelemetry/instrumentation-fs": {
+            enabled: !this.options.disableFsInstrumentation,
+          },
+        }),
+      ],
+    });
+
+    sdk.start();
+
+    if (this.options.enableLogging) {
+      console.log("OpenTelemetry initialized");
     }
 
-    protected createClient(): NodeSDK {
-        const traceExporter = new OTLPTraceExporter({
-            url: `${this.config.otelEndpoint}/v1/traces`,
-        });
+    return sdk;
+  }
 
-        const metricExporter = new OTLPMetricExporter({
-            url: `${this.config.otelEndpoint}/v1/metrics`,
-        });
+  protected async closeClient(client: NodeSDK): Promise<void> {
+    await client.shutdown();
 
-        const sdk = new NodeSDK({
-            serviceName: this.config.otelServiceName,
-            traceExporter,
-            metricReader: new PeriodicExportingMetricReader({
-                exporter: metricExporter,
-                exportIntervalMillis: this.options.metricExportIntervalMs,
-            }),
-            instrumentations: [
-                getNodeAutoInstrumentations({
-                    "@opentelemetry/instrumentation-fs": {
-                        enabled: !this.options.disableFsInstrumentation,
-                    },
-                }),
-            ],
-        });
-
-        sdk.start();
-
-        if (this.options.enableLogging) {
-            console.log("OpenTelemetry initialized");
-        }
-
-        return sdk;
+    if (this.options.enableLogging) {
+      console.log("OpenTelemetry shut down");
     }
+  }
 
-    protected async closeClient(client: NodeSDK): Promise<void> {
-        await client.shutdown();
-
-        if (this.options.enableLogging) {
-            console.log("OpenTelemetry shut down");
-        }
-    }
-
-    async checkHealth(): Promise<boolean> {
-        // OTEL doesn't have a direct health check
-        // We assume it's healthy if it's initialized
-        return this.isInitialized();
-    }
+  async checkHealth(): Promise<boolean> {
+    // OTEL doesn't have a direct health check
+    // We assume it's healthy if it's initialized
+    return this.isInitialized();
+  }
 }

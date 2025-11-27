@@ -1,6 +1,6 @@
-import { OtelConnection } from "@wallpaperdb/core/connections";
-import { inject, singleton } from "tsyringe";
-import type { Config } from "../config.js";
+import { OtelConnection } from '@wallpaperdb/core/connections';
+import { inject, singleton } from 'tsyringe';
+import type { Config } from '../config.js';
 
 /**
  * OpenTelemetry connection for the media service.
@@ -8,11 +8,11 @@ import type { Config } from "../config.js";
  */
 @singleton()
 export class OpenTelemetryConnection extends OtelConnection {
-	constructor(@inject("config") config: Config) {
-		super(config, {
-			metricExportIntervalMs: 60000,
-			disableFsInstrumentation: true,
-			enableLogging: true,
-		});
-	}
+  constructor(@inject('config') config: Config) {
+    super(config, {
+      metricExportIntervalMs: 60000,
+      disableFsInstrumentation: true,
+      enableLogging: true,
+    });
+  }
 }

@@ -26,31 +26,38 @@ export const wallpapers = pgTable('wallpapers', {
  * Variants table - stores information about pre-generated size variants
  * Will be populated by a separate Variant Generator service
  */
-export const variants = pgTable('variants', {
-  // Primary key - variant ID (e.g., var_01ABC...)
-  id: text('id').primaryKey(),
+export const variants = pgTable(
+  'variants',
+  {
+    // Primary key - variant ID (e.g., var_01ABC...)
+    id: text('id').primaryKey(),
 
-  // Reference to parent wallpaper
-  wallpaperId: text('wallpaper_id')
-    .notNull()
-    .references(() => wallpapers.id, { onDelete: 'cascade' }),
+    // Reference to parent wallpaper
+    wallpaperId: text('wallpaper_id')
+      .notNull()
+      .references(() => wallpapers.id, { onDelete: 'cascade' }),
 
-  // Storage information
-  storageKey: text('storage_key').notNull(),
+    // Storage information
+    storageKey: text('storage_key').notNull(),
 
-  // Variant dimensions
-  width: integer('width').notNull(),
-  height: integer('height').notNull(),
-  fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }).notNull(),
+    // Variant dimensions
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }).notNull(),
 
-  // Timestamps
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => ({
-  // Composite index for efficient variant selection queries
-  // Used by VariantRepository.findSmallestSuitable() to find variants by dimensions
-  variantSelectionIdx: index('idx_variants_selection')
-    .on(table.wallpaperId, table.width, table.height),
-}));
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Composite index for efficient variant selection queries
+    // Used by VariantRepository.findSmallestSuitable() to find variants by dimensions
+    variantSelectionIdx: index('idx_variants_selection').on(
+      table.wallpaperId,
+      table.width,
+      table.height
+    ),
+  })
+);
 
 // Type exports for use in services
 export type Wallpaper = typeof wallpapers.$inferSelect;

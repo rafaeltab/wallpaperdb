@@ -296,6 +296,9 @@ lint:
 lint-fix:
 	@turbo run lint:fix --log-order grouped
 
+check:
+	@turbo run build lint check-types --log-order grouped
+
 install:
 	pnpm install
 

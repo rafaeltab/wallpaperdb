@@ -8,6 +8,7 @@ import {
 	WALLPAPER_UPLOADED_SUBJECT,
 	type WallpaperUploadedEvent,
 } from "@wallpaperdb/events/schemas";
+import { recordHistogram, Attributes } from "@wallpaperdb/core/telemetry";
 import { inject, injectable } from "tsyringe";
 import type { z } from "zod";
 import type { Config } from "../../config.js";
@@ -51,6 +52,8 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
 		);
 
 		try {
+			const startTime = Date.now();
+
 			await this.repository.upsert({
 				id: event.wallpaper.id,
 				storageBucket: event.wallpaper.storageBucket,
@@ -59,6 +62,13 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
 				width: event.wallpaper.width,
 				height: event.wallpaper.height,
 				fileSizeBytes: event.wallpaper.fileSizeBytes,
+			});
+
+			const durationMs = Date.now() - startTime;
+
+			// Record business-specific metric (repository upsert already has db metrics)
+			recordHistogram("media.consumer.upsert_duration_ms", durationMs, {
+				[Attributes.EVENT_TYPE]: "wallpaper.uploaded",
 			});
 
 			console.log(

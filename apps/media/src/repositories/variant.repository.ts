@@ -1,5 +1,6 @@
 import { eq, and, gte, sql } from "drizzle-orm";
 import { inject, injectable } from "tsyringe";
+import { withSpan, Attributes, recordCounter, recordHistogram } from "@wallpaperdb/core/telemetry";
 import { DatabaseConnection } from "../connections/database.js";
 import { variants, type Variant } from "../db/schema.js";
 
@@ -48,21 +49,52 @@ export class VariantRepository {
 		minWidth: number,
 		minHeight: number,
 	): Promise<Variant | null> {
-		const client = this.db.getClient();
+		return await withSpan(
+			"db.variant.find_smallest_suitable",
+			{
+				[Attributes.WALLPAPER_ID]: wallpaperId,
+				[Attributes.RESIZE_WIDTH]: minWidth,
+				[Attributes.RESIZE_HEIGHT]: minHeight,
+			},
+			async (span) => {
+				const startTime = Date.now();
+				const client = this.db.getClient();
 
-		const results = await client.db
-			.select()
-			.from(variants)
-			.where(
-				and(
-					eq(variants.wallpaperId, wallpaperId),
-					gte(variants.width, minWidth),
-					gte(variants.height, minHeight),
-				),
-			)
-			.orderBy(sql`(${variants.width} * ${variants.height}) ASC`)
-			.limit(1);
+				const results = await client.db
+					.select()
+					.from(variants)
+					.where(
+						and(
+							eq(variants.wallpaperId, wallpaperId),
+							gte(variants.width, minWidth),
+							gte(variants.height, minHeight),
+						),
+					)
+					.orderBy(sql`(${variants.width} * ${variants.height}) ASC`)
+					.limit(1);
 
-		return results[0] || null;
+				const durationMs = Date.now() - startTime;
+				const result = results[0] || null;
+				const found = result !== null;
+
+				span.setAttribute("db.query.found", found);
+				if (found && result) {
+					span.setAttribute(Attributes.VARIANT_ID, result.id);
+				}
+
+				recordCounter("db.queries.total", 1, {
+					table: "variants",
+					operation: "find_smallest_suitable",
+					found: found.toString(),
+				});
+
+				recordHistogram("db.query_duration_ms", durationMs, {
+					table: "variants",
+					operation: "find_smallest_suitable",
+				});
+
+				return result;
+			},
+		);
 	}
 }

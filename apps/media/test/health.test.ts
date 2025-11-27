@@ -102,8 +102,11 @@ describe("Media Service - Health Endpoint", () => {
 		expect(body.checks).toHaveProperty("minio");
 		expect(body.checks).toHaveProperty("nats");
 
-		// Media service should NOT have otel or redis checks in Phase 1
-		expect(body.checks).not.toHaveProperty("otel");
+		// Media service should have otel check (initialized)
+		expect(body.checks).toHaveProperty("otel");
+		expect(body.checks.otel).toBe(true);
+
+		// Media service should NOT have redis check in Phase 1
 		expect(body.checks).not.toHaveProperty("redis");
 	});
 });

@@ -6,6 +6,7 @@ import type { Config } from './config.js';
 import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
+import { OpenTelemetryConnection } from './connections/otel.js';
 import { registerRoutes } from './routes/index.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
 
@@ -88,6 +89,12 @@ export async function createApp(
   fastify.log.info('Initializing connections...');
 
   try {
+    // Initialize OpenTelemetry first (must be initialized before other services)
+    if (options?.enableOtel !== false) {
+      await container.resolve(OpenTelemetryConnection).initialize();
+      fastify.log.info('OpenTelemetry initialized');
+    }
+
     await container.resolve(DatabaseConnection).initialize();
     fastify.log.info('Database connection pool created');
 
@@ -135,6 +142,11 @@ export async function createApp(
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
     await container.resolve(MinioConnection).close();
+
+    // Close OpenTelemetry last (to capture all final metrics/traces)
+    if (options?.enableOtel !== false) {
+      await container.resolve(OpenTelemetryConnection).close();
+    }
   });
 
   // Register all routes

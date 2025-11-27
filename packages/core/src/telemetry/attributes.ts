@@ -42,6 +42,21 @@ export const Attributes = {
   EVENT_STREAM: "event.stream",
   EVENT_CONSUMER: "event.consumer",
   EVENT_DELIVERY_ATTEMPT: "event.delivery_attempt",
+
+  // Resize context
+  RESIZE_WIDTH: "resize.width",
+  RESIZE_HEIGHT: "resize.height",
+  RESIZE_FIT_MODE: "resize.fit_mode",
+  RESIZE_SOURCE: "resize.source", // "original" | "variant"
+
+  // Variant selection
+  VARIANT_ID: "variant.id",
+  VARIANT_SELECTION_RESULT: "variant.selection.result", // "hit" | "miss" | "no_resize" | "upscale_avoided"
+  VARIANT_FALLBACK: "variant.fallback", // true if variant file missing, fell back to original
+
+  // Image processing
+  IMAGE_FORMAT: "image.format", // jpeg, png, webp
+  IMAGE_QUALITY: "image.quality",
 } as const;
 
 export type AttributeKey = (typeof Attributes)[keyof typeof Attributes];

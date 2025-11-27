@@ -40,6 +40,9 @@ export function setSpanAttribute(key: string, value: string | number | boolean):
 /**
  * Wraps an async function in a span, automatically handling success/error status.
  *
+ * Uses startActiveSpan to ensure proper context propagation - nested withSpan calls
+ * will automatically create parent-child relationships.
+ *
  * @example
  * ```typescript
  * const result = await withSpan(
@@ -61,28 +64,34 @@ export async function withSpan<T>(
   options?: SpanOptions
 ): Promise<T> {
   const tracer = getTracer();
-  const span = tracer.startSpan(name, { attributes, ...options });
 
-  try {
-    const result = await fn(span);
-    span.setStatus({ code: SpanStatusCode.OK });
-    return result;
-  } catch (error) {
-    span.setStatus({
-      code: SpanStatusCode.ERROR,
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-    if (error instanceof Error) {
-      span.recordException(error);
+  // Use startActiveSpan instead of startSpan to ensure proper context propagation
+  // NOTE: startActiveSpan automatically ends the span when the callback completes
+  return tracer.startActiveSpan(name, { attributes, ...options }, async (span) => {
+    try {
+      const result = await fn(span);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      if (error instanceof Error) {
+        span.recordException(error);
+      }
+      throw error;
+    } finally {
+      span.end();
     }
-    throw error;
-  } finally {
-    span.end();
-  }
+  });
 }
 
 /**
  * Synchronous version of withSpan for non-async operations.
+ *
+ * Uses startActiveSpan to ensure proper context propagation - nested withSpanSync calls
+ * will automatically create parent-child relationships.
  */
 export function withSpanSync<T>(
   name: string,
@@ -91,22 +100,25 @@ export function withSpanSync<T>(
   options?: SpanOptions
 ): T {
   const tracer = getTracer();
-  const span = tracer.startSpan(name, { attributes, ...options });
 
-  try {
-    const result = fn(span);
-    span.setStatus({ code: SpanStatusCode.OK });
-    return result;
-  } catch (error) {
-    span.setStatus({
-      code: SpanStatusCode.ERROR,
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-    if (error instanceof Error) {
-      span.recordException(error);
+  // Use startActiveSpan instead of startSpan to ensure proper context propagation
+  // NOTE: startActiveSpan automatically ends the span when the callback completes
+  return tracer.startActiveSpan(name, { attributes, ...options }, (span) => {
+    try {
+      const result = fn(span);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+      if (error instanceof Error) {
+        span.recordException(error);
+      }
+      throw error;
+    } finally {
+      span.end();
     }
-    throw error;
-  } finally {
-    span.end();
-  }
+  });
 }

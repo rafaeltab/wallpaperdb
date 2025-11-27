@@ -10,3 +10,4 @@ export {
   type RedisClientOptions,
 } from "./redis.js";
 export { createOtelSdk, shutdownOtelSdk, type OtelOptions } from "./otel.js";
+export { OtelConnection, type OtelConnectionOptions } from "./otel-connection.js";

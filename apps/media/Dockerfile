@@ -18,7 +18,7 @@ FROM build_base AS pruner
 RUN pnpm install -g turbo@^2
 COPY . .
  
-RUN turbo prune @wallpaperdb/ingestor --docker
+RUN turbo prune @wallpaperdb/media --docker
  
 FROM build_base AS builder
  
@@ -36,17 +36,17 @@ RUN apk update && apk add --no-cache libc6-compat
 
 # Don't run production as root
 RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 ingestor
+RUN adduser --system --uid 1001 media
 
-WORKDIR /app/apps/ingestor
+WORKDIR /app/apps/media
 
 # Copy built application and dependencies from builder
 # Preserve pnpm workspace structure for proper module resolution
-COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/dist ./dist
-COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/node_modules ./node_modules
-COPY --from=builder --chown=ingestor:nodejs /app/node_modules /app/node_modules
+COPY --from=builder --chown=media:nodejs /app/apps/media/dist ./dist
+COPY --from=builder --chown=media:nodejs /app/apps/media/node_modules ./node_modules
+COPY --from=builder --chown=media:nodejs /app/node_modules /app/node_modules
 
-USER ingestor
+USER media
 
 EXPOSE 3000
 

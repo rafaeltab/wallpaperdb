@@ -11,10 +11,9 @@ import { wallpapers, type NewWallpaper, type Wallpaper } from "../db/schema.js";
  */
 @injectable()
 export class WallpaperRepository {
-	private readonly db: DatabaseClient["db"];
+    get db() { return this.dbConnection.getClient().db; }
 
-	constructor(@inject(DatabaseConnection) dbConnection: DatabaseConnection) {
-		this.db = dbConnection.getClient().db;
+	constructor(@inject(DatabaseConnection) private readonly dbConnection: DatabaseConnection) {
 	}
 
 	/**

@@ -1,10 +1,15 @@
 import 'reflect-metadata';
 import type { FastifyInstance } from 'fastify';
-import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { initializeOtel } from './otel-init.js';
+import { createApp } from './app.js';
 
 // Load configuration
 const config = loadConfig();
+
+// Initialize OpenTelemetry IMMEDIATELY (before importing/using app)
+// This ensures auto-instrumentations are active before pg, fastify, etc. are loaded
+initializeOtel(config);
 
 // Graceful shutdown handler
 async function gracefulShutdown(signal: string, fastify: FastifyInstance) {

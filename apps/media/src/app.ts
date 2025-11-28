@@ -6,8 +6,8 @@ import type { Config } from './config.js';
 import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
-import { OpenTelemetryConnection } from './connections/otel.js';
 import { registerRoutes } from './routes/index.js';
+import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
 
 // Connection state interface
@@ -85,15 +85,17 @@ export async function createApp(
     connectionsInitialized: false,
   });
 
+  // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
+  // This allows the SDK to be accessed via DI if needed
+  const otelSdk = getOtelSdk();
+  if (otelSdk) {
+    container.register('otelSdk', { useValue: otelSdk });
+  }
+
   // Initialize connections
   fastify.log.info('Initializing connections...');
 
   try {
-    // Initialize OpenTelemetry first (must be initialized before other services)
-    if (options?.enableOtel !== false) {
-      await container.resolve(OpenTelemetryConnection).initialize();
-      fastify.log.info('OpenTelemetry initialized');
-    }
 
     await container.resolve(DatabaseConnection).initialize();
     fastify.log.info('Database connection pool created');
@@ -142,11 +144,7 @@ export async function createApp(
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
     await container.resolve(MinioConnection).close();
-
-    // Close OpenTelemetry last (to capture all final metrics/traces)
-    if (options?.enableOtel !== false) {
-      await container.resolve(OpenTelemetryConnection).close();
-    }
+    await shutdownOtel();
   });
 
   // Register all routes

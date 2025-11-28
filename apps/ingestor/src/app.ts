@@ -6,9 +6,9 @@ import type { Config } from './config.js';
 import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
-import { OpenTelemetryConnection } from './connections/otel.js';
 import { RedisConnection } from './connections/redis.js';
 import { registerRoutes } from './routes/index.js';
+import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import {
   UploadSuccessResponseJsonSchema,
   uploadBodySchemaForDocs,
@@ -44,9 +44,11 @@ export async function createApp(
   // Register TimeService as singleton instance for testability
   container.register('TimeService', { useValue: new SystemTimeService() });
 
-  // Initialize OpenTelemetry first (for instrumentation) - skip in tests by default
-  if (options?.enableOtel !== false && config.nodeEnv !== 'test') {
-    await container.resolve(OpenTelemetryConnection).initialize();
+  // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
+  // This allows the SDK to be accessed via DI if needed
+  const otelSdk = getOtelSdk();
+  if (otelSdk) {
+    container.register('otelSdk', { useValue: otelSdk });
   }
 
   // Create Fastify server
@@ -167,7 +169,7 @@ export async function createApp(
     await container.resolve(DatabaseConnection).close();
     await container.resolve(MinioConnection).close();
     await container.resolve(RedisConnection).close();
-    await container.resolve(OpenTelemetryConnection).close();
+    await shutdownOtel();
   });
 
   // Initialize custom rate limiting service

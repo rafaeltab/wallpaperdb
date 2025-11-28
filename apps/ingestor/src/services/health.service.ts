@@ -8,7 +8,7 @@ import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
 import { MinioConnection } from '../connections/minio.js';
 import { NatsConnectionManager } from '../connections/nats.js';
-import { OpenTelemetryConnection } from '../connections/otel.js';
+import { getOtelSdk } from '../otel-init.js';
 
 // Re-export types for backwards compatibility
 export type HealthResponse = CoreHealthResponse;
@@ -30,8 +30,7 @@ export class HealthService {
     @inject('config') private readonly config: Config,
     @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
     @inject(MinioConnection) private readonly minioConnection: MinioConnection,
-    @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager,
-    @inject(OpenTelemetryConnection) private readonly otelConnection: OpenTelemetryConnection
+    @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager
   ) {
     this.aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
 
@@ -40,12 +39,27 @@ export class HealthService {
     this.aggregator.register('minio', async () => this.minioConnection.checkHealth());
     this.aggregator.register('nats', async () => this.natsConnection.checkHealth());
 
-    // OTEL is optional in tests - if disabled, consider it healthy
-    if (this.config.nodeEnv === 'test') {
-      this.aggregator.register('otel', async () => true);
-    } else {
-      this.aggregator.register('otel', async () => this.otelConnection.checkHealth());
-    }
+    // OTEL health check logic:
+    // - In test mode: always report healthy (tests don't initialize OTEL)
+    // - If OTEL endpoint is NOT configured (disabled): always report healthy (true)
+    // - If OTEL endpoint IS configured (enabled): check if SDK is actually running
+    this.aggregator.register('otel', async () => {
+      // In tests, OTEL is not initialized - this is expected and healthy
+      if (this.config.nodeEnv === 'test') {
+        return true;
+      }
+
+      const isOtelConfigured = !!this.config.otelEndpoint;
+      const isOtelRunning = getOtelSdk() !== null;
+
+      if (!isOtelConfigured) {
+        // OTEL is disabled - this is fine, report as healthy
+        return true;
+      }
+
+      // OTEL is configured - check if it's actually running
+      return isOtelRunning;
+    });
   }
 
   async checkHealth(isShuttingDown: boolean): Promise<HealthResponse> {

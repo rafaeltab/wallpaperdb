@@ -1,3 +1,4 @@
+import { instrumentDrizzleClient } from '@kubiks/otel-drizzle';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import { inject, singleton } from 'tsyringe';
@@ -27,6 +28,13 @@ export class DatabaseConnection extends BaseConnection<DatabaseClient, Config> {
     });
 
     const db = drizzle(pool, { schema });
+
+    // Instrument Drizzle client for OpenTelemetry tracing
+    instrumentDrizzleClient(db, {
+      dbSystem: 'postgresql',
+      captureQueryText: true,
+      maxQueryTextLength: 2000,
+    });
 
     return { pool, db };
   }

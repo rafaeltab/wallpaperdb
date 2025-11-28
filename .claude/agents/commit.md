@@ -15,6 +15,8 @@ To create useful, consistent, and concise commits you always follow these steps:
 5. You write a description of 1-4 short lines, explaining what changed and why. Include context, motivation, and notable impacts. Mention breaking changes or follow-ups if relevant.
 6. Finally you create a commit.
 
+You do not create commits with huge descriptions. You sacrifice grammar for the sake of being concise.
+
 # Commit format
 
 ```

@@ -1,0 +1,21 @@
+{
+    "name": "cosine_color_accuracy",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts"
+    },
+    "type": "module",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "packageManager": "pnpm@10.18.3",
+    "devDependencies": {
+        "tsx": "^4.19.2",
+        "typescript": "^5.9.3"
+    },
+    "dependencies": {
+        "sharp": "^0.33.5"
+    }
+}

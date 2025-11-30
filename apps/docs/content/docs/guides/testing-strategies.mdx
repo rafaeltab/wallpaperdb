@@ -1,0 +1,758 @@
+---
+title: Testing Strategies
+description: When to use unit, integration, and E2E tests in WallpaperDB
+---
+
+WallpaperDB organizes tests by resource intensity to optimize local development speed and CI/CD reliability. This guide helps you choose the right test type for your needs.
+
+## Quick Decision Tree
+
+```
+Is this pure logic with no external dependencies?
+└─ YES → Unit test (make test-unit)
+└─ NO  → Does it test the full deployment artifact?
+   ├─ YES → E2E test (make test-e2e)
+   └─ NO  → Integration test (make test-integration)
+```
+
+**Rule of thumb:**
+- **Unit tests:** Pure functions, utilities, schemas, validators
+- **Integration tests:** Routes, services, database interactions, NATS publishing
+- **E2E tests:** Docker deployment, multi-container orchestration, production-like scenarios
+
+## Test Categories
+
+### Unit Tests
+
+**Characteristics:**
+- Fast (milliseconds)
+- No containers
+- No external dependencies (databases, message queues, object storage)
+- Pure logic testing
+
+**When to use:**
+- Testing utility functions
+- Validating Zod schemas
+- Testing error classes
+- Configuration parsing
+- Data transformations
+
+**Packages with unit tests:**
+- `@wallpaperdb/core` - Config schemas, telemetry helpers
+- `@wallpaperdb/events` - Event schemas, validators
+- `@wallpaperdb/url-ipv4-resolver` - URL validation logic
+
+**Run command:**
+```bash
+make test-unit
+```
+
+**Example:**
+```typescript
+// packages/core/src/config/database.test.ts
+import { describe, it, expect } from 'vitest';
+import { DatabaseConfigSchema } from './database.js';
+
+describe('DatabaseConfigSchema', () => {
+  it('should parse valid database URL', () => {
+    const result = DatabaseConfigSchema.parse({
+      databaseUrl: 'postgresql://user:pass@localhost:5432/db',
+    });
+
+    expect(result.databaseUrl).toBe('postgresql://user:pass@localhost:5432/db');
+  });
+
+  it('should reject invalid URL', () => {
+    expect(() => {
+      DatabaseConfigSchema.parse({ databaseUrl: 'invalid' });
+    }).toThrow();
+  });
+});
+```
+
+**Advantages:**
+- Instant feedback (< 1 second)
+- Easy to debug
+- No infrastructure setup needed
+- Great for TDD
+
+**Limitations:**
+- Can't test integrations
+- Can't verify real infrastructure behavior
+- May miss connection/serialization issues
+
+### Integration Tests
+
+**Characteristics:**
+- Medium speed (2-10 seconds per test suite)
+- Uses Testcontainers for real infrastructure
+- App runs in-process (same Node.js runtime)
+- Tests full request/response cycle
+
+**When to use:**
+- Testing HTTP routes
+- Testing database operations (Drizzle ORM)
+- Testing MinIO uploads
+- Testing NATS event publishing
+- Testing Redis caching
+- Testing service interactions
+
+**Packages with integration tests:**
+- `@wallpaperdb/ingestor` - Full upload flow, reconciliation
+
+**Run command:**
+```bash
+make test-integration
+```
+
+**Example:**
+```typescript
+// apps/ingestor/test/upload-flow.test.ts
+import { describe, it, expect } from 'vitest';
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+describe('POST /upload', () => {
+  it('should upload wallpaper successfully', async () => {
+    const { app, db, cleanup } = await new TesterBuilder()
+      .withPostgres()
+      .withMinIO()
+      .withNATS()
+      .withRedis()
+      .withIngestorApp()
+      .build();
+
+    try {
+      const file = Buffer.from('fake-image-data');
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/upload',
+        payload: {
+          file: {
+            filename: 'test.jpg',
+            mimetype: 'image/jpeg',
+            encoding: '7bit',
+            value: file,
+          },
+          userId: 'test-user',
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+
+      const body = JSON.parse(response.body);
+      expect(body.wallpaperId).toMatch(/^wlpr_/);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+```
+
+**Advantages:**
+- Tests real infrastructure (PostgreSQL, MinIO, NATS, Redis)
+- Catches integration bugs (serialization, connection pooling)
+- Fast enough for TDD workflow
+- Container reuse across test files (< 5s startup)
+
+**Limitations:**
+- Requires Docker
+- Slower than unit tests
+- Can't test deployment artifacts (Docker image, environment variables)
+- Resource intensive (multiple containers)
+
+### E2E Tests
+
+**Characteristics:**
+- Slow (10-30 seconds per test suite)
+- Tests Docker deployment artifact
+- App runs in separate container
+- Full production-like environment
+
+**When to use:**
+- Testing Docker image build
+- Testing environment variable configuration
+- Testing multi-container orchestration
+- Testing service-to-service communication
+- Verifying deployment readiness
+
+**Packages with E2E tests:**
+- `@wallpaperdb/testcontainers` - Custom container implementations
+- `@wallpaperdb/test-utils` - TesterBuilder framework
+- `@wallpaperdb/ingestor-e2e` - Ingestor deployment tests
+
+**Run command:**
+```bash
+make test-e2e
+```
+
+**Example:**
+```typescript
+// apps/ingestor-e2e/test/health-builder.e2e.test.ts
+import { describe, it, expect } from 'vitest';
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+describe('Ingestor E2E - Health endpoints', () => {
+  it('should respond to health check', async () => {
+    const { client, cleanup } = await new TesterBuilder()
+      .withDocker()
+      .withPostgres()
+      .withMinIO()
+      .withNATS()
+      .withRedis()
+      .withIngestorDocker()
+      .build();
+
+    try {
+      const response = await client.get('/health');
+
+      expect(response.status).toBe(200);
+      expect(response.data).toEqual({
+        status: 'ok',
+        timestamp: expect.any(String),
+      });
+    } finally {
+      await cleanup();
+    }
+  });
+});
+```
+
+**Advantages:**
+- Tests actual deployment artifact (Docker image)
+- Verifies environment variables and configuration
+- Catches container-specific issues (networking, permissions)
+- Production-representative
+
+**Limitations:**
+- Slow (Docker image build + container startup)
+- Resource intensive (CPU, memory, disk)
+- Not suitable for TDD
+- Harder to debug (logs across containers)
+
+## Test Organization
+
+### By Intensity
+
+```
+packages/
+  core/
+    src/
+      config/
+        database.test.ts        # Unit test
+      telemetry/
+        otel.test.ts            # Unit test
+
+  events/
+    src/
+      schemas/
+        wallpaper.test.ts       # Unit test
+
+  url-ipv4-resolver/
+    src/
+      index.test.ts             # Unit test
+
+apps/
+  ingestor/
+    test/
+      upload-flow.test.ts       # Integration test
+      reconciliation.test.ts    # Integration test
+      health-builder.test.ts    # Integration test
+
+  ingestor-e2e/
+    test/
+      health-builder.e2e.test.ts    # E2E test
+      upload-builder.e2e.test.ts    # E2E test
+```
+
+### By Package
+
+Each package defines test scripts in `package.json`:
+
+```json
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run",
+    "test:e2e": "vitest run"
+  }
+}
+```
+
+**Turbo orchestrates parallel execution:**
+```bash
+# Run all tests
+make test
+
+# Run by intensity
+make test-unit         # Fast, no containers
+make test-integration  # Medium, uses Testcontainers
+make test-e2e          # Slow, sequential (--concurrency=1)
+```
+
+## TesterBuilder Pattern
+
+Composable test infrastructure setup:
+
+```typescript
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+const { app, db, cleanup } = await new TesterBuilder()
+  .withPostgres()         // PostgreSQL container + migrations
+  .withMinIO()            // MinIO container + bucket setup
+  .withNATS()             // NATS container + stream setup
+  .withRedis()            // Redis container
+  .withIngestorApp()      // In-process Fastify app (integration)
+  .build();
+
+// Or for E2E:
+const { client, cleanup } = await new TesterBuilder()
+  .withDocker()           // Docker client
+  .withPostgres()
+  .withMinIO()
+  .withNATS()
+  .withRedis()
+  .withIngestorDocker()   // Containerized app (E2E)
+  .build();
+```
+
+**See also:** [Guide: TesterBuilder Pattern](/docs/packages/test-utils)
+
+## Coverage Requirements
+
+**Target coverage:**
+- Unit tests: 90%+ coverage
+- Integration tests: 80%+ coverage
+- E2E tests: Critical paths only (health, upload, retrieval)
+
+**Generate coverage:**
+```bash
+make test-coverage          # Run all tests with coverage
+make coverage-summary       # Display AI-friendly summary
+open coverage/index.html    # View HTML report
+```
+
+**Coverage reporters:**
+- `text` - Console output
+- `json` - Machine-readable (`coverage/coverage-summary.json`)
+- `html` - Interactive browser report (`coverage/index.html`)
+- `lcov` - For Codecov integration (`coverage/lcov.info`)
+
+## Testing Best Practices
+
+### 1. Test Pyramid
+
+Maintain a healthy test distribution:
+
+```
+     /\
+    /E2E\          10% - Critical paths only
+   /------\
+  / Integ \       30% - Routes, services, workflows
+ /----------\
+/    Unit    \    60% - Pure logic, utilities, validators
+/-------------\
+```
+
+**Why?**
+- Unit tests are fast → quick feedback loop
+- Integration tests catch bugs → confidence in integrations
+- E2E tests verify deployment → production readiness
+
+### 2. Test-First Development (TDD)
+
+**Write tests before implementation:**
+
+1. **Write failing test** - Define expected behavior
+2. **Implement minimum code** - Make test pass
+3. **Refactor** - Improve code while keeping tests green
+4. **Repeat** - Add next test
+
+**Example workflow:**
+```bash
+# 1. Write test
+vim packages/core/src/config/s3.test.ts
+
+# 2. Run test (fails)
+make test-unit
+
+# 3. Implement
+vim packages/core/src/config/s3.ts
+
+# 4. Run test (passes)
+make test-unit
+
+# 5. Refactor and repeat
+```
+
+### 3. Arrange-Act-Assert
+
+Structure tests clearly:
+
+```typescript
+it('should upload wallpaper successfully', async () => {
+  // Arrange - Set up test data
+  const file = Buffer.from('fake-image-data');
+  const userId = 'test-user';
+
+  // Act - Execute the operation
+  const response = await app.inject({
+    method: 'POST',
+    url: '/upload',
+    payload: { file, userId },
+  });
+
+  // Assert - Verify the result
+  expect(response.statusCode).toBe(200);
+  expect(response.body.wallpaperId).toMatch(/^wlpr_/);
+});
+```
+
+### 4. Test Isolation
+
+**Each test should be independent:**
+- Don't rely on test execution order
+- Clean up resources after each test
+- Use unique identifiers (random user IDs, unique filenames)
+
+```typescript
+describe('Upload flow', () => {
+  let cleanup: () => Promise<void>;
+
+  beforeEach(async () => {
+    const builder = await new TesterBuilder()
+      .withPostgres()
+      .withMinIO()
+      .build();
+    cleanup = builder.cleanup;
+  });
+
+  afterEach(async () => {
+    await cleanup();
+  });
+
+  it('test 1', async () => {
+    // Isolated
+  });
+
+  it('test 2', async () => {
+    // Isolated
+  });
+});
+```
+
+### 5. Descriptive Test Names
+
+**Use full sentences that describe behavior:**
+
+❌ **Bad:**
+```typescript
+it('upload', async () => { ... });
+it('error', async () => { ... });
+```
+
+✅ **Good:**
+```typescript
+it('should upload JPEG wallpaper successfully', async () => { ... });
+it('should return 400 when file format is invalid', async () => { ... });
+```
+
+### 6. Test Edge Cases
+
+Don't just test the happy path:
+
+```typescript
+describe('File validation', () => {
+  it('should accept valid JPEG', async () => { ... });
+  it('should accept valid PNG', async () => { ... });
+  it('should reject GIF format', async () => { ... });
+  it('should reject file with wrong extension', async () => { ... });
+  it('should reject file without magic bytes', async () => { ... });
+  it('should reject decompression bombs', async () => { ... });
+});
+```
+
+### 7. Use Fixtures
+
+**Create reusable test data:**
+
+```typescript
+// test/fixtures/images.ts
+export const VALID_JPEG = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, /* ... */]);
+export const VALID_PNG = Buffer.from([0x89, 0x50, 0x4E, 0x47, /* ... */]);
+export const INVALID_GIF = Buffer.from([0x47, 0x49, 0x46, 0x38, /* ... */]);
+
+// test/upload.test.ts
+import { VALID_JPEG, INVALID_GIF } from './fixtures/images.js';
+
+it('should accept JPEG', async () => {
+  const response = await upload(VALID_JPEG);
+  expect(response.statusCode).toBe(200);
+});
+
+it('should reject GIF', async () => {
+  const response = await upload(INVALID_GIF);
+  expect(response.statusCode).toBe(400);
+});
+```
+
+### 8. Container Reuse
+
+**Reuse containers across test files:**
+
+```typescript
+// test/setup.ts
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+let sharedContainers: Awaited<ReturnType<typeof TesterBuilder.prototype.build>>;
+
+export async function setup() {
+  sharedContainers = await new TesterBuilder()
+    .withPostgres()
+    .withMinIO()
+    .withNATS()
+    .withRedis()
+    .build();
+}
+
+export async function teardown() {
+  await sharedContainers?.cleanup();
+}
+
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    globalSetup: ['./test/setup.ts'],
+  },
+});
+```
+
+**Benefits:**
+- Faster test suite (containers start once)
+- Reduced Docker resource usage
+- Better for CI/CD
+
+## CI/CD Integration
+
+### GitHub Actions
+
+**Two workflows:**
+
+1. **ci.yml** - Fast checks (build, lint, types, unit, integration)
+2. **e2e.yml** - Slow E2E tests (runs on PR approval)
+
+**Example ci.yml:**
+```yaml
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - run: pnpm install
+      - run: pnpm run build
+      - run: pnpm run lint
+      - run: pnpm run check-types
+      - run: pnpm run test:unit
+      - run: pnpm run test:integration --concurrency=1
+
+      - uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+```
+
+### Local CI Parity
+
+**Run full CI pipeline locally:**
+```bash
+make ci
+```
+
+**Equivalent to:**
+```bash
+turbo run build lint check-types test:unit test:integration
+turbo run test:e2e --concurrency=1
+pnpm coverage:merge
+```
+
+**Force no cache:**
+```bash
+make ci-force
+```
+
+## Debugging Tests
+
+### Logs
+
+**View test output:**
+```bash
+make test-integration  # Shows all logs
+```
+
+**Filter by test:**
+```bash
+pnpm --filter @wallpaperdb/ingestor test upload-flow
+```
+
+### Vitest UI
+
+**Interactive test runner:**
+```bash
+make test-ui
+```
+
+**Features:**
+- Run/debug individual tests
+- View test coverage
+- Inspect failures
+- Watch mode with file watching
+
+### Container Logs
+
+**If a test hangs, check container logs:**
+```bash
+docker ps                     # Find container ID
+docker logs <container-id>    # View logs
+docker exec -it <container-id> sh  # Shell into container
+```
+
+### Database Inspection
+
+**Use Drizzle Studio to inspect test database:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:studio
+```
+
+**Or connect with psql:**
+```bash
+docker exec -it wallpaperdb-postgres psql -U wallpaperdb
+```
+
+## Common Pitfalls
+
+### 1. Testing Implementation Details
+
+❌ **Bad:**
+```typescript
+it('should call uploadToMinIO with correct params', async () => {
+  const spy = vi.spyOn(storage, 'uploadToMinIO');
+  await handler(request);
+  expect(spy).toHaveBeenCalledWith('bucket', 'key', buffer);
+});
+```
+
+✅ **Good:**
+```typescript
+it('should upload file to MinIO', async () => {
+  await handler(request);
+  const exists = await storage.fileExists('bucket', 'key');
+  expect(exists).toBe(true);
+});
+```
+
+**Why?** Testing implementation ties tests to code structure, making refactoring difficult.
+
+### 2. Shared Mutable State
+
+❌ **Bad:**
+```typescript
+let counter = 0;
+
+it('test 1', () => {
+  counter++;
+  expect(counter).toBe(1);
+});
+
+it('test 2', () => {
+  counter++;
+  expect(counter).toBe(1); // Fails if test 1 runs first
+});
+```
+
+✅ **Good:**
+```typescript
+it('test 1', () => {
+  const counter = 0;
+  expect(counter + 1).toBe(1);
+});
+
+it('test 2', () => {
+  const counter = 0;
+  expect(counter + 1).toBe(1);
+});
+```
+
+### 3. Not Cleaning Up Resources
+
+❌ **Bad:**
+```typescript
+it('test', async () => {
+  const container = await startPostgres();
+  // Test...
+  // Container never stopped → resource leak
+});
+```
+
+✅ **Good:**
+```typescript
+it('test', async () => {
+  const { cleanup } = await new TesterBuilder()
+    .withPostgres()
+    .build();
+
+  try {
+    // Test...
+  } finally {
+    await cleanup();
+  }
+});
+```
+
+### 4. Flaky Tests
+
+**Common causes:**
+- Race conditions (use `await` everywhere)
+- Timing issues (avoid `setTimeout`, use `waitFor` utilities)
+- Shared state between tests (isolate tests)
+- Non-deterministic data (use fixed seeds, UUIDs)
+
+**Example fix:**
+```typescript
+// ❌ Flaky - race condition
+it('should process upload', async () => {
+  uploadFile(file);
+  const result = await db.query('SELECT * FROM wallpapers');
+  expect(result.rows).toHaveLength(1);
+});
+
+// ✅ Fixed - wait for completion
+it('should process upload', async () => {
+  await uploadFile(file);
+  const result = await db.query('SELECT * FROM wallpapers');
+  expect(result.rows).toHaveLength(1);
+});
+```
+
+## Migration Guide
+
+**From manual Testcontainers setup to TesterBuilder:**
+
+See [Guide: TesterBuilder Migration](/docs/packages/test-utils#migration-guide)
+
+## Related Documentation
+
+- [Package: test-utils](/docs/packages/test-utils) - TesterBuilder framework
+- [Package: testcontainers](/docs/packages/testcontainers) - Custom container implementations
+- [Development Guidelines](/docs/development-guidelines) - TDD workflow
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Service testing setup

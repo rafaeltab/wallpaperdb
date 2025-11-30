@@ -1,0 +1,121 @@
+---
+title: Shared Packages
+description: Reusable packages for all WallpaperDB services
+---
+
+WallpaperDB uses a monorepo architecture with shared packages that provide common functionality across all services. This approach ensures consistency, reduces duplication, and accelerates service development.
+
+## Package Overview
+
+### [@wallpaperdb/core](/docs/packages/core)
+**Infrastructure and utilities**
+
+Shared infrastructure patterns including database connections, S3 clients, NATS setup, configuration management, health checks, error handling, and OpenTelemetry telemetry helpers.
+
+- 7 modules: connections, config, health, errors, telemetry, OpenAPI, types
+- No DI coupling - use with any architecture
+- Production-ready patterns
+
+### [@wallpaperdb/events](/docs/packages/events)
+**Event schemas and pub/sub**
+
+Event schemas (Zod-based) and abstract base classes for publishing and consuming events via NATS JetStream. Includes automatic trace context propagation for distributed tracing.
+
+- Event schemas with validation
+- BaseEventPublisher for publishing events
+- BaseEventConsumer for consuming events
+- OpenTelemetry trace context propagation
+
+### [@wallpaperdb/testcontainers](/docs/packages/testcontainers)
+**Shared test infrastructure**
+
+Reusable Testcontainers setups for integration testing. Provides custom NATS container configuration and will expand to include PostgreSQL, MinIO, and other infrastructure containers.
+
+- Custom NATS container with JetStream support
+- Proper wait strategies for container readiness
+- Type-safe APIs with TypeScript support
+
+### [@wallpaperdb/test-utils](/docs/packages/test-utils)
+**TesterBuilder pattern framework**
+
+Composable test infrastructure builders using the TesterBuilder pattern. Provides 9 infrastructure builders (Docker, Postgres, MinIO, NATS, Redis, Fixtures, Cleanup, Setup, Destroy) with type-safe composition.
+
+- Infrastructure builders for all services
+- Composable mixin pattern
+- Lifecycle hooks (setup, cleanup, destroy)
+- Container reuse and optimization
+
+### [@wallpaperdb/url-ipv4-resolver](/docs/packages/url-ipv4-resolver)
+**URL validation and DNS resolution**
+
+Utility for resolving URLs and domain names to IPv4 addresses. Handles bare domains, full URLs, and IPv4 literals with DNS lookup support.
+
+- IPv4 literal detection
+- DNS lookup for hostnames
+- URL parsing and resolution
+- Security-focused validation
+
+## When to Use Each Package
+
+### For Service Development
+
+- **@wallpaperdb/core** - Always. Use for config, connections, telemetry, and health checks
+- **@wallpaperdb/events** - When publishing/consuming events via NATS
+- **@wallpaperdb/url-ipv4-resolver** - When validating user-provided URLs
+
+### For Testing
+
+- **@wallpaperdb/testcontainers** - For custom container setups
+- **@wallpaperdb/test-utils** - Always. Use the TesterBuilder pattern for all tests
+
+## Package Dependency Graph
+
+```
+Service (e.g., ingestor, media)
+├─ @wallpaperdb/core (config, connections, telemetry)
+├─ @wallpaperdb/events (event pub/sub)
+└─ @wallpaperdb/url-ipv4-resolver (optional, for URL validation)
+
+Service Tests
+├─ @wallpaperdb/test-utils (TesterBuilder framework)
+└─ @wallpaperdb/testcontainers (custom containers)
+```
+
+## Installation
+
+All packages are workspace packages using pnpm workspaces:
+
+```json
+{
+  "dependencies": {
+    "@wallpaperdb/core": "workspace:*",
+    "@wallpaperdb/events": "workspace:*"
+  },
+  "devDependencies": {
+    "@wallpaperdb/testcontainers": "workspace:*",
+    "@wallpaperdb/test-utils": "workspace:*"
+  }
+}
+```
+
+## Architecture Principles
+
+### Single Responsibility
+Each package has a clear, focused purpose and doesn't overlap with others.
+
+### No DI Coupling
+Packages (especially `@wallpaperdb/core`) can be used with or without dependency injection frameworks. Services use TSyringe, but packages provide static utilities that work anywhere.
+
+### Type Safety
+All packages are written in TypeScript with strict mode enabled and export full type definitions.
+
+### Testing First
+Every package includes comprehensive tests and supports the TesterBuilder pattern for easy testing in services.
+
+## Next Steps
+
+- [Package: Core](/docs/packages/core) - Infrastructure and utilities
+- [Package: Events](/docs/packages/events) - Event schemas and pub/sub
+- [Package: Test Utils](/docs/packages/test-utils) - TesterBuilder framework
+- [Testing Documentation](/docs/testing) - Testing strategies and patterns
+- [Architecture: Shared Packages](/docs/architecture/shared-packages) - Architectural decisions

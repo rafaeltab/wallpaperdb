@@ -1,0 +1,148 @@
+---
+title: OpenSearch
+description: Search engine for future full-text search capabilities
+---
+
+OpenSearch provides full-text search capabilities for WallpaperDB. Currently running but not yet integrated with services.
+
+**Status:** 📋 Infrastructure ready, not yet used
+
+## Quick Reference
+
+- **API**: http://localhost:9200
+- **Dashboards**: http://localhost:5601
+- **Version**: OpenSearch 2.11.0
+- **Security**: Disabled (local development only)
+
+## Access
+
+**API Endpoint:**
+```bash
+curl http://localhost:9200
+```
+
+**Response:**
+```json
+{
+  "name": "wallpaperdb-opensearch",
+  "cluster_name": "docker-cluster",
+  "version": {
+    "number": "2.11.0"
+  }
+}
+```
+
+**Dashboards:**
+- URL: http://localhost:5601
+- No authentication (local development)
+
+## Future Use Cases
+
+### 1. Wallpaper Search
+Full-text search across wallpaper metadata:
+
+```json
+POST /wallpapers/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "nature landscape mountain",
+      "fields": ["tags", "description", "title"]
+    }
+  }
+}
+```
+
+### 2. Tag Autocomplete
+Suggest tags as users type:
+
+```json
+POST /tags/_search
+{
+  "suggest": {
+    "tag-suggest": {
+      "prefix": "nat",
+      "completion": {
+        "field": "tag_suggest"
+      }
+    }
+  }
+}
+```
+
+### 3. Analytics
+Aggregate search queries and popular tags:
+
+```json
+POST /search_logs/_search
+{
+  "aggs": {
+    "popular_searches": {
+      "terms": {
+        "field": "query.keyword",
+        "size": 10
+      }
+    }
+  }
+}
+```
+
+## Planned Integration
+
+**Index Structure:**
+```json
+{
+  "mappings": {
+    "properties": {
+      "wallpaper_id": { "type": "keyword" },
+      "user_id": { "type": "keyword" },
+      "title": { "type": "text" },
+      "description": { "type": "text" },
+      "tags": { "type": "keyword" },
+      "colors": { "type": "keyword" },
+      "upload_date": { "type": "date" },
+      "dimensions": {
+        "properties": {
+          "width": { "type": "integer" },
+          "height": { "type": "integer" }
+        }
+      }
+    }
+  }
+}
+```
+
+**Indexing Pipeline:**
+1. Service publishes wallpaper event
+2. Search indexer consumes event
+3. Document indexed in OpenSearch
+4. Available for search immediately
+
+## Health Check
+
+```bash
+curl http://localhost:9200/_cluster/health
+```
+
+**Response:**
+```json
+{
+  "cluster_name": "docker-cluster",
+  "status": "green",
+  "number_of_nodes": 1,
+  "active_primary_shards": 0
+}
+```
+
+## Configuration
+
+**Memory:**
+- Heap: 512MB (configurable via `OPENSEARCH_JAVA_OPTS`)
+
+**Persistence:**
+- Volume: `opensearch-data`
+- Path: `/usr/share/opensearch/data`
+
+## Related Documentation
+
+- [Infrastructure Overview](/docs/infrastructure) - All infrastructure services

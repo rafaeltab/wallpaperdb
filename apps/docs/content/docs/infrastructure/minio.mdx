@@ -1,0 +1,110 @@
+---
+title: MinIO
+description: S3-compatible object storage for wallpaper files
+---
+
+MinIO provides S3-compatible object storage for storing wallpaper files (originals and variants).
+
+## Quick Reference
+
+- **Console**: http://localhost:9001
+- **API**: http://localhost:9000
+- **User**: minioadmin
+- **Password**: minioadmin
+- **Bucket**: wallpapers
+
+## Connection
+
+```typescript
+import { MinioConnection } from "@wallpaperdb/core/connections";
+
+const s3 = new MinioConnection({
+  s3Endpoint: 'http://localhost:9000',
+  s3AccessKeyId: 'minioadmin',
+  s3SecretAccessKey: 'minioadmin',
+  s3Bucket: 'wallpapers',
+  s3Region: 'us-east-1'
+});
+await s3.initialize();
+
+const client = s3.getClient();
+```
+
+## Buckets
+
+**wallpapers** - Main wallpaper storage
+- Path format: `wlpr_<ulid>/original.<ext>`
+- Public download access (local dev only)
+
+**example-bucket** - Testing/examples
+- For development use
+
+## File Organization
+
+```
+wallpapers/
+└── wlpr_01HABCDEF123456789/
+    ├── original.jpg          # Original uploaded file
+    ├── 1920x1080.jpg         # Pre-generated variant
+    ├── 1280x720.jpg          # Pre-generated variant
+    └── thumbnail_small.jpg   # Thumbnail variant
+```
+
+## Common Operations
+
+**Upload file:**
+```typescript
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+
+await client.send(new PutObjectCommand({
+  Bucket: 'wallpapers',
+  Key: 'wlpr_123/original.jpg',
+  Body: buffer,
+  ContentType: 'image/jpeg'
+}));
+```
+
+**Download file:**
+```typescript
+import { GetObjectCommand } from "@aws-sdk/client-s3";
+
+const response = await client.send(new GetObjectCommand({
+  Bucket: 'wallpapers',
+  Key: 'wlpr_123/original.jpg'
+}));
+
+const stream = response.Body;
+```
+
+**List objects:**
+```typescript
+import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+
+const response = await client.send(new ListObjectsV2Command({
+  Bucket: 'wallpapers',
+  Prefix: 'wlpr_123/'
+}));
+```
+
+## MinIO Console
+
+Access the web UI at http://localhost:9001
+
+**Features:**
+- Browse buckets and objects
+- Upload/download files
+- Manage bucket policies
+- View server metrics
+
+## CLI (mc)
+
+MinIO Client (`mc`) is available in the `minio-init` container:
+
+```bash
+docker exec -it wallpaperdb-minio-init mc ls myminio/wallpapers
+```
+
+## Related Documentation
+
+- [Services: Ingestor](/docs/services/ingestor) - File upload workflow
+- [Services: Media](/docs/services/media) - File retrieval

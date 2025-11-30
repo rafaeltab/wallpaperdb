@@ -1,0 +1,134 @@
+---
+title: PostgreSQL
+description: PostgreSQL database setup and management
+---
+
+PostgreSQL is the primary metadata database for WallpaperDB, storing wallpaper metadata, user information, and application state.
+
+## Quick Reference
+
+- **Version**: PostgreSQL 16 Alpine
+- **Port**: 5432
+- **Database**: `wallpaperdb`
+- **User**: `wallpaperdb`
+- **Password**: `wallpaperdb` (local development only)
+- **Connection String**: `postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb`
+
+## Connection
+
+```typescript
+import { DatabaseConnection } from "@wallpaperdb/core/connections";
+
+const db = new DatabaseConnection({
+  databaseUrl: process.env.DATABASE_URL!
+});
+await db.initialize();
+
+const pool = db.getClient();
+const result = await pool.query('SELECT NOW()');
+```
+
+## Schema Management
+
+Using Drizzle ORM for type-safe schema management.
+
+**Generate migration:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:generate
+```
+
+**Apply migrations:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+**Open Drizzle Studio:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:studio
+```
+
+## Tables
+
+### wallpapers
+Main table for wallpaper metadata.
+
+```sql
+CREATE TABLE wallpapers (
+  id TEXT PRIMARY KEY,              -- wlpr_<ulid>
+  user_id TEXT NOT NULL,
+  content_hash TEXT,                -- SHA256
+  upload_state upload_state NOT NULL DEFAULT 'initiated',
+  file_type file_type,              -- 'image' | 'video'
+  mime_type TEXT,
+  file_size_bytes BIGINT,
+  width INTEGER,
+  height INTEGER,
+  aspect_ratio DECIMAL(10,4),
+  storage_key TEXT,
+  storage_bucket TEXT DEFAULT 'wallpapers',
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Indexes:**
+- `idx_wallpapers_user_id` - User lookups
+- `idx_wallpapers_upload_state` - State filtering
+- `idx_wallpapers_content_hash` - Deduplication (conditional unique)
+
+## pgAdmin
+
+Access PostgreSQL admin UI at http://localhost:5050
+
+- **Email**: admin@example.com
+- **Password**: admin
+
+The server connection is pre-configured.
+
+## Common Operations
+
+**Connect via psql:**
+```bash
+docker exec -it wallpaperdb-postgres psql -U wallpaperdb -d wallpaperdb
+```
+
+**List tables:**
+```sql
+\dt
+```
+
+**View table schema:**
+```sql
+\d wallpapers
+```
+
+**Query examples:**
+```sql
+-- Count wallpapers by state
+SELECT upload_state, COUNT(*)
+FROM wallpapers
+GROUP BY upload_state;
+
+-- Find stuck uploads
+SELECT id, upload_state, state_changed_at
+FROM wallpapers
+WHERE upload_state = 'uploading'
+  AND state_changed_at < NOW() - INTERVAL '5 minutes';
+```
+
+## Backup & Restore
+
+**Backup:**
+```bash
+docker exec wallpaperdb-postgres pg_dump -U wallpaperdb wallpaperdb > backup.sql
+```
+
+**Restore:**
+```bash
+cat backup.sql | docker exec -i wallpaperdb-postgres psql -U wallpaperdb -d wallpaperdb
+```
+
+## Related Documentation
+
+- [Guide: Database Migrations](/docs/guides/database-migrations) - Migration workflow
+- [Services: Ingestor](/docs/services/ingestor) - Database schema details

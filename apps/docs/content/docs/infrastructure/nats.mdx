@@ -1,0 +1,116 @@
+---
+title: NATS
+description: Event bus with JetStream for service-to-service communication
+---
+
+NATS with JetStream provides reliable, persistent event-driven communication between services.
+
+## Quick Reference
+
+- **Client Port**: 4222
+- **Monitoring**: http://localhost:8222
+- **URL**: `nats://localhost:4222`
+- **JetStream**: Enabled
+
+## Connection
+
+```typescript
+import { NatsConnectionManager } from "@wallpaperdb/core/connections";
+
+const natsConn = new NatsConnectionManager({
+  natsUrl: 'nats://localhost:4222'
+});
+await natsConn.initialize();
+
+const nc = natsConn.getClient();
+const js = nc.jetstream();
+```
+
+## Streams
+
+### WALLPAPERS Stream
+
+Stores all wallpaper-related events.
+
+**Configuration:**
+- **Subjects**: `wallpaper.>`
+- **Retention**: Limits-based
+- **Max messages**: 1,000,000
+- **Max age**: 30 days
+
+**Events:**
+- `wallpaper.uploaded` - Wallpaper uploaded and stored
+- `wallpaper.thumbnail.generated` - Thumbnails created (future)
+- `wallpaper.quality.analyzed` - Quality score assigned (future)
+- `wallpaper.colors.extracted` - Colors extracted (future)
+
+## Makefile Commands
+
+```bash
+# Setup streams
+make nats-setup-streams
+
+# List streams
+make nats-stream-list
+
+# Stream info
+make nats-stream-info
+```
+
+## Publishing Events
+
+```typescript
+import { WallpaperUploadedPublisher } from "@wallpaperdb/events";
+
+const publisher = new WallpaperUploadedPublisher(js);
+
+await publisher.publish({
+  wallpaperId: 'wlpr_123',
+  userId: 'user_123',
+  contentHash: 'sha256:...',
+  fileType: 'image',
+  mimeType: 'image/jpeg',
+  fileSizeBytes: 1024000,
+  width: 1920,
+  height: 1080,
+  aspectRatio: '1.7778',
+  storageKey: 'wlpr_123/original.jpg',
+  storageBucket: 'wallpapers'
+});
+```
+
+## Consuming Events
+
+```typescript
+import { BaseEventConsumer } from "@wallpaperdb/events";
+
+class MyConsumer extends BaseEventConsumer {
+  protected async handleMessage(event, context) {
+    console.log(`Processing: ${event.wallpaperId}`);
+    // Process event...
+  }
+}
+
+const consumer = new MyConsumer(js);
+await consumer.start();
+```
+
+## NATS Monitoring
+
+Access monitoring UI at http://localhost:8222
+
+**Features:**
+- Server statistics
+- Connection info
+- JetStream statistics
+- Stream details
+
+**Endpoints:**
+- `/varz` - Server variables
+- `/connz` - Connection details
+- `/jsz` - JetStream info
+
+## Related Documentation
+
+- [Package: Events](/docs/packages/events) - Event schemas and pub/sub
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Event-driven architecture

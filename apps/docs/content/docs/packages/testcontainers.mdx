@@ -1,0 +1,372 @@
+---
+title: "@wallpaperdb/testcontainers"
+description: Shared Testcontainers setups for integration testing
+---
+
+The `@wallpaperdb/testcontainers` package provides reusable Testcontainers setups for integration testing across all WallpaperDB services. It ensures consistent test infrastructure and eliminates duplication.
+
+## Installation
+
+This is a workspace package. Add it to your app's `package.json`:
+
+```json
+{
+  "devDependencies": {
+    "@wallpaperdb/testcontainers": "workspace:*"
+  }
+}
+```
+
+## Overview
+
+This package provides custom Testcontainers configurations that:
+
+- Use proper wait strategies for container readiness
+- Provide type-safe APIs with TypeScript support
+- Allow flexible configuration for different test scenarios
+- Optimize performance by eliminating connection delays
+
+## Available Containers
+
+### NATS Container
+
+Create a NATS testcontainer with JetStream support:
+
+```typescript
+import { createNatsContainer } from '@wallpaperdb/testcontainers/containers';
+
+describe("NATS Integration", () => {
+  let natsContainer: StartedNatsContainer;
+
+  beforeAll(async () => {
+    natsContainer = await createNatsContainer({
+      enableJetStream: true
+    });
+  });
+
+  afterAll(async () => {
+    await natsContainer.stop();
+  });
+
+  it("should connect to NATS", async () => {
+    const natsUrl = natsContainer.getConnectionUrl();
+    const nc = await connect({ servers: natsUrl });
+
+    expect(nc.info?.server_name).toBeDefined();
+
+    await nc.close();
+  });
+});
+```
+
+#### Configuration Options
+
+```typescript
+interface NatsContainerOptions {
+  /** Docker image to use (default: 'nats:2.10-alpine') */
+  image?: string;
+
+  /** Enable JetStream support (default: true) */
+  enableJetStream?: boolean;
+
+  /** Additional CLI arguments to pass to NATS */
+  additionalArgs?: string[];
+}
+```
+
+#### API Reference
+
+**createNatsContainer(options?): Promise<StartedNatsContainer>**
+
+Creates and starts a NATS container with the specified options.
+
+**StartedNatsContainer**
+
+```typescript
+interface StartedNatsContainer {
+  /** Get the NATS connection URL */
+  getConnectionUrl(): string;
+
+  /** Stop the container */
+  stop(): Promise<void>;
+}
+```
+
+### Future Containers
+
+The following containers are planned but not yet implemented:
+
+#### PostgreSQL Container (Planned)
+
+```typescript
+import { createPostgresContainer } from '@wallpaperdb/testcontainers/containers';
+
+const postgresContainer = await createPostgresContainer({
+  database: 'testdb',
+  username: 'testuser',
+  password: 'testpass',
+  initScripts: ['./migrations/*.sql'] // Run migrations on startup
+});
+
+const connectionUrl = postgresContainer.getConnectionUrl();
+```
+
+#### MinIO Container (Planned)
+
+```typescript
+import { createMinioContainer } from '@wallpaperdb/testcontainers/containers';
+
+const minioContainer = await createMinioContainer({
+  accessKey: 'minioadmin',
+  secretKey: 'minioadmin',
+  buckets: ['wallpapers', 'thumbnails'] // Create buckets on startup
+});
+
+const endpoint = minioContainer.getEndpoint();
+const credentials = minioContainer.getCredentials();
+```
+
+#### Redis Container (Planned)
+
+```typescript
+import { createRedisContainer } from '@wallpaperdb/testcontainers/containers';
+
+const redisContainer = await createRedisContainer({
+  password: 'testpass'
+});
+
+const connectionUrl = redisContainer.getConnectionUrl();
+```
+
+## Wait Strategies
+
+All containers use proper wait strategies to ensure services are fully ready before tests begin:
+
+### NATS Wait Strategy
+
+The NATS container waits for:
+1. Container to be running
+2. NATS server port (4222) to be listening
+3. NATS to accept connections
+4. JetStream to be enabled (if `enableJetStream: true`)
+
+```typescript
+// This is handled automatically
+const natsContainer = await createNatsContainer();
+// NATS is fully ready here!
+```
+
+## Container Reuse
+
+For better performance, consider using container reuse with the TesterBuilder pattern from `@wallpaperdb/test-utils`:
+
+```typescript
+import { NatsTesterBuilder } from "@wallpaperdb/test-utils";
+
+// Container is reused across test files
+const tester = await new NatsTesterBuilder()
+  .withNats()
+  .build();
+
+// Use tester.nats in your tests
+```
+
+See [Package: Test Utils](/docs/packages/test-utils) for the TesterBuilder pattern.
+
+## Performance Optimization
+
+### Using 127.0.0.1 Instead of localhost
+
+The containers use `127.0.0.1` instead of `localhost` to avoid DNS lookup delays (~5 seconds per test):
+
+```typescript
+// Automatically uses 127.0.0.1
+const url = natsContainer.getConnectionUrl();
+// Returns: "nats://127.0.0.1:RANDOM_PORT"
+```
+
+### Parallel Container Startup
+
+Start multiple containers in parallel for faster test setup:
+
+```typescript
+const [natsContainer, redisContainer] = await Promise.all([
+  createNatsContainer(),
+  createRedisContainer()
+]);
+```
+
+## Type Safety
+
+All containers provide full TypeScript support with exported types:
+
+```typescript
+import type {
+  NatsContainerOptions,
+  StartedNatsContainer
+} from '@wallpaperdb/testcontainers/containers';
+
+async function setupNats(
+  options: NatsContainerOptions
+): Promise<StartedNatsContainer> {
+  return await createNatsContainer(options);
+}
+```
+
+## Troubleshooting
+
+### Container Fails to Start
+
+**Issue**: Container exits immediately or fails health check
+
+**Solution**: Check Docker daemon is running and has enough resources
+
+```bash
+docker ps  # Verify Docker is responsive
+docker system df  # Check available disk space
+```
+
+### Port Conflicts
+
+**Issue**: Container port already in use
+
+**Solution**: Testcontainers automatically assigns random ports to avoid conflicts. Get the mapped port:
+
+```typescript
+const url = natsContainer.getConnectionUrl();
+// Port is randomized, e.g., nats://127.0.0.1:54321
+```
+
+### Slow Container Startup
+
+**Issue**: Tests take a long time to start
+
+**Solution**: Use container reuse with TesterBuilder pattern or enable Docker layer caching:
+
+```bash
+# Pull images ahead of time
+docker pull nats:2.10-alpine
+```
+
+### Connection Timeouts
+
+**Issue**: Cannot connect to container
+
+**Solution**: Ensure wait strategy has completed before attempting connection:
+
+```typescript
+// Wait strategy is automatic
+const container = await createNatsContainer();
+
+// Connection should work immediately
+const nc = await connect({ servers: container.getConnectionUrl() });
+```
+
+## Development
+
+Build the package:
+
+```bash
+pnpm --filter @wallpaperdb/testcontainers build
+```
+
+Watch mode for development:
+
+```bash
+pnpm --filter @wallpaperdb/testcontainers dev
+```
+
+## Examples
+
+### Complete Integration Test
+
+```typescript
+import { createNatsContainer } from '@wallpaperdb/testcontainers/containers';
+import { connect, type NatsConnection } from 'nats';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+
+describe("NATS JetStream Integration", () => {
+  let container: StartedNatsContainer;
+  let nc: NatsConnection;
+
+  beforeAll(async () => {
+    // Start NATS container
+    container = await createNatsContainer({
+      enableJetStream: true
+    });
+
+    // Connect to NATS
+    nc = await connect({
+      servers: container.getConnectionUrl()
+    });
+  });
+
+  afterAll(async () => {
+    // Cleanup
+    await nc?.close();
+    await container?.stop();
+  });
+
+  it("should create a stream", async () => {
+    const js = nc.jetstream();
+    const jsm = await nc.jetstreamManager();
+
+    await jsm.streams.add({
+      name: "TEST_STREAM",
+      subjects: ["test.>"]
+    });
+
+    const ack = await js.publish("test.subject", JSON.stringify({ data: "hello" }));
+    expect(ack.stream).toBe("TEST_STREAM");
+  });
+
+  it("should consume messages", async () => {
+    const js = nc.jetstream();
+
+    // Publish a message
+    await js.publish("test.subject", JSON.stringify({ id: "123" }));
+
+    // Consume the message
+    const consumer = await js.consumers.get("TEST_STREAM", "test-consumer");
+    const messages = await consumer.fetch({ max_messages: 1 });
+
+    for await (const msg of messages) {
+      const data = JSON.parse(msg.string());
+      expect(data.id).toBe("123");
+      msg.ack();
+    }
+  });
+});
+```
+
+### Using with TesterBuilder
+
+```typescript
+import { NatsTesterBuilder } from "@wallpaperdb/test-utils";
+import { describe, it, expect } from 'vitest';
+
+describe("Event Publisher", () => {
+  it("should publish events", async () => {
+    const tester = await new NatsTesterBuilder()
+      .withNats()
+      .build();
+
+    const js = tester.nats.jetstream();
+    const publisher = new MyEventPublisher(js);
+
+    await publisher.publish({ id: "123", data: "test" });
+
+    // Verify event was published
+    const jsm = await tester.nats.jetstreamManager();
+    const stream = await jsm.streams.info("MY_STREAM");
+    expect(stream.state.messages).toBe(1);
+  });
+});
+```
+
+## Related Documentation
+
+- [Package: Test Utils](/docs/packages/test-utils) - TesterBuilder pattern framework
+- [Testing: Test Builder Pattern](/docs/testing/test-builder-pattern) - Complete testing guide
+- [Testing: Troubleshooting](/docs/testing/troubleshooting) - Common issues and solutions
+- [Testing: Integration vs E2E](/docs/testing/integration-vs-e2e) - Choosing the right test type

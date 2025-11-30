@@ -1,0 +1,86 @@
+---
+title: Getting Started
+description: Quick start guide for WallpaperDB local development
+---
+
+Get up and running with WallpaperDB in under 10 minutes.
+
+## Prerequisites
+
+- Docker & Docker Compose
+- Node.js 22+
+- pnpm 8+
+- Make
+
+See [Local Setup](/docs/infrastructure/local-setup) for installation instructions.
+
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/your-org/wallpaperdb.git
+cd wallpaperdb
+pnpm install
+
+# 2. Start infrastructure
+make infra-start
+
+# 3. Run migrations
+pnpm --filter @wallpaperdb/ingestor db:migrate
+
+# 4. Start services
+make dev
+```
+
+**Access points:**
+- Ingestor: http://localhost:3001
+- Docs: http://localhost:3002
+- Media: http://localhost:3003
+- Grafana: http://localhost:3000
+- MinIO Console: http://localhost:9001
+
+## Test the Upload Flow
+
+```bash
+# Create test image
+curl -o test.jpg https://via.placeholder.com/1920x1080.jpg
+
+# Upload wallpaper
+curl -X POST http://localhost:3001/upload \
+  -F "file=@test.jpg" \
+  -F "userId=test_user"
+
+# Response includes wallpaper ID
+# {"wallpaperId": "wlpr_...", "uploadState": "processing"}
+
+# Retrieve wallpaper (use ID from above)
+curl http://localhost:3003/wallpapers/wlpr_... > retrieved.jpg
+
+# Resize on-the-fly
+curl "http://localhost:3003/wallpapers/wlpr_...?w=800&h=600" > resized.jpg
+```
+
+## View Telemetry
+
+1. Open Grafana: http://localhost:3000
+2. Login: admin/admin
+3. Navigate to **Explore** → **Tempo**
+4. Search for service: `wallpaperdb-ingestor`
+5. View upload traces with full span details
+
+## Next Steps
+
+**Development:**
+- [Development Guidelines](/docs/development-guidelines) - TDD, code standards
+- [Guide: Makefile Commands](/docs/guides/makefile-commands) - All available commands
+- [Testing](/docs/testing) - Test strategies and patterns
+
+**Architecture:**
+- [Services](/docs/services) - Service architecture
+- [Packages](/docs/packages) - Shared packages
+- [Infrastructure](/docs/infrastructure) - Infrastructure services
+
+**Guides:**
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Build a service
+- [Guide: Database Migrations](/docs/guides/database-migrations) - Schema changes
+- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 patterns

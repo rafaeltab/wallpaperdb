@@ -1,0 +1,278 @@
+---
+title: Services
+description: WallpaperDB microservices architecture and service registry
+---
+
+WallpaperDB uses a microservices architecture with specialized services for different aspects of wallpaper processing and delivery. Each service is independently deployable, scalable, and communicates via NATS events.
+
+## Current Services
+
+### Ingestor Service
+**Status:** ✅ Complete (Production-ready)
+
+The entry point for wallpapers into the system. Handles file uploads, validation, storage in MinIO, and event publishing for downstream processing.
+
+**Key Features:**
+- Multi-part file upload with streaming
+- State machine for upload workflow (6 states)
+- Content-based deduplication (SHA256)
+- Reconciliation system for eventual consistency
+- Redis-based rate limiting
+- RFC 7807 error handling
+
+**API Endpoints:**
+- `POST /upload` - Upload a wallpaper
+- `GET /health` - Health check with dependency status
+- `GET /ready` - Readiness probe
+
+[View Full Documentation →](/docs/services/ingestor) | [OpenAPI Spec →](/docs/openapi/ingestor/upload/post)
+
+### Media Service
+**Status:** 🚧 IN PROGRESS
+
+Retrieval and serving of wallpapers with on-demand resizing and format conversion.
+
+**Key Features:**
+- Wallpaper retrieval from MinIO
+- On-demand image resizing (Sharp)
+- Multiple resize modes (contain, cover, fill)
+- CDN-ready caching headers
+- Streaming responses for memory efficiency
+
+**API Endpoints:**
+- `GET /wallpapers/:id` - Retrieve wallpaper with optional resize
+- `GET /health` - Health check
+- `GET /ready` - Readiness probe
+
+**Query Parameters:**
+- `w` - Target width (1-7680)
+- `h` - Target height (1-4320)
+- `fit` - Resize mode: contain | cover | fill
+
+[View Full Documentation →](/docs/services/media) | [OpenAPI Spec →](/docs/openapi/media/wallpapers/id/get)
+
+## Planned Services
+
+The following services are planned as part of the multi-service architecture expansion:
+
+### Thumbnail Extractor
+**Status:** 📋 Planned
+
+Generates thumbnails for video wallpapers using FFmpeg.
+
+**Planned Features:**
+- Video thumbnail generation at multiple timestamps
+- Multiple thumbnail variants (small, medium, large)
+- FFmpeg integration
+- Batch processing support
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded` (video files)
+- Publishes: `wallpaper.thumbnail.generated`
+
+### Quality Enrichment
+**Status:** 📋 Planned
+
+Analyzes image quality and assigns quality scores.
+
+**Planned Features:**
+- Resolution and sharpness analysis
+- Compression artifact detection
+- ML-based quality scoring
+- Quality tier assignment (low, medium, high, ultra)
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded` (image files)
+- Publishes: `wallpaper.quality.analyzed`
+
+### Color Enrichment
+**Status:** 📋 Planned
+
+Extracts dominant colors and color palettes from wallpapers.
+
+**Planned Features:**
+- Dominant color extraction
+- Color palette generation (5-10 colors)
+- Color clustering algorithms
+- Perceptual color space analysis
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded`
+- Publishes: `wallpaper.colors.extracted`
+
+### Tagging Service
+**Status:** 📋 Planned
+
+Tag management and assignment for wallpapers.
+
+**Planned Features:**
+- Manual tag assignment
+- Tag CRUD operations
+- Tag hierarchy management
+- Search by tags
+
+**API-driven:**
+- REST API for tag management
+- GraphQL integration
+
+### Gateway
+**Status:** 📋 Planned
+
+GraphQL API gateway for unified access to all services.
+
+**Planned Features:**
+- GraphQL schema stitching
+- Query optimization and caching
+- Authentication and authorization
+- Rate limiting
+- API analytics
+
+## Service Architecture
+
+### Communication Patterns
+
+**Event-Driven (NATS JetStream):**
+- Services publish events when work is complete
+- Other services consume events asynchronously
+- Enables loose coupling and independent scaling
+- Provides durability and replay capabilities
+
+```
+Ingestor → wallpaper.uploaded → {
+  Media Service (caches metadata)
+  Thumbnail Extractor (generates thumbnails)
+  Quality Enrichment (analyzes quality)
+  Color Enrichment (extracts colors)
+}
+```
+
+**Synchronous (HTTP/REST):**
+- Used for retrieval operations
+- Client-facing endpoints
+- Service-to-service queries (when needed)
+
+### Service Registry
+
+| Service | Port | Database | S3/MinIO | NATS | Redis | Status |
+|---------|------|----------|----------|------|-------|--------|
+| Ingestor | 3001 | ✓ | ✓ | ✓ (publish) | ✓ | ✅ Complete |
+| Media | 3002 | ✓ | ✓ | ✓ (consume) | - | 🚧 In Progress |
+| Thumbnail | 3003 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Quality | 3004 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Color | 3005 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Tagging | 3006 | ✓ | - | - | - | 📋 Planned |
+| Gateway | 3000 | - | - | - | ✓ | 📋 Planned |
+
+### Shared Infrastructure
+
+All services use:
+- **PostgreSQL** - Primary data store
+- **MinIO** - S3-compatible object storage
+- **NATS JetStream** - Event bus with durability
+- **Grafana LGTM** - Observability (traces, metrics, logs)
+
+Selected services use:
+- **Redis** - Rate limiting and caching
+- **OpenSearch** - Full-text search (future)
+
+## Technology Stack
+
+### Core Framework
+- **Fastify** - High-performance HTTP server
+- **TypeScript** - Type-safe development
+- **TSyringe** - Dependency injection
+
+### Shared Packages
+- **@wallpaperdb/core** - Connections, config, telemetry, health
+- **@wallpaperdb/events** - Event schemas and pub/sub abstractions
+- **@wallpaperdb/test-utils** - TesterBuilder pattern for testing
+
+See [Packages](/docs/packages) for complete package documentation.
+
+### Database & Storage
+- **Drizzle ORM** - Type-safe PostgreSQL queries
+- **AWS SDK v3** - S3/MinIO client
+- **IORedis** - Redis client
+
+### Observability
+- **OpenTelemetry** - Distributed tracing and metrics
+- **Pino** - Structured logging
+- **Grafana** - Dashboards and alerting
+
+## Development Workflow
+
+### Running a Service
+
+```bash
+# Start infrastructure first
+make infra-start
+
+# Run ingestor service
+make ingestor-dev
+
+# Run media service
+make media-dev
+
+# Run all services
+make dev
+```
+
+### Testing a Service
+
+```bash
+# Test specific service
+make ingestor-test
+make media-test
+
+# Test all services
+make test
+```
+
+### Building for Production
+
+```bash
+# Build specific service
+make ingestor-build
+make media-build
+
+# Build all services
+make build
+```
+
+## Service Development Timeline
+
+**Completed:**
+- ✅ Ingestor Service (production-ready)
+
+**In Progress:**
+- 🚧 Media Service (~75% complete)
+  - Core retrieval: ✅ Done
+  - Resizing: ✅ Done
+  - Testing: 🚧 In Progress
+  - Deployment: 📋 Pending
+
+**Target Timeline:**
+Each new service: ~1 week (with shared packages)
+
+**Priority Order:**
+1. Media Service (finish current work)
+2. Thumbnail Extractor (event consumer pattern)
+3. Quality/Color Enrichment (parallel processing)
+4. Tagging Service (CRUD API)
+5. Gateway (unified GraphQL API)
+
+## Architecture Decisions
+
+Key architectural decisions are documented in ADRs:
+
+- [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs) - Framework choice
+- [Multi-Service Architecture](/docs/architecture/multi-service) - Service decomposition strategy
+- [Service Registry](/docs/architecture/service-registry) - Complete service catalog
+
+## Related Documentation
+
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Architecture strategy and patterns
+- [Architecture: Service Registry](/docs/architecture/service-registry) - Detailed service specifications
+- [Package: Events](/docs/packages/events) - Event schemas and pub/sub
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Step-by-step service creation
+- [Testing](/docs/testing) - Testing strategies for services

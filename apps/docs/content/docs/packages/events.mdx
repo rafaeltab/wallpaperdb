@@ -1,0 +1,430 @@
+---
+title: "@wallpaperdb/events"
+description: Event schemas and pub/sub abstractions for WallpaperDB services
+---
+
+The `@wallpaperdb/events` package provides Zod-based event schemas and abstract base classes for publishing and consuming events via NATS JetStream. It includes automatic OpenTelemetry trace context propagation for distributed tracing across services.
+
+## Installation
+
+```bash
+pnpm add @wallpaperdb/events
+```
+
+## Overview
+
+This package provides three main components:
+
+1. **Event Schemas** - Zod schemas for validating event payloads
+2. **BaseEventPublisher** - Abstract class for publishing events to NATS JetStream
+3. **BaseEventConsumer** - Abstract class for consuming events from NATS JetStream
+
+All components include built-in OpenTelemetry trace context propagation for end-to-end distributed tracing.
+
+## Event Schemas
+
+### WallpaperUploaded Event
+
+The `WallpaperUploadedEventSchema` is published when a wallpaper is successfully uploaded and stored.
+
+```typescript
+import {
+  WallpaperUploadedEventSchema,
+  WALLPAPER_UPLOADED_SUBJECT,
+  type WallpaperUploadedEvent
+} from "@wallpaperdb/events";
+
+// Subject: "wallpaper.uploaded"
+const event: WallpaperUploadedEvent = {
+  wallpaperId: "wlpr_01HABCDEF123456789",
+  userId: "user_123",
+  contentHash: "sha256:abc123...",
+  fileType: "image",
+  mimeType: "image/jpeg",
+  fileSizeBytes: 1024000,
+  width: 1920,
+  height: 1080,
+  aspectRatio: "1.7778",
+  storageKey: "wlpr_01HABCDEF123456789/original.jpg",
+  storageBucket: "wallpapers"
+};
+
+// Validate
+const validated = WallpaperUploadedEventSchema.parse(event);
+```
+
+**Event Fields:**
+- `wallpaperId` - Wallpaper ID (format: `wlpr_<ulid>`)
+- `userId` - User who uploaded the wallpaper
+- `contentHash` - SHA256 hash for deduplication
+- `fileType` - `"image"` or `"video"`
+- `mimeType` - MIME type (e.g., `"image/jpeg"`)
+- `fileSizeBytes` - File size in bytes
+- `width`, `height` - Dimensions in pixels
+- `aspectRatio` - Decimal aspect ratio
+- `storageKey` - S3 object key
+- `storageBucket` - S3 bucket name
+
+### Creating Custom Event Schemas
+
+While not explicitly exported, you can create custom events following the same pattern:
+
+```typescript
+import { z } from "zod";
+
+export const MyCustomEventSchema = z.object({
+  // Add your event-specific fields
+  resourceId: z.string(),
+  action: z.enum(["created", "updated", "deleted"]),
+  timestamp: z.string().datetime(),
+  metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+export type MyCustomEvent = z.infer<typeof MyCustomEventSchema>;
+export const MY_CUSTOM_EVENT_SUBJECT = "my.custom.event";
+```
+
+## BaseEventPublisher
+
+Abstract class for publishing events with automatic validation and trace context propagation.
+
+### Basic Usage
+
+```typescript
+import { BaseEventPublisher } from "@wallpaperdb/events";
+import type { JetStreamClient } from "nats";
+import { z } from "zod";
+
+const MyEventSchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  data: z.record(z.string(), z.unknown())
+});
+
+class MyEventPublisher extends BaseEventPublisher<typeof MyEventSchema> {
+  constructor(js: JetStreamClient) {
+    super({
+      js,
+      subject: "my.event.subject",
+      schema: MyEventSchema,
+      serviceName: "my-service"
+    });
+  }
+}
+
+// Usage
+const jetstream = natsConnection.getClient().jetstream();
+const publisher = new MyEventPublisher(jetstream);
+
+await publisher.publish({
+  id: "123",
+  action: "created",
+  data: { foo: "bar" }
+});
+```
+
+### Using WallpaperUploadedPublisher
+
+```typescript
+import { WallpaperUploadedPublisher } from "@wallpaperdb/events";
+import type { WallpaperUploadedEvent } from "@wallpaperdb/events";
+
+const publisher = new WallpaperUploadedPublisher(jetstream);
+
+const event: WallpaperUploadedEvent = {
+  wallpaperId: "wlpr_01HABCDEF123456789",
+  userId: "user_123",
+  contentHash: "sha256:abc123...",
+  fileType: "image",
+  mimeType: "image/jpeg",
+  fileSizeBytes: 1024000,
+  width: 1920,
+  height: 1080,
+  aspectRatio: "1.7778",
+  storageKey: "wlpr_01HABCDEF123456789/original.jpg",
+  storageBucket: "wallpapers"
+};
+
+await publisher.publish(event);
+```
+
+### Features
+
+#### Schema Validation
+Events are validated against the Zod schema before publishing. Invalid events throw validation errors.
+
+```typescript
+// This will throw a Zod validation error
+await publisher.publish({
+  id: 123, // Wrong type! Should be string
+  action: "created"
+});
+```
+
+#### Trace Context Propagation
+
+The publisher automatically injects OpenTelemetry trace context into NATS message headers:
+
+```typescript
+// Trace context is automatically propagated
+await withSpan("upload.process", {}, async () => {
+  // This publish will include trace context in headers
+  await publisher.publish(event);
+  // Downstream consumers can extract and continue the trace
+});
+```
+
+Headers added:
+- `traceparent` - W3C Trace Context traceparent header
+- `tracestate` - W3C Trace Context tracestate header (if present)
+
+#### Publish Acknowledgment
+
+The `publish()` method returns a NATS `PubAck` for durability guarantees:
+
+```typescript
+const ack = await publisher.publish(event);
+console.log(`Published to stream ${ack.stream}, sequence ${ack.seq}`);
+```
+
+## BaseEventConsumer
+
+Abstract class for consuming events with automatic validation, trace context extraction, and error handling.
+
+### Basic Usage
+
+```typescript
+import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
+import type { JetStreamClient } from "nats";
+import { z } from "zod";
+
+const MyEventSchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  data: z.record(z.string(), z.unknown())
+});
+
+class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
+  constructor(js: JetStreamClient) {
+    super({
+      js,
+      stream: "MY_STREAM",
+      consumer: "my-consumer",
+      schema: MyEventSchema,
+      serviceName: "my-service"
+    });
+  }
+
+  protected async handleMessage(
+    event: z.infer<typeof MyEventSchema>,
+    context: MessageContext
+  ): Promise<void> {
+    console.log(`Processing event ${event.id}`);
+
+    // Access message metadata
+    console.log(`Subject: ${context.subject}`);
+    console.log(`Sequence: ${context.seq}`);
+
+    // Do processing...
+    await processEvent(event);
+
+    // Message is automatically acked on success
+  }
+}
+
+// Usage
+const consumer = new MyEventConsumer(jetstream);
+await consumer.start();
+
+// Later, when shutting down
+await consumer.stop();
+```
+
+### MessageContext
+
+The `MessageContext` provides access to NATS message metadata:
+
+```typescript
+interface MessageContext {
+  subject: string;      // NATS subject
+  seq: number;          // Stream sequence number
+  redelivered: boolean; // Whether message was redelivered
+  reply?: string;       // Reply subject (if present)
+}
+```
+
+### Features
+
+#### Schema Validation
+Events are validated before being passed to `handleMessage()`. Invalid messages are nacked and can be retried or dead-lettered based on NATS consumer configuration.
+
+#### Automatic Acknowledgment
+- **Success**: Message is acked automatically when `handleMessage()` completes successfully
+- **Error**: Message is nacked if `handleMessage()` throws an error
+
+```typescript
+protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
+  // If this throws, message is nacked
+  await riskyOperation(event);
+
+  // If we reach here, message is acked
+}
+```
+
+#### Trace Context Extraction
+
+The consumer automatically extracts OpenTelemetry trace context from NATS message headers and creates a span for each message:
+
+```typescript
+// Trace context is automatically extracted and continued
+protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
+  // This span is linked to the publisher's trace
+  await withSpan("event.process", { eventId: event.id }, async () => {
+    await processEvent(event);
+  });
+}
+```
+
+This enables end-to-end distributed tracing across services!
+
+#### Error Handling
+
+Consumers include built-in error handling:
+
+```typescript
+protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
+  try {
+    await processEvent(event);
+  } catch (error) {
+    // Log error, add context
+    console.error("Failed to process event", { eventId: event.id, error });
+
+    // Re-throw to nack the message
+    throw error;
+  }
+}
+```
+
+## Complete Example: Thumbnail Service
+
+Here's a complete example of a service that consumes wallpaper upload events and generates thumbnails:
+
+```typescript
+import "reflect-metadata";
+import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
+import { WallpaperUploadedEventSchema, WALLPAPER_UPLOADED_SUBJECT } from "@wallpaperdb/events";
+import type { JetStreamClient } from "nats";
+import { withSpan } from "@wallpaperdb/core/telemetry";
+import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
+
+class WallpaperUploadedConsumer extends BaseEventConsumer<typeof WallpaperUploadedEventSchema> {
+  constructor(
+    js: JetStreamClient,
+    private thumbnailService: ThumbnailService
+  ) {
+    super({
+      js,
+      stream: "WALLPAPERS",
+      consumer: "thumbnail-generator",
+      schema: WallpaperUploadedEventSchema,
+      serviceName: "thumbnail-service"
+    });
+  }
+
+  protected async handleMessage(
+    event: z.infer<typeof WallpaperUploadedEventSchema>,
+    context: MessageContext
+  ): Promise<void> {
+    return await withSpan(
+      "wallpaper.thumbnail.generate",
+      {
+        [Attributes.WALLPAPER_ID]: event.wallpaperId,
+        [Attributes.USER_ID]: event.userId,
+        [Attributes.FILE_TYPE]: event.fileType
+      },
+      async (span) => {
+        console.log(`Generating thumbnail for ${event.wallpaperId}`);
+
+        // Download original from S3
+        const imageData = await this.thumbnailService.download(
+          event.storageBucket,
+          event.storageKey
+        );
+
+        // Generate thumbnails
+        const thumbnails = await this.thumbnailService.generateThumbnails(imageData);
+
+        // Upload thumbnails to S3
+        await this.thumbnailService.uploadThumbnails(
+          event.wallpaperId,
+          thumbnails
+        );
+
+        span.setAttribute("thumbnails.count", thumbnails.length);
+        console.log(`Generated ${thumbnails.length} thumbnails for ${event.wallpaperId}`);
+      }
+    );
+  }
+}
+
+// Start the service
+const jetstream = natsConnection.getClient().jetstream();
+const consumer = new WallpaperUploadedConsumer(jetstream, thumbnailService);
+await consumer.start();
+console.log("Thumbnail service started");
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  console.log("Shutting down...");
+  await consumer.stop();
+  process.exit(0);
+});
+```
+
+## Event Subjects and Streams
+
+### Current Events
+
+| Event | Subject | Stream | Description |
+|-------|---------|--------|-------------|
+| WallpaperUploaded | `wallpaper.uploaded` | `WALLPAPERS` | Wallpaper successfully uploaded and stored |
+
+### Future Events
+
+Planned events for multi-service architecture:
+
+- `wallpaper.thumbnail.generated` - Thumbnails created
+- `wallpaper.quality.analyzed` - Quality score calculated
+- `wallpaper.colors.extracted` - Color palette extracted
+- `wallpaper.tagged` - Tags added
+
+## Testing Event Publishers and Consumers
+
+See [Testing: Integration vs E2E](/docs/testing/integration-vs-e2e) for strategies on testing event-driven services.
+
+```typescript
+import { NatsTesterBuilder } from "@wallpaperdb/test-utils";
+
+describe("WallpaperUploadedPublisher", () => {
+  it("should publish events to NATS", async () => {
+    const tester = await new NatsTesterBuilder()
+      .withNats()
+      .build();
+
+    const js = tester.nats.jetstream();
+    const publisher = new WallpaperUploadedPublisher(js);
+
+    const event = { /* ... */ };
+    const ack = await publisher.publish(event);
+
+    expect(ack.stream).toBe("WALLPAPERS");
+  });
+});
+```
+
+## Related Documentation
+
+- [Package: Core](/docs/packages/core) - Infrastructure and telemetry
+- [Observability](/docs/observability) - Distributed tracing setup
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Event-driven architecture
+- [Testing](/docs/testing) - Testing strategies for event-driven services

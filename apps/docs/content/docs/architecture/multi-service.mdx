@@ -1,0 +1,657 @@
+---
+title: Multi-Service Architecture
+description: Microservices strategy, patterns, and shared infrastructure
+---
+
+WallpaperDB uses a microservices architecture with event-driven communication, shared packages, and standardized service patterns. This document outlines the strategy, technology choices, and implementation approach.
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Gateway                              │
+│                    (GraphQL / Future)                           │
+└────────────┬────────────────────────────────────────────────────┘
+             │
+   ┌─────────┴──────────┬──────────────┬─────────────┬────────────┐
+   │                    │              │             │            │
+┌──▼────┐     ┌────────▼─────┐  ┌─────▼────┐  ┌────▼───┐  ┌────▼────┐
+│       │     │              │  │          │  │        │  │         │
+│Ingest │────▶│   Media      │  │Thumbnail │  │Quality │  │Tagging  │
+│ or    │     │   Service    │  │Extractor │  │Enrich  │  │         │
+│       │     │              │  │          │  │        │  │         │
+└──┬────┘     └──────────────┘  └─────▲────┘  └────▲───┘  └─────────┘
+   │                                   │            │
+   │                                   │            │
+   └───────────────┬───────────────────┴────────────┘
+                   │
+           ┌───────▼────────┐
+           │  Event Bus     │
+           │    (NATS)      │
+           └────────────────┘
+                   │
+    ┌──────────────┼──────────────┬─────────────┐
+    │              │              │             │
+┌───▼────┐   ┌────▼─────┐   ┌───▼────┐   ┌───▼──────┐
+│        │   │          │   │        │   │          │
+│PostGres│   │  MinIO   │   │  NATS  │   │OpenSearch│
+│        │   │          │   │        │   │          │
+└────────┘   └──────────┘   └────────┘   └──────────┘
+```
+
+## Service Registry
+
+### Current Services
+
+**1. Ingestor** (✅ Production)
+- Port: 3001
+- Purpose: Wallpaper upload and validation
+- Dependencies: PostgreSQL, MinIO, NATS, Redis
+- Events Published: `wallpaper.uploaded`
+- Database: `wallpaperdb_ingestor`
+- Status: Complete
+
+**2. Media** (🚧 In Progress)
+- Port: 3002
+- Purpose: Wallpaper retrieval and resizing
+- Dependencies: PostgreSQL, MinIO, Redis
+- Events Consumed: `wallpaper.uploaded`
+- Database: `wallpaperdb_media`
+- Status: In development
+
+### Planned Services
+
+**3. Thumbnail Extractor** (📋 Planned)
+- Purpose: Video thumbnail generation
+- Dependencies: MinIO, NATS, FFmpeg
+- Events Consumed: `wallpaper.uploaded` (video only)
+- Events Published: `thumbnail.generated`
+
+**4. Quality Enrichment** (📋 Planned)
+- Purpose: Image quality analysis
+- Dependencies: MinIO, NATS, PostgreSQL
+- Events Consumed: `wallpaper.uploaded`
+- Events Published: `quality.analyzed`
+
+**5. Color Enrichment** (📋 Planned)
+- Purpose: Color extraction and palette generation
+- Dependencies: MinIO, NATS, PostgreSQL
+- Events Consumed: `wallpaper.uploaded`
+- Events Published: `colors.extracted`
+
+**6. Tagging Service** (📋 Planned)
+- Purpose: Tag management and suggestions
+- Dependencies: PostgreSQL, OpenSearch
+- Database: `wallpaperdb_tags`
+
+**7. Gateway** (📋 Future)
+- Purpose: GraphQL API for clients
+- Dependencies: All services, OpenSearch
+- Routes traffic to appropriate services
+
+## Technology Stack
+
+### Framework: Fastify + TSyringe
+
+**Decision:** Continue with Fastify and TSyringe (NOT migrating to NestJS)
+
+**Rationale:**
+- Current stack is well-designed for microservices
+- Excellent test infrastructure (TesterBuilder)
+- Maximum flexibility per service
+- Low migration cost
+- Shared packages achieve 90% of NestJS benefits
+
+**See:** [ADR-001: Fastify over NestJS](./decisions/001-fastify-over-nestjs)
+
+### Core Technologies
+
+**HTTP Framework:** Fastify
+- Fast, low overhead
+- Excellent plugin ecosystem
+- Built-in JSON schema validation
+- OpenAPI/Swagger support
+
+**Dependency Injection:** TSyringe
+- Lightweight, decorator-based DI
+- Constructor injection
+- Singleton and transient lifecycles
+- Easy testing with DI container
+
+**Database:** PostgreSQL + Drizzle ORM
+- Type-safe queries
+- Schema migrations
+- Connection pooling
+- OpenTelemetry instrumentation
+
+**Object Storage:** MinIO (S3-compatible)
+- Self-hosted
+- AWS SDK v3 compatible
+- Bucket-per-service pattern
+
+**Message Queue:** NATS with JetStream
+- Persistent event log
+- At-least-once delivery
+- Stream-based architecture
+- Trace context propagation
+
+**Caching:** Redis
+- Distributed rate limiting
+- Metadata caching
+- Session storage (future)
+
+**Observability:** OpenTelemetry + Grafana LGTM
+- Distributed tracing
+- Metrics (Prometheus-compatible)
+- Logs (Loki)
+- Single dashboard (Grafana)
+
+## Shared Packages
+
+### Package Architecture
+
+```
+packages/
+├── core/                      # Infrastructure patterns
+│   ├── connections/          # Connection managers
+│   ├── errors/               # RFC 7807 error handling
+│   ├── telemetry/            # OTEL helpers
+│   ├── config/               # Zod config schemas
+│   ├── health/               # Health check utilities
+│   └── openapi/              # OpenAPI registration
+│
+├── events/                    # Event schemas
+│   ├── schemas/              # Zod schemas for all events
+│   ├── consumer/             # BaseEventConsumer
+│   └── publisher/            # BaseEventPublisher
+│
+├── test-utils/               # Testing infrastructure
+│   ├── builders/             # TesterBuilder pattern
+│   ├── fixtures/             # Test data generators
+│   └── helpers/              # Test utilities
+│
+├── testcontainers/           # Custom containers
+│   └── nats/                 # NATS JetStream setup
+│
+└── url-ipv4-resolver/        # URL validation
+    └── src/                  # SSRF prevention
+```
+
+### @wallpaperdb/core
+
+**Purpose:** Shared infrastructure patterns for all services
+
+**Exports:**
+- Connection managers (Database, MinIO, NATS, Redis, OTEL)
+- Configuration schemas (DatabaseConfig, S3Config, NatsConfig, etc.)
+- Error classes (ProblemDetailsError, ApplicationError)
+- Telemetry helpers (withSpan, recordCounter, recordHistogram)
+- Health check utilities (HealthAggregator, formatters)
+- OpenAPI plugin (registerOpenAPI)
+
+**Key design:**
+- No DI coupling (static imports)
+- Composable config schemas
+- Trace context propagation
+- Type-safe everywhere
+
+**See:** [Package: Core](/docs/packages/core)
+
+### @wallpaperdb/events
+
+**Purpose:** Event-driven communication patterns
+
+**Exports:**
+- Event schemas (WallpaperUploadedEvent, etc.)
+- BaseEventPublisher (with trace context)
+- BaseEventConsumer (with error handling)
+- Event types (Zod schemas)
+
+**Key features:**
+- Type-safe event publishing
+- Automatic trace context propagation
+- Event versioning support
+- Consumer base class
+
+**See:** [Package: Events](/docs/packages/events)
+
+### @wallpaperdb/test-utils
+
+**Purpose:** Composable test infrastructure
+
+**Exports:**
+- TesterBuilder (composable builders)
+- Infrastructure builders (Postgres, MinIO, NATS, Redis, Docker)
+- Fixture generators
+- Test helpers
+
+**Key features:**
+- Container reuse across test files
+- Type-safe builder composition
+- Integration and E2E test support
+- Automatic cleanup
+
+**See:** [Package: Test Utils](/docs/packages/test-utils)
+
+## Service Patterns
+
+### Standard Service Structure
+
+```
+apps/<service-name>/
+├── src/
+│   ├── app.ts              # Fastify setup + DI registration
+│   ├── config.ts           # Zod schema (service-specific config)
+│   ├── index.ts            # Entry point with lifecycle
+│   ├── routes/
+│   │   ├── index.ts        # Route registration
+│   │   ├── health.routes.ts
+│   │   └── <feature>.routes.ts
+│   ├── services/
+│   │   └── <feature>.service.ts
+│   ├── connections/
+│   │   ├── database.ts     # Service-specific connection
+│   │   ├── minio.ts
+│   │   └── nats.ts
+│   ├── db/
+│   │   └── schema.ts       # Drizzle schema
+│   └── errors/
+│       └── problem-details.ts  # Service-specific errors
+├── test/
+│   ├── setup.ts            # Test infrastructure
+│   └── <feature>.test.ts
+├── drizzle/                # Migrations
+├── Dockerfile
+├── package.json
+└── tsconfig.json
+```
+
+### Configuration Pattern
+
+**Compose shared config schemas:**
+
+```typescript
+import { z } from 'zod';
+import {
+  ServerConfigSchema,
+  DatabaseConfigSchema,
+  S3ConfigSchema,
+  NatsConfigSchema,
+  RedisConfigSchema,
+  OtelConfigSchema,
+} from '@wallpaperdb/core/config';
+
+const MyServiceConfigSchema = z.object({
+  ...ServerConfigSchema.shape,
+  ...DatabaseConfigSchema.shape,
+  ...S3ConfigSchema.shape,
+  ...NatsConfigSchema.shape,
+  ...RedisConfigSchema.shape,
+  ...OtelConfigSchema.shape,
+
+  // Service-specific config
+  myFeatureEnabled: z.boolean().default(true),
+  myFeatureTimeout: z.coerce.number().int().positive().default(5000),
+});
+
+export type Config = z.infer<typeof MyServiceConfigSchema>;
+
+export const config: Config = MyServiceConfigSchema.parse(process.env);
+```
+
+### Connection Management
+
+**Use shared connection managers:**
+
+```typescript
+import { DatabaseConnection, MinioConnection, NatsConnectionManager } from '@wallpaperdb/core/connections';
+import { container } from 'tsyringe';
+
+// Register connections
+container.registerSingleton(DatabaseConnection);
+container.registerSingleton(MinioConnection);
+container.registerSingleton(NatsConnectionManager);
+container.register('config', { useValue: config });
+
+// Initialize connections
+const db = container.resolve(DatabaseConnection);
+await db.initialize();
+
+const minio = container.resolve(MinioConnection);
+await minio.initialize();
+
+const nats = container.resolve(NatsConnectionManager);
+await nats.initialize();
+```
+
+### Service Layer
+
+**Business logic with DI:**
+
+```typescript
+import { injectable, inject } from 'tsyringe';
+import { DatabaseConnection } from '@wallpaperdb/core/connections';
+import { withSpan } from '@wallpaperdb/core/telemetry';
+import { Attributes } from '@wallpaperdb/core/telemetry/attributes';
+
+@injectable()
+export class MyFeatureService {
+  constructor(
+    @inject(DatabaseConnection) private readonly db: DatabaseConnection,
+    @inject('config') private readonly config: Config
+  ) {}
+
+  async processFeature(userId: string, data: unknown) {
+    return await withSpan(
+      'my_feature.process',
+      { [Attributes.USER_ID]: userId },
+      async (span) => {
+        const pool = this.db.getClient();
+        const result = await pool.query(/* ... */);
+
+        span.setAttribute('result.count', result.rows.length);
+        return result.rows;
+      }
+    );
+  }
+}
+```
+
+### Error Handling
+
+**RFC 7807 Problem Details:**
+
+```typescript
+import { ProblemDetailsError } from '@wallpaperdb/core/errors';
+
+export class MyCustomError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/my-error';
+  readonly title = 'My Error';
+  readonly status = 400;
+  readonly instance = '/my-endpoint';
+
+  constructor(context: string) {
+    super(`Something went wrong: ${context}`);
+  }
+}
+
+// In route handler
+if (error instanceof ProblemDetailsError) {
+  return reply
+    .code(error.status)
+    .header('content-type', 'application/problem+json')
+    .send(error.toJSON());
+}
+```
+
+### Event Publishing
+
+**Type-safe events with trace context:**
+
+```typescript
+import { BaseEventPublisher } from '@wallpaperdb/events';
+import { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
+
+@injectable()
+export class MyEventPublisher extends BaseEventPublisher {
+  async publishWallpaperUploaded(event: WallpaperUploadedEvent) {
+    await this.publish('wallpaper.uploaded', event);
+  }
+}
+```
+
+### Event Consuming
+
+**Base consumer with error handling:**
+
+```typescript
+import { BaseEventConsumer } from '@wallpaperdb/events';
+import { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
+
+@injectable()
+export class WallpaperUploadedConsumer extends BaseEventConsumer<WallpaperUploadedEvent> {
+  protected readonly subject = 'wallpaper.uploaded';
+  protected readonly durableName = 'my-service-wallpaper-uploaded';
+
+  protected async handleMessage(event: WallpaperUploadedEvent): Promise<void> {
+    // Process event
+    await this.myService.processUpload(event);
+  }
+}
+```
+
+## Service Communication
+
+### Event-Driven Architecture
+
+**Primary communication:** NATS events
+
+**Event flow:**
+1. Ingestor publishes `wallpaper.uploaded` event
+2. Media, Thumbnail, Quality, Color services consume event
+3. Each service processes independently
+4. Services publish their own events (e.g., `thumbnail.generated`)
+
+**Benefits:**
+- Loose coupling between services
+- Automatic retries (NATS JetStream)
+- Trace context propagation
+- Fault tolerance (services can be down temporarily)
+
+### Synchronous Communication
+
+**When to use direct HTTP:**
+- Gateway → Service queries (GraphQL resolvers)
+- Health checks
+- Admin operations
+
+**Pattern:**
+```typescript
+// In gateway service
+const response = await fetch('http://media-service:3002/wallpapers/wlpr_123');
+const wallpaper = await response.json();
+```
+
+## Database Strategy
+
+### Database per Service
+
+**Each service has its own database:**
+- `wallpaperdb_ingestor` - Ingestor state machine
+- `wallpaperdb_media` - Media metadata, variants
+- `wallpaperdb_tags` - Tags and relationships
+
+**Benefits:**
+- Service isolation
+- Independent scaling
+- Schema independence
+- Failure isolation
+
+**Drawbacks:**
+- No cross-database joins
+- Eventual consistency between services
+- Data duplication
+
+### Shared Database Schema
+
+**Some tables may be replicated:**
+- `wallpapers` - Core wallpaper metadata (denormalized)
+- `users` - User information (replicated via events)
+
+**Strategy:**
+- Replicate via events (not database replication)
+- Each service owns its tables
+- Foreign keys only within service boundaries
+
+## Testing Strategy
+
+### Service Testing Layers
+
+**Unit tests:**
+- Pure logic (utilities, validators)
+- No containers needed
+- Fast feedback (< 1 second)
+
+**Integration tests:**
+- Routes, services, database interactions
+- Uses Testcontainers (real infrastructure)
+- In-process app (same Node.js)
+- Medium speed (~5 seconds)
+
+**E2E tests:**
+- Docker deployment
+- Multi-container orchestration
+- Full service-to-service communication
+- Slow (~30 seconds)
+
+**Example integration test:**
+```typescript
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+describe('My Service', () => {
+  it('should process feature', async () => {
+    const { app, db, cleanup } = await new TesterBuilder()
+      .withPostgres()
+      .withMinIO()
+      .withNATS()
+      .withRedis()
+      .withMyServiceApp()
+      .build();
+
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/my-feature',
+        payload: { data: 'test' },
+      });
+
+      expect(response.statusCode).toBe(200);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+```
+
+## Deployment
+
+### Docker Images
+
+**Each service has its own Dockerfile:**
+
+```dockerfile
+# Multi-stage build
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm build
+
+FROM node:22-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY package.json ./
+RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile
+CMD ["node", "dist/index.mjs"]
+```
+
+### Environment Variables
+
+**12-factor app configuration:**
+- All config via environment variables
+- Secrets via secret management (not committed)
+- Zod validation on startup
+
+### Orchestration
+
+**Future:** Kubernetes
+- Each service in its own deployment
+- Services communicate via cluster DNS
+- Horizontal pod autoscaling
+- Rolling updates
+
+## Observability
+
+### Distributed Tracing
+
+**OpenTelemetry across all services:**
+- Trace context propagation via NATS headers
+- HTTP header propagation (W3C Trace Context)
+- Service-to-service trace visualization in Grafana
+
+**Example trace:**
+```
+Upload Request (Ingestor)
+├── Validate File (Ingestor)
+├── Upload to MinIO (Ingestor)
+├── Publish Event (Ingestor → NATS)
+└── Process Upload (Media)
+    ├── Fetch from MinIO
+    ├── Generate Variant
+    └── Update Database
+```
+
+### Metrics
+
+**Per-service metrics:**
+- Request rate, latency, error rate
+- Database query latency
+- Event processing latency
+- Custom business metrics
+
+**Grafana dashboards:**
+- Service-specific dashboards (e.g., Media Service Dashboard)
+- System overview dashboard (future)
+
+### Logs
+
+**Structured logging with Pino:**
+- JSON logs
+- Trace ID in every log
+- Loki aggregation
+- Linked to traces in Grafana
+
+## Best Practices
+
+### 1. Keep Services Small
+
+**Single responsibility:**
+- Each service does one thing well
+- If a service has >10 routes, consider splitting
+
+### 2. Event-First Design
+
+**Prefer events over sync calls:**
+- Publish events for state changes
+- Let consumers decide what to do
+- Enables future features without changing producer
+
+### 3. Idempotency
+
+**All event handlers should be idempotent:**
+- Use unique event IDs
+- Track processed events
+- Handle duplicate deliveries gracefully
+
+### 4. Graceful Degradation
+
+**Services should work when others are down:**
+- Cache data locally when possible
+- Return partial results
+- Use circuit breakers for sync calls
+
+### 5. Schema Versioning
+
+**Plan for schema evolution:**
+- Version event schemas (v1, v2)
+- Support multiple versions during migration
+- Document breaking changes
+
+## Related Documentation
+
+- [Service: Ingestor](/docs/services/ingestor) - Reference implementation
+- [Service: Media](/docs/services/media) - Second service example
+- [Package: Core](/docs/packages/core) - Shared infrastructure
+- [Package: Events](/docs/packages/events) - Event patterns
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Step-by-step guide

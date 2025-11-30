@@ -1,0 +1,522 @@
+---
+title: "@wallpaperdb/test-utils"
+description: TesterBuilder pattern framework for composable test infrastructure
+---
+
+The `@wallpaperdb/test-utils` package provides the TesterBuilder pattern framework - a composable, type-safe system for building test infrastructure. It includes 9 infrastructure builders that can be mixed together to create exactly the test environment you need.
+
+## Installation
+
+This is a workspace package. Add it to your app's `package.json`:
+
+```json
+{
+  "devDependencies": {
+    "@wallpaperdb/test-utils": "workspace:*"
+  }
+}
+```
+
+## Overview
+
+The TesterBuilder pattern uses composable mixins to build test infrastructure. Instead of manually setting up containers and connections, you declare what you need:
+
+```typescript
+import { PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withMinio()
+  .withNats()
+  .build();
+
+// Now you have:
+// - tester.pool (PostgreSQL connection pool)
+// - tester.minio (MinIO S3 client)
+// - tester.nats (NATS connection)
+```
+
+### Key Benefits
+
+- **Type-safe**: Full TypeScript support with IntelliSense
+- **Composable**: Mix and match infrastructure builders
+- **Container reuse**: Shared containers across test files
+- **Lifecycle hooks**: Setup, cleanup, and destroy hooks
+- **Environment variables**: Automatic env var management
+
+## Available Builders
+
+### Infrastructure Builders
+
+| Builder | Purpose | Provides |
+|---------|---------|----------|
+| `DockerTesterBuilder` | Docker engine access | Docker environment, network |
+| `PostgresTesterBuilder` | PostgreSQL database | Connection pool, migrations |
+| `MinioTesterBuilder` | S3/MinIO storage | S3 client, bucket management |
+| `NatsTesterBuilder` | NATS messaging | NATS connection, JetStream |
+| `RedisTesterBuilder` | Redis cache | Redis client |
+| `FixturesTesterBuilder` | Test data management | Fixture loading/cleanup |
+| `SetupTesterBuilder` | Setup hooks | Pre-test initialization |
+| `CleanupTesterBuilder` | Cleanup hooks | Post-test cleanup |
+| `DestroyTesterBuilder` | Teardown hooks | Final teardown |
+
+### Quick Start
+
+```typescript
+import { NatsTesterBuilder } from "@wallpaperdb/test-utils";
+
+describe("Event Publisher", () => {
+  it("should publish events", async () => {
+    const tester = await new NatsTesterBuilder()
+      .withNats()
+      .build();
+
+    const js = tester.nats.jetstream();
+    const publisher = new MyEventPublisher(js);
+
+    await publisher.publish({ id: "123", data: "test" });
+
+    // Verify
+    const jsm = await tester.nats.jetstreamManager();
+    const stream = await jsm.streams.info("MY_STREAM");
+    expect(stream.state.messages).toBe(1);
+  });
+});
+```
+
+## Core Builders
+
+### DockerTesterBuilder
+
+Provides Docker engine access for creating networks and managing containers.
+
+```typescript
+import { DockerTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new DockerTesterBuilder()
+  .withDocker()
+  .build();
+
+// Access Docker environment
+const network = tester.docker.network;
+```
+
+**Provides:**
+- `docker.environment` - Testcontainers environment
+- `docker.network` - Isolated network for containers
+
+### PostgresTesterBuilder
+
+PostgreSQL database with automatic migrations.
+
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withMigrations("./drizzle")
+  .build();
+
+// Use connection pool
+const result = await tester.pool.query('SELECT NOW()');
+```
+
+**Methods:**
+- `withPostgres(options?)` - Start PostgreSQL container
+- `withMigrations(path)` - Run Drizzle migrations
+
+**Provides:**
+- `pool` - PostgreSQL connection pool
+- `postgres.container` - Container instance
+- `postgres.connectionString` - Connection URL
+
+### MinioTesterBuilder
+
+MinIO/S3 storage with bucket management.
+
+```typescript
+import { MinioTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new MinioTesterBuilder()
+  .withMinio({
+    buckets: ['wallpapers', 'thumbnails']
+  })
+  .build();
+
+// Use S3 client
+await tester.minio.send(new PutObjectCommand({
+  Bucket: 'wallpapers',
+  Key: 'test.jpg',
+  Body: buffer
+}));
+```
+
+**Methods:**
+- `withMinio(options?)` - Start MinIO container
+
+**Options:**
+- `buckets` - Array of bucket names to create
+
+**Provides:**
+- `minio` - AWS SDK v3 S3 client
+- `minioContainer` - Container instance
+- `minioEndpoint` - S3 endpoint URL
+
+### NatsTesterBuilder
+
+NATS messaging with JetStream support.
+
+```typescript
+import { NatsTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new NatsTesterBuilder()
+  .withNats()
+  .build();
+
+// Use NATS connection
+const js = tester.nats.jetstream();
+await js.publish('subject', JSON.stringify({ data: 'test' }));
+```
+
+**Methods:**
+- `withNats(options?)` - Start NATS container
+
+**Provides:**
+- `nats` - NATS connection
+- `natsContainer` - Container instance
+
+### RedisTesterBuilder
+
+Redis cache for rate limiting and caching.
+
+```typescript
+import { RedisTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new RedisTesterBuilder()
+  .withRedis()
+  .build();
+
+// Use Redis client
+await tester.redis.set('key', 'value');
+const value = await tester.redis.get('key');
+```
+
+**Methods:**
+- `withRedis(options?)` - Start Redis container
+
+**Provides:**
+- `redis` - IORedis client
+- `redisContainer` - Container instance
+
+## Lifecycle Builders
+
+### SetupTesterBuilder
+
+Run initialization logic before tests.
+
+```typescript
+import { SetupTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withSetup(async (context) => {
+    // Create test data
+    await context.pool.query('INSERT INTO users (id, name) VALUES (1, \'Test User\')');
+  })
+  .build();
+```
+
+**Methods:**
+- `withSetup(fn)` - Add setup hook
+
+### CleanupTesterBuilder
+
+Run cleanup logic after each test.
+
+```typescript
+import { CleanupTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withCleanup(async (context) => {
+    // Clean up test data
+    await context.pool.query('TRUNCATE TABLE wallpapers');
+  })
+  .build();
+
+// Call after each test
+afterEach(async () => {
+  await tester.cleanup();
+});
+```
+
+**Methods:**
+- `withCleanup(fn)` - Add cleanup hook
+- `cleanup()` - Execute cleanup hooks
+
+### DestroyTesterBuilder
+
+Run teardown logic when done with the tester.
+
+```typescript
+import { DestroyTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withDestroy(async (context) => {
+    // Final cleanup
+    console.log('Tearing down test infrastructure');
+  })
+  .build();
+
+// Call once at the end
+afterAll(async () => {
+  await tester.destroy();
+});
+```
+
+**Methods:**
+- `withDestroy(fn)` - Add destroy hook
+- `destroy()` - Execute destroy hooks
+
+### FixturesTesterBuilder
+
+Manage test fixtures and data.
+
+```typescript
+import { FixturesTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withFixtures()
+  .build();
+
+// Load fixtures
+await tester.fixtures.load('users', [
+  { id: 1, name: 'Alice' },
+  { id: 2, name: 'Bob' }
+]);
+
+// Access loaded fixtures
+const users = tester.fixtures.get('users');
+expect(users).toHaveLength(2);
+
+// Clear fixtures
+await tester.fixtures.clear();
+```
+
+**Methods:**
+- `withFixtures()` - Enable fixture management
+- `fixtures.load(name, data)` - Load fixtures
+- `fixtures.get(name)` - Get loaded fixtures
+- `fixtures.clear()` - Clear all fixtures
+
+## Composing Builders
+
+### Chaining Multiple Builders
+
+The power of TesterBuilder is in composition:
+
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await new PostgresTesterBuilder()
+  .withDocker()
+  .withPostgres()
+  .withMinio({ buckets: ['wallpapers'] })
+  .withNats()
+  .withRedis()
+  .withMigrations("./drizzle")
+  .withSetup(async (ctx) => {
+    // Initialize test data
+  })
+  .withCleanup(async (ctx) => {
+    // Cleanup after each test
+  })
+  .build();
+
+// Everything is typed and available:
+// tester.pool, tester.minio, tester.nats, tester.redis
+```
+
+### Type Safety
+
+The builder pattern provides full type inference:
+
+```typescript
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withMinio()
+  .build();
+
+// TypeScript knows tester has both pool and minio
+tester.pool;  // ✓ Type: Pool
+tester.minio; // ✓ Type: S3Client
+
+// @ts-expect-error - TypeScript catches this
+tester.nats;  // ✗ Error: Property 'nats' does not exist
+```
+
+## Container Reuse
+
+Containers are automatically reused across test files for better performance:
+
+```typescript
+// test-1.test.ts
+const tester1 = await new PostgresTesterBuilder().withPostgres().build();
+// Starts PostgreSQL container
+
+// test-2.test.ts
+const tester2 = await new PostgresTesterBuilder().withPostgres().build();
+// Reuses the same PostgreSQL container!
+```
+
+This dramatically speeds up test execution.
+
+## Environment Variables
+
+Builders automatically set environment variables:
+
+```typescript
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withMinio()
+  .build();
+
+// Environment variables are set:
+// DATABASE_URL=postgresql://...
+// MINIO_ENDPOINT=http://127.0.0.1:...
+// MINIO_ACCESS_KEY=...
+// MINIO_SECRET_KEY=...
+```
+
+## Default Builder
+
+For convenience, a default builder with common infrastructure is provided:
+
+```typescript
+import { createDefaultTesterBuilder } from "@wallpaperdb/test-utils";
+
+const tester = await createDefaultTesterBuilder()
+  .withPostgres()
+  .withMinio()
+  .withNats()
+  .build();
+```
+
+## Complete Example
+
+### Integration Test with Full Infrastructure
+
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+
+describe("Upload Flow Integration", () => {
+  let tester: Awaited<ReturnType<typeof setupTester>>;
+
+  async function setupTester() {
+    return await new PostgresTesterBuilder()
+      .withDocker()
+      .withPostgres()
+      .withMinio({ buckets: ['wallpapers'] })
+      .withNats()
+      .withMigrations("./drizzle")
+      .withSetup(async (ctx) => {
+        // Create test user
+        await ctx.pool.query(
+          'INSERT INTO users (id, name) VALUES ($1, $2)',
+          ['user_123', 'Test User']
+        );
+      })
+      .withCleanup(async (ctx) => {
+        // Cleanup wallpapers after each test
+        await ctx.pool.query('TRUNCATE TABLE wallpapers CASCADE');
+      })
+      .build();
+  }
+
+  beforeAll(async () => {
+    tester = await setupTester();
+  });
+
+  afterEach(async () => {
+    await tester.cleanup();
+  });
+
+  afterAll(async () => {
+    await tester.destroy();
+  });
+
+  it("should upload wallpaper end-to-end", async () => {
+    // Upload to S3
+    await tester.minio.send(new PutObjectCommand({
+      Bucket: 'wallpapers',
+      Key: 'wlpr_123/original.jpg',
+      Body: Buffer.from('fake image data')
+    }));
+
+    // Record in database
+    await tester.pool.query(
+      'INSERT INTO wallpapers (id, user_id, storage_key) VALUES ($1, $2, $3)',
+      ['wlpr_123', 'user_123', 'wlpr_123/original.jpg']
+    );
+
+    // Publish event
+    const js = tester.nats.jetstream();
+    await js.publish('wallpaper.uploaded', JSON.stringify({
+      wallpaperId: 'wlpr_123',
+      userId: 'user_123'
+    }));
+
+    // Verify
+    const result = await tester.pool.query(
+      'SELECT * FROM wallpapers WHERE id = $1',
+      ['wlpr_123']
+    );
+    expect(result.rows).toHaveLength(1);
+  });
+});
+```
+
+## Performance Tips
+
+### 1. Use Container Reuse
+Let Testcontainers reuse containers across tests (enabled by default).
+
+### 2. Minimize Builders
+Only include the infrastructure you need:
+
+```typescript
+// Good - minimal
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .build();
+
+// Bad - unnecessary infrastructure
+const tester = await new PostgresTesterBuilder()
+  .withPostgres()
+  .withMinio()
+  .withNats()
+  .withRedis()
+  .build();
+```
+
+### 3. Use Cleanup Hooks
+Clear data between tests instead of rebuilding containers:
+
+```typescript
+.withCleanup(async (ctx) => {
+  await ctx.pool.query('TRUNCATE TABLE wallpapers');
+});
+```
+
+## Troubleshooting
+
+See [Testing: Troubleshooting](/docs/testing/troubleshooting) for common issues and solutions.
+
+## Related Documentation
+
+- [Testing: Test Builder Pattern](/docs/testing/test-builder-pattern) - Complete guide
+- [Testing: Creating Custom Builders](/docs/testing/creating-custom-builders) - Build application-specific builders
+- [Package: Testcontainers](/docs/packages/testcontainers) - Custom container setups
+- [Testing: Integration vs E2E](/docs/testing/integration-vs-e2e) - Choosing test types

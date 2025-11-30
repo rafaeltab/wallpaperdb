@@ -1,0 +1,560 @@
+---
+title: Error Handling
+description: RFC 7807 Problem Details pattern for structured HTTP errors
+---
+
+WallpaperDB uses RFC 7807 Problem Details for all HTTP API errors, providing machine-readable error responses with consistent structure and extensibility.
+
+## Quick Reference
+
+**Base classes:**
+- `ProblemDetailsError` - RFC 7807 compliant errors (for HTTP APIs)
+- `ApplicationError` - Generic application errors (for internal use)
+
+**Response format:**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/invalid-file-format",
+  "title": "Invalid File Format",
+  "status": 400,
+  "detail": "Only JPEG, PNG, WebP, WebM, and MP4 formats are supported",
+  "instance": "/upload",
+  "receivedMimeType": "image/gif"
+}
+```
+
+**Content-Type:** `application/problem+json`
+
+## RFC 7807 Overview
+
+[RFC 7807](https://tools.ietf.org/html/rfc7807) defines a standard format for HTTP API error responses:
+
+**Required fields:**
+- `type` - URI identifying the problem type (permanent, dereferenceable documentation URL)
+- `title` - Short, human-readable summary (same for all occurrences of this type)
+- `status` - HTTP status code
+- `detail` - Human-readable explanation specific to this occurrence
+- `instance` - URI of the endpoint that generated the error
+
+**Extension fields:**
+Additional context can be added as custom fields (e.g., `receivedMimeType`, `traceId`).
+
+**Benefits:**
+- Machine-readable error types
+- Consistent structure across all APIs
+- Extensible with custom fields
+- Self-documenting (type URL points to docs)
+- Better client error handling
+
+## ProblemDetailsError Class
+
+Located in `@wallpaperdb/core/errors`:
+
+```typescript
+import { ProblemDetailsError } from '@wallpaperdb/core/errors';
+
+export abstract class ProblemDetailsError extends Error {
+  abstract readonly type: string;
+  abstract readonly title: string;
+  abstract readonly status: number;
+  abstract readonly instance: string;
+
+  constructor(
+    public readonly detail: string,
+    public readonly extensions: Record<string, unknown> = {}
+  ) {
+    super(detail);
+    this.name = this.constructor.name;
+  }
+
+  toJSON(): ProblemDetails {
+    return {
+      type: this.type,
+      title: this.title,
+      status: this.status,
+      detail: this.detail,
+      instance: this.instance,
+      ...this.extensions,
+    };
+  }
+}
+```
+
+## Creating Custom Errors
+
+### Basic Error
+
+**Pattern:**
+```typescript
+export class MyCustomError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/my-error';
+  readonly title = 'My Error';
+  readonly status = 400;
+  readonly instance = '/my-endpoint';
+
+  constructor() {
+    super('Something went wrong');
+  }
+}
+```
+
+**Usage:**
+```typescript
+throw new MyCustomError();
+```
+
+**Response:**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/my-error",
+  "title": "My Error",
+  "status": 400,
+  "detail": "Something went wrong",
+  "instance": "/my-endpoint"
+}
+```
+
+### Error with Context
+
+**Pattern:**
+```typescript
+export class FileTooLargeError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/file-too-large';
+  readonly title = 'File Too Large';
+  readonly status = 413;
+  readonly instance = '/upload';
+
+  constructor(fileSizeBytes: number, maxFileSizeBytes: number, fileType: 'image' | 'video') {
+    super(
+      `File size of ${Math.round(fileSizeBytes / (1024 * 1024))}MB exceeds your limit of ${Math.round(maxFileSizeBytes / (1024 * 1024))}MB for ${fileType}s`,
+      { fileSizeBytes, maxFileSizeBytes, fileType }
+    );
+  }
+}
+```
+
+**Usage:**
+```typescript
+throw new FileTooLargeError(52428800, 52428800, 'image');
+```
+
+**Response:**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/file-too-large",
+  "title": "File Too Large",
+  "status": 413,
+  "detail": "File size of 50MB exceeds your limit of 50MB for images",
+  "instance": "/upload",
+  "fileSizeBytes": 52428800,
+  "maxFileSizeBytes": 52428800,
+  "fileType": "image"
+}
+```
+
+### Error with Trace Context
+
+For debugging production issues:
+
+```typescript
+export class StorageUploadFailedError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/storage-upload-failed';
+  readonly title = 'Storage Upload Failed';
+  readonly status = 500;
+  readonly instance = '/upload';
+
+  constructor(traceId?: string) {
+    super('Failed to upload file to object storage', traceId ? { traceId } : {});
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/storage-upload-failed",
+  "title": "Storage Upload Failed",
+  "status": 500,
+  "detail": "Failed to upload file to object storage",
+  "instance": "/upload",
+  "traceId": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+}
+```
+
+Clients can use `traceId` to correlate with logs/traces in Grafana.
+
+## Error Handling in Routes
+
+Fastify routes catch and serialize `ProblemDetailsError` automatically:
+
+```typescript
+import { ProblemDetailsError, InvalidFileFormatError } from '../errors/problem-details.js';
+
+async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    // Business logic...
+    if (!isValidFormat(file)) {
+      throw new InvalidFileFormatError(file.mimetype);
+    }
+
+    return reply.code(200).send({ success: true });
+  } catch (error) {
+    // Handle ProblemDetailsError
+    if (error instanceof ProblemDetailsError) {
+      return reply
+        .code(error.status)
+        .header('content-type', 'application/problem+json')
+        .send(error.toJSON());
+    }
+
+    // Handle unexpected errors
+    request.log.error(error, 'Unexpected error in upload handler');
+    return reply.code(500).send({
+      type: 'https://wallpaperdb.example/problems/internal-error',
+      title: 'Internal Server Error',
+      status: 500,
+      detail: 'An unexpected error occurred',
+      instance: request.url,
+    });
+  }
+}
+```
+
+## Ingestor Service Examples
+
+All errors defined in `apps/ingestor/src/errors/problem-details.ts`:
+
+### Validation Errors (400)
+
+**Missing user ID:**
+```typescript
+export class MissingUserId extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/missing-user-id';
+  readonly title = 'Missing userId';
+  readonly status = 400;
+  readonly instance = '/upload';
+
+  constructor() {
+    super('A userId must be provided');
+  }
+}
+```
+
+**Invalid file format:**
+```typescript
+export class InvalidFileFormatError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/invalid-file-format';
+  readonly title = 'Invalid File Format';
+  readonly status = 400;
+  readonly instance = '/upload';
+
+  constructor(receivedMimeType: string) {
+    super('Only JPEG, PNG, WebP, WebM, and MP4 formats are supported', {
+      receivedMimeType,
+    });
+  }
+}
+```
+
+**Dimensions out of bounds:**
+```typescript
+export class DimensionsOutOfBoundsError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/dimensions-out-of-bounds';
+  readonly title = 'Dimensions Out of Bounds';
+  readonly status = 400;
+  readonly instance = '/upload';
+
+  constructor(
+    width: number,
+    height: number,
+    minWidth: number,
+    minHeight: number,
+    maxWidth: number,
+    maxHeight: number
+  ) {
+    super(
+      `Image dimensions must be between ${minWidth}x${minHeight} and ${maxWidth}x${maxHeight}`,
+      { width, height, minWidth, minHeight, maxWidth, maxHeight }
+    );
+  }
+}
+```
+
+### Client Errors (4xx)
+
+**Missing file (400):**
+```typescript
+export class MissingFileError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/missing-file';
+  readonly title = 'Missing File';
+  readonly status = 400;
+  readonly instance = '/upload';
+
+  constructor() {
+    super('No file provided in the request');
+  }
+}
+```
+
+**File too large (413):**
+```typescript
+export class FileTooLargeError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/file-too-large';
+  readonly title = 'File Too Large';
+  readonly status = 413;
+  readonly instance = '/upload';
+
+  constructor(fileSizeBytes: number, maxFileSizeBytes: number, fileType: 'image' | 'video') {
+    super(
+      `File size of ${Math.round(fileSizeBytes / (1024 * 1024))}MB exceeds your limit of ${Math.round(maxFileSizeBytes / (1024 * 1024))}MB for ${fileType}s`,
+      { fileSizeBytes, maxFileSizeBytes, fileType }
+    );
+  }
+}
+```
+
+**Rate limit exceeded (429):**
+```typescript
+export class RateLimitExceededError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/rate-limit-exceeded';
+  readonly title = 'Rate Limit Exceeded';
+  readonly status = 429;
+  readonly instance = '/upload';
+
+  constructor(max: number, windowMs: number, retryAfter: number) {
+    const windowMinutes = Math.ceil(windowMs / 60000);
+    super(
+      `You have exceeded the upload limit of ${max} uploads per ${windowMinutes} minute${windowMinutes > 1 ? 's' : ''}. Please try again later.`,
+      { max, windowMs, retryAfter }
+    );
+  }
+}
+```
+
+### Server Errors (500)
+
+**Storage upload failed:**
+```typescript
+export class StorageUploadFailedError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/storage-upload-failed';
+  readonly title = 'Storage Upload Failed';
+  readonly status = 500;
+  readonly instance = '/upload';
+
+  constructor(traceId?: string) {
+    super('Failed to upload file to object storage', traceId ? { traceId } : {});
+  }
+}
+```
+
+**Database error:**
+```typescript
+export class DatabaseError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/database-error';
+  readonly title = 'Database Error';
+  readonly status = 500;
+  readonly instance = '/upload';
+
+  constructor(traceId?: string) {
+    super('Failed to save file metadata to database', traceId ? { traceId } : {});
+  }
+}
+```
+
+**Event publishing failed:**
+```typescript
+export class EventPublishingFailedError extends ProblemDetailsError {
+  readonly type = 'https://wallpaperdb.example/problems/event-publishing-failed';
+  readonly title = 'Event Publishing Failed';
+  readonly status = 500;
+  readonly instance = '/upload';
+
+  constructor(traceId?: string) {
+    super('File uploaded successfully but event publishing failed', traceId ? { traceId } : {});
+  }
+}
+```
+
+## ApplicationError (Internal Use)
+
+For non-HTTP errors (internal application logic):
+
+```typescript
+import { ApplicationError, ValidationError } from '@wallpaperdb/core/errors';
+
+export class MyServiceError extends ApplicationError {
+  readonly code = 'MY_SERVICE_ERROR';
+  readonly statusCode = 500;
+}
+
+// Pre-defined errors in @wallpaperdb/core/errors:
+// - InternalError (500)
+// - DataIncompleteError (500)
+// - NotFoundError (404)
+// - ValidationError (400)
+// - UnauthorizedError (401)
+// - ForbiddenError (403)
+// - ConflictError (409)
+```
+
+**Usage:**
+```typescript
+import { ValidationError } from '@wallpaperdb/core/errors';
+
+function processData(data: unknown) {
+  if (!isValid(data)) {
+    throw new ValidationError('Invalid data format', { receivedType: typeof data });
+  }
+}
+```
+
+**Difference from ProblemDetailsError:**
+- `ApplicationError` is for internal use (services, background jobs)
+- `ProblemDetailsError` is for HTTP API responses (routes)
+- `ApplicationError` has `code` and `context`, `ProblemDetailsError` has `type`, `title`, `instance`
+
+## Error Documentation URLs
+
+**Best practice:** Host documentation for each error type at its `type` URL.
+
+**Example structure:**
+```
+https://wallpaperdb.example/problems/
+  ├── missing-user-id          → Docs for MissingUserId
+  ├── invalid-file-format      → Docs for InvalidFileFormatError
+  ├── file-too-large           → Docs for FileTooLargeError
+  └── rate-limit-exceeded      → Docs for RateLimitExceededError
+```
+
+**Documentation should include:**
+- Description of the error
+- Common causes
+- How to fix it
+- Related API documentation
+- Example request/response
+
+**Future:** Auto-generate error documentation from TypeScript definitions.
+
+## Client-Side Error Handling
+
+TypeScript client example:
+
+```typescript
+interface ProblemDetails {
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  instance: string;
+  [key: string]: unknown;
+}
+
+async function uploadWallpaper(file: File, userId: string) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('userId', userId);
+
+  const response = await fetch('http://localhost:3001/upload', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type');
+
+    if (contentType?.includes('application/problem+json')) {
+      const problem: ProblemDetails = await response.json();
+
+      // Handle specific error types
+      switch (problem.type) {
+        case 'https://wallpaperdb.example/problems/file-too-large':
+          console.error(`File too large: ${problem.detail}`);
+          console.error('Max size:', problem.maxFileSizeBytes);
+          break;
+
+        case 'https://wallpaperdb.example/problems/rate-limit-exceeded':
+          console.error(`Rate limited. Retry after ${problem.retryAfter}s`);
+          break;
+
+        default:
+          console.error(`Error: ${problem.title} - ${problem.detail}`);
+      }
+
+      throw new Error(problem.detail);
+    }
+
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+```
+
+## Testing Error Responses
+
+**Unit test:**
+```typescript
+import { describe, it, expect } from 'vitest';
+import { FileTooLargeError } from '../errors/problem-details.js';
+
+describe('FileTooLargeError', () => {
+  it('should create error with correct structure', () => {
+    const error = new FileTooLargeError(52428800, 52428800, 'image');
+
+    expect(error.status).toBe(413);
+    expect(error.type).toBe('https://wallpaperdb.example/problems/file-too-large');
+    expect(error.title).toBe('File Too Large');
+
+    const json = error.toJSON();
+    expect(json.fileSizeBytes).toBe(52428800);
+    expect(json.maxFileSizeBytes).toBe(52428800);
+    expect(json.fileType).toBe('image');
+  });
+});
+```
+
+**Integration test:**
+```typescript
+import { describe, it, expect } from 'vitest';
+
+describe('POST /upload', () => {
+  it('should return 413 when file is too large', async () => {
+    const largeFile = Buffer.alloc(100 * 1024 * 1024); // 100MB
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/upload',
+      payload: {
+        file: largeFile,
+        userId: 'test-user',
+      },
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+
+    const body = JSON.parse(response.body);
+    expect(body.type).toBe('https://wallpaperdb.example/problems/file-too-large');
+    expect(body.fileSizeBytes).toBe(100 * 1024 * 1024);
+  });
+});
+```
+
+## Best Practices
+
+1. **Use specific error types** - Create dedicated error classes for each failure mode
+2. **Include context** - Pass relevant data in `extensions` for debugging
+3. **Consistent URLs** - Use permanent, dereferenceable URLs for `type`
+4. **Document errors** - Host documentation at the `type` URL
+5. **Add trace IDs** - Include `traceId` in 5xx errors for debugging
+6. **Test error paths** - Write tests for all error scenarios
+7. **Don't leak internals** - Avoid exposing stack traces or sensitive data in error responses
+8. **Use retry headers** - Include `Retry-After` for rate limits and temporary failures
+9. **Log before throwing** - Log errors with full context before throwing
+10. **Catch at boundaries** - Catch and serialize errors at route handlers, not in services
+
+## Related Documentation
+
+- [Package: Core](/docs/packages/core) - Error base classes
+- [Service: Ingestor](/docs/services/ingestor) - Error usage examples
+- [RFC 7807 Specification](https://tools.ietf.org/html/rfc7807) - Problem Details standard

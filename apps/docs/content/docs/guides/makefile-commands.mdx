@@ -1,0 +1,827 @@
+---
+title: Makefile Commands
+description: Complete reference for all Make commands in WallpaperDB
+---
+
+WallpaperDB uses Make as the primary interface for all development operations. This ensures consistency, discoverability, and a single source of truth.
+
+## Quick Reference
+
+View all commands:
+```bash
+make help
+```
+
+**Most common commands:**
+```bash
+make infra-start      # Start all infrastructure
+make dev              # Start all services
+make test             # Run all tests
+make ci               # Run full CI pipeline locally
+```
+
+## Infrastructure
+
+### Starting & Stopping
+
+**make infra-start**
+- Starts all infrastructure services (PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana)
+- Uses Docker Compose in `infra/` directory
+- First-time startup takes ~2 minutes (downloads images)
+- Subsequent startups take ~10 seconds
+- Equivalent to: `turbo run start --filter=@wallpaperdb/infra-local`
+
+**make infra-stop**
+- Stops all infrastructure services
+- Preserves data volumes
+- Containers can be restarted without data loss
+- Equivalent to: `turbo run stop --filter=@wallpaperdb/infra-local`
+
+**make infra-reset**
+- ⚠️ **WARNING: Deletes all data!**
+- Stops containers, deletes volumes, restarts infrastructure
+- Use when database schema changes require migration
+- Use when testing from clean state
+- Equivalent to: `turbo run reset --filter=@wallpaperdb/infra-local`
+
+**make infra-logs**
+- Tails logs from all infrastructure services
+- Useful for debugging container issues
+- Use `Ctrl+C` to stop tailing
+- Equivalent to: `turbo run logs --filter=@wallpaperdb/infra-local`
+
+**Example workflow:**
+```bash
+# First time setup
+make infra-start
+
+# Work on code...
+
+# Stop for the day (preserves data)
+make infra-stop
+
+# Next day - restart
+make infra-start
+
+# Reset when needed
+make infra-reset
+```
+
+## Redis
+
+### redis-cli
+
+**make redis-cli**
+- Opens interactive Redis CLI
+- Connects to local Redis instance (port 6379)
+- Use for debugging rate limits, caches
+- Equivalent to: `docker exec -it wallpaperdb-redis redis-cli`
+
+**Example commands:**
+```bash
+make redis-cli
+
+# Inside Redis CLI:
+127.0.0.1:6379> KEYS wallpaperdb:ratelimit:*
+127.0.0.1:6379> GET wallpaperdb:ratelimit:user:test-user
+127.0.0.1:6379> TTL wallpaperdb:ratelimit:user:test-user
+127.0.0.1:6379> exit
+```
+
+### redis-flush
+
+**make redis-flush**
+- ⚠️ **WARNING: Deletes all Redis data!**
+- Flushes all keys from Redis
+- Use when testing rate limits, caches
+- Equivalent to: `docker exec -it wallpaperdb-redis redis-cli FLUSHALL`
+
+**Example:**
+```bash
+# Clear all rate limits and caches
+make redis-flush
+```
+
+### redis-info
+
+**make redis-info**
+- Shows Redis server information
+- Memory usage, connected clients, hit rates
+- Useful for performance monitoring
+- Equivalent to: `docker exec wallpaperdb-redis redis-cli INFO`
+
+**Example output:**
+```
+# Server
+redis_version:7.2.3
+uptime_in_seconds:3600
+
+# Memory
+used_memory_human:1.2M
+maxmemory_human:0B
+
+# Stats
+total_connections_received:42
+total_commands_processed:1337
+```
+
+## NATS
+
+### nats-setup-streams
+
+**make nats-setup-streams**
+- Creates all required NATS JetStream streams
+- Idempotent (safe to run multiple times)
+- Required before running services that publish events
+- Equivalent to: `./infra/nats/init/setup-streams.sh`
+
+**Creates:**
+- `WALLPAPER` stream with subjects: `wallpaper.*`
+
+**Example:**
+```bash
+# First time setup
+make infra-start
+make nats-setup-streams
+
+# Verify stream created
+make nats-stream-list
+```
+
+### nats-stream-list
+
+**make nats-stream-list**
+- Lists all NATS JetStream streams
+- Shows stream name, subjects, messages, bytes
+- Equivalent to: `nats stream list --server nats://localhost:4222`
+
+**Example output:**
+```
+Streams:
+
+    WALLPAPER
+```
+
+### nats-stream-info
+
+**make nats-stream-info**
+- Shows detailed information about WALLPAPER stream
+- Messages count, consumers, storage type
+- Equivalent to: `nats stream info WALLPAPER --server nats://localhost:4222`
+
+**Example output:**
+```
+Information for Stream WALLPAPER
+
+Configuration:
+
+     Subjects: wallpaper.*
+     Storage: File
+     Messages: 42
+     Bytes: 8.1 KiB
+```
+
+## Ingestor Service
+
+### Development
+
+**make ingestor-dev**
+- Starts ingestor in development mode
+- Hot-reload on file changes (tsx watch)
+- Requires infrastructure running (`make infra-start`)
+- Listens on port 3001
+- Equivalent to: `turbo run dev --filter=@wallpaperdb/ingestor`
+
+**make ingestor-build**
+- Builds ingestor for production
+- TypeScript compilation to `dist/` directory
+- Outputs CommonJS modules
+- Equivalent to: `turbo run build --filter=@wallpaperdb/ingestor`
+
+**make ingestor-start**
+- Starts ingestor in production mode
+- Runs compiled code from `dist/`
+- No hot-reload
+- Equivalent to: `turbo run start --filter=@wallpaperdb/ingestor`
+
+**Example workflow:**
+```bash
+# Start infrastructure
+make infra-start
+
+# Start ingestor in dev mode
+make ingestor-dev
+
+# Test endpoint
+curl http://localhost:3001/health
+```
+
+### Testing
+
+**make ingestor-test**
+- Runs all ingestor tests
+- Includes unit and integration tests
+- Requires infrastructure running
+- Equivalent to: `turbo run test --filter=@wallpaperdb/ingestor`
+
+**make ingestor-test-watch**
+- Runs ingestor tests in watch mode
+- Re-runs tests on file changes
+- Great for TDD workflow
+- Equivalent to: `turbo run test:watch --filter=@wallpaperdb/ingestor`
+
+**Example TDD workflow:**
+```bash
+# Terminal 1: Start infrastructure
+make infra-start
+
+# Terminal 2: Watch tests
+make ingestor-test-watch
+
+# Terminal 3: Edit code
+vim apps/ingestor/src/services/upload.service.ts
+
+# Tests re-run automatically in Terminal 2
+```
+
+### Code Quality
+
+**make ingestor-format**
+- Formats ingestor code with Biome
+- Fixes formatting issues automatically
+- Equivalent to: `turbo run format --filter=@wallpaperdb/ingestor`
+
+**make ingestor-lint**
+- Lints ingestor code with Biome
+- Reports linting issues
+- Equivalent to: `turbo run lint --filter=@wallpaperdb/ingestor`
+
+**make ingestor-check**
+- Runs Biome check (format + lint + fixes)
+- Applies auto-fixes
+- Equivalent to: `turbo run check --filter=@wallpaperdb/ingestor`
+
+**Example:**
+```bash
+# Before committing
+make ingestor-check
+```
+
+### Docker
+
+**make ingestor-docker-build**
+- Builds ingestor Docker image
+- Tags as `wallpaperdb-ingestor:latest`
+- Multi-stage build (build + runtime)
+- Uses Dockerfile at `apps/ingestor/Dockerfile`
+
+**make ingestor-docker-run**
+- Runs ingestor Docker container
+- Loads environment from `infra/.env`
+- Exposes port 3001
+- Requires infrastructure running
+- Container name: `wallpaperdb-ingestor`
+
+**make ingestor-docker-stop**
+- Stops ingestor Docker container
+- Removes container
+- Preserves image
+
+**make ingestor-docker-logs**
+- Tails logs from ingestor Docker container
+- Use `Ctrl+C` to stop tailing
+- Equivalent to: `docker logs -f wallpaperdb-ingestor`
+
+**Example workflow:**
+```bash
+# Start infrastructure
+make infra-start
+
+# Build Docker image
+make ingestor-docker-build
+
+# Run container
+make ingestor-docker-run
+
+# View logs
+make ingestor-docker-logs
+
+# Stop container
+make ingestor-docker-stop
+```
+
+### E2E Testing
+
+**make ingestor-e2e-test**
+- Runs E2E tests against Docker container
+- Builds Docker image first
+- Tests deployment artifact (not source code)
+- Slower than integration tests (~30 seconds)
+- Equivalent to: `turbo run test --filter=@wallpaperdb/ingestor-e2e`
+
+**make ingestor-e2e-test-watch**
+- Runs E2E tests in watch mode
+- Re-runs on file changes
+- Equivalent to: `turbo run test:watch --filter=@wallpaperdb/ingestor-e2e`
+
+**make ingestor-e2e-verify**
+- Verifies E2E tests don't import application code
+- Ensures tests are properly isolated
+- Runs as part of CI
+- Equivalent to: `pnpm --filter @wallpaperdb/ingestor-e2e verify-no-imports`
+
+**Example:**
+```bash
+# Run E2E tests
+make ingestor-e2e-test
+
+# Verify isolation
+make ingestor-e2e-verify
+```
+
+## Media Service
+
+### Development
+
+**make media-dev**
+- Starts media service in development mode
+- Hot-reload on file changes
+- Listens on port 3002
+- Equivalent to: `turbo run dev --filter=@wallpaperdb/media`
+
+**make media-build**
+- Builds media service for production
+- TypeScript compilation to `dist/`
+- Equivalent to: `turbo run build --filter=@wallpaperdb/media`
+
+**make media-start**
+- Starts media service in production mode
+- Runs compiled code
+- Equivalent to: `turbo run start --filter=@wallpaperdb/media`
+
+### Testing
+
+**make media-test**
+- Runs all media service tests
+- Equivalent to: `turbo run test --filter=@wallpaperdb/media`
+
+**make media-test-watch**
+- Runs media tests in watch mode
+- Equivalent to: `turbo run test:watch --filter=@wallpaperdb/media`
+
+### Code Quality
+
+**make media-format**
+- Formats media service code
+- Equivalent to: `turbo run format --filter=@wallpaperdb/media`
+
+**make media-lint**
+- Lints media service code
+- Equivalent to: `turbo run lint --filter=@wallpaperdb/media`
+
+**make media-check**
+- Runs Biome check (format + lint + fixes)
+- Equivalent to: `turbo run check --filter=@wallpaperdb/media`
+
+## Documentation
+
+### docs-dev
+
+**make docs-dev**
+- Starts documentation dev server
+- Hot-reload on file changes
+- Listens on port 3002 (or next available)
+- Fumadocs-powered site
+- Equivalent to: `turbo run dev --filter=@wallpaperdb/docs`
+
+**Example:**
+```bash
+make docs-dev
+
+# Open http://localhost:3002 in browser
+```
+
+### docs-build
+
+**make docs-build**
+- Builds documentation for production
+- Static site generation
+- Outputs to `.next/` directory
+- Equivalent to: `turbo run build --filter=@wallpaperdb/docs`
+
+### docs-start
+
+**make docs-start**
+- Starts documentation production server
+- Serves built static site
+- Equivalent to: `turbo run start --filter=@wallpaperdb/docs`
+
+## OpenAPI
+
+### openapi-generate
+
+**make openapi-generate**
+- Generates OpenAPI specs from code
+- Outputs to `apps/ingestor/swagger.json`
+- Uses `@fastify/swagger` plugin
+- Equivalent to: `pnpm --filter @wallpaperdb/ingestor gen:swagger`
+
+**Example:**
+```bash
+# After changing route schemas
+make openapi-generate
+
+# Verify generated
+cat apps/ingestor/swagger.json
+```
+
+### docs-generate
+
+**make docs-generate**
+- Generates API documentation from OpenAPI specs
+- Creates MDX files in `apps/docs/content/docs/openapi/`
+- Auto-imports into Fumadocs
+- Equivalent to: `pnpm --filter @wallpaperdb/docs gen:swagger-pages`
+
+**Example workflow:**
+```bash
+# 1. Update route schemas
+vim apps/ingestor/src/routes/upload.routes.ts
+
+# 2. Generate OpenAPI spec
+make openapi-generate
+
+# 3. Generate docs from spec
+make docs-generate
+
+# 4. View docs
+make docs-dev
+# Open http://localhost:3002/docs/openapi/ingestor
+```
+
+### openapi-verify
+
+**make openapi-verify**
+- Verifies OpenAPI spec generation works
+- Checks `apps/ingestor/swagger.json` exists after generation
+- Runs as part of CI
+- Equivalent to: `pnpm --filter @wallpaperdb/ingestor gen:swagger`
+
+## All Services
+
+### Development
+
+**make dev**
+- Starts all services in development mode
+- Parallel execution (Turborepo)
+- Requires infrastructure running
+- Equivalent to: `turbo run dev`
+
+**Services started:**
+- Ingestor (port 3001)
+- Media (port 3002)
+- Docs (port 3000 or next available)
+
+**Example:**
+```bash
+# Start everything
+make infra-start
+make dev
+
+# Access services:
+# - Ingestor: http://localhost:3001
+# - Docs: http://localhost:3002
+# - Media: http://localhost:3003
+# - Grafana: http://localhost:3000
+```
+
+### Building
+
+**make build**
+- Builds all services and packages
+- Parallel execution
+- Outputs to `dist/` directories
+- Equivalent to: `turbo run build`
+
+**Builds:**
+- All packages (`@wallpaperdb/*`)
+- All apps (ingestor, media, docs)
+
+**Example:**
+```bash
+make build
+```
+
+### Testing
+
+**make test**
+- Runs all tests (unit, integration, E2E)
+- Parallel execution (except E2E)
+- Requires infrastructure running
+- Equivalent to: `turbo run test`
+
+**make test-watch**
+- Runs all tests in watch mode
+- Re-runs on file changes
+- Equivalent to: `turbo run test:watch`
+
+### Testing by Intensity
+
+**make test-unit**
+- Fast unit tests (no containers)
+- Tests pure logic
+- ~1 second total
+- Packages: core, events, url-ipv4-resolver
+- Equivalent to: `turbo run test:unit`
+
+**make test-integration**
+- Medium-speed integration tests (uses Testcontainers)
+- Tests routes, services, database
+- ~10-30 seconds total
+- Apps: ingestor
+- Runs with `--concurrency=1` to avoid Docker overload
+- Equivalent to: `turbo run test:integration --concurrency=1`
+
+**make test-e2e**
+- Slow E2E tests (heavy container usage)
+- Tests Docker deployment
+- ~30-60 seconds total
+- Apps: ingestor-e2e, testcontainers, test-utils
+- Runs with `--concurrency=1` (sequential)
+- Equivalent to: `turbo run test:e2e --concurrency=1`
+
+**make test-ui**
+- Opens Vitest UI for interactive testing
+- View coverage, run specific tests, debug
+- Equivalent to: `pnpm test:ui`
+
+**Example workflow:**
+```bash
+# Quick feedback (unit tests only)
+make test-unit
+
+# Full validation (all tests)
+make test
+```
+
+### Coverage
+
+**make test-coverage**
+- Runs all tests with coverage
+- Generates merged coverage report
+- Outputs to `coverage/` directory
+
+**make coverage-summary**
+- Displays AI-friendly coverage summary
+- Shows per-package coverage
+- Equivalent to: `node scripts/coverage-summary.js`
+
+**Example:**
+```bash
+make test-coverage
+make coverage-summary
+
+# View HTML report
+open coverage/index.html
+```
+
+### Code Quality
+
+**make format**
+- Formats all code with Biome
+- Parallel execution
+- Fixes formatting issues
+- Equivalent to: `turbo run format --log-order grouped`
+
+**make lint**
+- Lints all code with Biome
+- Parallel execution
+- Reports linting issues
+- Equivalent to: `turbo run lint --log-order grouped`
+
+**make lint-fix**
+- Lints and fixes all code
+- Applies auto-fixes
+- Equivalent to: `turbo run lint:fix --log-order grouped`
+
+**make check**
+- Runs build + lint + type check
+- Comprehensive code quality check
+- Equivalent to: `turbo run build lint check-types --log-order grouped`
+
+**Example:**
+```bash
+# Before committing
+make format
+make lint
+make check-types
+```
+
+### Installation
+
+**make install**
+- Installs all dependencies
+- Uses pnpm
+- Runs workspace install
+- Equivalent to: `pnpm install`
+
+## CI/CD
+
+### check-types
+
+**make check-types**
+- Runs TypeScript type checking on all packages
+- No compilation (just type checking)
+- Fast (~5 seconds)
+- Equivalent to: `turbo run check-types`
+
+### ci
+
+**make ci**
+- Runs full CI pipeline locally
+- Replicates GitHub Actions workflow
+- Reports total duration
+- Equivalent to:
+  ```bash
+  turbo run build lint check-types test:unit test:integration
+  turbo run test:e2e --concurrency=1
+  pnpm coverage:merge
+  ```
+
+**Steps:**
+1. Build all packages and services
+2. Lint all code
+3. Type check all packages
+4. Run unit tests (parallel)
+5. Run integration tests (sequential)
+6. Run E2E tests (sequential)
+7. Merge coverage reports
+
+**Example output:**
+```bash
+make ci
+
+# ... build output ...
+# ... lint output ...
+# ... test output ...
+
+✓ All CI checks passed in 127s
+✓ Coverage report: coverage/lcov.info
+```
+
+### ci-force
+
+**make ci-force**
+- Same as `make ci` but skips Turbo cache
+- Forces all tasks to re-run
+- Use when debugging CI issues
+- Equivalent to: Same as `ci` but with `--force` flag
+
+**Example:**
+```bash
+# Skip cache, run everything
+make ci-force
+```
+
+## Best Practices
+
+### 1. Always Use Make
+
+**Prefer Make over direct pnpm/turbo commands:**
+
+❌ **Don't:**
+```bash
+pnpm --filter @wallpaperdb/ingestor dev
+turbo run test --filter=@wallpaperdb/ingestor
+```
+
+✅ **Do:**
+```bash
+make ingestor-dev
+make ingestor-test
+```
+
+**Why?**
+- Consistent interface across the team
+- Discoverable (`make help`)
+- Single source of truth
+- Easy to add new commands
+
+### 2. Add New Commands to Makefile
+
+**If you find yourself running a command repeatedly, add it to Makefile:**
+
+```makefile
+# Add to Makefile
+my-new-command:
+	@turbo run my-task --filter=@wallpaperdb/my-package
+
+# Add to .PHONY
+.PHONY: ... my-new-command ...
+
+# Add to help
+help:
+	@echo "  make my-new-command  - Description of command"
+```
+
+### 3. Infrastructure First
+
+**Always start infrastructure before services:**
+
+❌ **Don't:**
+```bash
+make dev  # Will fail - no database, MinIO, etc.
+```
+
+✅ **Do:**
+```bash
+make infra-start  # Start infrastructure first
+make dev          # Then start services
+```
+
+### 4. Use CI Locally
+
+**Run CI checks before pushing:**
+
+```bash
+# Quick check
+make test-unit
+
+# Full check (before PR)
+make ci
+```
+
+### 5. Clean State for Testing
+
+**Reset infrastructure when testing state-dependent features:**
+
+```bash
+# Before testing upload flow
+make infra-reset
+make infra-start
+make ingestor-test
+```
+
+## Troubleshooting
+
+### Command not found
+
+**Issue:** `make: command not found`
+
+**Solution:** Install Make
+```bash
+# Ubuntu/Debian
+sudo apt-get install make
+
+# macOS (via Xcode Command Line Tools)
+xcode-select --install
+
+# macOS (via Homebrew)
+brew install make
+```
+
+### Turbo not found
+
+**Issue:** `turbo: command not found`
+
+**Solution:** Install dependencies
+```bash
+pnpm install
+```
+
+### Infrastructure fails to start
+
+**Issue:** `make infra-start` fails
+
+**Solutions:**
+1. Check Docker is running: `docker ps`
+2. Check ports are available: `lsof -i :5432` (PostgreSQL)
+3. Reset Docker: `docker system prune -a`
+4. Check disk space: `df -h`
+
+### Tests hang
+
+**Issue:** Tests run indefinitely
+
+**Solutions:**
+1. Ensure infrastructure is running: `make infra-start`
+2. Check container health: `docker ps`
+3. View container logs: `make infra-logs`
+4. Reset infrastructure: `make infra-reset`
+
+### E2E tests fail
+
+**Issue:** E2E tests fail but integration tests pass
+
+**Solutions:**
+1. Rebuild Docker image: `make ingestor-docker-build`
+2. Check Docker logs: `make ingestor-docker-logs`
+3. Verify environment variables in `infra/.env`
+4. Check network connectivity: `docker network ls`
+
+## Related Documentation
+
+- [Getting Started](/docs/getting-started) - Initial setup guide
+- [Development Guidelines](/docs/development-guidelines) - TDD workflow
+- [Guide: Testing Strategies](/docs/guides/testing-strategies) - Test organization
+- [Infrastructure: Local Setup](/docs/infrastructure/local-setup) - Infrastructure details

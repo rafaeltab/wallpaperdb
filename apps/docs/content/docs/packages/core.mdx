@@ -1,0 +1,523 @@
+---
+title: "@wallpaperdb/core"
+description: Shared infrastructure patterns and utilities for WallpaperDB services
+---
+
+The `@wallpaperdb/core` package provides shared infrastructure patterns, configuration management, health checks, error handling, telemetry helpers, and OpenAPI utilities for all WallpaperDB services.
+
+## Installation
+
+```bash
+pnpm add @wallpaperdb/core
+```
+
+## Modules
+
+### Connections (`@wallpaperdb/core/connections`)
+
+Connection management classes for infrastructure services. All connections extend `BaseConnection` for consistent lifecycle management.
+
+#### BaseConnection Pattern
+
+Abstract base class for building service-specific connection managers:
+
+```typescript
+import { BaseConnection } from "@wallpaperdb/core/connections/base";
+
+export class MyConnection extends BaseConnection<Client, Config> {
+  protected createClient(): Client {
+    // Initialize your client
+  }
+
+  protected async closeClient(client: Client): Promise<void> {
+    // Close your client
+  }
+
+  async checkHealth(): Promise<boolean> {
+    // Implement health check
+  }
+}
+```
+
+**Features:**
+- Lifecycle management (initialize/close)
+- Health checking
+- Graceful shutdown support
+- DI-friendly (TSyringe compatible)
+
+#### Database Connection
+
+PostgreSQL connection pool management using `node-postgres`:
+
+```typescript
+import { DatabaseConnection } from "@wallpaperdb/core/connections";
+import type { DatabaseConfig } from "@wallpaperdb/core/connections/types";
+
+const config: DatabaseConfig = {
+  databaseUrl: process.env.DATABASE_URL!
+};
+
+const dbConnection = new DatabaseConnection(config);
+await dbConnection.initialize();
+
+const pool = dbConnection.getClient();
+const result = await pool.query('SELECT NOW()');
+
+// Health check
+const isHealthy = await dbConnection.checkHealth();
+
+// Cleanup
+await dbConnection.close();
+```
+
+#### MinIO/S3 Connection
+
+S3 client configuration for MinIO or AWS S3:
+
+```typescript
+import { MinioConnection } from "@wallpaperdb/core/connections";
+import type { S3Config } from "@wallpaperdb/core/connections/types";
+
+const config: S3Config = {
+  s3Endpoint: process.env.MINIO_ENDPOINT!,
+  s3AccessKeyId: process.env.MINIO_ACCESS_KEY!,
+  s3SecretAccessKey: process.env.MINIO_SECRET_KEY!,
+  s3Bucket: 'wallpapers',
+  s3Region: 'us-east-1'
+};
+
+const s3Connection = new MinioConnection(config);
+await s3Connection.initialize();
+
+const s3Client = s3Connection.getClient();
+// Use AWS SDK v3 commands
+```
+
+**Features:**
+- Path-style URLs for MinIO compatibility
+- AWS SDK v3 support
+- Bucket validation
+- Health check via ListBuckets
+
+#### NATS Connection
+
+NATS client with JetStream support:
+
+```typescript
+import { NatsConnectionManager } from "@wallpaperdb/core/connections";
+import type { NatsConfig } from "@wallpaperdb/core/connections/types";
+
+const config: NatsConfig = {
+  natsUrl: process.env.NATS_URL!
+};
+
+const natsConnection = new NatsConnectionManager(config);
+await natsConnection.initialize();
+
+const nc = natsConnection.getClient();
+const js = nc.jetstream();
+
+// Publish message
+await js.publish('subject', JSON.stringify({ data: 'hello' }));
+
+// Health check
+const isHealthy = await natsConnection.checkHealth();
+
+// Cleanup
+await natsConnection.close();
+```
+
+#### Redis Connection
+
+Redis client using `ioredis`:
+
+```typescript
+import { RedisConnection } from "@wallpaperdb/core/connections";
+import type { RedisConfig } from "@wallpaperdb/core/connections/types";
+
+const config: RedisConfig = {
+  redisHost: process.env.REDIS_HOST || 'localhost',
+  redisPort: parseInt(process.env.REDIS_PORT || '6379'),
+  redisPassword: process.env.REDIS_PASSWORD,
+  redisDb: parseInt(process.env.REDIS_DB || '0')
+};
+
+const redisConnection = new RedisConnection(config);
+await redisConnection.initialize();
+
+const redis = redisConnection.getClient();
+await redis.set('key', 'value');
+
+// Health check
+const isHealthy = await redisConnection.checkHealth();
+
+// Cleanup
+await redisConnection.close();
+```
+
+#### OpenTelemetry Connection
+
+OpenTelemetry SDK initialization and management:
+
+```typescript
+import { OtelConnection } from "@wallpaperdb/core/connections";
+import type { OtelConfig } from "@wallpaperdb/core/connections/types";
+
+const config: OtelConfig = {
+  otelEndpoint: process.env.OTLP_ENDPOINT || 'http://localhost:4318',
+  otelServiceName: process.env.SERVICE_NAME || 'my-service'
+};
+
+const otelConnection = new OtelConnection(config, {
+  metricExportIntervalMs: 60000,
+  disableFsInstrumentation: true,
+  enableLogging: true
+});
+
+await otelConnection.initialize();
+
+// SDK is now initialized and auto-instrumentation is active
+// Use with @wallpaperdb/core/telemetry utilities
+
+// Cleanup
+await otelConnection.close();
+```
+
+**Features:**
+- Auto-instrumentation for Fastify, PostgreSQL, HTTP, NATS
+- OTLP exporters for traces and metrics
+- Configurable metric export interval
+- Optional file system instrumentation
+- Singleton-based setup for DI
+
+### Config (`@wallpaperdb/core/config`)
+
+Zod-based configuration schemas and environment variable utilities.
+
+#### Configuration Schemas
+
+```typescript
+import {
+  ServerConfigSchema,
+  DatabaseConfigSchema,
+  S3ConfigSchema,
+  NatsConfigSchema,
+  RedisConfigSchema,
+  OtelConfigSchema
+} from "@wallpaperdb/core/config";
+import { z } from "zod";
+
+// Compose schemas for your service
+const ServiceConfigSchema = z.object({
+  ...ServerConfigSchema.shape,
+  ...DatabaseConfigSchema.shape,
+  ...S3ConfigSchema.shape,
+  ...NatsConfigSchema.shape,
+  // Add service-specific fields
+  myCustomField: z.string().default("default-value")
+});
+
+export type ServiceConfig = z.infer<typeof ServiceConfigSchema>;
+```
+
+**Available Schemas:**
+- `ServerConfigSchema` - port, nodeEnv
+- `DatabaseConfigSchema` - databaseUrl
+- `S3ConfigSchema` - s3Endpoint, s3AccessKeyId, s3SecretAccessKey, s3Bucket, s3Region
+- `NatsConfigSchema` - natsUrl
+- `RedisConfigSchema` - redisHost, redisPort, redisPassword, redisDb
+- `OtelConfigSchema` - otelEndpoint, otelServiceName
+
+#### Environment Variable Utilities
+
+```typescript
+import {
+  parseIntEnv,
+  parseBoolEnv,
+  getEnv,
+  requireEnv
+} from "@wallpaperdb/core/config";
+
+// Parse integer with default
+const port = parseIntEnv(process.env.PORT, 3000);
+
+// Parse boolean with default
+const enableFeature = parseBoolEnv(process.env.ENABLE_FEATURE, false);
+
+// Get with default
+const nodeEnv = getEnv("NODE_ENV", "development");
+
+// Require (throws if missing)
+const apiKey = requireEnv("API_KEY");
+```
+
+### Telemetry (`@wallpaperdb/core/telemetry`)
+
+OpenTelemetry helpers for tracing and metrics. No DI coupling - works with any setup.
+
+#### Tracing with Spans
+
+```typescript
+import { withSpan, withSpanSync } from "@wallpaperdb/core/telemetry";
+import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
+
+// Async operation
+async function processUpload(userId: string, fileId: string) {
+  return await withSpan(
+    'upload.process',
+    {
+      [Attributes.USER_ID]: userId,
+      [Attributes.FILE_ID]: fileId
+    },
+    async (span) => {
+      // Do work...
+      span.setAttribute(Attributes.FILE_SIZE_BYTES, 1024);
+      return result;
+    }
+  );
+}
+
+// Sync operation
+function calculateHash(data: Buffer) {
+  return withSpanSync(
+    'hash.calculate',
+    { [Attributes.DATA_SIZE]: data.length },
+    (span) => {
+      // Calculate hash...
+      return hash;
+    }
+  );
+}
+```
+
+#### Recording Metrics
+
+```typescript
+import { recordCounter, recordHistogram } from "@wallpaperdb/core/telemetry";
+import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
+
+// Record counter
+recordCounter('uploads.total', 1, {
+  [Attributes.USER_ID]: userId,
+  [Attributes.FILE_TYPE]: 'image'
+});
+
+// Record histogram
+recordHistogram('upload.duration', durationMs, {
+  [Attributes.USER_ID]: userId
+});
+```
+
+#### Standard Attributes
+
+```typescript
+import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
+
+// User attributes
+Attributes.USER_ID          // 'user.id'
+Attributes.USER_SUBSCRIPTION // 'user.subscription_tier'
+
+// Wallpaper attributes
+Attributes.WALLPAPER_ID     // 'wallpaper.id'
+Attributes.WALLPAPER_STATE  // 'wallpaper.state'
+Attributes.FILE_TYPE        // 'file.type'
+Attributes.FILE_SIZE_BYTES  // 'file.size_bytes'
+
+// Event attributes
+Attributes.EVENT_TYPE       // 'event.type'
+Attributes.EVENT_ID         // 'event.id'
+
+// And more...
+```
+
+### Health (`@wallpaperdb/core/health`)
+
+Health check aggregation for Kubernetes-style health endpoints.
+
+```typescript
+import { HealthAggregator, getHealthStatusCode } from "@wallpaperdb/core/health";
+
+const aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
+
+// Register health checks
+aggregator.register("database", async () => dbConnection.checkHealth());
+aggregator.register("nats", async () => natsConnection.checkHealth());
+aggregator.register("redis", async () => redisConnection.checkHealth());
+
+// In /health route
+const result = await aggregator.checkHealth();
+reply.code(getHealthStatusCode(result)).send(result);
+
+// Response format:
+// {
+//   "status": "healthy" | "degraded" | "unhealthy",
+//   "checks": {
+//     "database": { "status": "healthy" },
+//     "nats": { "status": "healthy" },
+//     "redis": { "status": "unhealthy", "error": "Connection refused" }
+//   }
+// }
+```
+
+**Status Codes:**
+- `healthy` → 200
+- `degraded` → 200 (some checks failed)
+- `unhealthy` → 503
+
+### Errors (`@wallpaperdb/core/errors`)
+
+RFC 7807 Problem Details error classes for standardized HTTP errors.
+
+```typescript
+import {
+  ApplicationError,
+  ProblemDetailsError,
+  ValidationError,
+  NotFoundError,
+  UnauthorizedError,
+  ConflictError
+} from "@wallpaperdb/core/errors";
+
+// Throw standard error
+throw new ValidationError("Invalid file format", {
+  field: "file",
+  format: "image/jpeg"
+});
+
+// Create custom error
+class RateLimitError extends ProblemDetailsError {
+  constructor(retryAfter: number) {
+    super(
+      "Rate Limit Exceeded",
+      "Too many requests. Please try again later.",
+      429,
+      "https://wallpaperdb.example/problems/rate-limit",
+      { retryAfter }
+    );
+  }
+}
+```
+
+**Error Response Format (RFC 7807):**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/validation-error",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "Invalid file format",
+  "field": "file",
+  "format": "image/jpeg"
+}
+```
+
+See [Error Handling Guide](/docs/guides/error-handling) for more details.
+
+### OpenAPI (`@wallpaperdb/core/openapi`)
+
+Fastify plugin for OpenAPI/Swagger documentation generation.
+
+```typescript
+import Fastify from "fastify";
+import { registerOpenAPI } from "@wallpaperdb/core/openapi";
+
+const app = Fastify();
+
+await registerOpenAPI(app, {
+  info: {
+    title: "My Service API",
+    version: "1.0.0",
+    description: "API documentation for My Service"
+  }
+});
+
+// Access Swagger UI at /documentation
+// Access OpenAPI spec at /documentation/json
+```
+
+**Features:**
+- Automatic schema generation from Zod schemas
+- Swagger UI integration
+- Multipart body support
+- JSON Schema conversion
+
+## Usage Patterns
+
+### Service Initialization
+
+```typescript
+import "reflect-metadata";
+import { container } from "tsyringe";
+import {
+  DatabaseConnection,
+  MinioConnection,
+  NatsConnectionManager,
+  RedisConnection,
+  OtelConnection
+} from "@wallpaperdb/core/connections";
+import type {
+  DatabaseConfig,
+  S3Config,
+  NatsConfig,
+  RedisConfig,
+  OtelConfig
+} from "@wallpaperdb/core/connections/types";
+
+// Load config
+const config = loadConfig();
+
+// Register connections with DI
+container.register("DatabaseConnection", {
+  useFactory: () => new DatabaseConnection(config)
+});
+container.register("MinioConnection", {
+  useFactory: () => new MinioConnection(config)
+});
+container.register("NatsConnection", {
+  useFactory: () => new NatsConnectionManager(config)
+});
+container.register("RedisConnection", {
+  useFactory: () => new RedisConnection(config)
+});
+container.register("OtelConnection", {
+  useFactory: () => new OtelConnection(config)
+});
+
+// Initialize all connections
+const otel = container.resolve<OtelConnection>("OtelConnection");
+await otel.initialize();
+
+const db = container.resolve<DatabaseConnection>("DatabaseConnection");
+await db.initialize();
+
+// ... initialize other connections
+```
+
+### Health Check Route
+
+```typescript
+import { HealthAggregator, getHealthStatusCode } from "@wallpaperdb/core/health";
+import type { FastifyInstance } from "fastify";
+
+export async function healthRoutes(app: FastifyInstance) {
+  const aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
+
+  aggregator.register("database", async () =>
+    container.resolve<DatabaseConnection>("DatabaseConnection").checkHealth()
+  );
+  aggregator.register("nats", async () =>
+    container.resolve<NatsConnectionManager>("NatsConnection").checkHealth()
+  );
+
+  app.get("/health", async (request, reply) => {
+    const result = await aggregator.checkHealth();
+    reply.code(getHealthStatusCode(result)).send(result);
+  });
+}
+```
+
+## Related Documentation
+
+- [Package: Events](/docs/packages/events) - Event schemas and pub/sub
+- [Testing: Test Builder Pattern](/docs/testing/test-builder-pattern) - Testing with infrastructure builders
+- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 patterns
+- [Observability](/docs/observability) - OpenTelemetry setup and best practices

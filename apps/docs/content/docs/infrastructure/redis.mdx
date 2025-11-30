@@ -1,0 +1,163 @@
+---
+title: Redis
+description: Distributed rate limiting and caching with Redis
+---
+
+Redis provides distributed rate limiting and caching capabilities for WallpaperDB services.
+
+## Quick Reference
+
+- **Port**: 6379
+- **URL**: `redis://localhost:6379`
+- **Persistence**: AOF (Append-Only File)
+- **Password**: None (local development)
+
+## Connection
+
+```typescript
+import { RedisConnection } from "@wallpaperdb/core/connections";
+
+const redisConn = new RedisConnection({
+  redisHost: 'localhost',
+  redisPort: 6379,
+  redisPassword: undefined,
+  redisDb: 0
+});
+await redisConn.initialize();
+
+const redis = redisConn.getClient();
+```
+
+## Use Cases
+
+### 1. Distributed Rate Limiting
+
+The ingestor service uses Redis for atomic, distributed rate limiting.
+
+**Implementation:**
+```typescript
+import { RateLimitService } from "./services/rate-limit.service";
+
+const rateLimiter = new RateLimitService(redis);
+
+const allowed = await rateLimiter.checkLimit('user_123', {
+  maxRequests: 10,
+  windowSeconds: 3600
+});
+
+if (!allowed) {
+  throw new RateLimitError();
+}
+```
+
+**Lua Script (Atomic):**
+```lua
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local current = redis.call('INCR', key)
+if current == 1 then
+  redis.call('EXPIRE', key, window)
+end
+if current > limit then
+  return 0
+end
+return 1
+```
+
+See [Guide: Rate Limiting](/docs/guides/rate-limiting) for details.
+
+### 2. Metadata Caching (Future)
+
+Cache frequently accessed wallpaper metadata:
+
+```typescript
+// Cache wallpaper metadata
+await redis.set(
+  `wallpaper:${wallpaperId}`,
+  JSON.stringify(metadata),
+  'EX',
+  3600  // 1 hour TTL
+);
+
+// Retrieve from cache
+const cached = await redis.get(`wallpaper:${wallpaperId}`);
+```
+
+## Makefile Commands
+
+```bash
+# Connect to Redis CLI
+make redis-cli
+
+# Flush all data
+make redis-flush
+
+# Show server info
+make redis-info
+```
+
+## Common Operations
+
+**Redis CLI:**
+```bash
+docker exec -it wallpaperdb-redis redis-cli
+
+# Get all keys
+KEYS *
+
+# Get value
+GET rate_limit:user_123
+
+# Set value with TTL
+SETEX cache:key 60 "value"
+
+# Delete key
+DEL rate_limit:user_123
+
+# View TTL
+TTL rate_limit:user_123
+```
+
+**Flush all data:**
+```bash
+make redis-flush
+# or
+docker exec -it wallpaperdb-redis redis-cli FLUSHALL
+```
+
+## Persistence
+
+Redis uses AOF (Append-Only File) for durability:
+
+**Configuration:**
+```bash
+redis-server --appendonly yes
+```
+
+**Data location:**
+- Volume: `redis-data`
+- Path: `/data/appendonly.aof`
+
+**Rebuild AOF:**
+```bash
+docker exec -it wallpaperdb-redis redis-cli BGREWRITEAOF
+```
+
+## Monitoring
+
+**Server info:**
+```bash
+make redis-info
+```
+
+**Key metrics:**
+- `used_memory_human` - Memory usage
+- `total_commands_processed` - Command count
+- `instantaneous_ops_per_sec` - Operations per second
+- `connected_clients` - Active connections
+
+## Related Documentation
+
+- [Guide: Rate Limiting](/docs/guides/rate-limiting) - Distributed rate limiting patterns
+- [Services: Ingestor](/docs/services/ingestor) - Rate limiting implementation

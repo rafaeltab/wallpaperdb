@@ -1,0 +1,346 @@
+---
+title: "@wallpaperdb/url-ipv4-resolver"
+description: URL validation and DNS resolution to IPv4 addresses
+---
+
+The `@wallpaperdb/url-ipv4-resolver` package provides utilities for resolving URLs and domain names to IPv4 addresses. It handles bare domains, full URLs, and IPv4 literals with DNS lookup support and security-focused validation.
+
+## Installation
+
+```bash
+pnpm add @wallpaperdb/url-ipv4-resolver
+```
+
+## Overview
+
+This package solves a common problem: converting user-provided URLs or domain names into IPv4 addresses for secure, predictable network operations. It's particularly useful for:
+
+- **Webhook validation** - Resolve webhook URLs to prevent SSRF attacks
+- **External API calls** - Ensure connections use IPv4 for consistency
+- **DNS-based security** - Validate and resolve domains before making requests
+- **Testing** - Ensure test environments use IPv4 for faster connections
+
+## API Reference
+
+### resolveUrlIpv4()
+
+Resolves a URL, domain name, or IPv4 literal to an IPv4 address.
+
+```typescript
+async function resolveUrlIpv4(url: string): Promise<string>
+```
+
+**Parameters:**
+- `url` (string) - URL, bare domain, or IPv4 address to resolve
+
+**Returns:**
+- `Promise<string>` - IPv4 address or resolved URL with IPv4
+
+**Throws:**
+- Error if DNS lookup fails
+- Error if input is invalid
+
+## Usage
+
+### IPv4 Literals
+
+If the input is already an IPv4 address, it's returned as-is (fast path):
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+const result = await resolveUrlIpv4('192.168.1.1');
+console.log(result); // '192.168.1.1'
+```
+
+### Bare Domains
+
+Bare domains are resolved via DNS lookup to IPv4:
+
+```typescript
+const result = await resolveUrlIpv4('example.com');
+console.log(result); // '93.184.216.34' (example.com's IPv4)
+
+const result2 = await resolveUrlIpv4('localhost');
+console.log(result2); // '127.0.0.1'
+```
+
+### Full URLs
+
+Full URLs have their hostname resolved and the URL reconstructed:
+
+```typescript
+const result = await resolveUrlIpv4('https://example.com/path?query=1');
+console.log(result); // 'https://93.184.216.34/path?query=1'
+
+const result2 = await resolveUrlIpv4('http://api.example.com:8080/webhook');
+console.log(result2); // 'http://93.184.216.34:8080/webhook'
+```
+
+**Note:** The resolved URL uses the IPv4 address for the hostname, but preserves:
+- Protocol (http/https)
+- Port
+- Path
+- Query parameters
+- Fragment
+
+## Validation
+
+### Bare Domain Validation
+
+The package includes robust validation for bare domains:
+
+**Valid bare domains:**
+- `example.com` - Standard domain
+- `subdomain.example.com` - Subdomain
+- `localhost` - Single-label names
+- `api-v2.example.com` - Hyphens in labels
+- `例え.jp` - Internationalized domain names (IDN)
+
+**Invalid inputs:**
+- `https://example.com` - Has protocol (treated as URL)
+- `example.com/path` - Has path (treated as URL)
+- `example.com.` - Trailing dot
+- `.example.com` - Leading dot
+- `example..com` - Empty label
+- `-example.com` - Label starts with hyphen
+- `example.123` - All-numeric TLD (when 2+ labels)
+
+### IPv4 Literal Detection
+
+IPv4 addresses are detected using a regex pattern:
+
+```typescript
+// Valid IPv4
+await resolveUrlIpv4('192.168.1.1');    // ✓
+await resolveUrlIpv4('127.0.0.1');      // ✓
+await resolveUrlIpv4('255.255.255.255'); // ✓
+
+// Invalid IPv4
+await resolveUrlIpv4('256.1.1.1');      // ✗ (treated as domain, DNS lookup fails)
+await resolveUrlIpv4('192.168.1');      // ✗ (treated as domain, DNS lookup fails)
+```
+
+## Security Considerations
+
+### SSRF Prevention
+
+When validating webhook URLs or external API endpoints, always resolve to IPv4 to prevent SSRF attacks:
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+async function validateWebhookUrl(userProvidedUrl: string): Promise<string> {
+  // Resolve to IPv4
+  const resolvedUrl = await resolveUrlIpv4(userProvidedUrl);
+
+  // Parse and validate the resolved URL
+  const url = new URL(resolvedUrl);
+
+  // Block private IP ranges
+  const ipParts = url.hostname.split('.').map(Number);
+
+  // RFC 1918 private ranges
+  const isPrivate =
+    ipParts[0] === 10 || // 10.0.0.0/8
+    (ipParts[0] === 172 && ipParts[1] >= 16 && ipParts[1] <= 31) || // 172.16.0.0/12
+    (ipParts[0] === 192 && ipParts[1] === 168); // 192.168.0.0/16
+
+  // Block loopback
+  const isLoopback = ipParts[0] === 127; // 127.0.0.0/8
+
+  // Block link-local
+  const isLinkLocal = ipParts[0] === 169 && ipParts[1] === 254; // 169.254.0.0/16
+
+  if (isPrivate || isLoopback || isLinkLocal) {
+    throw new Error('Webhook URL resolves to private IP address');
+  }
+
+  return resolvedUrl;
+}
+
+// Usage
+try {
+  const safeUrl = await validateWebhookUrl('https://evil.com/webhook');
+  // Make request to safeUrl
+} catch (error) {
+  console.error('Invalid webhook URL:', error.message);
+}
+```
+
+### DNS Rebinding Protection
+
+The package performs DNS lookup at resolution time. For additional security against DNS rebinding attacks, consider:
+
+1. **Re-resolve before each request** - DNS can change between resolution and request
+2. **Cache resolutions with TTL** - Respect DNS TTL for cached resolutions
+3. **Validate IP range** - Block private/loopback IPs as shown above
+
+## Error Handling
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+try {
+  const result = await resolveUrlIpv4('nonexistent-domain-12345.com');
+} catch (error) {
+  // DNS lookup failed
+  console.error('Resolution failed:', error.message);
+  // "getaddrinfo ENOTFOUND nonexistent-domain-12345.com"
+}
+
+try {
+  const result = await resolveUrlIpv4('');
+} catch (error) {
+  // Invalid input
+  console.error('Invalid input:', error.message);
+}
+```
+
+## Performance
+
+### Fast Path for IPv4 Literals
+
+IPv4 addresses are detected using regex and returned immediately without DNS lookup:
+
+```typescript
+// Fast path - no DNS lookup
+await resolveUrlIpv4('192.168.1.1'); // ~1µs
+
+// DNS lookup required
+await resolveUrlIpv4('example.com'); // ~10-100ms (depends on DNS)
+```
+
+### DNS Caching
+
+Node.js DNS lookups are not cached by default. For production use, consider:
+
+```typescript
+import { Resolver } from 'node:dns/promises';
+import { LRUCache } from 'lru-cache';
+
+const dnsCache = new LRUCache<string, string>({
+  max: 1000,
+  ttl: 300000 // 5 minutes
+});
+
+async function cachedResolveUrlIpv4(url: string): Promise<string> {
+  // Check if already IPv4
+  if (isIPv4Literal(url)) return url;
+
+  // Check cache
+  const cached = dnsCache.get(url);
+  if (cached) return cached;
+
+  // Resolve
+  const resolved = await resolveUrlIpv4(url);
+  dnsCache.set(url, resolved);
+
+  return resolved;
+}
+```
+
+## Use Cases
+
+### 1. Webhook Validation
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+app.post('/webhooks/register', async (req, reply) => {
+  const webhookUrl = req.body.url;
+
+  try {
+    // Resolve and validate
+    const resolvedUrl = await resolveUrlIpv4(webhookUrl);
+
+    // Additional validation (block private IPs, etc.)
+    validateNotPrivateIP(resolvedUrl);
+
+    // Store webhook
+    await db.webhooks.create({
+      url: webhookUrl,
+      resolvedIp: new URL(resolvedUrl).hostname
+    });
+
+    reply.send({ success: true });
+  } catch (error) {
+    reply.code(400).send({ error: 'Invalid webhook URL' });
+  }
+});
+```
+
+### 2. External API Call Safety
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+async function fetchExternalData(url: string) {
+  // Resolve to IPv4 first
+  const resolvedUrl = await resolveUrlIpv4(url);
+
+  // Validate IP is not private
+  validatePublicIP(new URL(resolvedUrl).hostname);
+
+  // Make request with resolved IP
+  const response = await fetch(resolvedUrl);
+  return response.json();
+}
+```
+
+### 3. Testing with IPv4
+
+```typescript
+import { resolveUrlIpv4 } from '@wallpaperdb/url-ipv4-resolver';
+
+describe('External API Integration', () => {
+  it('should fetch data from external API', async () => {
+    // Use IPv4 for faster, more reliable tests
+    const apiUrl = await resolveUrlIpv4('api.example.com');
+
+    const result = await fetchData(apiUrl);
+    expect(result).toBeDefined();
+  });
+});
+```
+
+## Implementation Details
+
+### isIPv4Literal()
+
+Fast IPv4 detection using regex:
+
+```typescript
+const ipv4Regex = /^(?:25[0-5]|2[0-4]\d|1?\d{1,2})(?:\.(?:25[0-5]|2[0-4]\d|1?\d{1,2})){3}$/;
+```
+
+This matches valid IPv4 addresses (0.0.0.0 to 255.255.255.255).
+
+### isBareDomain()
+
+Validates bare domains with comprehensive checks:
+
+1. No protocol, path, query, or fragment
+2. No trailing or leading dots
+3. No empty labels
+4. Label length limits (1-63 chars)
+5. Valid label characters (letters, numbers, hyphens)
+6. No all-numeric TLD (for 2+ labels)
+7. Supports internationalized domain names (IDN)
+
+### DNS Lookup
+
+Uses Node.js `dns/promises` with IPv4 family:
+
+```typescript
+import { lookup } from 'node:dns/promises';
+
+const address = await lookup(hostname, { family: 4 });
+return address.address; // IPv4 string
+```
+
+## Related Documentation
+
+- [Package: Core](/docs/packages/core) - Infrastructure and utilities
+- [Services: Ingestor](/docs/services/ingestor) - Example usage in services
+- [Guide: Error Handling](/docs/guides/error-handling) - Error handling patterns

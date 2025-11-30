@@ -1,0 +1,692 @@
+---
+title: Database Migrations
+description: Schema changes with Drizzle ORM and Drizzle Kit
+---
+
+WallpaperDB uses Drizzle ORM for type-safe database queries and Drizzle Kit for schema migrations. This guide covers the complete migration workflow from schema changes to production deployment.
+
+## Quick Reference
+
+**Common commands:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:generate   # Generate migration from schema
+pnpm --filter @wallpaperdb/ingestor db:push       # Push schema directly (dev only)
+pnpm --filter @wallpaperdb/ingestor db:migrate    # Run migrations
+pnpm --filter @wallpaperdb/ingestor db:studio     # Open Drizzle Studio
+```
+
+**Migration workflow:**
+1. Edit `src/db/schema.ts`
+2. Generate migration: `db:generate`
+3. Review generated SQL in `drizzle/` directory
+4. Apply migration: `db:migrate`
+5. Verify in database or Drizzle Studio
+
+## Drizzle ORM
+
+**Type-safe PostgreSQL queries:**
+```typescript
+import { drizzle } from 'drizzle-orm/postgres-js';
+import { wallpapers } from './db/schema.js';
+
+const db = drizzle(pool);
+
+// Insert
+await db.insert(wallpapers).values({
+  id: 'wlpr_01HF8XQZJ...',
+  userId: 'user-123',
+  uploadState: 'initiated',
+});
+
+// Query
+const results = await db
+  .select()
+  .from(wallpapers)
+  .where(eq(wallpapers.userId, 'user-123'));
+
+// Update
+await db
+  .update(wallpapers)
+  .set({ uploadState: 'completed' })
+  .where(eq(wallpapers.id, 'wlpr_01HF8XQZJ...'));
+```
+
+**Benefits:**
+- Full TypeScript type safety
+- Auto-completion for columns
+- Compile-time validation
+- Zero runtime overhead
+- SQL-like API
+
+## Schema Definition
+
+Located in `apps/ingestor/src/db/schema.ts`:
+
+```typescript
+import { pgTable, text, integer, timestamp, decimal, index, bigint, pgEnum } from 'drizzle-orm/pg-core';
+
+export const uploadStateEnum = pgEnum('upload_state', [
+  'initiated',
+  'uploading',
+  'stored',
+  'processing',
+  'completed',
+  'failed',
+]);
+
+export const fileTypeEnum = pgEnum('file_type', ['image', 'video']);
+
+export const wallpapers = pgTable(
+  'wallpapers',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull(),
+    contentHash: text('content_hash').notNull(),
+    uploadState: uploadStateEnum('upload_state').notNull().default('initiated'),
+    stateChangedAt: timestamp('state_changed_at', { withTimezone: true }).notNull().defaultNow(),
+
+    // File metadata
+    fileType: fileTypeEnum('file_type'),
+    mimeType: text('mime_type'),
+    fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }),
+    width: integer('width'),
+    height: integer('height'),
+    aspectRatio: decimal('aspect_ratio', { precision: 10, scale: 4 }),
+
+    // Storage references
+    storageKey: text('storage_key'),
+    storageBucket: text('storage_bucket'),
+
+    // Timestamps
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // Conditional unique index - only enforced for stored/processing/completed states
+    contentHashIdx: index('idx_wallpapers_content_hash')
+      .on(table.contentHash, table.userId)
+      .where(sql`upload_state IN ('stored', 'processing', 'completed')`),
+    userIdIdx: index('idx_wallpapers_user_id').on(table.userId),
+    uploadStateIdx: index('idx_wallpapers_upload_state').on(table.uploadState),
+  })
+);
+```
+
+**Key features:**
+- Enums for state machine (`upload_state`)
+- Conditional unique index (prevents duplicates only for successful uploads)
+- Composite indexes for query performance
+- Timestamps with timezone support
+- BigInt for file sizes (supports files > 2GB)
+
+## Drizzle Kit Configuration
+
+Located in `apps/ingestor/drizzle.config.ts`:
+
+```typescript
+import { defineConfig } from 'drizzle-kit';
+import { config as loadEnv } from 'dotenv';
+
+loadEnv();
+
+export default defineConfig({
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL || 'postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_ingestor',
+  },
+  verbose: true,
+  strict: true,
+});
+```
+
+**Configuration options:**
+- `schema` - Path to schema file
+- `out` - Output directory for migrations
+- `dialect` - Database type (postgresql, mysql, sqlite)
+- `dbCredentials` - Database connection details
+- `verbose` - Show detailed logs
+- `strict` - Enable strict mode (prevents accidental schema changes)
+
+## Migration Workflow
+
+### 1. Edit Schema
+
+Add new table or column:
+
+```typescript
+// Add new column to wallpapers table
+export const wallpapers = pgTable(
+  'wallpapers',
+  {
+    // ... existing columns ...
+    description: text('description'), // New column
+  },
+  // ... indexes ...
+);
+```
+
+Or create new table:
+
+```typescript
+export const tags = pgTable(
+  'tags',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    nameIdx: index('idx_tags_name').on(table.name),
+  })
+);
+```
+
+### 2. Generate Migration
+
+```bash
+pnpm --filter @wallpaperdb/ingestor db:generate
+```
+
+**What happens:**
+1. Drizzle Kit compares schema with current database state
+2. Generates SQL migration in `drizzle/` directory
+3. Creates `<timestamp>_migration_name.sql` file
+4. Creates `meta/` directory with migration metadata
+
+**Example output:**
+```
+drizzle/
+├── 0000_init.sql
+├── 0001_add_description.sql  # New migration
+└── meta/
+    ├── _journal.json
+    ├── 0000_snapshot.json
+    └── 0001_snapshot.json
+```
+
+### 3. Review Generated SQL
+
+Always review migrations before applying:
+
+```sql
+-- drizzle/0001_add_description.sql
+ALTER TABLE "wallpapers" ADD COLUMN "description" text;
+```
+
+**Check for:**
+- Data loss (DROP COLUMN, DROP TABLE)
+- Performance impact (full table scans, locks)
+- Constraints that might fail (NOT NULL on existing data)
+- Index creation time (can be slow on large tables)
+
+**Common issues:**
+
+❌ **Adding NOT NULL without default:**
+```sql
+ALTER TABLE "wallpapers" ADD COLUMN "description" text NOT NULL;
+-- ↑ Fails if table has existing rows
+```
+
+✅ **Fix: Add default or make nullable:**
+```sql
+ALTER TABLE "wallpapers" ADD COLUMN "description" text NOT NULL DEFAULT '';
+-- or
+ALTER TABLE "wallpapers" ADD COLUMN "description" text;
+```
+
+### 4. Apply Migration
+
+```bash
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+**What happens:**
+1. Connects to database
+2. Checks `drizzle_migrations` table for applied migrations
+3. Applies pending migrations in order
+4. Records applied migrations in `drizzle_migrations` table
+
+**Migration tracking table:**
+```sql
+CREATE TABLE drizzle_migrations (
+  id SERIAL PRIMARY KEY,
+  hash TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**Example output:**
+```
+Migrating...
+✔ Migration 0001_add_description.sql applied successfully
+```
+
+### 5. Verify Changes
+
+**Option 1: Drizzle Studio (GUI)**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:studio
+```
+
+Opens browser-based database explorer at `https://local.drizzle.studio`.
+
+**Option 2: psql**
+```bash
+docker exec -it wallpaperdb-postgres psql -U wallpaperdb
+
+\d wallpapers  -- Show table structure
+\di            -- Show indexes
+SELECT * FROM wallpapers LIMIT 5;
+```
+
+**Option 3: pgAdmin**
+1. Open http://localhost:5050
+2. Login: admin@example.com / admin
+3. Connect to PostgreSQL server
+4. Browse tables and schemas
+
+## Development vs Production
+
+### Development: db:push (Schema Push)
+
+**Fast iteration without migrations:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:push
+```
+
+**What it does:**
+- Directly applies schema changes to database
+- No migration files generated
+- Faster feedback loop
+- **Destructive** (can drop columns, tables)
+
+**When to use:**
+- Local development
+- Prototyping
+- Experimenting with schema
+- Before generating final migration
+
+**Never use in:**
+- Production
+- Shared development databases
+- Any database with data you care about
+
+### Production: db:migrate (Migrations)
+
+**Safe, versioned schema changes:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+**What it does:**
+- Applies migration files in `drizzle/` directory
+- Tracks applied migrations
+- Reversible (if you write down migrations)
+- Safe (reviewed SQL)
+
+**When to use:**
+- Production deployments
+- Shared development databases
+- Any database with data
+- CI/CD pipelines
+
+**Always:**
+- Review generated SQL
+- Test on staging first
+- Have rollback plan
+
+## Advanced Patterns
+
+### Data Migrations
+
+Sometimes schema changes require data transformations:
+
+**Example: Split name column into first_name and last_name**
+
+1. **Generate schema migration:**
+```typescript
+// Old schema
+export const users = pgTable('users', {
+  name: text('name'),
+});
+
+// New schema
+export const users = pgTable('users', {
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+});
+```
+
+2. **Edit generated migration:**
+```sql
+-- Add new columns
+ALTER TABLE "users" ADD COLUMN "first_name" text;
+ALTER TABLE "users" ADD COLUMN "last_name" text;
+
+-- Migrate data
+UPDATE "users"
+SET
+  "first_name" = split_part("name", ' ', 1),
+  "last_name" = split_part("name", ' ', 2);
+
+-- Drop old column
+ALTER TABLE "users" DROP COLUMN "name";
+```
+
+3. **Apply migration:**
+```bash
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+### Conditional Indexes
+
+Create indexes only for specific conditions:
+
+```typescript
+export const wallpapers = pgTable(
+  'wallpapers',
+  {
+    id: text('id').primaryKey(),
+    uploadState: uploadStateEnum('upload_state').notNull(),
+    contentHash: text('content_hash').notNull(),
+  },
+  (table) => ({
+    // Only index content_hash for completed uploads
+    contentHashIdx: index('idx_wallpapers_content_hash')
+      .on(table.contentHash)
+      .where(sql`upload_state = 'completed'`),
+  })
+);
+```
+
+**Benefits:**
+- Smaller indexes
+- Faster writes
+- Same query performance (for filtered queries)
+
+### Multi-Column Indexes
+
+Optimize queries with multiple WHERE clauses:
+
+```typescript
+export const wallpapers = pgTable(
+  'wallpapers',
+  {
+    userId: text('user_id').notNull(),
+    uploadState: uploadStateEnum('upload_state').notNull(),
+    uploadedAt: timestamp('uploaded_at').notNull(),
+  },
+  (table) => ({
+    // Composite index for user queries
+    userStateIdx: index('idx_wallpapers_user_state')
+      .on(table.userId, table.uploadState),
+  })
+);
+```
+
+**Optimizes queries like:**
+```typescript
+const results = await db
+  .select()
+  .from(wallpapers)
+  .where(
+    and(
+      eq(wallpapers.userId, 'user-123'),
+      eq(wallpapers.uploadState, 'completed')
+    )
+  );
+```
+
+### Partial Indexes
+
+Index only a subset of rows:
+
+```typescript
+export const wallpapers = pgTable(
+  'wallpapers',
+  {
+    uploadState: uploadStateEnum('upload_state').notNull(),
+  },
+  (table) => ({
+    // Only index failed uploads (for reconciliation)
+    failedUploadsIdx: index('idx_wallpapers_failed')
+      .on(table.id)
+      .where(sql`upload_state = 'failed'`),
+  })
+);
+```
+
+### Enum Migrations
+
+Adding values to enums requires special handling:
+
+**PostgreSQL doesn't support ALTER TYPE in transactions, so:**
+
+```sql
+-- Option 1: Create new enum
+CREATE TYPE upload_state_new AS ENUM ('initiated', 'uploading', 'stored', 'processing', 'completed', 'failed', 'archived');
+
+-- Migrate column
+ALTER TABLE wallpapers ALTER COLUMN upload_state TYPE upload_state_new USING upload_state::text::upload_state_new;
+
+-- Drop old enum
+DROP TYPE upload_state;
+
+-- Rename new enum
+ALTER TYPE upload_state_new RENAME TO upload_state;
+```
+
+**Or use Drizzle's enum migration helper** (if available in future versions).
+
+## Testing Migrations
+
+### Unit Test Migrations
+
+```typescript
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
+
+describe('Database migrations', () => {
+  let db: ReturnType<typeof drizzle>;
+  let client: ReturnType<typeof postgres>;
+
+  beforeAll(async () => {
+    client = postgres(process.env.DATABASE_URL!);
+    db = drizzle(client);
+
+    // Apply migrations
+    await migrate(db, { migrationsFolder: './drizzle' });
+  });
+
+  afterAll(async () => {
+    await client.end();
+  });
+
+  it('should create wallpapers table', async () => {
+    const result = await client`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'wallpapers'
+      )
+    `;
+
+    expect(result[0].exists).toBe(true);
+  });
+
+  it('should create indexes', async () => {
+    const result = await client`
+      SELECT indexname FROM pg_indexes
+      WHERE tablename = 'wallpapers'
+    `;
+
+    const indexNames = result.map((r) => r.indexname);
+    expect(indexNames).toContain('idx_wallpapers_content_hash');
+    expect(indexNames).toContain('idx_wallpapers_user_id');
+  });
+});
+```
+
+### Integration Test with TesterBuilder
+
+```typescript
+import { TesterBuilder } from '@wallpaperdb/test-utils';
+
+describe('Upload with migrations', () => {
+  it('should work with latest schema', async () => {
+    const { db, cleanup } = await new TesterBuilder()
+      .withPostgres() // Automatically runs migrations
+      .build();
+
+    try {
+      // Test with current schema
+      await db.insert(wallpapers).values({
+        id: 'wlpr_test',
+        userId: 'user-123',
+        uploadState: 'initiated',
+      });
+
+      const results = await db.select().from(wallpapers);
+      expect(results).toHaveLength(1);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+```
+
+## Best Practices
+
+### 1. Always Review Generated SQL
+
+**Never blindly apply migrations:**
+```bash
+# Review before applying
+cat drizzle/0001_new_migration.sql
+
+# Then apply
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+### 2. Test Migrations on Staging
+
+**Workflow:**
+1. Apply migration to local database
+2. Test locally
+3. Apply to staging database
+4. Test on staging
+5. Apply to production
+
+### 3. Backup Before Migration
+
+**PostgreSQL backup:**
+```bash
+docker exec wallpaperdb-postgres pg_dump -U wallpaperdb wallpaperdb > backup.sql
+```
+
+**Restore if needed:**
+```bash
+docker exec -i wallpaperdb-postgres psql -U wallpaperdb wallpaperdb < backup.sql
+```
+
+### 4. Use Transactions
+
+**Most migrations run in transactions automatically:**
+```sql
+BEGIN;
+ALTER TABLE wallpapers ADD COLUMN description text;
+COMMIT;
+```
+
+**But some operations can't run in transactions:**
+- CREATE INDEX CONCURRENTLY
+- ALTER TYPE ... ADD VALUE
+
+### 5. Avoid Downtime with Online Migrations
+
+**For large tables:**
+
+❌ **Bad - locks table:**
+```sql
+ALTER TABLE wallpapers ADD COLUMN description text NOT NULL DEFAULT '';
+```
+
+✅ **Good - multiple steps:**
+```sql
+-- Step 1: Add column (nullable)
+ALTER TABLE wallpapers ADD COLUMN description text;
+
+-- Step 2: Backfill data (in batches)
+UPDATE wallpapers SET description = '' WHERE description IS NULL;
+
+-- Step 3: Add NOT NULL constraint
+ALTER TABLE wallpapers ALTER COLUMN description SET NOT NULL;
+```
+
+### 6. Version Control Migrations
+
+**Always commit migrations:**
+```bash
+git add drizzle/
+git commit -m "feat(db): add description column to wallpapers"
+```
+
+### 7. Document Complex Migrations
+
+**Add comments to migrations:**
+```sql
+-- Migration: Add description column
+-- Context: Users requested ability to add custom descriptions
+-- Impact: No downtime, column is nullable
+-- Rollback: ALTER TABLE wallpapers DROP COLUMN description;
+
+ALTER TABLE wallpapers ADD COLUMN description text;
+```
+
+## Troubleshooting
+
+### Migration fails with "relation already exists"
+
+**Cause:** Migration already applied manually or out of order
+
+**Solution:**
+```bash
+# Check applied migrations
+psql -c "SELECT * FROM drizzle_migrations"
+
+# Manually mark as applied (if already applied)
+psql -c "INSERT INTO drizzle_migrations (hash, created_at) VALUES ('migration_hash', NOW())"
+```
+
+### Schema drift detected
+
+**Cause:** Database schema doesn't match schema.ts
+
+**Solution:**
+```bash
+# Reset database to match schema
+pnpm --filter @wallpaperdb/ingestor db:push
+```
+
+### Migration hangs
+
+**Cause:** Table locked by long-running query
+
+**Solution:**
+```sql
+-- Find blocking queries
+SELECT pid, query, state FROM pg_stat_activity WHERE state != 'idle';
+
+-- Kill blocking query (if safe)
+SELECT pg_terminate_backend(pid);
+```
+
+## Related Documentation
+
+- [Infrastructure: PostgreSQL](/docs/infrastructure/postgresql) - PostgreSQL setup
+- [Service: Ingestor](/docs/services/ingestor) - Database schema details
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Database setup for new services
+- [Drizzle ORM Documentation](https://orm.drizzle.team/) - Official Drizzle docs

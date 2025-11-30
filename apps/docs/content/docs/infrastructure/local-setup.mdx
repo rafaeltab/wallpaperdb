@@ -1,0 +1,324 @@
+---
+title: Local Setup
+description: Complete guide to setting up WallpaperDB local development environment
+---
+
+This guide walks through setting up the complete WallpaperDB local development environment from scratch.
+
+## Prerequisites
+
+- **Docker Engine** 20.10+ ([Install Docker](https://docs.docker.com/get-docker/))
+- **Docker Compose** V2+ (included with Docker Desktop)
+- **Node.js** 22+ ([Install Node](https://nodejs.org/))
+- **pnpm** 8+ (`npm install -g pnpm`)
+- **Git** ([Install Git](https://git-scm.com/downloads))
+- **Make** (usually pre-installed on macOS/Linux)
+
+**System Requirements:**
+- 4GB+ RAM available
+- 10GB+ disk space
+- macOS, Linux, or Windows with WSL2
+
+## Quick Setup (5 Minutes)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/your-org/wallpaperdb.git
+cd wallpaperdb
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Start infrastructure
+make infra-start
+
+# 4. Run database migrations
+pnpm --filter @wallpaperdb/ingestor db:migrate
+
+# 5. Start services
+make dev
+
+# 6. Access services
+# - Ingestor: http://localhost:3001
+# - Docs: http://localhost:3002
+# - Media: http://localhost:3003
+# - Grafana: http://localhost:3000
+```
+
+## Detailed Setup
+
+### 1. Install Prerequisites
+
+**macOS (Homebrew):**
+```bash
+brew install docker docker-compose node pnpm git
+```
+
+**Ubuntu/Debian:**
+```bash
+# Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+# Node.js 22
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# pnpm
+npm install -g pnpm
+```
+
+**Windows:**
+- Install [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- Install [Node.js 22](https://nodejs.org/)
+- Install pnpm: `npm install -g pnpm`
+- Enable WSL2 for better performance
+
+### 2. Clone Repository
+
+```bash
+git clone https://github.com/your-org/wallpaperdb.git
+cd wallpaperdb
+```
+
+### 3. Install Dependencies
+
+```bash
+pnpm install
+```
+
+This installs all dependencies for the monorepo (~2 minutes first time).
+
+### 4. Start Infrastructure
+
+```bash
+make infra-start
+```
+
+**What happens:**
+1. Creates `.env` from `.env.example` (if needed)
+2. Pulls Docker images (~2 minutes first time)
+3. Starts 9 services (PostgreSQL, MinIO, NATS, Redis, Grafana, OpenSearch, etc.)
+4. Initializes MinIO buckets
+5. Waits for health checks
+
+**Verify infrastructure:**
+```bash
+docker ps
+# All containers should show "healthy"
+```
+
+### 5. Run Database Migrations
+
+```bash
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+This creates all database tables and indexes.
+
+**Verify:**
+```bash
+# Connect to PostgreSQL
+docker exec -it wallpaperdb-postgres psql -U wallpaperdb -d wallpaperdb
+
+# List tables
+\dt
+
+# Should see: wallpapers table
+```
+
+### 6. Start Services
+
+```bash
+make dev
+```
+
+This starts all services in development mode with hot-reload.
+
+**Access points:**
+- Ingestor API: http://localhost:3001
+- Docs Site: http://localhost:3002
+- Media API: http://localhost:3003
+- Grafana: http://localhost:3000
+- MinIO Console: http://localhost:9001
+
+## Verifying Setup
+
+### 1. Test Ingestor Health
+
+```bash
+curl http://localhost:3001/health
+```
+
+**Expected response:**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "database": { "status": "healthy" },
+    "minio": { "status": "healthy" },
+    "nats": { "status": "healthy" },
+    "redis": { "status": "healthy" }
+  }
+}
+```
+
+### 2. Test File Upload
+
+```bash
+# Create test image
+curl -o test.jpg https://via.placeholder.com/1920x1080.jpg
+
+# Upload
+curl -X POST http://localhost:3001/upload \
+  -F "file=@test.jpg" \
+  -F "userId=test_user_123"
+```
+
+**Expected response:**
+```json
+{
+  "wallpaperId": "wlpr_...",
+  "uploadState": "processing",
+  "fileType": "image",
+  "mimeType": "image/jpeg"
+}
+```
+
+### 3. Test Media Retrieval
+
+```bash
+# Use wallpaper ID from upload
+curl http://localhost:3003/wallpapers/wlpr_... > retrieved.jpg
+```
+
+### 4. View Telemetry
+
+Open Grafana: http://localhost:3000
+- Username: `admin`
+- Password: `admin`
+
+Navigate to **Explore** and select **Tempo** to view traces.
+
+## Development Workflow
+
+### Daily Development
+
+```bash
+# Morning: Start infrastructure (if not running)
+make infra-start
+
+# Start services
+make dev
+
+# Make changes to code (hot-reload enabled)
+# ...
+
+# Run tests
+make test
+
+# Evening: Stop infrastructure (optional - can leave running)
+make infra-stop
+```
+
+### Running Specific Services
+
+```bash
+# Just ingestor
+make ingestor-dev
+
+# Just media
+make media-dev
+
+# Just docs
+make docs-dev
+```
+
+### Running Tests
+
+```bash
+# All tests
+make test
+
+# Specific service
+make ingestor-test
+make media-test
+
+# Watch mode
+make ingestor-test-watch
+
+# By intensity
+make test-unit         # Fast (no containers)
+make test-integration  # Medium (with Testcontainers)
+make test-e2e          # Slow (full Docker builds)
+```
+
+## Troubleshooting
+
+### Infrastructure won't start
+
+**Issue:** Port conflicts
+
+**Solution:**
+```bash
+# Check what's using ports
+lsof -i :5432  # PostgreSQL
+lsof -i :9000  # MinIO
+lsof -i :4222  # NATS
+
+# Kill conflicting processes or change ports
+```
+
+### pnpm install fails
+
+**Issue:** Node version mismatch
+
+**Solution:**
+```bash
+node --version  # Should be 22+
+pnpm --version  # Should be 8+
+
+# Use nvm to manage Node versions
+nvm install 22
+nvm use 22
+```
+
+### Database migrations fail
+
+**Issue:** Database not ready
+
+**Solution:**
+```bash
+# Wait for PostgreSQL health check
+docker ps | grep postgres
+
+# Retry migrations
+pnpm --filter @wallpaperdb/ingestor db:migrate
+```
+
+### Hot reload not working
+
+**Issue:** File watcher limits (Linux)
+
+**Solution:**
+```bash
+# Increase file watcher limit
+echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### Docker Desktop slow (macOS/Windows)
+
+**Issue:** Poor performance on non-Linux
+
+**Solution:**
+- Increase Docker Desktop memory (Preferences → Resources → 4GB+)
+- Use native Linux (dual boot or VM)
+- Use lima/colima instead of Docker Desktop (macOS)
+
+## Next Steps
+
+- [Infrastructure Overview](/docs/infrastructure) - All infrastructure services
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Build a service
+- [Testing](/docs/testing) - Testing strategies
+- [Development Guidelines](/docs/development-guidelines) - Code standards

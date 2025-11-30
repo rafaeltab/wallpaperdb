@@ -1,0 +1,705 @@
+---
+title: Creating a New Service
+description: Complete guide to building a new microservice in WallpaperDB
+---
+
+This guide walks through creating a new microservice for WallpaperDB using the established patterns and shared packages.
+
+## Prerequisites
+
+- Infrastructure running (`make infra-start`)
+- Familiarity with TypeScript and Fastify
+- Understanding of dependency injection (TSyringe)
+
+**Estimated time:** ~1 week per service (with shared packages)
+
+## Service Template Structure
+
+```
+apps/my-service/
+├── src/
+│   ├── app.ts                    # Fastify app factory
+│   ├── index.ts                  # Entry point
+│   ├── otel-init.ts             # OpenTelemetry initialization
+│   ├── config.ts                 # Zod-validated configuration
+│   ├── connections/              # Connection managers
+│   │   ├── database.ts
+│   │   ├── minio.ts
+│   │   ├── nats.ts
+│   │   └── otel.ts
+│   ├── db/
+│   │   └── schema.ts            # Drizzle schema
+│   ├── routes/
+│   │   ├── index.ts             # Route registration
+│   │   ├── health.routes.ts
+│   │   └── my-feature.routes.ts
+│   ├── services/                 # Business logic
+│   │   └── my-feature.service.ts
+│   ├── repositories/             # Database access
+│   │   └── my-entity.repository.ts
+│   └── errors/
+│       └── problem-details.ts   # RFC 7807 errors
+├── test/                         # Integration tests
+│   ├── setup.ts
+│   └── my-feature.test.ts
+├── drizzle/                      # Database migrations
+├── package.json
+├── tsconfig.json
+├── vitest.config.ts
+└── README.md
+```
+
+## Step 1: Create Service Directory
+
+```bash
+# Create service directory
+mkdir -p apps/my-service/src/{connections,routes,services,repositories,errors,db}
+mkdir -p apps/my-service/test
+mkdir -p apps/my-service/drizzle
+
+cd apps/my-service
+```
+
+## Step 2: Package Configuration
+
+**Create `package.json`:**
+
+```json
+{
+  "name": "@wallpaperdb/my-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "gen:swagger": "tsx src/gen_swagger.ts"
+  },
+  "dependencies": {
+    "@wallpaperdb/core": "workspace:*",
+    "@wallpaperdb/events": "workspace:*",
+    "fastify": "^5.2.0",
+    "drizzle-orm": "^0.36.4",
+    "pg": "^8.13.1",
+    "@aws-sdk/client-s3": "^3.705.0",
+    "nats": "^2.30.0",
+    "ioredis": "^5.4.2",
+    "zod": "^3.24.1",
+    "tsyringe": "^4.8.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "@wallpaperdb/test-utils": "workspace:*",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "drizzle-kit": "^0.30.1"
+  }
+}
+```
+
+**Create `tsconfig.json`:**
+
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+## Step 3: Configuration
+
+**Create `src/config.ts`:**
+
+```typescript
+import { z } from "zod";
+import {
+  ServerConfigSchema,
+  DatabaseConfigSchema,
+  S3ConfigSchema,
+  NatsConfigSchema,
+  OtelConfigSchema,
+  parseIntEnv,
+  getEnv
+} from "@wallpaperdb/core/config";
+
+const MyServiceConfigSchema = z.object({
+  ...ServerConfigSchema.shape,
+  ...DatabaseConfigSchema.shape,
+  ...S3ConfigSchema.shape,
+  ...NatsConfigSchema.shape,
+  ...OtelConfigSchema.shape,
+  // Add service-specific config
+  myFeatureEnabled: z.boolean().default(true)
+});
+
+export type MyServiceConfig = z.infer<typeof MyServiceConfigSchema>;
+
+export function loadConfig(): MyServiceConfig {
+  return MyServiceConfigSchema.parse({
+    port: parseIntEnv(process.env.PORT, 3003),
+    nodeEnv: getEnv("NODE_ENV", "development"),
+    databaseUrl: process.env.DATABASE_URL,
+    s3Endpoint: process.env.MINIO_ENDPOINT,
+    s3AccessKeyId: process.env.MINIO_ACCESS_KEY,
+    s3SecretAccessKey: process.env.MINIO_SECRET_KEY,
+    s3Bucket: getEnv("S3_BUCKET", "wallpapers"),
+    s3Region: getEnv("S3_REGION", "us-east-1"),
+    natsUrl: process.env.NATS_URL,
+    otelEndpoint: getEnv("OTLP_ENDPOINT", "http://localhost:4318"),
+    otelServiceName: getEnv("SERVICE_NAME", "wallpaperdb-my-service"),
+    myFeatureEnabled: process.env.MY_FEATURE_ENABLED === "true"
+  });
+}
+```
+
+## Step 4: OpenTelemetry Setup
+
+**Create `src/otel-init.ts`:**
+
+```typescript
+import { OtelConnection } from "@wallpaperdb/core/connections";
+import { loadConfig } from "./config.js";
+
+const config = loadConfig();
+
+const otel = new OtelConnection({
+  otelEndpoint: config.otelEndpoint,
+  otelServiceName: config.otelServiceName
+});
+
+await otel.initialize();
+
+// Export for graceful shutdown
+export { otel };
+```
+
+## Step 5: Connections
+
+**Create `src/connections/database.ts`:**
+
+```typescript
+import { DatabaseConnection as BaseConnection } from "@wallpaperdb/core/connections";
+import { singleton } from "tsyringe";
+import { loadConfig } from "../config.js";
+
+@singleton()
+export class DatabaseConnection extends BaseConnection {
+  constructor() {
+    const config = loadConfig();
+    super({ databaseUrl: config.databaseUrl });
+  }
+}
+```
+
+Repeat for `minio.ts`, `nats.ts` following the same pattern.
+
+## Step 6: Database Schema
+
+**Create `src/db/schema.ts`:**
+
+```typescript
+import { pgTable, text, timestamp, integer } from "drizzle-orm/pg-core";
+
+export const myEntities = pgTable("my_entities", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export type MyEntity = typeof myEntities.$inferSelect;
+export type NewMyEntity = typeof myEntities.$inferInsert;
+```
+
+## Step 7: Health Routes
+
+**Create `src/routes/health.routes.ts`:**
+
+```typescript
+import type { FastifyInstance } from "fastify";
+import { HealthAggregator, getHealthStatusCode } from "@wallpaperdb/core/health";
+import { DatabaseConnection } from "../connections/database.js";
+
+export async function registerHealthRoutes(app: FastifyInstance) {
+  const aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
+
+  aggregator.register("database", async () => {
+    const db = app.container.resolve(DatabaseConnection);
+    return await db.checkHealth();
+  });
+
+  app.get("/health", async (request, reply) => {
+    const result = await aggregator.checkHealth();
+    reply.code(getHealthStatusCode(result)).send(result);
+  });
+
+  app.get("/ready", async (request, reply) => {
+    reply.send({ ready: true });
+  });
+}
+```
+
+## Step 8: Business Logic
+
+**Create `src/services/my-feature.service.ts`:**
+
+```typescript
+import { singleton } from "tsyringe";
+import { DatabaseConnection } from "../connections/database.js";
+import { withSpan } from "@wallpaperdb/core/telemetry";
+import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
+
+@singleton()
+export class MyFeatureService {
+  constructor(private db: DatabaseConnection) {}
+
+  async processFeature(userId: string, data: unknown) {
+    return await withSpan(
+      "my_feature.process",
+      { [Attributes.USER_ID]: userId },
+      async (span) => {
+        const pool = this.db.getClient();
+
+        // Business logic here
+        const result = await pool.query(
+          "SELECT * FROM my_entities WHERE user_id = $1",
+          [userId]
+        );
+
+        span.setAttribute("entities.count", result.rows.length);
+        return result.rows;
+      }
+    );
+  }
+}
+```
+
+## Step 9: Fastify App
+
+**Create `src/app.ts`:**
+
+```typescript
+import Fastify from "fastify";
+import { container } from "tsyringe";
+import { registerOpenAPI } from "@wallpaperdb/core/openapi";
+import { registerHealthRoutes } from "./routes/health.routes.js";
+import { DatabaseConnection } from "./connections/database.js";
+import { loadConfig } from "./config.js";
+
+export async function createApp() {
+  const config = loadConfig();
+  const app = Fastify({ logger: true });
+
+  // Register container
+  app.decorate("container", container);
+
+  // Initialize connections
+  const db = container.resolve(DatabaseConnection);
+  await db.initialize();
+
+  // Register OpenAPI
+  await registerOpenAPI(app, {
+    info: {
+      title: "My Service API",
+      version: "1.0.0",
+      description: "API for My Service"
+    }
+  });
+
+  // Register routes
+  await app.register(registerHealthRoutes);
+
+  return app;
+}
+```
+
+## Step 10: Entry Point
+
+**Create `src/index.ts`:**
+
+```typescript
+import "./otel-init.js";
+import "reflect-metadata";
+import { createApp } from "./app.js";
+import { loadConfig } from "./config.js";
+
+const config = loadConfig();
+const app = await createApp();
+
+try {
+  await app.listen({ port: config.port, host: "0.0.0.0" });
+  console.log(`Server listening on http://localhost:${config.port}`);
+} catch (err) {
+  app.log.error(err);
+  process.exit(1);
+}
+
+// Graceful shutdown
+process.on("SIGTERM", async () => {
+  await app.close();
+  process.exit(0);
+});
+```
+
+## Step 11: Testing Setup
+
+**Create `test/setup.ts`:**
+
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+import { beforeAll, afterAll } from "vitest";
+
+export async function setupTester() {
+  return await new PostgresTesterBuilder()
+    .withDocker()
+    .withPostgres()
+    .withMinio({ buckets: ["wallpapers"] })
+    .withNats()
+    .withMigrations("./drizzle")
+    .build();
+}
+
+let globalTester: Awaited<ReturnType<typeof setupTester>>;
+
+beforeAll(async () => {
+  globalTester = await setupTester();
+});
+
+afterAll(async () => {
+  await globalTester?.destroy();
+});
+
+export { globalTester };
+```
+
+**Create `test/my-feature.test.ts`:**
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { globalTester } from "./setup.js";
+import { createApp } from "../src/app.js";
+
+describe("My Feature", () => {
+  it("should work", async () => {
+    const app = await createApp();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/health"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe("healthy");
+  });
+});
+```
+
+## Step 12: Makefile Integration
+
+Add to root `Makefile`:
+
+```makefile
+# My Service
+.PHONY: my-service-dev my-service-build my-service-test
+
+my-service-dev:
+	@turbo run dev --filter=@wallpaperdb/my-service
+
+my-service-build:
+	@turbo run build --filter=@wallpaperdb/my-service
+
+my-service-test:
+	@turbo run test --filter=@wallpaperdb/my-service
+
+my-service-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/my-service
+```
+
+## Step 13: Add to Turborepo
+
+Add to `turbo.json` if needed (should auto-detect):
+
+```json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "cache": false
+    }
+  }
+}
+```
+
+## Step 14: Database Migrations
+
+**Run migrations:**
+
+```bash
+# Generate migration from schema
+pnpm --filter @wallpaperdb/my-service db:generate
+
+# Review generated SQL in drizzle/
+cat drizzle/0000_initial.sql
+
+# Apply migration
+pnpm --filter @wallpaperdb/my-service db:migrate
+```
+
+## Step 15: Run the Service
+
+```bash
+# Start service
+make my-service-dev
+
+# Test health endpoint
+curl http://localhost:3003/health
+
+# Run tests
+make my-service-test
+```
+
+## Using Shared Packages
+
+### @wallpaperdb/core
+
+```typescript
+// Connections
+import { DatabaseConnection, MinioConnection } from "@wallpaperdb/core/connections";
+
+// Config
+import { ServerConfigSchema, parseIntEnv } from "@wallpaperdb/core/config";
+
+// Telemetry
+import { withSpan, recordCounter } from "@wallpaperdb/core/telemetry";
+
+// Health
+import { HealthAggregator } from "@wallpaperdb/core/health";
+
+// Errors
+import { ValidationError, NotFoundError } from "@wallpaperdb/core/errors";
+```
+
+### @wallpaperdb/events
+
+**Publishing events:**
+
+```typescript
+import { BaseEventPublisher } from "@wallpaperdb/events";
+import { z } from "zod";
+
+const MyEventSchema = z.object({
+  id: z.string(),
+  data: z.string()
+});
+
+class MyEventPublisher extends BaseEventPublisher<typeof MyEventSchema> {
+  constructor(js: JetStreamClient) {
+    super({
+      js,
+      subject: "my.event",
+      schema: MyEventSchema,
+      serviceName: "my-service"
+    });
+  }
+}
+
+// Usage
+const publisher = new MyEventPublisher(jetstream);
+await publisher.publish({ id: "123", data: "hello" });
+```
+
+**Consuming events:**
+
+```typescript
+import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
+
+class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
+  constructor(js: JetStreamClient) {
+    super({
+      js,
+      stream: "MY_STREAM",
+      consumer: "my-consumer",
+      schema: MyEventSchema,
+      serviceName: "my-service"
+    });
+  }
+
+  protected async handleMessage(event: MyEvent, context: MessageContext) {
+    console.log(`Processing: ${event.id}`);
+    // Handle event...
+  }
+}
+```
+
+## Best Practices
+
+### 1. Use Dependency Injection
+
+```typescript
+@singleton()
+export class MyService {
+  constructor(
+    private db: DatabaseConnection,
+    private s3: MinioConnection,
+    private nats: NatsConnectionManager
+  ) {}
+}
+```
+
+### 2. Add OpenTelemetry Spans
+
+```typescript
+async myOperation(userId: string) {
+  return await withSpan(
+    "my.operation",
+    { [Attributes.USER_ID]: userId },
+    async (span) => {
+      // Operation logic
+      span.setAttribute("custom.attr", "value");
+      return result;
+    }
+  );
+}
+```
+
+### 3. Use RFC 7807 Errors
+
+```typescript
+import { ValidationError, NotFoundError } from "@wallpaperdb/core/errors";
+
+if (!entity) {
+  throw new NotFoundError("Entity not found", { entityId: id });
+}
+
+if (invalid) {
+  throw new ValidationError("Invalid input", { field: "name" });
+}
+```
+
+### 4. Write Tests First (TDD)
+
+```typescript
+describe("Feature", () => {
+  it("should create entity", async () => {
+    // Arrange
+    const data = { name: "test" };
+
+    // Act
+    const result = await service.create(data);
+
+    // Assert
+    expect(result.id).toBeDefined();
+    expect(result.name).toBe("test");
+  });
+});
+```
+
+### 5. Use Health Checks
+
+Register all dependencies in health aggregator:
+
+```typescript
+aggregator.register("database", () => db.checkHealth());
+aggregator.register("minio", () => s3.checkHealth());
+aggregator.register("nats", () => nats.checkHealth());
+```
+
+## CI/CD Integration
+
+Add to `.github/workflows/ci.yml`:
+
+```yaml
+jobs:
+  test-my-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+      - run: pnpm install
+      - run: pnpm --filter @wallpaperdb/my-service test
+```
+
+## Deployment Checklist
+
+- [ ] Service builds successfully (`make my-service-build`)
+- [ ] All tests pass (`make my-service-test`)
+- [ ] Health checks implemented
+- [ ] OpenAPI documentation generated
+- [ ] Environment variables documented
+- [ ] Makefile commands added
+- [ ] README.md created
+- [ ] CI/CD pipeline configured
+
+## Common Patterns
+
+### Event-Driven Service
+
+Consume events, process, publish new events:
+
+```typescript
+class MyConsumer extends BaseEventConsumer {
+  async handleMessage(event: UploadedEvent) {
+    // Process event
+    const result = await this.processService.process(event);
+
+    // Publish result
+    await this.publisher.publish({
+      entityId: result.id,
+      status: "completed"
+    });
+  }
+}
+```
+
+### API Service
+
+HTTP endpoints with validation:
+
+```typescript
+app.post("/entities", async (request, reply) => {
+  const data = RequestSchema.parse(request.body);
+  const entity = await service.create(data);
+  reply.code(201).send(entity);
+});
+```
+
+### Background Worker
+
+Scheduled jobs:
+
+```typescript
+import { CronJob } from "cron";
+
+const job = new CronJob("0 */5 * * * *", async () => {
+  await reconciliationService.run();
+});
+
+job.start();
+```
+
+## Next Steps
+
+- [Testing](/docs/testing) - Test strategies
+- [Package: Core](/docs/packages/core) - Shared utilities
+- [Package: Events](/docs/packages/events) - Event patterns
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Architecture overview

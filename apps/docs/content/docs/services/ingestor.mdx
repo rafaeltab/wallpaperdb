@@ -1,0 +1,525 @@
+---
+title: Ingestor Service
+description: Wallpaper upload and validation service with state machine workflow
+---
+
+The Ingestor Service is the entry point for wallpapers into WallpaperDB. It handles file uploads, validation, storage in MinIO, metadata recording in PostgreSQL, and event publishing for downstream processing.
+
+**Status:** ✅ Production-ready
+
+## Quick Start
+
+```bash
+# Start infrastructure
+make infra-start
+
+# Run ingestor in development mode
+make ingestor-dev
+
+# The service starts on http://localhost:3001
+```
+
+## Features
+
+### Core Functionality
+- **Multi-part file upload** with streaming (no full file in memory)
+- **Content-based MIME detection** (doesn't trust client headers)
+- **SHA256 deduplication** per user (prevents duplicate uploads)
+- **State machine workflow** (6 states for reliability)
+- **Reconciliation system** for eventual consistency
+- **Distributed rate limiting** via Redis
+- **RFC 7807 error responses** with structured problem details
+
+### File Processing
+- **Format validation**: JPEG, PNG, WebP (images), MP4, WebM (videos)
+- **Size limits**: 50MB for images, 200MB for videos
+- **Dimension limits**: 16384x16384 pixels (decompression bomb protection)
+- **Metadata extraction**: Width, height, aspect ratio via Sharp
+- **Security**: Filename sanitization, content validation
+
+### Observability
+- **OpenTelemetry** traces and metrics
+- **Structured logging** with Pino
+- **Health checks** for all dependencies
+- **Grafana dashboards** for monitoring
+
+## Architecture
+
+### State Machine
+
+The ingestor uses a 6-state machine for reliable uploads:
+
+```
+initiated → uploading → stored → processing → completed
+                                            ↘ failed
+```
+
+**State Transitions:**
+
+1. **initiated** - Intent recorded (write-ahead log)
+   - Database record created with user ID and generated wallpaper ID
+   - Content hash not yet calculated
+   - No file uploaded
+
+2. **uploading** - File being uploaded to MinIO
+   - Content hash calculated (SHA256)
+   - File streamed to MinIO
+   - Metadata extracted (dimensions, MIME type, file size)
+
+3. **stored** - File in MinIO, metadata in DB, awaiting NATS publish
+   - File successfully stored in MinIO
+   - All metadata recorded in database
+   - Ready to publish event
+
+4. **processing** - Event published to NATS, downstream services working
+   - `wallpaper.uploaded` event published to NATS
+   - Downstream services (media, thumbnail, etc.) processing
+
+5. **completed** - All downstream processing complete (terminal state)
+   - All enrichment services have finished
+   - Wallpaper fully ready for serving
+
+6. **failed** - Terminal failure state
+   - Upload failed after max retries
+   - Error message recorded in `processingError` field
+   - User notified
+
+**Key Design:** Upload succeeds even if NATS publish fails (stays in `stored` state). Reconciliation system will retry publishing.
+
+### Database Schema
+
+```typescript
+wallpapers {
+  id: text                    // Format: wlpr_<ulid>
+  userId: text
+  contentHash: text           // SHA256 for deduplication
+  uploadState: enum           // State machine
+  stateChangedAt: timestamp
+  uploadAttempts: integer
+  processingError: text       // Error if failed
+
+  // File metadata (null until 'stored')
+  fileType: enum              // 'image' | 'video'
+  mimeType: text
+  fileSizeBytes: bigint
+  width, height: integer
+  aspectRatio: decimal(10,4)
+
+  // Storage references
+  storageKey: text            // S3 path: wlpr_<ulid>/original.<ext>
+  storageBucket: text
+
+  uploadedAt, updatedAt: timestamp
+}
+```
+
+**Critical Index:**
+```sql
+CREATE UNIQUE INDEX idx_wallpapers_content_hash
+ON wallpapers(user_id, content_hash)
+WHERE content_hash IS NOT NULL
+  AND upload_state IN ('stored', 'processing', 'completed');
+```
+
+This conditional unique index prevents duplicate uploads while allowing failed uploads to be retried.
+
+### Upload Flow
+
+```
+1. Client POSTs to /upload
+2. File validated (format, size, dimensions)
+3. SHA256 hash calculated
+4. Duplicate check against DB (per user)
+5. State: initiated → Insert DB record
+6. State: uploading → Upload to MinIO
+7. State: stored → Record all metadata
+8. Publish NATS event to "wallpaper.uploaded"
+9. State: processing (if NATS succeeds)
+   OR stays stored (reconciliation will retry)
+```
+
+### Reconciliation System
+
+Four background jobs ensure eventual consistency:
+
+#### 1. Stuck Uploads Reconciliation
+Recovers uploads stuck in `uploading` state.
+
+**Logic:**
+- Find records in `uploading` state for >5 minutes
+- Check if file exists in MinIO
+- If exists: transition to `stored` state
+- If missing: increment retry count
+- After 3 retries: mark as `failed`
+
+**Runs:** Every 5 minutes
+
+#### 2. Missing Events Reconciliation
+Republishes NATS events for records stuck in `stored` state.
+
+**Logic:**
+- Find records in `stored` state for >5 minutes
+- Republish to NATS
+- If successful: transition to `processing`
+- If failed: stays in `stored` for retry
+
+**Runs:** Every 5 minutes
+
+#### 3. Orphaned Intents Reconciliation
+Deletes abandoned `initiated` records.
+
+**Logic:**
+- Find records in `initiated` state for >1 hour
+- Delete (upload never started)
+
+**Runs:** Every 5 minutes
+
+#### 4. Orphaned MinIO Reconciliation
+Deletes MinIO objects without DB records.
+
+**Logic:**
+- List all objects in wallpapers bucket
+- Check for corresponding DB record
+- Delete orphans (objects without DB records)
+
+**Runs:** Every 24 hours
+
+**Multi-Instance Safety:**
+- Row-level locking (`FOR UPDATE SKIP LOCKED`)
+- Idempotent operations
+- Transaction-based processing
+
+### Rate Limiting
+
+Distributed rate limiting via Redis with atomic Lua script.
+
+**Implementation:**
+```typescript
+// Redis Lua script for atomic rate limiting
+const script = `
+  local key = KEYS[1]
+  local limit = tonumber(ARGV[1])
+  local window = tonumber(ARGV[2])
+  local current = redis.call('INCR', key)
+  if current == 1 then
+    redis.call('EXPIRE', key, window)
+  end
+  if current > limit then
+    return 0
+  end
+  return 1
+`;
+```
+
+**Features:**
+- **Atomic operations** (no race conditions)
+- **Per-user limits** (configurable by subscription tier)
+- **In-memory fallback** for testing
+- **RFC 7807 errors** with `Retry-After` header
+
+**Default Limits:**
+- Free tier: 10 uploads per hour
+- Configurable via `ValidationLimitsService`
+
+See [Rate Limiting Guide](/docs/guides/rate-limiting) for details.
+
+### Error Handling
+
+All errors follow RFC 7807 Problem Details standard.
+
+**Example Response:**
+```json
+{
+  "type": "https://wallpaperdb.dev/problems/validation-error",
+  "title": "Validation Error",
+  "status": 400,
+  "detail": "File format not supported. Allowed: jpeg, png, webp",
+  "instance": "/upload",
+  "allowedFormats": ["jpeg", "png", "webp"]
+}
+```
+
+**Error Types:**
+- `ValidationError` (400) - Invalid file format, size, or dimensions
+- `ConflictError` (409) - Duplicate upload (same content hash)
+- `RateLimitError` (429) - Rate limit exceeded
+- `InternalError` (500) - Server error
+
+See [Error Handling Guide](/docs/guides/error-handling) for details.
+
+## API Reference
+
+### POST /upload
+
+Upload a wallpaper file.
+
+**Request:**
+```bash
+curl -X POST http://localhost:3001/upload \
+  -F "file=@wallpaper.jpg" \
+  -F "userId=user_123"
+```
+
+**Content-Type:** `multipart/form-data`
+
+**Parameters:**
+- `file` (required) - File to upload
+- `userId` (required) - User ID
+
+**Success Response (201):**
+```json
+{
+  "wallpaperId": "wlpr_01HABCDEF123456789",
+  "uploadState": "processing",
+  "fileType": "image",
+  "mimeType": "image/jpeg",
+  "fileSizeBytes": 1024000,
+  "width": 1920,
+  "height": 1080,
+  "aspectRatio": "1.7778"
+}
+```
+
+**Error Responses:**
+- `400` - Validation error (invalid format, size, dimensions)
+- `409` - Duplicate upload (same content hash for user)
+- `429` - Rate limit exceeded
+- `500` - Internal server error
+
+**Validation Rules:**
+- **Formats**: JPEG, PNG, WebP (images), MP4, WebM (videos)
+- **Image size**: Max 50MB
+- **Video size**: Max 200MB
+- **Dimensions**: Max 16384x16384 pixels
+- **MIME detection**: Content-based (not from client header)
+
+[View OpenAPI Specification →](/docs/openapi/ingestor/upload/post)
+
+### GET /health
+
+Health check with dependency status.
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "database": { "status": "healthy" },
+    "minio": { "status": "healthy" },
+    "nats": { "status": "healthy" },
+    "redis": { "status": "healthy" }
+  }
+}
+```
+
+**Status Codes:**
+- `200` - All checks healthy or degraded
+- `503` - Unhealthy (critical dependencies down)
+
+**Status Values:**
+- `healthy` - All dependencies operational
+- `degraded` - Some dependencies failed (service still operational)
+- `unhealthy` - Critical dependencies failed
+
+[View OpenAPI Specification →](/docs/openapi/ingestor/health/get)
+
+### GET /ready
+
+Kubernetes-style readiness probe.
+
+**Response (200):**
+```json
+{
+  "ready": true
+}
+```
+
+**Status Codes:**
+- `200` - Service ready to accept traffic
+- `503` - Service not ready
+
+[View OpenAPI Specification →](/docs/openapi/ingestor/ready/get)
+
+## Configuration
+
+Environment variables (Zod-validated):
+
+```bash
+# Server
+PORT=3001
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
+
+# MinIO/S3
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+S3_BUCKET=wallpapers
+S3_REGION=us-east-1
+
+# NATS
+NATS_URL=nats://localhost:4222
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_DB=0
+
+# OpenTelemetry
+OTLP_ENDPOINT=http://localhost:4318
+SERVICE_NAME=wallpaperdb-ingestor
+```
+
+## Testing
+
+The ingestor has comprehensive test coverage using the TesterBuilder pattern.
+
+**Run tests:**
+```bash
+make ingestor-test          # All tests
+make ingestor-test-watch    # Watch mode
+```
+
+**Test categories:**
+- **Upload flow** - Happy path for JPEG, PNG, WebP
+- **Validation** - Format, size, dimension checks
+- **Deduplication** - Same content hash rejection
+- **Reconciliation** - All 4 reconciliation jobs
+- **Rate limiting** - Both in-memory and Redis
+- **Multi-instance** - Concurrent upload safety
+- **State machine** - State transition logic
+
+**Example test:**
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+
+describe("Upload Flow", () => {
+  it("should upload JPEG successfully", async () => {
+    const tester = await new PostgresTesterBuilder()
+      .withPostgres()
+      .withMinio({ buckets: ['wallpapers'] })
+      .withNats()
+      .withRedis()
+      .withMigrations("./drizzle")
+      .build();
+
+    const app = await createApp(/* ... */);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/upload',
+      payload: createMultipartPayload(jpegBuffer, 'user_123')
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json().uploadState).toBe('processing');
+  });
+});
+```
+
+See [Testing Documentation](/docs/testing) for more details.
+
+## Observability
+
+### Metrics
+
+Key metrics recorded:
+
+- `uploads.total` - Total uploads (by status, file type)
+- `upload.duration_ms` - Upload duration histogram
+- `reconciliation.processed` - Reconciliation job counts
+- `rate_limit.exceeded` - Rate limit violations
+
+### Traces
+
+Distributed tracing with OpenTelemetry:
+
+- `upload.process` - Full upload workflow
+- `upload.validate` - File validation
+- `upload.hash` - SHA256 calculation
+- `upload.minio` - MinIO upload
+- `upload.nats` - NATS publish
+- `reconciliation.*` - Reconciliation jobs
+
+### Dashboards
+
+View metrics in Grafana:
+- **Ingestor Overview** - Upload rates, errors, latency
+- **Reconciliation** - Stuck uploads, missing events
+
+Access Grafana: http://localhost:3000 (admin/admin)
+
+## Deployment
+
+### Docker
+
+Build and run in Docker:
+
+```bash
+make ingestor-docker-build  # Build image
+make ingestor-docker-run    # Run container
+make ingestor-docker-logs   # View logs
+make ingestor-docker-stop   # Stop container
+```
+
+### Production Build
+
+```bash
+make ingestor-build  # TypeScript compilation
+make ingestor-start  # Run production build
+```
+
+Output: `apps/ingestor/dist/`
+
+## Project Structure
+
+```
+apps/ingestor/
+├── src/
+│   ├── app.ts                    # Fastify app factory
+│   ├── index.ts                  # Entry point (server lifecycle)
+│   ├── config.ts                 # Zod-validated config
+│   ├── connections/              # Singleton connection managers
+│   │   ├── database.ts          # PostgreSQL pool
+│   │   ├── minio.ts             # S3 client
+│   │   ├── nats.ts              # NATS client
+│   │   ├── redis.ts             # Redis client
+│   │   └── otel.ts              # OpenTelemetry SDK
+│   ├── db/schema.ts              # Drizzle schema
+│   ├── routes/                   # HTTP handlers
+│   │   ├── health.routes.ts     # /health, /ready
+│   │   └── upload.routes.ts     # /upload
+│   ├── services/                 # Business logic
+│   │   ├── upload-orchestrator.service.ts  # Upload workflow
+│   │   ├── file-processor.service.ts       # Validation, metadata
+│   │   ├── storage.service.ts              # MinIO operations
+│   │   ├── events.service.ts               # NATS publishing
+│   │   ├── validation-limits.service.ts    # Per-user limits
+│   │   ├── rate-limit.service.ts           # Redis rate limiting
+│   │   ├── state-machine/                  # State management
+│   │   │   └── wallpaper-state-machine.service.ts
+│   │   └── reconciliation/                 # Eventual consistency
+│   │       ├── stuck-uploads.service.ts
+│   │       ├── missing-events.service.ts
+│   │       ├── orphaned-intents.service.ts
+│   │       └── orphaned-minio.service.ts
+│   └── errors/problem-details.ts           # RFC 7807 errors
+├── test/                         # Integration tests
+├── drizzle/                      # Database migrations
+├── package.json
+└── tsconfig.json
+```
+
+## Related Documentation
+
+- [Services Overview](/docs/services) - All services
+- [Services: Media](/docs/services/media) - Retrieval service
+- [Package: Core](/docs/packages/core) - Shared infrastructure
+- [Package: Events](/docs/packages/events) - Event schemas
+- [Guide: Rate Limiting](/docs/guides/rate-limiting) - Rate limiting patterns
+- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 errors
+- [Testing](/docs/testing) - Testing strategies
+- [Observability](/docs/observability) - OpenTelemetry setup

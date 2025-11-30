@@ -1,0 +1,447 @@
+---
+title: Media Service
+description: Wallpaper retrieval and on-demand resizing service
+---
+
+The Media Service handles retrieval and serving of wallpapers from MinIO with on-demand image resizing and format conversion using Sharp.
+
+**Status:** 🚧 IN PROGRESS (~75% complete)
+
+## Quick Start
+
+```bash
+# Start infrastructure
+make infra-start
+
+# Run media service in development mode
+make media-dev
+
+# The service starts on http://localhost:3003
+```
+
+## Features
+
+### Implemented ✅
+- **Wallpaper retrieval** from MinIO
+- **On-demand image resizing** using Sharp
+- **Multiple resize modes**: contain, cover, fill
+- **Streaming responses** (memory-efficient)
+- **CDN-ready caching headers** (`Cache-Control: public, max-age=31536000, immutable`)
+- **Health checks** for all dependencies
+- **OpenTelemetry** traces and metrics
+- **RFC 7807 error responses**
+
+### In Progress 🚧
+- Comprehensive integration tests
+- Event consumer for `wallpaper.uploaded` (caching metadata)
+- Variant storage (pre-generated sizes)
+
+### Planned 📋
+- Format conversion (JPEG → WebP, etc.)
+- CDN integration
+- Image optimization (compression, quality tuning)
+- Video streaming support
+
+## Architecture
+
+### Retrieval Flow
+
+```
+1. Client requests GET /wallpapers/:id?w=800&h=600&fit=contain
+2. Validate query parameters (dimensions, fit mode)
+3. Look up wallpaper metadata in database
+4. If not found → 404 (RFC 7807 error)
+5. Download original from MinIO
+6. If resize requested:
+   a. Resize using Sharp
+   b. Stream resized image to client
+7. If no resize:
+   a. Stream original directly to client
+8. Set caching headers (immutable, 1 year)
+```
+
+### Resize Modes
+
+Using Sharp's fit modes:
+
+**contain** (default)
+- Preserves aspect ratio
+- Image fits within target dimensions
+- May have letterboxing/pillarboxing
+- Use case: Thumbnails, previews
+
+**cover**
+- Preserves aspect ratio
+- Image fills target dimensions (may crop)
+- No letterboxing
+- Use case: Hero images, backgrounds
+
+**fill**
+- Does not preserve aspect ratio
+- Image stretched to exact dimensions
+- Use case: Fixed-size slots (rare)
+
+**Example requests:**
+```bash
+# Original size
+curl http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789
+
+# 800x600 with letterboxing
+curl http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=800&h=600&fit=contain
+
+# 800x600 cropped to fill
+curl http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=800&h=600&fit=cover
+
+# Width only (height auto-calculated)
+curl http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=800&fit=contain
+```
+
+### Database Schema
+
+The media service uses the same `wallpapers` table as the ingestor:
+
+```typescript
+wallpapers {
+  id: text                    // Format: wlpr_<ulid>
+  userId: text
+  uploadState: enum           // Only serves 'processing' or 'completed'
+  fileType: enum              // 'image' | 'video'
+  mimeType: text
+  width, height: integer
+  aspectRatio: decimal(10,4)
+  storageKey: text            // S3 path
+  storageBucket: text
+}
+```
+
+**Future:** `variants` table for pre-generated sizes.
+
+### Variant Selection (Planned)
+
+Future optimization: pre-generate common sizes and serve directly.
+
+```typescript
+variants {
+  wallpaperId: text
+  width, height: integer
+  format: text                // 'jpeg', 'webp', 'avif'
+  storageKey: text            // S3 path to variant
+  fileSizeBytes: bigint
+}
+```
+
+Variant selection algorithm:
+1. Find smallest variant >= requested size
+2. If exists: serve variant directly (no resize)
+3. If not exists: resize original on-demand
+
+This reduces CPU usage for common sizes (e.g., 1920x1080, 1280x720).
+
+### Event Consumer (In Progress)
+
+The media service will consume `wallpaper.uploaded` events to cache metadata:
+
+```typescript
+class WallpaperUploadedConsumer extends BaseEventConsumer {
+  async handleMessage(event: WallpaperUploadedEvent) {
+    // Cache frequently accessed metadata
+    await this.cache.set(`wallpaper:${event.wallpaperId}`, {
+      storageKey: event.storageKey,
+      storageBucket: event.storageBucket,
+      mimeType: event.mimeType,
+      width: event.width,
+      height: event.height
+    });
+  }
+}
+```
+
+This reduces database queries for popular wallpapers.
+
+## API Reference
+
+### GET /wallpapers/:id
+
+Retrieve a wallpaper with optional resizing.
+
+**Parameters:**
+- `id` (path, required) - Wallpaper ID (format: `wlpr_<ulid>`)
+- `w` (query, optional) - Target width (1-7680)
+- `h` (query, optional) - Target height (1-4320)
+- `fit` (query, optional) - Resize mode: `contain` | `cover` | `fill` (default: `contain`)
+
+**Success Response (200):**
+- **Content-Type**: Image MIME type (e.g., `image/jpeg`)
+- **Cache-Control**: `public, max-age=31536000, immutable`
+- **Content-Length**: File size (only for original, not resized)
+- **Body**: Image binary data (streaming)
+
+**Error Responses:**
+- `400` - Invalid dimensions or fit mode
+- `404` - Wallpaper not found or file missing from storage
+- `500` - Internal server error
+
+**Examples:**
+```bash
+# Get original
+curl http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789 > original.jpg
+
+# Resize to 800x600 (contain)
+curl "http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=800&h=600" > thumbnail.jpg
+
+# Resize width only (height auto)
+curl "http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=1920" > resized.jpg
+
+# Cover mode (crop to fill)
+curl "http://localhost:3003/wallpapers/wlpr_01HABCDEF123456789?w=800&h=600&fit=cover" > hero.jpg
+```
+
+[View OpenAPI Specification →](/docs/openapi/media/wallpapers/id/get)
+
+### GET /health
+
+Health check with dependency status.
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "database": { "status": "healthy" },
+    "minio": { "status": "healthy" },
+    "nats": { "status": "healthy" }
+  }
+}
+```
+
+[View OpenAPI Specification →](/docs/openapi/media/health/get)
+
+### GET /ready
+
+Readiness probe for Kubernetes.
+
+**Response (200):**
+```json
+{
+  "ready": true
+}
+```
+
+[View OpenAPI Specification →](/docs/openapi/media/ready/get)
+
+## Configuration
+
+Environment variables (Zod-validated):
+
+```bash
+# Server
+PORT=3002
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
+
+# MinIO/S3
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+S3_BUCKET=wallpapers
+S3_REGION=us-east-1
+
+# NATS (for event consumption)
+NATS_URL=nats://localhost:4222
+
+# OpenTelemetry
+OTLP_ENDPOINT=http://localhost:4318
+SERVICE_NAME=wallpaperdb-media
+```
+
+## Testing
+
+The media service uses the TesterBuilder pattern for testing.
+
+**Run tests:**
+```bash
+make media-test          # All tests
+make media-test-watch    # Watch mode
+```
+
+**Test categories (planned):**
+- **Retrieval** - Fetch original wallpapers
+- **Resizing** - All resize modes (contain, cover, fill)
+- **Validation** - Invalid dimensions, missing wallpapers
+- **Caching** - Metadata cache behavior
+- **Streaming** - Memory-efficient streaming
+
+**Example test:**
+```typescript
+import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
+
+describe("Media Service", () => {
+  it("should retrieve and resize wallpaper", async () => {
+    const tester = await new PostgresTesterBuilder()
+      .withPostgres()
+      .withMinio({ buckets: ['wallpapers'] })
+      .withMigrations("./drizzle")
+      .build();
+
+    // Create test wallpaper
+    await tester.pool.query(
+      `INSERT INTO wallpapers (id, user_id, storage_key, upload_state, file_type, mime_type, width, height)
+       VALUES ($1, $2, $3, 'completed', 'image', 'image/jpeg', 1920, 1080)`,
+      ['wlpr_123', 'user_123', 'wlpr_123/original.jpg']
+    );
+
+    // Upload test image to MinIO
+    await tester.minio.send(new PutObjectCommand({
+      Bucket: 'wallpapers',
+      Key: 'wlpr_123/original.jpg',
+      Body: jpegBuffer
+    }));
+
+    const app = await createApp(/* ... */);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/wallpapers/wlpr_123?w=800&h=600'
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toBe('image/jpeg');
+  });
+});
+```
+
+## Observability
+
+### Metrics
+
+Key metrics recorded:
+
+- `http.wallpaper_retrievals.total` - Total retrievals (by status, resize)
+- `http.wallpaper_retrieval_duration_ms` - Retrieval duration histogram
+- `resize.operations.total` - Resize operations (by fit mode)
+- `http.requests.not_found` - 404 errors
+
+### Traces
+
+Distributed tracing spans:
+
+- `http.get_wallpaper` - Full retrieval request
+- `wallpaper.retrieve` - Database lookup
+- `wallpaper.download` - MinIO download
+- `wallpaper.resize` - Sharp resize operation
+
+### Dashboards
+
+View metrics in Grafana:
+- **Media Service Dashboard** - Retrieval rates, resize operations, cache hits
+- Access: http://localhost:3000 (admin/admin)
+
+Dashboard file: `/infra/grafana/dashboards/media-service-dashboard.json`
+
+## Performance Considerations
+
+### Memory Efficiency
+
+**Streaming:** Files are streamed directly to the client, never fully loaded into memory:
+
+```typescript
+// Sharp creates a transform stream
+const resizeStream = sharp()
+  .resize(width, height, { fit })
+  .jpeg({ quality: 85 });
+
+// MinIO download stream → Sharp transform → HTTP response
+minioStream.pipe(resizeStream).pipe(reply.raw);
+```
+
+### Caching Strategy
+
+**Client-side caching:**
+- `Cache-Control: public, max-age=31536000, immutable`
+- Wallpapers are immutable (ID never reused)
+- Browser/CDN can cache indefinitely
+
+**Server-side caching (planned):**
+- Metadata cache (Redis) to reduce DB queries
+- Variant pre-generation for common sizes
+
+### CDN Integration (Planned)
+
+Future: CloudFlare/CloudFront integration for global delivery:
+
+```
+Client → CDN → Media Service → MinIO
+         ↓
+    (cache miss)
+```
+
+After first request, CDN serves directly (no media service hit).
+
+## Project Structure
+
+```
+apps/media/
+├── src/
+│   ├── app.ts                    # Fastify app factory
+│   ├── index.ts                  # Entry point
+│   ├── config.ts                 # Zod-validated config
+│   ├── connections/              # Connection managers
+│   │   ├── database.ts
+│   │   ├── minio.ts
+│   │   ├── nats.ts
+│   │   └── otel.ts
+│   ├── db/schema.ts              # Drizzle schema
+│   ├── routes/                   # HTTP handlers
+│   │   ├── health.routes.ts
+│   │   └── media.routes.ts       # GET /wallpapers/:id
+│   ├── services/
+│   │   ├── media.service.ts      # Wallpaper retrieval
+│   │   ├── resize.service.ts     # Image resizing
+│   │   ├── variant-selector.service.ts  # Variant selection (future)
+│   │   └── consumers/
+│   │       └── wallpaper-uploaded-consumer.service.ts
+│   ├── repositories/
+│   │   ├── wallpaper.repository.ts
+│   │   └── variant.repository.ts
+│   └── errors/problem-details.ts
+├── test/                         # Integration tests
+├── package.json
+└── tsconfig.json
+```
+
+## Development Status
+
+### Completed ✅
+- Core retrieval endpoint
+- Sharp integration for resizing
+- All three resize modes (contain, cover, fill)
+- Health checks
+- OpenTelemetry instrumentation
+- RFC 7807 error handling
+- Streaming responses
+
+### In Progress 🚧
+- Integration tests (~50% complete)
+- Event consumer implementation
+- Metadata caching
+
+### TODO 📋
+- Variant pre-generation system
+- Format conversion (WebP, AVIF)
+- Video streaming support
+- CDN integration
+- Performance benchmarks
+
+**Estimated completion:** 1-2 weeks
+
+## Related Documentation
+
+- [Services: Ingestor](/docs/services/ingestor) - Upload service
+- [Services Overview](/docs/services) - All services
+- [Package: Core](/docs/packages/core) - Shared infrastructure
+- [Package: Events](/docs/packages/events) - Event consumption
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Architecture strategy
+- [Testing](/docs/testing) - Testing patterns
+- [Observability](/docs/observability) - OpenTelemetry setup

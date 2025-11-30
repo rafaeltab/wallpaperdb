@@ -50,35 +50,53 @@ Welcome to the WallpaperDB documentation! This guide will help you navigate the 
 - Create ADRs for architectural choices
 - See [Development Guidelines](/docs/development-guidelines)
 
+## Documentation Structure
+
+### Core Documentation
+- **[Getting Started](/docs/getting-started)** - 10-minute quick start guide
+- **[Development Guidelines](/docs/development-guidelines)** - TDD, incremental changes, coding standards
+- **[Observability](/docs/observability)** - OpenTelemetry, Grafana LGTM, monitoring
+
+### Guides
+- **[Creating New Service](/docs/guides/creating-new-service)** - Step-by-step service creation guide
+- **[Error Handling](/docs/guides/error-handling)** - RFC 7807 Problem Details patterns
+- **[Rate Limiting](/docs/guides/rate-limiting)** - Redis-based distributed rate limiting
+- **[Testing Strategies](/docs/guides/testing-strategies)** - Unit, integration, E2E test organization
+- **[Makefile Commands](/docs/guides/makefile-commands)** - Complete command reference
+- **[Database Migrations](/docs/guides/database-migrations)** - Drizzle ORM migration workflow
+
+### Architecture
+- **[Multi-Service Architecture](/docs/architecture/multi-service)** - Microservices strategy and patterns
+- **[Service Registry](/docs/architecture/service-registry)** - Complete service reference
+- **[Shared Packages](/docs/architecture/shared-packages)** - Package architecture and integration
+- **[ADRs](/docs/architecture/decisions)** - Architectural decision records
+
+### Packages & Services
+- **[Packages](/docs/packages)** - Shared packages (core, events, test-utils, testcontainers, url-ipv4-resolver)
+- **[Services](/docs/services)** - Ingestor (✅ complete), Media (🚧 in progress), planned services
+- **[Infrastructure](/docs/infrastructure)** - PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana
+
 ## Current Status
 
-### Completed
-- Ingestor service (production-ready)
-- TesterBuilder pattern (exceptional test infrastructure)
-- State machine pattern for uploads
-- Reconciliation system
-- RFC 7807 error handling
-- Basic OTEL integration
+### Services
+- **✅ Ingestor** - Production-ready upload and validation service
+- **🚧 Media** - In progress - retrieval and resizing service
+- **📋 Planned** - Thumbnail Extractor, Quality Enrichment, Color Enrichment, Tagging, Gateway
 
-### In Progress
-- Multi-service architecture planning
-- Shared packages extraction
-- Observability enhancements
-- Test infrastructure setup
-
-### Planned
-- Service #2 (Media or Thumbnail Extractor)
-- Additional enrichment services
-- GraphQL gateway
+### Shared Packages
+- **✅ core** - Infrastructure patterns (connections, config, errors, telemetry, health, OpenAPI)
+- **✅ events** - Event schemas, publishers, consumers
+- **✅ test-utils** - TesterBuilder framework
+- **✅ testcontainers** - Custom container implementations
+- **✅ url-ipv4-resolver** - URL validation and SSRF prevention
 
 ## Common Questions
 
 ### Why Fastify instead of NestJS?
-See [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs). Migration cost exceeds benefit - current stack is excellent.
+See [ADR-001: Fastify over NestJS](/docs/architecture/decisions/001-fastify-over-nestjs). Migration cost exceeds benefit - current stack is excellent.
 
 ### How do I create a new service?
-After shared packages are ready, services take ~1 week to build using established patterns.
+See [Guide: Creating New Service](/docs/guides/creating-new-service). Services take ~1 week to build using shared packages and established patterns.
 
 ### What's the testing strategy?
-TDD always. Package tests (fast), integration tests (Testcontainers), E2E tests (Docker).
-See [Testing Documentation](/docs/testing)
+See [Guide: Testing Strategies](/docs/guides/testing-strategies). TDD always. Unit tests (fast), integration tests (Testcontainers), E2E tests (Docker)

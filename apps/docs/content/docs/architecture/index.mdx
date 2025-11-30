@@ -7,32 +7,42 @@ This section covers the architectural patterns and decisions for WallpaperDB.
 
 ## Overview
 
-WallpaperDB uses a monorepo structure with shared packages that provide common infrastructure patterns. This allows new services to be built quickly (~1 week) by reusing tested, production-ready code.
+WallpaperDB uses a microservices architecture with event-driven communication, shared packages, and standardized service patterns. This allows new services to be built quickly (~1 week) by reusing tested, production-ready code.
+
+**Key Documentation:**
+- **[Multi-Service Architecture](/docs/architecture/multi-service)** - Complete architecture overview, technology stack, service patterns
+- **[Service Registry](/docs/architecture/service-registry)** - Reference of all services, ports, dependencies, events
+- **[Shared Packages](/docs/architecture/shared-packages)** - Package architecture and integration patterns
 
 ## Package Structure
 
 ```
 packages/
-├── core/                    # Infrastructure patterns
-│   ├── connections/         # Database, MinIO, NATS, Redis, OTEL
-│   ├── config/             # Zod-based configuration
-│   ├── health/             # Health check aggregation
-│   ├── errors/             # RFC 7807 error handling
-│   └── telemetry/          # OpenTelemetry helpers
-├── events/                  # Event schemas and pub/sub
-│   ├── schemas/            # Zod event schemas
-│   ├── publisher/          # BaseEventPublisher
-│   └── consumer/           # BaseEventConsumer
-├── testcontainers/         # Test infrastructure
-└── test-utils/             # Test utilities
+├── core/                       # Infrastructure patterns
+│   ├── connections/           # Database, MinIO, NATS, Redis, OTEL
+│   ├── config/                # Zod-based configuration
+│   ├── health/                # Health check aggregation
+│   ├── errors/                # RFC 7807 error handling
+│   ├── telemetry/             # OpenTelemetry helpers
+│   └── openapi/               # OpenAPI registration
+├── events/                     # Event schemas and pub/sub
+│   ├── schemas/               # Zod event schemas
+│   ├── publisher/             # BaseEventPublisher
+│   └── consumer/              # BaseEventConsumer
+├── test-utils/                # Testing infrastructure
+│   └── builders/              # TesterBuilder pattern
+├── testcontainers/            # Custom container implementations
+└── url-ipv4-resolver/         # URL validation and SSRF prevention
 ```
 
 ## Key Principles
 
-1. **No DI Coupling** - All utilities use static imports, not dependency injection
-2. **Factory Functions** - Connections are created via factory functions
-3. **Composable Config** - Services compose their config from shared schemas
-4. **Testable** - All utilities have comprehensive unit tests
+1. **Event-Driven Communication** - Services communicate via NATS events
+2. **Database per Service** - Each service owns its database schema
+3. **Shared Infrastructure Patterns** - Reusable packages for common functionality
+4. **Type-Safe Everything** - TypeScript, Zod schemas, Drizzle ORM
+5. **Composable Config** - Services compose config from shared schemas
+6. **Comprehensive Testing** - TesterBuilder pattern, real infrastructure in tests
 
 ## Architecture Decisions
 

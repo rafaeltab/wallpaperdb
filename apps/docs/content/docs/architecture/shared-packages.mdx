@@ -7,33 +7,40 @@ This document describes the shared packages in the WallpaperDB monorepo and how 
 
 ## @wallpaperdb/core
 
+**See full documentation:** [Package: Core](/docs/packages/core)
+
 ### Purpose
 
 Provides foundational infrastructure patterns that all services need.
 
 ### Connections
 
-Factory functions for creating infrastructure connections:
+Connection managers for all infrastructure dependencies:
 
 ```typescript
-import { createPool, checkPoolHealth } from "@wallpaperdb/core/connections";
+import {
+  DatabaseConnection,
+  MinioConnection,
+  NatsConnectionManager,
+  RedisConnection,
+  OtelConnection,
+} from "@wallpaperdb/core/connections";
 
-const pool = createPool({ connectionString: config.databaseUrl });
-const healthy = await checkPoolHealth(pool);
-```
-
-Services typically extend `BaseConnection`:
-
-```typescript
-import { BaseConnection } from "@wallpaperdb/core/connections/base";
-
+// All connections implement BaseConnection interface
 @injectable()
 export class DatabaseConnection extends BaseConnection {
-  async doConnect(): Promise<void> { /* ... */ }
-  async doDisconnect(): Promise<void> { /* ... */ }
+  async initialize(): Promise<void> { /* ... */ }
+  async destroy(): Promise<void> { /* ... */ }
   async checkHealth(): Promise<boolean> { /* ... */ }
 }
 ```
+
+**Available connections:**
+- `DatabaseConnection` - PostgreSQL with Drizzle ORM
+- `MinioConnection` - S3-compatible object storage
+- `NatsConnectionManager` - NATS with JetStream
+- `RedisConnection` - Redis with connection pooling
+- `OtelConnection` - OpenTelemetry SDK initialization
 
 ### Config
 
@@ -91,6 +98,8 @@ async function processUpload(userId: string) {
 ```
 
 ## @wallpaperdb/events
+
+**See full documentation:** [Package: Events](/docs/packages/events)
 
 ### Purpose
 
@@ -209,6 +218,38 @@ export class HealthService {
   }
 }
 ```
+
+## Other Packages
+
+### @wallpaperdb/test-utils
+
+**See full documentation:** [Package: Test Utils](/docs/packages/test-utils)
+
+Composable test infrastructure using the TesterBuilder pattern.
+
+**Key features:**
+- Container reuse across test files
+- Type-safe builder composition
+- Integration and E2E test support
+- Automatic cleanup
+
+### @wallpaperdb/testcontainers
+
+**See full documentation:** [Package: Testcontainers](/docs/packages/testcontainers)
+
+Custom Testcontainers implementations for NATS, PostgreSQL, MinIO, and Redis.
+
+### @wallpaperdb/url-ipv4-resolver
+
+**See full documentation:** [Package: URL IPv4 Resolver](/docs/packages/url-ipv4-resolver)
+
+URL validation and DNS resolution to IPv4 for SSRF prevention.
+
+**Key features:**
+- URL validation and parsing
+- DNS resolution to IPv4
+- IPv4 literal detection
+- SSRF attack prevention
 
 ## Migration Guide
 

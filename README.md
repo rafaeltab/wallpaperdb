@@ -15,16 +15,27 @@ First-time setup takes ~2 minutes for infrastructure to initialize.
 
 ## Current Status
 
-**Active Development** - Currently implementing the Ingestor service (wallpaper upload and validation). Additional microservices (media delivery, thumbnail extraction, enrichment services) are planned.
+**Services:**
+- ✅ **Ingestor** - Production-ready upload and validation service
+- 🚧 **Media** - In progress - wallpaper retrieval and resizing
+- 📋 **Planned** - Thumbnail Extractor, Quality Enrichment, Color Enrichment, Tagging, Gateway
+
+**Shared Packages:**
+- `@wallpaperdb/core` - Infrastructure patterns (connections, config, errors, telemetry, health, OpenAPI)
+- `@wallpaperdb/events` - Event schemas, publishers, consumers
+- `@wallpaperdb/test-utils` - TesterBuilder framework
+- `@wallpaperdb/testcontainers` - Custom container implementations
+- `@wallpaperdb/url-ipv4-resolver` - URL validation and SSRF prevention
 
 ## Architecture
 
-**Current:**
-- **Ingestor Service** - Handles wallpaper uploads, validation, storage (MinIO), metadata persistence (PostgreSQL), and event publishing (NATS)
+**Event-driven microservices architecture:**
+- Each service has its own database
+- NATS for inter-service communication
+- Shared packages for rapid service development (~1 week per service)
+- Comprehensive testing with TesterBuilder pattern
 
-**Planned Services:** Media delivery, thumbnail extraction, quality enrichment, color enrichment, tagging, GraphQL gateway
-
-See `plans/services.md` for the full architecture plan.
+See [Architecture Documentation](apps/docs/content/docs/architecture) (run `make docs-dev` to view the rendered site) for complete details.
 
 ## Technology Stack
 
@@ -39,8 +50,11 @@ See `plans/services.md` for the full architecture plan.
 
 ## Documentation
 
-- **[CLAUDE.md](CLAUDE.md)** - Comprehensive project guide (architecture, commands, workflows)
-- **[docs/testing/](docs/testing/)** - Testing infrastructure and patterns
+**Primary Documentation:** [apps/docs/content/docs](apps/docs/content/docs) - Run `make docs-dev` to start the documentation server at http://localhost:3002.
+
+**Key Resources:**
+- **[Documentation](apps/docs/content/docs)** - Complete documentation (guides, architecture, packages, services, infrastructure)
+- **[CLAUDE.md](CLAUDE.md)** - Quick reference for AI agents (commands, workflows, key decisions)
 - **[Makefile](Makefile)** - All available commands (`make help`)
 
 ## Key Commands
@@ -69,11 +83,16 @@ make help
 
 ```
 apps/
-  ingestor/          # Wallpaper ingestion service
+  ingestor/          # Wallpaper upload and validation service (production-ready)
+  media/             # Wallpaper retrieval and resizing service (in progress)
   ingestor-e2e/      # E2E tests for ingestor
+  docs/              # Fumadocs documentation site
 packages/
-  testcontainers/    # Shared test utilities
-  test-utils/        # Test builder pattern utilities
+  core/              # Infrastructure patterns (connections, config, errors, telemetry)
+  events/            # Event schemas, publishers, consumers
+  test-utils/        # TesterBuilder framework
+  testcontainers/    # Custom container implementations
+  url-ipv4-resolver/ # URL validation and SSRF prevention
 infra/               # Local infrastructure (Docker Compose)
 plans/               # Architecture plans and design docs
 ```
@@ -82,11 +101,12 @@ plans/               # Architecture plans and design docs
 
 1. Start infrastructure: `make infra-start`
 2. Start services: `make dev`
-3. Make changes
-4. Run tests: `make test`
-5. Format & lint: `make format && make lint`
+3. Start documentation: `make docs-dev` (opens http://localhost:3002)
+4. Make changes
+5. Run tests: `make test`
+6. Format & lint: `make format && make lint`
 
-See [CLAUDE.md](CLAUDE.md) for detailed workflows, architecture explanations, and troubleshooting.
+See [Getting Started](apps/docs/content/docs/getting-started.mdx) for detailed setup and [Development Guidelines](apps/docs/content/docs/development-guidelines.mdx) for TDD workflow. Run `make docs-dev` to view the rendered documentation site.
 
 ## Coverage
 

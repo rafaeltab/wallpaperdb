@@ -1,0 +1,293 @@
+---
+title: Infrastructure
+description: Local development infrastructure and services for WallpaperDB
+---
+
+WallpaperDB uses Docker Compose to run all infrastructure services locally. This provides a complete development environment that mirrors production.
+
+## Quick Start
+
+```bash
+# Start all infrastructure
+make infra-start
+
+# Stop all infrastructure
+make infra-stop
+
+# Reset all data (WARNING: destructive)
+make infra-reset
+
+# View logs
+make infra-logs
+```
+
+## Infrastructure Services
+
+### Core Services
+
+| Service | Purpose | Ports | Access |
+|---------|---------|-------|--------|
+| [PostgreSQL](/docs/infrastructure/postgresql) | Metadata database | 5432 | `postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb` |
+| [MinIO](/docs/infrastructure/minio) | S3-compatible object storage | 9000, 9001 | Console: http://localhost:9001 |
+| [NATS](/docs/infrastructure/nats) | Event bus with JetStream | 4222, 8222 | `nats://localhost:4222`, Monitoring: http://localhost:8222 |
+| [Redis](/docs/infrastructure/redis) | Rate limiting cache | 6379 | `redis://localhost:6379` |
+
+### Observability
+
+| Service | Purpose | Ports | Access |
+|---------|---------|-------|--------|
+| [Grafana LGTM](/docs/infrastructure/grafana) | All-in-one observability | 3000, 4317, 4318 | http://localhost:3000 (admin/admin) |
+| [OpenSearch](/docs/infrastructure/opensearch) | Search engine (future) | 9200, 5601 | API: http://localhost:9200, Dashboards: http://localhost:5601 |
+
+### Administration
+
+| Service | Purpose | Port | Access |
+|---------|---------|------|--------|
+| pgAdmin | PostgreSQL admin | 5050 | http://localhost:5050 (admin@example.com/admin) |
+
+## Infrastructure Stack
+
+```
+┌─────────────────────────────────────────┐
+│         Application Services            │
+│   (Ingestor, Media, Thumbnail, etc.)   │
+└──┬───────────┬──────────┬──────────┬────┘
+   │           │          │          │
+   │           │          │          │
+┌──▼──────┐ ┌─▼─────┐ ┌─▼────┐  ┌─▼──────┐
+│PostgreSQL│MinIO   │ │NATS  │  │Redis   │
+│         │        │ │      │  │        │
+│Metadata │Objects │ │Events│  │Cache   │
+└─────────┘└────────┘└──────┘  └────────┘
+
+┌─────────────────────────────────────────┐
+│          Observability Stack            │
+│  (Grafana, Loki, Tempo, Mimir, Prom)   │
+└─────────────────────────────────────────┘
+
+┌─────────────────────────────────────────┐
+│         Search (Future Use)             │
+│  (OpenSearch + OpenSearch Dashboards)   │
+└─────────────────────────────────────────┘
+```
+
+## First-Time Setup
+
+**Prerequisites:**
+- Docker Engine 20.10+
+- Docker Compose V2+
+- 4GB+ RAM available
+- 10GB+ disk space
+
+**Installation:**
+
+1. **Start infrastructure:**
+   ```bash
+   make infra-start
+   ```
+
+   This will:
+   - Create `.env` from `.env.example` (if needed)
+   - Pull all Docker images (~2 minutes first time)
+   - Start all containers
+   - Initialize MinIO buckets
+   - Set up NATS streams
+
+2. **Verify services are healthy:**
+   ```bash
+   docker ps
+   ```
+
+   All containers should show `healthy` status.
+
+3. **Access services:**
+   - Grafana: http://localhost:3000 (admin/admin)
+   - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+   - NATS Monitoring: http://localhost:8222
+
+## Data Persistence
+
+All data is stored in Docker volumes:
+
+```bash
+# List volumes
+docker volume ls | grep wallpaperdb
+
+# Inspect a volume
+docker volume inspect wallpaperdb-postgres-data
+```
+
+**Volumes:**
+- `postgres-data` - PostgreSQL database
+- `minio-data` - Object storage
+- `opensearch-data` - Search indices
+- `nats-data` - Message queue persistence
+- `lgtm-data` - Grafana LGTM stack (metrics, logs, traces)
+- `pgadmin-data` - pgAdmin configuration
+- `redis-data` - Redis persistence (AOF)
+
+**Reset all data:**
+```bash
+make infra-reset  # WARNING: Deletes all volumes!
+```
+
+## Environment Variables
+
+Configuration via `.env` file (auto-generated from `.env.example`):
+
+```bash
+# PostgreSQL
+POSTGRES_DB=wallpaperdb
+POSTGRES_USER=wallpaperdb
+POSTGRES_PASSWORD=wallpaperdb
+
+# MinIO
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+
+# pgAdmin
+PGADMIN_DEFAULT_EMAIL=admin@example.com
+PGADMIN_DEFAULT_PASSWORD=admin
+```
+
+Default values work out of the box for local development.
+
+## Health Checks
+
+All services include health checks:
+
+```yaml
+# Example: PostgreSQL
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U wallpaperdb"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+```
+
+**Check health:**
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+## Initialization Scripts
+
+Services can run initialization scripts on first startup:
+
+```
+infra/
+├── postgres/init/       # SQL scripts (*.sql)
+├── opensearch/init/     # Index templates
+└── nats/init/          # Stream configurations
+```
+
+**MinIO buckets** are created automatically by the `minio-init` service:
+- `wallpapers` - Main wallpaper storage
+- `example-bucket` - Example/test bucket
+
+Both are set to public download access for local development.
+
+## Resource Usage
+
+Typical resource consumption (all services running):
+
+- **CPU**: 10-20% (idle), 50-100% (under load)
+- **Memory**: 2-3 GB total
+- **Disk**: ~5 GB images + data volumes
+
+**Optimization tips:**
+- Stop unused services (edit `docker-compose.yml`)
+- Limit container memory in `docker-compose.yml`
+- Use `make infra-stop` when not developing
+
+## Troubleshooting
+
+### Services won't start
+
+**Issue**: Port already in use
+
+**Solution**:
+```bash
+# Find process using port
+lsof -i :5432  # PostgreSQL
+lsof -i :9000  # MinIO
+
+# Kill process or change port in docker-compose.yml
+```
+
+### Out of disk space
+
+**Issue**: Docker volumes consuming too much space
+
+**Solution**:
+```bash
+# Check disk usage
+docker system df
+
+# Clean up
+docker system prune -a --volumes  # WARNING: Removes all unused data
+```
+
+### Container is unhealthy
+
+**Issue**: Health check failing
+
+**Solution**:
+```bash
+# View container logs
+docker logs wallpaperdb-postgres
+
+# Inspect health check
+docker inspect wallpaperdb-postgres | grep -A 10 Health
+
+# Restart service
+docker compose restart postgres
+```
+
+### Slow performance
+
+**Issue**: Services running slow
+
+**Solution**:
+- Increase Docker Desktop memory (Preferences → Resources)
+- Stop unused services
+- Use native Linux instead of Docker Desktop (if on Mac/Windows)
+
+## Integration with Services
+
+Services connect to infrastructure via environment variables:
+
+```typescript
+// In service config
+const config = {
+  databaseUrl: process.env.DATABASE_URL,  // PostgreSQL
+  minioEndpoint: process.env.MINIO_ENDPOINT,  // MinIO
+  natsUrl: process.env.NATS_URL,  // NATS
+  redisHost: process.env.REDIS_HOST,  // Redis
+  otelEndpoint: process.env.OTLP_ENDPOINT  // Grafana
+};
+```
+
+See [Guide: Creating New Service](/docs/guides/creating-new-service) for integration patterns.
+
+## Production Considerations
+
+**Local development** uses Docker Compose for simplicity.
+
+**Production** should use:
+- Managed PostgreSQL (RDS, Cloud SQL)
+- Managed S3 (AWS S3, Google Cloud Storage)
+- Managed NATS (NATS Cloud, self-hosted cluster)
+- Managed Redis (ElastiCache, Redis Cloud)
+- Managed observability (Grafana Cloud, Datadog)
+
+See deployment documentation (future) for production setup.
+
+## Next Steps
+
+- [PostgreSQL](/docs/infrastructure/postgresql) - Database setup and migrations
+- [MinIO](/docs/infrastructure/minio) - Object storage and bucket management
+- [NATS](/docs/infrastructure/nats) - Event bus and JetStream
+- [Redis](/docs/infrastructure/redis) - Rate limiting cache
+- [Grafana](/docs/infrastructure/grafana) - Observability stack
+- [Local Setup Guide](/docs/infrastructure/local-setup) - Detailed setup instructions

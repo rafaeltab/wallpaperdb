@@ -12,20 +12,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Write tests before implementation**
 - Every change must have corresponding tests
 - Tests validate the change works
-- See [Development Guidelines](docs/development-guidelines.md) for detailed TDD workflow
+- See [Development Guidelines](apps/docs/content/docs/development-guidelines.mdx) for detailed TDD workflow
 
 ### 2. Incremental Changes
 - **Make small, focused changes**
 - Never big-bang refactoring
 - Test after each increment
 - Example: Extract ONE connection at a time, not all connections
-- See [Development Guidelines](docs/development-guidelines.md) for migration patterns
+- See [Development Guidelines](apps/docs/content/docs/development-guidelines.mdx) for migration patterns
 
 ### 3. Document As You Go
-- Update `docs/` when architecture changes
+- Update Fumadocs (`apps/docs/content/docs/`) when architecture changes
 - Update `plans/` when decisions are made
 - Keep CLAUDE.md current with workflows
-- Create ADRs for architectural decisions in `docs/architecture/decisions/`
+- Create ADRs for architectural decisions in `apps/docs/content/docs/architecture/decisions/`
 
 ### 4. Migration Strategy
 - Create new structure alongside old
@@ -33,7 +33,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Verify tests pass after each piece
 - Remove old structure only when fully migrated
 
-**Full guidelines:** [docs/development-guidelines.md](docs/development-guidelines.md)
+**Full guidelines:** [Development Guidelines](apps/docs/content/docs/development-guidelines.mdx) (run `make docs-dev` to view the rendered site)
 
 ---
 
@@ -43,7 +43,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Strategic Direction:**
 - Continue with **Fastify + TSyringe** (NOT migrating to NestJS)
-- Extract shared packages (`@wallpaperdb/core`, `@wallpaperdb/events`)
+- Extract shared packages (`@wallpaperdb/core`, `@wallpaperdb/events`, `@wallpaperdb/test-utils`, `@wallpaperdb/testcontainers`, `@wallpaperdb/url-ipv4-resolver`)
 - Build service templates for rapid development
 - Target: ~1 week per new service
 
@@ -51,18 +51,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 4-6 weeks migration cost vs 2 weeks for shared packages
 - Excellent test infrastructure (TesterBuilder)
 - Maximum flexibility per service
-- See [ADR-001: Fastify over NestJS](docs/architecture/decisions/001-fastify-over-nestjs.md)
+- See [ADR-001: Fastify over NestJS](apps/docs/content/docs/architecture/decisions/001-fastify-over-nestjs.mdx)
 
 **Master Plan:** [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
 
-**Planned Services:**
+**Services:**
 1. ✅ **Ingestor** - Upload and validation (complete)
-2. 📋 **Media Service** - Retrieval and resizing
-3. 📋 **Thumbnail Extractor** - Video thumbnail generation
-4. 📋 **Quality Enrichment** - Image quality analysis
-5. 📋 **Color Enrichment** - Color extraction
-6. 📋 **Tagging Service** - Tag management
-7. 📋 **Gateway** - GraphQL API
+2. 🚧 **Media Service** - Retrieval and resizing (IN PROGRESS)
+3. 📋 **Thumbnail Extractor** - Video thumbnail generation (planned)
+4. 📋 **Quality Enrichment** - Image quality analysis (planned)
+5. 📋 **Color Enrichment** - Color extraction (planned)
+6. 📋 **Tagging Service** - Tag management (planned)
+7. 📋 **Gateway** - GraphQL API (future)
 
 ---
 
@@ -214,6 +214,23 @@ make redis-flush     # Flush all Redis data (WARNING: deletes all data)
 make redis-info      # Show Redis server info
 ```
 
+**Redis Usage:**
+- Distributed rate limiting (atomic Lua script for upload rate limits)
+- Metadata caching (future)
+- Session storage (future)
+
+### NATS Commands
+
+```bash
+make nats-setup-streams  # Setup all required NATS JetStream streams
+make nats-stream-list    # List all NATS streams
+make nats-stream-info    # Show info for WALLPAPER stream
+```
+
+**NATS Streams:**
+- `WALLPAPER` stream with subjects: `wallpaper.*`
+- Required for event-driven communication between services
+
 ### OpenAPI Commands
 
 ```bash
@@ -224,7 +241,7 @@ make openapi-verify    # Verify OpenAPI spec generation
 
 **Access Points:**
 - Swagger UI: http://localhost:3001/documentation (when ingestor is running)
-- Docs Site: http://localhost:3002 (run `make docs-dev`)
+- Docs Site: [apps/docs/content/docs](apps/docs/content/docs) (run `make docs-dev` to view at http://localhost:3002)
 - Generated Spec: `apps/ingestor/swagger.json`
 
 ### Running Specific Tests
@@ -444,21 +461,23 @@ Key variables:
 **Infrastructure Defaults:**
 The `infra/.env` file (auto-generated from `.env.example`) contains all local development credentials. Default values work out of the box.
 
-## Testing Documentation
+## Documentation
 
-Comprehensive testing guides are available in the `docs/testing/` directory:
+**Primary Documentation:** [apps/docs/content/docs](apps/docs/content/docs) (run `make docs-dev` to view the rendered site at http://localhost:3002)
 
-- **[Testing Overview](docs/testing/README.md)** - Start here for quick links and decision tree
-- **[TesterBuilder Pattern](docs/testing/test-builder-pattern.md)** - Core concepts, quick start, and infrastructure builders
-- **[Creating Custom Builders](docs/testing/creating-custom-builders.md)** - Step-by-step guide for application-specific builders
-- **[Integration vs E2E](docs/testing/integration-vs-e2e.md)** - Choosing the right test type for your needs
-- **[Migration Guide](docs/testing/migration-guide.md)** - Converting from manual Testcontainers setup
-- **[API Reference](docs/testing/api-reference.md)** - Complete API documentation for all builders
-- **[Troubleshooting](docs/testing/troubleshooting.md)** - Common issues and solutions
+**Key Documentation Pages:**
+- **Getting Started**: Quick 10-minute setup guide
+- **Development Guidelines**: TDD, incremental changes, coding standards
+- **Guides**: Creating services, error handling, rate limiting, testing strategies, Makefile commands, database migrations
+- **Architecture**: Multi-service architecture, service registry, shared packages, ADRs
+- **Packages**: Core, events, test-utils, testcontainers, url-ipv4-resolver
+- **Services**: Ingestor (complete), Media (in progress), planned services
+- **Infrastructure**: PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana
 
-**Example Test Files:**
-- Integration: `apps/ingestor/test/health-builder.test.ts` - In-process app testing (fast)
-- E2E: `apps/ingestor-e2e/test/health-builder.e2e.test.ts` - Containerized app testing (comprehensive)
+**Testing Documentation:**
+- **[Package: Test Utils](apps/docs/content/docs/packages/test-utils.mdx)** - TesterBuilder pattern documentation
+- **[Guide: Testing Strategies](apps/docs/content/docs/guides/testing-strategies.mdx)** - Unit, integration, E2E test organization
+- **[Guide: Creating New Service](apps/docs/content/docs/guides/creating-new-service.mdx)** - Includes testing setup
 
 **Key Concepts:**
 - **TesterBuilder Pattern**: Composable, type-safe test infrastructure setup
@@ -488,20 +507,37 @@ After `make infra-start`, access:
 - Traces and metrics exported to Grafana LGTM stack via OTLP
 - Service name: `wallpaperdb-ingestor` (configurable via `SERVICE_NAME` env var)
 - Access dashboards in Grafana (port 3000)
+- **Custom Dashboards**: Media Service Dashboard at `/infra/grafana/dashboards/media-service-dashboard.json`
 
 **Shared Packages:**
 
 - **`@wallpaperdb/core`** - Shared utilities for all services
+  - Connection managers (DatabaseConnection, MinioConnection, NatsConnectionManager, RedisConnection, **OtelConnection**)
   - Config schemas (Database, S3, NATS, Redis, OTEL, Server)
   - Telemetry module (`withSpan()`, `recordCounter()`, `recordHistogram()`)
   - OpenAPI plugin (`registerOpenAPI()`) + shared schemas
   - Health aggregator and formatters
+  - RFC 7807 error classes (ProblemDetailsError, ApplicationError)
   - No DI coupling - static imports, easy to use
 
 - **`@wallpaperdb/events`** - Event-driven architecture utilities
   - Event schemas (Zod) for all domain events
   - BaseEventPublisher with trace context propagation
   - BaseEventConsumer for service event handlers
+
+- **`@wallpaperdb/test-utils`** - Testing infrastructure
+  - TesterBuilder pattern for composable test setups
+  - Infrastructure builders (Docker, Postgres, MinIO, NATS, Redis)
+  - Container reuse across test files
+
+- **`@wallpaperdb/testcontainers`** - Custom container implementations
+  - Custom NATS container with JetStream setup
+  - Future: PostgreSQL, MinIO, Redis containers
+
+- **`@wallpaperdb/url-ipv4-resolver`** - URL validation
+  - URL parsing and validation
+  - DNS resolution to IPv4
+  - SSRF prevention
 
 - **Pattern:**
   ```typescript
@@ -581,7 +617,7 @@ See: [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
 3. Create `package.json` with `@wallpaperdb/` scope
 4. Add tests with Vitest
 5. Add Make targets if needed
-6. Document in `docs/architecture/shared-packages.md`
+6. Document in [apps/docs/content/docs/architecture/shared-packages.mdx](apps/docs/content/docs/architecture/shared-packages.mdx)
 
 ### Debugging Tests
 1. Ensure infrastructure is running: `make infra-start`

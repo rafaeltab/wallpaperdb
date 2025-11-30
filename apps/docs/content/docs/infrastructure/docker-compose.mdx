@@ -1,0 +1,225 @@
+---
+title: Docker Compose Reference
+description: Complete docker-compose.yml reference for local infrastructure
+---
+
+The `docker-compose.yml` file defines all infrastructure services for local development.
+
+## Services Overview
+
+```
+infra/
+└── docker-compose.yml
+    ├── postgres (PostgreSQL 16)
+    ├── minio (MinIO latest)
+    ├── minio-init (Bucket initialization)
+    ├── opensearch (OpenSearch 2.11.0)
+    ├── opensearch-dashboards
+    ├── nats (NATS latest with JetStream)
+    ├── pgadmin (pgAdmin 4)
+    ├── redis (Redis 7)
+    └── lgtm (Grafana LGTM stack)
+```
+
+## Service Definitions
+
+### PostgreSQL
+```yaml
+postgres:
+  image: postgres:16-alpine
+  ports: ["5432:5432"]
+  environment:
+    POSTGRES_DB: wallpaperdb
+    POSTGRES_USER: wallpaperdb
+    POSTGRES_PASSWORD: wallpaperdb
+  volumes:
+    - postgres-data:/var/lib/postgresql/data
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U wallpaperdb"]
+```
+
+### MinIO
+```yaml
+minio:
+  image: minio/minio:latest
+  command: server /data --console-address ":9001"
+  ports: ["9000:9000", "9001:9001"]
+  environment:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+  volumes:
+    - minio-data:/data
+```
+
+### NATS
+```yaml
+nats:
+  image: nats:latest
+  command: ["-js", "-m", "8222", "--store_dir=/data"]
+  ports: ["4222:4222", "8222:8222"]
+  volumes:
+    - nats-data:/data
+```
+
+### Redis
+```yaml
+redis:
+  image: redis:7-alpine
+  command: redis-server --appendonly yes
+  ports: ["6379:6379"]
+  volumes:
+    - redis-data:/data
+```
+
+### Grafana LGTM
+```yaml
+lgtm:
+  image: grafana/otel-lgtm:latest
+  ports:
+    - "3000:3000"   # Grafana
+    - "4317:4317"   # OTLP gRPC
+    - "4318:4318"   # OTLP HTTP
+  volumes:
+    - lgtm-data:/data
+    - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+```
+
+## Volumes
+
+Persistent data storage:
+
+```yaml
+volumes:
+  postgres-data:
+  minio-data:
+  opensearch-data:
+  nats-data:
+  lgtm-data:
+  pgadmin-data:
+  redis-data:
+```
+
+**Location:** Managed by Docker (usually `/var/lib/docker/volumes/`)
+
+**Inspect:**
+```bash
+docker volume inspect wallpaperdb-postgres-data
+```
+
+## Networks
+
+Default network: `wallpaperdb-network` (auto-created)
+
+All services communicate on this network:
+- Services reference each other by service name
+- Example: `postgresql://postgres:5432` (inside network)
+
+## Health Checks
+
+All critical services have health checks:
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U wallpaperdb"]
+  interval: 10s
+  timeout: 5s
+  retries: 5
+```
+
+**Check status:**
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+## Environment Variables
+
+Defined in `.env` file (generated from `.env.example`):
+
+```bash
+# PostgreSQL
+POSTGRES_DB=wallpaperdb
+POSTGRES_USER=wallpaperdb
+POSTGRES_PASSWORD=wallpaperdb
+
+# MinIO
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
+
+# pgAdmin
+PGADMIN_DEFAULT_EMAIL=admin@example.com
+PGADMIN_DEFAULT_PASSWORD=admin
+```
+
+## Customization
+
+### Change Ports
+
+Edit `docker-compose.yml`:
+
+```yaml
+postgres:
+  ports:
+    - "5433:5432"  # Use port 5433 instead of 5432
+```
+
+### Limit Resources
+
+```yaml
+postgres:
+  deploy:
+    resources:
+      limits:
+        memory: 512M
+        cpus: '0.5'
+```
+
+### Add Environment Variables
+
+```yaml
+postgres:
+  environment:
+    POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+```
+
+## Common Operations
+
+**Start all services:**
+```bash
+docker compose up -d
+```
+
+**Start specific service:**
+```bash
+docker compose up -d postgres
+```
+
+**View logs:**
+```bash
+docker compose logs -f
+docker compose logs -f postgres  # Specific service
+```
+
+**Stop all services:**
+```bash
+docker compose stop
+```
+
+**Remove all containers:**
+```bash
+docker compose down
+```
+
+**Remove containers and volumes:**
+```bash
+docker compose down -v  # WARNING: Deletes all data!
+```
+
+**Rebuild service:**
+```bash
+docker compose up -d --build postgres
+```
+
+## Related Documentation
+
+- [Infrastructure Overview](/docs/infrastructure) - All infrastructure services
+- [Local Setup](/docs/infrastructure/local-setup) - Setup guide

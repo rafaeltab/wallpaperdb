@@ -1,0 +1,593 @@
+---
+title: Rate Limiting
+description: Redis-based distributed rate limiting with atomic Lua scripts
+---
+
+WallpaperDB implements distributed rate limiting using Redis with atomic Lua scripts to prevent abuse while ensuring consistency across multiple service instances.
+
+## Quick Reference
+
+**Default limits:**
+- 10 uploads per user per 5 minutes (configurable via `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS`)
+
+**Implementation:**
+- Redis-backed with atomic Lua script
+- In-memory fallback for testing/development
+- Per-user sliding window
+- Automatic cleanup via TTL
+
+**Headers:**
+```
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+X-RateLimit-Reset: 1699564800000
+Retry-After: 42
+```
+
+**Error response (429):**
+```json
+{
+  "type": "https://wallpaperdb.example/problems/rate-limit-exceeded",
+  "title": "Rate Limit Exceeded",
+  "status": 429,
+  "detail": "Rate limit exceeded. Maximum 10 requests per 5 minutes.",
+  "instance": "/upload",
+  "retryAfter": 42
+}
+```
+
+## Why Redis?
+
+**Distributed consistency:**
+- Multiple service instances share rate limit state
+- Atomic operations prevent race conditions
+- No coordination needed between instances
+
+**Automatic expiry:**
+- Redis TTL automatically cleans up old keys
+- No background cleanup jobs needed
+- Memory efficient
+
+**High performance:**
+- Sub-millisecond latency
+- Millions of operations per second
+- Scales horizontally
+
+## Implementation
+
+### RateLimitService
+
+Located in `apps/ingestor/src/services/rate-limit.service.ts`:
+
+```typescript
+import { inject, injectable } from 'tsyringe';
+import type { Config } from '../config.js';
+import { RedisConnection } from '../connections/redis.js';
+
+@injectable()
+export class RateLimitService {
+  constructor(
+    @inject('config') private readonly config: Config,
+    @inject(RedisConnection) private readonly redisConnection: RedisConnection
+  ) {}
+
+  async checkRateLimit(userId: string): Promise<{ remaining: number; reset: number }> {
+    const key = `wallpaperdb:ratelimit:user:${userId}`;
+    const now = Date.now();
+    const windowMs = this.config.rateLimitWindowMs;
+    const max = this.config.rateLimitMax;
+
+    const redis = this.redisConnection.isInitialized()
+      ? this.redisConnection.getClient()
+      : undefined;
+
+    if (redis) {
+      // Redis implementation (see below)
+    } else {
+      // In-memory fallback (see below)
+    }
+  }
+}
+```
+
+### Atomic Lua Script
+
+**Why Lua?**
+- All operations execute atomically on Redis server
+- No race conditions between check and increment
+- Single round trip (no network latency between operations)
+
+**Script:**
+```lua
+local key = KEYS[1]
+local max = tonumber(ARGV[1])
+local windowMs = tonumber(ARGV[2])
+
+-- Get current count (without incrementing yet)
+local current = redis.call('GET', key)
+local count = current and tonumber(current) or 0
+
+-- Check if limit exceeded BEFORE incrementing
+if count >= max then
+  local ttl = redis.call('PTTL', key)
+  return {-1, ttl}  -- Return -1 to indicate rate limit exceeded
+end
+
+-- Increment the counter
+count = redis.call('INCR', key)
+
+-- Set expiry on first request
+if count == 1 then
+  redis.call('PEXPIRE', key, windowMs)
+end
+
+local ttl = redis.call('PTTL', key)
+return {count, ttl}
+```
+
+**How it works:**
+1. **Check current count** - `GET` the key (returns `nil` if doesn't exist)
+2. **Check limit** - If count >= max, return -1 and remaining TTL
+3. **Increment** - `INCR` the counter (atomically creates and increments)
+4. **Set expiry** - On first request (count == 1), set TTL to window duration
+5. **Return state** - Return [count, ttl] for calculating `remaining` and `reset`
+
+**Key design decisions:**
+- Check limit **before** incrementing to avoid counting rejected requests
+- Use `PTTL` (milliseconds) instead of `TTL` (seconds) for precision
+- Return `-1` as sentinel value for exceeded limit
+- Set expiry only on first request (count == 1) to avoid resetting the window
+
+### TypeScript Implementation
+
+```typescript
+if (redis) {
+  const luaScript = `
+    local key = KEYS[1]
+    local max = tonumber(ARGV[1])
+    local windowMs = tonumber(ARGV[2])
+
+    local current = redis.call('GET', key)
+    local count = current and tonumber(current) or 0
+
+    if count >= max then
+      local ttl = redis.call('PTTL', key)
+      return {-1, ttl}
+    end
+
+    count = redis.call('INCR', key)
+
+    if count == 1 then
+      redis.call('PEXPIRE', key, windowMs)
+    end
+
+    local ttl = redis.call('PTTL', key)
+    return {count, ttl}
+  `;
+
+  const result = (await redis.eval(luaScript, 1, key, max, windowMs)) as [number, number];
+  const [count, ttl] = result;
+
+  const reset = now + (ttl > 0 ? ttl : windowMs);
+
+  // Count of -1 means rate limit exceeded
+  if (count === -1) {
+    throw new RateLimitExceededError(max, windowMs, Math.ceil((reset - now) / 1000), reset);
+  }
+
+  return {
+    remaining: Math.max(0, max - count),
+    reset,
+  };
+}
+```
+
+**Parameters:**
+- `KEYS[1]` - Redis key (`wallpaperdb:ratelimit:user:<userId>`)
+- `ARGV[1]` - Max requests (e.g., `10`)
+- `ARGV[2]` - Window duration in milliseconds (e.g., `300000` for 5 minutes)
+
+**Return value:**
+- `[count, ttl]` - Current count and remaining TTL in milliseconds
+- `[-1, ttl]` - Rate limit exceeded, TTL until reset
+
+### In-Memory Fallback
+
+For testing and development without Redis:
+
+```typescript
+// In-memory fallback (not distributed, for testing only)
+const globalWithStore = global as typeof global & {
+  __rateLimitStore?: Map<string, { count: number; resetTime: number }>;
+};
+if (!globalWithStore.__rateLimitStore) {
+  globalWithStore.__rateLimitStore = new Map();
+}
+const inMemoryStore = globalWithStore.__rateLimitStore;
+
+const record = inMemoryStore.get(key) || { count: 0, resetTime: now + windowMs };
+
+// Reset if window expired
+if (now >= record.resetTime) {
+  record.count = 0;
+  record.resetTime = now + windowMs;
+}
+
+record.count++;
+inMemoryStore.set(key, record);
+
+if (record.count > max) {
+  throw new RateLimitExceededError(
+    max,
+    windowMs,
+    Math.ceil((record.resetTime - now) / 1000),
+    record.resetTime
+  );
+}
+
+return {
+  remaining: Math.max(0, max - record.count),
+  reset: record.resetTime,
+};
+```
+
+**Limitations:**
+- Not distributed (each process has its own state)
+- No automatic cleanup (grows over time)
+- Not suitable for production
+
+## Error Handling
+
+### RateLimitExceededError
+
+```typescript
+export class RateLimitExceededError extends Error {
+  constructor(
+    public max: number,
+    public windowMs: number,
+    public retryAfter: number,
+    public reset: number
+  ) {
+    super('Rate limit exceeded');
+    this.name = 'RateLimitExceededError';
+  }
+}
+```
+
+### Route Handler
+
+```typescript
+async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    // Check rate limit
+    const rateLimitResult = await request.server.rateLimitService.checkRateLimit(userId);
+
+    // Execute upload...
+
+    // Return success response with rate limit headers
+    return reply
+      .code(200)
+      .header('X-RateLimit-Limit', String(config.rateLimitMax))
+      .header('X-RateLimit-Remaining', String(rateLimitResult.remaining))
+      .header('X-RateLimit-Reset', String(rateLimitResult.reset))
+      .send(result);
+  } catch (error) {
+    // Handle rate limit exceeded
+    if (error instanceof RateLimitExceededError) {
+      return reply
+        .code(429)
+        .header('content-type', 'application/problem+json')
+        .header('Retry-After', String(error.retryAfter))
+        .header('X-RateLimit-Limit', String(error.max))
+        .header('X-RateLimit-Remaining', '0')
+        .header('X-RateLimit-Reset', String(error.reset))
+        .send({
+          type: 'https://wallpaperdb.example/problems/rate-limit-exceeded',
+          title: 'Rate Limit Exceeded',
+          status: 429,
+          detail: `Rate limit exceeded. Maximum ${error.max} requests per ${Math.floor(error.windowMs / 1000)} seconds.`,
+          instance: '/upload',
+          retryAfter: error.retryAfter,
+        });
+    }
+
+    throw error;
+  }
+}
+```
+
+## Configuration
+
+Environment variables:
+
+```bash
+# Maximum requests per window
+RATE_LIMIT_MAX=10
+
+# Window duration in milliseconds (5 minutes = 300000ms)
+RATE_LIMIT_WINDOW_MS=300000
+```
+
+**Config schema:**
+```typescript
+const ConfigSchema = z.object({
+  rateLimitMax: z.coerce.number().int().positive().default(10),
+  rateLimitWindowMs: z.coerce.number().int().positive().default(5 * 60 * 1000),
+  // ... other config
+});
+```
+
+## Response Headers
+
+**X-RateLimit-Limit:**
+- Maximum number of requests allowed in the window
+- Static value (same for all responses)
+- Example: `10`
+
+**X-RateLimit-Remaining:**
+- Number of requests remaining in current window
+- Decrements with each request
+- Example: `7`
+
+**X-RateLimit-Reset:**
+- Unix timestamp (milliseconds) when the window resets
+- Absolute time (not relative)
+- Example: `1699564800000`
+
+**Retry-After:**
+- Number of seconds to wait before retrying (only on 429 responses)
+- Relative time (not absolute)
+- Example: `42`
+
+**Example successful response:**
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 7
+X-RateLimit-Reset: 1699564800000
+
+{
+  "wallpaperId": "wlpr_01HF8XQZJ...",
+  "uploadState": "processing"
+}
+```
+
+**Example rate limited response:**
+```http
+HTTP/1.1 429 Too Many Requests
+Content-Type: application/problem+json
+X-RateLimit-Limit: 10
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1699564800000
+Retry-After: 42
+
+{
+  "type": "https://wallpaperdb.example/problems/rate-limit-exceeded",
+  "title": "Rate Limit Exceeded",
+  "status": 429,
+  "detail": "Rate limit exceeded. Maximum 10 requests per 300 seconds.",
+  "instance": "/upload",
+  "retryAfter": 42
+}
+```
+
+## Testing
+
+### Unit Test
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { RateLimitService, RateLimitExceededError } from '../services/rate-limit.service.js';
+
+describe('RateLimitService', () => {
+  let service: RateLimitService;
+
+  beforeEach(() => {
+    const config = { rateLimitMax: 3, rateLimitWindowMs: 60000 };
+    const redisConnection = new RedisConnection(config);
+    service = new RateLimitService(config, redisConnection);
+  });
+
+  it('should allow requests within limit', async () => {
+    const result1 = await service.checkRateLimit('user-1');
+    expect(result1.remaining).toBe(2);
+
+    const result2 = await service.checkRateLimit('user-1');
+    expect(result2.remaining).toBe(1);
+
+    const result3 = await service.checkRateLimit('user-1');
+    expect(result3.remaining).toBe(0);
+  });
+
+  it('should throw when limit exceeded', async () => {
+    await service.checkRateLimit('user-2');
+    await service.checkRateLimit('user-2');
+    await service.checkRateLimit('user-2');
+
+    await expect(service.checkRateLimit('user-2')).rejects.toThrow(RateLimitExceededError);
+  });
+
+  it('should isolate limits per user', async () => {
+    await service.checkRateLimit('user-3');
+    await service.checkRateLimit('user-3');
+    await service.checkRateLimit('user-3');
+
+    // user-4 should have full quota
+    const result = await service.checkRateLimit('user-4');
+    expect(result.remaining).toBe(2);
+  });
+});
+```
+
+### Integration Test
+
+```typescript
+describe('POST /upload - rate limiting', () => {
+  it('should enforce rate limits', async () => {
+    const file = Buffer.from('fake-image-data');
+
+    // Make requests up to limit
+    for (let i = 0; i < 10; i++) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/upload',
+        payload: { file, userId: 'rate-test-user' },
+      });
+      expect(response.statusCode).toBe(200);
+    }
+
+    // 11th request should be rate limited
+    const response = await app.inject({
+      method: 'POST',
+      url: '/upload',
+      payload: { file, userId: 'rate-test-user' },
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBeDefined();
+
+    const body = JSON.parse(response.body);
+    expect(body.type).toBe('https://wallpaperdb.example/problems/rate-limit-exceeded');
+  });
+});
+```
+
+## Advanced Patterns
+
+### Per-Subscription Limits
+
+Different limits for different user tiers:
+
+```typescript
+interface SubscriptionTier {
+  maxRequests: number;
+  windowMs: number;
+}
+
+const TIERS: Record<string, SubscriptionTier> = {
+  free: { maxRequests: 10, windowMs: 300000 },
+  pro: { maxRequests: 100, windowMs: 300000 },
+  enterprise: { maxRequests: 1000, windowMs: 300000 },
+};
+
+async function checkRateLimitForSubscription(userId: string, tier: string) {
+  const limits = TIERS[tier] || TIERS.free;
+  // Use limits.maxRequests and limits.windowMs in Lua script
+}
+```
+
+### Multiple Rate Limit Windows
+
+Apply both per-minute and per-hour limits:
+
+```typescript
+async function checkMultipleRateLimits(userId: string) {
+  // Check per-minute limit
+  await checkRateLimit(userId, 10, 60000);
+
+  // Check per-hour limit
+  await checkRateLimit(userId, 100, 3600000);
+}
+```
+
+### Global Rate Limiting
+
+Limit across all users (prevent DoS):
+
+```typescript
+async function checkGlobalRateLimit() {
+  const key = 'wallpaperdb:ratelimit:global';
+  // Use same Lua script with global key
+}
+```
+
+### Token Bucket Algorithm
+
+More flexible than fixed window:
+
+```typescript
+const luaScript = `
+  local key = KEYS[1]
+  local capacity = tonumber(ARGV[1])
+  local refillRate = tonumber(ARGV[2])
+  local now = tonumber(ARGV[3])
+
+  local bucket = redis.call('HMGET', key, 'tokens', 'last_refill')
+  local tokens = tonumber(bucket[1]) or capacity
+  local lastRefill = tonumber(bucket[2]) or now
+
+  -- Refill tokens based on time elapsed
+  local elapsed = now - lastRefill
+  local refill = math.floor(elapsed * refillRate / 1000)
+  tokens = math.min(capacity, tokens + refill)
+
+  if tokens < 1 then
+    return {-1, 0}
+  end
+
+  tokens = tokens - 1
+  redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
+  redis.call('EXPIRE', key, 3600)
+
+  return {tokens, 0}
+`;
+```
+
+## Best Practices
+
+1. **Use Redis in production** - In-memory fallback is for testing only
+2. **Include rate limit headers** - Always include X-RateLimit-* headers on all responses
+3. **Document limits** - Clearly document rate limits in API documentation
+4. **Graceful degradation** - If Redis is down, decide whether to allow or deny requests
+5. **Monitor abuse** - Track users who frequently hit rate limits
+6. **Per-user limits** - Isolate limits by user ID, not IP (shared IPs, NAT, proxies)
+7. **Subscription-aware** - Adjust limits based on subscription tier
+8. **Test edge cases** - Test concurrent requests, window expiry, Redis failures
+9. **Use Retry-After** - Help clients backoff appropriately
+10. **Log rate limit hits** - Track and alert on unusual patterns
+
+## Observability
+
+**Metrics to track:**
+- Rate limit hits per user
+- Global rate limit hit rate
+- Redis operation latency
+- Fallback usage (in-memory vs Redis)
+
+**Example with OpenTelemetry:**
+```typescript
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+
+async function checkRateLimit(userId: string) {
+  const startTime = Date.now();
+
+  try {
+    const result = await this.executeRateLimitCheck(userId);
+
+    recordCounter('rate_limit.checks', 1, {
+      user_id: userId,
+      status: 'allowed',
+    });
+
+    return result;
+  } catch (error) {
+    if (error instanceof RateLimitExceededError) {
+      recordCounter('rate_limit.checks', 1, {
+        user_id: userId,
+        status: 'exceeded',
+      });
+    }
+    throw error;
+  } finally {
+    recordHistogram('rate_limit.check_duration_ms', Date.now() - startTime);
+  }
+}
+```
+
+## Related Documentation
+
+- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 error responses
+- [Infrastructure: Redis](/docs/infrastructure/redis) - Redis setup and configuration
+- [Service: Ingestor](/docs/services/ingestor) - Rate limiting implementation
+- [Package: Core](/docs/packages/core) - Shared configuration and telemetry

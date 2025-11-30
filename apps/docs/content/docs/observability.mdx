@@ -25,6 +25,8 @@ open http://localhost:3000
 # Default credentials: admin/admin
 ```
 
+**See also:** [Infrastructure: Grafana](/docs/infrastructure/grafana) - Complete Grafana LGTM stack documentation
+
 ## Adding Telemetry to Services
 
 ### Import Telemetry Utilities
@@ -175,3 +177,9 @@ Ensure trace context is propagated. The `@wallpaperdb/events` package automatica
 ### High cardinality warnings
 
 Avoid using high-cardinality values as metric labels (e.g., user IDs). Use spans for per-request debugging instead.
+
+## Related Documentation
+
+- [Infrastructure: Grafana](/docs/infrastructure/grafana) - Complete LGTM stack setup and usage
+- [Package: Core](/docs/packages/core) - Telemetry helpers and OtelConnection
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Integrating OpenTelemetry in new services

@@ -1,0 +1,488 @@
+---
+title: Service Registry
+description: Complete reference of all WallpaperDB services and their configurations
+---
+
+Central registry of all services in the WallpaperDB microservices architecture, including ports, dependencies, events, and database configurations.
+
+## Service Registry Table
+
+| Service | Port | Status | Database | Dependencies | Events Published | Events Consumed |
+|---------|------|--------|----------|--------------|------------------|-----------------|
+| **Ingestor** | 3001 | ✅ Production | wallpaperdb_ingestor | PostgreSQL, MinIO, NATS, Redis | `wallpaper.uploaded` | - |
+| **Media** | 3002 | 🚧 In Progress | wallpaperdb_media | PostgreSQL, MinIO, Redis | - | `wallpaper.uploaded` |
+| **Thumbnail Extractor** | 3003 | 📋 Planned | - | MinIO, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
+| **Quality Enrichment** | 3004 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
+| **Color Enrichment** | 3005 | 📋 Planned | wallpaperdb_colors | PostgreSQL, MinIO, NATS | `colors.extracted` | `wallpaper.uploaded` |
+| **Tagging** | 3006 | 📋 Planned | wallpaperdb_tags | PostgreSQL, OpenSearch | - | - |
+| **Gateway** | 3000 | 📋 Future | - | All services, OpenSearch | - | - |
+
+## Service Details
+
+### Ingestor (3001)
+
+**Status:** ✅ Production Ready
+
+**Purpose:** Wallpaper upload and validation
+
+**Key Features:**
+- Multi-format upload (JPEG, PNG, WebP, MP4, WebM)
+- State machine workflow (6 states)
+- Content-based deduplication (SHA256)
+- Reconciliation system (4 background jobs)
+- Redis-based rate limiting
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_ingestor)
+- MinIO (wallpapers bucket)
+- NATS (wallpaper.* subjects)
+- Redis (rate limiting, caching)
+
+**Events Published:**
+- `wallpaper.uploaded` - When upload completes successfully
+
+**API Endpoints:**
+- `POST /upload` - Upload wallpaper
+- `GET /health` - Health check
+- `GET /ready` - Readiness check
+- `GET /documentation` - Swagger UI
+
+**Configuration:**
+```bash
+PORT=3001
+DATABASE_URL=postgresql://...
+S3_ENDPOINT=http://localhost:9000
+S3_BUCKET=wallpapers
+NATS_URL=nats://localhost:4222
+REDIS_URL=redis://localhost:6379
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+RATE_LIMIT_MAX=10
+RATE_LIMIT_WINDOW_MS=300000
+```
+
+**See:** [Service: Ingestor](/docs/services/ingestor)
+
+### Media (3002)
+
+**Status:** 🚧 In Progress
+
+**Purpose:** Wallpaper retrieval and on-demand resizing
+
+**Key Features:**
+- Wallpaper retrieval by ID
+- On-demand image resizing (Sharp)
+- 3 resize modes (contain, cover, fill)
+- CDN-ready caching headers
+- Streaming responses
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_media)
+- MinIO (wallpapers bucket)
+- Redis (metadata caching)
+
+**Events Consumed:**
+- `wallpaper.uploaded` - Sync wallpaper metadata to local database
+
+**API Endpoints:**
+- `GET /wallpapers/:id` - Retrieve wallpaper (with optional resize)
+- `GET /health` - Health check
+- `GET /ready` - Readiness check
+
+**Query Parameters:**
+- `w` - Width (pixels)
+- `h` - Height (pixels)
+- `mode` - Resize mode (contain, cover, fill)
+- `format` - Output format (jpeg, png, webp)
+
+**Configuration:**
+```bash
+PORT=3002
+DATABASE_URL=postgresql://...
+S3_ENDPOINT=http://localhost:9000
+S3_BUCKET=wallpapers
+REDIS_URL=redis://localhost:6379
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+**See:** [Service: Media](/docs/services/media)
+
+### Thumbnail Extractor (3003)
+
+**Status:** 📋 Planned
+
+**Purpose:** Video thumbnail generation
+
+**Key Features:**
+- Extract thumbnails from video wallpapers (MP4, WebM)
+- Multiple thumbnail variants (start, middle, end)
+- FFmpeg integration
+- Thumbnail upload to MinIO
+
+**Dependencies:**
+- MinIO (wallpapers bucket, thumbnails bucket)
+- NATS (event consumption/publishing)
+- FFmpeg (external binary)
+
+**Events Consumed:**
+- `wallpaper.uploaded` - Filter for fileType === 'video'
+
+**Events Published:**
+- `thumbnail.generated` - When thumbnail extraction completes
+
+**Configuration:**
+```bash
+PORT=3003
+S3_ENDPOINT=http://localhost:9000
+S3_BUCKET_WALLPAPERS=wallpapers
+S3_BUCKET_THUMBNAILS=thumbnails
+NATS_URL=nats://localhost:4222
+FFMPEG_PATH=/usr/bin/ffmpeg
+```
+
+### Quality Enrichment (3004)
+
+**Status:** 📋 Planned
+
+**Purpose:** Image quality analysis
+
+**Key Features:**
+- Resolution scoring
+- Sharpness detection
+- Artifact detection
+- ML-based quality scoring (future)
+- Quality metadata stored in PostgreSQL
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_quality)
+- MinIO (wallpapers bucket)
+- NATS (event consumption/publishing)
+
+**Events Consumed:**
+- `wallpaper.uploaded`
+
+**Events Published:**
+- `quality.analyzed` - When quality analysis completes
+
+**Database Schema:**
+```typescript
+{
+  wallpaperId: text,
+  qualityScore: decimal,       // 0-100
+  resolution: enum,            // 'low', 'medium', 'high', 'ultra'
+  sharpnessScore: decimal,     // 0-100
+  hasArtifacts: boolean,
+  analyzedAt: timestamp
+}
+```
+
+**Configuration:**
+```bash
+PORT=3004
+DATABASE_URL=postgresql://...
+S3_ENDPOINT=http://localhost:9000
+NATS_URL=nats://localhost:4222
+ML_MODEL_PATH=/models/quality.onnx
+```
+
+### Color Enrichment (3005)
+
+**Status:** 📋 Planned
+
+**Purpose:** Color extraction and palette generation
+
+**Key Features:**
+- Dominant color extraction
+- Color palette generation (5-10 colors)
+- Color histogram analysis
+- OpenSearch indexing for color-based search
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_colors)
+- MinIO (wallpapers bucket)
+- NATS (event consumption/publishing)
+- OpenSearch (color search index)
+
+**Events Consumed:**
+- `wallpaper.uploaded`
+
+**Events Published:**
+- `colors.extracted` - When color analysis completes
+
+**Database Schema:**
+```typescript
+{
+  wallpaperId: text,
+  dominantColor: text,         // Hex color (#RRGGBB)
+  palette: jsonb,              // Array of hex colors
+  colorHistogram: jsonb,       // Color distribution
+  extractedAt: timestamp
+}
+```
+
+**Configuration:**
+```bash
+PORT=3005
+DATABASE_URL=postgresql://...
+S3_ENDPOINT=http://localhost:9000
+NATS_URL=nats://localhost:4222
+OPENSEARCH_URL=http://localhost:9200
+```
+
+### Tagging (3006)
+
+**Status:** 📋 Planned
+
+**Purpose:** Tag management and suggestions
+
+**Key Features:**
+- Tag CRUD operations
+- Tag suggestions (based on content)
+- Tag relationships (synonyms, hierarchies)
+- Full-text search via OpenSearch
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_tags)
+- OpenSearch (tag search index)
+
+**API Endpoints:**
+- `GET /tags` - List all tags
+- `GET /tags/:id` - Get tag details
+- `POST /tags` - Create tag
+- `PUT /tags/:id` - Update tag
+- `DELETE /tags/:id` - Delete tag
+- `GET /tags/suggestions` - Get tag suggestions
+
+**Database Schema:**
+```typescript
+{
+  id: text,
+  name: text,
+  category: text,              // 'style', 'color', 'subject', etc.
+  synonyms: jsonb,             // Array of synonym tag IDs
+  parentId: text,              // For hierarchical tags
+  usageCount: integer,         // Number of wallpapers with this tag
+  createdAt: timestamp
+}
+```
+
+**Configuration:**
+```bash
+PORT=3006
+DATABASE_URL=postgresql://...
+OPENSEARCH_URL=http://localhost:9200
+```
+
+### Gateway (3000)
+
+**Status:** 📋 Future
+
+**Purpose:** GraphQL API for clients
+
+**Key Features:**
+- GraphQL API (Apollo Server)
+- Unified schema across all services
+- OpenSearch integration for search
+- Query batching and caching
+- Authentication and authorization (future)
+
+**Dependencies:**
+- All microservices (via HTTP)
+- OpenSearch (search queries)
+- Redis (caching, sessions)
+
+**GraphQL Schema:**
+```graphql
+type Query {
+  wallpaper(id: ID!): Wallpaper
+  wallpapers(filter: WallpaperFilter, limit: Int, offset: Int): [Wallpaper!]!
+  search(query: String!, filters: SearchFilters): SearchResults!
+  tags: [Tag!]!
+}
+
+type Mutation {
+  uploadWallpaper(file: Upload!, userId: ID!): UploadResult!
+  addTag(wallpaperId: ID!, tagId: ID!): Wallpaper!
+  removeTag(wallpaperId: ID!, tagId: ID!): Wallpaper!
+}
+
+type Wallpaper {
+  id: ID!
+  userId: ID!
+  fileType: FileType!
+  dimensions: Dimensions!
+  url(width: Int, height: Int, mode: ResizeMode): String!
+  thumbnailUrl: String
+  quality: QualityMetrics
+  colors: ColorPalette
+  tags: [Tag!]!
+  uploadedAt: DateTime!
+}
+```
+
+**Configuration:**
+```bash
+PORT=3000
+INGESTOR_URL=http://ingestor:3001
+MEDIA_URL=http://media:3002
+TAGGING_URL=http://tagging:3006
+OPENSEARCH_URL=http://localhost:9200
+REDIS_URL=redis://localhost:6379
+```
+
+## NATS Event Subjects
+
+**Stream:** `WALLPAPER`
+
+**Subjects:**
+- `wallpaper.uploaded` - Published by Ingestor, consumed by Media, Thumbnail, Quality, Color
+- `thumbnail.generated` - Published by Thumbnail Extractor
+- `quality.analyzed` - Published by Quality Enrichment
+- `colors.extracted` - Published by Color Enrichment
+
+**Event Schema Example:**
+```typescript
+// wallpaper.uploaded event
+{
+  wallpaperId: 'wlpr_01HF8XQZJ...',
+  userId: 'user-123',
+  fileType: 'image',
+  mimeType: 'image/jpeg',
+  fileSizeBytes: 1048576,
+  width: 1920,
+  height: 1080,
+  aspectRatio: 1.7778,
+  storageKey: 'wlpr_01HF8XQZJ.../original.jpg',
+  storageBucket: 'wallpapers',
+  contentHash: 'sha256:abc123...',
+  uploadedAt: '2025-01-15T10:30:00Z'
+}
+```
+
+## Database Schema Overview
+
+**PostgreSQL databases:**
+
+| Service | Database Name | Tables | Purpose |
+|---------|--------------|--------|---------|
+| Ingestor | wallpaperdb_ingestor | wallpapers | Upload state machine |
+| Media | wallpaperdb_media | wallpapers, variants | Metadata, resize cache |
+| Quality | wallpaperdb_quality | quality_analysis | Quality scores |
+| Colors | wallpaperdb_colors | color_analysis | Color palettes |
+| Tagging | wallpaperdb_tags | tags, wallpaper_tags | Tag management |
+
+**Shared schema (replicated):**
+```typescript
+// wallpapers table (replicated across services)
+{
+  id: text,                    // Canonical ID (wlpr_<ulid>)
+  userId: text,
+  fileType: enum,              // 'image' | 'video'
+  mimeType: text,
+  fileSizeBytes: bigint,
+  width: integer,
+  height: integer,
+  aspectRatio: decimal,
+  storageKey: text,
+  storageBucket: text,
+  uploadedAt: timestamp,
+  updatedAt: timestamp
+}
+```
+
+## Port Allocation
+
+**Production ports:**
+- 3000: Gateway (GraphQL)
+- 3001: Ingestor
+- 3002: Media
+- 3003: Thumbnail Extractor
+- 3004: Quality Enrichment
+- 3005: Color Enrichment
+- 3006: Tagging
+
+**Infrastructure ports:**
+- 5432: PostgreSQL
+- 9000: MinIO API
+- 9001: MinIO Console
+- 4222: NATS
+- 8222: NATS Monitoring
+- 6379: Redis
+- 9200: OpenSearch
+- 5601: OpenSearch Dashboards
+- 3000: Grafana
+- 4317: OTLP gRPC
+- 4318: OTLP HTTP
+
+## Service Startup Order
+
+**Recommended order:**
+1. Infrastructure (PostgreSQL, MinIO, NATS, Redis)
+2. Core services (Ingestor, Media)
+3. Enrichment services (Thumbnail, Quality, Color)
+4. Support services (Tagging)
+5. Gateway (depends on all services)
+
+**Commands:**
+```bash
+# 1. Start infrastructure
+make infra-start
+
+# 2. Setup NATS streams
+make nats-setup-streams
+
+# 3. Start core services
+make ingestor-dev    # Terminal 1
+make media-dev       # Terminal 2
+
+# 4. Start enrichment services (future)
+# make thumbnail-dev   # Terminal 3
+# make quality-dev     # Terminal 4
+# make color-dev       # Terminal 5
+
+# 5. Start gateway (future)
+# make gateway-dev     # Terminal 6
+```
+
+## Health Check Endpoints
+
+All services implement standard health endpoints:
+
+**GET /health**
+- Returns 200 OK if service is running
+- No dependency checks
+- Always succeeds (unless service is completely down)
+
+**GET /ready**
+- Returns 200 OK if service is ready to accept traffic
+- Checks all dependencies (database, MinIO, NATS, Redis)
+- Returns 503 Service Unavailable if any dependency is down
+
+**Example health response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-01-15T10:30:00Z"
+}
+```
+
+**Example ready response:**
+```json
+{
+  "status": "ready",
+  "checks": {
+    "database": "ok",
+    "minio": "ok",
+    "nats": "ok",
+    "redis": "ok"
+  },
+  "timestamp": "2025-01-15T10:30:00Z"
+}
+```
+
+## Related Documentation
+
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Architecture overview
+- [Service: Ingestor](/docs/services/ingestor) - Ingestor service details
+- [Service: Media](/docs/services/media) - Media service details
+- [Package: Events](/docs/packages/events) - Event schemas and patterns
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Service creation guide

@@ -18,9 +18,9 @@ Its sole purpose is to take a wallpaper uploaded by a user, store it, and notify
 
 ---
 
-## Media 📋 Ready to Build
+## Media ✅ Complete
 
-**Status**: Plan ready - [plans/media-service.md](./media-service.md)
+**Status**: Production-ready - [plans/done/media-service.md](./done/media-service.md)
 
 Users must retrieve wallpapers efficiently, the 'media' service exposes wallpapers efficiently to the user.
 

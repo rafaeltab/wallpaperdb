@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { WallpaperUploadedEventSchema, WALLPAPER_UPLOADED_SUBJECT } from "../src/schemas/index.js";
+import {
+  WallpaperUploadedEventSchema,
+  WALLPAPER_UPLOADED_SUBJECT,
+  WallpaperVariantAvailableEventSchema,
+  WALLPAPER_VARIANT_AVAILABLE_SUBJECT,
+} from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
   describe("WallpaperUploadedEventSchema", () => {
@@ -77,6 +82,99 @@ describe("Event Schemas", () => {
   describe("WALLPAPER_UPLOADED_SUBJECT", () => {
     it("should have the correct subject name", () => {
       expect(WALLPAPER_UPLOADED_SUBJECT).toBe("wallpaper.uploaded");
+    });
+  });
+
+  describe("WallpaperVariantAvailableEventSchema", () => {
+    const validEvent = {
+      eventId: "evt_01HXYZ987654321",
+      eventType: "wallpaper.variant.available" as const,
+      timestamp: new Date().toISOString(),
+      variant: {
+        wallpaperId: "wlpr_01HXYZ123456789",
+        userId: "user_456",
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1920 / 1080,
+        format: "webp" as const,
+        fileSizeBytes: 500000,
+        createdAt: new Date().toISOString(),
+      },
+    };
+
+    it("should validate a correct event", () => {
+      const result = WallpaperVariantAvailableEventSchema.safeParse(validEvent);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject event with wrong eventType", () => {
+      const invalid = { ...validEvent, eventType: "wrong.type" };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event without aspectRatio", () => {
+      const invalid = {
+        ...validEvent,
+        variant: { ...validEvent.variant, aspectRatio: undefined },
+      };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with invalid format", () => {
+      const invalid = {
+        ...validEvent,
+        variant: { ...validEvent.variant, format: "bmp" },
+      };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should accept all valid formats", () => {
+      const formats = ["jpeg", "png", "webp"] as const;
+
+      for (const format of formats) {
+        const event = {
+          ...validEvent,
+          variant: { ...validEvent.variant, format },
+        };
+        const result = WallpaperVariantAvailableEventSchema.safeParse(event);
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it("should reject event with negative dimensions", () => {
+      const invalid = {
+        ...validEvent,
+        variant: { ...validEvent.variant, width: -100 },
+      };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with zero aspect ratio", () => {
+      const invalid = {
+        ...validEvent,
+        variant: { ...validEvent.variant, aspectRatio: 0 },
+      };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with missing userId", () => {
+      const invalid = {
+        ...validEvent,
+        variant: { ...validEvent.variant, userId: undefined },
+      };
+      const result = WallpaperVariantAvailableEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("WALLPAPER_VARIANT_AVAILABLE_SUBJECT", () => {
+    it("should have the correct subject name", () => {
+      expect(WALLPAPER_VARIANT_AVAILABLE_SUBJECT).toBe("wallpaper.variant.available");
     });
   });
 });

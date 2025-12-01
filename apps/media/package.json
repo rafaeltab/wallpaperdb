@@ -50,7 +50,7 @@
     "@wallpaperdb/events": "workspace:*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.4",
+    "@biomejs/biome": "^2.3.8",
     "@testcontainers/minio": "^11.9.0",
     "@testcontainers/postgresql": "^11.9.0",
     "@types/node": "^22.10.2",

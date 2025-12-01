@@ -7,6 +7,7 @@ import {
 import type { Config } from '../config.js';
 import { OpenSearchConnection } from '../connections/opensearch.js';
 import { getOtelSdk } from '../otel-init.js';
+import { NatsConnectionManager } from '../connections/nats.js';
 
 // Re-export types for backwards compatibility
 export type HealthResponse = CoreHealthResponse;
@@ -18,20 +19,13 @@ export class HealthService {
 
   constructor(
     @inject('config') private readonly config: Config,
-    @inject(OpenSearchConnection) private readonly opensearchConnection: OpenSearchConnection
+    @inject(OpenSearchConnection) private readonly opensearchConnection: OpenSearchConnection,
+    @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager
   ) {
     this.aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
 
-    // Register health checks
-    this.aggregator.register('opensearch', async () => {
-      try {
-        const client = this.opensearchConnection.getClient();
-        await client.ping();
-        return true;
-      } catch {
-        return false;
-      }
-    });
+    this.aggregator.register('opensearch', async () => this.opensearchConnection.checkHealth());
+    this.aggregator.register('nats', async () => this.natsConnection.checkHealth());
 
     // OTEL health check logic:
     // - In test mode: always report healthy (tests don't initialize OTEL)

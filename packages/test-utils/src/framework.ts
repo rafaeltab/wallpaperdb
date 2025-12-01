@@ -13,12 +13,8 @@ type AnyTester = BaseTesterBuilder<string, AnyTester[]>;
 type TupleOfTesters = AnyTester[];
 
 type InferAddMethod<TTester extends AnyTester> = TTester['addMethods'];
-type InferName<TTester extends AnyTester> = TTester extends BaseTesterBuilder<
-  infer Name,
-  AnyTester[]
->
-  ? Name
-  : never;
+type InferName<TTester extends AnyTester> =
+  TTester extends BaseTesterBuilder<infer Name, AnyTester[]> ? Name : never;
 type InferNames<TTesters extends TupleOfTesters, Names extends string[] = []> = TTesters extends [
   infer Head extends AnyTester,
   ...infer Rest extends TupleOfTesters,
@@ -27,12 +23,10 @@ type InferNames<TTesters extends TupleOfTesters, Names extends string[] = []> = 
   : Names;
 type InferConstructorClass<TConstructor extends Constructor<unknown>> =
   TConstructor extends Constructor<infer T> ? T : never;
-type InferRequiredTesters<TTester extends AnyTester> = TTester extends BaseTesterBuilder<
-  string,
-  infer Required extends TupleOfTesters
->
-  ? Required
-  : never;
+type InferRequiredTesters<TTester extends AnyTester> =
+  TTester extends BaseTesterBuilder<string, infer Required extends TupleOfTesters>
+    ? Required
+    : never;
 type InferAddMethodReturnType<TTester extends AnyTester> = ReturnTypeOf<InferAddMethod<TTester>>;
 type InferAddMethodClass<TTester extends AnyTester> = ExtractPrototype<
   InferAddMethodReturnType<TTester>

@@ -1,0 +1,1 @@
+ALTER TABLE "variants" ADD COLUMN "mime_type" text NOT NULL;

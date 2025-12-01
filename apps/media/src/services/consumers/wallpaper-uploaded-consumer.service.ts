@@ -1,14 +1,14 @@
+import { Attributes, recordHistogram } from '@wallpaperdb/core/telemetry';
 import {
   BaseEventConsumer,
   type EventConsumerConfig,
   type MessageContext,
 } from '@wallpaperdb/events/consumer';
 import {
-  WallpaperUploadedEventSchema,
   WALLPAPER_UPLOADED_SUBJECT,
   type WallpaperUploadedEvent,
+  WallpaperUploadedEventSchema,
 } from '@wallpaperdb/events/schemas';
-import { recordHistogram, Attributes } from '@wallpaperdb/core/telemetry';
 import { inject, injectable } from 'tsyringe';
 import type { z } from 'zod';
 import type { Config } from '../../config.js';
@@ -33,7 +33,7 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
     @inject('config') config: Config
   ) {
     const consumerConfig: EventConsumerConfig = {
-      natsConnection: natsConnection.getClient(),
+      natsConnectionProvider: () => natsConnection.getClient(),
       serviceName: config.otelServiceName,
       streamName: config.natsStream,
       durableName: 'media-wallpaper-uploaded-consumer',

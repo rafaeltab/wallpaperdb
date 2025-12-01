@@ -34,7 +34,7 @@
     "@types/node": "^22.10.2",
     "nats": "^2.29.1",
     "typescript": "^5.7.2",
-    "@biomejs/biome": "^2.3.4",
+    "@biomejs/biome": "^2.3.8",
     "vitest": "^2.1.8"
   }
 }

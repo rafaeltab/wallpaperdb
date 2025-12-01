@@ -18,8 +18,8 @@
     "devDependencies": {
         "@aws-sdk/client-s3": "^3.709.0",
         "@biomejs/biome": "^2.3.4",
-        "@testcontainers/minio": "^11.8.0",
-        "@testcontainers/postgresql": "^11.8.0",
+        "@testcontainers/minio": "^11.9.0",
+        "@testcontainers/postgresql": "^11.9.0",
         "@types/node": "^22.10.2",
         "@types/pg": "^8.15.6",
         "@wallpaperdb/ingestor": "workspace:*",
@@ -29,7 +29,7 @@
         "nats": "^2.29.1",
         "pg": "^8.13.1",
         "sharp": "^0.33.5",
-        "testcontainers": "^11.8.0",
+        "testcontainers": "^11.9.0",
         "ulid": "^2.4.0",
         "vitest": "^2.1.8"
     }

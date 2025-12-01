@@ -5,6 +5,7 @@
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
+        gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
@@ -45,6 +46,15 @@ help:
 	@echo "  make media-test-watch - Run media service tests in watch mode"
 	@echo "  make media-format     - Format media service code"
 	@echo "  make media-lint       - Lint media service code"
+	@echo ""
+	@echo "Gateway Service:"
+	@echo "  make gateway-dev        - Start gateway service in development mode"
+	@echo "  make gateway-build      - Build gateway service for production"
+	@echo "  make gateway-start      - Start gateway service in production mode"
+	@echo "  make gateway-test       - Run gateway service tests"
+	@echo "  make gateway-test-watch - Run gateway service tests in watch mode"
+	@echo "  make gateway-format     - Format gateway service code"
+	@echo "  make gateway-lint       - Lint gateway service code"
 	@echo ""
 	@echo "Ingestor Docker:"
 	@echo "  make ingestor-docker-build - Build ingestor Docker image"
@@ -169,6 +179,31 @@ media-lint:
 
 media-check:
 	@turbo run check --filter=@wallpaperdb/media
+
+# Gateway service commands
+gateway-dev:
+	@turbo run dev --filter=@wallpaperdb/gateway
+
+gateway-build:
+	@turbo run build --filter=@wallpaperdb/gateway
+
+gateway-start:
+	@turbo run start --filter=@wallpaperdb/gateway
+
+gateway-test:
+	@turbo run test --filter=@wallpaperdb/gateway
+
+gateway-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/gateway
+
+gateway-format:
+	@turbo run format --filter=@wallpaperdb/gateway
+
+gateway-lint:
+	@turbo run lint --filter=@wallpaperdb/gateway
+
+gateway-check:
+	@turbo run check --filter=@wallpaperdb/gateway
 
 # Ingestor Docker commands
 ingestor-docker-build:

@@ -51,8 +51,8 @@
     },
     "devDependencies": {
         "@biomejs/biome": "^2.3.4",
-        "@testcontainers/minio": "^11.8.0",
-        "@testcontainers/postgresql": "^11.8.0",
+        "@testcontainers/minio": "^11.9.0",
+        "@testcontainers/postgresql": "^11.9.0",
         "@types/node": "^22.10.2",
         "@types/pg": "^8.11.10",
         "@wallpaperdb/test-utils": "workspace:*",
@@ -61,7 +61,7 @@
         "esbuild": "^0.25.12",
         "pino-pretty": "^13.0.0",
         "postgres": "^3.4.3",
-        "testcontainers": "^11.8.0",
+        "testcontainers": "^11.9.0",
         "tsx": "^4.19.2",
         "typescript": "^5.7.2",
         "vitest": "^2.1.8"

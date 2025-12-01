@@ -1,42 +1,44 @@
 {
-  "name": "@wallpaperdb/test-utils",
-  "version": "0.1.0",
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./fixtures": "./src/fixtures/index.ts",
-    "./helpers": "./src/helpers/index.ts"
-  },
-  "scripts": {
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "test": "vitest run",
-    "test:e2e": "vitest run --coverage",
-    "test:watch": "vitest",
-    "check-types": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.709.0",
-    "@testcontainers/minio": "^11.8.0",
-    "@testcontainers/postgresql": "^11.8.0",
-    "@testcontainers/redis": "^11.8.0",
-    "@wallpaperdb/testcontainers": "workspace:*",
-    "nats": "^2.29.1",
-    "postgres": "^3.4.3",
-    "redis": "^4.7.0",
-    "sharp": "^0.33.5",
-    "testcontainers": "^11.8.0"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.4",
-    "@types/dockerode": "^3.3.45",
-    "@types/node": "^20.11.5",
-    "@types/pg": "^8.11.10",
-    "dockerode": "^4.0.9",
-    "typescript": "^5.3.3",
-    "vitest": "^2.1.8",
-    "pg": "^8.13.1"
-  }
+    "name": "@wallpaperdb/test-utils",
+    "version": "0.1.0",
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./fixtures": "./src/fixtures/index.ts",
+        "./helpers": "./src/helpers/index.ts"
+    },
+    "scripts": {
+        "format": "biome format --write .",
+        "format:check": "biome format .",
+        "lint": "biome lint .",
+        "lint:fix": "biome lint --write .",
+        "test": "vitest run",
+        "test:e2e": "vitest run --coverage",
+        "test:watch": "vitest",
+        "check-types": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.709.0",
+        "@opensearch-project/opensearch": "^2.12.0",
+        "@testcontainers/minio": "^11.9.0",
+        "@testcontainers/opensearch": "^11.9.0",
+        "@testcontainers/postgresql": "^11.9.0",
+        "@testcontainers/redis": "^11.9.0",
+        "@wallpaperdb/testcontainers": "workspace:*",
+        "nats": "^2.29.1",
+        "postgres": "^3.4.3",
+        "redis": "^4.7.0",
+        "sharp": "^0.33.5",
+        "testcontainers": "^11.9.0"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.3.4",
+        "@types/dockerode": "^3.3.45",
+        "@types/node": "^20.11.5",
+        "@types/pg": "^8.11.10",
+        "dockerode": "^4.0.9",
+        "typescript": "^5.3.3",
+        "vitest": "^2.1.8",
+        "pg": "^8.13.1"
+    }
 }

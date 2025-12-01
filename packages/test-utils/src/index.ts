@@ -31,5 +31,8 @@ export type { NatsOptions, NatsConfig } from './builders/NatsTesterBuilder.js';
 export { RedisTesterBuilder } from './builders/RedisTesterBuilder.js';
 export type { RedisOptions, RedisConfig } from './builders/RedisTesterBuilder.js';
 
+export { OpenSearchTesterBuilder } from './builders/OpenSearchTesterBuilder.js';
+export type { OpenSearchOptions, OpenSearchConfig } from './builders/OpenSearchTesterBuilder.js';
+
 // Export utilities
 export { Semaphore, dockerStartSemaphore } from './utils/semaphore.js';

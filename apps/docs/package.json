@@ -1,39 +1,39 @@
 {
-    "name": "@wallpaperdb/docs",
-    "version": "0.0.0",
-    "private": true,
-    "scripts": {
-        "build": "next build",
-        "dev": "next dev --port 3002",
-        "start": "next start --port 3002",
-        "types:check": "fumadocs-mdx && tsc --noEmit",
-        "postinstall": "fumadocs-mdx",
-        "lint": "biome check",
-        "format": "biome format --write",
-        "gen:swagger-pages": "rm -rf content/docs/openapi && node --experimental-strip-types scripts/generate-docs.ts"
-    },
-    "dependencies": {
-        "fumadocs-core": "16.1.0",
-        "fumadocs-mdx": "14.0.3",
-        "fumadocs-openapi": "^10.0.11",
-        "fumadocs-ui": "16.1.0",
-        "lucide-react": "^0.552.0",
-        "next": "16.0.1",
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0",
-        "shiki": "^3.15.0"
-    },
-    "devDependencies": {
-        "@biomejs/biome": "^2.3.5",
-        "@tailwindcss/postcss": "^4.1.16",
-        "@types/mdx": "^2.0.13",
-        "@types/node": "^24.10.0",
-        "@types/react": "^19.2.2",
-        "@types/react-dom": "^19.2.2",
-        "postcss": "^8.5.6",
-        "tailwindcss": "^4.1.16",
-        "typescript": "^5.9.3",
-        "@wallpaperdb/ingestor": "workspace:*",
-        "@wallpaperdb/media": "workspace:*"
-    }
+  "name": "@wallpaperdb/docs",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev --port 3002",
+    "start": "next start --port 3002",
+    "types:check": "fumadocs-mdx && tsc --noEmit",
+    "postinstall": "fumadocs-mdx",
+    "lint": "biome check",
+    "format": "biome format --write",
+    "gen:swagger-pages": "rm -rf content/docs/openapi && node --experimental-strip-types scripts/generate-docs.ts"
+  },
+  "dependencies": {
+    "fumadocs-core": "16.1.0",
+    "fumadocs-mdx": "14.0.3",
+    "fumadocs-openapi": "^10.0.11",
+    "fumadocs-ui": "16.1.0",
+    "lucide-react": "^0.552.0",
+    "next": "16.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "shiki": "^3.15.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.5",
+    "@tailwindcss/postcss": "^4.1.16",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@wallpaperdb/ingestor": "workspace:*",
+    "@wallpaperdb/media": "workspace:*",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.16",
+    "typescript": "^5.9.3"
+  }
 }

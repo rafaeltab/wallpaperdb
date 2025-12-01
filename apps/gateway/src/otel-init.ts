@@ -1,6 +1,6 @@
-import type { NodeSDK } from "@opentelemetry/sdk-node";
-import { createOtelSdk } from "@wallpaperdb/core/connections";
-import type { OtelConfig } from "@wallpaperdb/core/config";
+import type { NodeSDK } from '@opentelemetry/sdk-node';
+import { createOtelSdk } from '@wallpaperdb/core/connections';
+import type { OtelConfig } from '@wallpaperdb/core/config';
 
 /**
  * Global reference to the OTEL SDK instance.
@@ -27,29 +27,29 @@ let otelSdkInstance: NodeSDK | null = null;
  * ```
  */
 export function initializeOtel(config: OtelConfig): NodeSDK | null {
-    // Skip if no endpoint configured (tests, or when OTEL is disabled)
-    if (!config.otelEndpoint) {
-        console.log("OpenTelemetry disabled (no endpoint configured)");
-        return null;
-    }
+  // Skip if no endpoint configured (tests, or when OTEL is disabled)
+  if (!config.otelEndpoint) {
+    console.log('OpenTelemetry disabled (no endpoint configured)');
+    return null;
+  }
 
-    // Return existing instance if already initialized
-    if (otelSdkInstance) {
-        return otelSdkInstance;
-    }
+  // Return existing instance if already initialized
+  if (otelSdkInstance) {
+    return otelSdkInstance;
+  }
 
-    try {
-        otelSdkInstance = createOtelSdk(config as Required<OtelConfig>, {
-            metricExportIntervalMs: 60000,
-            disableFsInstrumentation: true,
-        });
-        console.log("OpenTelemetry initialized (auto-instrumentations active)");
-        return otelSdkInstance;
-    } catch (error) {
-        console.error("Failed to initialize OpenTelemetry:", error);
-        // Continue without OTEL - don't crash the app
-        return null;
-    }
+  try {
+    otelSdkInstance = createOtelSdk(config as Required<OtelConfig>, {
+      metricExportIntervalMs: 60000,
+      disableFsInstrumentation: true,
+    });
+    console.log('OpenTelemetry initialized (auto-instrumentations active)');
+    return otelSdkInstance;
+  } catch (error) {
+    console.error('Failed to initialize OpenTelemetry:', error);
+    // Continue without OTEL - don't crash the app
+    return null;
+  }
 }
 
 /**
@@ -57,7 +57,7 @@ export function initializeOtel(config: OtelConfig): NodeSDK | null {
  * Safe to call after initializeOtel().
  */
 export function getOtelSdk(): NodeSDK | null {
-    return otelSdkInstance;
+  return otelSdkInstance;
 }
 
 /**
@@ -65,13 +65,13 @@ export function getOtelSdk(): NodeSDK | null {
  * Called during app shutdown in app.ts onClose hook.
  */
 export async function shutdownOtel(): Promise<void> {
-    if (otelSdkInstance) {
-        try {
-            await otelSdkInstance.shutdown();
-            console.log("OpenTelemetry shut down");
-            otelSdkInstance = null;
-        } catch (error) {
-            console.error("Error shutting down OpenTelemetry:", error);
-        }
+  if (otelSdkInstance) {
+    try {
+      await otelSdkInstance.shutdown();
+      console.log('OpenTelemetry shut down');
+      otelSdkInstance = null;
+    } catch (error) {
+      console.error('Error shutting down OpenTelemetry:', error);
     }
+  }
 }

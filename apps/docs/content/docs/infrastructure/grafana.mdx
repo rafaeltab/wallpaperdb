@@ -51,7 +51,7 @@ Log aggregation and querying.
 2. Select **Loki** data source
 3. Use LogQL queries:
 
-```logql
+```text
 {service_name="wallpaperdb-ingestor"} |= "error"
 ```
 
@@ -74,7 +74,7 @@ Prometheus-compatible metrics storage.
 2. Select **Mimir** data source
 3. Use PromQL queries:
 
-```promql
+```text
 rate(uploads_total[5m])
 ```
 
@@ -136,7 +136,7 @@ recordHistogram("upload.duration_ms", durationMs, { fileType: "image" });
 1. Navigate to **Explore** → **Mimir**
 2. Query examples:
 
-```promql
+```text
 # Request rate
 rate(http_requests_total[5m])
 
@@ -154,7 +154,7 @@ histogram_quantile(0.95,
 1. Navigate to **Explore** → **Loki**
 2. Query examples:
 
-```logql
+```text
 # All logs for a service
 {service_name="wallpaperdb-ingestor"}
 

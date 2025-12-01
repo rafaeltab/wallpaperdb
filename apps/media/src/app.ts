@@ -96,7 +96,6 @@ export async function createApp(
   fastify.log.info('Initializing connections...');
 
   try {
-
     await container.resolve(DatabaseConnection).initialize();
     fastify.log.info('Database connection pool created');
 

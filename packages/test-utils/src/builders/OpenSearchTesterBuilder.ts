@@ -1,7 +1,4 @@
-import {
-  OpenSearchContainer,
-  type StartedOpenSearchContainer,
-} from '@testcontainers/opensearch';
+import { OpenSearchContainer, type StartedOpenSearchContainer } from '@testcontainers/opensearch';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
@@ -98,13 +95,9 @@ export class OpenSearchTesterBuilder extends BaseTesterBuilder<
     return class OpenSearch extends Base {
       /** @internal */
       _openSearchConfig: OpenSearchConfig | undefined;
-      readonly opensearch = new OpenSearchHelpers(
-        this as TesterInstance<OpenSearchTesterBuilder>
-      );
+      readonly opensearch = new OpenSearchHelpers(this as TesterInstance<OpenSearchTesterBuilder>);
 
-      withOpenSearch(
-        configure: (opensearch: OpenSearchBuilder) => OpenSearchBuilder = (a) => a
-      ) {
+      withOpenSearch(configure: (opensearch: OpenSearchBuilder) => OpenSearchBuilder = (a) => a) {
         const options = configure(new OpenSearchBuilder()).build();
         const { image = 'opensearchproject/opensearch:2', networkAlias = 'opensearch' } = options;
 

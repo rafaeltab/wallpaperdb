@@ -6,7 +6,7 @@ export interface Variant {
   width: number;
   height: number;
   aspectRatio: number;
-  format: 'jpeg' | 'png' | 'webp';
+  format: 'image/jpeg' | 'image/png' | 'image/webp';
   fileSizeBytes: number;
   createdAt: string;
 }

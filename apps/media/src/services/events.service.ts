@@ -1,8 +1,8 @@
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
 import { NatsConnectionManager } from '../connections/nats.js';
-import type { Wallpaper } from '../db/schema.js';
-import { WallpaperUploadedPublisher } from './publishers/wallpaper-uploaded.publisher.js';
+import type { Variant, Wallpaper } from '../db/schema.js';
+import { WallpaperVariantAvailablePublisher } from './publishers/wallpaper_variant_available.publisher.js';
 
 // Re-export for backwards compatibility
 export type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
@@ -17,7 +17,7 @@ export type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
  */
 @injectable()
 export class EventsService {
-  private publisher: WallpaperUploadedPublisher | null = null;
+  private publisher: WallpaperVariantAvailablePublisher | null = null;
 
   constructor(
     @inject(NatsConnectionManager) private readonly natsClient: NatsConnectionManager,
@@ -28,9 +28,9 @@ export class EventsService {
    * Get or create the publisher instance.
    * Lazy initialization to ensure NatsConnection is ready.
    */
-  private getPublisher(): WallpaperUploadedPublisher {
+  private getPublisher(): WallpaperVariantAvailablePublisher {
     if (!this.publisher) {
-      this.publisher = new WallpaperUploadedPublisher({
+      this.publisher = new WallpaperVariantAvailablePublisher({
         natsConnection: this.natsClient.getClient(),
         serviceName: this.config.otelServiceName,
       });
@@ -39,41 +39,42 @@ export class EventsService {
   }
 
   /**
-   * Publish wallpaper.uploaded event to NATS.
+   * Publish wallpaper.variant.available event to NATS.
    *
    * The event is validated against the schema before publishing.
    * Trace context is automatically propagated via NATS headers.
    */
-  async publishUploadedEvent(wallpaper: Wallpaper): Promise<void> {
+  async publishUploadedEvent(wallpaper: Wallpaper, variant?: Variant): Promise<void> {
+    const dataSource = variant ?? wallpaper;
+
     if (
-      !wallpaper.fileType ||
+      !dataSource.fileSizeBytes ||
+      !dataSource.width ||
+      !dataSource.height ||
+      !dataSource.createdAt ||
       !wallpaper.mimeType ||
-      !wallpaper.width ||
-      !wallpaper.height ||
-      !wallpaper.fileSizeBytes ||
-      !wallpaper.storageKey ||
-      !wallpaper.storageBucket ||
-      !wallpaper.originalFilename
+      !wallpaper.id ||
+      !isStringUnion(wallpaper.mimeType, ['image/jpeg', 'image/png', 'image/webp'])
     ) {
       throw new Error('Wallpaper data incomplete for event publishing');
     }
 
+
     // Use the new publisher with full telemetry and validation
     await this.getPublisher().publishNew({
-      wallpaper: {
-        id: wallpaper.id,
-        userId: wallpaper.userId,
-        fileType: wallpaper.fileType,
-        mimeType: wallpaper.mimeType,
-        fileSizeBytes: wallpaper.fileSizeBytes,
-        width: wallpaper.width,
-        height: wallpaper.height,
-        aspectRatio: wallpaper.width / wallpaper.height,
-        storageKey: wallpaper.storageKey,
-        storageBucket: wallpaper.storageBucket,
-        originalFilename: wallpaper.originalFilename,
-        uploadedAt: wallpaper.uploadedAt.toISOString(),
+      variant: {
+        fileSizeBytes: dataSource.fileSizeBytes,
+        aspectRatio: dataSource.width / dataSource.height,
+        height: dataSource.height,
+        width: dataSource.width,
+        createdAt: dataSource.createdAt.toISOString(),
+        format: wallpaper.mimeType as 'image/jpeg' | 'image/png' | 'image/webp',
+        wallpaperId: wallpaper.id,
       },
     });
   }
+}
+
+function isStringUnion(str: string, allowed: string[]) {
+  return allowed.includes(str);
 }

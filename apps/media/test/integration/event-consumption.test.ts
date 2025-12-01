@@ -1,365 +1,449 @@
 import "reflect-metadata";
 import {
-	createDefaultTesterBuilder,
-	DockerTesterBuilder,
-	MinioTesterBuilder,
-	NatsTesterBuilder,
-	PostgresTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import type { WallpaperUploadedEvent } from "@wallpaperdb/events/schemas";
-import { headers as natsHeaders } from "nats";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+    WallpaperVariantAvailableEventSchema,
+    type WallpaperUploadedEvent,
+} from "@wallpaperdb/events/schemas";
 import {
-	InProcessMediaTesterBuilder,
-	MediaMigrationsTesterBuilder,
-} from "../builders/index.js";
+    createDefaultTesterBuilder,
+    DockerTesterBuilder,
+    MinioTesterBuilder,
+    NatsTesterBuilder,
+    PostgresTesterBuilder,
+} from "@wallpaperdb/test-utils";
 import { eq } from "drizzle-orm";
-import { wallpapers } from "../../src/db/schema.js";
+import { headers as natsHeaders } from "nats";
 import { container } from "tsyringe";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DatabaseConnection } from "../../src/connections/database.js";
+import { wallpapers } from "../../src/db/schema.js";
+import {
+    InProcessMediaTesterBuilder,
+    MediaMigrationsTesterBuilder,
+} from "../builders/index.js";
 
 describe("Media Service - Event Consumption", () => {
-	const setup = () => {
-		const TesterClass = createDefaultTesterBuilder()
-			.with(DockerTesterBuilder)
-			.with(PostgresTesterBuilder)
-			.with(MinioTesterBuilder)
-			.with(NatsTesterBuilder)
-			.with(MediaMigrationsTesterBuilder)
-			.with(InProcessMediaTesterBuilder)
-			.build();
+    const setup = () => {
+        const TesterClass = createDefaultTesterBuilder()
+            .with(DockerTesterBuilder)
+            .with(PostgresTesterBuilder)
+            .with(MinioTesterBuilder)
+            .with(NatsTesterBuilder)
+            .with(MediaMigrationsTesterBuilder)
+            .with(InProcessMediaTesterBuilder)
+            .build();
 
-		const tester = new TesterClass();
+        const tester = new TesterClass();
 
-		tester
-			.withPostgres((builder) =>
-				builder.withDatabase(`test_media_events_${Date.now()}`),
-			)
-			.withMinio()
-			.withMinioBucket("wallpapers")
-			.withNats((builder) => builder.withJetstream())
-			.withStream("WALLPAPER")
-			.withMigrations()
-			.withInProcessApp();
+        tester
+            .withPostgres((builder) =>
+                builder.withDatabase(`test_media_events_${Date.now()}`),
+            )
+            .withMinio()
+            .withMinioBucket("wallpapers")
+            .withNats((builder) => builder.withJetstream())
+            .withStream("WALLPAPER")
+            .withMigrations()
+            .withInProcessApp();
 
-		return tester;
-	};
+        return tester;
+    };
 
-	let tester: ReturnType<typeof setup>;
+    let tester: ReturnType<typeof setup>;
 
-	beforeAll(async () => {
-		tester = setup();
-		await tester.setup();
-	}, 60000);
+    beforeAll(async () => {
+        tester = setup();
+        await tester.setup();
+    }, 60000);
 
-	afterAll(async () => {
-		await tester.destroy();
-	});
+    afterAll(async () => {
+        await tester.destroy();
+    });
 
-	it("should consume wallpaper.uploaded event and store in database", async () => {
-		const js = await tester.nats.getJsClient();
+    /**
+     * Test Helper: Wait for NATS event on a subject
+     */
+    async function waitForNatsEvent(
+        subject: string,
+        timeoutMs = 5000,
+    ): Promise<unknown> {
+        const natsClient = await tester.nats.getConnection();
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                sub.unsubscribe();
+                reject(new Error(`Timeout waiting for event on ${subject}`));
+            }, timeoutMs);
 
-		const event: WallpaperUploadedEvent = {
-			eventId: "evt_test_001",
-			eventType: "wallpaper.uploaded",
-			timestamp: new Date().toISOString(),
-			wallpaper: {
-				id: "wlpr_test_001",
-				userId: "user_test_001",
-				fileType: "image",
-				mimeType: "image/jpeg",
-				fileSizeBytes: 1024000,
-				width: 1920,
-				height: 1080,
-				aspectRatio: 1.777,
-				storageKey: "wlpr_test_001/original.jpg",
-				storageBucket: "wallpapers",
-				originalFilename: "test-image.jpg",
-				uploadedAt: new Date().toISOString(),
-			},
-		};
+            const sub = natsClient.subscribe(subject);
 
-		// Publish event to NATS
-		await js.publish("wallpaper.uploaded", JSON.stringify(event));
+            (async () => {
+                for await (const msg of sub) {
+                    clearTimeout(timeout);
+                    sub.unsubscribe();
+                    const data = JSON.parse(new TextDecoder().decode(msg.data));
+                    resolve(data);
+                    return;
+                }
+            })();
+        });
+    }
 
-		// Wait for event to be processed (with timeout)
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+    it("should consume wallpaper.uploaded event and send wallpaper.variant.available event", async () => {
+        const js = await tester.nats.getJsClient();
 
-		// Verify database contains the wallpaper
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const [result] = await db
-			.select()
-			.from(wallpapers)
-			.where(eq(wallpapers.id, "wlpr_test_001"));
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_001",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_001",
+                userId: "user_test_001",
+                fileType: "image",
+                mimeType: "image/jpeg",
+                fileSizeBytes: 1024000,
+                width: 1920,
+                height: 1080,
+                aspectRatio: 1.777,
+                storageKey: "wlpr_test_001/original.jpg",
+                storageBucket: "wallpapers",
+                originalFilename: "test-image.jpg",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
 
-		expect(result).toBeDefined();
-		expect(result.id).toBe("wlpr_test_001");
-		expect(result.storageKey).toBe("wlpr_test_001/original.jpg");
-		expect(result.storageBucket).toBe("wallpapers");
-		expect(result.mimeType).toBe("image/jpeg");
-		expect(result.width).toBe(1920);
-		expect(result.height).toBe(1080);
-		expect(result.fileSizeBytes).toBe(1024000);
-		expect(result.createdAt).toBeDefined();
-	});
+        const eventsPromise = waitForNatsEvent(
+            "wallpaper.variant.available",
+            10000,
+        );
 
-	it("should handle duplicate events idempotently", async () => {
-		const js = await tester.nats.getJsClient();
+        // Publish event to NATS
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
 
-		const event: WallpaperUploadedEvent = {
-			eventId: "evt_test_002",
-			eventType: "wallpaper.uploaded",
-			timestamp: new Date().toISOString(),
-			wallpaper: {
-				id: "wlpr_test_002",
-				userId: "user_test_002",
-				fileType: "image",
-				mimeType: "image/png",
-				fileSizeBytes: 2048000,
-				width: 2560,
-				height: 1440,
-				aspectRatio: 1.777,
-				storageKey: "wlpr_test_002/original.png",
-				storageBucket: "wallpapers",
-				originalFilename: "test-image.png",
-				uploadedAt: new Date().toISOString(),
-			},
-		};
+        // Wait for event to be processed (with timeout)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Publish same event twice
-		await js.publish("wallpaper.uploaded", JSON.stringify(event));
-		await js.publish("wallpaper.uploaded", JSON.stringify(event));
+        // Verify database contains the wallpaper
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const [result] = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_001"));
 
-		// Wait for both events to be processed
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+        expect(result).toBeDefined();
+        expect(result.id).toBe("wlpr_test_001");
 
-		// Verify only one record exists
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const results = await db
-			.select()
-			.from(wallpapers)
-			.where(eq(wallpapers.id, "wlpr_test_002"));
+        const publishedEvent = await eventsPromise;
+        const res = WallpaperVariantAvailableEventSchema.parse(publishedEvent);
+        expect(res.variant.wallpaperId).toBe("wlpr_test_001");
+    });
 
-		expect(results).toHaveLength(1);
-		expect(results[0].width).toBe(2560);
-		expect(results[0].height).toBe(1440);
-	});
+    it("should consume wallpaper.uploaded event and store in database", async () => {
+        const js = await tester.nats.getJsClient();
 
-	it("should handle malformed events gracefully", async () => {
-		const js = await tester.nats.getJsClient();
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_001",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_001",
+                userId: "user_test_001",
+                fileType: "image",
+                mimeType: "image/jpeg",
+                fileSizeBytes: 1024000,
+                width: 1920,
+                height: 1080,
+                aspectRatio: 1.777,
+                storageKey: "wlpr_test_001/original.jpg",
+                storageBucket: "wallpapers",
+                originalFilename: "test-image.jpg",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
 
-		const malformedEvent = {
-			eventId: "evt_test_003",
-			eventType: "wallpaper.uploaded",
-			// Missing timestamp and wallpaper fields
-		};
+        // Publish event to NATS
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
 
-		// Publish malformed event
-		await js.publish("wallpaper.uploaded", JSON.stringify(malformedEvent));
+        // Wait for event to be processed (with timeout)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Wait for processing
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Verify database contains the wallpaper
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const [result] = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_001"));
 
-		// Service should still be healthy (no crash)
-		const app = tester.getApp();
-		const response = await app.inject({
-			method: "GET",
-			url: "/health",
-		});
+        expect(result).toBeDefined();
+        expect(result.id).toBe("wlpr_test_001");
+        expect(result.storageKey).toBe("wlpr_test_001/original.jpg");
+        expect(result.storageBucket).toBe("wallpapers");
+        expect(result.mimeType).toBe("image/jpeg");
+        expect(result.width).toBe(1920);
+        expect(result.height).toBe(1080);
+        expect(result.fileSizeBytes).toBe(1024000);
+        expect(result.createdAt).toBeDefined();
+    });
 
-		expect(response.statusCode).toBe(200);
+    it("should handle duplicate events idempotently", async () => {
+        const js = await tester.nats.getJsClient();
 
-		// And: No record inserted with invalid event ID
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const results = await db.select().from(wallpapers);
-		const malformedRecord = results.find((r) => r.id === "evt_test_003");
-		expect(malformedRecord).toBeUndefined();
-	});
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_002",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_002",
+                userId: "user_test_002",
+                fileType: "image",
+                mimeType: "image/png",
+                fileSizeBytes: 2048000,
+                width: 2560,
+                height: 1440,
+                aspectRatio: 1.777,
+                storageKey: "wlpr_test_002/original.png",
+                storageBucket: "wallpapers",
+                originalFilename: "test-image.png",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
 
-	it("should maintain trace context from publisher", async () => {
-		const js = await tester.nats.getJsClient();
+        // Publish same event twice
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
 
-		const event: WallpaperUploadedEvent = {
-			eventId: "evt_test_004",
-			eventType: "wallpaper.uploaded",
-			timestamp: new Date().toISOString(),
-			wallpaper: {
-				id: "wlpr_test_004",
-				userId: "user_test_004",
-				fileType: "image",
-				mimeType: "image/webp",
-				fileSizeBytes: 512000,
-				width: 1280,
-				height: 720,
-				aspectRatio: 1.777,
-				storageKey: "wlpr_test_004/original.webp",
-				storageBucket: "wallpapers",
-				originalFilename: "test-image.webp",
-				uploadedAt: new Date().toISOString(),
-			},
-		};
+        // Wait for both events to be processed
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Publish with trace headers
-		const headers = natsHeaders();
-		headers.set("traceparent", "00-test-trace-id-test-span-id-01");
+        // Verify only one record exists
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const results = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_002"));
 
-		await js.publish("wallpaper.uploaded", JSON.stringify(event), {
-			headers,
-		});
+        expect(results).toHaveLength(1);
+        expect(results[0].width).toBe(2560);
+        expect(results[0].height).toBe(1440);
+    });
 
-		// Wait for processing
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+    it("should handle malformed events gracefully", async () => {
+        const js = await tester.nats.getJsClient();
 
-		// Verify event was processed
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const [result] = await db
-			.select()
-			.from(wallpapers)
-			.where(eq(wallpapers.id, "wlpr_test_004"));
+        const malformedEvent = {
+            eventId: "evt_test_003",
+            eventType: "wallpaper.uploaded",
+            // Missing timestamp and wallpaper fields
+        };
 
-		expect(result).toBeDefined();
-		expect(result.mimeType).toBe("image/webp");
-		// Note: Actual trace validation would require OTEL mock/inspection
-	});
+        // Publish malformed event
+        await js.publish("wallpaper.uploaded", JSON.stringify(malformedEvent));
 
-	it("should retrieve wallpaper via GET endpoint after event is processed", async () => {
-		const js = await tester.nats.getJsClient();
+        // Wait for processing
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Create a test image buffer (simple 1x1 JPEG)
-		const imageBuffer = Buffer.from([
-			0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
-			0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
-		]);
+        // Service should still be healthy (no crash)
+        const app = tester.getApp();
+        const response = await app.inject({
+            method: "GET",
+            url: "/health",
+        });
 
-		// Upload the image to MinIO first (simulating what ingestor does)
-		const storageKey = "wlpr_test_005/original.jpg";
-		await tester.minio.uploadObject("wallpapers", storageKey, imageBuffer);
+        expect(response.statusCode).toBe(200);
 
-		// Publish wallpaper.uploaded event
-		const event: WallpaperUploadedEvent = {
-			eventId: "evt_test_005",
-			eventType: "wallpaper.uploaded",
-			timestamp: new Date().toISOString(),
-			wallpaper: {
-				id: "wlpr_test_005",
-				userId: "user_test_005",
-				fileType: "image",
-				mimeType: "image/jpeg",
-				fileSizeBytes: imageBuffer.length,
-				width: 1920,
-				height: 1080,
-				aspectRatio: 1.777,
-				storageKey: storageKey,
-				storageBucket: "wallpapers",
-				originalFilename: "test-image.jpg",
-				uploadedAt: new Date().toISOString(),
-			},
-		};
+        // And: No record inserted with invalid event ID
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const results = await db.select().from(wallpapers);
+        const malformedRecord = results.find((r) => r.id === "evt_test_003");
+        expect(malformedRecord).toBeUndefined();
+    });
 
-		await js.publish("wallpaper.uploaded", JSON.stringify(event));
+    it("should maintain trace context from publisher", async () => {
+        const js = await tester.nats.getJsClient();
 
-		// Wait for event processing
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_004",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_004",
+                userId: "user_test_004",
+                fileType: "image",
+                mimeType: "image/webp",
+                fileSizeBytes: 512000,
+                width: 1280,
+                height: 720,
+                aspectRatio: 1.777,
+                storageKey: "wlpr_test_004/original.webp",
+                storageBucket: "wallpapers",
+                originalFilename: "test-image.webp",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
 
-		// Verify database has the record
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const [dbResult] = await db
-			.select()
-			.from(wallpapers)
-			.where(eq(wallpapers.id, "wlpr_test_005"));
+        // Publish with trace headers
+        const headers = natsHeaders();
+        headers.set("traceparent", "00-test-trace-id-test-span-id-01");
 
-		expect(dbResult).toBeDefined();
+        await js.publish("wallpaper.uploaded", JSON.stringify(event), {
+            headers,
+        });
 
-		// Now test the GET endpoint
-		const app = tester.getApp();
-		const response = await app.inject({
-			method: "GET",
-			url: "/wallpapers/wlpr_test_005",
-		});
+        // Wait for processing
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Verify successful retrieval
-		expect(response.statusCode).toBe(200);
-		expect(response.headers["content-type"]).toBe("image/jpeg");
-		expect(response.headers["cache-control"]).toContain("public");
-		expect(response.headers["cache-control"]).toContain("max-age");
+        // Verify event was processed
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const [result] = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_004"));
 
-		// Verify the body is the image data
-		const responseBuffer = response.rawPayload;
-		expect(responseBuffer).toBeDefined();
-		expect(responseBuffer.length).toBeGreaterThan(0);
-		expect(responseBuffer).toEqual(imageBuffer);
-	});
+        expect(result).toBeDefined();
+        expect(result.mimeType).toBe("image/webp");
+        // Note: Actual trace validation would require OTEL mock/inspection
+    });
 
-	it("should return 404 when wallpaper exists in DB but file missing from MinIO", async () => {
-		const js = await tester.nats.getJsClient();
+    it("should retrieve wallpaper via GET endpoint after event is processed", async () => {
+        const js = await tester.nats.getJsClient();
 
-		// Publish event for a wallpaper (but DON'T upload to MinIO)
-		const event: WallpaperUploadedEvent = {
-			eventId: "evt_test_006",
-			eventType: "wallpaper.uploaded",
-			timestamp: new Date().toISOString(),
-			wallpaper: {
-				id: "wlpr_test_006",
-				userId: "user_test_006",
-				fileType: "image",
-				mimeType: "image/png",
-				fileSizeBytes: 1024,
-				width: 800,
-				height: 600,
-				aspectRatio: 1.333,
-				storageKey: "wlpr_test_006/original.png",
-				storageBucket: "wallpapers",
-				originalFilename: "missing.png",
-				uploadedAt: new Date().toISOString(),
-			},
-		};
+        // Create a test image buffer (simple 1x1 JPEG)
+        const imageBuffer = Buffer.from([
+            0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+            0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
+        ]);
 
-		await js.publish("wallpaper.uploaded", JSON.stringify(event));
+        // Upload the image to MinIO first (simulating what ingestor does)
+        const storageKey = "wlpr_test_005/original.jpg";
+        await tester.minio.uploadObject("wallpapers", storageKey, imageBuffer);
 
-		// Wait for event processing
-		await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Publish wallpaper.uploaded event
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_005",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_005",
+                userId: "user_test_005",
+                fileType: "image",
+                mimeType: "image/jpeg",
+                fileSizeBytes: imageBuffer.length,
+                width: 1920,
+                height: 1080,
+                aspectRatio: 1.777,
+                storageKey: storageKey,
+                storageBucket: "wallpapers",
+                originalFilename: "test-image.jpg",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
 
-		// Verify database has the record
-		const db = container.resolve(DatabaseConnection).getClient().db;
-		const [dbResult] = await db
-			.select()
-			.from(wallpapers)
-			.where(eq(wallpapers.id, "wlpr_test_006"));
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
 
-		expect(dbResult).toBeDefined();
+        // Wait for event processing
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
-		// Try to GET the wallpaper (should fail - file not in MinIO)
-		const app = tester.getApp();
-		const response = await app.inject({
-			method: "GET",
-			url: "/wallpapers/wlpr_test_006",
-		});
+        // Verify database has the record
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const [dbResult] = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_005"));
 
-		// Should return 404
-		expect(response.statusCode).toBe(404);
-		expect(response.headers["content-type"]).toContain("application/problem+json");
+        expect(dbResult).toBeDefined();
 
-		const body = JSON.parse(response.body);
-		expect(body.type).toBeDefined();
-		expect(body.title).toBeDefined();
-		expect(body.status).toBe(404);
-		expect(body.detail).toContain("not found");
-	});
+        // Now test the GET endpoint
+        const app = tester.getApp();
+        const response = await app.inject({
+            method: "GET",
+            url: "/wallpapers/wlpr_test_005",
+        });
 
-	it("should return 404 when wallpaper does not exist in database", async () => {
-		const app = tester.getApp();
+        // Verify successful retrieval
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["content-type"]).toBe("image/jpeg");
+        expect(response.headers["cache-control"]).toContain("public");
+        expect(response.headers["cache-control"]).toContain("max-age");
 
-		const response = await app.inject({
-			method: "GET",
-			url: "/wallpapers/wlpr_nonexistent",
-		});
+        // Verify the body is the image data
+        const responseBuffer = response.rawPayload;
+        expect(responseBuffer).toBeDefined();
+        expect(responseBuffer.length).toBeGreaterThan(0);
+        expect(responseBuffer).toEqual(imageBuffer);
+    });
 
-		expect(response.statusCode).toBe(404);
-		expect(response.headers["content-type"]).toContain("application/problem+json");
+    it("should return 404 when wallpaper exists in DB but file missing from MinIO", async () => {
+        const js = await tester.nats.getJsClient();
 
-		const body = JSON.parse(response.body);
-		expect(body.type).toBeDefined();
-		expect(body.title).toBeDefined();
-		expect(body.status).toBe(404);
-	});
+        // Publish event for a wallpaper (but DON'T upload to MinIO)
+        const event: WallpaperUploadedEvent = {
+            eventId: "evt_test_006",
+            eventType: "wallpaper.uploaded",
+            timestamp: new Date().toISOString(),
+            wallpaper: {
+                id: "wlpr_test_006",
+                userId: "user_test_006",
+                fileType: "image",
+                mimeType: "image/png",
+                fileSizeBytes: 1024,
+                width: 800,
+                height: 600,
+                aspectRatio: 1.333,
+                storageKey: "wlpr_test_006/original.png",
+                storageBucket: "wallpapers",
+                originalFilename: "missing.png",
+                uploadedAt: new Date().toISOString(),
+            },
+        };
+
+        await js.publish("wallpaper.uploaded", JSON.stringify(event));
+
+        // Wait for event processing
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify database has the record
+        const db = container.resolve(DatabaseConnection).getClient().db;
+        const [dbResult] = await db
+            .select()
+            .from(wallpapers)
+            .where(eq(wallpapers.id, "wlpr_test_006"));
+
+        expect(dbResult).toBeDefined();
+
+        // Try to GET the wallpaper (should fail - file not in MinIO)
+        const app = tester.getApp();
+        const response = await app.inject({
+            method: "GET",
+            url: "/wallpapers/wlpr_test_006",
+        });
+
+        // Should return 404
+        expect(response.statusCode).toBe(404);
+        expect(response.headers["content-type"]).toContain(
+            "application/problem+json",
+        );
+
+        const body = JSON.parse(response.body);
+        expect(body.type).toBeDefined();
+        expect(body.title).toBeDefined();
+        expect(body.status).toBe(404);
+        expect(body.detail).toContain("not found");
+    });
+
+    it("should return 404 when wallpaper does not exist in database", async () => {
+        const app = tester.getApp();
+
+        const response = await app.inject({
+            method: "GET",
+            url: "/wallpapers/wlpr_nonexistent",
+        });
+
+        expect(response.statusCode).toBe(404);
+        expect(response.headers["content-type"]).toContain(
+            "application/problem+json",
+        );
+
+        const body = JSON.parse(response.body);
+        expect(body.type).toBeDefined();
+        expect(body.title).toBeDefined();
+        expect(body.status).toBe(404);
+    });
 });

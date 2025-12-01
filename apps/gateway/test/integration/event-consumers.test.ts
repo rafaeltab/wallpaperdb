@@ -159,11 +159,10 @@ describe("Event Consumers Integration", () => {
                 timestamp: new Date().toISOString(),
                 variant: {
                     wallpaperId: "wlpr_consumer_003",
-                    userId: "user_003",
                     width: 1920,
                     height: 1080,
                     aspectRatio: 1920 / 1080,
-                    format: "jpeg",
+                    format: "image/jpeg",
                     fileSizeBytes: 500000,
                     createdAt: new Date().toISOString(),
                 },
@@ -182,7 +181,7 @@ describe("Event Consumers Integration", () => {
             expect(doc?.variants).toHaveLength(1);
             expect(doc?.variants[0].width).toBe(1920);
             expect(doc?.variants[0].height).toBe(1080);
-            expect(doc?.variants[0].format).toBe("jpeg");
+            expect(doc?.variants[0].format).toBe("image/jpeg");
         });
 
         it("should add multiple variants to same wallpaper", async () => {
@@ -218,11 +217,10 @@ describe("Event Consumers Integration", () => {
                 timestamp: new Date().toISOString(),
                 variant: {
                     wallpaperId: "wlpr_consumer_004",
-                    userId: "user_004",
                     width: 2560,
                     height: 1440,
                     aspectRatio: 2560 / 1440,
-                    format: "webp",
+                    format: "image/webp",
                     fileSizeBytes: 600000,
                     createdAt: new Date().toISOString(),
                 },
@@ -242,11 +240,10 @@ describe("Event Consumers Integration", () => {
                 timestamp: new Date().toISOString(),
                 variant: {
                     wallpaperId: "wlpr_consumer_004",
-                    userId: "user_004",
                     width: 1920,
                     height: 1080,
                     aspectRatio: 1920 / 1080,
-                    format: "png",
+                    format: "image/png",
                     fileSizeBytes: 800000,
                     createdAt: new Date().toISOString(),
                 },
@@ -263,8 +260,8 @@ describe("Event Consumers Integration", () => {
             const doc = await repository.findById("wlpr_consumer_004");
             expect(doc).not.toBeNull();
             expect(doc?.variants).toHaveLength(2);
-            expect(doc?.variants[0].format).toBe("webp");
-            expect(doc?.variants[1].format).toBe("png");
+            expect(doc?.variants[0].format).toBe("image/webp");
+            expect(doc?.variants[1].format).toBe("image/png");
         });
     });
 });

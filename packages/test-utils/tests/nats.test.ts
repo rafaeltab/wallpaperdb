@@ -142,7 +142,13 @@ describe(
 
             const streamInfo = await jsm.streams.info(streamName);
             expect(streamInfo.config.name).toBe(streamName);
-            expect(streamInfo.config.subjects).toEqual(["test_stream.*"]);
+            expect(streamInfo.config.subjects).toEqual([
+                "test_stream.*",
+                "test_stream.*.*",
+                "test_stream.*.*.*",
+                "test_stream.*.*.*.*",
+                "test_stream.*.*.*.*.*",
+            ]);
 
             await nc.close();
             await tester.destroy();

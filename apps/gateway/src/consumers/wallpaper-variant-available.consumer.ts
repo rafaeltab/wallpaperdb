@@ -21,8 +21,8 @@ export class WallpaperVariantAvailableConsumer extends BaseEventConsumer<
   protected readonly eventType = 'wallpaper.variant.available' as const;
 
   constructor(
-        @inject(NatsConnectionManager) natsConnectionManager: NatsConnectionManager,
-        @inject(WallpaperRepository) private readonly wallpaperRepository: WallpaperRepository,
+    @inject(NatsConnectionManager) natsConnectionManager: NatsConnectionManager,
+    @inject(WallpaperRepository) private readonly wallpaperRepository: WallpaperRepository
   ) {
     super({
       natsConnectionProvider: () => natsConnectionManager.getConnection(),
@@ -35,7 +35,7 @@ export class WallpaperVariantAvailableConsumer extends BaseEventConsumer<
   }
 
   public async handleEvent(event: WallpaperVariantAvailableEvent): Promise<void> {
-    console.log("BEEP handleEventAvailable");
+    console.log('BEEP handleEventAvailable');
 
     // Add variant to wallpaper document
     await this.wallpaperRepository.addVariant(event.variant.wallpaperId, {

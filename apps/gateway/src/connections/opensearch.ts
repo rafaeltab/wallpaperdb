@@ -27,7 +27,6 @@ export class OpenSearchConnection {
       }),
     });
 
-
     // Test connection with retries
     for (let i = 0; i < 2; i++) {
       try {

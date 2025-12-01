@@ -14,6 +14,7 @@ import type { z } from 'zod';
 import type { Config } from '../../config.js';
 import { NatsConnectionManager } from '../../connections/nats.js';
 import { WallpaperRepository } from '../../repositories/wallpaper.repository.js';
+import { EventsService } from '../events.service.js';
 
 /**
  * Consumer for wallpaper.uploaded events.
@@ -28,6 +29,7 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
   protected readonly eventType = 'wallpaper.uploaded';
 
   constructor(
+    @inject(EventsService) private readonly eventsService: EventsService,
     @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
     @inject(NatsConnectionManager) natsConnection: NatsConnectionManager,
     @inject('config') config: Config
@@ -51,7 +53,7 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
     try {
       const startTime = Date.now();
 
-      await this.repository.upsert({
+      const wallpaper = await this.repository.upsert({
         id: event.wallpaper.id,
         storageBucket: event.wallpaper.storageBucket,
         storageKey: event.wallpaper.storageKey,
@@ -67,6 +69,8 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
       recordHistogram('media.consumer.upsert_duration_ms', durationMs, {
         [Attributes.EVENT_TYPE]: 'wallpaper.uploaded',
       });
+
+      await this.eventsService.publishUploadedEvent(wallpaper, undefined);
 
       console.log(
         `[WallpaperUploadedConsumer] Successfully processed wallpaper ${event.wallpaper.id}`

@@ -1,12 +1,12 @@
 import {
-    BaseEventConsumer,
-    WALLPAPER_UPLOADED_SUBJECT,
-    type WallpaperUploadedEvent,
-    WallpaperUploadedEventSchema,
-} from "@wallpaperdb/events";
-import { inject, singleton } from "tsyringe";
-import { NatsConnectionManager } from "../connections/nats.js";
-import { WallpaperRepository } from "../repositories/wallpaper.repository.js";
+  BaseEventConsumer,
+  WALLPAPER_UPLOADED_SUBJECT,
+  type WallpaperUploadedEvent,
+  WallpaperUploadedEventSchema,
+} from '@wallpaperdb/events';
+import { inject, singleton } from 'tsyringe';
+import { NatsConnectionManager } from '../connections/nats.js';
+import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
 
 /**
  * Consumer for wallpaper.uploaded events
@@ -14,35 +14,35 @@ import { WallpaperRepository } from "../repositories/wallpaper.repository.js";
  */
 @singleton()
 export class WallpaperUploadedConsumer extends BaseEventConsumer<
-    typeof WallpaperUploadedEventSchema
+  typeof WallpaperUploadedEventSchema
 > {
-    protected readonly schema = WallpaperUploadedEventSchema;
-    protected readonly subject = WALLPAPER_UPLOADED_SUBJECT;
-    protected readonly eventType = "wallpaper.uploaded" as const;
+  protected readonly schema = WallpaperUploadedEventSchema;
+  protected readonly subject = WALLPAPER_UPLOADED_SUBJECT;
+  protected readonly eventType = 'wallpaper.uploaded' as const;
 
-    constructor(
-        @inject(NatsConnectionManager) natsConnectionManager: NatsConnectionManager,
-        @inject(WallpaperRepository) private readonly wallpaperRepository: WallpaperRepository,
-    ) {
-        super({
-            natsConnectionProvider: () => natsConnectionManager.getConnection(),
-            serviceName: "gateway",
-            streamName: "WALLPAPER",
-            durableName: "gateway-wallpaper-uploaded",
+  constructor(
+    @inject(NatsConnectionManager) natsConnectionManager: NatsConnectionManager,
+    @inject(WallpaperRepository) private readonly wallpaperRepository: WallpaperRepository
+  ) {
+    super({
+      natsConnectionProvider: () => natsConnectionManager.getConnection(),
+      serviceName: 'gateway',
+      streamName: 'WALLPAPER',
+      durableName: 'gateway-wallpaper-uploaded',
       maxRetries: 3,
       ackWait: 30000, // 30 seconds
-        });
-    }
+    });
+  }
 
-    public async handleEvent(event: WallpaperUploadedEvent): Promise<void> {
-        console.log("BEEP handleEventUploaded");
-        // Create wallpaper document with empty variants array
-        await this.wallpaperRepository.upsert({
-            wallpaperId: event.wallpaper.id,
-            userId: event.wallpaper.userId,
-            variants: [],
-            uploadedAt: event.wallpaper.uploadedAt,
-            updatedAt: new Date().toISOString(),
-        });
-    }
+  public async handleEvent(event: WallpaperUploadedEvent): Promise<void> {
+    console.log('BEEP handleEventUploaded');
+    // Create wallpaper document with empty variants array
+    await this.wallpaperRepository.upsert({
+      wallpaperId: event.wallpaper.id,
+      userId: event.wallpaper.userId,
+      variants: [],
+      uploadedAt: event.wallpaper.uploadedAt,
+      updatedAt: new Date().toISOString(),
+    });
+  }
 }

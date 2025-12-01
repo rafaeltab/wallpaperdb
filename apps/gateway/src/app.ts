@@ -1,171 +1,164 @@
-import cors from "@fastify/cors";
-import { registerOpenAPI } from "@wallpaperdb/core/openapi";
-import Fastify, { type FastifyInstance } from "fastify";
-import mercurius from "mercurius";
-import { container } from "tsyringe";
-import type { Config } from "./config.js";
-import { NatsConnectionManager } from "./connections/nats.js";
-import { OpenSearchConnection } from "./connections/opensearch.js";
-import { WallpaperUploadedConsumer } from "./consumers/wallpaper-uploaded.consumer.js";
-import { WallpaperVariantAvailableConsumer } from "./consumers/wallpaper-variant-available.consumer.js";
-import { Resolvers } from "./graphql/resolvers.js";
-import { schema } from "./graphql/schema.js";
-import { getOtelSdk } from "./otel-init.js";
-import { registerRoutes } from "./routes/index.js";
+import cors from '@fastify/cors';
+import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import Fastify, { type FastifyInstance } from 'fastify';
+import mercurius from 'mercurius';
+import { container } from 'tsyringe';
+import type { Config } from './config.js';
+import { NatsConnectionManager } from './connections/nats.js';
+import { OpenSearchConnection } from './connections/opensearch.js';
+import { WallpaperUploadedConsumer } from './consumers/wallpaper-uploaded.consumer.js';
+import { WallpaperVariantAvailableConsumer } from './consumers/wallpaper-variant-available.consumer.js';
+import { Resolvers } from './graphql/resolvers.js';
+import { schema } from './graphql/schema.js';
+import { getOtelSdk } from './otel-init.js';
+import { registerRoutes } from './routes/index.js';
 
 // Connection state interface
 export interface ConnectionsState {
-    isShuttingDown: boolean;
-    connectionsInitialized: boolean;
+  isShuttingDown: boolean;
+  connectionsInitialized: boolean;
 }
 
 // Extend Fastify instance with our custom state
-declare module "fastify" {
-    interface FastifyInstance {
-        connectionsState: ConnectionsState;
-        container: typeof container;
-    }
+declare module 'fastify' {
+  interface FastifyInstance {
+    connectionsState: ConnectionsState;
+    container: typeof container;
+  }
 }
 
 export async function createApp(
-    config: Config,
-    options?: { logger?: boolean; enableOtel?: boolean },
+  config: Config,
+  options?: { logger?: boolean; enableOtel?: boolean }
 ): Promise<FastifyInstance> {
-    // Register config in DI container
-    container.register("config", { useValue: config });
+  // Register config in DI container
+  container.register('config', { useValue: config });
 
-    // Register pre-initialized OTEL SDK
-    const otelSdk = getOtelSdk();
-    if (otelSdk) {
-        container.register("otelSdk", { useValue: otelSdk });
-    }
+  // Register pre-initialized OTEL SDK
+  const otelSdk = getOtelSdk();
+  if (otelSdk) {
+    container.register('otelSdk', { useValue: otelSdk });
+  }
 
-    // Create Fastify server
-    const fastify = Fastify({
-        logger:
-            options?.logger !== false
+  // Create Fastify server
+  const fastify = Fastify({
+    logger:
+      options?.logger !== false
+        ? {
+            level: config.nodeEnv === 'development' ? 'debug' : 'info',
+            transport:
+              config.nodeEnv === 'development'
                 ? {
-                    level: config.nodeEnv === "development" ? "debug" : "info",
-                    transport:
-                        config.nodeEnv === "development"
-                            ? {
-                                target: "pino-pretty",
-                                options: {
-                                    translateTime: "HH:MM:ss Z",
-                                    ignore: "pid,hostname",
-                                },
-                            }
-                            : undefined,
-                }
-                : false,
-    });
-
-    // Attach container to Fastify instance
-    fastify.decorate("container", container);
-
-    // Initialize connection state
-    fastify.decorate("connectionsState", {
-        isShuttingDown: false,
-        connectionsInitialized: false,
-    });
-
-    // Register CORS for development
-    await fastify.register(cors, {
-        origin:
-            config.nodeEnv === "development"
-                ? [/localhost:\d+/, /127\.0\.0\.1:\d+/]
-                : false,
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allowedHeaders: ["Content-Type", "Authorization"],
-        credentials: true,
-    });
-
-    // Register OpenAPI documentation
-    await registerOpenAPI(fastify, {
-        title: "WallpaperDB Gateway API",
-        version: "1.0.0",
-        description:
-            "GraphQL gateway for querying wallpapers. Provides read-optimized access with flexible filtering capabilities.",
-        servers:
-            config.nodeEnv === "production"
-                ? undefined
-                : [
-                    {
-                        url: `http://localhost:${config.port}`,
-                        description: "Local development server",
+                    target: 'pino-pretty',
+                    options: {
+                      translateTime: 'HH:MM:ss Z',
+                      ignore: 'pid,hostname',
                     },
-                ],
-    });
+                  }
+                : undefined,
+          }
+        : false,
+  });
 
-    // Register GraphQL with Mercurius
-    const resolversInstance = container.resolve(Resolvers);
-    await fastify.register(mercurius, {
-        schema,
-        resolvers: resolversInstance.getResolvers(),
-        graphiql: config.nodeEnv === "development", // Enable GraphiQL in development
-        path: "/graphql",
-    });
+  // Attach container to Fastify instance
+  fastify.decorate('container', container);
 
-    // Initialize connections
-    fastify.log.info("Initializing connections...");
+  // Initialize connection state
+  fastify.decorate('connectionsState', {
+    isShuttingDown: false,
+    connectionsInitialized: false,
+  });
 
-    try {
-        // Connect to OpenSearch
-        const opensearch = container.resolve(OpenSearchConnection);
-        await opensearch.connect();
-        fastify.log.info("OpenSearch connection established");
+  // Register CORS for development
+  await fastify.register(cors, {
+    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
 
-        // Connect to NATS
-        const natsManager = container.resolve(NatsConnectionManager);
-        await natsManager.connect();
-        fastify.log.info("NATS connection established");
+  // Register OpenAPI documentation
+  await registerOpenAPI(fastify, {
+    title: 'WallpaperDB Gateway API',
+    version: '1.0.0',
+    description:
+      'GraphQL gateway for querying wallpapers. Provides read-optimized access with flexible filtering capabilities.',
+    servers:
+      config.nodeEnv === 'production'
+        ? undefined
+        : [
+            {
+              url: `http://localhost:${config.port}`,
+              description: 'Local development server',
+            },
+          ],
+  });
 
-        // Start event consumers
+  // Register GraphQL with Mercurius
+  const resolversInstance = container.resolve(Resolvers);
+  await fastify.register(mercurius, {
+    schema,
+    resolvers: resolversInstance.getResolvers(),
+    graphiql: config.nodeEnv === 'development', // Enable GraphiQL in development
+    path: '/graphql',
+  });
 
-        const variantConsumer = container.resolve(
-            WallpaperVariantAvailableConsumer,
-        );
-        await variantConsumer.start();
-        fastify.log.info("WallpaperVariantAvailableConsumer started");
+  // Initialize connections
+  fastify.log.info('Initializing connections...');
 
-        const uploadedConsumer = container.resolve(WallpaperUploadedConsumer);
-        await uploadedConsumer.start();
-        fastify.log.info("WallpaperUploadedConsumer started");
+  try {
+    // Connect to OpenSearch
+    const opensearch = container.resolve(OpenSearchConnection);
+    await opensearch.connect();
+    fastify.log.info('OpenSearch connection established');
 
-        // Mark connections as initialized
-        fastify.connectionsState.connectionsInitialized = true;
-    } catch (error) {
-        fastify.log.error({ err: error }, "Failed to initialize connections");
-        throw error;
-    }
+    // Connect to NATS
+    const natsManager = container.resolve(NatsConnectionManager);
+    await natsManager.connect();
+    fastify.log.info('NATS connection established');
 
-    // Register HTTP routes (health checks, etc.)
-    await registerRoutes(fastify);
+    // Start event consumers
 
-    // Graceful shutdown handler
-    fastify.addHook("onClose", async () => {
-        fastify.connectionsState.isShuttingDown = true;
+    const variantConsumer = container.resolve(WallpaperVariantAvailableConsumer);
+    await variantConsumer.start();
+    fastify.log.info('WallpaperVariantAvailableConsumer started');
 
-        fastify.log.info("Stopping event consumers...");
-        const uploadedConsumer = container.resolve(WallpaperUploadedConsumer);
-        await uploadedConsumer.stop();
+    const uploadedConsumer = container.resolve(WallpaperUploadedConsumer);
+    await uploadedConsumer.start();
+    fastify.log.info('WallpaperUploadedConsumer started');
 
-        const variantConsumer = container.resolve(
-            WallpaperVariantAvailableConsumer,
-        );
-        await variantConsumer.stop();
-        fastify.log.info("Event consumers stopped");
+    // Mark connections as initialized
+    fastify.connectionsState.connectionsInitialized = true;
+  } catch (error) {
+    fastify.log.error({ err: error }, 'Failed to initialize connections');
+    throw error;
+  }
 
-        fastify.log.info("Closing NATS connection...");
-        const natsManager = container.resolve(NatsConnectionManager);
-        await natsManager.disconnect();
-        fastify.log.info("NATS connection closed");
+  // Register HTTP routes (health checks, etc.)
+  await registerRoutes(fastify);
 
-        fastify.log.info("Closing OpenSearch connection...");
-        const opensearch = container.resolve(OpenSearchConnection);
-        await opensearch.disconnect();
-        fastify.log.info("OpenSearch connection closed");
-    });
+  // Graceful shutdown handler
+  fastify.addHook('onClose', async () => {
+    fastify.connectionsState.isShuttingDown = true;
 
-    return fastify;
+    fastify.log.info('Stopping event consumers...');
+    const uploadedConsumer = container.resolve(WallpaperUploadedConsumer);
+    await uploadedConsumer.stop();
+
+    const variantConsumer = container.resolve(WallpaperVariantAvailableConsumer);
+    await variantConsumer.stop();
+    fastify.log.info('Event consumers stopped');
+
+    fastify.log.info('Closing NATS connection...');
+    const natsManager = container.resolve(NatsConnectionManager);
+    await natsManager.disconnect();
+    fastify.log.info('NATS connection closed');
+
+    fastify.log.info('Closing OpenSearch connection...');
+    const opensearch = container.resolve(OpenSearchConnection);
+    await opensearch.disconnect();
+    fastify.log.info('OpenSearch connection closed');
+  });
+
+  return fastify;
 }

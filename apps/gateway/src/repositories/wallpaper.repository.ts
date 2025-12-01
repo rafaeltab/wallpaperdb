@@ -27,8 +27,7 @@ export class WallpaperRepository {
   constructor(
     @inject(OpenSearchConnection) private readonly openSearchConnection: OpenSearchConnection,
     @inject(IndexManagerService) private readonly indexManager: IndexManagerService
-  ) {
-  }
+  ) {}
 
   /**
    * Create or update a wallpaper document

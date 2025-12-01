@@ -92,12 +92,8 @@
           "name": "variants_wallpaper_id_wallpapers_id_fk",
           "tableFrom": "variants",
           "tableTo": "wallpapers",
-          "columnsFrom": [
-            "wallpaper_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["wallpaper_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

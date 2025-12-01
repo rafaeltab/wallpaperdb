@@ -10,15 +10,14 @@ export class IndexManagerService {
   private readonly indexName = 'wallpapers';
 
   constructor(
-    @inject(OpenSearchConnection) private readonly openSearchConnection: OpenSearchConnection,
-  ) {
-  }
+    @inject(OpenSearchConnection) private readonly openSearchConnection: OpenSearchConnection
+  ) {}
 
   /**
    * Create the wallpapers index with mappings
    */
   async createIndex(): Promise<void> {
-      const client = this.openSearchConnection.getClient();
+    const client = this.openSearchConnection.getClient();
     const exists = await client.indices.exists({
       index: this.indexName,
     });
@@ -39,7 +38,7 @@ export class IndexManagerService {
    * Delete the wallpapers index (for testing)
    */
   async deleteIndex(): Promise<void> {
-      const client = this.openSearchConnection.getClient();
+    const client = this.openSearchConnection.getClient();
     const exists = await client.indices.exists({
       index: this.indexName,
     });

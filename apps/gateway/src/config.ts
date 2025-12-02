@@ -1,12 +1,12 @@
-import { config as loadEnv } from 'dotenv';
-import { z } from 'zod';
 import {
-  ServerConfigSchema,
+  getEnv,
   NatsConfigSchema,
   OtelConfigSchema,
   parseIntEnv,
-  getEnv,
+  ServerConfigSchema,
 } from '@wallpaperdb/core/config';
+import { config as loadEnv } from 'dotenv';
+import { z } from 'zod';
 
 // Load environment variables from .env file
 loadEnv();

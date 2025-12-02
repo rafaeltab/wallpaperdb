@@ -59,7 +59,6 @@ export class EventsService {
       throw new Error('Wallpaper data incomplete for event publishing');
     }
 
-
     // Use the new publisher with full telemetry and validation
     await this.getPublisher().publishNew({
       variant: {

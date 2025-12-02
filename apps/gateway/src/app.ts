@@ -12,6 +12,7 @@ import { Resolvers } from './graphql/resolvers.js';
 import { schema } from './graphql/schema.js';
 import { getOtelSdk } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
+import { IndexManagerService } from './services/index-manager.service.js';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -131,6 +132,13 @@ export async function createApp(
     fastify.connectionsState.connectionsInitialized = true;
   } catch (error) {
     fastify.log.error({ err: error }, 'Failed to initialize connections');
+    throw error;
+  }
+
+  try {
+    await container.resolve(IndexManagerService).createIndex();
+  } catch (error) {
+    fastify.log.error({ err: error }, 'Failed to create required indexes');
     throw error;
   }
 

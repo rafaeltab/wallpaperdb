@@ -143,7 +143,7 @@ describe("GraphQL API Integration", () => {
                         width: 1920,
                         height: 1080,
                         aspectRatio: 1920 / 1080,
-                        format: "jpeg",
+                        format: "image/jpeg",
                         fileSizeBytes: 500000,
                         createdAt: new Date().toISOString(),
                     },
@@ -200,7 +200,7 @@ describe("GraphQL API Integration", () => {
                         width: 2560,
                         height: 1440,
                         aspectRatio: 2560 / 1440,
-                        format: "webp",
+                        format: "image/webp",
                         fileSizeBytes: 600000,
                         createdAt: new Date().toISOString(),
                     },
@@ -240,7 +240,7 @@ describe("GraphQL API Integration", () => {
             const result = JSON.parse(response.body);
             const variant = result.data.searchWallpapers.edges[0].node.variants[0];
             expect(variant.url).toBe(
-                "http://media.example.com/wallpapers/wlpr_gql_004?w=2560&h=1440&format=webp",
+                "http://media.example.com/wallpapers/wlpr_gql_004?w=2560&h=1440&format=image/webp",
             );
         });
 
@@ -334,7 +334,7 @@ describe("GraphQL API Integration", () => {
                         width: 3840,
                         height: 2160,
                         aspectRatio: 3840 / 2160,
-                        format: "png",
+                        format: "image/png",
                         fileSizeBytes: 1200000,
                         createdAt: new Date().toISOString(),
                     },
@@ -348,7 +348,7 @@ describe("GraphQL API Integration", () => {
 					searchWallpapers(
 						filter: {
 							userId: "user_gql_005"
-							variants: { width: 3840, format: "png" }
+							variants: { width: 3840, format: "image/png" }
 						}
 					) {
 						edges {
@@ -376,6 +376,7 @@ describe("GraphQL API Integration", () => {
 
             expect(response.statusCode).toBe(200);
             const result = JSON.parse(response.body);
+            console.log(result);
             expect(result.data.searchWallpapers.edges).toHaveLength(1);
             expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
                 "wlpr_gql_005",

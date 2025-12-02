@@ -1,6 +1,7 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
+        migrate \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
@@ -28,6 +29,9 @@ help:
 	@echo "  make nats-setup-streams - Setup all required NATS JetStream streams"
 	@echo "  make nats-stream-list   - List all NATS streams"
 	@echo "  make nats-stream-info   - Show info for WALLPAPER stream"
+	@echo ""
+	@echo "Database:"
+	@echo "  make migrate - Run database migrations (apply to local infra)"
 	@echo ""
 	@echo "Ingestor Service:"
 	@echo "  make ingestor-dev        - Start ingestor in development mode"
@@ -129,6 +133,12 @@ nats-stream-list:
 
 nats-stream-info:
 	@nats stream info WALLPAPER --server nats://localhost:4222
+
+# Database commands
+migrate:
+	@echo "Running database migrations..."
+	@turbo run db:migrate
+	@echo "✓ Database migrations completed"
 
 # Ingestor service commands
 ingestor-dev:

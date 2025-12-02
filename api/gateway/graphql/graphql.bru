@@ -1,0 +1,36 @@
+meta {
+  name: GraphQL Playground
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{gatewayBaseUrl}}/graphql
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  {
+    searchWallpapers(first: 10) {
+      edges {
+        node {
+          wallpaperId
+          userId
+          uploadedAt
+          variants {
+            width
+            height
+            format
+            url
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+  
+}

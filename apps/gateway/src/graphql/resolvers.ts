@@ -1,5 +1,6 @@
 import { inject, singleton } from 'tsyringe';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import { Config } from '../config.js';
 
 interface WallpaperFilter {
   userId?: string;
@@ -41,7 +42,10 @@ interface Wallpaper {
  */
 @singleton()
 export class Resolvers {
-  constructor(@inject(WallpaperRepository) private readonly repository: WallpaperRepository) {}
+  constructor(
+      @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
+      @inject("config") private readonly config: Config,
+  ) {}
 
   /**
    * Get resolvers object for Mercurius
@@ -124,7 +128,7 @@ export class Resolvers {
    * Get URL for a variant (field resolver)
    */
   private getVariantUrl(variant: Variant & { __wallpaperId?: string }): string {
-    const mediaServiceUrl = process.env.MEDIA_SERVICE_URL || 'http://localhost:3002';
+    const mediaServiceUrl = this.config.mediaServiceUrl;
     const wallpaperId = variant.__wallpaperId;
 
     return `${mediaServiceUrl}/wallpapers/${wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`;

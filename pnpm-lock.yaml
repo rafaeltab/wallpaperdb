@@ -160,9 +160,6 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.8
-      '@testcontainers/opensearch':
-        specifier: ^11.9.0
-        version: 11.9.0
       '@types/node':
         specifier: ^22.10.2
         version: 22.18.13
@@ -646,9 +643,6 @@ importers:
         specifier: ^2.12.0
         version: 2.13.0
       '@testcontainers/minio':
-        specifier: ^11.9.0
-        version: 11.9.0
-      '@testcontainers/opensearch':
         specifier: ^11.9.0
         version: 11.9.0
       '@testcontainers/postgresql':
@@ -3721,9 +3715,6 @@ packages:
 
   '@testcontainers/minio@11.9.0':
     resolution: {integrity: sha512-r/AZwoYPR3X5T7qjrLYuIcVJZakiUqBR+ANI7ttJnpyrlaML0ATayGlAK2YUkIh0nNW5s+j6cmes/fnHZRuv+Q==}
-
-  '@testcontainers/opensearch@11.9.0':
-    resolution: {integrity: sha512-T0fsxOtgXo2vchApFxLhubsV2NzsWt6bp44KUgpT99W9qayL9TLNjSG9iwSWFkxdbCj3wAc2vecIr5fjqp71Pw==}
 
   '@testcontainers/postgresql@11.9.0':
     resolution: {integrity: sha512-beLyLdLygFllktviM132Xd6tQ4i5FnuyZP+4BQEjUb5sJYHYnIrV/ZBzRRflIlF8gugt1GXgudkmr/HxM9vtKw==}
@@ -9753,16 +9744,6 @@ snapshots:
   '@testcontainers/minio@11.9.0':
     dependencies:
       testcontainers: 11.9.0
-    transitivePeerDependencies:
-      - bare-abort-controller
-      - bare-buffer
-      - react-native-b4a
-      - supports-color
-
-  '@testcontainers/opensearch@11.9.0':
-    dependencies:
-      testcontainers: 11.9.0
-      zxcvbn: 4.4.2
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer

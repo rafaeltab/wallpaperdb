@@ -16,7 +16,7 @@ export class OpenSearchContainer extends GenericContainer {
   private password = 'yourStrong(!)P@ssw0rd';
   private readonly username = 'admin';
 
-  // HTTPS + Basic Auth wait strategy
+  // HTTP(S) + Basic Auth wait strategy
   private get defaultWaitStrategy() {
     let strategy = Wait.forHttp('/', OPENSEARCH_HTTP_PORT).withBasicCredentials(
       this.username,

@@ -1,4 +1,4 @@
-import { OpenSearchContainer, type StartedOpenSearchContainer } from '@testcontainers/opensearch';
+import { OpenSearchContainer, type StartedOpenSearchContainer } from '@wallpaperdb/testcontainers';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
@@ -126,16 +126,16 @@ export class OpenSearchTesterBuilder extends BaseTesterBuilder<
           };
           const port = {
             networked: '9200',
-            fromHost: started.getPort().toString(),
-            fromHostDockerInternal: started.getPort().toString(),
+            fromHost: started.getPort('host').toString(),
+            fromHostDockerInternal: started.getPort('host').toString(),
             directIp: '9200',
           };
 
           const endpoint = {
             networked: `http://${host.networked}:${port.networked}`,
-            fromHost: `http://${host.fromHost}:${port.fromHost}`,
+            fromHost: started.getHttpUrl('host'),
             fromHostDockerInternal: `http://${host.fromHostDockerInternal}:${port.fromHostDockerInternal}`,
-            directIp: `http://${host.directIp}:${port.directIp}`,
+            directIp: started.getHttpUrl('directIp'),
           };
 
           this._openSearchConfig = {

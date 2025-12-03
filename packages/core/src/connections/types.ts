@@ -31,3 +31,9 @@ export interface OtelConfig {
   otelEndpoint?: string;
   otelServiceName: string;
 }
+
+export interface OpenSearchConfig {
+  opensearchUrl: string;
+  opensearchUsername?: string;
+  opensearchPassword?: string;
+}

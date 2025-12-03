@@ -1,6 +1,6 @@
+import { RedisConnection } from '../connections/redis.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
-import { RedisConnection } from '../connections/redis.js';
 
 @injectable()
 export class RateLimitService {

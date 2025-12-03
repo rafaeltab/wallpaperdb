@@ -1,5 +1,5 @@
-import { inject, singleton } from 'tsyringe';
 import { OpenSearchConnection } from '../connections/opensearch.js';
+import { inject, singleton } from 'tsyringe';
 import { IndexManagerService } from '../services/index-manager.service.js';
 
 export interface Variant {

@@ -9,10 +9,10 @@ import {
   type WallpaperUploadedEvent,
   WallpaperUploadedEventSchema,
 } from '@wallpaperdb/events/schemas';
+import { NatsConnectionManager } from '../../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { z } from 'zod';
 import type { Config } from '../../config.js';
-import { NatsConnectionManager } from '../../connections/nats.js';
 import { WallpaperRepository } from '../../repositories/wallpaper.repository.js';
 import { EventsService } from '../events.service.js';
 

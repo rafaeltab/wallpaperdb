@@ -110,12 +110,12 @@ export async function createApp(
   try {
     // Connect to OpenSearch
     const opensearch = container.resolve(OpenSearchConnection);
-    await opensearch.connect();
+    await opensearch.initialize();
     fastify.log.info('OpenSearch connection established');
 
     // Connect to NATS
     const natsManager = container.resolve(NatsConnectionManager);
-    await natsManager.connect();
+    await natsManager.initialize();
     fastify.log.info('NATS connection established');
 
     // Start event consumers
@@ -159,12 +159,12 @@ export async function createApp(
 
     fastify.log.info('Closing NATS connection...');
     const natsManager = container.resolve(NatsConnectionManager);
-    await natsManager.disconnect();
+    await natsManager.close();
     fastify.log.info('NATS connection closed');
 
     fastify.log.info('Closing OpenSearch connection...');
     const opensearch = container.resolve(OpenSearchConnection);
-    await opensearch.disconnect();
+    await opensearch.close();
     fastify.log.info('OpenSearch connection closed');
   });
 

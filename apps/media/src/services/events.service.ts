@@ -1,6 +1,6 @@
+import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
-import { NatsConnectionManager } from '../connections/nats.js';
 import type { Variant, Wallpaper } from '../db/schema.js';
 import { WallpaperVariantAvailablePublisher } from './publishers/wallpaper_variant_available.publisher.js';
 

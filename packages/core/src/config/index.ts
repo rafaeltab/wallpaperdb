@@ -14,6 +14,8 @@ export {
   type RedisConfig,
   OtelConfigSchema,
   type OtelConfig,
+  OpenSearchConfigSchema,
+  type OpenSearchConfig,
 } from "./schemas/index.js";
 
 // Utility exports

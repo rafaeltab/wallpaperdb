@@ -44,6 +44,7 @@ WORKDIR /app/apps/ingestor
 # Preserve pnpm workspace structure for proper module resolution
 COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/dist ./dist
 COPY --from=builder --chown=ingestor:nodejs /app/apps/ingestor/node_modules ./node_modules
+COPY --from=builder --chown=ingestor:nodejs /app/packages/core/node_modules ./node_modules
 COPY --from=builder --chown=ingestor:nodejs /app/node_modules /app/node_modules
 
 USER ingestor

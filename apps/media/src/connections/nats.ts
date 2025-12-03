@@ -1,37 +1,17 @@
-import { connect, type NatsConnection } from 'nats';
+import { NatsConnectionManager as CoreNatsConnectionManager } from '@wallpaperdb/core/connections';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
-import { BaseConnection } from './base/base-connection.js';
 
+/**
+ * Media service-specific NATS connection.
+ * Extends the core NatsConnectionManager with service-specific configuration.
+ */
 @singleton()
-export class NatsConnectionManager extends BaseConnection<NatsConnection, Config> {
+export class NatsConnectionManager extends CoreNatsConnectionManager {
   constructor(@inject('config') config: Config) {
-    super(config);
-  }
-
-  protected async createClient(): Promise<NatsConnection> {
-    console.log(`Connecting to NATS at '${this.config.natsUrl}'`);
-
-    const client = await connect({
-      servers: this.config.natsUrl,
-      name: this.config.otelServiceName,
+    super({
+      natsUrl: config.natsUrl,
+      serviceName: config.otelServiceName,
     });
-
-    console.log(`Connected to NATS`);
-    return client;
-  }
-
-  protected async closeClient(client: NatsConnection): Promise<void> {
-    await client.close();
-  }
-
-  async checkHealth(): Promise<boolean> {
-    try {
-      const info = this.getClient().info;
-      return info !== null && !this.getClient().isClosed();
-    } catch (error) {
-      console.error('NATS health check failed:', error);
-      return false;
-    }
   }
 }

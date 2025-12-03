@@ -1,6 +1,7 @@
 import {
   getEnv,
   NatsConfigSchema,
+  OpenSearchConfigSchema,
   OtelConfigSchema,
   parseIntEnv,
   ServerConfigSchema,
@@ -11,20 +12,17 @@ import { z } from 'zod';
 // Load environment variables from .env file
 loadEnv();
 
-// OpenSearch config schema
-const OpenSearchConfigSchema = z.object({
-  opensearchUrl: z.string().url(),
+// Gateway-specific OpenSearch config (extends shared schema with index field)
+const GatewayOpenSearchConfigSchema = OpenSearchConfigSchema.extend({
   opensearchIndex: z.string().min(1),
-  opensearchUsername: z.string(),
-  opensearchPassword: z.string(),
 });
 
 // Compose full config from shared schemas + gateway-specific fields
 const configSchema = z.object({
   // Server config
   ...ServerConfigSchema.shape,
-  // OpenSearch config
-  ...OpenSearchConfigSchema.shape,
+  // OpenSearch config (with gateway-specific index field)
+  ...GatewayOpenSearchConfigSchema.shape,
   // NATS config
   ...NatsConfigSchema.shape,
   // OTEL config

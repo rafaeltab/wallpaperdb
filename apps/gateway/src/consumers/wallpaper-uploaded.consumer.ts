@@ -4,8 +4,8 @@ import {
   type WallpaperUploadedEvent,
   WallpaperUploadedEventSchema,
 } from '@wallpaperdb/events';
-import { inject, singleton } from 'tsyringe';
 import { NatsConnectionManager } from '../connections/nats.js';
+import { inject, singleton } from 'tsyringe';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
 
 /**
@@ -25,7 +25,7 @@ export class WallpaperUploadedConsumer extends BaseEventConsumer<
     @inject(WallpaperRepository) private readonly wallpaperRepository: WallpaperRepository
   ) {
     super({
-      natsConnectionProvider: () => natsConnectionManager.getConnection(),
+      natsConnectionProvider: () => natsConnectionManager.getClient(),
       serviceName: 'gateway',
       streamName: 'WALLPAPER',
       durableName: 'gateway-wallpaper-uploaded',

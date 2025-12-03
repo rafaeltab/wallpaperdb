@@ -3,10 +3,10 @@ import cors from '@fastify/cors';
 import { container } from 'tsyringe';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import type { Config } from './config.js';
-import { DatabaseConnection } from './connections/database.js';
-import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { RedisConnection } from './connections/redis.js';
+import { DatabaseConnection } from './connections/database.js';
+import { MinioConnection } from './connections/minio.js';
 import { registerRoutes } from './routes/index.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import {

@@ -1,13 +1,13 @@
-import { inject, injectable } from 'tsyringe';
 import {
   HealthAggregator,
   type HealthResponse as CoreHealthResponse,
   type ReadyResponse as CoreReadyResponse,
 } from '@wallpaperdb/core/health';
-import type { Config } from '../config.js';
-import { OpenSearchConnection } from '../connections/opensearch.js';
-import { getOtelSdk } from '../otel-init.js';
 import { NatsConnectionManager } from '../connections/nats.js';
+import { OpenSearchConnection } from '../connections/opensearch.js';
+import { inject, injectable } from 'tsyringe';
+import type { Config } from '../config.js';
+import { getOtelSdk } from '../otel-init.js';
 
 // Re-export types for backwards compatibility
 export type HealthResponse = CoreHealthResponse;

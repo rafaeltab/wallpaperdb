@@ -1,5 +1,5 @@
-import { inject, singleton } from 'tsyringe';
 import { OpenSearchConnection } from '../connections/opensearch.js';
+import { inject, singleton } from 'tsyringe';
 import { wallpapersIndexMapping } from '../opensearch/mappings.js';
 
 /**

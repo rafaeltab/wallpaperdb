@@ -17,3 +17,8 @@ export { NatsConfigSchema, type NatsConfig } from "./nats.schema.js";
 export { RedisConfigSchema, type RedisConfig } from "./redis.schema.js";
 
 export { OtelConfigSchema, type OtelConfig } from "./otel.schema.js";
+
+export {
+  OpenSearchConfigSchema,
+  type OpenSearchConfig,
+} from "./opensearch.schema.js";

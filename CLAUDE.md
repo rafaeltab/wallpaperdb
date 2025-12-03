@@ -354,11 +354,11 @@ apps/ingestor/src/
 ├── app.ts                    # Fastify application factory
 ├── index.ts                  # Entry point (server lifecycle)
 ├── config.ts                 # Zod-validated configuration
-├── connections/              # Singleton connection managers
-│   ├── database.ts          # PostgreSQL pool (20 max connections)
-│   ├── minio.ts             # S3 client (path-style URLs for MinIO)
-│   ├── nats.ts              # NATS client with JetStream
-│   └── otel.ts              # OpenTelemetry SDK setup
+├── connections/              # Service-specific connection extensions
+│   ├── database.ts          # Extends core DatabaseConnection with service schema
+│   ├── minio.ts             # Extends core MinioConnection
+│   ├── nats.ts              # Extends core NatsConnectionManager
+│   └── otel.ts              # Extends core OtelConnection
 ├── db/schema.ts              # Drizzle schema definitions
 ├── routes/                   # HTTP handlers (registered as Fastify plugins)
 │   ├── health.routes.ts     # /health and /ready

@@ -1,59 +1,18 @@
-import { instrumentDrizzleClient } from '@kubiks/otel-drizzle';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
+import { DatabaseConnection as CoreDatabaseConnection } from '@wallpaperdb/core/connections';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import * as schema from '../db/schema.js';
-import { BaseConnection } from './base/base-connection.js';
 
-const { Pool } = pg;
+// Re-export the typed client for convenience
+export type DatabaseClient = ReturnType<CoreDatabaseConnection<typeof schema>['getClient']>;
 
-export type DatabaseClient = {
-  pool: pg.Pool;
-  db: ReturnType<typeof drizzle<typeof schema>>;
-};
-
+/**
+ * Media service-specific database connection.
+ * Extends the core DatabaseConnection with media schema and configuration.
+ */
 @singleton()
-export class DatabaseConnection extends BaseConnection<DatabaseClient, Config> {
+export class DatabaseConnection extends CoreDatabaseConnection<typeof schema> {
   constructor(@inject('config') config: Config) {
-    super(config);
-  }
-
-  protected createClient(): DatabaseClient {
-    const pool = new Pool({
-      connectionString: this.config.databaseUrl,
-      max: 20, // Maximum connections in pool
-      idleTimeoutMillis: 30000, // Close idle connections after 30s
-      connectionTimeoutMillis: 2000, // Fail fast if can't get connection
-    });
-
-    const db = drizzle(pool, { schema });
-
-    // Instrument Drizzle client for OpenTelemetry tracing
-    instrumentDrizzleClient(db, {
-      dbSystem: 'postgresql',
-      captureQueryText: true,
-      maxQueryTextLength: 2000,
-    });
-
-    return { pool, db };
-  }
-
-  protected async closeClient(client: DatabaseClient): Promise<void> {
-    await client.pool.end();
-  }
-
-  async checkHealth(): Promise<boolean> {
-    try {
-      const connection = await this.getClient().pool.connect();
-      await connection.query('SELECT 1');
-      connection.release();
-      return true;
-    } catch (error) {
-      // Keep console.error here as this is low-level infrastructure
-      // and may be called before logger is initialized
-      console.error('Database health check failed:', error);
-      return false;
-    }
+    super(config, schema);
   }
 }

@@ -240,7 +240,7 @@ describe("GraphQL API Integration", () => {
             const result = JSON.parse(response.body);
             const variant = result.data.searchWallpapers.edges[0].node.variants[0];
             expect(variant.url).toBe(
-                "http://media.example.com/wallpapers/wlpr_gql_004?w=2560&h=1440&format=image/webp",
+                `${process.env.MEDIA_SERVICE_URL}/wallpapers/wlpr_gql_004?w=2560&h=1440&format=image/webp`,
             );
         });
 

@@ -7,7 +7,7 @@ import {
 } from "@wallpaperdb/test-utils";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { InProcessGatewayTesterBuilder } from "./builders/index.js";
+import { InProcessGatewayTesterBuilder } from "../builders/index.js";
 
 describe("Health and Ready Endpoints", () => {
     const setup = () => {

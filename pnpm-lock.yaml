@@ -593,6 +593,9 @@ importers:
       '@types/pg':
         specifier: ^8.11.10
         version: 8.15.6
+      '@wallpaperdb/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
       fastify:
         specifier: ^5.0.0
         version: 5.6.1

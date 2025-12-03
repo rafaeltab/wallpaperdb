@@ -46,7 +46,8 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "test": "vitest run",
-    "test:unit": "vitest run --coverage",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:integration": "vitest run --config vitest.config.integration.ts",
     "test:watch": "vitest",
     "check-types": "tsc --noEmit"
   },
@@ -76,6 +77,7 @@
     "@opentelemetry/sdk-trace-node": "^1.29.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
+    "@wallpaperdb/test-utils": "workspace:*",
     "fastify": "^5.0.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

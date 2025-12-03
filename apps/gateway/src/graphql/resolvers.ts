@@ -1,6 +1,6 @@
 import { inject, singleton } from 'tsyringe';
+import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
-import { Config } from '../config.js';
 
 interface WallpaperFilter {
   userId?: string;
@@ -43,8 +43,8 @@ interface Wallpaper {
 @singleton()
 export class Resolvers {
   constructor(
-      @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
-      @inject("config") private readonly config: Config,
+    @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
+    @inject('config') private readonly config: Config
   ) {}
 
   /**

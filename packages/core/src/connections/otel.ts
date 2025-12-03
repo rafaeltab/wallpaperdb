@@ -26,12 +26,15 @@ export interface OtelOptions {
  * ```
  */
 export function createOtelSdk(config: OtelConfig, options: OtelOptions = {}): NodeSDK {
+  // Default endpoint if not provided (for testing/development)
+  const endpoint = config.otelEndpoint || "http://localhost:4318";
+
   const traceExporter = new OTLPTraceExporter({
-    url: `${config.otelEndpoint}/v1/traces`,
+    url: `${endpoint}/v1/traces`,
   });
 
   const metricExporter = new OTLPMetricExporter({
-    url: `${config.otelEndpoint}/v1/metrics`,
+    url: `${endpoint}/v1/metrics`,
   });
 
   const sdk = new NodeSDK({

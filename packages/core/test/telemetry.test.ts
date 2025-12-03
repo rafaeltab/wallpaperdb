@@ -11,7 +11,7 @@ import {
 } from "../src/telemetry/index.js";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { trace } from "@opentelemetry/api";
+import { trace, type TracerProvider } from "@opentelemetry/api";
 
 describe("Telemetry", () => {
   describe("Attributes", () => {
@@ -79,7 +79,7 @@ describe("Telemetry", () => {
       let memoryExporter: InMemorySpanExporter;
       let spanProcessor: SimpleSpanProcessor;
       let provider: NodeTracerProvider;
-      let originalProvider: any;
+      let originalProvider: TracerProvider;
 
       beforeAll(() => {
         // Setup in-memory span exporter to capture spans

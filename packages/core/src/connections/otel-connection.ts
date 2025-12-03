@@ -13,29 +13,39 @@ export interface OtelConnectionOptions {
   disableFsInstrumentation?: boolean;
   /** Log messages during initialization/shutdown (default: true) */
   enableLogging?: boolean;
+  /**
+   * Pre-initialized SDK from otel-init.ts pattern.
+   * When provided, the connection wraps the existing SDK instead of creating a new one.
+   * The connection will NOT shutdown this SDK on close() (external lifecycle).
+   */
+  existingSdk?: NodeSDK;
 }
 
 /**
  * OpenTelemetry connection manager for WallpaperDB services.
  *
- * Provides a singleton-based OTEL setup that can be used with dependency injection.
- * Uses the shared `withSpan()` utilities from `@wallpaperdb/core/telemetry` for
- * proper span nesting.
+ * Supports two initialization patterns:
+ * - **Pattern A**: Create SDK in connection (default)
+ * - **Pattern B**: Wrap pre-initialized SDK (via existingSdk option)
+ *
+ * Pattern B is useful for services that need to initialize OTEL early (before imports)
+ * via otel-init.ts, then wrap the SDK in this connection for lifecycle management.
  *
  * @example
  * ```typescript
- * // With TSyringe DI
- * container.register('config', { useValue: config });
- * const otel = container.resolve(OtelConnection);
+ * // Pattern A: Create SDK in connection
+ * const otel = new OtelConnection(config);
  * await otel.initialize();
  *
- * // Without DI
- * const otel = new OtelConnection(config);
+ * // Pattern B: Wrap existing SDK
+ * const sdk = createOtelSdk(config); // from otel-init.ts
+ * const otel = new OtelConnection(config, { existingSdk: sdk });
  * await otel.initialize();
  * ```
  */
 export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
   private options: OtelConnectionOptions;
+  private readonly isExternalSdk: boolean;
 
   constructor(config: OtelConfig, options: OtelConnectionOptions = {}) {
     super(config);
@@ -45,15 +55,25 @@ export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
       enableLogging: true,
       ...options,
     };
+    this.isExternalSdk = !!options.existingSdk;
   }
 
   protected createClient(): NodeSDK {
+    // Pattern B: Wrap existing SDK
+    if (this.options.existingSdk) {
+      return this.options.existingSdk;
+    }
+
+    // Pattern A: Create SDK in connection
+    // Default endpoint if not provided (for testing/development)
+    const endpoint = this.config.otelEndpoint || "http://localhost:4318";
+
     const traceExporter = new OTLPTraceExporter({
-      url: `${this.config.otelEndpoint}/v1/traces`,
+      url: `${endpoint}/v1/traces`,
     });
 
     const metricExporter = new OTLPMetricExporter({
-      url: `${this.config.otelEndpoint}/v1/metrics`,
+      url: `${endpoint}/v1/metrics`,
     });
 
     const sdk = new NodeSDK({
@@ -82,6 +102,11 @@ export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
   }
 
   protected async closeClient(client: NodeSDK): Promise<void> {
+    // Don't shutdown external SDKs (managed by otel-init.ts)
+    if (this.isExternalSdk) {
+      return;
+    }
+
     await client.shutdown();
 
     if (this.options.enableLogging) {

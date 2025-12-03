@@ -1,3 +1,4 @@
+// Message from user: This biome-ignore is allowed!
 // biome-ignore-all lint/suspicious/noExplicitAny: these anys are actually needed to be able to write the very type-safe code needed.
 // biome-ignore-all lint/complexity/noBannedTypes: I actually actually need some of the banned types.
 

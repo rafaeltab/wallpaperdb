@@ -13,6 +13,7 @@ import { InProcessGatewayTesterBuilder } from "../builders/InProcessGatewayBuild
 
 describe("GraphQL API Integration", () => {
     const setup = () => {
+        process.env.MEDIA_SERVICE_URL = "http://media.example.com";
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(OpenSearchTesterBuilder)
@@ -189,8 +190,7 @@ describe("GraphQL API Integration", () => {
         });
 
         it("should return variant URLs with MEDIA_SERVICE_URL", async () => {
-            // Set environment variable
-            process.env.MEDIA_SERVICE_URL = "http://media.example.com";
+            // Environment variable set in the setup
 
             await repository.upsert({
                 wallpaperId: "wlpr_gql_004",

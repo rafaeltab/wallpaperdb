@@ -28,6 +28,6 @@ export interface RedisConfig {
 }
 
 export interface OtelConfig {
-  otelEndpoint: string;
+  otelEndpoint?: string;
   otelServiceName: string;
 }

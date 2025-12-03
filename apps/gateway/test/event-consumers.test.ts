@@ -5,55 +5,12 @@ import {
     type WallpaperUploadedEvent,
     type WallpaperVariantAvailableEvent,
 } from "@wallpaperdb/events";
-import {
-    createDefaultTesterBuilder,
-    DockerTesterBuilder,
-    NatsTesterBuilder,
-    OpenSearchTesterBuilder,
-} from "@wallpaperdb/test-utils";
 import { container } from "tsyringe";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { WallpaperRepository } from "../../src/repositories/wallpaper.repository.js";
-import { InProcessGatewayTesterBuilder } from "../builders/InProcessGatewayBuilder.js";
+import { describe, expect, it } from "vitest";
+import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { tester } from "./setup.js";
 
 describe("Event Consumers Integration", () => {
-    const setup = () => {
-        const TesterClass = createDefaultTesterBuilder()
-            .with(DockerTesterBuilder)
-            .with(OpenSearchTesterBuilder)
-            .with(NatsTesterBuilder)
-            .with(InProcessGatewayTesterBuilder)
-            .build();
-
-        const tester = new TesterClass();
-
-        tester
-            .withNats((n) => n.withJetstream())
-            .withStream("WALLPAPER")
-            // .withNatsAutoCleanup()
-            .withOpenSearch()
-            .withInProcessApp();
-
-        return tester;
-    };
-
-    let tester: ReturnType<typeof setup>;
-    let repository: WallpaperRepository;
-
-    beforeAll(async () => {
-        tester = setup();
-        await tester.setup();
-        repository = container.resolve(WallpaperRepository);
-    }, 60000);
-
-    afterAll(async () => {
-        await tester.destroy();
-    });
-
-    afterEach(async () => {
-        await tester.cleanup();
-    });
-
     describe("WallpaperUploadedConsumer", () => {
         it("should create wallpaper document when receiving wallpaper.uploaded event", async () => {
             const event: WallpaperUploadedEvent = {
@@ -83,7 +40,7 @@ describe("Event Consumers Integration", () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Verify document was created
-            const doc = await repository.findById("wlpr_consumer_001");
+            const doc = await container.resolve(WallpaperRepository).findById("wlpr_consumer_001");
             expect(doc).not.toBeNull();
             expect(doc?.wallpaperId).toBe("wlpr_consumer_001");
             expect(doc?.userId).toBe("user_001");
@@ -119,7 +76,7 @@ describe("Event Consumers Integration", () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Verify document exists and wasn't duplicated
-            const doc = await repository.findById("wlpr_consumer_002");
+            const doc = await container.resolve(WallpaperRepository).findById("wlpr_consumer_002");
             expect(doc).not.toBeNull();
             expect(doc?.wallpaperId).toBe("wlpr_consumer_002");
         });
@@ -176,7 +133,7 @@ describe("Event Consumers Integration", () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Verify variant was added
-            const doc = await repository.findById("wlpr_consumer_003");
+            const doc = await container.resolve(WallpaperRepository).findById("wlpr_consumer_003");
             expect(doc).not.toBeNull();
             expect(doc?.variants).toHaveLength(1);
             expect(doc?.variants[0].width).toBe(1920);
@@ -257,7 +214,7 @@ describe("Event Consumers Integration", () => {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Verify both variants were added
-            const doc = await repository.findById("wlpr_consumer_004");
+            const doc = await container.resolve(WallpaperRepository).findById("wlpr_consumer_004");
             expect(doc).not.toBeNull();
             expect(doc?.variants).toHaveLength(2);
             expect(doc?.variants[0].format).toBe("image/webp");

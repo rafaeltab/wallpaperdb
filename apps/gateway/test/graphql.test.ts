@@ -1,52 +1,10 @@
 import "reflect-metadata";
-import {
-    createDefaultTesterBuilder,
-    DockerTesterBuilder,
-    NatsTesterBuilder,
-    OpenSearchTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import type { FastifyInstance } from "fastify";
 import { container } from "tsyringe";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { WallpaperRepository } from "../../src/repositories/wallpaper.repository.js";
-import { InProcessGatewayTesterBuilder } from "../builders/InProcessGatewayBuilder.js";
+import { describe, expect, it } from "vitest";
+import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { tester } from "./setup.js";
 
 describe("GraphQL API Integration", () => {
-    const setup = () => {
-        process.env.MEDIA_SERVICE_URL = "http://media.example.com";
-        const TesterClass = createDefaultTesterBuilder()
-            .with(DockerTesterBuilder)
-            .with(OpenSearchTesterBuilder)
-            .with(NatsTesterBuilder)
-            .with(InProcessGatewayTesterBuilder)
-            .build();
-
-        const tester = new TesterClass();
-
-        tester
-            .withNats((n) => n.withJetstream())
-            .withStream("WALLPAPER")
-            .withOpenSearch()
-            .withInProcessApp();
-
-        return tester;
-    };
-
-    let tester: ReturnType<typeof setup>;
-    let app: FastifyInstance;
-    let repository: WallpaperRepository;
-
-    beforeAll(async () => {
-        tester = setup();
-        await tester.setup();
-        app = tester.getApp();
-        repository = container.resolve(WallpaperRepository);
-    }, 60000);
-
-    afterAll(async () => {
-        await tester.destroy();
-    });
-
     describe("searchWallpapers Query", () => {
         it("should return empty results when no wallpapers exist", async () => {
             const query = `
@@ -68,7 +26,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response = await app.inject({
+            const response = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -85,7 +43,7 @@ describe("GraphQL API Integration", () => {
 
         it("should search wallpapers by userId", async () => {
             // Create test data
-            await repository.upsert({
+            await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_001",
                 userId: "user_gql_001",
                 variants: [],
@@ -93,7 +51,7 @@ describe("GraphQL API Integration", () => {
                 updatedAt: new Date().toISOString(),
             });
 
-            await repository.upsert({
+            await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_002",
                 userId: "user_gql_002",
                 variants: [],
@@ -114,7 +72,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response = await app.inject({
+            const response = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -136,7 +94,7 @@ describe("GraphQL API Integration", () => {
 
         it("should search wallpapers by variant width", async () => {
             // Create wallpaper with specific variant
-            await repository.upsert({
+            await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_003",
                 userId: "user_gql_003",
                 variants: [
@@ -170,7 +128,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response = await app.inject({
+            const response = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -192,7 +150,7 @@ describe("GraphQL API Integration", () => {
         it("should return variant URLs with MEDIA_SERVICE_URL", async () => {
             // Environment variable set in the setup
 
-            await repository.upsert({
+            await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_004",
                 userId: "user_gql_004",
                 variants: [
@@ -227,7 +185,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response = await app.inject({
+            const response = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -247,7 +205,7 @@ describe("GraphQL API Integration", () => {
         it("should support pagination with first/after", async () => {
             // Create multiple wallpapers
             for (let i = 0; i < 5; i++) {
-                await repository.upsert({
+                await container.resolve(WallpaperRepository).upsert({
                     wallpaperId: `wlpr_gql_page_${i}`,
                     userId: "user_gql_pagination",
                     variants: [],
@@ -273,7 +231,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response1 = await app.inject({
+            const response1 = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -310,7 +268,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response2 = await app.inject({
+            const response2 = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {
@@ -326,7 +284,7 @@ describe("GraphQL API Integration", () => {
         });
 
         it("should combine userId and variant filters", async () => {
-            await repository.upsert({
+            await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_005",
                 userId: "user_gql_005",
                 variants: [
@@ -365,7 +323,7 @@ describe("GraphQL API Integration", () => {
 				}
 			`;
 
-            const response = await app.inject({
+            const response = await tester.getApp().inject({
                 method: "POST",
                 url: "/graphql",
                 headers: {

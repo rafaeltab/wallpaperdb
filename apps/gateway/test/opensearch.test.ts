@@ -1,52 +1,20 @@
 import "reflect-metadata";
 import { Client } from "@opensearch-project/opensearch";
-import {
-    createDefaultTesterBuilder,
-    DockerTesterBuilder,
-    NatsTesterBuilder,
-    OpenSearchTesterBuilder,
-} from "@wallpaperdb/test-utils";
 import { container } from "tsyringe";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { WallpaperRepository } from "../../src/repositories/wallpaper.repository.js";
-import { InProcessGatewayTesterBuilder } from "../builders/InProcessGatewayBuilder.js";
+import { beforeAll, describe, expect, it } from "vitest";
+import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { tester } from "./setup.js";
 
 describe("OpenSearch Integration", () => {
-    const setup = () => {
-        const TesterClass = createDefaultTesterBuilder()
-            .with(DockerTesterBuilder)
-            .with(OpenSearchTesterBuilder)
-            .with(NatsTesterBuilder)
-            .with(InProcessGatewayTesterBuilder)
-            .build();
-
-        const tester = new TesterClass();
-
-        tester
-            .withNats((n) => n.withJetstream())
-            .withStream("WALLPAPER")
-            .withOpenSearch()
-            .withInProcessApp();
-
-        return tester;
-    };
-
-    let tester: ReturnType<typeof setup>;
     let repository: WallpaperRepository;
     let client: Client;
 
     beforeAll(async () => {
-        tester = setup();
-        await tester.setup();
         repository = container.resolve(WallpaperRepository);
         client = new Client({
             node: `http://${tester.opensearch.config.host.fromHost}:${tester.opensearch.config.port.fromHost}`,
         });
     }, 60000);
-
-    afterAll(async () => {
-        await tester.destroy();
-    });
 
     describe("IndexManagerService", () => {
         it("should create the wallpapers index", async () => {
@@ -90,7 +58,7 @@ describe("OpenSearch Integration", () => {
                 width: 1920,
                 height: 1080,
                 aspectRatio: 1920 / 1080,
-                format: "jpeg",
+                format: "image/jpeg",
                 fileSizeBytes: 500000,
                 createdAt: new Date().toISOString(),
             });
@@ -99,7 +67,7 @@ describe("OpenSearch Integration", () => {
             expect(doc?.variants).toHaveLength(1);
             expect(doc?.variants[0].width).toBe(1920);
             expect(doc?.variants[0].height).toBe(1080);
-            expect(doc?.variants[0].format).toBe("jpeg");
+            expect(doc?.variants[0].format).toBe("image/jpeg");
         });
 
         it("should return null for non-existent wallpaper", async () => {
@@ -151,7 +119,7 @@ describe("OpenSearch Integration", () => {
                         width: 2560,
                         height: 1440,
                         aspectRatio: 2560 / 1440,
-                        format: "webp",
+                        format: "image/webp",
                         fileSizeBytes: 600000,
                         createdAt: new Date().toISOString(),
                     },
@@ -182,7 +150,7 @@ describe("OpenSearch Integration", () => {
                         width: 1920,
                         height: 1080,
                         aspectRatio: 1920 / 1080,
-                        format: "png",
+                        format: "image/png",
                         fileSizeBytes: 800000,
                         createdAt: new Date().toISOString(),
                     },
@@ -193,7 +161,7 @@ describe("OpenSearch Integration", () => {
 
             // Search by format
             const result = await repository.search({
-                variantFilters: { format: "png" },
+                variantFilters: { format: "image/png" },
             });
 
             expect(result.total).toBeGreaterThanOrEqual(1);
@@ -213,7 +181,7 @@ describe("OpenSearch Integration", () => {
                         width: 3840,
                         height: 2160,
                         aspectRatio: 3840 / 2160,
-                        format: "jpeg",
+                        format: "image/jpeg",
                         fileSizeBytes: 1200000,
                         createdAt: new Date().toISOString(),
                     },

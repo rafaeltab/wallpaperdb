@@ -70,6 +70,7 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
                     process.env.NATS_STREAM = nats.streams[0];
                     process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
                         "http://localhost:4318/v1/traces";
+                    process.env.MEDIA_SERVICE_URL = "http://localhost:3003";
 
                     // Apply config overrides
                     if (options.configOverrides) {

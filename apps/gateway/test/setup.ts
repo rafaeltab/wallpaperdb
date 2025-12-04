@@ -5,8 +5,10 @@ import {
     NatsTesterBuilder,
     OpenSearchTesterBuilder,
 } from "@wallpaperdb/test-utils";
-import { afterAll, afterEach, beforeAll } from "vitest";
+import { afterEach, beforeAll } from "vitest";
 import { InProcessGatewayTesterBuilder } from "./builders/InProcessGatewayBuilder.js";
+
+export let tester: ReturnType<typeof setup>;
 
 const setup = () => {
     const TesterClass = createDefaultTesterBuilder()
@@ -16,28 +18,33 @@ const setup = () => {
         .with(InProcessGatewayTesterBuilder)
         .build();
 
-    const tester = new TesterClass();
+    const t = new TesterClass();
 
-    tester
+    t
         .withNats((n) => n.withJetstream())
         .withStream("WALLPAPER")
         .withOpenSearch()
         .withInProcessApp();
 
-    return tester;
+    return t;
 };
 
-export let tester: ReturnType<typeof setup>;
-
 beforeAll(async () => {
+    if (globalThis.__tester__ !== undefined) {
+        tester = globalThis.__tester__;
+        return;
+    }
+    if (tester !== undefined) return;
     tester = setup();
+    globalThis.__tester__ = tester;
+
     await tester.setup();
 }, 60000);
-
-afterAll(async () => {
-    await tester.destroy();
-});
 
 afterEach(async () => {
     await tester.cleanup();
 });
+
+declare global {
+    var __tester__: ReturnType<typeof setup>;
+}

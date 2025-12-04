@@ -9,14 +9,17 @@ export default defineConfig({
         include: ['test/**/*.test.ts'],
         testTimeout: 60000, // 60 seconds for testcontainers
         hookTimeout: 60000,
-        // Enable parallel test execution within files
-        maxConcurrency: 5, // Run up to 5 tests in parallel per file
+        fileParallelism: false,
+        maxConcurrency: 1,
+        isolate: false,
+        pool: "threads",
         poolOptions: {
             threads: {
-                singleThread: false,
-                maxThreads: 5,
-                minThreads: 2,
-            },
+                minThreads: 1,
+                isolate: false,
+                maxThreads: 1,
+                singleThread: true,
+            }
         },
         coverage: {
             provider: 'v8',
@@ -27,3 +30,4 @@ export default defineConfig({
         },
     },
 });
+

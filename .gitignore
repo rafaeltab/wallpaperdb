@@ -1,7 +1,19 @@
 .turbo
 node_modules
+
+# Environment files
 .env
+.env.local
+.env.*.local
+
+# Build outputs
 dist
 *.tsbuildinfo
 coverage
 .nyc_output
+
+# Vite
+.vite
+
+# TanStack Router generated files
+**/routeTree.gen.ts

@@ -8,7 +8,7 @@ export default defineConfig({
         environment: 'node',
         include: ['test/**/*.test.ts'],
         testTimeout: 60000, // 60 seconds for testcontainers
-        hookTimeout: 60000,
+        hookTimeout: 120000,
         fileParallelism: false,
         maxConcurrency: 1,
         isolate: false,

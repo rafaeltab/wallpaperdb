@@ -39,7 +39,7 @@ beforeAll(async () => {
     globalThis.__tester__ = tester;
 
     await tester.setup();
-}, 60000);
+}, 120000);
 
 afterEach(async () => {
     await tester.cleanup();

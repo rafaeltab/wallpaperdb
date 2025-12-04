@@ -7,6 +7,7 @@
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
+        web-dev web-build web-preview web-format web-lint web-check \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
@@ -59,6 +60,14 @@ help:
 	@echo "  make gateway-test-watch - Run gateway service tests in watch mode"
 	@echo "  make gateway-format     - Format gateway service code"
 	@echo "  make gateway-lint       - Lint gateway service code"
+	@echo ""
+	@echo "Web Frontend:"
+	@echo "  make web-dev     - Start web frontend in development mode (http://localhost:3005)"
+	@echo "  make web-build   - Build web frontend for production"
+	@echo "  make web-preview - Preview production build"
+	@echo "  make web-format  - Format web frontend code"
+	@echo "  make web-lint    - Lint web frontend code"
+	@echo "  make web-check   - Type check web frontend"
 	@echo ""
 	@echo "Ingestor Docker:"
 	@echo "  make ingestor-docker-build - Build ingestor Docker image"
@@ -214,6 +223,25 @@ gateway-lint:
 
 gateway-check:
 	@turbo run check --filter=@wallpaperdb/gateway
+
+# Web frontend commands
+web-dev:
+	@turbo run dev --filter=@wallpaperdb/web
+
+web-build:
+	@turbo run build --filter=@wallpaperdb/web
+
+web-preview:
+	@turbo run preview --filter=@wallpaperdb/web
+
+web-format:
+	@turbo run format --filter=@wallpaperdb/web
+
+web-lint:
+	@turbo run lint --filter=@wallpaperdb/web
+
+web-check:
+	@turbo run check-types --filter=@wallpaperdb/web
 
 # Ingestor Docker commands
 ingestor-docker-build:

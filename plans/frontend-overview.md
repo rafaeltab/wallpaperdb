@@ -9,7 +9,7 @@
 - **Data Fetching:** TanStack Query + graphql-request
 - **Styling:** Tailwind CSS 4
 - **Code Quality:** Biome
-- **Port:** 3003
+- **Port:** 3005
 
 ## Implementation Phases
 
@@ -44,7 +44,7 @@ Execute these phases in order:
 
 ## Success Criteria
 
-1. ✅ `make web-dev` starts Vite dev server on port 3003
+1. ✅ `make web-dev` starts Vite dev server on port 3005
 2. ✅ Home page displays wallpapers from Gateway GraphQL API
 3. ✅ Upload page sends files to Ingestor REST API
 4. ✅ TanStack Query/Router devtools accessible
@@ -76,7 +76,7 @@ make ingestor-dev
 make web-dev
 
 # Open browser
-open http://localhost:3003
+open http://localhost:3005
 ```
 
 ## Notes

@@ -51,9 +51,9 @@ mkdir -p apps/web/public
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3003",
+    "dev": "vite --port 3005",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 3003",
+    "preview": "vite preview --port 3005",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",
@@ -102,7 +102,7 @@ export default defineConfig({
     react(),
   ],
   server: {
-    port: 3003,
+    port: 3005,
   },
   resolve: {
     alias: {

@@ -46,6 +46,6 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "src/**/*.tsx", "*.json", "*.ts"]
+    "includes": ["src/**/*.ts", "src/**/*.tsx", "*.json", "*.ts", "!src/routeTree.gen.ts"]
   }
 }

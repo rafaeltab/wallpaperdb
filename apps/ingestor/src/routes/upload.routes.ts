@@ -11,7 +11,7 @@ interface CachedMultipartData {
   buffer: Buffer;
   filename: string;
   mimetype: string;
-  userId: string;
+  userId: string | undefined;
 }
 
 interface RequestWithCache extends FastifyRequest {
@@ -26,30 +26,20 @@ async function uploadHandler(request: FastifyRequest, reply: FastifyReply) {
     // Use cached multipart data from preHandler
     const cachedData = (request as RequestWithCache).cachedMultipartData;
 
-    let buffer: Buffer;
-    let originalFilename: string;
-    let providedMimeType: string;
-    let userId: string;
-
-    if (cachedData) {
-      // Use cached data from preHandler
-      buffer = cachedData.buffer;
-      originalFilename = cachedData.filename;
-      providedMimeType = cachedData.mimetype;
-      userId = cachedData.userId;
-    } else {
-      // If not cached (shouldn't happen), parse again
-      const data = await request.file();
-
-      if (!data) {
-        throw new MissingFileError();
-      }
-
-      userId = parseUserId(data);
-      buffer = await data.toBuffer();
-      originalFilename = data.filename;
-      providedMimeType = data.mimetype;
+    // preHandler should always cache the data
+    if (!cachedData) {
+      throw new MissingFileError();
     }
+
+    // Check for missing userId
+    if (!cachedData.userId) {
+      throw new MissingUserId();
+    }
+
+    const buffer = cachedData.buffer;
+    const originalFilename = cachedData.filename;
+    const providedMimeType = cachedData.mimetype;
+    const userId = cachedData.userId;
 
     // Check rate limit for user
     const rateLimitResult = await request.server.rateLimitService.checkRateLimit(userId);
@@ -124,25 +114,28 @@ export default async function uploadRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', async (request, _reply) => {
     // Only for POST /upload
     if (request.url === '/upload' && request.method === 'POST') {
-      try {
-        const data = await request.file();
-        if (data) {
-          const userId = parseUserId(data);
-          const buffer = await data.toBuffer();
+      const data = await request.file();
+      if (data) {
+        // Read buffer first (consumes stream)
+        const buffer = await data.toBuffer();
 
+        // Try to get userId (may be missing)
+        let userId: string | undefined;
+        try {
+          userId = parseUserId(data);
           // Set userId for future rate limiting (won't affect current request)
           (request as RequestWithCache).rateLimitUserId = userId;
-
-          // Cache data for handler
-          (request as RequestWithCache).cachedMultipartData = {
-            buffer,
-            filename: data.filename,
-            mimetype: data.mimetype,
-            userId,
-          };
+        } catch {
+          // userId is missing - handler will throw proper error
         }
-      } catch (_error) {
-        // Let main handler deal with errors
+
+        // Always cache data for handler (even without userId)
+        (request as RequestWithCache).cachedMultipartData = {
+          buffer,
+          filename: data.filename,
+          mimetype: data.mimetype,
+          userId,
+        };
       }
     }
   });

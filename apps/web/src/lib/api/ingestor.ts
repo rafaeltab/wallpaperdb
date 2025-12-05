@@ -13,9 +13,10 @@ export interface UploadResponse {
   uploadedAt: string;
 }
 
-export async function uploadWallpaper(file: File): Promise<UploadResponse> {
+export async function uploadWallpaper(file: File, userId: string): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('userId', userId);
 
   const response = await fetch(`${INGESTOR_URL}/upload`, {
     method: 'POST',

@@ -94,6 +94,40 @@ export async function uploadFile(
 }
 
 /**
+ * Upload a file without userId field (to test missing userId error)
+ */
+export async function uploadFileWithoutUserId(
+  fastify: FastifyInstance,
+  options: {
+    file: Buffer;
+    filename: string;
+    mimeType?: string;
+  }
+) {
+  const { file, filename, mimeType = 'image/jpeg' } = options;
+
+  // Create multipart form data without userId field
+  const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
+  const formData = [
+    `--${boundary}`,
+    `Content-Disposition: form-data; name="file"; filename="${filename}"`,
+    `Content-Type: ${mimeType}`,
+    '',
+    file.toString('binary'),
+    `--${boundary}--`,
+  ].join('\r\n');
+
+  return fastify.inject({
+    method: 'POST',
+    url: '/upload',
+    headers: {
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+    },
+    payload: Buffer.from(formData, 'binary'),
+  });
+}
+
+/**
  * Wait for a condition to be true (with timeout)
  */
 export async function waitFor(

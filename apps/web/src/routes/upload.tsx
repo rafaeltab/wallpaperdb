@@ -7,6 +7,9 @@ export const Route = createFileRoute('/upload')({
   component: UploadPage,
 });
 
+// TODO: Replace with actual user ID from authentication
+const DEMO_USER_ID = 'user_demo_001';
+
 function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -14,7 +17,7 @@ function UploadPage() {
   const router = useRouter();
 
   const uploadMutation = useMutation({
-    mutationFn: uploadWallpaper,
+    mutationFn: (file: File) => uploadWallpaper(file, DEMO_USER_ID),
     onSuccess: () => {
       // Invalidate wallpapers query to refetch
       queryClient.invalidateQueries({ queryKey: ['wallpapers'] });

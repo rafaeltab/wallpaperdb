@@ -10,7 +10,7 @@
 // Types
 export type {
   // Muuri Core Types
-  MuuriItem,
+  MuuriItem as MuuriItemInstance,
   MuuriInstance,
   MuuriItemElement,
   MuuriOptions,
@@ -62,9 +62,13 @@ export type {
   DeclarativeSort,
 } from './types/index.js';
 
-// Components (to be implemented in Phase 2)
-// export { MuuriGrid } from './MuuriGrid.js';
-// export { MuuriItem } from './MuuriItem.js';
+// Components
+export { MuuriGrid } from './MuuriGrid.js';
+export { MuuriItem } from './MuuriItem.js';
+
+// Contexts
+export { MuuriContext, MuuriProvider } from './context/MuuriContext.js';
+export { ItemContext, ItemProvider } from './context/ItemContext.js';
 
 // Hooks (to be implemented in Phase 3)
 // export { useGrid } from './hooks/useGrid.js';
@@ -74,7 +78,3 @@ export type {
 // export { useSort } from './hooks/useSort.js';
 // export { useLayout } from './hooks/useLayout.js';
 // export { useRefresh } from './hooks/useRefresh.js';
-
-// Contexts (to be implemented in Phase 2)
-// export { MuuriContext, MuuriProvider } from './context/MuuriContext.js';
-// export { ItemContext, ItemProvider } from './context/ItemContext.js';

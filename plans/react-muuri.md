@@ -75,6 +75,14 @@ packages/react-muuri/
 
 ## Implementation Phases
 
+### Phase 1: Package Setup & Core Types ✅
+
+### Phase 2: Core Components (TDD) ✅
+
+### Phase 3: Core Hooks (TDD) ← **CURRENT**
+
+---
+
 ### Phase 1: Package Setup & Core Types
 
 **Tasks:**

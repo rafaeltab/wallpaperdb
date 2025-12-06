@@ -43,24 +43,13 @@ export const Basic: Story = {
   render: () => (
     <div style={containerStyle}>
       <MuuriGrid layoutDuration={300}>
-        <MuuriItem key="1">
-          <div style={itemStyle}>1</div>
-        </MuuriItem>
-        <MuuriItem key="2">
-          <div style={itemStyle}>2</div>
-        </MuuriItem>
-        <MuuriItem key="3">
-          <div style={itemStyle}>3</div>
-        </MuuriItem>
-        <MuuriItem key="4">
-          <div style={itemStyle}>4</div>
-        </MuuriItem>
-        <MuuriItem key="5">
-          <div style={itemStyle}>5</div>
-        </MuuriItem>
-        <MuuriItem key="6">
-          <div style={itemStyle}>6</div>
-        </MuuriItem>
+        {Array.from({ length: 30 }, (_, i) => (
+          <MuuriItem key={i + 1}>
+            <div style={{ ...itemStyle, backgroundColor: `hsl(${(i * 15) % 360}, 70%, 50%)` }}>
+              {i + 1}
+            </div>
+          </MuuriItem>
+        ))}
       </MuuriGrid>
     </div>
   ),
@@ -78,6 +67,30 @@ export const VaryingSizes: Story = {
       { width: 200, height: 100 },
       { width: 100, height: 200 },
       { width: 150, height: 150 },
+      { width: 120, height: 120 },
+      { width: 180, height: 100 },
+      { width: 100, height: 180 },
+      { width: 160, height: 120 },
+      { width: 120, height: 160 },
+      { width: 140, height: 140 },
+      { width: 100, height: 100 },
+      { width: 200, height: 150 },
+      { width: 150, height: 200 },
+      { width: 130, height: 100 },
+      { width: 100, height: 130 },
+      { width: 170, height: 170 },
+      { width: 110, height: 110 },
+      { width: 190, height: 100 },
+      { width: 100, height: 190 },
+      { width: 140, height: 100 },
+      { width: 100, height: 140 },
+      { width: 160, height: 160 },
+      { width: 125, height: 125 },
+      { width: 175, height: 100 },
+      { width: 100, height: 175 },
+      { width: 145, height: 120 },
+      { width: 120, height: 145 },
+      { width: 155, height: 155 },
     ];
 
     return (
@@ -104,12 +117,74 @@ export const VaryingSizes: Story = {
 };
 
 /**
+ * Grid with varying item sizes that can be dragged and rearranged
+ */
+export const VaryingSizesDraggable: Story = {
+  render: () => {
+    const sizes = [
+      { width: 100, height: 100 },
+      { width: 150, height: 100 },
+      { width: 100, height: 150 },
+      { width: 200, height: 100 },
+      { width: 100, height: 200 },
+      { width: 150, height: 150 },
+      { width: 120, height: 120 },
+      { width: 180, height: 100 },
+      { width: 100, height: 180 },
+      { width: 160, height: 120 },
+      { width: 120, height: 160 },
+      { width: 140, height: 140 },
+      { width: 100, height: 100 },
+      { width: 200, height: 150 },
+      { width: 150, height: 200 },
+      { width: 130, height: 100 },
+      { width: 100, height: 130 },
+      { width: 170, height: 170 },
+      { width: 110, height: 110 },
+      { width: 190, height: 100 },
+      { width: 100, height: 190 },
+      { width: 140, height: 100 },
+      { width: 100, height: 140 },
+      { width: 160, height: 160 },
+      { width: 125, height: 125 },
+      { width: 175, height: 100 },
+      { width: 100, height: 175 },
+      { width: 145, height: 120 },
+      { width: 120, height: 145 },
+      { width: 155, height: 155 },
+    ];
+
+    return (
+      <div style={containerStyle}>
+        <MuuriGrid dragEnabled dragSort layoutDuration={300}>
+          {sizes.map((size, index) => (
+            <MuuriItem key={index}>
+              <div
+                style={{
+                  ...itemStyle,
+                  width: size.width,
+                  height: size.height,
+                  backgroundColor: `hsl(${index * 12}, 70%, 50%)`,
+                  cursor: 'grab',
+                }}
+              >
+                {index + 1}
+              </div>
+            </MuuriItem>
+          ))}
+        </MuuriGrid>
+      </div>
+    );
+  },
+};
+
+/**
  * Interactive grid where items can be added and removed
  */
 export const DynamicItems: Story = {
   render: function DynamicItemsStory() {
-    const [items, setItems] = useState([1, 2, 3, 4, 5, 6]);
-    const [nextId, setNextId] = useState(7);
+    const [items, setItems] = useState(Array.from({ length: 30 }, (_, i) => i + 1));
+    const [nextId, setNextId] = useState(31);
 
     const addItem = () => {
       setItems([...items, nextId]);
@@ -188,7 +263,7 @@ export const DragAndDrop: Story = {
   render: () => (
     <div style={containerStyle}>
       <MuuriGrid dragEnabled dragSort layoutDuration={300}>
-        {[1, 2, 3, 4, 5, 6].map((id) => (
+        {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
             <div
               style={{
@@ -218,7 +293,7 @@ export const CustomAnimation: Story = {
         showDuration={400}
         hideDuration={400}
       >
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((id) => (
+        {Array.from({ length: 40 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
             <div
               style={{
@@ -258,13 +333,13 @@ export const WithEventCallbacks: Story = {
             onDragStart={() => logEvent('Drag started')}
             onDragEnd={() => logEvent('Drag ended')}
           >
-            {[1, 2, 3, 4].map((id) => (
+            {Array.from({ length: 20 }, (_, i) => i + 1).map((id) => (
               <MuuriItem key={id}>
                 <div
                   style={{
                     ...itemStyle,
                     cursor: 'grab',
-                    backgroundColor: `hsl(${id * 70}, 70%, 50%)`,
+                    backgroundColor: `hsl(${id * 18}, 70%, 50%)`,
                   }}
                 >
                   Drag {id}

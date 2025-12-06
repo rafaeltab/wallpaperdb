@@ -75,9 +75,9 @@ export const BasicDragAndDrop: Story = {
         Drag items to reorder. Items show visual feedback when being dragged.
       </p>
       <MuuriGrid dragEnabled dragSort layoutDuration={300}>
-        {[1, 2, 3, 4, 5, 6].map((id) => (
+        {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
-            <DraggableCard id={id} color={`hsl(${id * 50}, 70%, 50%)`} />
+            <DraggableCard id={id} color={`hsl(${(id * 12) % 360}, 70%, 50%)`} />
           </MuuriItem>
         ))}
       </MuuriGrid>
@@ -143,9 +143,9 @@ export const DragWithHandle: Story = {
         Only the handle (top bar with grip icon) can be used to drag items.
       </p>
       <MuuriGrid dragEnabled dragSort dragHandle=".drag-handle" layoutDuration={300}>
-        {[1, 2, 3, 4, 5, 6].map((id) => (
+        {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
-            <CardWithHandle id={id} color={`hsl(${id * 50}, 70%, 45%)`} />
+            <CardWithHandle id={id} color={`hsl(${(id * 12) % 360}, 70%, 45%)`} />
           </MuuriItem>
         ))}
       </MuuriGrid>
@@ -197,7 +197,7 @@ export const StateDebugView: Story = {
         Debug view showing real-time state from useItem and useDrag hooks.
       </p>
       <MuuriGrid dragEnabled dragSort layoutDuration={300}>
-        {[1, 2, 3, 4].map((id) => (
+        {Array.from({ length: 20 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
             <DetailedStateCard id={id} />
           </MuuriItem>
@@ -259,9 +259,9 @@ export const WithGridControls: Story = {
   render: () => (
     <MuuriGrid dragEnabled dragSort layoutDuration={300}>
       <GridControls />
-      {[1, 2, 3, 4, 5, 6].map((id) => (
+      {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => (
         <MuuriItem key={id}>
-          <DraggableCard id={id} color={`hsl(${id * 50}, 70%, 50%)`} />
+          <DraggableCard id={id} color={`hsl(${(id * 12) % 360}, 70%, 50%)`} />
         </MuuriItem>
       ))}
     </MuuriGrid>
@@ -275,12 +275,12 @@ export const LargeGrid: Story = {
   render: () => (
     <div style={containerStyle}>
       <p style={{ marginBottom: 16, color: '#666' }}>
-        Large grid with 24 draggable items. Performance test for drag and drop.
+        Large grid with 120 draggable items. Performance test for drag and drop.
       </p>
       <MuuriGrid dragEnabled dragSort layoutDuration={200}>
-        {Array.from({ length: 24 }, (_, i) => i + 1).map((id) => (
+        {Array.from({ length: 120 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
-            <DraggableCard id={id} color={`hsl(${(id * 15) % 360}, 70%, 50%)`} />
+            <DraggableCard id={id} color={`hsl(${(id * 3) % 360}, 70%, 50%)`} />
           </MuuriItem>
         ))}
       </MuuriGrid>
@@ -322,9 +322,9 @@ export const WithPlaceholder: Story = {
           },
         }}
       >
-        {[1, 2, 3, 4, 5, 6].map((id) => (
+        {Array.from({ length: 30 }, (_, i) => i + 1).map((id) => (
           <MuuriItem key={id}>
-            <DraggableCard id={id} color={`hsl(${id * 50}, 70%, 50%)`} />
+            <DraggableCard id={id} color={`hsl(${(id * 12) % 360}, 70%, 50%)`} />
           </MuuriItem>
         ))}
       </MuuriGrid>

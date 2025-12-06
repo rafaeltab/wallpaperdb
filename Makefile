@@ -8,6 +8,7 @@
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check \
+        react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
@@ -68,6 +69,16 @@ help:
 	@echo "  make web-format  - Format web frontend code"
 	@echo "  make web-lint    - Lint web frontend code"
 	@echo "  make web-check   - Type check web frontend"
+	@echo ""
+	@echo "React Muuri Package:"
+	@echo "  make react-muuri-build          - Build react-muuri package"
+	@echo "  make react-muuri-test           - Run react-muuri tests"
+	@echo "  make react-muuri-test-watch     - Run react-muuri tests in watch mode"
+	@echo "  make react-muuri-format         - Format react-muuri code"
+	@echo "  make react-muuri-lint           - Lint react-muuri code"
+	@echo "  make react-muuri-check          - Type check react-muuri"
+	@echo "  make react-muuri-storybook      - Start Storybook dev server (http://localhost:6006)"
+	@echo "  make react-muuri-storybook-build - Build Storybook for production"
 	@echo ""
 	@echo "Ingestor Docker:"
 	@echo "  make ingestor-docker-build - Build ingestor Docker image"
@@ -242,6 +253,31 @@ web-lint:
 
 web-check:
 	@turbo run check-types --filter=@wallpaperdb/web
+
+# React Muuri package commands
+react-muuri-build:
+	@turbo run build --filter=@wallpaperdb/react-muuri
+
+react-muuri-test:
+	@turbo run test --filter=@wallpaperdb/react-muuri
+
+react-muuri-test-watch:
+	@pnpm --filter @wallpaperdb/react-muuri test:watch
+
+react-muuri-format:
+	@turbo run format --filter=@wallpaperdb/react-muuri
+
+react-muuri-lint:
+	@turbo run lint --filter=@wallpaperdb/react-muuri
+
+react-muuri-check:
+	@turbo run check-types --filter=@wallpaperdb/react-muuri
+
+react-muuri-storybook:
+	@pnpm --filter @wallpaperdb/react-muuri storybook
+
+react-muuri-storybook-build:
+	@pnpm --filter @wallpaperdb/react-muuri build-storybook
 
 # Ingestor Docker commands
 ingestor-docker-build:

@@ -17,7 +17,6 @@ describe('useSort', () => {
       const { result } = renderHook(() => useSort());
 
       expect(() => result.current.sort('data-id')).not.toThrow();
-      expect(() => result.current.sort(['data-id', 'data-name'])).not.toThrow();
       expect(() => result.current.sort((_a, _b) => 0)).not.toThrow();
     });
   });
@@ -92,7 +91,7 @@ describe('useSort', () => {
       expect(() => result.current.sort('data-order')).not.toThrow();
     });
 
-    it('should accept array of data attribute strings', async () => {
+    it('should accept custom comparer for multi-attribute sorting', async () => {
       const { result } = renderHook(() => useSort(), {
         wrapper: GridWrapper,
       });
@@ -104,8 +103,20 @@ describe('useSort', () => {
         { timeout: 1000 }
       );
 
-      // Sort by multiple attributes
-      expect(() => result.current.sort(['data-order', 'data-name'])).not.toThrow();
+      // Sort by multiple attributes using custom comparer
+      expect(() =>
+        result.current.sort((itemA, itemB) => {
+          const elA = itemA.getElement();
+          const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
+          const orderA = parseInt(elA.getAttribute('data-order') ?? '0', 10);
+          const orderB = parseInt(elB.getAttribute('data-order') ?? '0', 10);
+          if (orderA !== orderB) return orderA - orderB;
+          const nameA = elA.getAttribute('data-name') ?? '';
+          const nameB = elB.getAttribute('data-name') ?? '';
+          return nameA.localeCompare(nameB);
+        })
+      ).not.toThrow();
     });
 
     it('should accept comparer function', async () => {
@@ -125,6 +136,7 @@ describe('useSort', () => {
         result.current.sort((itemA, itemB) => {
           const elA = itemA.getElement();
           const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
           const orderA = parseInt(
             elA.querySelector('[data-order]')?.getAttribute('data-order') ?? '0',
             10

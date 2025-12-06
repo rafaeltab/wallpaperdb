@@ -57,7 +57,7 @@ export function useGrid(): UseGridReturn {
   );
 
   const sort = useCallback(
-    (comparer: string | string[] | SortComparer | MuuriItem[], options?: SortOptions): void => {
+    (comparer: string | SortComparer | MuuriItem[], options?: SortOptions): void => {
       if (!grid) return;
       grid.sort(comparer, options);
     },

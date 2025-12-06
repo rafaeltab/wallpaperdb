@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MuuriEvents, MuuriInstance, MuuriItem } from '../../src/types/index.js';
 import {
   createDragEventBridge,

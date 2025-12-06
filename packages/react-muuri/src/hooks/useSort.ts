@@ -35,7 +35,7 @@ export function useSort(): UseSortReturn {
   const grid = context?.grid ?? null;
 
   const sort = useCallback(
-    (comparer: string | string[] | SortComparer | MuuriItem[], options?: SortOptions): void => {
+    (comparer: string | SortComparer | MuuriItem[], options?: SortOptions): void => {
       if (!grid) return;
       grid.sort(comparer, options);
     },

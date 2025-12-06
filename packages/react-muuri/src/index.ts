@@ -7,41 +7,41 @@
  * Based on muuri-react API patterns but rewritten for modern React.
  */
 
-// Types
+// Re-export Muuri types directly for convenience
 export type {
   // Muuri Core Types
-  MuuriItem as MuuriItemInstance,
-  MuuriInstance,
-  MuuriItemElement,
-  MuuriOptions,
-  MuuriEvents,
-  MuuriEventName,
+  Item as MuuriItemInstance,
+  GridOptions as MuuriOptions,
+  GridEvents as MuuriEvents,
   // Layout Types
   LayoutOptions,
   LayoutFunction,
-  LayoutCallback,
+  LayoutOnFinish as LayoutCallback,
   // Drag Types
-  DragStartPredicate,
-  DragStartPredicateFunction,
+  DragStartPredicateOptions as DragStartPredicate,
+  DragStartPredicate as DragStartPredicateFunction,
   DragSortHeuristics,
-  DragSortPredicate,
-  DragSortPredicateFunction,
+  DragSortPredicateOptions as DragSortPredicate,
+  DragSortPredicate as DragSortPredicateFunction,
   DragReleaseOptions,
   DragPlaceholderOptions,
   DragAutoScrollOptions,
-  DragCssProps,
-  AutoScrollTarget,
+  DraggerCssProps as DragCssProps,
+  DragAutoScrollTarget as AutoScrollTarget,
   // Sort/Filter Types
   SortDataGetter,
+} from 'muuri';
+
+// Export our custom types
+export type {
+  // Backwards compatibility aliases
+  MuuriItem as MuuriItemType,
+  MuuriInstance,
+  // Filter/Sort Types
   FilterPredicate,
   SortComparer,
-  // Options Types
-  AddOptions,
-  RemoveOptions,
-  VisibilityOptions,
   FilterOptions,
   SortOptions,
-  MoveOptions,
   // React Component Types
   MuuriGridProps,
   MuuriItemProps,

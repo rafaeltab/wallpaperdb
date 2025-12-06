@@ -78,6 +78,7 @@ describe('useFilter', () => {
       expect(() =>
         result.current.filter((item) => {
           const el = item.getElement();
+          if (!el) return false;
           const content = el.querySelector('[data-visible]');
           return content?.getAttribute('data-visible') === 'true';
         })
@@ -135,6 +136,7 @@ describe('useFilter', () => {
             onClick={() =>
               filter((item) => {
                 const el = item.getElement();
+                if (!el) return false;
                 return el.querySelector('[data-category="a"]') !== null;
               })
             }

@@ -173,21 +173,43 @@ export const MultiCriteriaSorting: Story = {
     function MultiSortControls() {
       const { sort } = useSort();
 
+      // Custom multi-criteria sort: rating descending, then price descending
+      const sortBestValue = () => {
+        sort((itemA, itemB) => {
+          const elA = itemA.getElement();
+          const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
+          const ratingA = parseFloat(elA.getAttribute('data-rating') ?? '0');
+          const ratingB = parseFloat(elB.getAttribute('data-rating') ?? '0');
+          if (ratingA !== ratingB) return ratingB - ratingA; // descending
+          const priceA = parseFloat(elA.getAttribute('data-price') ?? '0');
+          const priceB = parseFloat(elB.getAttribute('data-price') ?? '0');
+          return priceB - priceA; // descending
+        });
+      };
+
+      // Custom multi-criteria sort: price ascending, then rating ascending
+      const sortBudgetFriendly = () => {
+        sort((itemA, itemB) => {
+          const elA = itemA.getElement();
+          const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
+          const priceA = parseFloat(elA.getAttribute('data-price') ?? '0');
+          const priceB = parseFloat(elB.getAttribute('data-price') ?? '0');
+          if (priceA !== priceB) return priceA - priceB; // ascending
+          const ratingA = parseFloat(elA.getAttribute('data-rating') ?? '0');
+          const ratingB = parseFloat(elB.getAttribute('data-rating') ?? '0');
+          return ratingA - ratingB; // ascending
+        });
+      };
+
       return (
         <div style={{ marginBottom: 16 }}>
           <p style={{ color: '#666', marginBottom: 8 }}>Sort by multiple criteria:</p>
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={() => sort(['data-rating', 'data-price'], { descending: true })}
-          >
+          <button type="button" style={buttonStyle} onClick={sortBestValue}>
             Best Value (Rating ↓, then Price ↓)
           </button>
-          <button
-            type="button"
-            style={buttonStyle}
-            onClick={() => sort(['data-price', 'data-rating'])}
-          >
+          <button type="button" style={buttonStyle} onClick={sortBudgetFriendly}>
             Budget Friendly (Price ↑, then Rating ↑)
           </button>
         </div>
@@ -221,6 +243,7 @@ export const CustomComparer: Story = {
         sort((itemA, itemB) => {
           const elA = itemA.getElement();
           const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
           const ratingA = parseFloat(
             elA.querySelector('[data-rating]')?.getAttribute('data-rating') ?? '0'
           );
@@ -235,6 +258,7 @@ export const CustomComparer: Story = {
         sort((itemA, itemB) => {
           const elA = itemA.getElement();
           const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
           const dateA = new Date(
             elA.querySelector('[data-date]')?.getAttribute('data-date') ?? ''
           ).getTime();
@@ -249,6 +273,7 @@ export const CustomComparer: Story = {
         sort((itemA, itemB) => {
           const elA = itemA.getElement();
           const elB = itemB.getElement();
+          if (!elA || !elB) return 0;
           const priceA = parseFloat(
             elA.querySelector('[data-price]')?.getAttribute('data-price') ?? '0'
           );

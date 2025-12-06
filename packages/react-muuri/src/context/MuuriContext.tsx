@@ -103,7 +103,7 @@ export function MuuriProviderInternal({ children, onGridRef }: MuuriProviderInte
     (key: string): void => {
       const registration = itemsRef.current.get(key);
       if (registration?.muuriItem && grid) {
-        grid.remove(registration.muuriItem, { removeElements: false, layout: true });
+        grid.remove([registration.muuriItem], { removeElements: false, layout: true });
       }
       itemsRef.current.delete(key);
     },

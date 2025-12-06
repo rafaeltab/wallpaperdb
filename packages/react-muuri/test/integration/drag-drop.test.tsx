@@ -1,10 +1,35 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MuuriGrid } from '../../src/MuuriGrid.js';
 import { MuuriItem } from '../../src/MuuriItem.js';
 import { useDrag } from '../../src/hooks/useDrag.js';
 import { useGrid } from '../../src/hooks/useGrid.js';
 import { useItem } from '../../src/hooks/useItem.js';
+
+/**
+ * Helper to simulate drag operation on an element
+ */
+function simulateDrag(element: HTMLElement, deltaX = 50, deltaY = 50) {
+  const rect = element.getBoundingClientRect();
+  const startX = rect.left + rect.width / 2;
+  const startY = rect.top + rect.height / 2;
+
+  fireEvent.mouseDown(element, {
+    clientX: startX,
+    clientY: startY,
+    button: 0,
+  });
+
+  fireEvent.mouseMove(document, {
+    clientX: startX + deltaX,
+    clientY: startY + deltaY,
+  });
+
+  fireEvent.mouseUp(document, {
+    clientX: startX + deltaX,
+    clientY: startY + deltaY,
+  });
+}
 
 describe('Drag and Drop Integration', () => {
   describe('drag-enabled grid', () => {
@@ -249,6 +274,83 @@ describe('Drag and Drop Integration', () => {
         },
         { timeout: 1000 }
       );
+    });
+  });
+
+  /**
+   * BUG TEST: dragPlaceholder undefined error
+   *
+   * When dragEnabled is true but no dragPlaceholder is configured,
+   * attempting to drag an item throws:
+   * "can't access property 'enabled' of undefined - grid._settings.dragPlaceholder is undefined"
+   *
+   * Root cause: MuuriGrid.tsx passes `dragPlaceholder: undefined` to Muuri options,
+   * but Muuri expects this property to be absent (not explicitly undefined).
+   */
+  describe('drag without explicit dragPlaceholder (BUG)', () => {
+    it('should not throw when initiating drag without dragPlaceholder config', async () => {
+      // This test exposes a bug where dragging throws an error when dragPlaceholder is not configured
+      const onDragInit = vi.fn();
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <MuuriGrid dragEnabled dragSort onDragInit={onDragInit}>
+          <MuuriItem key="1">
+            <div data-testid="item1" style={{ width: 100, height: 100 }}>
+              Item 1
+            </div>
+          </MuuriItem>
+          <MuuriItem key="2">
+            <div data-testid="item2" style={{ width: 100, height: 100 }}>
+              Item 2
+            </div>
+          </MuuriItem>
+        </MuuriGrid>
+      );
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('item1')).toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
+
+      // Attempt to drag - this should NOT throw an error
+      const item1 = screen.getByTestId('item1');
+      expect(() => simulateDrag(item1)).not.toThrow();
+
+      consoleError.mockRestore();
+    });
+
+    it('should not throw when initiating drag with dragHandle but no dragPlaceholder', async () => {
+      // Same bug but with dragHandle specified
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(
+        <MuuriGrid dragEnabled dragSort dragHandle=".handle">
+          <MuuriItem key="1">
+            <div data-testid="item1" style={{ width: 100, height: 100 }}>
+              <div className="handle" data-testid="handle1">
+                Drag here
+              </div>
+              <div>Content</div>
+            </div>
+          </MuuriItem>
+        </MuuriGrid>
+      );
+
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('handle1')).toBeInTheDocument();
+        },
+        { timeout: 1000 }
+      );
+
+      // Attempt to drag via handle - this should NOT throw an error
+      const handle = screen.getByTestId('handle1');
+      expect(() => simulateDrag(handle)).not.toThrow();
+
+      consoleError.mockRestore();
     });
   });
 });

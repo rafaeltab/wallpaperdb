@@ -10,16 +10,9 @@ import {
   type CSSProperties,
 } from 'react';
 import { MuuriContext } from './context/MuuriContext.js';
-import type {
-  MuuriContextValue,
-  MuuriGridProps,
-  MuuriInstance,
-  MuuriItem,
-  MuuriOptions,
-} from './types/index.js';
-
-// Muuri is imported dynamically to support SSR
-type MuuriConstructor = new (element: HTMLElement, options?: MuuriOptions) => MuuriInstance;
+import type Muuri from 'muuri';
+import type { Item, GridOptions } from 'muuri';
+import type { MuuriContextValue, MuuriGridProps } from './types/index.js';
 
 /**
  * MuuriGrid component - the main container for Muuri layout.
@@ -38,7 +31,7 @@ type MuuriConstructor = new (element: HTMLElement, options?: MuuriOptions) => Mu
  * </MuuriGrid>
  * ```
  */
-export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(function MuuriGrid(
+export const MuuriGrid = forwardRef<Muuri | null, MuuriGridProps>(function MuuriGrid(
   {
     children,
     className,
@@ -104,10 +97,8 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
   ref
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [grid, setGrid] = useState<MuuriInstance | null>(null);
-  const itemsMapRef = useRef<Map<string, { element: HTMLElement; item: MuuriItem | null }>>(
-    new Map()
-  );
+  const [grid, setGrid] = useState<Muuri | null>(null);
+  const itemsMapRef = useRef<Map<string, { element: HTMLElement; item: Item | null }>>(new Map());
   const pendingItemsRef = useRef<HTMLElement[]>([]);
   const isInitializedRef = useRef(false);
 
@@ -167,13 +158,13 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
   useEffect(() => {
     if (!containerRef.current || typeof window === 'undefined') return;
 
-    let muuriInstance: MuuriInstance | null = null;
+    let muuriInstance: Muuri | null = null;
     let isCancelled = false;
 
     const initMuuri = async () => {
       // Dynamic import to avoid SSR issues
       const MuuriModule = await import('muuri');
-      const Muuri = MuuriModule.default as unknown as MuuriConstructor;
+      const MuuriClass = MuuriModule.default;
 
       if (isCancelled || !containerRef.current) return;
 
@@ -183,7 +174,9 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
 
       // Build Muuri options - we don't pass items here, we add them after
       // to properly track them in our itemsMapRef
-      const options: MuuriOptions = {
+      // Filter out undefined values to avoid passing explicit undefined to Muuri,
+      // which can cause errors (e.g., dragPlaceholder: undefined throws when dragging)
+      const rawOptions: GridOptions = {
         items: [],
         layout,
         layoutOnResize,
@@ -219,8 +212,13 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
         itemPlaceholderClass,
       };
 
+      // Strip undefined values - Muuri expects properties to be absent rather than undefined
+      const options = Object.fromEntries(
+        Object.entries(rawOptions).filter(([, v]) => v !== undefined)
+      ) as GridOptions;
+
       // Create Muuri instance
-      muuriInstance = new Muuri(containerRef.current, options);
+      muuriInstance = new MuuriClass(containerRef.current, options);
 
       // Bind event listeners
       muuriInstance.on('layoutStart', (items, isInstant) => {
@@ -329,7 +327,7 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
 
   // Register item with grid
   const registerItem = useCallback(
-    (element: HTMLElement, key: string): MuuriItem | null => {
+    (element: HTMLElement, key: string): Item | null => {
       // Check if already registered
       const existing = itemsMapRef.current.get(key);
       if (existing) {
@@ -376,7 +374,12 @@ export const MuuriGrid = forwardRef<MuuriInstance | null, MuuriGridProps>(functi
       const registration = itemsMapRef.current.get(key);
       if (registration) {
         if (registration.item && grid) {
-          grid.remove(registration.item, { removeElements: false, layout: true });
+          const itemToRemove = registration.item;
+          // Hide the item instantly (no animation since React is unmounting)
+          grid.hide([itemToRemove], { instant: true });
+          // Remove the item from Muuri's tracking and trigger layout
+          // so remaining items reposition to fill the gap
+          grid.remove([itemToRemove], { removeElements: false, layout: true });
         } else {
           // Remove from pending if not yet added
           const index = pendingItemsRef.current.indexOf(registration.element);

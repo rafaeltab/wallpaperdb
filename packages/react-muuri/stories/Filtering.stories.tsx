@@ -187,6 +187,7 @@ export const SearchFilter: Story = {
         } else {
           filter((item) => {
             const el = item.getElement();
+            if (!el) return false;
             const text = el.textContent?.toLowerCase() ?? '';
             return text.includes(term.toLowerCase());
           });
@@ -253,6 +254,7 @@ export const MultiSelectFilter: Story = {
         } else {
           filter((item) => {
             const el = item.getElement();
+            if (!el) return false;
             const cat = el
               .querySelector('[data-category]')
               ?.getAttribute('data-category') as Category;

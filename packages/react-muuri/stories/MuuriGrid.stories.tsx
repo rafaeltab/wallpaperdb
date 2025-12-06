@@ -212,7 +212,12 @@ export const DragAndDrop: Story = {
 export const CustomAnimation: Story = {
   render: () => (
     <div style={containerStyle}>
-      <MuuriGrid layoutDuration={600} layoutEasing="ease-in-out" showDuration={400} hideDuration={400}>
+      <MuuriGrid
+        layoutDuration={600}
+        layoutEasing="ease-in-out"
+        showDuration={400}
+        hideDuration={400}
+      >
         {[1, 2, 3, 4, 5, 6, 7, 8].map((id) => (
           <MuuriItem key={id}>
             <div

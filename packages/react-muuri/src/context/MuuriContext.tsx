@@ -34,13 +34,10 @@ export function MuuriProvider({ children }: MuuriProviderProps) {
   /**
    * Register an item element - no-op in basic provider
    */
-  const registerItem = useCallback(
-    (_element: HTMLElement, _key: string): MuuriItem | null => {
-      // No grid in basic provider
-      return null;
-    },
-    []
-  );
+  const registerItem = useCallback((_element: HTMLElement, _key: string): MuuriItem | null => {
+    // No grid in basic provider
+    return null;
+  }, []);
 
   /**
    * Unregister an item - no-op in basic provider

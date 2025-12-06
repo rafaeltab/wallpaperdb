@@ -79,7 +79,15 @@ packages/react-muuri/
 
 ### Phase 2: Core Components (TDD) ✅
 
-### Phase 3: Core Hooks (TDD) ← **CURRENT**
+### Phase 3: Core Hooks (TDD) ✅
+
+### Phase 4: Drag & Drop Support (TDD) ✅
+
+### Phase 5: Filtering & Sorting (TDD) ✅
+
+### Phase 6: Final Documentation & Cleanup ✅
+
+**All phases complete!**
 
 ---
 

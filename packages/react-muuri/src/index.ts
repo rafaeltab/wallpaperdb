@@ -70,11 +70,24 @@ export { MuuriItem } from './MuuriItem.js';
 export { MuuriContext, MuuriProvider } from './context/MuuriContext.js';
 export { ItemContext, ItemProvider } from './context/ItemContext.js';
 
-// Hooks (to be implemented in Phase 3)
-// export { useGrid } from './hooks/useGrid.js';
-// export { useItem } from './hooks/useItem.js';
-// export { useDrag } from './hooks/useDrag.js';
-// export { useFilter } from './hooks/useFilter.js';
-// export { useSort } from './hooks/useSort.js';
-// export { useLayout } from './hooks/useLayout.js';
-// export { useRefresh } from './hooks/useRefresh.js';
+// Hooks - Phase 3
+export { useGrid } from './hooks/useGrid.js';
+export { useItem } from './hooks/useItem.js';
+export { useLayout } from './hooks/useLayout.js';
+export { useRefresh } from './hooks/useRefresh.js';
+
+// Hooks - Phase 4
+export { useDrag } from './hooks/useDrag.js';
+
+// Hooks - Phase 5
+export { useFilter } from './hooks/useFilter.js';
+export { useSort } from './hooks/useSort.js';
+
+// Utilities
+export {
+  createDragEventBridge,
+  createVisibilityEventBridge,
+  type EventBridgeCleanup,
+  type DragEventCallbacks,
+  type VisibilityEventCallbacks,
+} from './utils/event-bridge.js';

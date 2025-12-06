@@ -78,11 +78,7 @@ export type LayoutFunction = (
   items: MuuriItem[],
   width: number,
   height: number,
-  callback: (
-    items: MuuriItem[],
-    width: number,
-    height: number
-  ) => void
+  callback: (items: MuuriItem[], width: number, height: number) => void
 ) => void;
 
 /**
@@ -133,10 +129,7 @@ export interface DragSortPredicate {
 export type DragSortPredicateFunction = (
   item: MuuriItem,
   event: MouseEvent | TouchEvent
-) =>
-  | { index: number; grid?: MuuriInstance; action?: 'move' | 'swap' }
-  | null
-  | undefined;
+) => { index: number; grid?: MuuriInstance; action?: 'move' | 'swap' } | null | undefined;
 
 /**
  * Drag release animation options
@@ -194,7 +187,17 @@ export interface DragAutoScrollOptions {
     | ((
         item: MuuriItem,
         scrollElement: HTMLElement | Window,
-        scrollData: { direction: number; threshold: number; distance: number; value: number; maxValue: number; duration: number; speed: number; deltaTime: number; isEnding: boolean }
+        scrollData: {
+          direction: number;
+          threshold: number;
+          distance: number;
+          value: number;
+          maxValue: number;
+          duration: number;
+          speed: number;
+          deltaTime: number;
+          isEnding: boolean;
+        }
       ) => number);
   /** Smooth stop */
   smoothStop?: boolean;
@@ -400,7 +403,9 @@ export interface MuuriInstance {
   /** Get a single item by index, element, or instance */
   getItem(target: number | HTMLElement | MuuriItem): MuuriItem | null;
   /** Get items array, optionally filtered by state */
-  getItems(targets?: number | HTMLElement | MuuriItem | (number | HTMLElement | MuuriItem)[]): MuuriItem[];
+  getItems(
+    targets?: number | HTMLElement | MuuriItem | (number | HTMLElement | MuuriItem)[]
+  ): MuuriItem[];
   /** Refresh cached item dimensions */
   refreshItems(items?: MuuriItem[], force?: boolean): MuuriInstance;
   /** Refresh sort data values */
@@ -420,9 +425,16 @@ export interface MuuriInstance {
   /** Filter items based on predicate */
   filter(predicate: string | FilterPredicate, options?: FilterOptions): MuuriInstance;
   /** Sort items */
-  sort(comparer: string | string[] | SortComparer | MuuriItem[], options?: SortOptions): MuuriInstance;
+  sort(
+    comparer: string | string[] | SortComparer | MuuriItem[],
+    options?: SortOptions
+  ): MuuriInstance;
   /** Move item to new position */
-  move(item: MuuriItem | HTMLElement | number, position: MuuriItem | HTMLElement | number, options?: MoveOptions): MuuriInstance;
+  move(
+    item: MuuriItem | HTMLElement | number,
+    position: MuuriItem | HTMLElement | number,
+    options?: MoveOptions
+  ): MuuriInstance;
   /** Send item to another grid */
   send(
     item: MuuriItem | HTMLElement | number,
@@ -468,13 +480,42 @@ export interface MuuriEvents {
   // Filter/Sort/Move
   filter: (shownItems: MuuriItem[], hiddenItems: MuuriItem[]) => void;
   sort: (currentOrder: MuuriItem[], previousOrder: MuuriItem[]) => void;
-  move: (data: { item: MuuriItem; fromIndex: number; toIndex: number; action: 'move' | 'swap' }) => void;
+  move: (data: {
+    item: MuuriItem;
+    fromIndex: number;
+    toIndex: number;
+    action: 'move' | 'swap';
+  }) => void;
 
   // Send/Receive (cross-grid)
-  send: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
-  beforeSend: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
-  receive: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
-  beforeReceive: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
+  send: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
+  beforeSend: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
+  receive: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
+  beforeReceive: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
 
   // Drag
   dragInit: (item: MuuriItem, event: MouseEvent | TouchEvent) => void;
@@ -522,7 +563,12 @@ export interface MuuriGridProps
   /** Called when sort is applied */
   onSort?: (currentOrder: MuuriItem[], previousOrder: MuuriItem[]) => void;
   /** Called when item is moved */
-  onMove?: (data: { item: MuuriItem; fromIndex: number; toIndex: number; action: 'move' | 'swap' }) => void;
+  onMove?: (data: {
+    item: MuuriItem;
+    fromIndex: number;
+    toIndex: number;
+    action: 'move' | 'swap';
+  }) => void;
   /** Called when drag is initialized */
   onDragInit?: (item: MuuriItem, event: MouseEvent | TouchEvent) => void;
   /** Called when drag starts */
@@ -536,9 +582,21 @@ export interface MuuriGridProps
   /** Called when drag release animation ends */
   onDragReleaseEnd?: (item: MuuriItem) => void;
   /** Called when item is sent to another grid */
-  onSend?: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
+  onSend?: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
   /** Called when item is received from another grid */
-  onReceive?: (data: { item: MuuriItem; fromGrid: MuuriInstance; fromIndex: number; toGrid: MuuriInstance; toIndex: number }) => void;
+  onReceive?: (data: {
+    item: MuuriItem;
+    fromGrid: MuuriInstance;
+    fromIndex: number;
+    toGrid: MuuriInstance;
+    toIndex: number;
+  }) => void;
 }
 
 /**

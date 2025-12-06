@@ -12,7 +12,11 @@ import {
 } from 'react';
 import { MuuriContext } from './context/MuuriContext.js';
 import { ItemContext } from './context/ItemContext.js';
-import type { MuuriItem as MuuriItemType, MuuriItemProps, ItemContextValue } from './types/index.js';
+import type {
+  MuuriItem as MuuriItemType,
+  MuuriItemProps,
+  ItemContextValue,
+} from './types/index.js';
 
 /**
  * MuuriItem component - represents a single item in the Muuri grid.

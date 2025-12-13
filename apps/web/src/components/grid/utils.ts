@@ -80,3 +80,72 @@ export function wallpapersToGridItems(wallpapers: Wallpaper[]): GridItem[] {
     .map(wallpaperToGridItem)
     .filter((item): item is GridItem => item !== null);
 }
+
+/**
+ * Configuration for image expansion behavior.
+ */
+export interface ExpansionConfig {
+  /** Target area increase multiplier (e.g., 4.0 = 4x area, 2x dimensions) */
+  areaMultiplier: number;
+  /** Max width as fraction of container (e.g., 0.95) */
+  maxWidthFraction: number;
+  /** Max height as fraction of viewport (e.g., 0.85) */
+  maxHeightFraction: number;
+}
+
+/**
+ * Default expansion configuration.
+ * Provides balanced growth for all aspect ratios.
+ * Images are also capped at their native resolution to prevent upscaling.
+ */
+export const DEFAULT_EXPANSION_CONFIG: ExpansionConfig = {
+  areaMultiplier: 4.0,
+  maxWidthFraction: 0.95,
+  maxHeightFraction: 0.85,
+};
+
+/**
+ * Calculate expanded dimensions using area-based scaling with dimension caps.
+ *
+ * This algorithm ensures visually similar growth for all aspect ratios by:
+ * 1. Targeting a consistent area increase (rather than linear width scaling)
+ * 2. Capping both width AND height to prevent any image from dominating
+ * 3. Scaling down proportionally when hitting either constraint
+ *
+ * @param baseWidth - Base width before expansion
+ * @param baseHeight - Base height before expansion
+ * @param aspectRatio - Image aspect ratio (width / height)
+ * @param maxWidth - Maximum allowed width
+ * @param maxHeight - Maximum allowed height
+ * @param areaMultiplier - Target area increase (e.g., 2.25 for 2.25x area)
+ */
+export function calculateExpandedDimensions(
+  baseWidth: number,
+  baseHeight: number,
+  aspectRatio: number,
+  maxWidth: number,
+  maxHeight: number,
+  areaMultiplier: number,
+): { width: number; height: number } {
+  // Step 1: Calculate target area
+  const baseArea = baseWidth * baseHeight;
+  const targetArea = baseArea * areaMultiplier;
+
+  // Step 2: Calculate ideal dimensions from target area preserving aspect ratio
+  // Area = w * h, AR = w / h
+  // Solving: w = sqrt(Area * AR), h = sqrt(Area / AR)
+  const idealWidth = Math.sqrt(targetArea * aspectRatio);
+  const idealHeight = Math.sqrt(targetArea / aspectRatio);
+
+  // Step 3: Calculate scale factors for each constraint
+  const widthScale = maxWidth / idealWidth;
+  const heightScale = maxHeight / idealHeight;
+
+  // Step 4: Use the more restrictive constraint (but don't scale up beyond ideal)
+  const scaleFactor = Math.min(widthScale, heightScale, 1);
+
+  return {
+    width: idealWidth * scaleFactor,
+    height: idealHeight * scaleFactor,
+  };
+}

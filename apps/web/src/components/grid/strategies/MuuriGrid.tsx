@@ -7,7 +7,12 @@ import {
 } from '@wallpaperdb/react-muuri';
 import type { GridProps, GridItem, ItemSpan } from '../types';
 import { WallpaperCard } from '../WallpaperCard';
-import { getDefaultSpan, getExpandedSpan } from '../utils';
+import {
+  getDefaultSpan,
+  getExpandedSpan,
+  calculateExpandedDimensions,
+  DEFAULT_EXPANSION_CONFIG,
+} from '../utils';
 
 /**
  * Layout state stored in a ref so the layout function can read current values
@@ -372,6 +377,20 @@ function createRefBasedLayout(
       }
     }
 
+    // Center content horizontally by calculating actual width and adding offset
+    let maxRightEdge = 0;
+    for (let i = 0; i < items.length; i++) {
+      const x = slots[i * 2];
+      const itemWidth = items[i].getWidth();
+      maxRightEdge = Math.max(maxRightEdge, x + itemWidth);
+    }
+    const centerOffset = Math.max(0, (gridWidth - maxRightEdge) / 2);
+
+    // Apply offset to all X positions
+    for (let i = 0; i < slots.length; i += 2) {
+      slots[i] += centerOffset;
+    }
+
     callback({
       id: layoutId,
       items,
@@ -425,22 +444,26 @@ export function MuuriGrid({
     []
   );
 
-  // Track container width for capping expanded items
+  // Track container width and viewport height for capping expanded items
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1200
   );
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window !== 'undefined' ? window.innerHeight : 800
+  );
 
   useEffect(() => {
-    const updateWidth = () => {
+    const updateDimensions = () => {
       if (containerRef.current) {
         setContainerWidth(containerRef.current.offsetWidth);
       }
+      setViewportHeight(window.innerHeight);
     };
 
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
+    updateDimensions();
+    window.addEventListener('resize', updateDimensions);
+    return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
   const handleClick = useCallback(
@@ -451,10 +474,14 @@ export function MuuriGrid({
         setExpandedCenter(null);
       } else {
         // Clicking any other item → expand it (auto-collapses previous)
-        const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
         const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const centerY = scrollY + viewportHeight / 2;
         const centerX = containerWidth / 2;
+
+        // Calculate viewport center relative to grid container (not document coordinates)
+        const containerRect = containerRef.current?.getBoundingClientRect();
+        const centerY = containerRect
+          ? viewportHeight / 2 - containerRect.top
+          : viewportHeight / 2;
 
         setExpandedId(item.id);
         setExpandedCenter({ x: centerX, y: centerY });
@@ -493,28 +520,45 @@ export function MuuriGrid({
 
   // Calculate pixel dimensions from span and aspect ratio
   const getItemDimensions = useCallback(
-    (item: GridItem, span: ItemSpan, isExpanded: boolean, maxWidth: number) => {
-      // Width is based on span columns
+    (
+      item: GridItem,
+      span: ItemSpan,
+      isExpanded: boolean,
+      containerW: number,
+      viewportH: number,
+    ) => {
+      // Base dimensions from span columns
       let width = span.cols * baseSize;
-      // Height is calculated from actual aspect ratio to preserve proportions
       let height = width / item.aspectRatio;
 
-      // Apply expansion multiplier (1.5x) for expanded items
+      // Apply area-based expansion with dimension caps
       if (isExpanded) {
-        const expandMultiplier = 1.5;
-        let expandedWidth = width * expandMultiplier;
+        const config = DEFAULT_EXPANSION_CONFIG;
 
-        // Cap to max width (container width minus gap for margins)
-        const maxAllowedWidth = maxWidth - gap;
-        if (expandedWidth > maxAllowedWidth) {
-          expandedWidth = maxAllowedWidth;
-        }
+        // Calculate max constraints:
+        // 1. Viewport/container based limits
+        // 2. Image's native resolution (don't upscale beyond original)
+        const maxWidth = Math.min(
+          containerW * config.maxWidthFraction - gap,
+          item.width,
+        );
+        const maxHeight = Math.min(
+          viewportH * config.maxHeightFraction,
+          item.height,
+        );
 
-        // Calculate height based on capped width to preserve aspect ratio
-        const expandedHeight = expandedWidth / item.aspectRatio;
+        // Use area-based algorithm for visually consistent expansion
+        const expanded = calculateExpandedDimensions(
+          width,
+          height,
+          item.aspectRatio,
+          maxWidth,
+          maxHeight,
+          config.areaMultiplier,
+        );
 
-        width = expandedWidth;
-        height = expandedHeight;
+        width = expanded.width;
+        height = expanded.height;
       }
 
       // Add margin (half gap on each side = full gap between items)
@@ -525,7 +569,7 @@ export function MuuriGrid({
         margin,
       };
     },
-    [baseSize, gap]
+    [baseSize, gap],
   );
 
   return (
@@ -539,7 +583,13 @@ export function MuuriGrid({
         {items.map((item) => {
           const isExpanded = expandedId === item.id;
           const span = getItemSpan(item);
-          const { width, height, margin } = getItemDimensions(item, span, isExpanded, containerWidth);
+          const { width, height, margin } = getItemDimensions(
+            item,
+            span,
+            isExpanded,
+            containerWidth,
+            viewportHeight,
+          );
 
           return (
             <MuuriItem key={item.id}>

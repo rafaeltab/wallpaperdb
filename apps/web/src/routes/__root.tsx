@@ -36,7 +36,7 @@ function RootLayout() {
           </div>
         </div>
       </nav>
-      <main className="py-8">
+      <main className="pb-8">
         <Outlet />
       </main>
       <TanStackRouterDevtools position="bottom-right" />

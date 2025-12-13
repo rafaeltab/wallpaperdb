@@ -54,8 +54,6 @@ function HomePage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Wallpapers</h1>
-
       {wallpapers.length === 0 ? (
         <div className="flex items-center justify-center py-12">
           <div className="text-center">

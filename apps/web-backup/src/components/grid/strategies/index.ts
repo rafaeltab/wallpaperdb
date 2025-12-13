@@ -1,1 +1,0 @@
-export { MuuriGrid } from './MuuriGrid';

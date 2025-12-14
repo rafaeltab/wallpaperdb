@@ -83,28 +83,17 @@ export function UploadDropZone({
     }
   }, [disabled]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
-        e.preventDefault();
-        fileInputRef.current?.click();
-      }
-    },
-    [disabled]
-  );
-
   return (
-    <div
+    <button
+      type="button"
       data-testid="drop-zone"
-      role="button"
-      tabIndex={disabled ? -1 : 0}
+      disabled={disabled}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onClick={handleClick}
-      onKeyDown={handleKeyDown}
       className={cn(
-        'relative border-2 border-dashed rounded-lg p-8 transition-colors cursor-pointer',
+        'relative border-2 border-dashed rounded-lg p-8 transition-colors cursor-pointer w-full',
         'hover:border-primary/50 hover:bg-muted/50',
         'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
         isDragActive && 'border-primary bg-primary/5',
@@ -135,6 +124,6 @@ export function UploadDropZone({
           {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         </div>
       </div>
-    </div>
+    </button>
   );
 }

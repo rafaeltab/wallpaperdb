@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 
 function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: role="group" is intentional - <fieldset> adds unwanted default styling
     <div
       data-slot="input-group"
       role="group"
@@ -46,6 +47,8 @@ function InputGroupAddon({
   ...props
 }: React.ComponentProps<'div'> & VariantProps<typeof inputGroupAddonVariants>) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: role="group" is intentional - <fieldset> adds unwanted default styling
+    // biome-ignore lint/a11y/useKeyWithClickEvents: onClick only focuses input - addon is not keyboard-navigable (similar to label behavior)
     <div
       role="group"
       data-slot="input-group-addon"

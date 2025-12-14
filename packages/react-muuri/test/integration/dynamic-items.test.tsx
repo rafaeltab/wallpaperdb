@@ -104,8 +104,13 @@ describe('Dynamic Items Integration', () => {
         { timeout: 1000 }
       );
 
-      // onAdd should have been called for the new item
-      expect(onAdd).toHaveBeenCalled();
+      // onAdd should have been called for the new item - wait for callback to fire
+      await waitFor(
+        () => {
+          expect(onAdd).toHaveBeenCalled();
+        },
+        { timeout: 1000 }
+      );
     });
   });
 

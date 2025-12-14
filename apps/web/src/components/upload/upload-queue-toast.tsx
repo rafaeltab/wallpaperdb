@@ -127,6 +127,7 @@ export function UploadQueueToast({
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Interactive card containing buttons - can't use <button> as it would create invalid nested buttons
     <div
       data-testid="upload-queue-toast"
       role="button"

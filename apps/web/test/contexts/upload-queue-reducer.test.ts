@@ -69,8 +69,9 @@ describe('uploadQueueReducer', () => {
     });
 
     it('enforces MAX_FILES_PER_BATCH limit including existing files', () => {
-      // Start with some files already in queue
-      const existingFiles = Array.from({ length: 30 }, (_, i) => ({
+      // Start with files already near the limit (MAX_FILES_PER_BATCH - 10)
+      const existingCount = MAX_FILES_PER_BATCH - 10;
+      const existingFiles = Array.from({ length: existingCount }, (_, i) => ({
         id: `existing-${i}`,
         file: createMockFile(`existing${i}.jpg`),
         status: 'pending' as const,
@@ -81,7 +82,7 @@ describe('uploadQueueReducer', () => {
         files: existingFiles,
       };
 
-      // Try to add more than remaining capacity
+      // Try to add more than remaining capacity (30 files when only 10 spots remain)
       const newFiles = Array.from({ length: 30 }, (_, i) => createMockFile(`new${i}.jpg`));
 
       const newState = uploadQueueReducer(state, {
@@ -89,6 +90,7 @@ describe('uploadQueueReducer', () => {
         payload: { files: newFiles },
       });
 
+      // Should be capped at MAX_FILES_PER_BATCH
       expect(newState.files.length).toBe(MAX_FILES_PER_BATCH);
     });
   });

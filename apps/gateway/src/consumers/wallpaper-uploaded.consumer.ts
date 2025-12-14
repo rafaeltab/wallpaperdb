@@ -7,6 +7,12 @@ import {
 import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, singleton } from 'tsyringe';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import {
+  withSpan,
+  recordCounter,
+  recordHistogram,
+  Attributes,
+} from '@wallpaperdb/core/telemetry';
 
 /**
  * Consumer for wallpaper.uploaded events
@@ -35,14 +41,29 @@ export class WallpaperUploadedConsumer extends BaseEventConsumer<
   }
 
   public async handleEvent(event: WallpaperUploadedEvent): Promise<void> {
-    console.log('BEEP handleEventUploaded');
-    // Create wallpaper document with empty variants array
-    await this.wallpaperRepository.upsert({
-      wallpaperId: event.wallpaper.id,
-      userId: event.wallpaper.userId,
-      variants: [],
-      uploadedAt: event.wallpaper.uploadedAt,
-      updatedAt: new Date().toISOString(),
-    });
+    return await withSpan(
+      'gateway.consumer.handle_wallpaper_uploaded',
+      {
+        [Attributes.WALLPAPER_ID]: event.wallpaper.id,
+        [Attributes.USER_ID]: event.wallpaper.userId,
+        [Attributes.EVENT_ID]: event.eventId,
+      },
+      async () => {
+        const startTime = Date.now();
+
+        // Create wallpaper document with empty variants array
+        await this.wallpaperRepository.upsert({
+          wallpaperId: event.wallpaper.id,
+          userId: event.wallpaper.userId,
+          variants: [],
+          uploadedAt: event.wallpaper.uploadedAt,
+          updatedAt: new Date().toISOString(),
+        });
+
+        const durationMs = Date.now() - startTime;
+        recordCounter('gateway.consumer.document_created.total', 1);
+        recordHistogram('gateway.consumer.document_upsert_duration_ms', durationMs);
+      }
+    );
   }
 }

@@ -7,6 +7,12 @@ import {
 import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, singleton } from 'tsyringe';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import {
+  withSpan,
+  recordCounter,
+  recordHistogram,
+  Attributes,
+} from '@wallpaperdb/core/telemetry';
 
 /**
  * Consumer for wallpaper.variant.available events
@@ -35,16 +41,32 @@ export class WallpaperVariantAvailableConsumer extends BaseEventConsumer<
   }
 
   public async handleEvent(event: WallpaperVariantAvailableEvent): Promise<void> {
-    console.log('BEEP handleEventAvailable');
+    return await withSpan(
+      'gateway.consumer.handle_wallpaper_variant_available',
+      {
+        [Attributes.WALLPAPER_ID]: event.variant.wallpaperId,
+        [Attributes.EVENT_ID]: event.eventId,
+        [Attributes.IMAGE_FORMAT]: event.variant.format,
+        [Attributes.FILE_WIDTH]: event.variant.width,
+        [Attributes.FILE_HEIGHT]: event.variant.height,
+      },
+      async () => {
+        const startTime = Date.now();
 
-    // Add variant to wallpaper document
-    await this.wallpaperRepository.addVariant(event.variant.wallpaperId, {
-      width: event.variant.width,
-      height: event.variant.height,
-      aspectRatio: event.variant.aspectRatio,
-      format: event.variant.format,
-      fileSizeBytes: event.variant.fileSizeBytes,
-      createdAt: event.variant.createdAt,
-    });
+        // Add variant to wallpaper document
+        await this.wallpaperRepository.addVariant(event.variant.wallpaperId, {
+          width: event.variant.width,
+          height: event.variant.height,
+          aspectRatio: event.variant.aspectRatio,
+          format: event.variant.format,
+          fileSizeBytes: event.variant.fileSizeBytes,
+          createdAt: event.variant.createdAt,
+        });
+
+        const durationMs = Date.now() - startTime;
+        recordCounter('gateway.consumer.variant_added.total', 1);
+        recordHistogram('gateway.consumer.variant_add_duration_ms', durationMs);
+      }
+    );
   }
 }

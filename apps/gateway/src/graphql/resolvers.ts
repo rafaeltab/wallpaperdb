@@ -1,6 +1,12 @@
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import {
+  withSpan,
+  recordCounter,
+  recordHistogram,
+} from '@wallpaperdb/core/telemetry';
+import { GatewayAttributes } from '../telemetry/attributes.js';
 
 interface WallpaperFilter {
   userId?: string;
@@ -69,59 +75,109 @@ export class Resolvers {
    * Search wallpapers with filters and pagination
    */
   private async searchWallpapers(args: SearchArgs) {
-    // Decode cursor if provided
-    let offset = 0;
-    if (args.after) {
-      offset = parseInt(Buffer.from(args.after, 'base64').toString('utf-8'), 10);
-    } else if (args.before) {
-      offset = parseInt(Buffer.from(args.before, 'base64').toString('utf-8'), 10);
-    }
-
-    // Default page size
     const limit = args.first ?? args.last ?? 10;
 
-    // If using 'last', we need to adjust offset for backward pagination
-    if (args.last && args.before) {
-      offset = Math.max(0, offset - args.last);
-    }
-
-    // Search with offset and limit
-    const result = await this.repository.search({
-      userId: args.filter?.userId,
-      variantFilters: args.filter?.variants,
-      from: offset,
-      size: limit + 1, // Fetch one extra to determine hasNextPage
-    });
-
-    // Check if there are more results
-    const hasMore = result.documents.length > limit;
-    const documents = hasMore ? result.documents.slice(0, limit) : result.documents;
-
-    // Attach wallpaperId to variants for URL resolution
-    const edges = documents.map((doc: Wallpaper) => ({
-      node: {
-        ...doc,
-        variants: doc.variants.map((v) => ({
-          ...v,
-          __wallpaperId: doc.wallpaperId,
-        })),
+    return await withSpan(
+      'graphql.resolve.searchWallpapers',
+      {
+        [GatewayAttributes.GRAPHQL_OPERATION_NAME]: 'searchWallpapers',
+        [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
+        [GatewayAttributes.SEARCH_PAGE_SIZE]: limit,
+        [GatewayAttributes.SEARCH_FILTER_USER_ID]: args.filter?.userId ?? 'none',
+        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: args.filter?.variants
+          ? 'true'
+          : 'false',
       },
-    }));
+      async (span) => {
+        const startTime = Date.now();
 
-    // Generate cursors
-    const startCursor = edges.length > 0 ? Buffer.from(offset.toString()).toString('base64') : null;
-    const endCursor =
-      edges.length > 0 ? Buffer.from((offset + edges.length).toString()).toString('base64') : null;
+        // Decode cursor if provided
+        let offset = 0;
+        if (args.after) {
+          offset = parseInt(
+            Buffer.from(args.after, 'base64').toString('utf-8'),
+            10
+          );
+        } else if (args.before) {
+          offset = parseInt(
+            Buffer.from(args.before, 'base64').toString('utf-8'),
+            10
+          );
+        }
 
-    return {
-      edges,
-      pageInfo: {
-        hasNextPage: hasMore && !args.last,
-        hasPreviousPage: offset > 0,
-        startCursor,
-        endCursor,
-      },
-    };
+        // If using 'last', we need to adjust offset for backward pagination
+        if (args.last && args.before) {
+          offset = Math.max(0, offset - args.last);
+        }
+
+        span.setAttribute(GatewayAttributes.SEARCH_OFFSET, offset);
+
+        // Search with offset and limit
+        const result = await this.repository.search({
+          userId: args.filter?.userId,
+          variantFilters: args.filter?.variants,
+          from: offset,
+          size: limit + 1, // Fetch one extra to determine hasNextPage
+        });
+
+        // Check if there are more results
+        const hasMore = result.documents.length > limit;
+        const documents = hasMore
+          ? result.documents.slice(0, limit)
+          : result.documents;
+
+        // Attach wallpaperId to variants for URL resolution
+        const edges = documents.map((doc: Wallpaper) => ({
+          node: {
+            ...doc,
+            variants: doc.variants.map((v) => ({
+              ...v,
+              __wallpaperId: doc.wallpaperId,
+            })),
+          },
+        }));
+
+        // Generate cursors
+        const startCursor =
+          edges.length > 0
+            ? Buffer.from(offset.toString()).toString('base64')
+            : null;
+        const endCursor =
+          edges.length > 0
+            ? Buffer.from((offset + edges.length).toString()).toString('base64')
+            : null;
+
+        const hasNextPage = hasMore && !args.last;
+        const hasPreviousPage = offset > 0;
+
+        // Record span attributes and metrics
+        span.setAttribute(GatewayAttributes.SEARCH_TOTAL_RESULTS, result.total);
+        span.setAttribute(GatewayAttributes.GRAPHQL_RESULT_COUNT, edges.length);
+        span.setAttribute(GatewayAttributes.SEARCH_HAS_NEXT_PAGE, hasNextPage);
+        span.setAttribute(GatewayAttributes.SEARCH_HAS_PREV_PAGE, hasPreviousPage);
+
+        const durationMs = Date.now() - startTime;
+        recordCounter('graphql.query.total', 1, {
+          operation: 'searchWallpapers',
+        });
+        recordHistogram('graphql.query.duration_ms', durationMs, {
+          operation: 'searchWallpapers',
+        });
+        recordHistogram('graphql.query.result_count', edges.length, {
+          operation: 'searchWallpapers',
+        });
+
+        return {
+          edges,
+          pageInfo: {
+            hasNextPage,
+            hasPreviousPage,
+            startCursor,
+            endCursor,
+          },
+        };
+      }
+    );
   }
 
   /**

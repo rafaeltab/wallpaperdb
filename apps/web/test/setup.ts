@@ -61,3 +61,67 @@ class MockDataTransfer {
 }
 
 global.DataTransfer = MockDataTransfer as unknown as typeof DataTransfer;
+
+// Mock IntersectionObserver with controllable trigger for testing
+type IntersectionCallback = (entries: IntersectionObserverEntry[]) => void;
+const intersectionObserverCallbacks = new Set<{
+  callback: IntersectionCallback;
+  elements: Set<Element>;
+}>();
+
+class MockIntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+  private callback: IntersectionCallback;
+  private elements = new Set<Element>();
+  private registration: { callback: IntersectionCallback; elements: Set<Element> };
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback as IntersectionCallback;
+    this.registration = { callback: this.callback, elements: this.elements };
+    intersectionObserverCallbacks.add(this.registration);
+  }
+
+  observe(element: Element) {
+    this.elements.add(element);
+  }
+
+  unobserve(element: Element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+    intersectionObserverCallbacks.delete(this.registration);
+  }
+
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
+  }
+}
+
+global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
+
+// Test helper to trigger intersection on all observers
+export function triggerIntersection(isIntersecting: boolean) {
+  intersectionObserverCallbacks.forEach(({ callback, elements }) => {
+    const entries = Array.from(elements).map((element) => ({
+      target: element,
+      isIntersecting,
+      intersectionRatio: isIntersecting ? 1 : 0,
+      boundingClientRect: {} as DOMRectReadOnly,
+      intersectionRect: {} as DOMRectReadOnly,
+      rootBounds: null,
+      time: Date.now(),
+    }));
+    if (entries.length > 0) {
+      callback(entries);
+    }
+  });
+}
+
+// Helper to clear all observer registrations between tests
+export function clearIntersectionObservers() {
+  intersectionObserverCallbacks.clear();
+}

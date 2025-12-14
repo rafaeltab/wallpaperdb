@@ -22,7 +22,7 @@ const router = createRouter({
   context: {
     queryClient,
   },
-  defaultPreload: 'intent', // Prefetch routes on hover/focus
+  defaultPreload: 'intent',
 });
 
 // Register router type for type safety

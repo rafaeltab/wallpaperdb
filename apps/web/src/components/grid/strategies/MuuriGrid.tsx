@@ -377,11 +377,24 @@ function createRefBasedLayout(layoutStateRef: React.RefObject<LayoutState>): Lay
       slots[i] += marginOffset;
     }
 
+    // Calculate container height from item positions
+    let maxHeight = 0;
+    for (let i = 0; i < items.length; i++) {
+      const y = slots[i * 2 + 1]; // Y position is at odd indices
+      const itemHeight = items[i].getHeight();
+      const bottom = y + itemHeight;
+      if (bottom > maxHeight) {
+        maxHeight = bottom;
+      }
+    }
+
     callback({
       id: layoutId,
       items,
       slots,
-      styles: null,
+      styles: {
+        height: `${maxHeight}px`,
+      },
     });
   };
 }

@@ -553,6 +553,9 @@ importers:
       lucide-react:
         specifier: ^0.552.0
         version: 0.552.0(react@19.2.0)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       radix-ui:
         specifier: ^1.4.3
         version: 1.4.3(@types/react-dom@19.2.3(@types/react@19.2.6))(@types/react@19.2.6)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -565,6 +568,9 @@ importers:
       shadcn:
         specifier: ^3.6.1
         version: 3.6.1(@types/node@24.10.1)(typescript@5.9.3)
+      sonner:
+        specifier: ^2.0.7
+        version: 2.0.7(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -8211,6 +8217,12 @@ packages:
   sonic-boom@4.2.0:
     resolution: {integrity: sha512-INb7TM37/mAcsGmc9hyyI6+QR3rR1zVRu36B0NeGXKnOOLiZOfER5SA+N7X7k3yUYRzLWafduTDvJAfDswwEww==}
 
+  sonner@2.0.7:
+    resolution: {integrity: sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -13886,14 +13898,14 @@ snapshots:
       msw: 2.12.4(@types/node@20.19.24)(typescript@5.9.3)
       vite: 5.4.21(@types/node@24.10.1)(lightningcss@1.30.2)
 
-  '@vitest/mocker@2.1.9(msw@2.12.4(@types/node@22.18.13)(typescript@5.9.3))(vite@5.4.21(@types/node@24.10.1)(lightningcss@1.30.2))':
+  '@vitest/mocker@2.1.9(msw@2.12.4(@types/node@22.18.13)(typescript@5.9.3))(vite@5.4.21(@types/node@22.18.13)(lightningcss@1.30.2))':
     dependencies:
       '@vitest/spy': 2.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
       msw: 2.12.4(@types/node@22.18.13)(typescript@5.9.3)
-      vite: 5.4.21(@types/node@24.10.1)(lightningcss@1.30.2)
+      vite: 5.4.21(@types/node@22.18.13)(lightningcss@1.30.2)
 
   '@vitest/mocker@2.1.9(msw@2.12.4(@types/node@24.10.1)(typescript@5.9.3))(vite@5.4.21(@types/node@24.10.1)(lightningcss@1.30.2))':
     dependencies:
@@ -17651,6 +17663,11 @@ snapshots:
     dependencies:
       atomic-sleep: 1.0.0
 
+  sonner@2.0.7(react-dom@19.2.0(react@19.2.0))(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
+
   source-map-js@1.2.1: {}
 
   source-map-support@0.5.21:
@@ -18355,7 +18372,7 @@ snapshots:
   vitest@2.1.9(@types/node@22.18.13)(@vitest/ui@2.1.9)(jsdom@25.0.1)(lightningcss@1.30.2)(msw@2.12.4(@types/node@22.18.13)(typescript@5.9.3)):
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(msw@2.12.4(@types/node@22.18.13)(typescript@5.9.3))(vite@5.4.21(@types/node@24.10.1)(lightningcss@1.30.2))
+      '@vitest/mocker': 2.1.9(msw@2.12.4(@types/node@22.18.13)(typescript@5.9.3))(vite@5.4.21(@types/node@22.18.13)(lightningcss@1.30.2))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9

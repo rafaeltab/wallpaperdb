@@ -1,22 +1,21 @@
 // Types
+
+export { MuuriGrid } from './strategies';
 export type {
   GridItem,
-  GridProps,
   GridItemRendererProps,
+  GridProps,
   GridStrategy,
   ItemSpan,
   SpanSize,
 } from './types';
-
-// Components
-export { WallpaperCard } from './WallpaperCard';
-export { MuuriGrid } from './strategies';
-
 // Utilities
 export {
+  ASPECT_RATIO_THRESHOLDS,
   getDefaultSpan,
   getExpandedSpan,
-  wallpaperToGridItem,
   wallpapersToGridItems,
-  ASPECT_RATIO_THRESHOLDS,
+  wallpaperToGridItem,
 } from './utils';
+// Components
+export { WallpaperCard } from './WallpaperCard';

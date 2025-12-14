@@ -21,14 +21,11 @@ export function useWallpaperInfiniteQuery({
   return useInfiniteQuery({
     queryKey: ['wallpapers', 'infinite', { filter, initialCursor }],
     queryFn: async ({ pageParam }) => {
-      const response = await graphqlClient.request<SearchWallpapersResponse>(
-        SEARCH_WALLPAPERS,
-        {
-          filter,
-          first: pageSize,
-          after: pageParam,
-        }
-      );
+      const response = await graphqlClient.request<SearchWallpapersResponse>(SEARCH_WALLPAPERS, {
+        filter,
+        first: pageSize,
+        after: pageParam,
+      });
       return response.searchWallpapers;
     },
     getNextPageParam: (lastPage) =>

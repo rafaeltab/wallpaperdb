@@ -1,18 +1,18 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
+  type LayoutFunction,
   MuuriGrid as MuuriGridComponent,
   MuuriItem,
   useRefresh,
-  type LayoutFunction,
 } from '@wallpaperdb/react-muuri';
-import type { GridProps, GridItem, ItemSpan } from '../types';
-import { WallpaperCard } from '../WallpaperCard';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { GridItem, GridProps, ItemSpan } from '../types';
 import {
-  getDefaultSpan,
-  getExpandedSpan,
   calculateExpandedDimensions,
   DEFAULT_EXPANSION_CONFIG,
+  getDefaultSpan,
+  getExpandedSpan,
 } from '../utils';
+import { WallpaperCard } from '../WallpaperCard';
 
 /**
  * Layout state stored in a ref so the layout function can read current values
@@ -64,10 +64,7 @@ function GridItemWrapper({
 
   // Trigger layout when size changes
   useEffect(() => {
-    if (
-      prevSizeRef.current.width !== width ||
-      prevSizeRef.current.height !== height
-    ) {
+    if (prevSizeRef.current.width !== width || prevSizeRef.current.height !== height) {
       refresh();
       prevSizeRef.current = { width, height };
     }
@@ -300,10 +297,7 @@ function pruneRects(rects: FreeRect[]): FreeRect[] {
  */
 function isRectContained(a: FreeRect, b: FreeRect): boolean {
   return (
-    a.x >= b.x &&
-    a.y >= b.y &&
-    a.x + a.width <= b.x + b.width &&
-    a.y + a.height <= b.y + b.height
+    a.x >= b.x && a.y >= b.y && a.x + a.width <= b.x + b.width && a.y + a.height <= b.y + b.height
   );
 }
 
@@ -311,9 +305,7 @@ function isRectContained(a: FreeRect, b: FreeRect): boolean {
  * Creates a custom layout function that reads from a ref for current state.
  * Uses bin-packing algorithm similar to Muuri's default.
  */
-function createRefBasedLayout(
-  layoutStateRef: React.RefObject<LayoutState>
-): LayoutFunction {
+function createRefBasedLayout(layoutStateRef: React.RefObject<LayoutState>): LayoutFunction {
   return (_grid, layoutId, items, gridWidth, _gridHeight, callback) => {
     // Read current state from ref
     const { expandedItemKey, viewportCenter } = layoutStateRef.current;
@@ -439,10 +431,7 @@ export function MuuriGrid({
   };
 
   // Create stable layout function once (reads from ref for current state)
-  const customLayout = useMemo(
-    () => createRefBasedLayout(layoutStateRef),
-    []
-  );
+  const customLayout = useMemo(() => createRefBasedLayout(layoutStateRef), []);
 
   // Track container width and viewport height for capping expanded items
   const containerRef = useRef<HTMLDivElement>(null);
@@ -479,9 +468,7 @@ export function MuuriGrid({
 
         // Calculate viewport center relative to grid container (not document coordinates)
         const containerRect = containerRef.current?.getBoundingClientRect();
-        const centerY = containerRect
-          ? viewportHeight / 2 - containerRect.top
-          : viewportHeight / 2;
+        const centerY = containerRect ? viewportHeight / 2 - containerRect.top : viewportHeight / 2;
 
         setExpandedId(item.id);
         setExpandedCenter({ x: centerX, y: centerY });
@@ -525,7 +512,7 @@ export function MuuriGrid({
       span: ItemSpan,
       isExpanded: boolean,
       containerW: number,
-      viewportH: number,
+      viewportH: number
     ) => {
       // Base dimensions from span columns
       let width = span.cols * baseSize;
@@ -538,14 +525,8 @@ export function MuuriGrid({
         // Calculate max constraints:
         // 1. Viewport/container based limits
         // 2. Image's native resolution (don't upscale beyond original)
-        const maxWidth = Math.min(
-          containerW * config.maxWidthFraction - gap,
-          item.width,
-        );
-        const maxHeight = Math.min(
-          viewportH * config.maxHeightFraction,
-          item.height,
-        );
+        const maxWidth = Math.min(containerW * config.maxWidthFraction - gap, item.width);
+        const maxHeight = Math.min(viewportH * config.maxHeightFraction, item.height);
 
         // Use area-based algorithm for visually consistent expansion
         const expanded = calculateExpandedDimensions(
@@ -554,7 +535,7 @@ export function MuuriGrid({
           item.aspectRatio,
           maxWidth,
           maxHeight,
-          config.areaMultiplier,
+          config.areaMultiplier
         );
 
         width = expanded.width;
@@ -569,7 +550,7 @@ export function MuuriGrid({
         margin,
       };
     },
-    [baseSize, gap],
+    [baseSize, gap]
   );
 
   return (
@@ -588,7 +569,7 @@ export function MuuriGrid({
             span,
             isExpanded,
             containerWidth,
-            viewportHeight,
+            viewportHeight
           );
 
           return (

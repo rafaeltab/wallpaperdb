@@ -1,5 +1,5 @@
-import type { GridItem, ItemSpan } from './types';
 import type { Wallpaper } from '@/lib/graphql/types';
+import type { GridItem, ItemSpan } from './types';
 
 /**
  * Aspect ratio thresholds for determining item spans.
@@ -76,9 +76,7 @@ export function wallpaperToGridItem(wallpaper: Wallpaper): GridItem | null {
  * Filters out wallpapers without variants.
  */
 export function wallpapersToGridItems(wallpapers: Wallpaper[]): GridItem[] {
-  return wallpapers
-    .map(wallpaperToGridItem)
-    .filter((item): item is GridItem => item !== null);
+  return wallpapers.map(wallpaperToGridItem).filter((item): item is GridItem => item !== null);
 }
 
 /**
@@ -125,7 +123,7 @@ export function calculateExpandedDimensions(
   aspectRatio: number,
   maxWidth: number,
   maxHeight: number,
-  areaMultiplier: number,
+  areaMultiplier: number
 ): { width: number; height: number } {
   // Step 1: Calculate target area
   const baseArea = baseWidth * baseHeight;

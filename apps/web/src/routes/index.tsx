@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { AlertCircle, ArrowLeft, ImageOff, Upload } from 'lucide-react';
 import { useCallback, useRef } from 'react';
+import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 
@@ -45,7 +45,7 @@ function HomePage() {
 
   return (
     <div>
-      <WallpaperGrid wallpapers={wallpapers} />
+      <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
       <LoadMoreTrigger
         onLoadMore={handleLoadMore}
         hasMore={hasNextPage ?? false}
@@ -56,15 +56,7 @@ function HomePage() {
 }
 
 function LoadingState() {
-  return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <Skeleton key={i} className="rounded-lg" style={{ height: `${150 + (i % 3) * 50}px` }} />
-        ))}
-      </div>
-    </div>
-  );
+  return <WallpaperGridSkeleton count={12} baseSize={375} gap={16} />;
 }
 
 function ErrorState({ error }: { error: Error }) {

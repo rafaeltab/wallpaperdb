@@ -2,6 +2,40 @@ import type { Wallpaper } from '@/lib/graphql/types';
 import type { GridItem, ItemSpan } from './types';
 
 /**
+ * Aspect ratios used for skeleton items to create visual variety.
+ */
+const SKELETON_ASPECT_RATIOS = [
+  1.78, // 16:9 standard
+  1.6, // 16:10
+  1.33, // 4:3
+  2.33, // 21:9 ultrawide
+  0.56, // 9:16 portrait
+  1.0, // 1:1 square
+];
+
+/**
+ * Generates skeleton placeholder GridItems for loading states.
+ * These items have varied aspect ratios to look natural in the grid.
+ */
+export function generateSkeletonItems(count: number, startIndex = 0): GridItem[] {
+  return Array.from({ length: count }, (_, i) => {
+    const aspectRatio = SKELETON_ASPECT_RATIOS[(startIndex + i) % SKELETON_ASPECT_RATIOS.length];
+    // Use reasonable dimensions that match the aspect ratio
+    const width = 1920;
+    const height = Math.round(width / aspectRatio);
+
+    return {
+      id: `skeleton-${startIndex + i}`,
+      src: '',
+      width,
+      height,
+      aspectRatio,
+      isSkeleton: true,
+    };
+  });
+}
+
+/**
  * Aspect ratio thresholds for determining item spans.
  * These can be adjusted based on visual preferences.
  */

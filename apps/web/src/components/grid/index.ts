@@ -12,6 +12,7 @@ export type {
 // Utilities
 export {
   ASPECT_RATIO_THRESHOLDS,
+  generateSkeletonItems,
   getDefaultSpan,
   getExpandedSpan,
   wallpapersToGridItems,
@@ -19,3 +20,4 @@ export {
 } from './utils';
 // Components
 export { WallpaperCard } from './WallpaperCard';
+export { WallpaperGridSkeleton } from './WallpaperGridSkeleton';

@@ -1,4 +1,3 @@
-import { Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 
@@ -22,16 +21,6 @@ export function LoadMoreTrigger({ onLoadMore, hasMore, isLoading }: LoadMoreTrig
 
   if (!hasMore) return null;
 
-  return (
-    <div ref={ref} className="flex justify-center py-8">
-      {isLoading ? (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Loading more...</span>
-        </div>
-      ) : (
-        <div className="h-4" />
-      )}
-    </div>
-  );
+  // Invisible trigger element - skeletons are rendered in the grid itself
+  return <div ref={ref} className="h-4" />;
 }

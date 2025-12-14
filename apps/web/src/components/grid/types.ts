@@ -17,6 +17,8 @@ export interface GridItem {
   aspectRatio: number;
   /** Optional metadata for custom rendering or logic */
   metadata?: Record<string, unknown>;
+  /** Whether this is a skeleton placeholder item */
+  isSkeleton?: boolean;
 }
 
 /**

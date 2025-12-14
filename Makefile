@@ -7,7 +7,7 @@
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
-        web-dev web-build web-preview web-format web-lint web-check \
+        web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
@@ -63,12 +63,14 @@ help:
 	@echo "  make gateway-lint       - Lint gateway service code"
 	@echo ""
 	@echo "Web Frontend:"
-	@echo "  make web-dev     - Start web frontend in development mode (http://localhost:3005)"
-	@echo "  make web-build   - Build web frontend for production"
-	@echo "  make web-preview - Preview production build"
-	@echo "  make web-format  - Format web frontend code"
-	@echo "  make web-lint    - Lint web frontend code"
-	@echo "  make web-check   - Type check web frontend"
+	@echo "  make web-dev        - Start web frontend in development mode (http://localhost:3005)"
+	@echo "  make web-build      - Build web frontend for production"
+	@echo "  make web-preview    - Preview production build"
+	@echo "  make web-test       - Run web frontend tests"
+	@echo "  make web-test-watch - Run web frontend tests in watch mode"
+	@echo "  make web-format     - Format web frontend code"
+	@echo "  make web-lint       - Lint web frontend code"
+	@echo "  make web-check      - Type check web frontend"
 	@echo ""
 	@echo "React Muuri Package:"
 	@echo "  make react-muuri-build          - Build react-muuri package"
@@ -253,6 +255,12 @@ web-lint:
 
 web-check:
 	@turbo run check-types --filter=@wallpaperdb/web
+
+web-test:
+	@turbo run test --filter=@wallpaperdb/web
+
+web-test-watch:
+	@pnpm --filter @wallpaperdb/web test:watch
 
 # React Muuri package commands
 react-muuri-build:

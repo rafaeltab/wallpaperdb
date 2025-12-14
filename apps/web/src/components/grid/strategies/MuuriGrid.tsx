@@ -21,6 +21,8 @@ import { WallpaperCard } from '../WallpaperCard';
 interface LayoutState {
   expandedItemKey: string | null;
   viewportCenter: { x: number; y: number } | null;
+  /** Left margin offset for items */
+  marginOffset: number;
 }
 
 interface GridItemWrapperProps {
@@ -369,18 +371,10 @@ function createRefBasedLayout(layoutStateRef: React.RefObject<LayoutState>): Lay
       }
     }
 
-    // Center content horizontally by calculating actual width and adding offset
-    let maxRightEdge = 0;
-    for (let i = 0; i < items.length; i++) {
-      const x = slots[i * 2];
-      const itemWidth = items[i].getWidth();
-      maxRightEdge = Math.max(maxRightEdge, x + itemWidth);
-    }
-    const centerOffset = Math.max(0, (gridWidth - maxRightEdge) / 2);
-
-    // Apply offset to all X positions
+    // Apply left margin offset to all X positions
+    const { marginOffset } = layoutStateRef.current;
     for (let i = 0; i < slots.length; i += 2) {
-      slots[i] += centerOffset;
+      slots[i] += marginOffset;
     }
 
     callback({
@@ -421,14 +415,8 @@ export function MuuriGrid({
   const layoutStateRef = useRef<LayoutState>({
     expandedItemKey: null,
     viewportCenter: null,
+    marginOffset: gap / 2,
   });
-
-  // Update ref synchronously during render (before children's effects run)
-  // This ensures the layout function sees the current state when refresh() is called
-  layoutStateRef.current = {
-    expandedItemKey: expandedId,
-    viewportCenter: expandedCenter,
-  };
 
   // Create stable layout function once (reads from ref for current state)
   const customLayout = useMemo(() => createRefBasedLayout(layoutStateRef), []);
@@ -454,6 +442,24 @@ export function MuuriGrid({
     window.addEventListener('resize', updateDimensions);
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
+
+  // Calculate effective base size to fill container width
+  // Available width = container - gap (for margins on each side)
+  // We want N columns where each column is (effectiveBaseSize + gap) wide
+  const effectiveBaseSize = useMemo(() => {
+    const availableWidth = containerWidth - gap; // space for content (excluding margins)
+    const numColumns = Math.max(1, Math.floor(availableWidth / (baseSize + gap)));
+    // Each column takes up availableWidth / numColumns, and gap is between items
+    return availableWidth / numColumns - gap;
+  }, [containerWidth, baseSize, gap]);
+
+  // Update ref synchronously during render (before children's effects run)
+  // This ensures the layout function sees the current state when refresh() is called
+  layoutStateRef.current = {
+    expandedItemKey: expandedId,
+    viewportCenter: expandedCenter,
+    marginOffset: gap / 2,
+  };
 
   const handleClick = useCallback(
     (item: GridItem) => {
@@ -515,7 +521,8 @@ export function MuuriGrid({
       viewportH: number
     ) => {
       // Base dimensions from span columns
-      let width = span.cols * baseSize;
+      // Account for internal gaps when spanning multiple columns
+      let width = span.cols * effectiveBaseSize + (span.cols - 1) * gap;
       let height = width / item.aspectRatio;
 
       // Apply area-based expansion with dimension caps
@@ -550,7 +557,7 @@ export function MuuriGrid({
         margin,
       };
     },
-    [baseSize, gap]
+    [effectiveBaseSize, gap]
   );
 
   return (

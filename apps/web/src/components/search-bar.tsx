@@ -1,9 +1,25 @@
 import { Search } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-import { Input } from '@/components/ui/input';
+import { useEffect, useRef, useState } from 'react';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '@/components/ui/input-group';
+import { Kbd } from '@/components/ui/kbd';
+
+function useIsMac() {
+  const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    setIsMac(navigator.platform.toUpperCase().includes('MAC'));
+  }, []);
+
+  return isMac;
+}
 
 export function SearchBar() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMac = useIsMac();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -19,17 +35,19 @@ export function SearchBar() {
   }, []);
 
   return (
-    <div className="relative w-full">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input
+    <InputGroup className="bg-muted/50 border-transparent hover:bg-muted focus-within:bg-background focus-within:border-input">
+      <InputGroupAddon>
+        <Search />
+      </InputGroupAddon>
+      <InputGroupInput
         ref={inputRef}
         type="search"
         placeholder="Search wallpapers..."
-        className="pl-9 pr-16 h-9 bg-muted/50 border-transparent hover:bg-muted focus:bg-background focus:border-input"
       />
-      <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
-        <span className="text-xs">⌘</span>K
-      </kbd>
-    </div>
+      <InputGroupAddon align="inline-end" className="hidden sm:flex">
+        {isMac ? <Kbd>⌘</Kbd> : <Kbd>Ctrl</Kbd>}
+        <Kbd>K</Kbd>
+      </InputGroupAddon>
+    </InputGroup>
   );
 }

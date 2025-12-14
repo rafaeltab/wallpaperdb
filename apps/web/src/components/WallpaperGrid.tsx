@@ -11,7 +11,7 @@ export function WallpaperGrid({ wallpapers }: WallpaperGridProps) {
   return (
     <MuuriGrid
       items={items}
-      baseSize={250}
+      baseSize={375}
       gap={16}
       onItemClick={(item) => {
         console.log('Clicked:', item.id);

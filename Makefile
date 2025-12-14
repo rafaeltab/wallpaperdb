@@ -6,6 +6,7 @@
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
+        variant-generator-dev variant-generator-build variant-generator-start variant-generator-test variant-generator-test-watch variant-generator-format variant-generator-lint variant-generator-check \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
@@ -52,6 +53,15 @@ help:
 	@echo "  make media-test-watch - Run media service tests in watch mode"
 	@echo "  make media-format     - Format media service code"
 	@echo "  make media-lint       - Lint media service code"
+	@echo ""
+	@echo "Variant Generator Service:"
+	@echo "  make variant-generator-dev        - Start variant-generator in development mode"
+	@echo "  make variant-generator-build      - Build variant-generator for production"
+	@echo "  make variant-generator-start      - Start variant-generator in production mode"
+	@echo "  make variant-generator-test       - Run variant-generator tests"
+	@echo "  make variant-generator-test-watch - Run variant-generator tests in watch mode"
+	@echo "  make variant-generator-format     - Format variant-generator code"
+	@echo "  make variant-generator-lint       - Lint variant-generator code"
 	@echo ""
 	@echo "Gateway Service:"
 	@echo "  make gateway-dev        - Start gateway service in development mode"
@@ -211,6 +221,31 @@ media-lint:
 
 media-check:
 	@turbo run check --filter=@wallpaperdb/media
+
+# Variant Generator service commands
+variant-generator-dev:
+	@turbo run dev --filter=@wallpaperdb/variant-generator
+
+variant-generator-build:
+	@turbo run build --filter=@wallpaperdb/variant-generator
+
+variant-generator-start:
+	@turbo run start --filter=@wallpaperdb/variant-generator
+
+variant-generator-test:
+	@turbo run test --filter=@wallpaperdb/variant-generator
+
+variant-generator-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/variant-generator
+
+variant-generator-format:
+	@turbo run format --filter=@wallpaperdb/variant-generator
+
+variant-generator-lint:
+	@turbo run lint --filter=@wallpaperdb/variant-generator
+
+variant-generator-check:
+	@turbo run check --filter=@wallpaperdb/variant-generator
 
 # Gateway service commands
 gateway-dev:

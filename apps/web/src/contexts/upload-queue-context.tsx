@@ -11,7 +11,7 @@ import {
 import { uploadWallpaperWithDetails } from '@/lib/api/ingestor';
 
 // Maximum files per batch (configurable constant)
-export const MAX_FILES_PER_BATCH = 50;
+export const MAX_FILES_PER_BATCH = 200;
 
 // Demo user ID (to be replaced with actual auth later)
 const DEMO_USER_ID = 'user_demo_001';

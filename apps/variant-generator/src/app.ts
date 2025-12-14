@@ -4,12 +4,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
-import { DatabaseConnection } from './connections/database.js';
 import { MinioConnection } from './connections/minio.js';
 import { registerRoutes } from './routes/index.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
-import { WallpaperVariantUploadedConsumerService } from './services/consumers/wallpaper-variant-uploaded-consumer.service.js';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -22,8 +20,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     connectionsState: ConnectionsState;
     container: typeof container;
-    wallpaperUploadedConsumer: WallpaperUploadedConsumerService;
-    variantUploadedConsumer: WallpaperVariantUploadedConsumerService;
+    consumer: WallpaperUploadedConsumerService;
   }
 }
 
@@ -63,10 +60,10 @@ export async function createApp(
 
   // Register OpenAPI documentation
   await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Media API',
+    title: 'WallpaperDB Variant Generator API',
     version: '1.0.0',
     description:
-      'Wallpaper retrieval and serving service. Retrieves wallpapers from object storage with optional resizing and format conversion.',
+      'Wallpaper variant generation service. Generates lower resolution variants of wallpapers for different device types.',
     servers:
       config.nodeEnv === 'production'
         ? undefined
@@ -94,18 +91,15 @@ export async function createApp(
     container.register('otelSdk', { useValue: otelSdk });
   }
 
-  // Initialize connections
+  // Initialize connections (no database for stateless service)
   fastify.log.info('Initializing connections...');
 
   try {
-    await container.resolve(DatabaseConnection).initialize();
-    fastify.log.info('Database connection pool created');
-
-    // Initialize MinIO connection (read-only access)
+    // Initialize MinIO connection (for reading originals and uploading variants)
     await container.resolve(MinioConnection).initialize();
     fastify.log.info('MinIO connection created');
 
-    // Initialize NATS connection (for event consumption)
+    // Initialize NATS connection (for event consumption and publishing)
     await container.resolve(NatsConnectionManager).initialize();
     fastify.log.info('NATS connection created');
 
@@ -116,20 +110,17 @@ export async function createApp(
     throw error;
   }
 
-  // Start event consumers
+  // Start event consumer
   fastify.log.info('Starting event consumers...');
   try {
-    const wallpaperUploadedConsumer = container.resolve(WallpaperUploadedConsumerService);
-    const variantUploadedConsumer = container.resolve(WallpaperVariantUploadedConsumerService);
+    const consumer = container.resolve(WallpaperUploadedConsumerService);
 
-    // Start consumers (non-blocking - runs in background)
-    await wallpaperUploadedConsumer.start();
-    await variantUploadedConsumer.start();
+    // Start consumer (non-blocking - runs in background)
+    await consumer.start();
     fastify.log.info('Event consumers started');
 
-    // Store consumer references for shutdown
-    fastify.decorate('wallpaperUploadedConsumer', wallpaperUploadedConsumer);
-    fastify.decorate('variantUploadedConsumer', variantUploadedConsumer);
+    // Store consumer reference for shutdown
+    fastify.decorate('consumer', consumer);
   } catch (error) {
     fastify.log.error({ err: error }, 'Failed to start event consumers');
     throw error;
@@ -139,17 +130,13 @@ export async function createApp(
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
 
-    // Stop consumers first
-    fastify.log.info('Stopping event consumers...');
-    if (fastify.wallpaperUploadedConsumer) {
-      await fastify.wallpaperUploadedConsumer.stop();
-    }
-    if (fastify.variantUploadedConsumer) {
-      await fastify.variantUploadedConsumer.stop();
+    // Stop consumer first
+    if (fastify.consumer) {
+      fastify.log.info('Stopping event consumers...');
+      await fastify.consumer.stop();
     }
 
     await container.resolve(NatsConnectionManager).close();
-    await container.resolve(DatabaseConnection).close();
     await container.resolve(MinioConnection).close();
     await shutdownOtel();
   });

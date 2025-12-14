@@ -1,8 +1,10 @@
 import { Link, useRouterState } from '@tanstack/react-router';
 import { Image, ImagePlus } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -30,7 +32,12 @@ export function AppSidebar() {
   const currentPath = router.location.pathname;
 
   return (
-    <Sidebar variant="floating" collapsible="offcanvas">
+    <Sidebar
+      variant="floating"
+      collapsible="offcanvas"
+      overlay
+      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -70,6 +77,12 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter>
+        <div className="flex items-center justify-between px-2">
+          <span className="text-sm text-muted-foreground">Theme</span>
+          <ThemeToggle />
+        </div>
+      </SidebarFooter>
     </Sidebar>
   );
 }

@@ -4,7 +4,6 @@ import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Image } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SearchBar } from '@/components/search-bar';
-import { ThemeToggle } from '@/components/theme-toggle';
 import {
   SidebarInset,
   SidebarProvider,
@@ -21,40 +20,40 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootLayout() {
   return (
-    <SidebarProvider defaultOpen={false}>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="max-w-7xl mx-auto px-4 py-3">
-              <div className="flex items-center gap-4">
-                {/* Sidebar Trigger */}
-                <SidebarTrigger className="-ml-1" />
-
-                {/* Logo */}
-                <Link to="/" className="flex items-center gap-2 shrink-0">
-                  <Image className="h-6 w-6 text-primary" />
-                  <span className="text-xl font-bold text-foreground hidden sm:inline">
-                    WallpaperDB
-                  </span>
-                </Link>
-
-                {/* Search Bar - grows to fill space */}
-                <div className="flex-1 flex justify-center max-w-xl mx-auto">
-                  <SearchBar />
-                </div>
-
-                {/* Theme Toggle */}
-                <ThemeToggle />
-              </div>
+    <div className="[--header-height:3.5rem]">
+      <SidebarProvider defaultOpen={false} className="flex flex-col">
+        {/* Header is OUTSIDE the sidebar/content flex */}
+        <header className="sticky top-0 z-50 flex h-(--header-height) w-full items-center border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex w-full items-center gap-4 px-4">
+            {/* Left side */}
+            <div className="flex items-center gap-4 shrink-0">
+              <SidebarTrigger className="-ml-1" />
+              <Link to="/" className="flex items-center gap-2 shrink-0">
+                <Image className="h-6 w-6 text-primary" />
+                <span className="text-xl font-bold text-foreground hidden sm:inline">
+                  WallpaperDB
+                </span>
+              </Link>
             </div>
-          </header>
-          <main className="pb-8">
-            <Outlet />
-          </main>
+            {/* Center - Search bar (absolutely centered) */}
+            <div className="absolute left-1/2 -translate-x-1/2 w-full max-w-xl px-4">
+              <SearchBar />
+            </div>
+            {/* Spacer to push nothing to the right */}
+            <div className="flex-1" />
+          </div>
+        </header>
+        {/* Sidebar and content in flex row */}
+        <div className="flex flex-1">
+          <AppSidebar />
+          <SidebarInset>
+            <main className="pb-8">
+              <Outlet />
+            </main>
+          </SidebarInset>
         </div>
-      </SidebarInset>
-      <TanStackRouterDevtools position="bottom-right" />
-    </SidebarProvider>
+        <TanStackRouterDevtools position="bottom-right" />
+      </SidebarProvider>
+    </div>
   );
 }

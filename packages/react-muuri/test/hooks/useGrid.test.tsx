@@ -64,7 +64,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
     });
 
@@ -77,7 +77,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       const items = result.current.getItems();
@@ -94,7 +94,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       // Should not throw
@@ -111,7 +111,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       // Should not throw
@@ -127,7 +127,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       // Should not throw
@@ -143,7 +143,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       // Should not throw
@@ -159,7 +159,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       // Should not throw
@@ -188,7 +188,7 @@ describe('useGrid', () => {
         () => {
           expect(result.current.grid).not.toBeNull();
         },
-        { timeout: 3000 } // Increased timeout for CI environments with slower I/O
+        { timeout: 1000 }
       );
 
       const firstLayout = result.current.layout;

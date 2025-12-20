@@ -1,8 +1,9 @@
 # Frontend: Wallpaper Detail Page
 
-**Status**: Ready for Implementation  
+**Status**: Tests Complete - TDD Implementation Ready  
 **Date**: December 20, 2024  
-**Route**: `/wallpapers/$wallpaperId`
+**Route**: `/wallpapers/$wallpaperId`  
+**Test Coverage**: 286 test cases across 9 files ✅
 
 ---
 
@@ -187,6 +188,9 @@ formatDate(dateString: string): string
 // Truncate ID for display (e.g., "wlpr_01JFABC...")
 truncateId(id: string): string
 
+// Sort variants by quality (resolution descending, highest first)
+sortVariantsByQuality(variants: Variant[]): Variant[]
+
 // Download variant (local-first with Cache API)
 downloadVariant(variant: Variant): Promise<void>
 ```
@@ -207,8 +211,8 @@ downloadVariant(variant: Variant): Promise<void>
 
 ```graphql
 export const GET_WALLPAPER = gql`
-  query GetWallpaper($id: ID!) {
-    getWallpaper(id: $id) {
+  query GetWallpaper($wallpaperId: ID!) {
+    getWallpaper(wallpaperId: $wallpaperId) {
       wallpaperId
       userId
       uploadedAt
@@ -227,7 +231,8 @@ export const GET_WALLPAPER = gql`
 `;
 ```
 
-**Note**: Backend implementation handled separately (see gateway service plan).
+**Note**: ✅ Backend implementation complete - verified in `api/gateway/graphql/get-wallpaper.bru`
+**Parameter**: Uses `wallpaperId` (not `id`) per actual GraphQL schema
 
 ---
 
@@ -417,31 +422,129 @@ handleDownloadVariant(variant: Variant): void
 
 Follow this sequence for clean, testable implementation:
 
+### Phase 0: TDD Test Suite (Completed ✅)
+- ✅ **286 test cases** written across 9 test files
+- ✅ `test/hooks/usePersistentState.test.ts` (31 tests)
+- ✅ `test/hooks/use-media-query.test.ts` (15 tests)
+- ✅ `test/lib/utils/wallpaper.test.ts` (50 tests)
+- ✅ `test/hooks/useWallpaperQuery.test.tsx` (25 tests)
+- ✅ `test/components/wallpaper-detail/WallpaperDetailSkeleton.test.tsx` (14 tests)
+- ✅ `test/components/wallpaper-detail/WallpaperDisplay.test.tsx` (27 tests)
+- ✅ `test/components/wallpaper-detail/VariantList.test.tsx` (33 tests)
+- ✅ `test/components/wallpaper-detail/WallpaperMetadata.test.tsx` (29 tests)
+- ✅ `test/routes/wallpapers.$wallpaperId.test.tsx` (62 tests)
+- ✅ Updated `test/setup.ts` with Cache API, clipboard, share mocks
+
+**Test Coverage**: Comprehensive TDD coverage including:
+- Happy paths and edge cases
+- Error states (404, validation, network)
+- Accessibility (ARIA, keyboard navigation)
+- Responsive behavior (desktop/mobile)
+- Browser API mocking (Cache API, clipboard, share, matchMedia)
+- Keyboard shortcuts with input field detection
+
 ### Phase 1: Utilities & Hooks (No Dependencies)
-1. ✅ `src/hooks/usePersistentState.ts`
-2. ✅ `src/hooks/use-media-query.ts`
-3. ✅ `src/lib/utils/wallpaper.ts`
+1. ⏳ `src/hooks/usePersistentState.ts` → Run tests → Fix until green
+2. ⏳ `src/hooks/use-media-query.ts` → Run tests → Fix until green
+3. ⏳ `src/lib/utils/wallpaper.ts` (6 functions) → Run tests → Fix until green
 
 ### Phase 2: GraphQL
-4. ✅ `src/lib/graphql/queries.ts` (add GET_WALLPAPER)
-5. ✅ `src/hooks/useWallpaperQuery.ts`
+4. ✅ `src/lib/graphql/queries.ts` (add GET_WALLPAPER - backend already implemented)
+5. ⏳ `src/hooks/useWallpaperQuery.ts` → Run tests → Fix until green
 
 ### Phase 3: Components (Bottom-Up)
-6. ✅ `src/components/wallpaper-detail/WallpaperDetailSkeleton.tsx`
-7. ✅ `src/components/wallpaper-detail/WallpaperDisplay.tsx`
-8. ✅ `src/components/wallpaper-detail/VariantList.tsx`
-9. ✅ `src/components/wallpaper-detail/WallpaperMetadata.tsx`
-10. ✅ `src/components/wallpaper-detail/index.ts`
+6. ⏳ `src/components/wallpaper-detail/WallpaperDetailSkeleton.tsx` → Run tests → Fix until green
+7. ⏳ `src/components/wallpaper-detail/WallpaperDisplay.tsx` → Run tests → Fix until green
+8. ⏳ `src/components/wallpaper-detail/VariantList.tsx` → Run tests → Fix until green
+9. ⏳ `src/components/wallpaper-detail/WallpaperMetadata.tsx` → Run tests → Fix until green
+10. ⏳ `src/components/wallpaper-detail/index.ts`
 
 ### Phase 4: Route (Integrates Everything)
-11. ✅ `src/routes/wallpapers.$wallpaperId.tsx`
+11. ⏳ `src/routes/wallpapers.$wallpaperId.tsx` → Run tests → Fix until green
 
-### Phase 5: Testing
-12. ✅ Manual testing checklist (see below)
+### Phase 5: Manual Testing
+12. ⏳ Manual testing checklist (see below)
 
 ---
 
-## Testing Checklist
+## TDD Test Suite (Completed ✅)
+
+A comprehensive test-driven development suite has been written **before implementation** to ensure all features work correctly. The test suite follows TDD principles:
+
+### Test Statistics
+- **Total Test Cases**: 286
+- **Test Files**: 9
+- **Coverage Areas**: Hooks, utilities, components, route integration
+- **Testing Framework**: Vitest + React Testing Library
+
+### Test Files Created
+
+#### Phase 1: Utilities & Hooks (71 tests)
+1. `test/hooks/usePersistentState.test.ts` - 31 tests
+   - localStorage persistence, error handling, multiple instances
+2. `test/hooks/use-media-query.test.ts` - 15 tests
+   - Media query matching, reactive updates, cleanup
+3. `test/lib/utils/wallpaper.test.ts` - 50 tests
+   - File size/aspect ratio/date formatting, ID truncation
+   - Variant sorting by quality (resolution-based)
+   - Download with Cache API fallback
+4. `test/hooks/useWallpaperQuery.test.tsx` - 25 tests
+   - GraphQL fetching, caching, error states, retry logic
+
+#### Phase 2: Components (103 tests)
+5. `test/components/wallpaper-detail/WallpaperDetailSkeleton.test.tsx` - 14 tests
+   - Layout structure, accessibility
+6. `test/components/wallpaper-detail/WallpaperDisplay.test.tsx` - 27 tests
+   - Loading/loaded states, variant indicator, image handling
+7. `test/components/wallpaper-detail/VariantList.test.tsx` - 33 tests
+   - Rendering variants, selection, downloads, tooltips, accessibility
+8. `test/components/wallpaper-detail/WallpaperMetadata.test.tsx` - 29 tests
+   - Information/display cards, variant list integration, keyboard shortcuts
+
+#### Phase 3: Route Integration (62 tests)
+9. `test/routes/wallpapers.$wallpaperId.test.tsx` - 62 tests
+   - Data loading, error states (404, validation, network)
+   - Panel behavior (desktop/mobile, persistence)
+   - Variant selection, downloads, sharing
+   - Keyboard shortcuts with input detection
+   - Accessibility, image loading, viewing indicator
+
+### Test Setup Updates
+- ✅ `test/setup.ts` updated with:
+  - Cache API mocks (open, match, put, delete, keys)
+  - URL.createObjectURL/revokeObjectURL
+  - navigator.clipboard (writeText, readText)
+  - navigator.share
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run specific test file
+pnpm --filter @wallpaperdb/web test usePersistentState.test.ts
+
+# Watch mode for TDD
+make test-watch
+
+# With coverage
+pnpm --filter @wallpaperdb/web test:unit
+```
+
+### TDD Implementation Flow
+
+All tests are currently **failing (red)** as expected. Follow this cycle:
+
+1. **Red**: Run tests → They fail (no implementation)
+2. **Green**: Write minimal code to make tests pass
+3. **Refactor**: Improve code while keeping tests green
+
+Start with Phase 1 (utilities & hooks) as they have no UI dependencies.
+
+---
+
+## Manual Testing Checklist
 
 ### Desktop Testing
 - [ ] Panel opens/closes with toggle button

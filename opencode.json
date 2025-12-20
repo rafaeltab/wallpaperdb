@@ -1,0 +1,12 @@
+{
+  "agents": {
+    "Build": {
+      "allowedCommands": [
+        {
+          "command": "pnpm",
+          "args": ["*"]
+        }
+      ]
+    }
+  }
+}

@@ -33,3 +33,23 @@ export const SEARCH_WALLPAPERS = gql`
     }
   }
 `;
+
+export const GET_WALLPAPER = gql`
+  query GetWallpaper($wallpaperId: ID!) {
+    getWallpaper(wallpaperId: $wallpaperId) {
+      wallpaperId
+      userId
+      uploadedAt
+      updatedAt
+      variants {
+        width
+        height
+        aspectRatio
+        format
+        fileSizeBytes
+        createdAt
+        url
+      }
+    }
+  }
+`;

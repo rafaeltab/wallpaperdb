@@ -458,6 +458,10 @@ install:
 check-types:
 	@turbo run check-types
 
+# CI/Local Parity commands
+check-types-force:
+	@turbo run check-types --force
+
 ci:
 	@echo "Running full CI checks locally..."
 	@start_time=$$(date +%s); \

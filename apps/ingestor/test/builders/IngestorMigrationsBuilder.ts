@@ -50,7 +50,7 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
             join(__dirname, "../../drizzle/0000_left_starjammers.sql");
 
         return class extends Base {
-            private _migrationsApplied = false;
+            _migrationsApplied = false;
 
             /**
              * Enable automatic database migration during setup.

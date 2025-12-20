@@ -11,8 +11,8 @@ export interface RedisOptions {
 }
 
 class RedisBuilder {
-  private image = 'redis:7-alpine';
-  private networkAlias = 'redis';
+  image = 'redis:7-alpine';
+  networkAlias = 'redis';
 
   withImage(image: string) {
     this.image = image;
@@ -60,7 +60,11 @@ export interface RedisConfig {
  * Currently minimal, but provides a consistent structure for future expansion.
  */
 class RedisHelpers {
-  constructor(private tester: TesterInstance<RedisTesterBuilder>) {}
+  tester: TesterInstance<RedisTesterBuilder>;
+
+  constructor(tester: TesterInstance<RedisTesterBuilder>) {
+    this.tester = tester;
+  }
 
   /**
    * Get the Redis configuration.

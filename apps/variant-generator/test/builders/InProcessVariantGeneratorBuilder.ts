@@ -50,12 +50,14 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
     this.options = options;
   }
 
-  addMethods<TBase extends AddMethodsType<[MinioTesterBuilder, NatsTesterBuilder]>>(Base: TBase) {
+  addMethods<TBase extends AddMethodsType<[MinioTesterBuilder, NatsTesterBuilder]>>(
+    Base: TBase
+  ) {
     const options = this.options;
 
     return class extends Base {
-      private app: FastifyInstance | null = null;
-      private _appInitialized = false;
+      app: FastifyInstance | null = null;
+      _appInitialized = false;
 
       withVariantGeneratorEnvironment() {
         this.addSetupHook(async () => {

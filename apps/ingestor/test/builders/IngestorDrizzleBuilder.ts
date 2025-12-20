@@ -36,8 +36,8 @@ export class IngestorDrizzleTesterBuilder extends BaseTesterBuilder<
         Base: TBase,
     ) {
         return class extends Base {
-            private _drizzleInstance: NodePgDatabase<typeof schema> | undefined;
-            private _drizzlePool: pg.Pool | undefined;
+            _drizzleInstance: NodePgDatabase<typeof schema> | undefined;
+            _drizzlePool: pg.Pool | undefined;
 
             /**
              * Get a cached Drizzle ORM instance for the Ingestor schema.

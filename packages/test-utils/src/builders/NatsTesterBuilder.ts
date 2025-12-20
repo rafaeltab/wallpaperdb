@@ -23,9 +23,9 @@ export interface NatsOptions {
 }
 
 class NatsBuilder {
-  private image = 'nats:2.10-alpine';
-  private enableJetStream = false;
-  private networkAlias = 'nats';
+  image = 'nats:2.10-alpine';
+  enableJetStream = false;
+  networkAlias = 'nats';
 
   withImage(image: string) {
     this.image = image;
@@ -68,10 +68,13 @@ export interface NatsConfig {
  * Manages cached NATS connections and provides JetStream helpers.
  */
 class NatsHelpers {
-  private connection: NatsConnection | undefined;
-  private jsClient: JetStreamClient | undefined;
+  connection: NatsConnection | undefined;
+  jsClient: JetStreamClient | undefined;
+  tester: TesterInstance<NatsTesterBuilder>;
 
-  constructor(private tester: TesterInstance<NatsTesterBuilder>) {}
+  constructor(tester: TesterInstance<NatsTesterBuilder>) {
+    this.tester = tester;
+  }
 
   /**
    * Get the NATS configuration.

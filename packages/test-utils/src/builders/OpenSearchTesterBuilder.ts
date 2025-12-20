@@ -11,8 +11,8 @@ export interface OpenSearchOptions {
 }
 
 class OpenSearchBuilder {
-  private image = 'opensearchproject/opensearch:2';
-  private networkAlias = 'opensearch';
+  image = 'opensearchproject/opensearch:2';
+  networkAlias = 'opensearch';
 
   withImage(image: string) {
     this.image = image;
@@ -61,7 +61,11 @@ export interface OpenSearchConfig {
  * Helper class providing namespaced OpenSearch operations.
  */
 class OpenSearchHelpers {
-  constructor(private tester: TesterInstance<OpenSearchTesterBuilder>) {}
+  tester: TesterInstance<OpenSearchTesterBuilder>;
+
+  constructor(tester: TesterInstance<OpenSearchTesterBuilder>) {
+    this.tester = tester;
+  }
 
   /**
    * Get the OpenSearch configuration.

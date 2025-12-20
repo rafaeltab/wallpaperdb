@@ -49,7 +49,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 			join(__dirname, "../../drizzle/0000_mute_the_professor.sql");
 
 		return class extends Base {
-			private _migrationsApplied = false;
+			_migrationsApplied = false;
 
 			/**
 			 * Enable automatic database migration during setup.

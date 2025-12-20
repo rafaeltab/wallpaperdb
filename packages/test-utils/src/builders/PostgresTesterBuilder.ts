@@ -15,11 +15,11 @@ export interface PostgresOptions {
 }
 
 class PostgresBuilder {
-  private image = 'postgres:16-alpine';
-  private database = `test_db_${Date.now()}`;
-  private username = 'test';
-  private password = 'test';
-  private networkAlias = 'postgres';
+  image = 'postgres:16-alpine';
+  database = `test_db_${Date.now()}`;
+  username = 'test';
+  password = 'test';
+  networkAlias = 'postgres';
 
   withImage(image: string) {
     this.image = image;
@@ -74,9 +74,12 @@ export interface PostgresConfig {
  * Manages a cached postgres.js client connection and provides query/cleanup helpers.
  */
 class PostgresHelpers {
-  private client: PostgresType | undefined;
+  client: PostgresType | undefined;
+  tester: TesterInstance<PostgresTesterBuilder>;
 
-  constructor(private tester: TesterInstance<PostgresTesterBuilder>) {}
+  constructor(tester: TesterInstance<PostgresTesterBuilder>) {
+    this.tester = tester;
+  }
 
   /**
    * Get the PostgreSQL configuration.

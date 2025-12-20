@@ -24,10 +24,10 @@ export interface MinioOptions {
 }
 
 class MinioBuilder {
-  private image = 'minio/minio:latest';
-  private accessKey = 'minioadmin';
-  private secretKey = 'minioadmin';
-  private networkAlias = 'minio';
+  image = 'minio/minio:latest';
+  accessKey = 'minioadmin';
+  secretKey = 'minioadmin';
+  networkAlias = 'minio';
 
   withImage(image: string) {
     this.image = image;
@@ -76,9 +76,12 @@ export interface MinioConfig {
  * Manages a cached S3Client and provides object storage helpers.
  */
 class MinioHelpers {
-  private s3Client: S3Client | undefined;
+  s3Client: S3Client | undefined;
+  tester: TesterInstance<MinioTesterBuilder>;
 
-  constructor(private tester: TesterInstance<MinioTesterBuilder>) {}
+  constructor(tester: TesterInstance<MinioTesterBuilder>) {
+    this.tester = tester;
+  }
 
   /**
    * Get the MinIO configuration.

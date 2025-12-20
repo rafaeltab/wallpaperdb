@@ -42,8 +42,8 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
         const options = this.options;
 
         return class extends Base {
-            private app: FastifyInstance | null = null;
-            private _appInitialized = false;
+            app: FastifyInstance | null = null;
+            _appInitialized = false;
 
             withGatewayEnvironment() {
                 this.addSetupHook(async () => {

@@ -1,12 +1,27 @@
 {
-  "agents": {
-    "Build": {
-      "allowedCommands": [
-        {
-          "command": "pnpm",
-          "args": ["*"]
+    "$schema": "https://opencode.ai/config.json",
+    "mcp": {
+        "shadcn": {
+            "type": "local",
+            "command": [
+                "npx",
+                "-y",
+                "shadcn@latest",
+                "mcp"
+            ],
+            "enabled": true,
         }
-      ]
+    },
+    "agent": {
+        "Build": {
+            "allowedCommands": [
+                {
+                    "command": "pnpm",
+                    "args": [
+                        "*"
+                    ]
+                }
+            ]
+        }
     }
-  }
 }

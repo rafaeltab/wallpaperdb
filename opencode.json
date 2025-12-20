@@ -13,15 +13,12 @@
         }
     },
     "agent": {
-        "Build": {
-            "allowedCommands": [
-                {
-                    "command": "pnpm",
-                    "args": [
-                        "*"
-                    ]
+        "build": {
+            "permission": {
+                "bash": {
+                    "pnpm *": "allow"
                 }
-            ]
+            }
         }
     }
 }

@@ -84,10 +84,11 @@ describe("Scheduler Service Tests", () => {
         }
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         // Ensure scheduler is stopped after each test
         try {
-            const schedulerService = tester.getApp().container.resolve(SchedulerService); schedulerService.stop();
+            const schedulerService = tester.getApp().container.resolve(SchedulerService);
+            await schedulerService.stopAndWait();
         } catch {
             // Ignore if scheduler doesn't exist or is already stopped
         }

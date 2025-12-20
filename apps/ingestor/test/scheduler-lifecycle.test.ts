@@ -290,8 +290,9 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(record.uploadState).toBe("uploading"); // Not yet processed
 
-        // Check at 150ms (should be processed by now)
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Wait for reconciliation to complete (interval + execution time)
+        // Interval is 100ms, but we need to account for reconciliation execution time
+        await new Promise((resolve) => setTimeout(resolve, 300));
         [record] = await tester
             .getDrizzle()
             .select()

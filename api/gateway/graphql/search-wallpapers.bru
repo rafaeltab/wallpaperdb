@@ -1,0 +1,110 @@
+meta {
+  name: Search Wallpapers
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{gatewayBaseUrl}}/graphql
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  query SearchWallpapers($first: Int, $filter: WallpaperFilter) {
+    searchWallpapers(first: $first, filter: $filter) {
+      edges {
+        node {
+          wallpaperId
+          userId
+          uploadedAt
+          updatedAt
+          variants {
+            width
+            height
+            aspectRatio
+            format
+            fileSizeBytes
+            createdAt
+            url
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "first": 10,
+    "filter": null
+  }
+}
+
+docs {
+  # Search Wallpapers
+  
+  Search for wallpapers with optional filters and cursor-based pagination.
+  
+  ## Parameters
+  
+  - `first` (Int): Number of items to return (forward pagination)
+  - `after` (String): Cursor to start after (forward pagination)
+  - `last` (Int): Number of items to return (backward pagination)
+  - `before` (String): Cursor to start before (backward pagination)
+  - `filter` (WallpaperFilter): Optional filter criteria
+    - `userId` (String): Filter by user ID
+    - `variants` (VariantFilter): Filter by variant properties
+      - `width` (Int): Filter by exact width
+      - `height` (Int): Filter by exact height
+      - `aspectRatio` (Float): Filter by aspect ratio
+      - `format` (String): Filter by format (image/jpeg, image/png, image/webp)
+  
+  ## Returns
+  
+  Returns a `WallpaperConnection` with:
+  - `edges`: Array of wallpaper edges containing the node data
+  - `pageInfo`: Pagination information (hasNextPage, hasPreviousPage, cursors)
+  
+  ## Example: Filter by User ID
+  
+  ```json
+  {
+    "first": 10,
+    "filter": {
+      "userId": "user_123"
+    }
+  }
+  ```
+  
+  ## Example: Filter by Variant Width
+  
+  ```json
+  {
+    "first": 10,
+    "filter": {
+      "variants": {
+        "width": 1920,
+        "format": "image/webp"
+      }
+    }
+  }
+  ```
+  
+  ## Example: Pagination (Next Page)
+  
+  After getting the first page, use the `endCursor` from `pageInfo`:
+  
+  ```json
+  {
+    "first": 10,
+    "after": "MTU="
+  }
+  ```
+}

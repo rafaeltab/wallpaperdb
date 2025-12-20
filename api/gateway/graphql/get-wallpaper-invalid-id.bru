@@ -1,0 +1,106 @@
+meta {
+  name: Get Wallpaper - Validation Error Example
+  type: graphql
+  seq: 4
+}
+
+post {
+  url: {{gatewayBaseUrl}}/graphql
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  query GetWallpaperInvalidId($wallpaperId: ID!) {
+    getWallpaper(wallpaperId: $wallpaperId) {
+      wallpaperId
+      userId
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "wallpaperId": "invalid-id-format"
+  }
+}
+
+docs {
+  # Get Wallpaper - Validation Error Example
+  
+  This example demonstrates what happens when you provide an invalid wallpaper ID.
+  
+  ## Expected Response
+  
+  When the wallpaper ID is invalid (doesn't start with `wlpr_`), you get a GraphQL error:
+  
+  ```json
+  {
+    "errors": [
+      {
+        "message": "wallpaperId must start with \"wlpr_\"",
+        "locations": [
+          {
+            "line": 2,
+            "column": 3
+          }
+        ],
+        "path": ["getWallpaper"]
+      }
+    ],
+    "data": {
+      "getWallpaper": null
+    }
+  }
+  ```
+  
+  ## Validation Rules
+  
+  The `wallpaperId` parameter must:
+  1. Not be empty
+  2. Start with the prefix `wlpr_`
+  
+  ## Other Invalid Examples
+  
+  ### Empty String
+  ```json
+  {
+    "wallpaperId": ""
+  }
+  ```
+  Response: `"wallpaperId cannot be empty"`
+  
+  ### Missing Prefix
+  ```json
+  {
+    "wallpaperId": "123456"
+  }
+  ```
+  Response: `"wallpaperId must start with \"wlpr_\""`
+  
+  ## How to handle in client code
+  
+  ```typescript
+  try {
+    const result = await client.query(GetWallpaper, { wallpaperId });
+    
+    if (result.errors) {
+      // Validation error - show error message to user
+      console.error('Invalid wallpaper ID:', result.errors[0].message);
+      return <ErrorMessage message={result.errors[0].message} />;
+    }
+    
+    if (result.data.getWallpaper === null) {
+      // Not found - show 404
+      return <NotFound />;
+    }
+    
+    // Success - render wallpaper
+    return <WallpaperDetail wallpaper={result.data.getWallpaper} />;
+  } catch (error) {
+    // Network error or other unexpected issue
+    console.error('Unexpected error:', error);
+    return <ErrorPage />;
+  }
+  ```
+}

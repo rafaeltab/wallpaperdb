@@ -189,5 +189,15 @@ export const schema = `#graphql
 			"""
 			before: String
 		): WallpaperConnection!
+
+		"""
+		Get a specific wallpaper by ID
+		"""
+		getWallpaper(
+			"""
+			The unique wallpaper ID
+			"""
+			wallpaperId: ID!
+		): Wallpaper
 	}
 `;

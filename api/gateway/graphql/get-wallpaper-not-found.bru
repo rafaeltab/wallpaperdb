@@ -1,0 +1,71 @@
+meta {
+  name: Get Wallpaper - Not Found Example
+  type: graphql
+  seq: 3
+}
+
+post {
+  url: {{gatewayBaseUrl}}/graphql
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  query GetWallpaperNotFound($wallpaperId: ID!) {
+    getWallpaper(wallpaperId: $wallpaperId) {
+      wallpaperId
+      userId
+      variants {
+        width
+        height
+        url
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "wallpaperId": "wlpr_nonexistent_wallpaper_id"
+  }
+}
+
+docs {
+  # Get Wallpaper - Not Found Example
+  
+  This example demonstrates what happens when you query for a wallpaper that doesn't exist.
+  
+  ## Expected Response
+  
+  When a wallpaper is not found, the query returns `null` (not an error):
+  
+  ```json
+  {
+    "data": {
+      "getWallpaper": null
+    }
+  }
+  ```
+  
+  ## Why null instead of an error?
+  
+  This follows GraphQL best practices:
+  - **Not found** (valid input, no result) → `null`
+  - **Invalid input** (validation error) → GraphQL error
+  
+  This allows clients to easily distinguish between "wallpaper doesn't exist" and "something went wrong with the request".
+  
+  ## How to handle in client code
+  
+  ```typescript
+  const result = await client.query(GetWallpaper, { wallpaperId: "wlpr_123" });
+  
+  if (result.data.getWallpaper === null) {
+    // Wallpaper doesn't exist - show 404 page
+    return <NotFound />;
+  }
+  
+  // Wallpaper exists - render it
+  return <WallpaperDetail wallpaper={result.data.getWallpaper} />;
+  ```
+}

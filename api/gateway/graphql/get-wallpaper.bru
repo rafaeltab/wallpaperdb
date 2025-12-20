@@ -1,0 +1,109 @@
+meta {
+  name: Get Wallpaper by ID
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{gatewayBaseUrl}}/graphql
+  body: graphql
+  auth: none
+}
+
+body:graphql {
+  query GetWallpaper($wallpaperId: ID!) {
+    getWallpaper(wallpaperId: $wallpaperId) {
+      wallpaperId
+      userId
+      uploadedAt
+      updatedAt
+      variants {
+        width
+        height
+        aspectRatio
+        format
+        fileSizeBytes
+        createdAt
+        url
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "wallpaperId": "wlpr_01234567890123456789012345"
+  }
+}
+
+docs {
+  # Get Wallpaper by ID
+  
+  Retrieves a specific wallpaper document by its unique ID.
+  
+  ## Parameters
+  
+  - `wallpaperId` (ID!, required): The unique wallpaper identifier (must start with `wlpr_`)
+  
+  ## Returns
+  
+  - Returns the `Wallpaper` object if found
+  - Returns `null` if wallpaper doesn't exist (not an error)
+  - Returns GraphQL error if `wallpaperId` is invalid (empty or wrong format)
+  
+  ## Example Responses
+  
+  ### Success (wallpaper found):
+  ```json
+  {
+    "data": {
+      "getWallpaper": {
+        "wallpaperId": "wlpr_01234567890123456789012345",
+        "userId": "user_123",
+        "uploadedAt": "2024-01-15T10:30:00.000Z",
+        "updatedAt": "2024-01-15T10:30:00.000Z",
+        "variants": [
+          {
+            "width": 1920,
+            "height": 1080,
+            "aspectRatio": 1.7777777777777777,
+            "format": "image/jpeg",
+            "fileSizeBytes": 500000,
+            "createdAt": "2024-01-15T10:30:15.000Z",
+            "url": "http://localhost:3003/wallpapers/wlpr_01234567890123456789012345?w=1920&h=1080&format=image/jpeg"
+          }
+        ]
+      }
+    }
+  }
+  ```
+  
+  ### Not Found:
+  ```json
+  {
+    "data": {
+      "getWallpaper": null
+    }
+  }
+  ```
+  
+  ### Validation Error (invalid format):
+  ```json
+  {
+    "errors": [
+      {
+        "message": "wallpaperId must start with \"wlpr_\"",
+        "locations": [{"line": 2, "column": 3}],
+        "path": ["getWallpaper"]
+      }
+    ],
+    "data": null
+  }
+  ```
+  
+  ## Usage
+  
+  1. Replace the `wallpaperId` variable with an actual wallpaper ID from your database
+  2. You can get wallpaper IDs by first running the "Search Wallpapers" query
+  3. The wallpaper ID must start with `wlpr_` prefix
+}

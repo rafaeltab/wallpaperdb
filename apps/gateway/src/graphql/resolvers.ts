@@ -1,12 +1,21 @@
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
-import {
-  withSpan,
-  recordCounter,
-  recordHistogram,
-} from '@wallpaperdb/core/telemetry';
 import { GatewayAttributes } from '../telemetry/attributes.js';
+
+/**
+ * Validate wallpaper ID format
+ * @throws Error if wallpaperId is invalid
+ */
+function validateWallpaperId(wallpaperId: string): void {
+  if (!wallpaperId || wallpaperId.trim() === '') {
+    throw new Error('wallpaperId cannot be empty');
+  }
+  if (!wallpaperId.startsWith('wlpr_')) {
+    throw new Error('wallpaperId must start with "wlpr_"');
+  }
+}
 
 interface WallpaperFilter {
   userId?: string;
@@ -24,6 +33,10 @@ interface SearchArgs {
   after?: string;
   last?: number;
   before?: string;
+}
+
+interface GetWallpaperArgs {
+  wallpaperId: string;
 }
 
 interface Variant {
@@ -62,6 +75,9 @@ export class Resolvers {
         searchWallpapers: async (_parent: unknown, args: SearchArgs) => {
           return await this.searchWallpapers(args);
         },
+        getWallpaper: async (_parent: unknown, args: GetWallpaperArgs) => {
+          return await this.getWallpaper(args);
+        },
       },
       Variant: {
         url: (parent: Variant & { __wallpaperId?: string }) => {
@@ -84,9 +100,7 @@ export class Resolvers {
         [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
         [GatewayAttributes.SEARCH_PAGE_SIZE]: limit,
         [GatewayAttributes.SEARCH_FILTER_USER_ID]: args.filter?.userId ?? 'none',
-        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: args.filter?.variants
-          ? 'true'
-          : 'false',
+        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: args.filter?.variants ? 'true' : 'false',
       },
       async (span) => {
         const startTime = Date.now();
@@ -94,15 +108,9 @@ export class Resolvers {
         // Decode cursor if provided
         let offset = 0;
         if (args.after) {
-          offset = parseInt(
-            Buffer.from(args.after, 'base64').toString('utf-8'),
-            10
-          );
+          offset = parseInt(Buffer.from(args.after, 'base64').toString('utf-8'), 10);
         } else if (args.before) {
-          offset = parseInt(
-            Buffer.from(args.before, 'base64').toString('utf-8'),
-            10
-          );
+          offset = parseInt(Buffer.from(args.before, 'base64').toString('utf-8'), 10);
         }
 
         // If using 'last', we need to adjust offset for backward pagination
@@ -122,9 +130,7 @@ export class Resolvers {
 
         // Check if there are more results
         const hasMore = result.documents.length > limit;
-        const documents = hasMore
-          ? result.documents.slice(0, limit)
-          : result.documents;
+        const documents = hasMore ? result.documents.slice(0, limit) : result.documents;
 
         // Attach wallpaperId to variants for URL resolution
         const edges = documents.map((doc: Wallpaper) => ({
@@ -139,9 +145,7 @@ export class Resolvers {
 
         // Generate cursors
         const startCursor =
-          edges.length > 0
-            ? Buffer.from(offset.toString()).toString('base64')
-            : null;
+          edges.length > 0 ? Buffer.from(offset.toString()).toString('base64') : null;
         const endCursor =
           edges.length > 0
             ? Buffer.from((offset + edges.length).toString()).toString('base64')
@@ -175,6 +179,56 @@ export class Resolvers {
             startCursor,
             endCursor,
           },
+        };
+      }
+    );
+  }
+
+  /**
+   * Get a specific wallpaper by ID
+   */
+  private async getWallpaper(args: GetWallpaperArgs): Promise<Wallpaper | null> {
+    // Validate wallpaper ID format
+    validateWallpaperId(args.wallpaperId);
+
+    return await withSpan(
+      'graphql.resolve.getWallpaper',
+      {
+        [GatewayAttributes.GRAPHQL_OPERATION_NAME]: 'getWallpaper',
+        [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
+        [Attributes.WALLPAPER_ID]: args.wallpaperId,
+      },
+      async (span) => {
+        const startTime = Date.now();
+
+        // Query repository
+        const wallpaper = await this.repository.findById(args.wallpaperId);
+
+        // Record metrics
+        const found = wallpaper !== null;
+        span.setAttribute(GatewayAttributes.OPENSEARCH_DOC_EXISTS, found);
+
+        const durationMs = Date.now() - startTime;
+        recordCounter('graphql.query.total', 1, {
+          operation: 'getWallpaper',
+          found: found.toString(),
+        });
+        recordHistogram('graphql.query.duration_ms', durationMs, {
+          operation: 'getWallpaper',
+        });
+
+        // If not found, return null
+        if (!wallpaper) {
+          return null;
+        }
+
+        // Attach wallpaperId to variants for URL resolution
+        return {
+          ...wallpaper,
+          variants: wallpaper.variants.map((v) => ({
+            ...v,
+            __wallpaperId: wallpaper.wallpaperId,
+          })),
         };
       }
     );

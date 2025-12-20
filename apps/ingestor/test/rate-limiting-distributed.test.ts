@@ -9,10 +9,8 @@ import {
 } from "@wallpaperdb/test-utils";
 import type { FastifyInstance, LightMyRequestResponse } from "fastify";
 import FormData from "form-data";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { loadConfig } from "../src/config.js";
-import { wallpapers } from "../src/db/schema.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,

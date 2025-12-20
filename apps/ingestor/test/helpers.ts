@@ -47,7 +47,7 @@ export async function cleanupMinio(config: Config) {
  * Clean up database test data
  * Note: This will be implemented once the database schema is defined
  */
-export async function cleanupDatabase(config: Config) {
+export async function cleanupDatabase(_config: Config) {
   // TODO: Implement once database schema is ready
   // const pool = new Pool({ connectionString: config.databaseUrl });
   // await pool.query('DELETE FROM wallpapers WHERE user_id LIKE $1', ['user_test_%']);

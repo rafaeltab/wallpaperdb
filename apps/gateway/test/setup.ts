@@ -8,8 +8,6 @@ import {
 import { afterEach, beforeAll } from "vitest";
 import { InProcessGatewayTesterBuilder } from "./builders/InProcessGatewayBuilder.js";
 
-export let tester: ReturnType<typeof setup>;
-
 const setup = () => {
     const TesterClass = createDefaultTesterBuilder()
         .with(DockerTesterBuilder)
@@ -28,6 +26,8 @@ const setup = () => {
 
     return t;
 };
+
+export let tester: ReturnType<typeof setup>;
 
 beforeAll(async () => {
     if (globalThis.__tester__ !== undefined) {

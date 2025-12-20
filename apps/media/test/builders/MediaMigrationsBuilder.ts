@@ -43,8 +43,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 	}
 
 	addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(
-		Base: TBase,
-	) {
+		Base: TBase) {
 		const migrationPath =
 			this.options.migrationPath ??
 			join(__dirname, "../../drizzle/0000_mute_the_professor.sql");

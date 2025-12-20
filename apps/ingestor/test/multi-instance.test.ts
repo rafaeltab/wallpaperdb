@@ -10,11 +10,8 @@ import {
 } from "@wallpaperdb/test-utils";
 import { eq } from "drizzle-orm";
 import { ulid } from "ulid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type NewWallpaper, wallpapers } from "../src/db/schema.js";
+import { wallpapers } from "../src/db/schema.js";
 import { StuckUploadsReconciliation } from "../src/services/reconciliation/stuck-uploads-reconciliation.service.js";
-import { MissingEventsReconciliation } from "../src/services/reconciliation/missing-events-reconciliation.service.js";
-import { OrphanedIntentsReconciliation } from "../src/services/reconciliation/orphaned-intents-reconciliation.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,

@@ -1,7 +1,7 @@
 // Re-export framework
 export { createTesterBuilder, BaseTesterBuilder } from './framework.js';
 export type { AddMethodsType, TesterInstance } from './framework.js';
-export type { AsyncReturnTypeof } from './types.js';
+export type { AsyncReturnTypeof, AnyConstructorFor } from './types.js';
 
 // Export convenience helper (Phase 3)
 export { createDefaultTesterBuilder } from './createDefaultTesterBuilder.js';

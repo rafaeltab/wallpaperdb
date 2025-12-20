@@ -181,7 +181,7 @@ describe("BaseEventConsumer", () => {
     } as unknown as NatsConnection;
 
     consumer = new TestEventConsumer({
-      natsConnection: mockNatsConnection,
+      natsConnectionProvider: () => mockNatsConnection,
       serviceName: "test-service",
       streamName: "test-stream",
       durableName: "test-consumer",

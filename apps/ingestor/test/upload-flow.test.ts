@@ -247,8 +247,6 @@ describe("Upload Flow Integration Tests", () => {
             const userId = tester.fixtures.generateTestUserId();
             const filename = tester.fixtures.generateTestFilename("jpg");
             const imageBuffer = await tester.fixtures.images.validJpeg();
-            const expectedHash =
-                await tester.fixtures.generateContentHash(imageBuffer);
 
             const response = await uploadFile(fastify, {
                 file: imageBuffer,

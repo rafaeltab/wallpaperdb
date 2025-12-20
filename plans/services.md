@@ -35,7 +35,7 @@ Users must retrieve wallpapers efficiently, the 'media' service exposes wallpape
 
 ---
 
-## Variant Generator 📋 Planned
+## Variant Generator ✅ Complete
 
 **Status**: Not started (after Media Service)
 
@@ -60,7 +60,7 @@ This service provides these to the system.
 
 ---
 
-## Gateway 📋 Planned
+## Gateway ✅ Complete
 
 **Status**: Not started
 

@@ -245,7 +245,14 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should run reconciliation on correct interval", async () => {
-        // Create a stuck record
+        // Start scheduler first (immediate run processes nothing since no data yet)
+        const schedulerService = tester.getApp().container.resolve(SchedulerService);
+        schedulerService.start();
+
+        // Wait for immediate reconciliation to complete
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Now create a stuck record AFTER the immediate run
         const testImage = await createTestImage({
             width: 1920,
             height: 1080,
@@ -276,12 +283,8 @@ describe("Scheduler Lifecycle Tests", () => {
                 contentHash,
             });
 
-        // Start scheduler
-        const schedulerService = tester.getApp().container.resolve(SchedulerService);
-        schedulerService.start();
-
-        // Test interval is 100ms, so we should see reconciliation happen
-        // Check at 50ms (should not be processed yet)
+        // Test interval is 100ms, so we should see reconciliation happen on next interval
+        // Check at 50ms (should not be processed yet - waiting for next interval)
         await new Promise((resolve) => setTimeout(resolve, 50));
         let [record] = await tester
             .getDrizzle()
@@ -290,7 +293,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(record.uploadState).toBe("uploading"); // Not yet processed
 
-        // Wait for reconciliation to complete (interval + execution time)
+        // Wait for next scheduled reconciliation to complete (interval + execution time)
         // Interval is 100ms, but we need to account for reconciliation execution time
         await new Promise((resolve) => setTimeout(resolve, 300));
         [record] = await tester
@@ -298,7 +301,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .select()
             .from(wallpapers)
             .where(eq(wallpapers.id, wallpaperId));
-        expect(record.uploadState).toBe("stored"); // Processed
+        expect(record.uploadState).toBe("stored"); // Processed by scheduled interval
 
         await schedulerService.stopAndWait();
     });
@@ -338,11 +341,15 @@ describe("Scheduler Lifecycle Tests", () => {
                 });
         }
 
-        // Start scheduler
+        // Start scheduler (runs immediate reconciliation)
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
+        // Wait for immediate reconciliation to complete
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
         // Manually trigger reconciliation to force concurrent attempt
+        // This should be skipped if a reconciliation is still running
         const reconciliationPromise = schedulerService.runReconciliationNow();
 
         // Wait a bit for manual reconciliation to start

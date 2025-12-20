@@ -250,14 +250,11 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Start scheduler with short interval (for testing)
+            // Start scheduler (runs reconciliation immediately, then on interval)
             schedulerService.start();
 
-            // Wait for at least one cycle (implementation should use ~100ms for tests)
-            await wait(500);
-
-            // Stop scheduler
-            schedulerService.stop();
+            // Wait for reconciliation to complete (stopAndWait ensures completion)
+            await schedulerService.stopAndWait();
 
             // Verify reconciliation ran before stop
             const record = await getRecordState(id);
@@ -268,7 +265,7 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Wait to ensure no more cycles run
+            // Wait to ensure no more cycles run (scheduler is stopped)
             await wait(500);
 
             // Verify second upload was NOT reconciled (scheduler stopped)
@@ -488,16 +485,16 @@ describe("Scheduler Service Tests", () => {
         it("should run manual reconciliation without waiting for scheduled interval", async () => {
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
-            // Start scheduler
-            schedulerService.start();
-
-            // Create test data
+            // Create test data before starting scheduler
             const id = await createStuckUpload("stored", 10);
 
-            // Immediately trigger manual reconciliation (don't wait for interval)
-            await schedulerService.runReconciliationNow();
+            // Start scheduler (runs reconciliation immediately)
+            schedulerService.start();
 
-            // Should be processed immediately, not waiting for next scheduled cycle
+            // Wait for initial reconciliation to complete
+            await new Promise((resolve) => setTimeout(resolve, 200));
+
+            // Should be processed immediately by the initial reconciliation cycle
             const record = await getRecordState(id);
             expect(record?.uploadState).toBe("processing");
         });

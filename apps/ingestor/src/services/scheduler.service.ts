@@ -44,14 +44,18 @@ export class SchedulerService {
 
     console.log('Starting reconciliation scheduler...');
 
-    // Run reconciliation on regular interval
+    // Run reconciliation immediately on start, then on interval
+    this.runReconciliationCycle().catch((error) => {
+      console.error('Fatal error in initial reconciliation cycle:', error);
+    });
+
     this.reconciliationInterval = setInterval(() => {
       this.runReconciliationCycle().catch((error) => {
         console.error('Fatal error in reconciliation interval:', error);
       });
     }, this.config.reconciliationIntervalMs);
 
-    // Run MinIO cleanup on separate interval
+    // Run MinIO cleanup on interval only (not immediately - it's expensive)
     this.minioCleanupInterval = setInterval(() => {
       this.runMinioCleanupCycle().catch((error) => {
         console.error('Fatal error in MinIO cleanup interval:', error);

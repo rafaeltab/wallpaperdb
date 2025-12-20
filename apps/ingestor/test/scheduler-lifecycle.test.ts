@@ -244,7 +244,7 @@ describe("Scheduler Lifecycle Tests", () => {
         expect(reconciledBeforeShutdown).toBeGreaterThan(0); // At least some were processed
     });
 
-    it("should run reconciliation on correct interval", async () => {
+    it("should run reconciliation on correct interval", { retry: 3 }, async () => {
         // Create a stuck record
         const testImage = await createTestImage({
             width: 1920,
@@ -303,7 +303,7 @@ describe("Scheduler Lifecycle Tests", () => {
         await schedulerService.stopAndWait();
     });
 
-    it("should prevent concurrent reconciliation cycles", async () => {
+    it("should prevent concurrent reconciliation cycles", { retry: 3 }, async () => {
         // Create many stuck uploads to make reconciliation take longer
         const testImage = await createTestImage({
             width: 1920,

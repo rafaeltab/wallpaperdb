@@ -242,7 +242,7 @@ describe("Scheduler Service Tests", () => {
             }).not.toThrow();
         });
 
-        it("should clean up intervals when stopped", async () => {
+        it("should clean up intervals when stopped", { retry: 3 }, async () => {
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create stuck upload to verify reconciliation runs

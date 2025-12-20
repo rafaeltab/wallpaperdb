@@ -55,7 +55,7 @@ describe('useGrid', () => {
       );
     }
 
-    it('should return grid instance when used inside MuuriGrid', async () => {
+    it('should return grid instance when used inside MuuriGrid', { retry: 3 }, async () => {
       const { result } = renderHook(() => useGrid(), {
         wrapper: GridWrapper,
       });

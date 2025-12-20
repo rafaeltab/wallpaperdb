@@ -125,3 +125,40 @@ export function triggerIntersection(isIntersecting: boolean) {
 export function clearIntersectionObservers() {
   intersectionObserverCallbacks.clear();
 }
+
+// Mock Cache API for download functionality
+const mockCache = {
+  match: vi.fn(() => Promise.resolve(undefined)),
+  put: vi.fn(() => Promise.resolve()),
+  delete: vi.fn(() => Promise.resolve(true)),
+  keys: vi.fn(() => Promise.resolve([])),
+};
+
+global.caches = {
+  open: vi.fn(() => Promise.resolve(mockCache)),
+  delete: vi.fn(() => Promise.resolve(true)),
+  has: vi.fn(() => Promise.resolve(false)),
+  keys: vi.fn(() => Promise.resolve([])),
+  match: vi.fn(() => Promise.resolve(undefined)),
+} as unknown as CacheStorage;
+
+// Mock URL.createObjectURL and URL.revokeObjectURL
+global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+global.URL.revokeObjectURL = vi.fn();
+
+// Mock navigator.clipboard
+Object.defineProperty(navigator, 'clipboard', {
+  value: {
+    writeText: vi.fn(() => Promise.resolve()),
+    readText: vi.fn(() => Promise.resolve('')),
+  },
+  writable: true,
+  configurable: true,
+});
+
+// Mock navigator.share
+Object.defineProperty(navigator, 'share', {
+  value: vi.fn(() => Promise.resolve()),
+  writable: true,
+  configurable: true,
+});

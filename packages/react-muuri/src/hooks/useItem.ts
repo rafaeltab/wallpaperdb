@@ -33,10 +33,9 @@ export function useItem(): UseItemReturn {
   const grid = muuriContext?.grid ?? null;
 
   // State for item flags - default to false when outside context
-  // isVisible defaults to true only when we have an item, since items are visible by default
   const [isDragging, setIsDragging] = useState(false);
   const [isPositioning, setIsPositioning] = useState(false);
-  const [isVisible, setIsVisible] = useState(() => (item ? item.isVisible() : false));
+  const [isVisible, setIsVisible] = useState(false);
   const [isShowing, setIsShowing] = useState(false);
   const [isHiding, setIsHiding] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
@@ -53,12 +52,16 @@ export function useItem(): UseItemReturn {
     }
   }, [item]);
 
+  // Update state when item becomes available
+  useEffect(() => {
+    if (item) {
+      updateState();
+    }
+  }, [item, updateState]);
+
   // Subscribe to grid events that affect item state
   useEffect(() => {
     if (!grid || !item) return;
-
-    // Initial state update
-    updateState();
 
     // Event handlers that update state
     const handleDragStart = (_draggedItem: unknown) => {

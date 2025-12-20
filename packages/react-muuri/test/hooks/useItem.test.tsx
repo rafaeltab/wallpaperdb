@@ -69,8 +69,13 @@ describe('useItem', () => {
         { timeout: 1000 }
       );
 
-      // Items are visible by default
-      expect(screen.getByTestId('item1-visible')).toHaveTextContent('yes');
+      // Items are visible by default - wait for state to update
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('item1-visible')).toHaveTextContent('yes');
+        },
+        { timeout: 1000 }
+      );
     });
 
     it('should return isDragging as false initially', async () => {

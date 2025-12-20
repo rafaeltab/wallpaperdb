@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -60,7 +60,9 @@ describe('useRefresh', () => {
       );
 
       // Clicking should call refresh without error
-      screen.getByTestId('item1').click();
+      await act(async () => {
+        screen.getByTestId('item1').click();
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('item1-refreshed')).toHaveTextContent('yes');
@@ -98,7 +100,9 @@ describe('useRefresh', () => {
       );
 
       // Should not throw with force parameter
-      expect(() => screen.getByTestId('item').click()).not.toThrow();
+      await act(async () => {
+        expect(() => screen.getByTestId('item').click()).not.toThrow();
+      });
     });
   });
 

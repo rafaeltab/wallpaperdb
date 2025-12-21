@@ -2,6 +2,7 @@ import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaper
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import { CursorService } from '../services/cursor.service.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
 /**
@@ -63,6 +64,7 @@ interface Wallpaper {
 export class Resolvers {
   constructor(
     @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
+    @inject(CursorService) private readonly cursorService: CursorService,
     @inject('config') private readonly config: Config
   ) {}
 
@@ -108,9 +110,9 @@ export class Resolvers {
         // Decode cursor if provided
         let offset = 0;
         if (args.after) {
-          offset = parseInt(Buffer.from(args.after, 'base64').toString('utf-8'), 10);
+          offset = this.cursorService.decode(args.after);
         } else if (args.before) {
-          offset = parseInt(Buffer.from(args.before, 'base64').toString('utf-8'), 10);
+          offset = this.cursorService.decode(args.before);
         }
 
         // If using 'last', we need to adjust offset for backward pagination
@@ -144,12 +146,9 @@ export class Resolvers {
         }));
 
         // Generate cursors
-        const startCursor =
-          edges.length > 0 ? Buffer.from(offset.toString()).toString('base64') : null;
+        const startCursor = edges.length > 0 ? this.cursorService.encode(offset) : null;
         const endCursor =
-          edges.length > 0
-            ? Buffer.from((offset + edges.length).toString()).toString('base64')
-            : null;
+          edges.length > 0 ? this.cursorService.encode(offset + edges.length) : null;
 
         const hasNextPage = hasMore && !args.last;
         const hasPreviousPage = offset > 0;

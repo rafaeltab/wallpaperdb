@@ -1,12 +1,7 @@
-import { OpenSearchConnection } from '../connections/opensearch.js';
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
+import { OpenSearchConnection } from '../connections/opensearch.js';
 import { IndexManagerService } from '../services/index-manager.service.js';
-import {
-  withSpan,
-  recordCounter,
-  recordHistogram,
-  Attributes,
-} from '@wallpaperdb/core/telemetry';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
 export interface Variant {
@@ -140,10 +135,7 @@ export class WallpaperRepository {
           this.recordOperationMetrics('get', true, startTime);
           return result.body._source as WallpaperDocument;
         } catch (error) {
-          if (
-            (error as { meta?: { statusCode?: number } }).meta?.statusCode ===
-            404
-          ) {
+          if ((error as { meta?: { statusCode?: number } }).meta?.statusCode === 404) {
             span.setAttribute(GatewayAttributes.OPENSEARCH_DOC_EXISTS, false);
             this.recordOperationMetrics('get', true, startTime);
             return null;
@@ -181,9 +173,7 @@ export class WallpaperRepository {
         [GatewayAttributes.SEARCH_PAGE_SIZE]: pageSize,
         [GatewayAttributes.SEARCH_OFFSET]: offset,
         [GatewayAttributes.SEARCH_FILTER_USER_ID]: params.userId ?? 'none',
-        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: params.variantFilters
-          ? 'true'
-          : 'false',
+        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: params.variantFilters ? 'true' : 'false',
       },
       async (span) => {
         const startTime = Date.now();
@@ -275,11 +265,7 @@ export class WallpaperRepository {
   /**
    * Record metrics for OpenSearch operations
    */
-  private recordOperationMetrics(
-    operation: string,
-    success: boolean,
-    startTime: number
-  ): void {
+  private recordOperationMetrics(operation: string, success: boolean, startTime: number): void {
     const durationMs = Date.now() - startTime;
     const attributes = {
       [GatewayAttributes.OPENSEARCH_OPERATION]: operation,

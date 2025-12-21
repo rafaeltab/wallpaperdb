@@ -1,18 +1,13 @@
+import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import {
   BaseEventConsumer,
   WALLPAPER_UPLOADED_SUBJECT,
   type WallpaperUploadedEvent,
   WallpaperUploadedEventSchema,
 } from '@wallpaperdb/events';
-import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, singleton } from 'tsyringe';
+import { NatsConnectionManager } from '../connections/nats.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
-import {
-  withSpan,
-  recordCounter,
-  recordHistogram,
-  Attributes,
-} from '@wallpaperdb/core/telemetry';
 
 /**
  * Consumer for wallpaper.uploaded events

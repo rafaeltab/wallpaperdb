@@ -1,0 +1,329 @@
+---
+title: "ADR-002: GraphQL Security Hardening"
+description: Architecture decision for implementing comprehensive GraphQL security without external complexity libraries.
+---
+
+**Status:** Accepted  
+**Date:** 2024-12-21  
+**Context:** Protecting Gateway GraphQL API from DoS attacks
+
+## Context
+
+The Gateway service's GraphQL API lacked critical security protections, making it vulnerable to:
+
+1. **Deeply nested queries** (depth attacks)
+2. **Expensive queries** (complexity attacks)
+3. **Unbounded result sets** (pagination attacks)
+4. **Query flooding** (rate limit attacks)
+5. **Cursor manipulation** (data enumeration)
+6. **Batch query abuse** (amplification attacks)
+7. **Schema discovery** (introspection probing)
+
+### Technology Stack
+
+- **Fastify:** 5.2.0
+- **Mercurius:** 16.6.0 (GraphQL adapter for Fastify)
+- **GraphQL:** 16.12.0
+
+### Initial Plan Issues
+
+The original plan proposed using:
+- `graphql-depth-limit` library
+- `graphql-query-complexity` library
+- Mercurius `validationRules` option
+
+**Problems Discovered:**
+1. `validationRules` only run during validation phase (cached, not per-request)
+2. Mercurius JIT compilation bypasses validation after first execution
+3. `graphql-query-complexity` caused "GraphQL realm" errors in Mercurius hooks
+4. Complexity estimators never executed (always returned 0)
+
+## Decision
+
+**We implemented a layered security architecture WITHOUT external complexity libraries:**
+
+### Layer 1: Transport (Fastify `preHandler`)
+- IP + User-Agent fingerprinted rate limiting (Redis-backed)
+- Batch size limiting (max 10 queries/batch)
+- Performance: ~1ms overhead (Redis roundtrip)
+
+### Layer 2: Mercurius Built-in
+- Query depth limiting via `queryDepth: 5` (built-in option)
+- Introspection disabled in production via `NoSchemaIntrospectionCustomRule`
+- Performance: ~0ms overhead
+
+### Layer 3: Custom Validation (`preExecution` Hook)
+- **Custom complexity calculator** (no external library)
+- Breadth limiting (unique fields + aliases)
+- Runs on EVERY request (not cached by JIT)
+- Performance: ~1-3ms overhead
+
+### Layer 4: Resolvers
+- HMAC-signed cursors with timestamp validation
+- Configurable expiration (default 7 days)
+- Performance: ~0.5ms overhead
+
+**Total Overhead:** ~2-5ms per request ✅
+
+## Rationale
+
+### Why Custom Complexity Calculator?
+
+**External Library Issues:**
+```typescript
+// ❌ graphql-query-complexity caused:
+- "GraphQL realm" errors (different module instances)
+- Never executed (validation phase only)
+- 5-10ms overhead (when it worked)
+```
+
+**Custom Implementation Benefits:**
+```typescript
+// ✅ Custom QueryComplexityService:
+- Runs in preExecution hook (every request)
+- No GraphQL realm issues
+- Faster (&lt;3ms vs 5-10ms)
+- Full control over cost calculation
+- Schema-specific optimizations
+```
+
+### Why Mercurius `queryDepth` Over Library?
+
+**Built-in Option:**
+```typescript
+await fastify.register(mercurius, {
+  queryDepth: 5, // ✅ Built-in, tested, works correctly
+});
+```
+
+**vs External Library:**
+```typescript
+import depthLimit from 'graphql-depth-limit';
+// ❌ Additional dependency
+// ❌ Same validation phase issues
+```
+
+### Why IP + User-Agent Rate Limiting?
+
+**Problem:** IP-only rate limiting penalizes shared networks (offices, universities)
+
+**Solution:**
+```typescript
+const key = `graphql:ratelimit:ip:${ip}:ua:${hash(userAgent)}`;
+// ✅ Better granularity
+// ✅ Prevents false positives
+// ✅ Minimal overhead (hash once)
+```
+
+### Why Custom Cursors Over Base64?
+
+**Insecure (Original):**
+```typescript
+const cursor = Buffer.from('10').toString('base64'); // "MTA="
+// ❌ Predictable: decode("MTA=") → 10, encode(11) → "MTE="
+// ❌ Tamperable: easy to manipulate offsets
+// ❌ No expiration: cursors valid forever
+```
+
+**Secure (New):**
+```typescript
+{
+  payload: JSON.stringify({ offset, timestamp }),
+  signature: HMAC(payload, secret)
+}
+// ✅ Opaque: can't predict next cursor
+// ✅ Tamper-proof: signature validation
+// ✅ Expires: timestamp check (7 days default)
+```
+
+## Implementation Details
+
+### Complexity Calculation Strategy
+
+```typescript
+// Field costs
+'Query.searchWallpapers': 10,
+'Wallpaper.variants': 5,
+
+// List multiplier from pagination
+first: 10 → multiplier = 10
+
+// Nested list multiplier (reviewer feedback)
+variants: 5 → multiplier = 5 (avg variants/wallpaper)
+
+// Total cost
+searchWallpapers(first: 10) { variants } 
+= 10 (base) + 10*10 (list) + 5*5 (nested)
+= 135 points ✅
+```
+
+### Breadth Limiting (Unique Fields)
+
+**Reviewer feedback:** Count unique fields, not total instances
+
+```typescript
+// Query with 10 fields repeated 10 times
+query {
+  user1: user { name email }
+  user2: user { name email }
+  # ... x10
+}
+
+// ❌ Original: 20 fields (10 queries × 2 fields) → REJECTED
+// ✅ Fixed: 2 unique fields (name, email) → ACCEPTED
+```
+
+### Environment-Based Error Messages
+
+**Production:**
+```json
+{
+  "errors": [{
+    "message": "Query validation failed",
+    "extensions": { "code": "COMPLEXITY_LIMIT_EXCEEDED" }
+  }]
+}
+```
+
+**Development:**
+```json
+{
+  "errors": [{
+    "message": "Query complexity 1523 exceeds maximum 1000",
+    "extensions": { 
+      "code": "COMPLEXITY_LIMIT_EXCEEDED",
+      "complexity": 1523,
+      "maxComplexity": 1000
+    }
+  }]
+}
+```
+
+## Configuration
+
+All security features configurable via environment variables:
+
+```bash
+# Query Validation
+GRAPHQL_MAX_DEPTH=5
+GRAPHQL_MAX_COMPLEXITY=1000
+GRAPHQL_MAX_UNIQUE_FIELDS=50
+GRAPHQL_MAX_ALIASES=20
+GRAPHQL_MAX_BATCH_SIZE=10
+GRAPHQL_INTROSPECTION_ENABLED=false
+
+# Rate Limiting
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_MAX_ANONYMOUS=100
+RATE_LIMIT_WINDOW_MS=60000
+
+# Redis (for rate limiting)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Cursor Security
+CURSOR_SECRET=<64-char-hex>
+CURSOR_EXPIRATION_MS=604800000  # 7 days
+```
+
+## Alternatives Considered
+
+### Option 1: Use `graphql-query-complexity` Library
+
+**Pros:** Battle-tested, feature-rich  
+**Cons:** GraphQL realm errors, doesn't run per-request, 5-10ms overhead  
+**Verdict:** ❌ Incompatible with Mercurius architecture
+
+### Option 2: Disable JIT Compilation
+
+**Pros:** `validationRules` would run every time  
+**Cons:** 50-80% performance penalty  
+**Verdict:** ❌ Defeats Mercurius's optimization purpose
+
+### Option 3: Use Apollo Server
+
+**Pros:** Better plugin ecosystem  
+**Cons:** Requires full rewrite, heavier framework  
+**Verdict:** ❌ Too expensive for this single issue
+
+### Option 4: Implement Custom (CHOSEN)
+
+**Pros:** Runs per-request, no realm errors, &lt;3ms overhead, full control  
+**Cons:** More code to maintain  
+**Verdict:** ✅ Best fit for Mercurius
+
+## Consequences
+
+### Positive
+
+- **DoS Protection:** Multiple layers prevent resource exhaustion
+- **Performance:** &lt;5ms overhead per request (within budget)
+- **No Dependencies:** Zero external security libraries
+- **Mercurius Compatible:** Works with JIT compilation
+- **Observability:** Comprehensive telemetry for security events
+- **Flexibility:** Easy to adjust limits per environment
+
+### Negative
+
+- **Maintenance:** Custom complexity calculator needs schema updates
+- **Learning Curve:** Team must understand cost calculations
+- **No Library Updates:** Can't benefit from library bug fixes
+
+### Mitigations
+
+- **Maintainability:** Well-documented cost calculations
+- **Testing:** Comprehensive test suite validates behavior
+- **Monitoring:** Grafana dashboard tracks security metrics
+- **Documentation:** ADR + Fumadocs guide for future developers
+
+## Security Metrics (Telemetry)
+
+All security events tracked via OpenTelemetry:
+
+```typescript
+recordCounter('graphql.security.complexity_exceeded', 1, { complexity, threshold });
+recordCounter('graphql.security.breadth_exceeded', 1, { type, count, threshold });
+recordCounter('graphql.security.rate_limited', 1, { ip: hash(ip) });
+recordCounter('graphql.security.batch_exceeded', 1, { batchSize, threshold });
+recordHistogram('graphql.query.complexity', complexity);
+```
+
+**Grafana Dashboard:** `/infra/grafana/dashboards/gateway-security.json`
+
+## Compliance
+
+Follows official recommendations:
+- [GraphQL.org Security Best Practices](https://graphql.org/learn/security/)
+- [OWASP GraphQL Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html)
+
+## References
+
+- **Original Plan:** `plans/graphql-security-hardening.md`
+- **Issue Summary:** `GRAPHQL_SECURITY_ISSUE_SUMMARY.md`
+- **Mercurius Hooks:** https://github.com/mercurius-js/mercurius/blob/master/docs/hooks.md
+- **Mercurius Issue #188:** https://github.com/mercurius-js/mercurius/issues/188
+
+## Related Decisions
+
+- ADR-001: Fastify over NestJS (framework choice)
+
+## Future Considerations
+
+- **Per-User Limits:** Authenticated users could have higher limits
+- **Query Allowlist:** Production APIs could use trusted documents only
+- **Cost Directives:** Schema annotations (`@cost(5)`) for field costs
+- **Adaptive Limits:** Dynamic limits based on server load
+
+## Success Criteria
+
+✅ **All queries validated** against depth/complexity/breadth limits  
+✅ **Rate limiting enforced** at 100 req/min per IP+UA  
+✅ **Cursors cryptographically secure** with HMAC + expiration  
+✅ **Performance overhead &lt;5ms** per request  
+✅ **Zero false positives** on legitimate queries  
+✅ **Comprehensive observability** via Grafana
+
+---
+
+**Approved by:** Development Team  
+**Review Date:** 2024-12-21

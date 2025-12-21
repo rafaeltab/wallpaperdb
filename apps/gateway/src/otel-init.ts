@@ -1,6 +1,6 @@
 import type { NodeSDK } from '@opentelemetry/sdk-node';
-import { createOtelSdk } from '@wallpaperdb/core/connections';
 import type { OtelConfig } from '@wallpaperdb/core/config';
+import { createOtelSdk } from '@wallpaperdb/core/connections';
 
 /**
  * Global reference to the OTEL SDK instance.

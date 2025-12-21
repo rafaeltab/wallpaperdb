@@ -1,7 +1,7 @@
+import { getHealthStatusCode, getReadyStatusCode } from '@wallpaperdb/core/health';
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
 import fp from 'fastify-plugin';
 import { container } from 'tsyringe';
-import { getHealthStatusCode, getReadyStatusCode } from '@wallpaperdb/core/health';
 import type { Config } from '../config.js';
 import { HealthService } from '../services/health.service.js';
 

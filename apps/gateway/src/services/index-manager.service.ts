@@ -1,11 +1,7 @@
-import { OpenSearchConnection } from '../connections/opensearch.js';
+import { recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
+import { OpenSearchConnection } from '../connections/opensearch.js';
 import { wallpapersIndexMapping } from '../opensearch/mappings.js';
-import {
-  withSpan,
-  recordCounter,
-  recordHistogram,
-} from '@wallpaperdb/core/telemetry';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
 /**

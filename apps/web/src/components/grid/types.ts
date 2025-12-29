@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { Wallpaper } from '@/lib/graphql/types';
 
 /**
  * Represents an item that can be displayed in the grid.
@@ -16,7 +17,13 @@ export interface GridItem {
   /** Pre-calculated aspect ratio (width / height) */
   aspectRatio: number;
   /** Optional metadata for custom rendering or logic */
-  metadata?: Record<string, unknown>;
+  metadata?: {
+    userId?: string;
+    uploadedAt?: string;
+    variantCount?: number;
+    /** Full wallpaper object for actions (download, share, view) */
+    wallpaper?: Wallpaper;
+  };
   /** Whether this is a skeleton placeholder item */
   isSkeleton?: boolean;
 }

@@ -101,6 +101,7 @@ export function wallpaperToGridItem(wallpaper: Wallpaper): GridItem | null {
       userId: wallpaper.userId,
       uploadedAt: wallpaper.uploadedAt,
       variantCount: wallpaper.variants.length,
+      wallpaper: wallpaper, // Store full wallpaper for actions (download, share, view)
     },
   };
 }

@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
 import { ArrowLeft, ChevronDown, ChevronUp, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
 import { downloadVariant, formatFileSize } from '@/lib/utils/wallpaper';
+import { shareWallpaper } from '@/lib/services/wallpaper-share';
 
 export function WallpaperDetailPage() {
   const { wallpaperId } = useParams({ strict: false }) as { wallpaperId: string };
@@ -56,30 +56,9 @@ export function WallpaperDetailPage() {
 
   // Share functionality
   const handleShare = useCallback(async () => {
-    const url = window.location.href;
-
-    // Try native share on mobile first
-    if (isMobile && navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Wallpaper',
-          text: 'Check out this wallpaper',
-          url,
-        });
-        return;
-      } catch {
-        // User cancelled or share failed, fall through to clipboard
-      }
-    }
-
-    // Fallback: copy to clipboard
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success('Link copied to clipboard');
-    } catch {
-      toast.error('Failed to copy link');
-    }
-  }, [isMobile]);
+    if (!wallpaper) return;
+    await shareWallpaper(wallpaper.wallpaperId);
+  }, [wallpaper]);
 
   // Keyboard shortcuts
   useEffect(() => {

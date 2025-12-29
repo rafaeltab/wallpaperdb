@@ -58,7 +58,9 @@ function UploadPage() {
   const handleFilesSelected = (files: File[]) => {
     const remainingCapacity = MAX_FILES_PER_BATCH - state.files.length;
     if (files.length > remainingCapacity && remainingCapacity > 0) {
-      toast.warning(`Only ${remainingCapacity} more files can be added (max ${MAX_FILES_PER_BATCH})`);
+      toast.warning(
+        `Only ${remainingCapacity} more files can be added (max ${MAX_FILES_PER_BATCH})`
+      );
     } else if (remainingCapacity === 0) {
       toast.error(`Maximum of ${MAX_FILES_PER_BATCH} files reached`);
       return;
@@ -181,20 +183,12 @@ function UploadPage() {
                   </Button>
                 )}
                 {isComplete && (
-                  <Button
-                    variant="outline"
-                    onClick={clearCompleted}
-                    className="flex-1"
-                  >
+                  <Button variant="outline" onClick={clearCompleted} className="flex-1">
                     <Check className="mr-2 h-4 w-4" />
                     Clear completed
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  onClick={handleClearAll}
-                  disabled={isUploading}
-                >
+                <Button variant="ghost" onClick={handleClearAll} disabled={isUploading}>
                   <Trash2 className="mr-2 h-4 w-4" />
                   Clear all
                 </Button>

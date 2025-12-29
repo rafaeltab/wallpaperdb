@@ -11,7 +11,7 @@ interface WallpaperDisplayProps {
 }
 
 /**
- * Displays a wallpaper at maximum size with optional variant indicator.
+ * Displays a wallpaper at maximum size with optional variant indicator and zoom capability.
  */
 export function WallpaperDisplay({
   variant,
@@ -24,16 +24,16 @@ export function WallpaperDisplay({
   const formatName = variant.format.split('/')[1]?.toUpperCase() || 'UNKNOWN';
 
   return (
-    <div className="relative flex items-center justify-center" data-testid="wallpaper-container">
+    <div
+      className="relative h-full w-full flex items-center justify-center"
+      data-testid="wallpaper-container"
+    >
       {/* Skeleton overlay while loading */}
       {isLoading && (
-        <Skeleton
-          className="absolute inset-0 h-full w-full"
-          data-testid="wallpaper-skeleton"
-        />
+        <Skeleton className="absolute inset-0 w-full h-full" data-testid="wallpaper-skeleton" />
       )}
 
-      {/* Main image */}
+      {/* Main image - no zoom for now */}
       <img
         src={variant.url}
         alt={`Wallpaper ${variant.width}×${variant.height}`}

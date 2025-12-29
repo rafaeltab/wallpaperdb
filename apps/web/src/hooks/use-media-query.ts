@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 /**
  * React hook for responsive breakpoint detection using window.matchMedia.
- * 
+ *
  * @param query - Media query string (e.g., "(max-width: 1024px)")
  * @returns Boolean indicating whether the media query matches
  */
@@ -14,7 +14,7 @@ export function useMediaQuery(query: string): boolean {
 
   useEffect(() => {
     const mediaQueryList = window.matchMedia(query);
-    
+
     // Update state when media query changes
     const handleChange = (event: MediaQueryListEvent) => {
       setMatches(event.matches);

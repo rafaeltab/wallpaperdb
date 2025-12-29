@@ -1,10 +1,6 @@
 import { Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from '@/components/ui/input-group';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Kbd } from '@/components/ui/kbd';
 
 function useIsMac() {
@@ -39,11 +35,7 @@ export function SearchBar() {
       <InputGroupAddon>
         <Search />
       </InputGroupAddon>
-      <InputGroupInput
-        ref={inputRef}
-        type="search"
-        placeholder="Search wallpapers..."
-      />
+      <InputGroupInput ref={inputRef} type="search" placeholder="Search wallpapers..." />
       <InputGroupAddon align="inline-end" className="hidden sm:flex">
         {isMac ? <Kbd>⌘</Kbd> : <Kbd>Ctrl</Kbd>}
         <Kbd>K</Kbd>

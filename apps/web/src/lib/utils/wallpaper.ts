@@ -91,9 +91,7 @@ export async function downloadVariant(variant: Variant): Promise<void> {
       const response = await fetch(variant.url);
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch variant: ${response.status} ${response.statusText}`,
-        );
+        throw new Error(`Failed to fetch variant: ${response.status} ${response.statusText}`);
       }
 
       blob = await response.blob();
@@ -108,9 +106,7 @@ export async function downloadVariant(variant: Variant): Promise<void> {
       const response = await fetch(variant.url);
 
       if (!response.ok) {
-        throw new Error(
-          `Failed to fetch variant: ${response.status} ${response.statusText}`,
-        );
+        throw new Error(`Failed to fetch variant: ${response.status} ${response.statusText}`);
       }
 
       blob = await response.blob();

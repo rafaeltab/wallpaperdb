@@ -2,15 +2,12 @@ import { useEffect, useState } from 'react';
 
 /**
  * React hook that persists state to localStorage with JSON serialization.
- * 
+ *
  * @param key - localStorage key
  * @param defaultValue - Default value if localStorage is empty or parsing fails
  * @returns Tuple of [state, setState] similar to useState
  */
-export function usePersistentState<T>(
-  key: string,
-  defaultValue: T,
-): [T, (value: T) => void] {
+export function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => void] {
   // Initialize state from localStorage or default value
   const [state, setState] = useState<T>(() => {
     try {

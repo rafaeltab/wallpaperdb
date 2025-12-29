@@ -37,7 +37,10 @@ const DEFAULT_RETRY_AFTER = 60;
  * Upload a wallpaper with detailed error handling.
  * Returns a structured result with success/failure info and error types.
  */
-export async function uploadWallpaperWithDetails(file: File, userId: string): Promise<UploadResult> {
+export async function uploadWallpaperWithDetails(
+  file: File,
+  userId: string
+): Promise<UploadResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('userId', userId);

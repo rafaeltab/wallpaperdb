@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ArrowLeft, ChevronDown, ChevronUp, Download, PanelRight, Share } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -158,115 +159,114 @@ export function WallpaperDetailPage() {
   const selectedVariant = wallpaper.variants[selectedVariantIndex];
   const formatName = selectedVariant.format.split('/')[1]?.toUpperCase() || 'UNKNOWN';
 
+  // Portal for header actions
+  const headerActionsContainer = document.getElementById('wallpaper-details-header-actions');
+
   return (
-    <div className="flex h-screen flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-3">
+    <>
+      {/* Portal panel toggle button into header */}
+      {headerActionsContainer &&
+        createPortal(
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate({ to: '/' })}
-            aria-label="Back to gallery"
+            onClick={() => setIsPanelOpen(!isPanelOpen)}
+            aria-label={isPanelOpen ? 'Close panel' : 'Open panel'}
           >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <h1 className="text-lg font-semibold">Wallpaper Details</h1>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsPanelOpen(!isPanelOpen)}
-          aria-label={isPanelOpen ? 'Close panel' : 'Open panel'}
-        >
-          <PanelRight className="h-4 w-4" />
-        </Button>
-      </header>
+            <PanelRight className="h-4 w-4" />
+          </Button>,
+          headerActionsContainer
+        )}
 
-      {/* Main content */}
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 overflow-auto p-4">
-        {/* Wallpaper display */}
-        <div className="flex h-full max-h-[70vh] w-full max-w-5xl items-center justify-center">
-          <WallpaperDisplay
-            variant={selectedVariant}
-            isLoading={isImageLoading}
-            onLoadComplete={() => setIsImageLoading(false)}
-            showIndicator={false}
-            isOriginal={selectedVariantIndex === 0}
-          />
-        </div>
+      {/* Main content - Simplified for debugging */}
+      <div className="fixed inset-0 top-[3.5rem] bg-background p-4">
+        <div className="h-full flex flex-col gap-3">
+          {/* Image container - takes all available space, prevents overflow */}
+          <div className="flex-1 flex items-center justify-center min-h-0 overflow-hidden">
+            <WallpaperDisplay
+              variant={selectedVariant}
+              isLoading={isImageLoading}
+              onLoadComplete={() => setIsImageLoading(false)}
+              showIndicator={false}
+              isOriginal={selectedVariantIndex === 0}
+            />
+          </div>
 
-        {/* Viewing indicator */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary">{formatName}</Badge>
-          <span>
-            {selectedVariant.width}×{selectedVariant.height}
-          </span>
-          {selectedVariantIndex === 0 && <Badge variant="default">Original</Badge>}
-        </div>
+          {/* Bottom controls - should be at bottom */}
+          <div className="flex flex-col items-center gap-3 shrink-0">
+            {/* Viewing indicator */}
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Badge variant="secondary">{formatName}</Badge>
+              <span>
+                {selectedVariant.width}×{selectedVariant.height}
+              </span>
+              {selectedVariantIndex === 0 && <Badge variant="default">Original</Badge>}
+            </div>
 
-        {/* Action bar */}
-        <div className="flex gap-2">
-          {/* Download dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button>
-                <Download className="mr-2 h-4 w-4" />
-                Download original
-                <ChevronDown className="ml-2 h-4 w-4" />
+            {/* Action bar */}
+            <div className="flex justify-center gap-2">
+              {/* Download dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download original
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64">
+                  <DropdownMenuLabel>Select variant</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {wallpaper.variants.map((variant, index) => {
+                    const variantFormat = variant.format.split('/')[1]?.toUpperCase() || 'UNKNOWN';
+                    const isViewing = index === selectedVariantIndex;
+                    const isOriginal = index === 0;
+
+                    return (
+                      <DropdownMenuItem
+                        key={`${variant.url}-${index}`}
+                        onClick={() => handleDownloadVariant(index)}
+                      >
+                        <div className="flex w-full items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {variantFormat}
+                            </Badge>
+                            <span className="text-sm">
+                              {variant.width}×{variant.height}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatFileSize(variant.fileSizeBytes)}
+                            </span>
+                          </div>
+                          <div className="flex gap-1">
+                            {isOriginal && (
+                              <Badge variant="outline" className="text-xs">
+                                original
+                              </Badge>
+                            )}
+                            {isViewing && (
+                              <Badge variant="outline" className="text-xs">
+                                viewing
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Share button */}
+              <Button variant="outline" onClick={handleShare}>
+                <Share className="mr-2 h-4 w-4" />
+                Share
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>Select variant</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {wallpaper.variants.map((variant, index) => {
-                const variantFormat = variant.format.split('/')[1]?.toUpperCase() || 'UNKNOWN';
-                const isViewing = index === selectedVariantIndex;
-                const isOriginal = index === 0;
-
-                return (
-                  <DropdownMenuItem
-                    key={`${variant.url}-${index}`}
-                    onClick={() => handleDownloadVariant(index)}
-                  >
-                    <div className="flex w-full items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {variantFormat}
-                        </Badge>
-                        <span className="text-sm">
-                          {variant.width}×{variant.height}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatFileSize(variant.fileSizeBytes)}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        {isOriginal && (
-                          <Badge variant="outline" className="text-xs">
-                            original
-                          </Badge>
-                        )}
-                        {isViewing && (
-                          <Badge variant="outline" className="text-xs">
-                            viewing
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Share button */}
-          <Button variant="outline" onClick={handleShare}>
-            <Share className="mr-2 h-4 w-4" />
-            Share
-          </Button>
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
 
       {/* Mobile peek indicator */}
       {isMobile && !isPanelOpen && (
@@ -282,7 +282,7 @@ export function WallpaperDetailPage() {
       <Sheet open={isPanelOpen} onOpenChange={setIsPanelOpen}>
         <SheetContent
           side={isMobile ? 'bottom' : 'right'}
-          className={isMobile ? 'h-[85vh]' : 'w-full sm:max-w-md lg:max-w-lg'}
+          className={`${isMobile ? 'h-[85vh]' : 'w-full sm:max-w-md lg:max-w-lg'} overflow-y-auto p-6`}
         >
           <WallpaperMetadata
             wallpaper={wallpaper}
@@ -291,7 +291,7 @@ export function WallpaperDetailPage() {
           />
         </SheetContent>
       </Sheet>
-    </div>
+    </>
   );
 }
 

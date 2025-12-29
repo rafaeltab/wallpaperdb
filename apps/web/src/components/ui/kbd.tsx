@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils"
+import { cn } from '@/lib/utils';
 
-function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
+function Kbd({ className, ...props }: React.ComponentProps<'kbd'>) {
   return (
     <kbd
       data-slot="kbd"
@@ -10,17 +10,17 @@ function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
       )}
       {...props}
     />
-  )
+  );
 }
 
-function KbdGroup({ className, ...props }: React.ComponentProps<"div">) {
+function KbdGroup({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <kbd
       data-slot="kbd-group"
-      className={cn("gap-1 inline-flex items-center", className)}
+      className={cn('gap-1 inline-flex items-center', className)}
       {...props}
     />
-  )
+  );
 }
 
-export { Kbd, KbdGroup }
+export { Kbd, KbdGroup };

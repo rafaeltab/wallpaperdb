@@ -17,7 +17,7 @@ import type { GridItemRendererProps } from './types';
  * It can be replaced with a custom renderer via the ItemRenderer prop on the grid.
  * When the item has `isSkeleton: true`, renders a skeleton placeholder instead.
  * Shows a skeleton overlay while the actual image is loading.
- * 
+ *
  * When expanded, displays an overlay menu with actions:
  * - View details (opens in new tab)
  * - Download original quality

@@ -114,7 +114,9 @@ export function uploadQueueReducer(
       return {
         ...state,
         isProcessing: true,
-        files: state.files.map((f) => (f.id === fileId ? { ...f, status: 'uploading' as const } : f)),
+        files: state.files.map((f) =>
+          f.id === fileId ? { ...f, status: 'uploading' as const } : f
+        ),
       };
     }
 

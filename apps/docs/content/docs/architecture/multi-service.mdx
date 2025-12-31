@@ -51,43 +51,63 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 - Database: `wallpaperdb_ingestor`
 - Status: Complete
 
-**2. Media** (🚧 In Progress)
+**2. Media** (✅ Production)
 - Port: 3002
 - Purpose: Wallpaper retrieval and resizing
 - Dependencies: PostgreSQL, MinIO, Redis
-- Events Consumed: `wallpaper.uploaded`
+- Events Consumed: `wallpaper.uploaded`, `wallpaper.variant.uploaded`
+- Events Published: `wallpaper.variant.available`
 - Database: `wallpaperdb_media`
-- Status: In development
+- Status: Production-ready
+
+**3. Variant Generator** (✅ Production)
+- Port: 3004
+- Purpose: Pre-generate common resolution variants
+- Dependencies: MinIO, NATS
+- Events Consumed: `wallpaper.uploaded`
+- Events Published: `wallpaper.variant.uploaded`
+- Status: Production-ready
+
+**4. Gateway** (✅ Production)
+- Port: 3000
+- Purpose: GraphQL API with search
+- Dependencies: PostgreSQL, OpenSearch, NATS, Redis
+- Events Consumed: `wallpaper.uploaded`, `wallpaper.variant.available`
+- Database: `wallpaperdb_gateway`
+- Status: Production-ready
+
+**5. Web Frontend** (✅ Production)
+- Port: 3005
+- Purpose: React-based UI
+- Dependencies: Gateway (GraphQL)
+- Status: Production-ready
 
 ### Planned Services
 
-**3. Thumbnail Extractor** (📋 Planned)
+**6. Thumbnail Extractor** (📋 Planned)
 - Purpose: Video thumbnail generation
 - Dependencies: MinIO, NATS, FFmpeg
 - Events Consumed: `wallpaper.uploaded` (video only)
 - Events Published: `thumbnail.generated`
 
-**4. Quality Enrichment** (📋 Planned)
+**7. Quality Enrichment** (📋 Planned)
 - Purpose: Image quality analysis
 - Dependencies: MinIO, NATS, PostgreSQL
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `quality.analyzed`
 
-**5. Color Enrichment** (📋 Planned)
+**8. Color Enrichment** (📋 Planned)
 - Purpose: Color extraction and palette generation
 - Dependencies: MinIO, NATS, PostgreSQL
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `colors.extracted`
 
-**6. Tagging Service** (📋 Planned)
+**9. Tagging Service** (📋 Planned)
 - Purpose: Tag management and suggestions
 - Dependencies: PostgreSQL, OpenSearch
 - Database: `wallpaperdb_tags`
 
-**7. Gateway** (📋 Future)
-- Purpose: GraphQL API for clients
-- Dependencies: All services, OpenSearch
-- Routes traffic to appropriate services
+
 
 ## Technology Stack
 

@@ -5,7 +5,7 @@ description: Wallpaper retrieval and on-demand resizing service
 
 The Media Service handles retrieval and serving of wallpapers from MinIO with on-demand image resizing and format conversion using Sharp.
 
-**Status:** 🚧 IN PROGRESS (~75% complete)
+**Status:** ✅ COMPLETE (Production-ready)
 
 ## Quick Start
 
@@ -25,21 +25,19 @@ make media-dev
 - **Wallpaper retrieval** from MinIO
 - **On-demand image resizing** using Sharp
 - **Multiple resize modes**: contain, cover, fill
+- **Variant selection** (picks best pre-generated variant)
 - **Streaming responses** (memory-efficient)
 - **CDN-ready caching headers** (`Cache-Control: public, max-age=31536000, immutable`)
+- **Event consumers** for wallpaper.uploaded and wallpaper.variant.uploaded
 - **Health checks** for all dependencies
 - **OpenTelemetry** traces and metrics
 - **RFC 7807 error responses**
+- **Comprehensive integration tests**
 
-### In Progress 🚧
-- Comprehensive integration tests
-- Event consumer for `wallpaper.uploaded` (caching metadata)
-- Variant storage (pre-generated sizes)
-
-### Planned 📋
+### Future Enhancements 📋
 - Format conversion (JPEG → WebP, etc.)
 - CDN integration
-- Image optimization (compression, quality tuning)
+- Advanced image optimization (compression, quality tuning)
 - Video streaming support
 
 ## Architecture

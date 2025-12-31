@@ -15,10 +15,18 @@ First-time setup takes ~2 minutes for infrastructure to initialize.
 
 ## Current Status
 
-**Services:**
-- ✅ **Ingestor** - Production-ready upload and validation service
-- 🚧 **Media** - In progress - wallpaper retrieval and resizing
-- 📋 **Planned** - Thumbnail Extractor, Quality Enrichment, Color Enrichment, Tagging, Gateway
+**Production Services (5):**
+- ✅ **Ingestor** (Port 3001) - Upload and validation
+- ✅ **Media** (Port 3002) - Retrieval and on-demand resizing
+- ✅ **Variant Generator** (Port 3004) - Pre-generates common resolutions
+- ✅ **Gateway** (Port 3000) - GraphQL API with OpenSearch
+- ✅ **Web Frontend** (Port 3005) - React UI for browsing and upload
+
+**Planned Services:**
+- 📋 Thumbnail Extractor - Video thumbnail generation
+- 📋 Quality Enrichment - Image quality analysis
+- 📋 Color Enrichment - Color extraction and palette generation
+- 📋 Tagging Service - Tag management
 
 **Shared Packages:**
 - `@wallpaperdb/core` - Infrastructure patterns (connections, config, errors, telemetry, health, OpenAPI)
@@ -26,14 +34,23 @@ First-time setup takes ~2 minutes for infrastructure to initialize.
 - `@wallpaperdb/test-utils` - TesterBuilder framework
 - `@wallpaperdb/testcontainers` - Custom container implementations
 - `@wallpaperdb/url-ipv4-resolver` - URL validation and SSRF prevention
+- `@wallpaperdb/react-muuri` - React wrapper for Muuri grid layout
 
 ## Architecture
 
 **Event-driven microservices architecture:**
-- Each service has its own database
-- NATS for inter-service communication
-- Shared packages for rapid service development (~1 week per service)
-- Comprehensive testing with TesterBuilder pattern
+- 5 production services with event-driven communication via NATS
+- Each service has its own database (PostgreSQL)
+- Shared packages enable rapid development (~1 week per service)
+- Comprehensive testing with TesterBuilder pattern (integration + E2E)
+- Production observability with OpenTelemetry + Grafana
+
+**Service Flow:**
+```
+Upload → Ingestor → NATS → Media, Variant Generator, Gateway
+                          ↓
+                    Web Frontend ← Gateway (GraphQL + OpenSearch)
+```
 
 See [Architecture Documentation](apps/docs/content/docs/architecture) (run `make docs-dev` to view the rendered site) for complete details.
 
@@ -45,8 +62,10 @@ See [Architecture Documentation](apps/docs/content/docs/architecture) (run `make
 - **Storage:** MinIO (S3-compatible)
 - **Messaging:** NATS with JetStream
 - **Cache/Rate Limiting:** Redis
+- **Search:** OpenSearch
 - **Testing:** Vitest with Testcontainers
 - **Observability:** OpenTelemetry + Grafana LGTM stack
+- **Frontend:** React + Vite + Muuri
 
 ## Documentation
 
@@ -71,9 +90,10 @@ make test              # Run all tests
 make format            # Format all code
 make lint              # Lint all code
 
-# Single Service (Ingestor)
+# Single Service (example: Ingestor)
 make ingestor-dev      # Start only ingestor service
 make ingestor-test     # Run only ingestor tests
+# Similar commands exist for: media, variant-generator, gateway, web
 
 # View all commands
 make help
@@ -83,8 +103,11 @@ make help
 
 ```
 apps/
-  ingestor/          # Wallpaper upload and validation service (production-ready)
-  media/             # Wallpaper retrieval and resizing service (in progress)
+  ingestor/          # Wallpaper upload and validation service (production)
+  media/             # Wallpaper retrieval and resizing service (production)
+  variant-generator/ # Pre-generates common resolution variants (production)
+  gateway/           # GraphQL API with OpenSearch (production)
+  web/               # React frontend (production)
   ingestor-e2e/      # E2E tests for ingestor
   docs/              # Fumadocs documentation site
 packages/
@@ -93,6 +116,7 @@ packages/
   test-utils/        # TesterBuilder framework
   testcontainers/    # Custom container implementations
   url-ipv4-resolver/ # URL validation and SSRF prevention
+  react-muuri/       # React wrapper for Muuri grid layout
 infra/               # Local infrastructure (Docker Compose)
 plans/               # Architecture plans and design docs
 ```

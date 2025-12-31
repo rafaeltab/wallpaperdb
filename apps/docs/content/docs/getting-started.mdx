@@ -33,11 +33,13 @@ make dev
 ```
 
 **Access points:**
+- Gateway (GraphQL): http://localhost:3000
 - Ingestor: http://localhost:3001
-- Docs: http://localhost:3002
-- Media: http://localhost:3003
-- Grafana: http://localhost:3000
-- MinIO Console: http://localhost:9001
+- Media: http://localhost:3002
+- Variant Generator: http://localhost:3004
+- Web Frontend: http://localhost:3005
+- Grafana: http://localhost:3000 (admin/admin)
+- MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
 
 ## Test the Upload Flow
 
@@ -54,10 +56,15 @@ curl -X POST http://localhost:3001/upload \
 # {"wallpaperId": "wlpr_...", "uploadState": "processing"}
 
 # Retrieve wallpaper (use ID from above)
-curl http://localhost:3003/wallpapers/wlpr_... > retrieved.jpg
+curl http://localhost:3002/wallpapers/wlpr_... > retrieved.jpg
 
 # Resize on-the-fly
-curl "http://localhost:3003/wallpapers/wlpr_...?w=800&h=600" > resized.jpg
+curl "http://localhost:3002/wallpapers/wlpr_...?w=800&h=600&fit=contain" > resized.jpg
+
+# Query via GraphQL
+curl -X POST http://localhost:3000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ searchWallpapers(first: 10) { edges { node { wallpaperId } } } }"}'
 ```
 
 ## View Telemetry

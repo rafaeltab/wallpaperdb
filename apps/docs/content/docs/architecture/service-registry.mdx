@@ -10,12 +10,14 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 | Service | Port | Status | Database | Dependencies | Events Published | Events Consumed |
 |---------|------|--------|----------|--------------|------------------|-----------------|
 | **Ingestor** | 3001 | ✅ Production | wallpaperdb_ingestor | PostgreSQL, MinIO, NATS, Redis | `wallpaper.uploaded` | - |
-| **Media** | 3002 | 🚧 In Progress | wallpaperdb_media | PostgreSQL, MinIO, Redis | - | `wallpaper.uploaded` |
+| **Media** | 3002 | ✅ Production | wallpaperdb_media | PostgreSQL, MinIO, Redis | `wallpaper.variant.available` | `wallpaper.uploaded`, `wallpaper.variant.uploaded` |
+| **Variant Generator** | 3004 | ✅ Production | - | MinIO, NATS | `wallpaper.variant.uploaded` | `wallpaper.uploaded` |
+| **Gateway** | 3000 | ✅ Production | wallpaperdb_gateway | PostgreSQL, OpenSearch, NATS, Redis | - | `wallpaper.uploaded`, `wallpaper.variant.available` |
+| **Web Frontend** | 3005 | ✅ Production | - | Gateway (GraphQL) | - | - |
 | **Thumbnail Extractor** | 3003 | 📋 Planned | - | MinIO, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
-| **Quality Enrichment** | 3004 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
-| **Color Enrichment** | 3005 | 📋 Planned | wallpaperdb_colors | PostgreSQL, MinIO, NATS | `colors.extracted` | `wallpaper.uploaded` |
-| **Tagging** | 3006 | 📋 Planned | wallpaperdb_tags | PostgreSQL, OpenSearch | - | - |
-| **Gateway** | 3000 | 📋 Future | - | All services, OpenSearch | - | - |
+| **Quality Enrichment** | 3006 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
+| **Color Enrichment** | 3007 | 📋 Planned | wallpaperdb_colors | PostgreSQL, MinIO, NATS | `colors.extracted` | `wallpaper.uploaded` |
+| **Tagging** | 3008 | 📋 Planned | wallpaperdb_tags | PostgreSQL, OpenSearch | - | - |
 
 ## Service Details
 
@@ -64,7 +66,7 @@ RATE_LIMIT_WINDOW_MS=300000
 
 ### Media (3002)
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Production
 
 **Purpose:** Wallpaper retrieval and on-demand resizing
 
@@ -82,6 +84,10 @@ RATE_LIMIT_WINDOW_MS=300000
 
 **Events Consumed:**
 - `wallpaper.uploaded` - Sync wallpaper metadata to local database
+- `wallpaper.variant.uploaded` - Register new variant availability
+
+**Events Published:**
+- `wallpaper.variant.available` - When variant is ready to serve
 
 **API Endpoints:**
 - `GET /wallpapers/:id` - Retrieve wallpaper (with optional resize)
@@ -105,6 +111,119 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ```
 
 **See:** [Service: Media](/docs/services/media)
+
+### Variant Generator (3004)
+
+**Status:** ✅ Production
+
+**Purpose:** Pre-generate common resolution variants for uploaded wallpapers
+
+**Key Features:**
+- Automated variant generation at standard resolutions (2K, 1080p, 720p)
+- Aspect-ratio aware (only generates matching presets)
+- Format preservation (PNG→PNG, JPEG→JPEG)
+- Event-driven processing
+
+**Dependencies:**
+- MinIO (wallpapers bucket)
+- NATS (event consumption/publishing)
+
+**Events Consumed:**
+- `wallpaper.uploaded` - Trigger variant generation
+
+**Events Published:**
+- `wallpaper.variant.uploaded` - When variant generation completes
+
+**Configuration:**
+```bash
+PORT=3004
+S3_ENDPOINT=http://localhost:9000
+S3_BUCKET=wallpapers
+NATS_URL=nats://localhost:4222
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+### Gateway (3000)
+
+**Status:** ✅ Production
+
+**Purpose:** GraphQL API gateway with search capabilities
+
+**Key Features:**
+- GraphQL API using Mercurius
+- OpenSearch integration for fast wallpaper search
+- Variant-based filtering (resolution, aspect ratio, format)
+- Event-driven metadata synchronization
+- Cursor-based pagination
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_gateway)
+- OpenSearch (wallpaper search index)
+- NATS (event consumption)
+- Redis (caching, rate limiting)
+
+**Events Consumed:**
+- `wallpaper.uploaded` - Index wallpaper metadata
+- `wallpaper.variant.available` - Update variant availability
+
+**GraphQL Schema:**
+```graphql
+type Query {
+  searchWallpapers(filter: WallpaperFilter, first: Int, after: String): WallpaperConnection!
+  getWallpaper(wallpaperId: ID!): Wallpaper
+}
+
+type Wallpaper {
+  wallpaperId: ID!
+  userId: ID!
+  variants: [WallpaperVariant!]!
+  uploadedAt: DateTime!
+}
+
+type WallpaperVariant {
+  width: Int!
+  height: Int!
+  aspectRatio: Float!
+  format: String!
+}
+```
+
+**Configuration:**
+```bash
+PORT=3000
+DATABASE_URL=postgresql://...
+OPENSEARCH_URL=http://localhost:9200
+NATS_URL=nats://localhost:4222
+REDIS_URL=redis://localhost:6379
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+### Web Frontend (3005)
+
+**Status:** ✅ Production
+
+**Purpose:** React-based user interface for browsing and uploading wallpapers
+
+**Key Features:**
+- Wallpaper upload interface
+- Muuri grid layout for responsive wallpaper browsing
+- Integration with Gateway GraphQL API
+- Responsive design
+
+**Dependencies:**
+- Gateway (GraphQL API)
+
+**Technology Stack:**
+- React
+- Vite
+- GraphQL (via fetch/Apollo)
+- Muuri (grid layout)
+
+**Configuration:**
+```bash
+PORT=3005
+VITE_GATEWAY_URL=http://localhost:3000/graphql
+```
 
 ### Thumbnail Extractor (3003)
 
@@ -272,72 +391,19 @@ DATABASE_URL=postgresql://...
 OPENSEARCH_URL=http://localhost:9200
 ```
 
-### Gateway (3000)
 
-**Status:** 📋 Future
-
-**Purpose:** GraphQL API for clients
-
-**Key Features:**
-- GraphQL API (Apollo Server)
-- Unified schema across all services
-- OpenSearch integration for search
-- Query batching and caching
-- Authentication and authorization (future)
-
-**Dependencies:**
-- All microservices (via HTTP)
-- OpenSearch (search queries)
-- Redis (caching, sessions)
-
-**GraphQL Schema:**
-```graphql
-type Query {
-  wallpaper(id: ID!): Wallpaper
-  wallpapers(filter: WallpaperFilter, limit: Int, offset: Int): [Wallpaper!]!
-  search(query: String!, filters: SearchFilters): SearchResults!
-  tags: [Tag!]!
-}
-
-type Mutation {
-  uploadWallpaper(file: Upload!, userId: ID!): UploadResult!
-  addTag(wallpaperId: ID!, tagId: ID!): Wallpaper!
-  removeTag(wallpaperId: ID!, tagId: ID!): Wallpaper!
-}
-
-type Wallpaper {
-  id: ID!
-  userId: ID!
-  fileType: FileType!
-  dimensions: Dimensions!
-  url(width: Int, height: Int, mode: ResizeMode): String!
-  thumbnailUrl: String
-  quality: QualityMetrics
-  colors: ColorPalette
-  tags: [Tag!]!
-  uploadedAt: DateTime!
-}
-```
-
-**Configuration:**
-```bash
-PORT=3000
-INGESTOR_URL=http://ingestor:3001
-MEDIA_URL=http://media:3002
-TAGGING_URL=http://tagging:3006
-OPENSEARCH_URL=http://localhost:9200
-REDIS_URL=redis://localhost:6379
-```
 
 ## NATS Event Subjects
 
 **Stream:** `WALLPAPER`
 
 **Subjects:**
-- `wallpaper.uploaded` - Published by Ingestor, consumed by Media, Thumbnail, Quality, Color
-- `thumbnail.generated` - Published by Thumbnail Extractor
-- `quality.analyzed` - Published by Quality Enrichment
-- `colors.extracted` - Published by Color Enrichment
+- `wallpaper.uploaded` - Published by Ingestor, consumed by Media, Variant Generator, Thumbnail, Quality, Color, Gateway
+- `wallpaper.variant.uploaded` - Published by Variant Generator, consumed by Media
+- `wallpaper.variant.available` - Published by Media, consumed by Gateway
+- `thumbnail.generated` - Published by Thumbnail Extractor (planned)
+- `quality.analyzed` - Published by Quality Enrichment (planned)
+- `colors.extracted` - Published by Color Enrichment (planned)
 
 **Event Schema Example:**
 ```typescript
@@ -365,10 +431,11 @@ REDIS_URL=redis://localhost:6379
 | Service | Database Name | Tables | Purpose |
 |---------|--------------|--------|---------|
 | Ingestor | wallpaperdb_ingestor | wallpapers | Upload state machine |
-| Media | wallpaperdb_media | wallpapers, variants | Metadata, resize cache |
-| Quality | wallpaperdb_quality | quality_analysis | Quality scores |
-| Colors | wallpaperdb_colors | color_analysis | Color palettes |
-| Tagging | wallpaperdb_tags | tags, wallpaper_tags | Tag management |
+| Media | wallpaperdb_media | wallpapers, variants | Metadata, variant cache |
+| Gateway | wallpaperdb_gateway | wallpapers | Search index sync |
+| Quality | wallpaperdb_quality | quality_analysis | Quality scores (planned) |
+| Colors | wallpaperdb_colors | color_analysis | Color palettes (planned) |
+| Tagging | wallpaperdb_tags | tags, wallpaper_tags | Tag management (planned) |
 
 **Shared schema (replicated):**
 ```typescript
@@ -395,10 +462,12 @@ REDIS_URL=redis://localhost:6379
 - 3000: Gateway (GraphQL)
 - 3001: Ingestor
 - 3002: Media
-- 3003: Thumbnail Extractor
-- 3004: Quality Enrichment
-- 3005: Color Enrichment
-- 3006: Tagging
+- 3003: Thumbnail Extractor (planned)
+- 3004: Variant Generator
+- 3005: Web Frontend
+- 3006: Quality Enrichment (planned)
+- 3007: Color Enrichment (planned)
+- 3008: Tagging (planned)
 
 **Infrastructure ports:**
 - 5432: PostgreSQL
@@ -416,11 +485,12 @@ REDIS_URL=redis://localhost:6379
 ## Service Startup Order
 
 **Recommended order:**
-1. Infrastructure (PostgreSQL, MinIO, NATS, Redis)
-2. Core services (Ingestor, Media)
-3. Enrichment services (Thumbnail, Quality, Color)
-4. Support services (Tagging)
-5. Gateway (depends on all services)
+1. Infrastructure (PostgreSQL, MinIO, NATS, Redis, OpenSearch)
+2. Core services (Ingestor, Media, Variant Generator)
+3. Gateway (depends on Media)
+4. Web Frontend (depends on Gateway)
+5. Enrichment services (Thumbnail, Quality, Color - planned)
+6. Support services (Tagging - planned)
 
 **Commands:**
 ```bash
@@ -431,16 +501,18 @@ make infra-start
 make nats-setup-streams
 
 # 3. Start core services
-make ingestor-dev    # Terminal 1
-make media-dev       # Terminal 2
+make ingestor-dev           # Terminal 1
+make media-dev              # Terminal 2
+make variant-generator-dev  # Terminal 3
 
-# 4. Start enrichment services (future)
-# make thumbnail-dev   # Terminal 3
-# make quality-dev     # Terminal 4
-# make color-dev       # Terminal 5
+# 4. Start gateway
+make gateway-dev            # Terminal 4
 
-# 5. Start gateway (future)
-# make gateway-dev     # Terminal 6
+# 5. Start web frontend
+make web-dev                # Terminal 5
+
+# Or start all at once
+make dev
 ```
 
 ## Health Check Endpoints

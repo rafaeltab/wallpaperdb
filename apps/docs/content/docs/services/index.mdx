@@ -28,7 +28,7 @@ The entry point for wallpapers into the system. Handles file uploads, validation
 [View Full Documentation →](/docs/services/ingestor) | [OpenAPI Spec →](/docs/openapi/ingestor/upload/post)
 
 ### Media Service
-**Status:** 🚧 IN PROGRESS
+**Status:** ✅ COMPLETE
 
 Retrieval and serving of wallpapers with on-demand resizing and format conversion.
 
@@ -50,6 +50,50 @@ Retrieval and serving of wallpapers with on-demand resizing and format conversio
 - `fit` - Resize mode: contain | cover | fill
 
 [View Full Documentation →](/docs/services/media) | [OpenAPI Spec →](/docs/openapi/media/wallpapers/id/get)
+
+### Variant Generator
+**Status:** ✅ COMPLETE
+
+Pre-generates common resolution variants for uploaded wallpapers.
+
+**Key Features:**
+- Automated variant generation at common resolutions (2K, 1080p, 720p)
+- Aspect-ratio aware (only generates matching presets)
+- Event-driven processing (consumes wallpaper.uploaded)
+- Format preservation (PNG stays PNG, JPEG stays JPEG)
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded`
+- Publishes: `wallpaper.variant.uploaded`
+
+### Gateway
+**Status:** ✅ COMPLETE
+
+GraphQL API gateway providing unified access to all wallpaper services.
+
+**Key Features:**
+- GraphQL API using Mercurius
+- OpenSearch integration for fast wallpaper search
+- Variant-based filtering (resolution, aspect ratio, format)
+- Event-driven metadata synchronization
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded`, `wallpaper.variant.available`
+
+**API:**
+- GraphQL endpoint for queries and mutations
+- Search wallpapers by variants (width, height, aspect ratio)
+
+### Web Frontend
+**Status:** ✅ COMPLETE
+
+React-based web application for browsing and uploading wallpapers.
+
+**Key Features:**
+- Wallpaper upload interface
+- Muuri grid layout for browsing
+- Integration with Gateway GraphQL API
+- Responsive design
 
 ## Planned Services
 
@@ -156,12 +200,14 @@ Ingestor → wallpaper.uploaded → {
 | Service | Port | Database | S3/MinIO | NATS | Redis | Status |
 |---------|------|----------|----------|------|-------|--------|
 | Ingestor | 3001 | ✓ | ✓ | ✓ (publish) | ✓ | ✅ Complete |
-| Media | 3002 | ✓ | ✓ | ✓ (consume) | - | 🚧 In Progress |
+| Media | 3002 | ✓ | ✓ | ✓ (consume) | - | ✅ Complete |
+| Variant Gen | 3004 | - | ✓ | ✓ (pub/sub) | - | ✅ Complete |
+| Gateway | 3000 | ✓ | - | ✓ (consume) | ✓ | ✅ Complete |
+| Web | 3005 | - | - | - | - | ✅ Complete |
 | Thumbnail | 3003 | ✓ | ✓ | ✓ | - | 📋 Planned |
-| Quality | 3004 | ✓ | ✓ | ✓ | - | 📋 Planned |
-| Color | 3005 | ✓ | ✓ | ✓ | - | 📋 Planned |
-| Tagging | 3006 | ✓ | - | - | - | 📋 Planned |
-| Gateway | 3000 | - | - | - | ✓ | 📋 Planned |
+| Quality | 3006 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Color | 3007 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Tagging | 3008 | ✓ | - | - | - | 📋 Planned |
 
 ### Shared Infrastructure
 
@@ -243,23 +289,22 @@ make build
 
 **Completed:**
 - ✅ Ingestor Service (production-ready)
+- ✅ Media Service (production-ready)
+- ✅ Variant Generator (production-ready)
+- ✅ Gateway (production-ready)
+- ✅ Web Frontend (production-ready)
 
-**In Progress:**
-- 🚧 Media Service (~75% complete)
-  - Core retrieval: ✅ Done
-  - Resizing: ✅ Done
-  - Testing: 🚧 In Progress
-  - Deployment: 📋 Pending
+**Actual Timeline:**
+- Phase 1: Ingestor (~2 weeks)
+- Phase 2: Media Service (~1 week)
+- Phase 3: Variant Generator (~1 week)
+- Phase 4: Gateway (~2 weeks)
+- Phase 5: Web Frontend (~2 weeks)
 
-**Target Timeline:**
-Each new service: ~1 week (with shared packages)
-
-**Priority Order:**
-1. Media Service (finish current work)
-2. Thumbnail Extractor (event consumer pattern)
-3. Quality/Color Enrichment (parallel processing)
-4. Tagging Service (CRUD API)
-5. Gateway (unified GraphQL API)
+**Priority Order (Remaining):**
+1. Thumbnail Extractor (event consumer pattern)
+2. Quality/Color Enrichment (parallel processing)
+3. Tagging Service (CRUD API)
 
 ## Architecture Decisions
 

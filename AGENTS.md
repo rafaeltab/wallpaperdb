@@ -51,13 +51,13 @@ This file provides guidance to AI agents (Claude, Gemini, etc.) when working wit
 
 ## Multi-Service Architecture
 
-**Current Status:** Single service (ingestor) completed. Planning multi-service architecture.
+**Current Status:** 5 production services running. Core platform complete.
 
 **Strategic Direction:**
 - Continue with **Fastify + TSyringe** (NOT migrating to NestJS)
-- Extract shared packages (`@wallpaperdb/core`, `@wallpaperdb/events`, `@wallpaperdb/test-utils`, `@wallpaperdb/testcontainers`, `@wallpaperdb/url-ipv4-resolver`)
-- Build service templates for rapid development
-- Target: ~1 week per new service
+- Shared packages established (`@wallpaperdb/core`, `@wallpaperdb/events`, `@wallpaperdb/test-utils`, `@wallpaperdb/testcontainers`, `@wallpaperdb/url-ipv4-resolver`)
+- Service templates working well
+- Achieved: ~1 week per new service
 
 **Why Fastify over NestJS:**
 - 4-6 weeks migration cost vs 2 weeks for shared packages
@@ -67,14 +67,18 @@ This file provides guidance to AI agents (Claude, Gemini, etc.) when working wit
 
 **Master Plan:** [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
 
-**Services:**
-1. ✅ **Ingestor** - Upload and validation (complete)
-2. 🚧 **Media Service** - Retrieval and resizing (IN PROGRESS)
-3. 📋 **Thumbnail Extractor** - Video thumbnail generation (planned)
-4. 📋 **Quality Enrichment** - Image quality analysis (planned)
-5. 📋 **Color Enrichment** - Color extraction (planned)
-6. 📋 **Tagging Service** - Tag management (planned)
-7. 📋 **Gateway** - GraphQL API (future)
+**Production Services:**
+1. ✅ **Ingestor** - Upload and validation (Port 3001)
+2. ✅ **Media** - Retrieval and resizing (Port 3002)
+3. ✅ **Variant Generator** - Pre-generate common resolutions (Port 3004)
+4. ✅ **Gateway** - GraphQL API with search (Port 3000)
+5. ✅ **Web Frontend** - React UI (Port 3005)
+
+**Planned Services:**
+6. 📋 **Thumbnail Extractor** - Video thumbnail generation
+7. 📋 **Quality Enrichment** - Image quality analysis
+8. 📋 **Color Enrichment** - Color extraction
+9. 📋 **Tagging Service** - Tag management
 
 ---
 
@@ -91,7 +95,13 @@ This file provides guidance to AI agents (Claude, Gemini, etc.) when working wit
 
 ## Project Overview
 
-WallpaperDB is a wallpaper management system built as a Turborepo monorepo. The **Ingestor Service** is the main application - a Fastify-based HTTP service that receives wallpaper uploads, validates them, stores them in MinIO (S3), records metadata in PostgreSQL, and publishes events to NATS for downstream processing.
+WallpaperDB is a wallpaper management system built as a Turborepo monorepo with a microservices architecture. The system consists of 5 production services working together via event-driven communication:
+
+- **Ingestor** - Receives wallpaper uploads, validates them, stores in MinIO, and publishes events
+- **Media** - Serves wallpapers with on-demand resizing, consumes variant availability events
+- **Variant Generator** - Pre-generates common resolution variants (2K, 1080p, 720p)
+- **Gateway** - GraphQL API with OpenSearch for fast wallpaper search and filtering
+- **Web Frontend** - React-based UI for browsing and uploading wallpapers
 
 **Technology Stack:**
 - Monorepo: Turborepo with pnpm workspaces
@@ -176,9 +186,9 @@ make test-integration # Integration tests with Testcontainers
 make test-e2e         # E2E tests (sequential to avoid Docker overload)
 ```
 
-### Single Service Commands (Ingestor)
+### Single Service Commands
 
-Use these when working on a single service:
+Use these when working on a single service (examples shown for Ingestor, similar commands exist for media, variant-generator, gateway, web):
 
 ```bash
 # Development
@@ -274,13 +284,19 @@ pnpm --filter @wallpaperdb/ingestor test --grep "validation"
 
 ```
 apps/
-  ingestor/         # Main wallpaper ingestion service (Fastify)
+  ingestor/         # Wallpaper ingestion service (Fastify)
+  media/            # Wallpaper retrieval and resizing service
+  variant-generator/# Pre-generates common resolution variants
+  gateway/          # GraphQL API with OpenSearch
+  web/              # React frontend
   docs/             # Documentation site (Fumadocs, auto-generated API docs)
 packages/
   core/             # Shared utilities (config, telemetry, OpenAPI, health)
   events/           # Event schemas and base consumers/publishers
-  testcontainers/   # Shared test utilities (custom NATS container setup)
   test-utils/       # TesterBuilder pattern for testing
+  testcontainers/   # Shared test utilities (custom NATS container setup)
+  url-ipv4-resolver/# URL validation and SSRF prevention
+  react-muuri/      # React wrapper for Muuri grid layout
 infra/              # Docker Compose infrastructure for local dev
 ```
 
@@ -397,7 +413,7 @@ apps/ingestor/src/
 - **Integration Tests** (`make test-integration`)
   - Uses Testcontainers for real infrastructure
   - Tests full workflows with PostgreSQL, MinIO, NATS
-  - Apps: `ingestor`
+  - Apps: `ingestor`, `media`, `gateway`
   - Runs with `--concurrency=1` to avoid Docker overload
 
 - **E2E Tests** (`make test-e2e`)
@@ -483,7 +499,7 @@ The `infra/.env` file (auto-generated from `.env.example`) contains all local de
 - **Guides**: Creating services, error handling, rate limiting, testing strategies, Makefile commands, database migrations
 - **Architecture**: Multi-service architecture, service registry, shared packages, ADRs
 - **Packages**: Core, events, test-utils, testcontainers, url-ipv4-resolver
-- **Services**: Ingestor (complete), Media (in progress), planned services
+- **Services**: Ingestor (complete), Media (complete), Variant Generator (complete), Gateway (complete), Web (complete), planned services
 - **Infrastructure**: PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana
 
 **Testing Documentation:**
@@ -512,14 +528,25 @@ After `make infra-start`, access:
 
 ## Observability
 
-**Current Status:** Basic OTEL setup. Advanced instrumentation planned.
+**Current Status:** Production observability operational with full instrumentation.
 
 **OpenTelemetry Integration:**
 - Auto-instrumentation for Fastify, PostgreSQL, HTTP clients
 - Traces and metrics exported to Grafana LGTM stack via OTLP
-- Service name: `wallpaperdb-ingestor` (configurable via `SERVICE_NAME` env var)
+- All services instrumented with distributed tracing
 - Access dashboards in Grafana (port 3000)
-- **Custom Dashboards**: Media Service Dashboard at `/infra/grafana/dashboards/media-service-dashboard.json`
+
+**Grafana Dashboards:**
+- Upload Overview (Ingestor) - `/infra/grafana/dashboards/upload-overview.json`
+- Media Overview - `/infra/grafana/dashboards/media-overview.json`
+- Gateway Overview - `/infra/grafana/dashboards/gateway-overview.json`
+- Gateway Security - `/infra/grafana/dashboards/gateway-security.json`
+
+**Alerts Configured:**
+- High Upload Failure Rate (>5%)
+- Slow Upload Response Time (p95 >10s)
+- Storage Operation Failures
+- Reconciliation Errors
 
 **Shared Packages:**
 
@@ -617,9 +644,9 @@ make dev            # Start all services
 4. Register OpenAPI: `import { registerOpenAPI } from '@wallpaperdb/core/openapi'`
 5. Add Make targets to `Makefile`
 6. Add to CI/CD workflows
-7. Update `plans/services.md`
+7. Update service documentation in `apps/docs/content/docs/services/`
 
-**Target time:** ~1 week per service (shared packages complete)
+**Target time:** ~1 week per service (validated across 4 services)
 
 See: [plans/multi-service-architecture.md](plans/multi-service-architecture.md)
 

@@ -72,16 +72,24 @@ Welcome to the WallpaperDB documentation! This guide will help you navigate the 
 - **[ADRs](/docs/architecture/decisions)** - Architectural decision records
 
 ### Packages & Services
-- **[Packages](/docs/packages)** - Shared packages (core, events, test-utils, testcontainers, url-ipv4-resolver)
-- **[Services](/docs/services)** - Ingestor (✅ complete), Media (🚧 in progress), planned services
+- **[Packages](/docs/packages)** - Shared packages (core, events, test-utils, testcontainers, url-ipv4-resolver, react-muuri)
+- **[Services](/docs/services)** - Production services and planned services
 - **[Infrastructure](/docs/infrastructure)** - PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana
 
 ## Current Status
 
-### Services
-- **✅ Ingestor** - Production-ready upload and validation service
-- **🚧 Media** - In progress - retrieval and resizing service
-- **📋 Planned** - Thumbnail Extractor, Quality Enrichment, Color Enrichment, Tagging, Gateway
+### Production Services (5)
+- **✅ Ingestor** - Upload and validation service
+- **✅ Media** - Retrieval and on-demand resizing
+- **✅ Variant Generator** - Pre-generates common resolutions
+- **✅ Gateway** - GraphQL API with OpenSearch
+- **✅ Web Frontend** - React UI for browsing and upload
+
+### Planned Services
+- **📋 Thumbnail Extractor** - Video thumbnail generation
+- **📋 Quality Enrichment** - Image quality analysis
+- **📋 Color Enrichment** - Color extraction and palette generation
+- **📋 Tagging Service** - Tag management
 
 ### Shared Packages
 - **✅ core** - Infrastructure patterns (connections, config, errors, telemetry, health, OpenAPI)
@@ -89,6 +97,7 @@ Welcome to the WallpaperDB documentation! This guide will help you navigate the 
 - **✅ test-utils** - TesterBuilder framework
 - **✅ testcontainers** - Custom container implementations
 - **✅ url-ipv4-resolver** - URL validation and SSRF prevention
+- **✅ react-muuri** - React wrapper for Muuri grid layout
 
 ## Common Questions
 

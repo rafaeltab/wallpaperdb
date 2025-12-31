@@ -30,12 +30,12 @@ make media-dev
 
 **Retrieve wallpaper:**
 ```bash
-curl http://localhost:3003/wallpapers/wlpr_01HF8XQZJ... > wallpaper.jpg
+curl http://localhost:3002/wallpapers/wlpr_01HF8XQZJ... > wallpaper.jpg
 ```
 
 **Resize on-the-fly:**
 ```bash
-curl "http://localhost:3003/wallpapers/wlpr_01HF8XQZJ...?w=800&h=600" > resized.jpg
+curl "http://localhost:3002/wallpapers/wlpr_01HF8XQZJ...?w=800&h=600&fit=contain" > resized.jpg
 ```
 
 **See the [complete documentation](../docs/content/docs/services/media.mdx) for detailed API reference.**
@@ -48,4 +48,4 @@ make media-test         # Run all tests
 make media-build        # Build for production
 ```
 
-**Status:** 🚧 In Progress
+**Status:** ✅ Production-ready

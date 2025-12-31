@@ -1,8 +1,8 @@
 # Multi-Service Architecture Plan
 
-**Status:** In Progress (Phase 0 & 1 Complete)
+**Status:** Phase 0-6 Complete - Production Services Running
 **Decision Date:** 2025-01-20
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-12-31
 
 ---
 
@@ -53,49 +53,63 @@ WallpaperDB is transitioning from a single-service (ingestor) to a multi-service
 └────────┘   └──────────┘                   └────────┘   └──────────┘
 ```
 
-### Planned Services
+### Implemented Services
 
-1. **Ingestor** (✅ Exists)
+1. **Ingestor** (✅ Complete)
    - Wallpaper upload and validation
    - State machine for upload workflow
    - Reconciliation system
    - Status: Production-ready
 
-2. **Media Service** (📋 Planned)
+2. **Media Service** (✅ Complete)
    - Wallpaper retrieval and serving
-   - Image resizing and format conversion
-   - CDN integration
-   - Status: High priority (Service #2 candidate)
+   - On-demand image resizing (Sharp)
+   - Variant selection and serving
+   - Status: Production-ready
 
-3. **Thumbnail Extractor** (📋 Planned)
+3. **Variant Generator** (✅ Complete)
+   - Pre-generates common resolution variants
+   - Event-driven (consumes wallpaper.uploaded)
+   - Aspect-ratio aware generation
+   - Status: Production-ready
+
+4. **Gateway** (✅ Complete)
+   - GraphQL API (Mercurius)
+   - OpenSearch integration for search
+   - Event-driven metadata sync
+   - Status: Production-ready
+
+5. **Web Frontend** (✅ Complete)
+   - React-based UI
+   - Wallpaper browsing and upload
+   - Muuri grid layout
+   - Status: Production-ready
+
+### Planned Services
+
+6. **Thumbnail Extractor** (📋 Planned)
    - Video thumbnail generation
    - Multiple thumbnail variants
    - FFmpeg integration
-   - Status: Medium priority (Good proving ground for patterns)
+   - Status: Medium priority
 
-4. **Quality Enrichment** (📋 Planned)
+7. **Quality Enrichment** (📋 Planned)
    - Image quality analysis
    - Resolution/sharpness scoring
    - ML-based quality detection
    - Status: Medium priority
 
-5. **Color Enrichment** (📋 Planned)
+8. **Color Enrichment** (📋 Planned)
    - Dominant color extraction
    - Color palette generation
    - Color-based search indexing
    - Status: Medium priority
 
-6. **Tagging Service** (📋 Planned)
+9. **Tagging Service** (📋 Planned)
    - Tag management (CRUD)
    - Tag suggestions
    - Tag relationships
    - Status: Low priority
-
-7. **Gateway** (📋 Future)
-   - GraphQL API
-   - OpenSearch integration
-   - Search and filtering
-   - Status: After core services
 
 ---
 
@@ -284,11 +298,11 @@ apps/<service-name>/
 
 ---
 
-### Phase 1: Observability (2 weeks) 🔶 ~80% COMPLETE
+### Phase 1: Observability (2 weeks) ✅ COMPLETE
 
 **Goal:** Production-grade telemetry and monitoring
 
-**Status:** ~80% Complete - minor gaps remaining
+**Status:** Complete - All services instrumented
 
 **Completed Tasks:**
 1. ✅ Telemetry module in `@wallpaperdb/core`
@@ -296,18 +310,17 @@ apps/<service-name>/
    - `recordCounter()`, `recordHistogram()` helpers
    - Comprehensive attribute constants
 
-2. ✅ Instrument ingestor (mostly complete)
-   - ✅ Upload orchestrator (spans + metrics)
-   - ✅ Storage operations (S3 instrumented)
-   - ✅ File processor (hash calculation spans)
-   - ✅ Events service (NATS + trace propagation in BaseEventPublisher)
-   - ✅ State machine instrumentation
-   - ✅ Reconciliation instrumentation
+2. ✅ Instrument all services
+   - ✅ Ingestor (upload orchestrator, storage, file processor, events, state machine, reconciliation)
+   - ✅ Media (retrieval, resizing, variant selection)
+   - ✅ Variant Generator (variant generation, event consumption)
+   - ✅ Gateway (GraphQL resolvers, OpenSearch queries, event consumers)
 
-3. 🔶 Grafana dashboards (partial)
-   - ✅ Upload Overview dashboard
-   - ❌ Infrastructure Health dashboard (missing)
-   - ❌ Service template dashboard (defer to Phase 3)
+3. ✅ Grafana dashboards
+   - ✅ Upload Overview dashboard (Ingestor)
+   - ✅ Media Overview dashboard
+   - ✅ Gateway Overview dashboard
+   - ✅ Gateway Security dashboard
 
 4. ✅ Alerts configured
    - ✅ High Upload Failure Rate (>5%)
@@ -315,11 +328,7 @@ apps/<service-name>/
    - ✅ Storage Operation Failures
    - ✅ Reconciliation Errors
 
-**Remaining Work:**
-- [ ] Create Infrastructure Health dashboard (MinIO, NATS, DB, Redis metrics)
-- [ ] Observability documentation for new services
-
-**Deliverable:** 80% complete - core observability working
+**Deliverable:** ✅ Complete - Production observability operational
 
 **See:** [Observability Implementation Plan (done)](./done/observability-implementation.md)
 
@@ -356,56 +365,84 @@ apps/<service-name>/
 
 ---
 
-### Phase 3: Service #2 Proof of Concept (1 week) 📋 READY TO START
+### Phase 3: Service #2 (Media Service) ✅ COMPLETE
 
 **Goal:** Validate multi-service patterns work
 
-**Status:** ✅ Ready to start - ALL prerequisites complete (including OpenAPI)
+**Status:** ✅ Complete - Media Service production-ready
 
-**Service Choice:** Media Service (decided)
-- **Media Service**: Image retrieval and resizing - higher user value, clear requirements
-- Plan: [plans/media-service.md](./media-service.md)
+**Outcome:** Media Service successfully implemented
+- Event-driven metadata sync (wallpaper.uploaded consumer)
+- On-demand image resizing with Sharp
+- Variant selection (picks best pre-generated variant)
+- Streaming responses for memory efficiency
+- Full integration test coverage
 
-**Tasks:**
-1. Generate service skeleton (or create manually as template)
-2. Implement business logic
-3. Add observability using @wallpaperdb/core/telemetry
-4. Integration tests using TesterBuilder pattern
-5. Deploy alongside ingestor
+**Success Criteria (All Met):**
+- ✅ Service built in ~1 week
+- ✅ Shared packages work seamlessly
+- ✅ Distributed tracing works (ingestor → media)
+- ✅ Patterns validated and documented
+- ✅ TesterBuilder pattern successful
 
-**Success Criteria:**
-- Service built in <1 week
-- Shared packages work seamlessly
-- Distributed tracing works (ingestor → service #2)
-- Template reduces boilerplate significantly
-- Patterns are clear and documented
+**Deliverable:** ✅ Media Service production-ready
 
-**Deliverable:** Working service #2, validated patterns
-
-**Prerequisites (all met):**
-- ✅ @wallpaperdb/core with config, telemetry, and OpenAPI
-- ✅ @wallpaperdb/events with BaseEventConsumer
-- ✅ TesterBuilder pattern for tests
-- ✅ NATS JetStream for event consumption
-- ✅ OpenAPI integration complete (Swagger UI + auto-generated docs)
+**See:** [Media Service Plan (done)](./done/media-service.md)
 
 ---
 
-### Phase 4+: Remaining Services (1 week each)
+### Phase 4: Variant Generator Service ✅ COMPLETE
 
-Services 3, 4, 5, etc. should take ~1 week each:
-- Business logic implementation
-- Testing
-- Observability
-- Deployment
+**Status:** ✅ Complete - Production-ready
+
+**Outcome:** Variant Generator successfully implemented
+- Pre-generates common resolution variants (2K, 1080p, 720p)
+- Aspect-ratio aware (only generates matching presets)
+- Event-driven (consumes wallpaper.uploaded)
+- Publishes wallpaper.variant.uploaded events
+
+**See:** [Variant Generator Plan (done)](./done/variant-generator-service.md)
+
+---
+
+### Phase 5: Gateway Service ✅ COMPLETE
+
+**Status:** ✅ Complete - Production-ready
+
+**Outcome:** Gateway successfully implemented
+- GraphQL API using Mercurius
+- OpenSearch integration for wallpaper search
+- Event-driven metadata sync (wallpaper.uploaded, wallpaper.variant.available)
+- Variant-based filtering
+
+**See:** [Gateway Service Plan (done)](./done/gateway-service.md)
+
+---
+
+### Phase 6: Web Frontend ✅ COMPLETE
+
+**Status:** ✅ Complete - Production-ready
+
+**Outcome:** Web frontend successfully implemented
+- React-based UI
+- Wallpaper upload functionality
+- Muuri grid layout for browsing
+- Integration with Gateway GraphQL API
+
+---
+
+### Phase 7+: Remaining Services (Planned)
 
 **Order:**
-1. **Media Service** (in progress - see [plans/media-service.md](./media-service.md))
-2. Thumbnail Extractor (video support)
-3. Quality Enrichment
-4. Color Enrichment
-5. Tagging Service
-6. Gateway (GraphQL)
+1. ✅ Ingestor (complete)
+2. ✅ Media Service (complete)
+3. ✅ Variant Generator (complete)
+4. ✅ Gateway (complete)
+5. ✅ Web Frontend (complete)
+6. 📋 Thumbnail Extractor (video support)
+7. 📋 Quality Enrichment
+8. 📋 Color Enrichment
+9. 📋 Tagging Service
 
 ---
 
@@ -602,25 +639,42 @@ Consider migrating to NestJS if:
 | Phase | Duration | Status |
 |-------|----------|--------|
 | Phase 0: Foundation | 2 weeks | ✅ Complete |
-| Phase 1: Observability | 2 weeks | 🔶 ~80% Complete |
-| Phase 2: Architecture | 1 week | 📋 Not Started (optional) |
-| Phase 3: Service #2 | 1 week | 📋 **READY TO START** |
-| Phase 4+: Services 3-7 | ~1 week each | 📋 Future |
+| Phase 1: Observability | 2 weeks | ✅ Complete |
+| Phase 2: Architecture | 1 week | 📋 Deferred (optional) |
+| Phase 3: Media Service | 1 week | ✅ Complete |
+| Phase 4: Variant Generator | 1 week | ✅ Complete |
+| Phase 5: Gateway | 2 weeks | ✅ Complete |
+| Phase 6: Web Frontend | 2 weeks | ✅ Complete |
+| Phase 7+: Enrichment Services | ~1 week each | 📋 Planned |
 
 ---
 
-## Next Action
+## Next Steps
 
-**👉 Phase 3: Build the Media Service**
+**Core Platform Complete ✅**
 
-The foundation is complete. All prerequisites met:
-- ✅ Shared packages (@wallpaperdb/core with OpenAPI, @wallpaperdb/events)
-- ✅ Test infrastructure (TesterBuilder pattern)
-- ✅ Observability (OTEL + Grafana)
-- ✅ API documentation (OpenAPI + Swagger UI)
+Five production services running:
+- ✅ Ingestor - Upload and validation
+- ✅ Media - Retrieval and resizing
+- ✅ Variant Generator - Pre-generation of common sizes
+- ✅ Gateway - GraphQL API with search
+- ✅ Web Frontend - User interface
 
-**Next:** [plans/media-service.md](./media-service.md)
+**Focus Areas for Next Phase:**
 
-**Optional parallel work:**
-- Complete Phase 1: Create Infrastructure Health dashboard
-- Start Phase 2: Architecture refinement (if patterns needed for Service #2)
+1. **Production Hardening** (High Priority)
+   - Security headers ([plans/security-headers.md](./security-headers.md))
+   - Input validation ([plans/input-validation-injection-prevention.md](./input-validation-injection-prevention.md))
+   - Backup/disaster recovery ([plans/backup-disaster-recovery.md](./backup-disaster-recovery.md))
+   - Secrets management ([plans/secrets-management-production.md](./secrets-management-production.md))
+
+2. **Operational Improvements** (Medium Priority)
+   - Structured logging ([plans/structured-logging.md](./structured-logging.md))
+   - Dependency scanning ([plans/dependency-vulnerability-scanning.md](./dependency-vulnerability-scanning.md))
+   - Enhanced monitoring ([plans/monitoring-alerting-improvements.md](./monitoring-alerting-improvements.md))
+
+3. **Feature Expansion** (Future)
+   - Thumbnail Extractor (video wallpapers)
+   - Quality Enrichment (image quality scoring)
+   - Color Enrichment (color search)
+   - Tagging Service (manual tags)

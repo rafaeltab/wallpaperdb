@@ -4,7 +4,7 @@ Read-optimized GraphQL gateway for querying wallpapers. Provides flexible filter
 
 ## Status
 
-🚧 **MVP in Development** - Basic scaffolding complete
+✅ **Production-ready** - Core functionality complete
 
 ## Technology Stack
 
@@ -23,10 +23,10 @@ make infra-start
 make gateway-dev
 
 # The server will be available at:
-# - Health: http://localhost:3004/health
-# - Ready: http://localhost:3004/ready
-# - GraphQL API: http://localhost:3004/graphql
-# - GraphiQL IDE: http://localhost:3004/graphiql
+# - Health: http://localhost:3000/health
+# - Ready: http://localhost:3000/ready
+# - GraphQL API: http://localhost:3000/graphql
+# - GraphiQL IDE: http://localhost:3000/graphiql
 ```
 
 ## Available Commands
@@ -42,25 +42,26 @@ make gateway-lint         # Lint code with Biome
 make gateway-check        # Run Biome check (format + lint)
 ```
 
-## MVP Scope
+## Features
 
-The initial MVP focuses on:
+Core functionality implemented:
 
-1. ✅ **Basic Infrastructure**: Fastify server with Mercurius GraphQL plugin
-2. ✅ **Health Checks**: `/health` and `/ready` endpoints
-3. ✅ **OpenSearch Connection**: Client setup and connection management
-4. 📋 **GraphQL Schema**: Wallpaper and Variant types (TODO)
-5. 📋 **Search Query**: Filter wallpapers by variant properties (TODO)
-6. 📋 **NATS Consumer**: Consume `wallpaper.variant.available` events (TODO)
-7. 📋 **Index Management**: Create and update OpenSearch documents (TODO)
+1. ✅ **GraphQL API**: Full GraphQL schema with queries
+2. ✅ **Health Checks**: `/health` and `/ready` endpoints with dependency checking
+3. ✅ **OpenSearch Integration**: Full-text search and filtering
+4. ✅ **GraphQL Schema**: Wallpaper, Variant, and connection types
+5. ✅ **Search Query**: Filter wallpapers by variant properties (width, height, aspect ratio, format)
+6. ✅ **NATS Consumers**: Consumes `wallpaper.uploaded` and `wallpaper.variant.available` events
+7. ✅ **Index Management**: Creates and updates OpenSearch documents
+8. ✅ **Cursor-based Pagination**: Efficient pagination for large datasets
 
-See [plans/gateway-service.md](/plans/gateway-service.md) for the full implementation plan.
+See [Service: Gateway](/docs/services/gateway) documentation for complete details.
 
 ## Environment Variables
 
 ```bash
 # Server
-PORT=3003
+PORT=3000
 NODE_ENV=development
 
 # OpenSearch
@@ -84,10 +85,12 @@ The gateway is designed as a read-optimized service that:
 2. **Builds Read Model**: Updates OpenSearch index with wallpaper metadata
 3. **Serves Queries**: Exposes GraphQL API for flexible querying
 
-### Data Flow (Planned)
+### Data Flow
 
 ```
-Media Service → NATS Event → Gateway Consumer → OpenSearch → GraphQL API → Client
+Ingestor → NATS (wallpaper.uploaded) → Gateway → OpenSearch
+Media → NATS (wallpaper.variant.available) → Gateway → OpenSearch
+Client → GraphQL API → Gateway → OpenSearch → Response
 ```
 
 ## Future Enhancements

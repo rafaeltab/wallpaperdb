@@ -1,62 +1,83 @@
 # Monitoring and Alerting Improvements
 
-> **Status:** Planned  
-> **Priority:** Medium  
-> **Estimated Effort:** 1 week  
+> **Status:** Mostly Complete (90%)
+> **Priority:** Low (minor enhancements remaining)
+> **Estimated Effort:** 1-2 days (for remaining items)
 
 ## Overview
 
-Add comprehensive dashboards and proactive alerts.
+Production observability with dashboards and alerts is operational. Minor enhancements remain.
 
-## Missing
+## Completed ✅
 
-- No alerts configured
-- Incomplete dashboards (missing Ingestor, Gateway)
-- No SLO tracking
-- Missing critical metrics (connection pool, consumer lag)
+- ✅ **Alerts configured** (4 critical alerts in Grafana)
+  - High Upload Failure Rate (>5%)
+  - Slow Upload Response Time (p95 >10s)
+  - Storage Operation Failures
+  - Reconciliation Errors
 
-## Dashboards to Create
+- ✅ **Service dashboards created**
+  - Upload Overview (Ingestor)
+  - Media Overview
+  - Gateway Overview
+  - Gateway Security
 
-### Ingestor Dashboard
-- Upload rate, success rate
-- Processing duration (P95, P99)
-- State machine distribution
-- Reconciliation metrics
+## Remaining Work
 
-### Gateway Dashboard
-- Query rate, complexity
-- Rejected queries
-- OpenSearch latency
+### Missing Dashboards
 
-### Infrastructure Dashboard
-- PostgreSQL pool usage
-- NATS consumer lag
-- Redis memory
-- MinIO bandwidth
+**Infrastructure Dashboard** (not yet created)
+- PostgreSQL pool usage and connection metrics
+- NATS consumer lag and pending messages
+- Redis memory usage and hit rates
+- MinIO bandwidth and storage metrics
+- OpenSearch index health
 
-## Critical Alerts
+**Variant Generator Dashboard** (not yet created)
+- Variant generation rate
+- Processing duration by resolution
+- Error rate by aspect ratio
+
+**Missing Metrics**
+- Database connection pool exhaustion warnings
+- NATS consumer lag alerts (when >10,000 pending)
+- Redis memory usage alerts
+
+**SLO Tracking** (not yet implemented)
+- Define and track Service Level Objectives
+- Example: 99.9% uptime, p95 response time <500ms
+
+## Additional Alerts to Add
 
 ```yaml
-# High error rate
-- alert: HighErrorRate
-  expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.01
-  for: 5m
-  severity: critical
-
-# Database pool exhaustion
+# Database pool exhaustion (missing)
 - alert: DatabasePoolExhausted
   expr: pg_connections / pg_max_connections > 0.8
+  for: 2m
   severity: critical
+  description: PostgreSQL connection pool is >80% utilized
 
-# NATS consumer lag
+# NATS consumer lag (missing)
 - alert: ConsumerLag
   expr: nats_consumer_num_pending > 10000
+  for: 5m
   severity: warning
+  description: NATS consumer has >10,000 pending messages
+
+# High GraphQL error rate (missing)
+- alert: HighGraphQLErrorRate
+  expr: rate(graphql_requests_total{status="error"}[5m]) > 0.01
+  for: 5m
+  severity: warning
+  description: GraphQL error rate >1%
 ```
 
 ## Acceptance Criteria
 
-- [ ] All services have dashboards
-- [ ] Critical alerts configured
+- [x] Core service dashboards created (Ingestor, Media, Gateway)
+- [x] Critical alerts configured (uploads, storage, reconciliation)
+- [ ] Infrastructure dashboard created
+- [ ] Variant Generator dashboard created
+- [ ] Additional alerts (DB pool, consumer lag, GraphQL errors)
 - [ ] SLO tracking implemented
-- [ ] Notification channels set up
+- [ ] Notification channels configured (email, Slack, etc.)

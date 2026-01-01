@@ -35,35 +35,48 @@ import {
 } from "@wallpaperdb/events";
 
 // Subject: "wallpaper.uploaded"
+// Events use a nested envelope structure with metadata + payload
 const event: WallpaperUploadedEvent = {
-  wallpaperId: "wlpr_01HABCDEF123456789",
-  userId: "user_123",
-  contentHash: "sha256:abc123...",
-  fileType: "image",
-  mimeType: "image/jpeg",
-  fileSizeBytes: 1024000,
-  width: 1920,
-  height: 1080,
-  aspectRatio: "1.7778",
-  storageKey: "wlpr_01HABCDEF123456789/original.jpg",
-  storageBucket: "wallpapers"
+  eventId: "01HABCDEF123456789",           // ULID, auto-generated
+  eventType: "wallpaper.uploaded",         // Event type identifier
+  timestamp: "2024-01-01T00:00:00.000Z",   // ISO 8601, auto-generated
+  wallpaper: {                              // Nested payload
+    id: "wlpr_01HABCDEF123456789",
+    userId: "user_123",
+    fileType: "image",
+    mimeType: "image/jpeg",
+    fileSizeBytes: 1024000,
+    width: 1920,
+    height: 1080,
+    aspectRatio: 1.7778,                    // Number, not string
+    storageKey: "wlpr_01HABCDEF123456789/original.jpg",
+    storageBucket: "wallpapers",
+    originalFilename: "my-wallpaper.jpg",
+    uploadedAt: "2024-01-01T00:00:00.000Z"
+  }
 };
 
 // Validate
 const validated = WallpaperUploadedEventSchema.parse(event);
 ```
 
-**Event Fields:**
-- `wallpaperId` - Wallpaper ID (format: `wlpr_<ulid>`)
+**Event Envelope Fields:**
+- `eventId` - Unique event identifier (ULID)
+- `eventType` - Event type (`"wallpaper.uploaded"`)
+- `timestamp` - ISO 8601 timestamp when event was created
+
+**Wallpaper Payload Fields:**
+- `id` - Wallpaper ID (format: `wlpr_<ulid>`)
 - `userId` - User who uploaded the wallpaper
-- `contentHash` - SHA256 hash for deduplication
 - `fileType` - `"image"` or `"video"`
 - `mimeType` - MIME type (e.g., `"image/jpeg"`)
 - `fileSizeBytes` - File size in bytes
 - `width`, `height` - Dimensions in pixels
-- `aspectRatio` - Decimal aspect ratio
+- `aspectRatio` - Decimal aspect ratio (number)
 - `storageKey` - S3 object key
 - `storageBucket` - S3 bucket name
+- `originalFilename` - Original filename from upload
+- `uploadedAt` - ISO 8601 timestamp of upload
 
 ### Creating Custom Event Schemas
 
@@ -91,61 +104,91 @@ Abstract class for publishing events with automatic validation and trace context
 ### Basic Usage
 
 ```typescript
-import { BaseEventPublisher } from "@wallpaperdb/events";
-import type { JetStreamClient } from "nats";
+import { BaseEventPublisher, type EventPublisherConfig } from "@wallpaperdb/events";
+import type { NatsConnection } from "nats";
 import { z } from "zod";
 
+// Define your event schema with envelope structure
 const MyEventSchema = z.object({
-  id: z.string(),
-  action: z.string(),
-  data: z.record(z.string(), z.unknown())
+  eventId: z.string(),
+  eventType: z.literal("my.event"),
+  timestamp: z.string().datetime(),
+  payload: z.object({
+    id: z.string(),
+    action: z.string(),
+    data: z.record(z.string(), z.unknown())
+  })
 });
 
 class MyEventPublisher extends BaseEventPublisher<typeof MyEventSchema> {
-  constructor(js: JetStreamClient) {
-    super({
-      js,
-      subject: "my.event.subject",
-      schema: MyEventSchema,
-      serviceName: "my-service"
-    });
+  protected readonly schema = MyEventSchema;
+  protected readonly subject = "my.event.subject";
+  protected readonly eventType = "my.event";
+
+  constructor(config: EventPublisherConfig) {
+    super(config);
   }
 }
 
 // Usage
-const jetstream = natsConnection.getClient().jetstream();
-const publisher = new MyEventPublisher(jetstream);
+const natsConnection: NatsConnection = /* ... */;
+const publisher = new MyEventPublisher({
+  natsConnection,
+  serviceName: "my-service"
+});
 
-await publisher.publish({
-  id: "123",
-  action: "created",
-  data: { foo: "bar" }
+// Publish with auto-generated envelope fields
+await publisher.publishNew({
+  payload: {
+    id: "123",
+    action: "created",
+    data: { foo: "bar" }
+  }
 });
 ```
 
-### Using WallpaperUploadedPublisher
+### Example: Implementing a WallpaperUploaded Publisher
+
+Note: `WallpaperUploadedPublisher` is not exported from `@wallpaperdb/events`. This is an example of how you would implement it in your service:
 
 ```typescript
-import { WallpaperUploadedPublisher } from "@wallpaperdb/events";
-import type { WallpaperUploadedEvent } from "@wallpaperdb/events";
+import {
+  BaseEventPublisher,
+  WallpaperUploadedEventSchema,
+  WALLPAPER_UPLOADED_SUBJECT,
+  type EventPublisherConfig,
+  type WallpaperUploadedEvent
+} from "@wallpaperdb/events";
 
-const publisher = new WallpaperUploadedPublisher(jetstream);
+class WallpaperUploadedPublisher extends BaseEventPublisher<typeof WallpaperUploadedEventSchema> {
+  protected readonly schema = WallpaperUploadedEventSchema;
+  protected readonly subject = WALLPAPER_UPLOADED_SUBJECT;
+  protected readonly eventType = "wallpaper.uploaded";
+}
 
-const event: WallpaperUploadedEvent = {
-  wallpaperId: "wlpr_01HABCDEF123456789",
-  userId: "user_123",
-  contentHash: "sha256:abc123...",
-  fileType: "image",
-  mimeType: "image/jpeg",
-  fileSizeBytes: 1024000,
-  width: 1920,
-  height: 1080,
-  aspectRatio: "1.7778",
-  storageKey: "wlpr_01HABCDEF123456789/original.jpg",
-  storageBucket: "wallpapers"
-};
+// Usage in your service (e.g., ingestor)
+const publisher = new WallpaperUploadedPublisher({
+  natsConnection,
+  serviceName: "ingestor"
+});
 
-await publisher.publish(event);
+// Publish with auto-generated eventId and timestamp
+await publisher.publishNew({
+  wallpaper: {
+    id: "wlpr_01HABCDEF123456789",
+    userId: "user_123",
+    fileType: "image",
+    mimeType: "image/jpeg",
+    fileSizeBytes: 1024000,
+    width: 1920,
+    height: 1080,
+    aspectRatio: 1.7778,
+    storageKey: "wlpr_01HABCDEF123456789/original.jpg",
+    storageBucket: "wallpapers",
+    originalFilename: "my-wallpaper.jpg",
+    uploadedAt: "2024-01-01T00:00:00.000Z"
+  }
+});
 ```
 
 ### Features
@@ -194,46 +237,59 @@ Abstract class for consuming events with automatic validation, trace context ext
 ### Basic Usage
 
 ```typescript
-import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
-import type { JetStreamClient } from "nats";
+import { BaseEventConsumer, type MessageContext, type EventConsumerConfig } from "@wallpaperdb/events";
+import type { NatsConnection } from "nats";
 import { z } from "zod";
 
 const MyEventSchema = z.object({
-  id: z.string(),
-  action: z.string(),
-  data: z.record(z.string(), z.unknown())
+  eventId: z.string(),
+  eventType: z.literal("my.event"),
+  timestamp: z.string().datetime(),
+  payload: z.object({
+    id: z.string(),
+    action: z.string(),
+    data: z.record(z.string(), z.unknown())
+  })
 });
 
 class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
-  constructor(js: JetStreamClient) {
-    super({
-      js,
-      stream: "MY_STREAM",
-      consumer: "my-consumer",
-      schema: MyEventSchema,
-      serviceName: "my-service"
-    });
+  protected readonly schema = MyEventSchema;
+  protected readonly subject = "my.event.subject";
+  protected readonly eventType = "my.event";
+
+  constructor(config: EventConsumerConfig) {
+    super(config);
   }
 
-  protected async handleMessage(
+  protected async handleEvent(
     event: z.infer<typeof MyEventSchema>,
     context: MessageContext
   ): Promise<void> {
-    console.log(`Processing event ${event.id}`);
+    console.log(`Processing event ${event.eventId}`);
 
     // Access message metadata
-    console.log(`Subject: ${context.subject}`);
-    console.log(`Sequence: ${context.seq}`);
+    console.log(`Event ID: ${context.eventId}`);
+    console.log(`Timestamp: ${context.timestamp}`);
+    console.log(`Delivery attempt: ${context.deliveryAttempt}`);
+    console.log(`Stream: ${context.stream}`);
+    console.log(`Consumer: ${context.consumer}`);
 
     // Do processing...
-    await processEvent(event);
+    await processEvent(event.payload);
 
     // Message is automatically acked on success
   }
 }
 
 // Usage
-const consumer = new MyEventConsumer(jetstream);
+const natsConnection: NatsConnection = /* ... */;
+const consumer = new MyEventConsumer({
+  natsConnectionProvider: () => natsConnection,
+  serviceName: "my-service",
+  streamName: "MY_STREAM",
+  durableName: "my-consumer"
+});
+
 await consumer.start();
 
 // Later, when shutting down
@@ -242,29 +298,32 @@ await consumer.stop();
 
 ### MessageContext
 
-The `MessageContext` provides access to NATS message metadata:
+The `MessageContext` provides access to event metadata and NATS message information:
 
 ```typescript
 interface MessageContext {
-  subject: string;      // NATS subject
-  seq: number;          // Stream sequence number
-  redelivered: boolean; // Whether message was redelivered
-  reply?: string;       // Reply subject (if present)
+  eventId: string;           // Unique event identifier from event payload
+  timestamp: string;         // ISO 8601 timestamp from event payload
+  headers: Record<string, string | undefined>;  // NATS message headers
+  deliveryAttempt: number;   // Number of times this message has been delivered
+  stream: string;            // Name of the JetStream stream
+  consumer: string;          // Name of the consumer
 }
 ```
 
 ### Features
 
 #### Schema Validation
-Events are validated before being passed to `handleMessage()`. Invalid messages are nacked and can be retried or dead-lettered based on NATS consumer configuration.
+Events are validated before being passed to `handleEvent()`. Invalid messages are terminated (not retried) since they won't pass validation on subsequent attempts.
 
 #### Automatic Acknowledgment
-- **Success**: Message is acked automatically when `handleMessage()` completes successfully
-- **Error**: Message is nacked if `handleMessage()` throws an error
+- **Success**: Message is acked automatically when `handleEvent()` completes successfully
+- **Error**: Message is nacked for retry if `handleEvent()` throws an error
+- **Max Retries**: Message is terminated after exceeding `maxRetries` (default: 3)
 
 ```typescript
-protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
-  // If this throws, message is nacked
+protected async handleEvent(event: MyEvent, context: MessageContext): Promise<void> {
+  // If this throws, message is nacked and will be retried
   await riskyOperation(event);
 
   // If we reach here, message is acked
@@ -277,10 +336,10 @@ The consumer automatically extracts OpenTelemetry trace context from NATS messag
 
 ```typescript
 // Trace context is automatically extracted and continued
-protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
+protected async handleEvent(event: MyEvent, context: MessageContext): Promise<void> {
   // This span is linked to the publisher's trace
-  await withSpan("event.process", { eventId: event.id }, async () => {
-    await processEvent(event);
+  await withSpan("event.process", { eventId: event.eventId }, async () => {
+    await processEvent(event.payload);
   });
 }
 ```
@@ -292,14 +351,14 @@ This enables end-to-end distributed tracing across services!
 Consumers include built-in error handling:
 
 ```typescript
-protected async handleMessage(event: MyEvent, context: MessageContext): Promise<void> {
+protected async handleEvent(event: MyEvent, context: MessageContext): Promise<void> {
   try {
-    await processEvent(event);
+    await processEvent(event.payload);
   } catch (error) {
     // Log error, add context
-    console.error("Failed to process event", { eventId: event.id, error });
+    console.error("Failed to process event", { eventId: event.eventId, error });
 
-    // Re-throw to nack the message
+    // Re-throw to nack the message for retry
     throw error;
   }
 }
@@ -311,44 +370,42 @@ Here's a complete example of a service that consumes wallpaper upload events and
 
 ```typescript
 import "reflect-metadata";
-import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
+import { BaseEventConsumer, type MessageContext, type EventConsumerConfig } from "@wallpaperdb/events";
 import { WallpaperUploadedEventSchema, WALLPAPER_UPLOADED_SUBJECT } from "@wallpaperdb/events";
-import type { JetStreamClient } from "nats";
+import type { NatsConnection } from "nats";
 import { withSpan } from "@wallpaperdb/core/telemetry";
 import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
 
 class WallpaperUploadedConsumer extends BaseEventConsumer<typeof WallpaperUploadedEventSchema> {
+  protected readonly schema = WallpaperUploadedEventSchema;
+  protected readonly subject = WALLPAPER_UPLOADED_SUBJECT;
+  protected readonly eventType = "wallpaper.uploaded";
+
   constructor(
-    js: JetStreamClient,
+    config: EventConsumerConfig,
     private thumbnailService: ThumbnailService
   ) {
-    super({
-      js,
-      stream: "WALLPAPERS",
-      consumer: "thumbnail-generator",
-      schema: WallpaperUploadedEventSchema,
-      serviceName: "thumbnail-service"
-    });
+    super(config);
   }
 
-  protected async handleMessage(
+  protected async handleEvent(
     event: z.infer<typeof WallpaperUploadedEventSchema>,
     context: MessageContext
   ): Promise<void> {
     return await withSpan(
       "wallpaper.thumbnail.generate",
       {
-        [Attributes.WALLPAPER_ID]: event.wallpaperId,
-        [Attributes.USER_ID]: event.userId,
-        [Attributes.FILE_TYPE]: event.fileType
+        [Attributes.WALLPAPER_ID]: event.wallpaper.id,
+        [Attributes.USER_ID]: event.wallpaper.userId,
+        [Attributes.FILE_TYPE]: event.wallpaper.fileType
       },
       async (span) => {
-        console.log(`Generating thumbnail for ${event.wallpaperId}`);
+        console.log(`Generating thumbnail for ${event.wallpaper.id}`);
 
         // Download original from S3
         const imageData = await this.thumbnailService.download(
-          event.storageBucket,
-          event.storageKey
+          event.wallpaper.storageBucket,
+          event.wallpaper.storageKey
         );
 
         // Generate thumbnails
@@ -356,20 +413,28 @@ class WallpaperUploadedConsumer extends BaseEventConsumer<typeof WallpaperUpload
 
         // Upload thumbnails to S3
         await this.thumbnailService.uploadThumbnails(
-          event.wallpaperId,
+          event.wallpaper.id,
           thumbnails
         );
 
         span.setAttribute("thumbnails.count", thumbnails.length);
-        console.log(`Generated ${thumbnails.length} thumbnails for ${event.wallpaperId}`);
+        console.log(`Generated ${thumbnails.length} thumbnails for ${event.wallpaper.id}`);
       }
     );
   }
 }
 
 // Start the service
-const jetstream = natsConnection.getClient().jetstream();
-const consumer = new WallpaperUploadedConsumer(jetstream, thumbnailService);
+const natsConnection: NatsConnection = /* ... */;
+const consumer = new WallpaperUploadedConsumer(
+  {
+    natsConnectionProvider: () => natsConnection,
+    serviceName: "thumbnail-service",
+    streamName: "WALLPAPERS",
+    durableName: "thumbnail-generator"
+  },
+  thumbnailService
+);
 await consumer.start();
 console.log("Thumbnail service started");
 

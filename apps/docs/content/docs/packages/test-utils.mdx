@@ -3,7 +3,7 @@ title: "@wallpaperdb/test-utils"
 description: TesterBuilder pattern framework for composable test infrastructure
 ---
 
-The `@wallpaperdb/test-utils` package provides the TesterBuilder pattern framework - a composable, type-safe system for building test infrastructure. It includes 9 infrastructure builders that can be mixed together to create exactly the test environment you need.
+The `@wallpaperdb/test-utils` package provides the TesterBuilder pattern framework - a composable, type-safe system for building test infrastructure. It includes 10 infrastructure builders that can be mixed together to create exactly the test environment you need.
 
 ## Installation
 
@@ -54,6 +54,7 @@ const tester = await new PostgresTesterBuilder()
 | `MinioTesterBuilder` | S3/MinIO storage | S3 client, bucket management |
 | `NatsTesterBuilder` | NATS messaging | NATS connection, JetStream |
 | `RedisTesterBuilder` | Redis cache | Redis client |
+| `OpenSearchTesterBuilder` | OpenSearch search engine | OpenSearch client, configuration |
 | `FixturesTesterBuilder` | Test data management | Fixture loading/cleanup |
 | `SetupTesterBuilder` | Setup hooks | Pre-test initialization |
 | `CleanupTesterBuilder` | Cleanup hooks | Post-test cleanup |
@@ -206,6 +207,54 @@ const value = await tester.redis.get('key');
 **Provides:**
 - `redis` - IORedis client
 - `redisContainer` - Container instance
+
+### OpenSearchTesterBuilder
+
+OpenSearch search engine for full-text search and analytics.
+
+```typescript
+import { OpenSearchTesterBuilder } from "@wallpaperdb/test-utils";
+import { Client } from "@opensearch-project/opensearch";
+
+const tester = await new OpenSearchTesterBuilder()
+  .withOpenSearch({
+    image: 'opensearchproject/opensearch:2.11.1'
+  })
+  .build();
+
+// Use OpenSearch client
+const client = new Client({
+  node: tester.opensearch.config.endpoint.fromHost,
+  auth: {
+    username: tester.opensearch.config.username,
+    password: tester.opensearch.config.password
+  },
+  ssl: {
+    rejectUnauthorized: false  // For self-signed cert in tests
+  }
+});
+
+await client.index({
+  index: 'test-index',
+  body: { title: 'Test Document' }
+});
+```
+
+**Methods:**
+- `withOpenSearch(options?)` - Start OpenSearch container
+
+**Options:**
+- `image` - Docker image (default: `'opensearchproject/opensearch:2'`)
+- `networkAlias` - Network alias (default: `'opensearch'`)
+
+**Provides:**
+- `opensearch.config` - Complete configuration object
+  - `container` - Container instance
+  - `endpoint` - Endpoint URLs (networked, fromHost, directIp)
+  - `username` - Admin username (always `'admin'`)
+  - `password` - Admin password
+  - `host` - Host addresses
+  - `port` - Port mappings
 
 ## Lifecycle Builders
 

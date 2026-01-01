@@ -30,6 +30,10 @@ This package provides custom Testcontainers configurations that:
 
 ### NATS Container
 
+**Status:** ✅ Implemented and available
+
+
+
 Create a NATS testcontainer with JetStream support:
 
 ```typescript
@@ -91,6 +95,91 @@ interface StartedNatsContainer {
   stop(): Promise<void>;
 }
 ```
+
+### OpenSearch Container
+
+**Status:** ✅ Implemented and available
+
+Create an OpenSearch testcontainer with security and authentication:
+
+```typescript
+import { OpenSearchContainer } from '@wallpaperdb/testcontainers/containers';
+
+describe("OpenSearch Integration", () => {
+  let container: StartedOpenSearchContainer;
+
+  beforeAll(async () => {
+    container = await new OpenSearchContainer('opensearchproject/opensearch:2.11.1')
+      .withSecurityEnabled(true)
+      .withPassword('MyStr0ng!P@ssw0rd')
+      .start();
+  });
+
+  afterAll(async () => {
+    await container.stop();
+  });
+
+  it("should connect to OpenSearch", async () => {
+    const client = new Client({
+      node: container.getHttpUrl('host'),
+      auth: {
+        username: container.getUsername(),
+        password: container.getPassword()
+      },
+      ssl: {
+        rejectUnauthorized: false  // For self-signed cert in tests
+      }
+    });
+
+    const health = await client.cluster.health();
+    expect(health.body.status).toBeDefined();
+  });
+});
+```
+
+#### Configuration Options
+
+```typescript
+class OpenSearchContainer {
+  /** Enable/disable OpenSearch security plugin (default: true) */
+  withSecurityEnabled(enabled: boolean): this;
+
+  /** Set admin password (must have zxcvbn score ≥ 3) */
+  withPassword(password: string): this;
+}
+```
+
+#### API Reference
+
+**StartedOpenSearchContainer**
+
+```typescript
+interface StartedOpenSearchContainer {
+  /** Get HTTP(S) endpoint URL */
+  getHttpUrl(from: 'host' | 'directIp'): string;
+
+  /** Get mapped HTTP(S) port */
+  getPort(from: 'host' | 'directIp'): number;
+
+  /** Get URL schema (http or https) */
+  getSchema(): string;
+
+  /** Get admin username (always 'admin') */
+  getUsername(): string;
+
+  /** Get admin password */
+  getPassword(): string;
+
+  /** Stop the container */
+  stop(): Promise<void>;
+}
+```
+
+**Security Features:**
+- Security plugin enabled by default with HTTPS
+- Password strength validation using zxcvbn (score ≥ 3 required)
+- Basic authentication with admin user
+- Self-signed certificate for HTTPS (test environments)
 
 ### Future Containers
 

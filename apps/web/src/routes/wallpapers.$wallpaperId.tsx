@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useParams } from '@tanstack/react-router';
+import { createFileRoute, Link, useParams } from '@tanstack/react-router';
 import { ChevronDown, ChevronUp, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -27,7 +27,6 @@ import { shareWallpaper } from '@/lib/services/wallpaper-share';
 
 export function WallpaperDetailPage() {
   const { wallpaperId } = useParams({ strict: false }) as { wallpaperId: string };
-  const navigate = useNavigate();
   const isMobile = useMediaQuery('(max-width: 1024px)');
 
   // Panel state (persisted to localStorage)

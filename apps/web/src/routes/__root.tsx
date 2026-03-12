@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
-import { Image, PanelRight, X } from 'lucide-react';
+import { Image, X } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';

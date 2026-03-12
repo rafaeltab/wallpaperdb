@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Eye, Download, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { downloadVariant } from '@/lib/utils/wallpaper';
@@ -50,7 +49,7 @@ export function WallpaperCard({
 
     try {
       await downloadVariant(wallpaper.variants[0]);
-    } catch (error) {
+    } catch (_error) {
       toast.error('Failed to download wallpaper');
     }
   };

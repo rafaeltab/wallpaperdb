@@ -3,7 +3,6 @@ title: Readiness check
 full: true
 _openapi:
   method: GET
-  route: /ready
   toc: []
   structuredData:
     headings: []
@@ -17,4 +16,4 @@ _openapi:
 
 Returns 200 if service is ready to handle requests, 503 otherwise. Use for Kubernetes readiness probes.
 
-<APIPage document={"../ingestor/swagger.json"} operations={[{"path":"/ready","method":"get"}]} webhooks={[]} hasHead={false} />
+<APIPage document={"../ingestor/swagger.json"} operations={[{"path":"/ready","method":"get"}]} />

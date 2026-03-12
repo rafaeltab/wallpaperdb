@@ -43,13 +43,16 @@ export const Basic: Story = {
   render: () => (
     <div style={containerStyle}>
       <MuuriGrid layoutDuration={300}>
-        {Array.from({ length: 30 }, (_, i) => (
-          <MuuriItem key={i + 1}>
-            <div style={{ ...itemStyle, backgroundColor: `hsl(${(i * 15) % 360}, 70%, 50%)` }}>
-              {i + 1}
-            </div>
-          </MuuriItem>
-        ))}
+        {Array.from({ length: 30 }, (_, i) => {
+          const id = i + 1;
+          return (
+            <MuuriItem key={`item-${id}`}>
+              <div style={{ ...itemStyle, backgroundColor: `hsl(${(i * 15) % 360}, 70%, 50%)` }}>
+                {id}
+              </div>
+            </MuuriItem>
+          );
+        })}
       </MuuriGrid>
     </div>
   ),
@@ -97,7 +100,7 @@ export const VaryingSizes: Story = {
       <div style={containerStyle}>
         <MuuriGrid layoutDuration={300}>
           {sizes.map((size, index) => (
-            <MuuriItem key={index}>
+            <MuuriItem key={`${size.width}x${size.height}-${index}`}>
               <div
                 style={{
                   ...itemStyle,
@@ -158,7 +161,7 @@ export const VaryingSizesDraggable: Story = {
       <div style={containerStyle}>
         <MuuriGrid dragEnabled dragSort layoutDuration={300}>
           {sizes.map((size, index) => (
-            <MuuriItem key={index}>
+            <MuuriItem key={`${size.width}x${size.height}-${index}`}>
               <div
                 style={{
                   ...itemStyle,
@@ -364,7 +367,7 @@ export const WithEventCallbacks: Story = {
           {events.length === 0 ? (
             <div style={{ color: '#666' }}>Drag items to see events...</div>
           ) : (
-            events.map((event, i) => <div key={i}>{event}</div>)
+            events.map((event) => <div key={event}>{event}</div>)
           )}
         </div>
       </div>

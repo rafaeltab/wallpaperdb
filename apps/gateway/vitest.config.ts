@@ -28,6 +28,25 @@ export default defineConfig({
             exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
             reportsDirectory: './coverage',
         },
+        deps: {
+            optimizer: {
+                ssr: {
+                    enabled: false,
+                    exclude: ['graphql', 'mercurius']
+                },
+                web: {
+                    enabled: false,
+                    exclude: ['graphql', 'mercurius']
+                },
+            }
+        }
+    },
+
+    optimizeDeps: {
+        exclude: ['graphql', 'mercurius'],
+    },
+    ssr: {
+        noExternal: ['mercurius'], // if needed to avoid double-bundling behavior
     },
 });
 

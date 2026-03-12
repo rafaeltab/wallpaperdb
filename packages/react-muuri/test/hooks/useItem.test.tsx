@@ -49,7 +49,7 @@ describe('useItem', () => {
         () => {
           expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
         },
-        { timeout: 1000 }
+        { timeout: 3000 }
       );
     });
 

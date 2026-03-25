@@ -8,3 +8,16 @@ assignees: ''
 ---
 
 TODO: add a reusable prompt for scaffolding a new service
+
+# Purpose
+
+What purpose does this new service serve?
+
+# Connections
+
+- [ ] HTTP (excluding the health and ready endpoints)
+- [ ] NATS.io
+- [ ] GraphQL
+- [ ] Postgres
+- [ ] S3 / Minio
+- [ ] OpenSearch

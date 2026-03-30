@@ -15,6 +15,9 @@ import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('NatsTesterBuilder');
 
 export interface NatsOptions {
   image?: string;
@@ -274,7 +277,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
         const { image = 'nats:2.10-alpine', jetStream = true, networkAlias = 'nats' } = options;
 
         this.addSetupHook(async () => {
-          console.log('Starting NATS container...');
+          logger.debug('Starting NATS container...');
 
           // Auto-detect if network is available
           const dockerNetwork = this.docker.network;
@@ -333,7 +336,7 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
               try {
                 await jsm.streams.add(streamConfig);
                 this._natsConfig?.streams.push(stream);
-                console.log(`Created NATS stream: ${stream}`);
+                logger.debug({ stream }, 'Created NATS stream');
               } catch (error) {
                 if (!(error as Error).message.includes('already exists')) {
                   throw error;
@@ -344,15 +347,20 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
             await nc.close();
           }
 
-          console.log(
-            `NATS started: ${endpoints.networked} (networked) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (host.docker.internal)`
+          logger.debug(
+            {
+              networked: endpoints.networked,
+              fromHost: endpoints.fromHost,
+              fromHostDockerInternal: endpoints.fromHostDockerInternal,
+            },
+            'NATS started'
           );
         });
 
         this.addDestroyHook(async () => {
           await this.nats.close(); // Close connection before stopping container
           if (this._natsConfig) {
-            console.log('Stopping NATS container...');
+            logger.debug('Stopping NATS container...');
             await this._natsConfig.container.stop();
           }
         });

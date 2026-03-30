@@ -8,6 +8,9 @@ import type { FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import { createApp } from '../../src/app.js';
 import type { Config } from '../../src/config.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('InProcessVariantGeneratorBuilder');
 
 /**
  * Options for InProcessVariantGeneratorMixin
@@ -61,7 +64,7 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
 
       withVariantGeneratorEnvironment() {
         this.addSetupHook(async () => {
-          console.log('[InProcessVariantGenerator] Setting up environment variables');
+          logger.debug('[InProcessVariantGenerator] Setting up environment variables');
           const minio = this.getMinio();
           const nats = this.getNats();
 
@@ -71,7 +74,7 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
             );
           }
 
-          console.log('Creating in-process Fastify app for Variant Generator service...');
+          logger.debug('Creating in-process Fastify app for Variant Generator service...');
 
           // Set environment variables for loadConfig()
           // Note: No DATABASE_URL - this service is stateless
@@ -99,7 +102,7 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
             }
           }
 
-          console.log('[InProcessVariantGenerator] Environment variables set up');
+          logger.debug('[InProcessVariantGenerator] Environment variables set up');
         });
         return this;
       }
@@ -117,7 +120,7 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
         this.withVariantGeneratorEnvironment();
 
         this.addSetupHook(async () => {
-          console.log('[InProcessVariantGenerator] Creating app via setup hook');
+          logger.debug('[InProcessVariantGenerator] Creating app via setup hook');
 
           // Import config at runtime to pick up environment variables
           const { loadConfig } = await import('../../src/config.js');
@@ -130,12 +133,12 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
             enableOtel: false,
           });
 
-          console.log('In-process Variant Generator Fastify app ready');
+          logger.debug('In-process Variant Generator Fastify app ready');
         });
 
         this.addDestroyHook(async () => {
           if (this.app) {
-            console.log('Closing in-process Variant Generator Fastify app...');
+            logger.debug('Closing in-process Variant Generator Fastify app...');
             await this.app.close();
             this.app = null;
           }

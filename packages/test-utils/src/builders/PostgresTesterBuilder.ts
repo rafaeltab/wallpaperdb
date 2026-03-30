@@ -5,6 +5,9 @@ import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('PostgresTesterBuilder');
 
 export interface PostgresOptions {
   image: string;
@@ -232,7 +235,7 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<
         const { image, database, username, password, networkAlias } = options;
 
         this.addSetupHook(async () => {
-          console.log('Starting PostgreSQL container...');
+          logger.debug('Starting PostgreSQL container...');
 
           // Check if network is available (properly typed now!)
           const dockerNetwork = this.docker?.network;
@@ -263,15 +266,20 @@ export class PostgresTesterBuilder extends BaseTesterBuilder<
             options: options,
           };
 
-          console.log(
-            `PostgreSQL started: ${connectionStrings.networked} (networked) ${connectionStrings.fromHost} (from host) ${connectionStrings.fromHostDockerInternal} (host.docker.internal)`
+          logger.debug(
+            {
+              networked: connectionStrings.networked,
+              fromHost: connectionStrings.fromHost,
+              fromHostDockerInternal: connectionStrings.fromHostDockerInternal,
+            },
+            'PostgreSQL started'
           );
         });
 
         this.addDestroyHook(async () => {
           await this.postgres.close(); // Close client before stopping container
           if (this._postgresConfig) {
-            console.log('Stopping PostgreSQL container...');
+            logger.debug('Stopping PostgreSQL container...');
             await this._postgresConfig.container.stop();
           }
         });

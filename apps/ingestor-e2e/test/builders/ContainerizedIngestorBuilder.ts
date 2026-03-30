@@ -12,6 +12,9 @@ import {
     type StartedTestContainer,
     Wait,
 } from "testcontainers";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("ContainerizedIngestorBuilder");
 
 /**
  * IMPORTANT: This file is duplicated from apps/ingestor/test/builders/ContainerizedIngestorBuilder.ts
@@ -116,7 +119,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                 this._containerizedAppInitialized = true;
 
                 this.addSetupHook(async () => {
-                    console.log(
+                    logger.debug(
                         "[ContainerizedIngestor] Starting containers via setup hook",
                     );
                     const network = this.docker.network;
@@ -136,7 +139,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                     const instances = options.instances ?? 1;
                     const image = options.image ?? "wallpaperdb-ingestor:latest";
 
-                    console.log(`Starting ${instances} ingestor container(s)...`);
+                    logger.debug({ instances }, `Starting ingestor container(s)...`);
 
                     for (let i = 0; i < instances; i++) {
                         const environment: Record<string, string> = {
@@ -194,10 +197,10 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                             .withLogConsumer((stream) =>
                                 stream
                                     .on("data", (line) =>
-                                        console.log(`[Ingestor] ${line}`.trimEnd()),
+                                        logger.debug(`[Ingestor] ${line}`.trimEnd()),
                                     )
                                     .on("err", (line) =>
-                                        console.error(`[Ingestor] ${line}`.trimEnd()),
+                                        logger.error(`[Ingestor] ${line}`.trimEnd()),
                                     ),
                             )
                             .withWaitStrategy(
@@ -217,7 +220,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                         const host = container.getHost();
                         const port = container.getMappedPort(3001);
 
-                        console.log(`Ingestor instance ${i} started at ${host}:${port}`);
+                        logger.debug({ instance: i, host, port }, `Ingestor instance started`);
 
                         this.containers.push(container);
 
@@ -227,12 +230,12 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                         }
                     }
 
-                    console.log(`All ${instances} ingestor instances ready`);
+                    logger.debug({ instances }, `All ingestor instances ready`);
                 });
 
                 this.addDestroyHook(async () => {
                     if (this.containers.length > 0) {
-                        console.log("Stopping ingestor containers...");
+                        logger.debug("Stopping ingestor containers...");
                         await Promise.all(this.containers.map((c) => c.stop()));
                         this.containers = [];
                     }

@@ -7,6 +7,9 @@ import {
 	type PostgresTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import createPostgresClient from "postgres";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("MediaMigrationsBuilder");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -62,7 +65,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 				this._migrationsApplied = true;
 
 				this.addSetupHook(async () => {
-					console.log("[MediaMigrations] Running migration hook");
+					logger.debug("[MediaMigrations] Running migration hook");
 					const postgres = this.getPostgres();
 
 					if (!postgres) {
@@ -71,7 +74,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 						);
 					}
 
-					console.log("Applying media service database migrations...");
+					logger.debug("Applying media service database migrations...");
 
 					const sql = createPostgresClient(
 						postgres.connectionStrings.fromHost,
@@ -81,7 +84,7 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 					try {
 						const migrationSql = readFileSync(migrationPath, "utf-8");
 						await sql.unsafe(migrationSql);
-						console.log("Database migrations applied successfully");
+						logger.debug("Database migrations applied successfully");
 					} finally {
 						await sql.end();
 					}

@@ -36,7 +36,9 @@
     "nats": "^2.29.1",
     "typescript": "^5.7.2",
     "@biomejs/biome": "^2.3.8",
-    "vitest": "^2.1.8",
+    "@wallpaperdb/test-logger": "workspace:*",
+    "@wallpaperdb/vitest-config": "workspace:*",
+    "vitest": "^3.0.0",
     "@types/zxcvbn": "^4.4.5",
     "@opensearch-project/opensearch": "^2.12.0"
   }

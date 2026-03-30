@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config";
+import { defineBaseConfig } from "@wallpaperdb/vitest-config";
 
-export default defineConfig({
+export default defineBaseConfig({
     test: {
         name: "ingestor-e2e",
         testTimeout: 60000,
@@ -9,7 +9,6 @@ export default defineConfig({
         maxConcurrency: 5,
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
             include: ['test/**/*.ts'],
             exclude: ['test/**/*.d.ts'],
             reportsDirectory: './coverage',

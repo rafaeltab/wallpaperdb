@@ -3,6 +3,9 @@ import { type AddMethodsType, BaseTesterBuilder } from '../framework.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import { dockerStartSemaphore } from '../utils/semaphore.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('DockerTesterBuilder');
 
 export interface DockerConfig {
   network?: StartedNetwork;
@@ -24,18 +27,18 @@ export class DockerTesterBuilder extends BaseTesterBuilder<
         this.addSetupHook(async () => {
           // Use semaphore to limit concurrent network creation
           await dockerStartSemaphore.run(async () => {
-            console.log('Creating Docker network...');
+            logger.debug('Creating Docker network...');
 
             const network = await new Network(new RandomUuid()).start();
 
             this.docker.network = network;
-            console.log(`Docker network created: ${network.getName()}`);
+            logger.debug({ name: network.getName() }, 'Docker network created');
           });
         });
 
         this.addDestroyHook(async () => {
           if (this.docker.network) {
-            console.log('Stopping Docker network...');
+            logger.debug('Stopping Docker network...');
             await this.docker.network.stop();
           }
         });

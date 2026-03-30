@@ -15,6 +15,9 @@ import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('MinioTesterBuilder');
 
 export interface MinioOptions {
   image: string;
@@ -303,7 +306,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
         this.addSetupHook(async () => {
           // Use semaphore to limit concurrent container starts
           await dockerStartSemaphore.run(async () => {
-            console.log('Starting MinIO container...');
+            logger.debug('Starting MinIO container...');
 
             let container = new MinioContainer(image);
 
@@ -335,8 +338,14 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
               buckets: [],
             };
 
-            console.log(
-              `MinIO started: ${endpoints.networked} (networked) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (host.docker.internal) ${endpoints.directIp} (direct ip)`
+            logger.debug(
+              {
+                networked: endpoints.networked,
+                fromHost: endpoints.fromHost,
+                fromHostDockerInternal: endpoints.fromHostDockerInternal,
+                directIp: endpoints.directIp,
+              },
+              'MinIO started'
             );
           });
 
@@ -346,7 +355,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
             for (const bucket of desiredBuckets) {
               try {
                 await this.minio.getS3Client().send(new CreateBucketCommand({ Bucket: bucket }));
-                console.log(`Created S3 bucket: ${bucket}`);
+                logger.debug({ bucket }, 'Created S3 bucket');
                 this._minioConfig.buckets.push(bucket);
               } catch (error) {
                 if ((error as Error).name !== 'BucketAlreadyOwnedByYou') {
@@ -359,7 +368,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
 
         this.addDestroyHook(async () => {
           if (this._minioConfig) {
-            console.log('Stopping MinIO container...');
+            logger.debug('Stopping MinIO container...');
             await this._minioConfig.container.stop();
           }
         });

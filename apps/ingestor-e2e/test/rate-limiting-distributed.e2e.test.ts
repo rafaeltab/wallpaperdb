@@ -20,6 +20,9 @@ import { request } from "undici";
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import { ContainerizedIngestorTesterBuilder } from "./builders/ContainerizedIngestorBuilder.js";
 import { IngestorMigrationsTesterBuilder } from "./builders/IngestorMigrationsTesterBuilder.js";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("rate-limiting-distributed.e2e");
 
 /**
  * Test Scenarios:
@@ -151,9 +154,9 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         baseUrl2 = `http://${containers[1].getHost()}:${containers[1].getMappedPort(3001)}`;
         baseUrl3 = `http://${containers[2].getHost()}:${containers[2].getMappedPort(3001)}`;
 
-        console.log(`Instance 1: ${baseUrl1}`);
-        console.log(`Instance 2: ${baseUrl2}`);
-        console.log(`Instance 3: ${baseUrl3}`);
+        logger.debug(`Instance 1: ${baseUrl1}`);
+        logger.debug(`Instance 2: ${baseUrl2}`);
+        logger.debug(`Instance 3: ${baseUrl3}`);
 
         // Give instances a moment to fully initialize
         await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -167,7 +170,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         // Flush Redis before each test to start fresh
         const redisContainer = tester.redis.config.container;
         await redisContainer.exec(["redis-cli", "FLUSHALL"]);
-        console.log("Redis flushed");
+        logger.debug("Redis flushed");
 
         await tester.cleanup();
     });
@@ -177,7 +180,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         const userId = `user_distributed_${Date.now()}`;
         const instances = [baseUrl1, baseUrl2, baseUrl3];
 
-        console.log(`Testing with userId: ${userId}`);
+        logger.debug(`Testing with userId: ${userId}`);
 
         // Make 10 requests distributed across 3 instances in round-robin fashion (rate limit = 10)
         // Sending sequentially to avoid upload concurrency issues (not related to rate limiting)
@@ -196,7 +199,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
             expect(response.statusCode).toBe(200);
         }
 
-        console.log(
+        logger.debug(
             `✓ All 10 requests succeeded across instances in round-robin fashion`,
         );
 
@@ -209,7 +212,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         });
 
         expect(response11.statusCode).toBe(429);
-        console.log(`✓ 11th request correctly rejected with 429`);
+        logger.debug(`✓ 11th request correctly rejected with 429`);
 
         // Verify error format (RFC 7807)
         const body = (await response11.body.json()) as object;
@@ -222,14 +225,14 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         expect(response11.headers["retry-after"]).toBeDefined();
         expect(response11.headers["x-ratelimit-limit"]).toBe("10");
         expect(response11.headers["x-ratelimit-remaining"]).toBe("0");
-        console.log(`✓ Error response format correct`);
+        logger.debug(`✓ Error response format correct`);
     });
 
     test("should share rate limit counter across instances", async () => {
         const testImage = await createTestJpeg();
         const userId = `user_counter_${Date.now()}`;
 
-        console.log(`Testing counter sharing with userId: ${userId}`);
+        logger.debug(`Testing counter sharing with userId: ${userId}`);
 
         // Instance 1: Make 5 requests
         for (let i = 0; i < 5; i++) {
@@ -246,7 +249,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                 String(10 - (i + 1)),
             );
         }
-        console.log(`✓ Instance 1 made 5 requests, remaining should be 5`);
+        logger.debug(`✓ Instance 1 made 5 requests, remaining should be 5`);
 
         // Instance 2: Make 5 more requests (should reach limit)
         for (let i = 0; i < 5; i++) {
@@ -259,7 +262,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
 
             expect(response.statusCode).toBe(200);
         }
-        console.log(`✓ Instance 2 made 5 more requests, total now 10`);
+        logger.debug(`✓ Instance 2 made 5 more requests, total now 10`);
 
         // Instance 3: 11th request should fail
         const formData11 = createFormData(testImage, userId, "app3-exceed.jpg");
@@ -271,7 +274,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
 
         expect(response11.statusCode).toBe(429);
         expect(response11.headers["x-ratelimit-remaining"]).toBe("0");
-        console.log(`✓ Instance 3 correctly rejected 11th request`);
+        logger.debug(`✓ Instance 3 correctly rejected 11th request`);
     });
 
     test("should isolate rate limits per user across instances", async () => {
@@ -279,7 +282,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         const userA = `user_a_isolated_${Date.now()}`;
         const userB = `user_b_isolated_${Date.now()}`;
 
-        console.log(`Testing user isolation: ${userA} vs ${userB}`);
+        logger.debug(`Testing user isolation: ${userA} vs ${userB}`);
 
         // User A: Hit limit on instance 1
         for (let i = 0; i < 10; i++) {
@@ -290,7 +293,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                 body: formData.body,
             });
         }
-        console.log(`✓ User A hit rate limit`);
+        logger.debug(`✓ User A hit rate limit`);
 
         // User A: Verify rate limited on instance 2
         const formDataA11 = createFormData(testImage, userA, "userA-exceed.jpg");
@@ -301,7 +304,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         });
 
         expect(responseA11.statusCode).toBe(429);
-        console.log(`✓ User A correctly rate limited on different instance`);
+        logger.debug(`✓ User A correctly rate limited on different instance`);
 
         // User B: Should still be able to upload on instance 3
         const formDataB1 = createFormData(testImage, userB, "userB-1.jpg");
@@ -312,14 +315,14 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         });
 
         expect(responseB1.statusCode).toBe(200);
-        console.log(`✓ User B can still upload (rate limits are per-user)`);
+        logger.debug(`✓ User B can still upload (rate limits are per-user)`);
     });
 
     test("should reset rate limit after time window expires", async () => {
         const testImage = await createTestJpeg();
         const userId = `user_reset_${Date.now()}`;
 
-        console.log(`Testing rate limit reset with userId: ${userId}`);
+        logger.debug(`Testing rate limit reset with userId: ${userId}`);
 
         // Hit rate limit across instances
         for (let i = 0; i < 10; i++) {
@@ -331,7 +334,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                 body: formData.body,
             });
         }
-        console.log(`✓ Rate limit hit (10 uploads)`);
+        logger.debug(`✓ Rate limit hit (10 uploads)`);
 
         // Verify rate limited
         const formDataExceed = createFormData(testImage, userId, "test-exceed.jpg");
@@ -342,10 +345,10 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         });
 
         expect(responseExceed.statusCode).toBe(429);
-        console.log(`✓ Confirmed rate limited`);
+        logger.debug(`✓ Confirmed rate limited`);
 
         // Wait for window to expire (10 seconds + buffer)
-        console.log("Waiting for rate limit window to expire (11 seconds)...");
+        logger.debug("Waiting for rate limit window to expire (11 seconds)...");
         await new Promise((resolve) => setTimeout(resolve, 11000));
 
         // After reset, should be able to upload again
@@ -361,7 +364,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         });
 
         expect(responseAfterReset.statusCode).toBe(200);
-        console.log(`✓ After window reset, uploads work again`);
+        logger.debug(`✓ After window reset, uploads work again`);
     }, 30000); // Extended timeout for waiting
 
     test("should include proper rate limit headers in all responses", async () => {
@@ -382,6 +385,6 @@ describe("E2E Multi-Instance Rate Limiting", () => {
 
         const resetTime = Number(response.headers["x-ratelimit-reset"]);
         expect(resetTime).toBeGreaterThan(Date.now());
-        console.log(`✓ Rate limit headers present and valid`);
+        logger.debug(`✓ Rate limit headers present and valid`);
     });
 });

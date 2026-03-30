@@ -4,6 +4,9 @@ import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
 import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('OpenSearchTesterBuilder');
 
 export interface OpenSearchOptions {
   image?: string;
@@ -108,7 +111,7 @@ export class OpenSearchTesterBuilder extends BaseTesterBuilder<
         const { image = 'opensearchproject/opensearch:2', networkAlias = 'opensearch' } = options;
 
         this.addSetupHook(async () => {
-          console.log('Starting OpenSearch container...');
+          logger.debug('Starting OpenSearch container...');
 
           // Auto-detect if network is available
           const dockerNetwork = this.docker.network;
@@ -152,14 +155,12 @@ export class OpenSearchTesterBuilder extends BaseTesterBuilder<
             username: started.getUsername(),
           };
 
-          console.log(
-            `OpenSearch started: ${endpoint.networked} (internal) ${endpoint.fromHost} (from host)`
-          );
+          logger.debug({ networked: endpoint.networked, fromHost: endpoint.fromHost }, 'OpenSearch started');
         });
 
         this.addDestroyHook(async () => {
           if (this._openSearchConfig) {
-            console.log('Stopping OpenSearch container...');
+            logger.debug('Stopping OpenSearch container...');
             await this._openSearchConfig.container.stop();
           }
         });

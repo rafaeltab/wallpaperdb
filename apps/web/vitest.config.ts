@@ -1,9 +1,9 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
-import { defineConfig } from 'vitest/config';
+import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineConfig({
+export default defineBaseConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -20,7 +20,6 @@ export default defineConfig({
     hookTimeout: 10000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: [
         'src/**/*.test.ts',

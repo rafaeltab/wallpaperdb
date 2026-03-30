@@ -9,6 +9,9 @@ import type { FastifyInstance } from "fastify";
 import { container } from "tsyringe";
 import { createApp } from "../../src/app.js";
 import type { Config } from "../../src/config.js";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("InProcessMediaBuilder");
 
 /**
  * Options for InProcessMediaMixin
@@ -64,7 +67,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 
 			withMediaEnvironment() {
 				this.addSetupHook(async () => {
-					console.log("[InProcessMedia] Setting up environment variables");
+					logger.debug("[InProcessMedia] Setting up environment variables");
 					const postgres = this.getPostgres();
 					const minio = this.getMinio();
 					const nats = this.getNats();
@@ -75,7 +78,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 						);
 					}
 
-					console.log("Creating in-process Fastify app for Media service...");
+					logger.debug("Creating in-process Fastify app for Media service...");
 
 					// Set environment variables for loadConfig()
 					process.env.NODE_ENV = "test";
@@ -108,7 +111,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 						}
 					}
 
-					console.log("[InProcessMedia] Environment variables set up");
+					logger.debug("[InProcessMedia] Environment variables set up");
 				});
 				return this;
 			}
@@ -126,7 +129,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 				this.withMediaEnvironment();
 
 				this.addSetupHook(async () => {
-					console.log("[InProcessMedia] Creating app via setup hook");
+					logger.debug("[InProcessMedia] Creating app via setup hook");
 
 					// Import config at runtime to pick up environment variables
 					const { loadConfig } = await import("../../src/config.js");
@@ -139,12 +142,12 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 						enableOtel: false,
 					});
 
-					console.log("In-process Media Fastify app ready");
+					logger.debug("In-process Media Fastify app ready");
 				});
 
 				this.addDestroyHook(async () => {
 					if (this.app) {
-						console.log("Closing in-process Media Fastify app...");
+						logger.debug("Closing in-process Media Fastify app...");
 						await this.app.close();
 						this.app = null;
 					}

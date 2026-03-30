@@ -85,8 +85,9 @@
     "@types/node": "^22.10.2",
     "@types/pg": "^8.11.10",
     "@wallpaperdb/test-utils": "workspace:*",
+    "@wallpaperdb/vitest-config": "workspace:*",
     "fastify": "^5.0.0",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.0"
   }
 }

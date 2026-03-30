@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config";
+import { defineBaseConfig } from "@wallpaperdb/vitest-config";
 
-export default defineConfig({
+export default defineBaseConfig({
     test: {
         name: "url-ipv4-resolver",
         globals: true,
@@ -11,7 +11,6 @@ export default defineConfig({
         maxConcurrency: 30,
         coverage: {
             provider: "v8",
-            reporter: ["text", "json", "html", "lcov", "json-summary"],
             include: ["src/**/*.ts"],
             exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "test/**/*.ts"],
             reportsDirectory: "./coverage",

@@ -7,6 +7,9 @@ import {
     type PostgresTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import { Pool } from "pg";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("IngestorMigrationsTesterBuilder");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -63,7 +66,7 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
                 this._migrationsApplied = true;
 
                 this.addSetupHook(async () => {
-                    console.log("[IngestorMigrations] Running migration hook");
+                    logger.debug("[IngestorMigrations] Running migration hook");
                     const postgres = this.getPostgres();
 
                     if (!postgres) {
@@ -72,7 +75,7 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
                         );
                     }
 
-                    console.log("Applying ingestor database migrations...");
+                    logger.debug("Applying ingestor database migrations...");
 
                     // Use externalConnectionString for host-to-container communication
                     // postgres.connectionString uses network alias which isn't accessible from host
@@ -82,9 +85,9 @@ export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
 
                     try {
                         const migrationSql = readFileSync(migrationPath, "utf-8");
-                        console.log("Read migrations, applying...");
+                        logger.debug("Read migrations, applying...");
                         await pool.query(migrationSql);
-                        console.log("Database migrations applied successfully");
+                        logger.debug("Database migrations applied successfully");
                     } finally {
                         await pool.end();
                     }

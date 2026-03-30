@@ -17,6 +17,9 @@ import {
     InProcessIngestorTesterBuilder,
 } from "./builders/index.js";
 import { createTestImage } from "./fixtures.js";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("rate-limiting-distributed");
 
 /**
  * E2E Multi-Instance Rate Limiting Tests
@@ -72,7 +75,7 @@ describe("Multi-Instance Rate Limiting", () => {
         tester = setup();
         await tester.setup();
 
-        console.log("Starting app instances...");
+        logger.debug("Starting app instances...");
 
         const config = loadConfig();
 
@@ -89,7 +92,7 @@ describe("Multi-Instance Rate Limiting", () => {
         await app2.ready();
         await app3.ready();
 
-        console.log("All instances started");
+        logger.debug("All instances started");
     }, 120000); // 2 minute timeout for container startup
 
     afterAll(async () => {
@@ -378,7 +381,7 @@ describe("Multi-Instance Rate Limiting", () => {
         expect(responseExceed.statusCode).toBe(429);
 
         // Wait for window to expire (10 seconds + buffer)
-        console.log("Waiting for rate limit window to expire...");
+        logger.debug("Waiting for rate limit window to expire...");
         await new Promise((resolve) => setTimeout(resolve, 11000));
 
         // After reset, should be able to upload again

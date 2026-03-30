@@ -10,6 +10,9 @@ import { container } from "tsyringe";
 import { createApp } from "../../src/app.js";
 import type { Config } from "../../src/config.js";
 import { IndexManagerService } from "../../src/services/index-manager.service.js";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("InProcessGatewayBuilder");
 
 /**
  * Options for InProcessGatewayMixin
@@ -47,7 +50,7 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
 
             withGatewayEnvironment() {
                 this.addSetupHook(async () => {
-                    console.log("[InProcessGateway] Setting up environment variables");
+                    logger.debug("[InProcessGateway] Setting up environment variables");
                     const opensearch: OpenSearchConfig | undefined =
                         this.opensearch.tryGetConfig();
                     const nats = this.getNats();
@@ -58,7 +61,7 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
                         );
                     }
 
-                    console.log("Creating in-process Fastify app...");
+                    logger.debug("Creating in-process Fastify app...");
 
                     // Set environment variables for loadConfig()
                     process.env.NODE_ENV = "test";
@@ -95,7 +98,7 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
                         }
                     }
 
-                    console.log("[InProcessGateway] Environment variables set up");
+                    logger.debug("[InProcessGateway] Environment variables set up");
                 });
                 return this;
             }
@@ -112,7 +115,7 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
                 this.withGatewayEnvironment();
 
                 this.addSetupHook(async () => {
-                    console.log("[InProcessGateway] Creating app via setup hook");
+                    logger.debug("[InProcessGateway] Creating app via setup hook");
 
                     // Import config at runtime to pick up environment variables
                     const { loadConfig } = await import("../../src/config.js");
@@ -127,12 +130,12 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
 
                     await container.resolve(IndexManagerService).createIndex();
 
-                    console.log("In-process Fastify app ready");
+                    logger.debug("In-process Fastify app ready");
                 });
 
                 this.addDestroyHook(async () => {
                     if (this.app) {
-                        console.log("Closing in-process Fastify app...");
+                        logger.debug("Closing in-process Fastify app...");
                         await container.resolve(IndexManagerService).deleteIndex();
                         await this.app.close();
                         this.app = null;

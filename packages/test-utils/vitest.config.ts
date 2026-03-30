@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config";
+import { defineBaseConfig } from "@wallpaperdb/vitest-config";
 
-export default defineConfig({
+export default defineBaseConfig({
     test: {
         name: "test-utils",
         globals: true,
@@ -13,7 +13,6 @@ export default defineConfig({
         retry: 3,
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
             include: ['src/**/*.ts'],
             exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'tests/**/*.ts'],
             reportsDirectory: './coverage',

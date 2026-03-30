@@ -62,8 +62,8 @@ export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRec
   }
 
   /**
-   * Override error handling to break on NATS publish failure.
-   * This prevents infinite retry loop - next cycle will try again.
+   * Override error handling to log NATS publish failures.
+   * The transaction rolls back, leaving the record in 'stored' for retry.
    */
   protected handleError(error: unknown): void {
     console.error('Failed to republish event:', error);
@@ -71,9 +71,19 @@ export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRec
   }
 
   /**
-   * Override to handle NATS publish failures - return false to break on error
+   * Override to handle NATS publish failures resiliently.
+   *
+   * A single transient NATS error increments a consecutive-error counter and
+   * the loop continues with the next record (the transaction rolls back, leaving
+   * the failed record in 'stored' for retry in the next scheduled cycle).
+   *
+   * Only after MAX_CONSECUTIVE_ERRORS back-to-back failures (indicating NATS is
+   * structurally unavailable) does the loop exit early to avoid a busy-loop.
    */
   async reconcile(): Promise<void> {
+    const MAX_CONSECUTIVE_ERRORS = 3;
+    let consecutiveErrors = 0;
+
     while (true) {
       try {
         const processed = await this.database.transaction(async (tx) => {
@@ -90,11 +100,18 @@ export class MissingEventsReconciliation extends BaseReconciliation<WallpaperRec
           return true;
         });
 
-        if (!processed) break;
+        consecutiveErrors = 0; // reset streak on success
+        if (!processed) break; // no more records — normal exit
       } catch (error) {
         this.handleError(error);
-        // Break on error to avoid infinite retry loop
-        break;
+        consecutiveErrors++;
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          // NATS is likely structurally unavailable; stop to avoid an
+          // infinite retry storm. The next scheduled cycle will retry.
+          break;
+        }
+        // A single transient failure — the transaction rolled back, the
+        // record stays in 'stored', and we continue to the next record.
       }
     }
   }

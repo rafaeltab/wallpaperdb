@@ -17,6 +17,7 @@ import { RateLimitService } from './services/rate-limit.service.js';
 import { DefaultValidationLimitsService } from './services/validation-limits.service.js';
 import { SystemTimeService } from './services/core/time.service.js';
 import { FastifyLogger } from './services/core/logger.service.js';
+import { SystemTimerService } from '@wallpaperdb/core/timer';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -43,6 +44,11 @@ export async function createApp(
   });
   // Register TimeService as singleton instance for testability
   container.register('TimeService', { useValue: new SystemTimeService() });
+  // Register TimerService — swap with FakeTimerService in tests via the builder
+  container.register('TimerService', { useValue: new SystemTimerService() });
+  // Register scalar interval values from config so SchedulerService can inject them
+  container.register('reconciliationIntervalMs', { useValue: config.reconciliationIntervalMs });
+  container.register('minioCleanupIntervalMs', { useValue: config.minioCleanupIntervalMs });
 
   // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
   // This allows the SDK to be accessed via DI if needed

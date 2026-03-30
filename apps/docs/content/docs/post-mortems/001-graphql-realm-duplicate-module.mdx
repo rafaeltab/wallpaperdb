@@ -1,0 +1,130 @@
+---
+title: "PM-001: GraphQL \"from another module or realm\" test failures"
+description: Post-mortem for the 2026-03-30 incident where all gateway GraphQL tests began failing with a duplicate module realm error after running make clean.
+---
+
+**Status:** Resolved  
+**Date:** 2026-03-30  
+**Severity:** Low — CI/test environment only, no production impact  
+**Services Affected:** `@wallpaperdb/gateway` (tests only)
+
+## Summary
+
+All GraphQL integration tests in the gateway service began failing with the error:
+
+```
+Cannot use GraphQLNonNull "WallpaperConnection!" from another module or realm.
+
+Ensure that there is only one instance of "graphql" in the node_modules
+directory.
+```
+
+The tests had been passing. The failure was triggered by running `pnpm store prune` as part of a newly added `make clean` target, which corrupted the pnpm store's esbuild entries. This caused Vite's internal transform to break down, exposing a pre-existing latent bug: the `graphql` package was being loaded twice under Vitest — once as ESM (`index.mjs`) and once as CJS (`index.js`) — producing two distinct class identities and causing `instanceof` checks to fail.
+
+## Timeline
+
+| Time | Event |
+|------|-------|
+| ~19:30 | `make clean` target added to Makefile; included `pnpm store prune` |
+| ~20:18 | `make clean` run to test the new target; `pnpm store prune` executed and removed esbuild entries from the global pnpm store |
+| ~20:20 | `pnpm install --force` run to recover; esbuild postinstall scripts re-patched their binaries, leaving `pnpm store status` reporting them as "modified" |
+| ~20:22 | `make gateway-test` run; 26/46 tests failing with the graphql realm error |
+| ~20:27 | `ssr.noExternal: ['mercurius']` removed from `vitest.config.ts` as a suspected cause — no effect |
+| ~20:30 | Root cause identified: `graphql` has no `exports` map; `"module": "index.mjs"` picked by Vitest's ESM pipeline while CJS packages load `"main": "index.js"` |
+| ~20:35 | Fix applied: `resolve.alias: { graphql: graphqlPath }` added to `vitest.config.ts`; failures drop from 26 to 1 |
+| ~20:36 | Confirmed remaining 1 failure is a pre-existing unrelated issue (introspection test) |
+| ~20:37 | `pnpm store prune` removed from `make clean` |
+
+## Root Cause
+
+Two compounding issues:
+
+### 1. `pnpm store prune` removed esbuild from the global store
+
+`pnpm store prune` removes packages that are no longer referenced. The esbuild packages used internally by Vite are referenced only during dev/test, not in the final dependency closure visible to pnpm at prune-time. After pruning, `pnpm install --force` refetched them but esbuild's `postinstall` script modifies the binary in-place (to set the correct platform binary), which is why `pnpm store status` permanently reports them as "modified" — this is expected esbuild behaviour, not corruption. However, the refetch cycle invalidated Vite's internal caching state.
+
+### 2. Latent ESM/CJS split in the `graphql` package
+
+`graphql@16.12.0` does not have a `package.json` `exports` field. It declares:
+
+```json
+{
+  "main": "index",      // → index.js  (CJS)
+  "module": "index.mjs" // → index.mjs (ESM)
+}
+```
+
+Vite/Vitest prefers the `module` field and loads `index.mjs` for app source files (transformed as ESM). CJS packages like `mercurius` load `index.js` via `require()`, bypassing Vitest's transform entirely.
+
+The result is two separate module instances with the same `Symbol.toStringTag` values but different constructor references. `graphql`'s `instanceOf` helper detects this in non-production mode and throws:
+
+```
+Cannot use GraphQLNonNull "..." from another module or realm.
+```
+
+This latent issue was masked in previous runs by Vite's dep optimiser cache. Once that cache was invalidated by the esbuild churn, the split was exposed on every cold run.
+
+## Impact
+
+- All 14 tests in `test/graphql.test.ts` failed
+- All 12 relevant tests in `test/graphql-security.test.ts` failed
+- No production impact (tests only)
+- `test/event-consumers.test.ts`, `test/opensearch.test.ts`, `test/health.test.ts` unaffected
+
+## Resolution
+
+### Fix 1: Pin `graphql` to a single file via Vite alias (`apps/gateway/vitest.config.ts`)
+
+```typescript
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+// Force all imports of 'graphql' — ESM or CJS — to the same CJS file,
+// preventing two separate class identities under Vitest.
+const graphqlPath = require.resolve('graphql');
+
+export default defineConfig({
+    resolve: {
+        alias: {
+            graphql: graphqlPath,
+        },
+    },
+    // ...
+});
+```
+
+This ensures that no matter how Vitest's module runner resolves `graphql` — whether following the `module` field to `index.mjs` or `main` to `index.js` — both paths are redirected to the same resolved file. `instanceof` checks pass because there is now exactly one class reference.
+
+### Fix 2: Remove `pnpm store prune` from `make clean` (`Makefile`)
+
+`pnpm store prune` is unsafe to run in a dev environment because:
+
+1. esbuild and other build tools have legitimate postinstall mutations that permanently mark them as "modified" in the store
+2. It removes packages that appear unreferenced during pruning but are needed at build/test time
+3. It invalidates Vite's internal caches in ways that can expose other latent issues
+
+The `make clean` target now removes only local `node_modules` directories. Re-running `pnpm install` after a clean is sufficient to restore a working state.
+
+## Action Items
+
+- [x] Add `resolve.alias` for `graphql` in `apps/gateway/vitest.config.ts` — done 2026-03-30
+- [x] Remove `pnpm store prune` from `make clean` — done 2026-03-30
+
+## Lessons Learned
+
+### `pnpm store prune` is a destructive operation in a monorepo dev environment
+
+It should only be run intentionally, not as part of routine cleanup. The global pnpm store is shared across projects and its integrity is assumed by Vite's internal tooling.
+
+### The `graphql` package's dual-format distribution is a known footgun
+
+Any package that ships both `index.js` (CJS) and `index.mjs` (ESM) without an `exports` map can silently produce two instances under a bundler/transform pipeline. Any library that uses `instanceof` across module boundaries (graphql, zod, etc.) is susceptible. The defence is a `resolve.alias` that forces a single canonical path.
+
+### Dep-optimizer caches can mask underlying module identity issues
+
+The fact that tests passed before without the alias means the Vite dep-optimizer cache was absorbing the ESM/CJS split transparently. Any cache invalidation — cold CI, `make clean`, Vitest version bumps — can re-expose such issues.
+
+## Related
+
+- [ADR-002: GraphQL Security Hardening](/docs/architecture/decisions/graphql-security-hardening) — prior context on the Mercurius/graphql integration
+- `apps/gateway/vitest.config.ts` — where the fix lives
+- `Makefile` — `clean` target

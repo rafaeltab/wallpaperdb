@@ -1,6 +1,19 @@
+import { createRequire } from 'node:module';
 import { defineConfig } from 'vitest/config';
 
+const require = createRequire(import.meta.url);
+// Force all imports of 'graphql' — whether ESM (index.mjs) or CJS (index.js) —
+// to resolve to the same CJS file. This prevents the "from another module or
+// realm" error that occurs when Vitest's ESM transform picks index.mjs while
+// CJS packages (mercurius) load index.js, producing two distinct class identities.
+const graphqlPath = require.resolve('graphql');
+
 export default defineConfig({
+    resolve: {
+        alias: {
+            graphql: graphqlPath,
+        },
+    },
     test: {
         setupFiles: ["test/setup.ts"],
         name: 'gateway',

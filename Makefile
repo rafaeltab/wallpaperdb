@@ -12,7 +12,7 @@
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
-        dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force help
+        dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force clean help
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -132,6 +132,9 @@ help:
 	@echo "  make ci                - Run full CI pipeline locally"
 	@echo "  make ci-force          - Run full CI pipeline (skip turbo cache)"
 	@echo "  make check-types       - Run type checking on all packages"
+	@echo ""
+	@echo "Cleanup:"
+	@echo "  make clean             - Remove all generated artifacts (node_modules, caches, build output)"
 	@echo ""
 
 infra-start:
@@ -485,3 +488,19 @@ ci-force:
 	echo ""; \
 	echo "✓ All CI checks passed in $${duration}s"; \
 	echo "✓ Coverage report: coverage/lcov.info"
+
+# Clean generated artifacts
+clean:
+	@echo "Cleaning node_modules..."
+	@rm -rf node_modules apps/*/node_modules packages/*/node_modules experiments/*/node_modules
+	@echo "Cleaning compiled output..."
+	@rm -rf apps/*/dist apps/docs/.next packages/*/dist packages/react-muuri/storybook-static
+	@echo "Cleaning turbo caches..."
+	@rm -rf .turbo apps/*/.turbo packages/*/.turbo
+	@echo "Cleaning coverage reports..."
+	@rm -rf coverage apps/*/coverage packages/*/coverage
+	@echo "Cleaning TypeScript incremental build cache..."
+	@find . -name "*.tsbuildinfo" -not -path "*/node_modules/*" -delete
+	@echo "Cleaning generated OpenAPI specs..."
+	@rm -f apps/ingestor/swagger.json apps/media/swagger.json
+	@echo "✓ Clean complete"

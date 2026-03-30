@@ -74,6 +74,10 @@ export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
                     process.env.CURSOR_SECRET =
                         "ba2f8de80021b4223e94c9dbf184551efd27cd301a26d43e0c1c82d01cf79c5f"; // Test secret
                     process.env.REDIS_ENABLED = "false"; // Use in-memory fallback for tests
+                    // NOTE: config.ts calls dotenv's loadEnv() at module-load time, which loads
+                    // .env (containing GRAPHQL_INTROSPECTION_ENABLED=false) before this builder
+                    // sets env vars. We must explicitly override to enable introspection in tests.
+                    process.env.GRAPHQL_INTROSPECTION_ENABLED = "true";
 
                     // Apply config overrides
                     if (options.configOverrides) {

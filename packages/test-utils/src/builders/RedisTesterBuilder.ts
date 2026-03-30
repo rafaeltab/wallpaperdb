@@ -4,6 +4,9 @@ import type { DestroyTesterBuilder } from './DestroyTesterBuilder.js';
 import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
+import { createTestLogger } from '@wallpaperdb/test-logger';
+
+const logger = createTestLogger('RedisTesterBuilder');
 
 export interface RedisOptions {
   image?: string;
@@ -115,7 +118,7 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
         const { image = 'redis:7-alpine', networkAlias = 'redis' } = options;
 
         this.addSetupHook(async () => {
-          console.log('Starting Redis container...');
+          logger.debug('Starting Redis container...');
 
           // Auto-detect if network is available
           const dockerNetwork = this.docker.network;
@@ -156,14 +159,12 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
             options: options,
           };
 
-          console.log(
-            `Redis started: ${endpoints.networked} (internal) ${endpoints.fromHost} (from host) ${endpoints.fromHostDockerInternal} (from host.docker.internal)`
-          );
+          logger.debug({ networked: endpoints.networked, fromHost: endpoints.fromHost, fromHostDockerInternal: endpoints.fromHostDockerInternal }, 'Redis started');
         });
 
         this.addDestroyHook(async () => {
           if (this._redisConfig) {
-            console.log('Stopping Redis container...');
+            logger.debug('Stopping Redis container...');
             await this._redisConfig.container.stop();
           }
         });

@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vitest/config';
+import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineConfig({
+export default defineBaseConfig({
   plugins: [react()],
   test: {
     name: 'react-muuri',
@@ -13,7 +13,6 @@ export default defineConfig({
     hookTimeout: 10000,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
       exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/*.d.ts', 'test/**/*.ts'],
       reportsDirectory: './coverage',

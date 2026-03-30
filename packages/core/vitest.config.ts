@@ -1,6 +1,6 @@
-import { defineConfig } from "vitest/config";
+import { defineBaseConfig } from "@wallpaperdb/vitest-config";
 
-export default defineConfig({
+export default defineBaseConfig({
   test: {
     name: "core:unit",
     globals: true,
@@ -11,7 +11,6 @@ export default defineConfig({
     hookTimeout: 30000,  // 30s for setup/teardown
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html", "lcov", "json-summary"],
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "test/**/*.ts"],
       reportsDirectory: "./coverage",

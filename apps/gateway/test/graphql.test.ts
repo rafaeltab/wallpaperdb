@@ -1,6 +1,9 @@
 import "reflect-metadata";
+import { createTestLogger } from "@wallpaperdb/test-logger";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vitest";
+
+const logger = createTestLogger("graphql.test");
 import type { WallpaperDocument } from "../src/repositories/wallpaper.repository.js";
 import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
 import { tester } from "./setup.js";
@@ -335,7 +338,7 @@ describe("GraphQL API Integration", () => {
 
             expect(response.statusCode).toBe(200);
             const result = JSON.parse(response.body);
-            console.log(result);
+            logger.debug({ result });
             expect(result.data.searchWallpapers.edges).toHaveLength(1);
             expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
                 "wlpr_gql_005",

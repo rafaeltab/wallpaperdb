@@ -14,6 +14,9 @@ import { container } from "tsyringe";
 import { DefaultValidationLimitsService } from "../../src/services/validation-limits.service.js";
 import { SystemTimeService } from "../../src/services/core/time.service.js";
 import { FakeTimerService } from "@wallpaperdb/core/timer";
+import { createTestLogger } from "@wallpaperdb/test-logger";
+
+const logger = createTestLogger("InProcessIngestorBuilder");
 
 /**
  * Options for InProcessIngestorMixin
@@ -81,7 +84,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
 
             withIngestorEnvironment() {
                 this.addSetupHook(async () => {
-                    console.log("[InProcessIngestor] Setting up environment variables");
+                    logger.debug("[InProcessIngestor] Setting up environment variables");
                     const postgres = this.getPostgres();
                     const minio = this.getMinio();
                     const nats = this.getNats();
@@ -93,7 +96,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                         );
                     }
 
-                    console.log("Creating in-process Fastify app...");
+                    logger.debug("Creating in-process Fastify app...");
 
                     // Set environment variables for loadConfig()
                     process.env.NODE_ENV = "test";
@@ -135,7 +138,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                         }
                     }
 
-                    console.log("[InProcessIngestor] Environment variables set up");
+                    logger.debug("[InProcessIngestor] Environment variables set up");
                 });
                 return this;
             }
@@ -183,7 +186,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                 const self = this;
 
                 this.addSetupHook(async () => {
-                    console.log("[InProcessIngestor] Creating app via setup hook");
+                    logger.debug("[InProcessIngestor] Creating app via setup hook");
 
                     // Import config at runtime to pick up environment variables
                     const { loadConfig } = await import("../../src/config.js");
@@ -213,12 +216,12 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                         container.register("TimerService", { useValue: fakeTimer });
                     }
 
-                    console.log("In-process Fastify app ready");
+                    logger.debug("In-process Fastify app ready");
                 });
 
                 this.addDestroyHook(async () => {
                     if (this.app) {
-                        console.log("Closing in-process Fastify app...");
+                        logger.debug("Closing in-process Fastify app...");
                         await this.app.close();
                         this.app = null;
                     }

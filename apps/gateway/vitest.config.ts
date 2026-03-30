@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { defineConfig } from 'vitest/config';
+import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
 const require = createRequire(import.meta.url);
 // Force all imports of 'graphql' — whether ESM (index.mjs) or CJS (index.js) —
@@ -8,7 +8,7 @@ const require = createRequire(import.meta.url);
 // CJS packages (mercurius) load index.js, producing two distinct class identities.
 const graphqlPath = require.resolve('graphql');
 
-export default defineConfig({
+export default defineBaseConfig({
     resolve: {
         alias: {
             graphql: graphqlPath,
@@ -36,7 +36,6 @@ export default defineConfig({
         },
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
             include: ['src/**/*.ts'],
             exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
             reportsDirectory: './coverage',
@@ -62,4 +61,3 @@ export default defineConfig({
         noExternal: ['mercurius'], // if needed to avoid double-bundling behavior
     },
 });
-

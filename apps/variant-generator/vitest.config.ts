@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
+import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
-export default defineConfig({
+export default defineBaseConfig({
   test: {
     name: 'variant-generator',
     globals: true,
@@ -19,7 +19,6 @@ export default defineConfig({
     },
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov', 'json-summary'],
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
       reportsDirectory: './coverage',

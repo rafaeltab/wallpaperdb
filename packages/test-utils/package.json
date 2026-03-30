@@ -23,6 +23,7 @@
     "@testcontainers/minio": "^11.9.0",
     "@testcontainers/postgresql": "^11.9.0",
     "@testcontainers/redis": "^11.9.0",
+    "@wallpaperdb/test-logger": "workspace:*",
     "@wallpaperdb/testcontainers": "workspace:*",
     "nats": "^2.29.1",
     "postgres": "^3.4.3",
@@ -35,9 +36,10 @@
     "@types/dockerode": "^3.3.45",
     "@types/node": "^20.11.5",
     "@types/pg": "^8.11.10",
+    "@wallpaperdb/vitest-config": "workspace:*",
     "dockerode": "^4.0.9",
     "typescript": "^5.3.3",
-    "vitest": "^2.1.8",
+    "vitest": "^3.0.0",
     "pg": "^8.13.1"
   }
 }

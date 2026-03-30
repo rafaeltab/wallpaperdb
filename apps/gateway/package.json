@@ -52,11 +52,13 @@
     "@types/node": "^22.10.2",
     "@wallpaperdb/test-utils": "workspace:*",
     "@wallpaperdb/testcontainers": "workspace:*",
+    "@wallpaperdb/test-logger": "workspace:*",
+    "@wallpaperdb/vitest-config": "workspace:*",
     "esbuild": "^0.25.12",
     "pino-pretty": "^13.0.0",
     "testcontainers": "^11.9.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.0"
   }
 }

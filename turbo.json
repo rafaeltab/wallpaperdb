@@ -125,9 +125,11 @@
             ]
         },
         "check-types": {
+            "dependsOn": ["^build"],
             "cache": true,
             "inputs": [
                 "src/**",
+                "vitest.config.ts",
                 "package.json",
                 "package-lock.json",
                 "tsconfig.json"

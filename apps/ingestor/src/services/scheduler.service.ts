@@ -1,5 +1,5 @@
 import { inject, singleton } from 'tsyringe';
-import type { Config } from '../config.js';
+import type { TimerService } from '@wallpaperdb/core/timer';
 import { StuckUploadsReconciliation } from './reconciliation/stuck-uploads-reconciliation.service.js';
 import { MissingEventsReconciliation } from './reconciliation/missing-events-reconciliation.service.js';
 import { OrphanedIntentsReconciliation } from './reconciliation/orphaned-intents-reconciliation.service.js';
@@ -11,6 +11,10 @@ import { OrphanedMinioReconciliation } from './reconciliation/orphaned-minio-rec
  * Manages two intervals:
  * - Reconciliation cycle: Runs stuck uploads, missing events, and orphaned intents reconciliation
  * - MinIO cleanup cycle: Removes orphaned objects from MinIO storage
+ *
+ * Timer calls are delegated to an injected TimerService so that tests can
+ * substitute FakeTimerService and advance time deterministically without
+ * touching global setInterval (which would freeze database/NATS drivers).
  */
 @singleton()
 export class SchedulerService {
@@ -20,7 +24,9 @@ export class SchedulerService {
   private isReconciling = false;
 
   constructor(
-    @inject('config') private readonly config: Config,
+    @inject('TimerService') private readonly timerService: TimerService,
+    @inject('reconciliationIntervalMs') private readonly reconciliationIntervalMs: number,
+    @inject('minioCleanupIntervalMs') private readonly minioCleanupIntervalMs: number,
     @inject(StuckUploadsReconciliation)
     private readonly stuckUploadsReconciliation: StuckUploadsReconciliation,
     @inject(MissingEventsReconciliation)
@@ -32,9 +38,9 @@ export class SchedulerService {
   ) {}
 
   /**
-   * Start the reconciliation scheduler
-   * Runs reconciliation every 5 minutes (or 100ms in test mode)
-   * Runs MinIO cleanup every 24 hours (or 500ms in test mode)
+   * Start the reconciliation scheduler.
+   * Runs reconciliation every reconciliationIntervalMs milliseconds.
+   * Runs MinIO cleanup every minioCleanupIntervalMs milliseconds.
    */
   start(): void {
     if (this.isRunning) {
@@ -45,22 +51,22 @@ export class SchedulerService {
     console.log('Starting reconciliation scheduler...');
 
     // Run reconciliation on regular interval
-    this.reconciliationInterval = setInterval(() => {
-      this.runReconciliationCycle().catch((error) => {
+    this.reconciliationInterval = this.timerService.setInterval(() => {
+      return this.runReconciliationCycle().catch((error) => {
         console.error('Fatal error in reconciliation interval:', error);
       });
-    }, this.config.reconciliationIntervalMs);
+    }, this.reconciliationIntervalMs);
 
     // Run MinIO cleanup on separate interval
-    this.minioCleanupInterval = setInterval(() => {
-      this.runMinioCleanupCycle().catch((error) => {
+    this.minioCleanupInterval = this.timerService.setInterval(() => {
+      return this.runMinioCleanupCycle().catch((error) => {
         console.error('Fatal error in MinIO cleanup interval:', error);
       });
-    }, this.config.minioCleanupIntervalMs);
+    }, this.minioCleanupIntervalMs);
 
     this.isRunning = true;
     console.log(
-      `Scheduler started (reconciliation: ${this.config.reconciliationIntervalMs}ms, MinIO cleanup: ${this.config.minioCleanupIntervalMs}ms)`
+      `Scheduler started (reconciliation: ${this.reconciliationIntervalMs}ms, MinIO cleanup: ${this.minioCleanupIntervalMs}ms)`
     );
   }
 
@@ -77,12 +83,12 @@ export class SchedulerService {
     console.log('Stopping reconciliation scheduler...');
 
     if (this.reconciliationInterval) {
-      clearInterval(this.reconciliationInterval);
+      this.timerService.clearInterval(this.reconciliationInterval);
       this.reconciliationInterval = null;
     }
 
     if (this.minioCleanupInterval) {
-      clearInterval(this.minioCleanupInterval);
+      this.timerService.clearInterval(this.minioCleanupInterval);
       this.minioCleanupInterval = null;
     }
 
@@ -97,9 +103,11 @@ export class SchedulerService {
   async stopAndWait(): Promise<void> {
     this.stop();
 
-    // Wait for any in-progress reconciliation to complete
+    // Wait for any in-progress reconciliation to complete.
+    // setImmediate yields to the event loop (draining pending microtasks/I/O)
+    // without adding real wall-clock time, keeping tests fast.
     while (this.isReconciling) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
   }
 
@@ -111,6 +119,16 @@ export class SchedulerService {
     console.log('Running manual reconciliation...');
     await this.runReconciliationCycle();
     console.log('Manual reconciliation complete');
+  }
+
+  /**
+   * Run MinIO cleanup immediately (for testing or admin trigger)
+   * This can be called independently of the scheduler
+   */
+  async runMinioCleanupNow(): Promise<void> {
+    console.log('Running manual MinIO cleanup...');
+    await this.runMinioCleanupCycle();
+    console.log('Manual MinIO cleanup complete');
   }
 
   /**

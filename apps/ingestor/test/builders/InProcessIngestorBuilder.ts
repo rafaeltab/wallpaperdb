@@ -13,6 +13,7 @@ import type { Config } from "../../src/config.js";
 import { container } from "tsyringe";
 import { DefaultValidationLimitsService } from "../../src/services/validation-limits.service.js";
 import { SystemTimeService } from "../../src/services/core/time.service.js";
+import { FakeTimerService } from "@wallpaperdb/core/timer";
 
 /**
  * Options for InProcessIngestorMixin
@@ -75,6 +76,8 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
         return class extends Base {
             app: FastifyInstance | null = null;
             _appInitialized = false;
+            /** Set by withFakeTimers() before withInProcessApp() is called */
+            _fakeTimer: FakeTimerService | null = null;
 
             withIngestorEnvironment() {
                 this.addSetupHook(async () => {
@@ -138,6 +141,32 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
             }
 
             /**
+             * Opt in to fake timer control for this test session.
+             *
+             * Must be called **before** `withInProcessApp()`.  After `setup()`
+             * completes, retrieve the instance with `getFakeTimer()` and use
+             * `fakeTimer.tickAsync(ms)` to advance time deterministically instead of
+             * `await wait(ms)`.
+             */
+            withFakeTimers() {
+                this._fakeTimer = new FakeTimerService();
+                return this;
+            }
+
+            /**
+             * Returns the FakeTimerService instance registered via withFakeTimers().
+             * Throws if withFakeTimers() was not called first.
+             */
+            getFakeTimer(): FakeTimerService {
+                if (!this._fakeTimer) {
+                    throw new Error(
+                        "FakeTimerService not set up. Call withFakeTimers() before withInProcessApp().",
+                    );
+                }
+                return this._fakeTimer;
+            }
+
+            /**
              * Enable in-process Fastify app creation during setup.
              * The app will be created after all infrastructure is ready.
              */
@@ -148,6 +177,10 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
 
                 this._appInitialized = true;
                 this.withIngestorEnvironment();
+
+                // Capture reference so the hook closure can see it.
+                // biome-ignore lint/suspicious/noThisInStatic -- needed to capture instance ref in hook closure
+                const self = this;
 
                 this.addSetupHook(async () => {
                     console.log("[InProcessIngestor] Creating app via setup hook");
@@ -162,11 +195,23 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                     );
                     container.registerType("TimeService", SystemTimeService);
 
-                    // Create Fastify app
+                    // If the test opted into fake timers, override the TimerService
+                    // registration that createApp() is about to make.  We register
+                    // the fake instance here — createApp() also calls
+                    // container.register('TimerService', …) but tsyringe resolves the
+                    // *last* registration, so we re-register after createApp() returns.
+                    const fakeTimer = self._fakeTimer;
+
+                    // Create Fastify app (registers SystemTimerService internally)
                     this.app = await createApp(config, {
                         logger: options.logger ?? false,
                         enableOtel: false,
                     });
+
+                    // Override with fake timer after createApp() if requested
+                    if (fakeTimer) {
+                        container.register("TimerService", { useValue: fakeTimer });
+                    }
 
                     console.log("In-process Fastify app ready");
                 });

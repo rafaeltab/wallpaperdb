@@ -52,7 +52,6 @@ export type Config = z.infer<typeof configSchema>;
 
 export function loadConfig(): Config {
   const nodeEnv = getEnv('NODE_ENV', 'development');
-  const isTest = nodeEnv === 'test';
 
   const raw = {
     // Server
@@ -86,11 +85,11 @@ export function loadConfig(): Config {
     // Ingestor-specific
     reconciliationIntervalMs: parseIntEnv(
       process.env.RECONCILIATION_INTERVAL_MS,
-      isTest ? 100 : 5 * 60 * 1000
+      5 * 60 * 1000 // 5 minutes (production default — tests use FakeTimerService)
     ),
     minioCleanupIntervalMs: parseIntEnv(
       process.env.MINIO_CLEANUP_INTERVAL_MS,
-      isTest ? 500 : 24 * 60 * 60 * 1000
+      24 * 60 * 60 * 1000 // 24 hours (production default — tests use runMinioCleanupNow())
     ),
     rateLimitMax: parseIntEnv(process.env.RATE_LIMIT_MAX, 100),
     rateLimitWindowMs: parseIntEnv(process.env.RATE_LIMIT_WINDOW_MS, 60 * 60 * 1000),

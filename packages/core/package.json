@@ -38,6 +38,10 @@
     "./openapi": {
       "import": "./src/openapi/index.ts",
       "types": "./src/openapi/index.ts"
+    },
+    "./timer": {
+      "import": "./src/timer/index.ts",
+      "types": "./src/timer/index.ts"
     }
   },
   "scripts": {

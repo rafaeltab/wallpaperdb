@@ -69,6 +69,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
+            .withFakeTimers()
             .withInProcessApp();
         return tester;
     };
@@ -86,6 +87,10 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     beforeEach(async () => {
+        // Reset the fake timer so each test starts with a clean clock at t=0
+        // with no stale intervals or timeouts from a previous test.
+        tester.getFakeTimer().reset();
+
         // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
 
@@ -110,6 +115,8 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should start scheduler and run reconciliation automatically", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create test data: stuck upload that needs reconciliation
         const testImage = await createTestImage({
             width: 1920,
@@ -151,16 +158,14 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(initial.uploadState).toBe("uploading");
 
-        // Start scheduler (uses 100ms interval in test mode)
+        // Start scheduler
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Wait for reconciliation to run (250ms to ensure completion)
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Advance one reconciliation interval — deterministic, no wall-clock waiting
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Verify record was reconciled to 'stored' state
-        // Note: Reconciliation only changes state, it doesn't extract metadata
-        // Metadata extraction happens during initial upload flow
         const [reconciled] = await tester
             .getDrizzle()
             .select()
@@ -176,6 +181,8 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should stop scheduler cleanly during graceful shutdown", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create multiple stuck records
         const testImage = await createTestImage({
             width: 1920,
@@ -214,8 +221,8 @@ describe("Scheduler Lifecycle Tests", () => {
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Wait for at least one reconciliation cycle
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Advance one reconciliation interval
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Get count of reconciled records before shutdown
         const beforeShutdown = await tester
@@ -228,8 +235,8 @@ describe("Scheduler Lifecycle Tests", () => {
         // Stop scheduler
         await schedulerService.stopAndWait();
 
-        // Wait a bit more (another interval would occur at ~200ms)
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        // Advance more time — nothing should fire because the scheduler is stopped
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Get count of reconciled records after shutdown
         const afterShutdown = await tester
@@ -244,7 +251,9 @@ describe("Scheduler Lifecycle Tests", () => {
         expect(reconciledBeforeShutdown).toBeGreaterThan(0); // At least some were processed
     });
 
-    it("should run reconciliation on correct interval", { retry: 3 }, async () => {
+    it("should run reconciliation on correct interval", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create a stuck record
         const testImage = await createTestImage({
             width: 1920,
@@ -280,9 +289,8 @@ describe("Scheduler Lifecycle Tests", () => {
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Test interval is 100ms, so we should see reconciliation happen
-        // Check at 50ms (should not be processed yet)
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        // Advance to just before the reconciliation interval — should NOT fire yet
+        await fakeTimer.tickAsync(5 * 60 * 1000 - 1);
         let [record] = await tester
             .getDrizzle()
             .select()
@@ -290,9 +298,8 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(record.uploadState).toBe("uploading"); // Not yet processed
 
-        // Wait for reconciliation to complete (interval + execution time)
-        // Interval is 100ms, but we need to account for reconciliation execution time
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Advance the remaining 1 ms to reach the interval
+        await fakeTimer.tickAsync(1);
         [record] = await tester
             .getDrizzle()
             .select()
@@ -303,7 +310,9 @@ describe("Scheduler Lifecycle Tests", () => {
         await schedulerService.stopAndWait();
     });
 
-    it("should prevent concurrent reconciliation cycles", { retry: 3 }, async () => {
+    it("should prevent concurrent reconciliation cycles", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create many stuck uploads to make reconciliation take longer
         const testImage = await createTestImage({
             width: 1920,
@@ -345,16 +354,22 @@ describe("Scheduler Lifecycle Tests", () => {
         // Manually trigger reconciliation to force concurrent attempt
         const reconciliationPromise = schedulerService.runReconciliationNow();
 
-        // Wait a bit for manual reconciliation to start
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        // The scheduled interval might try to run, but should be skipped due to isReconciling flag
-        // We just verify that we don't get errors and records are processed correctly
+        // Advance the timer so a scheduled interval also fires — the isReconciling
+        // guard should prevent a concurrent cycle from running.
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         await reconciliationPromise;
 
-        // All records should eventually be processed
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // Allow any remaining batches to finish
+        for (let i = 0; i < 10; i++) {
+            await fakeTimer.tickAsync(5 * 60 * 1000);
+            const remaining = await tester
+                .getDrizzle()
+                .select()
+                .from(wallpapers)
+                .where(eq(wallpapers.uploadState, "uploading"));
+            if (remaining.length === 0) break;
+        }
 
         const processedCount = await tester
             .getDrizzle()
@@ -369,6 +384,8 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should handle reconciliation errors gracefully and continue running", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create a valid stuck upload
         const testImage = await createTestImage({
             width: 1920,
@@ -406,8 +423,8 @@ describe("Scheduler Lifecycle Tests", () => {
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Wait for first reconciliation cycle
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Advance one interval
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Verify record was processed
         const [processed] = await tester
@@ -417,7 +434,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .where(eq(wallpapers.id, wallpaperId));
         expect(processed.uploadState).toBe("stored");
 
-        // Now create another record to verify scheduler continues after potential errors
+        // Now create another record to verify scheduler continues
         const wallpaperId2 = `wlpr_error_recovery_2_${ulid()}`;
         const storageKey2 = `${wallpaperId2}/original.jpg`;
         const testImage2 = await createTestImage({
@@ -450,8 +467,8 @@ describe("Scheduler Lifecycle Tests", () => {
                 contentHash: contentHash2,
             });
 
-        // Wait for next reconciliation cycle
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Advance another interval — scheduler must still be running
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Verify second record was also processed (scheduler still running)
         const [processed2] = await tester
@@ -465,6 +482,8 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should handle missing event publishing during scheduled reconciliation", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create records stuck in 'stored' state (need NATS event publishing)
         const testImage = await createTestImage({
             width: 1920,
@@ -475,7 +494,6 @@ describe("Scheduler Lifecycle Tests", () => {
         for (let i = 0; i < 5; i++) {
             const wallpaperId = `wlpr_stored_${i}_${ulid()}`;
             const storageKey = `${wallpaperId}/original.jpg`;
-            // Generate unique content hash for each record to avoid constraint violation
             const contentHash = generateContentHash(
                 Buffer.concat([testImage, Buffer.from(`_${i}`)]),
             );
@@ -506,8 +524,8 @@ describe("Scheduler Lifecycle Tests", () => {
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Wait for reconciliation to run
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        // Advance one reconciliation interval
+        await fakeTimer.tickAsync(5 * 60 * 1000);
 
         // Verify all records moved to 'processing' state
         const processing = await tester
@@ -528,6 +546,8 @@ describe("Scheduler Lifecycle Tests", () => {
     });
 
     it("should handle orphaned intent cleanup during scheduled reconciliation", async () => {
+        const fakeTimer = tester.getFakeTimer();
+
         // Create orphaned intents (stuck in 'initiated' state for >1 hour)
         for (let i = 0; i < 8; i++) {
             const wallpaperId = `wlpr_orphan_${i}_${ulid()}`;
@@ -558,8 +578,16 @@ describe("Scheduler Lifecycle Tests", () => {
         const schedulerService = tester.getApp().container.resolve(SchedulerService);
         schedulerService.start();
 
-        // Wait for reconciliation to run multiple cycles to process all 8 records
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Tick in a loop until all orphaned intents are deleted (batch processing)
+        for (let i = 0; i < 20; i++) {
+            await fakeTimer.tickAsync(5 * 60 * 1000);
+            const remaining = await tester
+                .getDrizzle()
+                .select()
+                .from(wallpapers)
+                .where(eq(wallpapers.uploadState, "initiated"));
+            if (remaining.length === 0) break;
+        }
 
         // Verify all orphaned intents were deleted
         const remaining = await tester

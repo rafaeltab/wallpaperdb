@@ -55,6 +55,7 @@ describe("Scheduler Service Tests", () => {
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
+            .withFakeTimers()
             .withInProcessApp();
         return tester;
     };
@@ -68,6 +69,10 @@ describe("Scheduler Service Tests", () => {
     });
 
     beforeEach(async () => {
+        // Reset the fake timer so each test starts with a clean clock at t=0
+        // with no stale intervals or timeouts from a previous test.
+        tester.getFakeTimer().reset();
+
         // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
 
@@ -186,13 +191,6 @@ describe("Scheduler Service Tests", () => {
     }
 
     /**
-     * Test Helper: Wait for a specific amount of time
-     */
-    function wait(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    /**
      * Test Helper: Count records in a specific state
      */
     async function countRecordsInState(state: UploadState): Promise<number> {
@@ -227,11 +225,9 @@ describe("Scheduler Service Tests", () => {
             schedulerService.start();
 
             // Try to start again (should be idempotent or throw)
-            // Implementation could either ignore or throw - just ensure it's handled
             const secondStart = () => schedulerService.start();
 
             // Should either not throw (idempotent) or throw with clear message
-            // We test that calling it twice doesn't crash the process
             expect(() => {
                 try {
                     secondStart();
@@ -242,7 +238,8 @@ describe("Scheduler Service Tests", () => {
             }).not.toThrow();
         });
 
-        it("should clean up intervals when stopped", { retry: 3 }, async () => {
+        it("should clean up intervals when stopped", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create stuck upload to verify reconciliation runs
@@ -250,11 +247,11 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Start scheduler with short interval (for testing)
+            // Start scheduler
             schedulerService.start();
 
-            // Wait for at least one cycle (implementation should use ~100ms for tests)
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Stop scheduler
             schedulerService.stop();
@@ -268,8 +265,8 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Wait to ensure no more cycles run
-            await wait(500);
+            // Advance more time — scheduler is stopped, nothing should fire
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify second upload was NOT reconciled (scheduler stopped)
             const record2 = await getRecordState(id2);
@@ -279,6 +276,7 @@ describe("Scheduler Service Tests", () => {
 
     describe("Regular Reconciliation Cycles", () => {
         it("should run reconcileStuckUploads on scheduled interval", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create stuck upload in 'uploading' state
@@ -292,8 +290,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation cycle to run
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify reconciliation was executed
             const record = await getRecordState(id);
@@ -301,6 +299,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should run reconcileMissingEvents on scheduled interval", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create record in 'stored' state
@@ -312,8 +311,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation cycle to run
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify event was republished and state changed
             const record = await getRecordState(id);
@@ -321,6 +320,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should run reconcileOrphanedIntents on scheduled interval", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create old 'initiated' record
@@ -332,14 +332,15 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation cycle to run
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify record was deleted
             expect(await getRecordState(id)).toBeUndefined();
         });
 
         it("should run all three reconciliation functions in one cycle", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create test data for all three scenarios
@@ -352,8 +353,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation cycle to complete
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify all three were executed
             expect((await getRecordState(uploadingId))?.uploadState).toBe("stored");
@@ -362,6 +363,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should run multiple cycles continuously", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Start scheduler
@@ -372,8 +374,8 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Wait for first cycle
-            await wait(300);
+            // Advance first interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify first batch processed
             expect((await getRecordState(id1))?.uploadState).toBe("stored");
@@ -383,14 +385,15 @@ describe("Scheduler Service Tests", () => {
                 hasMinioFile: true,
             });
 
-            // Wait for second cycle
-            await wait(300);
+            // Advance second interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify second batch processed
             expect((await getRecordState(id2))?.uploadState).toBe("stored");
         });
 
         it("should handle empty database gracefully", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // No test data created - database is empty
@@ -398,8 +401,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler (should not throw on empty database)
             expect(() => schedulerService.start()).not.toThrow();
 
-            // Wait for cycle
-            await wait(300);
+            // Advance one interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Should still be running without errors
             // (No assertion needed - just verify no crash)
@@ -422,14 +425,10 @@ describe("Scheduler Service Tests", () => {
                 tester.minio.getS3Client().send(headCommand),
             ).resolves.toBeDefined();
 
-            // Start scheduler
-            // Note: Implementation should have a way to trigger MinIO cleanup
-            // either via shorter interval for tests or manual trigger
+            // Start scheduler, but trigger MinIO cleanup directly
+            // (its interval is 24 h — no need to tick that far)
             schedulerService.start();
-
-            // Wait for MinIO cleanup cycle
-            // This might need to be longer or triggered manually in tests
-            await wait(1000);
+            await schedulerService.runMinioCleanupNow();
 
             // Verify orphaned object was deleted
             await expect(
@@ -438,6 +437,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should not run MinIO cleanup on regular reconciliation cycles", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create regular stuck upload (should be reconciled quickly)
@@ -448,11 +448,9 @@ describe("Scheduler Service Tests", () => {
             // Create orphaned MinIO object (should NOT be cleaned up in regular cycle)
             const orphanedId = await createOrphanedMinioObject();
 
-            // Start scheduler
+            // Start scheduler and advance one reconciliation interval (not MinIO cleanup)
             schedulerService.start();
-
-            // Wait for one regular cycle (not MinIO cleanup)
-            await wait(300);
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify regular reconciliation ran
             expect((await getRecordState(regularId))?.uploadState).toBe("stored");
@@ -523,13 +521,13 @@ describe("Scheduler Service Tests", () => {
 
     describe("Error Handling", () => {
         it("should continue running after reconciliation function throws error", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Start scheduler
             schedulerService.start();
 
             // Create invalid data that might cause errors
-            // For example, a record with missing required fields
             await tester
                 .getDrizzle()
                 .insert(wallpapers)
@@ -541,21 +539,20 @@ describe("Scheduler Service Tests", () => {
                     stateChangedAt: new Date(Date.now() - 10 * 60 * 1000),
                     uploadAttempts: 0,
                     // Missing required fields for 'stored' state - may cause errors
-                    // Using unknown cast to bypass type safety for testing error handling
                     fileType: null as unknown as "image",
                     mimeType: null as unknown as string,
                 });
 
-            // Wait for cycle (should handle error gracefully)
-            await wait(500);
+            // Advance one interval (should handle error gracefully)
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Create valid data
             const validId = await createStuckUpload("uploading", 15, {
                 hasMinioFile: true,
             });
 
-            // Wait for next cycle (increased to ensure reconciliation completes)
-            await wait(400);
+            // Advance another interval — scheduler must still be running
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Scheduler should still be running and processing valid records
             const record = await getRecordState(validId);
@@ -563,32 +560,31 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should handle database connection errors gracefully", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Start scheduler
             schedulerService.start();
 
-            // Scheduler should not crash even if database has issues
-            // This is a basic smoke test - implementation should log errors
-            await wait(300);
+            // Advance one interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify scheduler is still running (by stopping it)
             expect(() => schedulerService.stop()).not.toThrow();
         });
 
         it("should handle NATS connection errors gracefully", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create stuck upload in 'stored' state
             const id = await createStuckUpload("stored", 10);
 
-            // Note: This test is simplified - NATS connection errors are handled gracefully
-            // Records stay in 'stored' state if NATS publish fails
             // Start scheduler
             schedulerService.start();
 
-            // Wait for cycle
-            await wait(500);
+            // Advance one interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Record should be in 'processing' state (NATS connection is available in test)
             const record = await getRecordState(id);
@@ -599,6 +595,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should log errors without crashing the process", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create data that will cause reconciliation errors
@@ -610,8 +607,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation
-            await wait(500);
+            // Advance one interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify record was marked as failed (error handled properly)
             const record = await getRecordState(id);
@@ -622,6 +619,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should continue reconciliation even if one function fails", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create test data for multiple reconciliation types
@@ -633,14 +631,12 @@ describe("Scheduler Service Tests", () => {
             // Even if one reconciliation function fails, others should run
             schedulerService.start();
 
-            await wait(500);
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // At least some reconciliation should have succeeded
-            // (This tests that errors in one function don't stop the whole cycle)
             const uploadingRecord = await getRecordState(uploadingId);
             const initiatedRecord = await getRecordState(initiatedId);
 
-            // At least one of these should have been processed
             const atLeastOneProcessed =
                 uploadingRecord?.uploadState === "stored" ||
                 initiatedRecord === undefined;
@@ -651,6 +647,7 @@ describe("Scheduler Service Tests", () => {
 
     describe("Integration Tests", () => {
         it("should work end-to-end with real infrastructure", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create comprehensive test scenario with multiple stuck states
@@ -677,8 +674,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for reconciliation to complete
-            await wait(800);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Verify results
             const storedCount = await countRecordsInState("stored");
@@ -700,6 +697,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should handle high volume of stuck records", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create 50 stuck uploads
@@ -712,8 +710,12 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for multiple cycles to process all records
-            await wait(2000);
+            // Tick in a loop until all records are processed (reconciliation uses .limit(N) per cycle)
+            for (let i = 0; i < 20; i++) {
+                await fakeTimer.tickAsync(5 * 60 * 1000);
+                const remaining = await countRecordsInState("uploading");
+                if (remaining === 0) break;
+            }
 
             // Verify all were processed to 'stored' state
             const storedCount = await countRecordsInState("stored");
@@ -731,7 +733,6 @@ describe("Scheduler Service Tests", () => {
             );
 
             // Simulate multiple instances by calling reconciliation directly
-            // (The scheduler itself will call these, but we can test the underlying safety)
             await Promise.all([
                 stuckUploadsService.reconcile(),
                 stuckUploadsService.reconcile(),
@@ -750,6 +751,7 @@ describe("Scheduler Service Tests", () => {
 
     describe("Timing and Configuration", () => {
         it("should respect time windows for stuck uploads (10 minutes)", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create upload that is 9 minutes old (should NOT be reconciled)
@@ -765,8 +767,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for cycle
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Recent upload should remain in 'uploading'
             expect((await getRecordState(recentId))?.uploadState).toBe("uploading");
@@ -776,6 +778,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should respect time windows for missing events (5 minutes)", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create record that is 4 minutes old (should NOT be reconciled)
@@ -787,8 +790,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for cycle
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Recent record should remain in 'stored'
             expect((await getRecordState(recentId))?.uploadState).toBe("stored");
@@ -798,6 +801,7 @@ describe("Scheduler Service Tests", () => {
         });
 
         it("should respect time windows for orphaned intents (1 hour)", async () => {
+            const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create intent that is 50 minutes old (should NOT be deleted)
@@ -809,8 +813,8 @@ describe("Scheduler Service Tests", () => {
             // Start scheduler
             schedulerService.start();
 
-            // Wait for cycle
-            await wait(500);
+            // Advance one reconciliation interval
+            await fakeTimer.tickAsync(5 * 60 * 1000);
 
             // Recent intent should still exist
             expect(await getRecordState(recentId)).toBeDefined();

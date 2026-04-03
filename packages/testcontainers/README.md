@@ -1,31 +1,13 @@
 # @wallpaperdb/testcontainers
 
-Custom Testcontainers implementations for WallpaperDB testing.
+Custom Testcontainers implementations that provide ready-to-use, correctly configured Docker containers for integration and E2E tests across the WallpaperDB monorepo.
 
-## Documentation
+## Key Capabilities
 
-**Complete documentation:** [apps/docs/content/docs/packages/testcontainers.mdx](../../apps/docs/content/docs/packages/testcontainers.mdx)
+- **NATS container** — starts a NATS server with JetStream enabled, waits for a confirmed health check before reporting readiness, and exposes a typed connection URL helper that avoids DNS resolution delays
+- **OpenSearch container** — starts an OpenSearch node in single-node mode with configurable security, enforces password strength requirements before container startup, and exposes typed URL and credential accessors for both host and direct-IP access patterns
 
-Run `make docs-dev` from the repository root to view the rendered documentation site.
+## Technology Choices
 
-## Quick Example
-
-```typescript
-import { createNatsContainer } from '@wallpaperdb/testcontainers/containers';
-
-const natsContainer = await createNatsContainer({
-  enableJetStream: true
-});
-
-const natsUrl = natsContainer.getConnectionUrl();
-
-// Clean up
-await natsContainer.stop();
-```
-
-## Available Containers
-
-- **NATS**: NATS with JetStream support
-- **Future**: PostgreSQL, MinIO, Redis
-
-**See the [complete documentation](../../apps/docs/content/docs/packages/testcontainers.mdx) for detailed API reference.**
+- **testcontainers** — manages Docker container lifecycle, health-check wait strategies, and port mapping within tests
+- **zxcvbn** — enforces password strength scoring to satisfy OpenSearch's security plugin requirements at configuration time rather than at runtime

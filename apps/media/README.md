@@ -1,51 +1,17 @@
 # Media Service
 
-Wallpaper retrieval and on-demand resizing service.
+Serves wallpapers to clients with on-demand resizing, consuming upload events from the ingestor to build and maintain its local catalog.
 
-## Documentation
+## Capabilities
 
-**Complete documentation:** [apps/docs/content/docs/services/media.mdx](../docs/content/docs/services/media.mdx)
+- Streams wallpaper files directly from object storage to clients with minimal memory overhead
+- Resizes images on demand using three fit modes: contain (preserve aspect ratio), cover (crop to fill), and fill (stretch to exact dimensions)
+- Selects the smallest pre-generated variant that satisfies the requested dimensions before applying any final resize transform, reducing processing cost and bandwidth
+- Falls back transparently to the original file when a referenced variant is unavailable in storage
+- Emits immutable, long-lived cache headers suitable for CDN delivery
+- Builds and maintains its local wallpaper and variant catalog by consuming domain events over NATS JetStream
+- Returns RFC 7807 problem details for error responses
 
-Run `make docs-dev` from the repository root to view the rendered documentation site.
+## Technology
 
-## Quick Start
-
-```bash
-# Start infrastructure first
-make infra-start
-
-# Start media service
-make media-dev
-```
-
-## Features
-
-- Wallpaper retrieval by ID
-- On-demand image resizing (Sharp)
-- 3 resize modes (contain, cover, fill)
-- CDN-ready caching headers
-- Streaming responses
-
-## API
-
-**Retrieve wallpaper:**
-```bash
-curl http://localhost:3002/wallpapers/wlpr_01HF8XQZJ... > wallpaper.jpg
-```
-
-**Resize on-the-fly:**
-```bash
-curl "http://localhost:3002/wallpapers/wlpr_01HF8XQZJ...?w=800&h=600&fit=contain" > resized.jpg
-```
-
-**See the [complete documentation](../docs/content/docs/services/media.mdx) for detailed API reference.**
-
-## Commands
-
-```bash
-make media-dev          # Start service in development mode
-make media-test         # Run all tests
-make media-build        # Build for production
-```
-
-**Status:** ✅ Production-ready
+- **Sharp** — streaming image processing pipeline with decompression bomb protection

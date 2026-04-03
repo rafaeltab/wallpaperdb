@@ -1,60 +1,17 @@
-# Ingestor Service
+# Ingestor
 
-Production-ready wallpaper upload and validation service.
+Accepts wallpaper file uploads, validates them against content-based rules, persists them to object storage, and publishes domain events to trigger downstream processing.
 
-## Documentation
+## Capabilities
 
-**Complete documentation:** [apps/docs/content/docs/services/ingestor.mdx](../docs/content/docs/services/ingestor.mdx)
+- **Upload durability** — implements a write-ahead state machine to guarantee that every upload is either fully committed or recoverable across partial failures; each stage of the upload pipeline is persisted to the database before the next stage begins
+- **Content-based validation** — detects actual file formats from binary content rather than trusting client-supplied MIME types or filenames; rejects files that misrepresent their format, exceed dimension limits, or exceed size limits
+- **Deduplication** — computes a SHA-256 content hash at upload time and rejects files whose content already exists for that user, preventing redundant storage and processing work
+- **Eventual consistency** — background reconciliation workers recover stuck uploads, republish lost domain events, and remove orphaned records or storage objects; all workers use PostgreSQL row-level locking so multiple service instances can run safely without coordination
+- **Per-user rate limiting** — enforces upload frequency limits per user using an atomic operation in Redis, with a graceful in-memory fallback when Redis is unavailable
 
-Run `make docs-dev` from the repository root to view the rendered documentation site.
+## Notable Technology Choices
 
-## Quick Start
-
-```bash
-# Start infrastructure first
-make infra-start
-
-# Start ingestor service
-make ingestor-dev
-```
-
-## Features
-
-- Multi-format upload (JPEG, PNG, WebP, MP4, WebM)
-- 6-state upload workflow (initiated → uploading → stored → processing → completed/failed)
-- Content-based deduplication (SHA256)
-- 4 reconciliation systems for eventual consistency
-- Redis-based rate limiting
-- RFC 7807 error handling
-
-## API
-
-**Upload wallpaper:**
-```bash
-curl -X POST http://localhost:3001/upload \
-  -F "file=@wallpaper.jpg" \
-  -F "userId=test-user"
-```
-
-**Health check:**
-```bash
-curl http://localhost:3001/health
-```
-
-**Swagger UI:**
-```
-http://localhost:3001/documentation
-```
-
-**See the [complete documentation](../docs/content/docs/services/ingestor.mdx) for detailed API reference.**
-
-## Commands
-
-```bash
-make ingestor-dev          # Start service in development mode
-make ingestor-test         # Run all tests
-make ingestor-build        # Build for production
-make ingestor-docker-build # Build Docker image
-```
-
-**Status:** ✅ Production Ready
+- **Sharp** — used for image metadata extraction and decompression-bomb protection; pixel limits are enforced at decode time rather than after full file load
+- **file-type** — inspects raw bytes to determine the actual file format, independent of what the client claims
+- **RFC 7807 Problem Details** — all error responses use structured `application/problem+json` bodies, enabling clients to handle specific error conditions programmatically

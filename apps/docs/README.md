@@ -1,45 +1,15 @@
-# docs
+# @wallpaperdb/docs
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+The primary documentation site for WallpaperDB, serving as a single authoritative reference for developers and AI agents working across the monorepo.
 
-Run development server:
+## Key Capabilities
 
-```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
-```
+- Hosts MDX-authored documentation covering development guidelines, architectural decisions, testing strategy, service descriptions, shared package references, and operational guides
+- Auto-generates REST API reference pages from the OpenAPI specifications exported by each service, keeping the API docs in sync with the live service contracts
+- Exposes a full-text endpoint formatted for LLM consumption, enabling AI agents to retrieve the entire documentation corpus in a single request
 
-Open http://localhost:3000 with your browser to see the result.
+## Technology Choices
 
-## Explore
-
-In the project, you can see:
-
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
-
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
-
-### Fumadocs MDX
-
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
-
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+- **Fumadocs** — documentation framework that provides MDX content pipeline, navigation, full-text search, and a structured Next.js UI; chosen for its deep OpenAPI integration and MDX-first authoring model
+- **fumadocs-openapi** — generates typed, navigable API reference pages directly from OpenAPI specs without manual authoring
+- **Next.js (App Router)** — hosts the documentation as a statically exportable web application

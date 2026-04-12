@@ -77,8 +77,8 @@ export function loadConfig(): Config {
     otelServiceName: getEnv('OTEL_SERVICE_NAME', 'ingestor'),
 
     // Redis
-    redisHost: getEnv('REDIS_HOST', 'localhost'),
-    redisPort: parseIntEnv(process.env.REDIS_PORT, 6379),
+    redisHost: process.env.REDIS_HOST,
+    redisPort: parseIntEnv(process.env.REDIS_PORT),
     redisPassword: process.env.REDIS_PASSWORD,
     redisEnabled: parseBoolEnv(process.env.REDIS_ENABLED, true),
 

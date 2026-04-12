@@ -4,6 +4,7 @@
     "type": "module",
     "packageManager": "pnpm@10.18.3",
     "scripts": {
+        "postinstall": "test -f scripts/setup-worktree.mjs && node scripts/setup-worktree.mjs || true",
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",

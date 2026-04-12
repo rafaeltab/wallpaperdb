@@ -6,6 +6,7 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.VITE_BASE_PATH ?? '/',
   plugins: [
     TanStackRouterVite(), // Auto-generates route tree
     react(),
@@ -13,6 +14,7 @@ export default defineConfig({
   ],
   server: {
     port: 3005,
+    host: true, // Needed inside Docker
   },
   resolve: {
     alias: {

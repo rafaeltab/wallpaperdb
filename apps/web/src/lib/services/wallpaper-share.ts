@@ -10,7 +10,8 @@ import { toast } from 'sonner';
  * @returns Promise<void>
  */
 export async function shareWallpaper(wallpaperId: string): Promise<void> {
-  const url = `${window.location.origin}/wallpapers/${wallpaperId}`;
+  const basePath = import.meta.env.VITE_BASE_PATH || '';
+  const url = `${window.location.origin}${basePath}/wallpapers/${wallpaperId}`;
 
   // Try native share on mobile first
   if (navigator.share) {

@@ -10,10 +10,15 @@ vi.mock('sonner', () => ({
 	},
 }));
 
+function buildExpectedUrl(origin: string, wallpaperId: string): string {
+	const basePath = import.meta.env.VITE_BASE_PATH || '';
+	return `${origin}${basePath}/wallpapers/${wallpaperId}`;
+}
+
 describe('wallpaper-share service', () => {
 	const mockWallpaperId = 'wlpr_test123';
 	const mockOrigin = 'https://example.com';
-	const expectedUrl = `${mockOrigin}/wallpapers/${mockWallpaperId}`;
+	const expectedUrl = buildExpectedUrl(mockOrigin, mockWallpaperId);
 
 	beforeEach(() => {
 		// Reset mocks
@@ -191,7 +196,7 @@ describe('wallpaper-share service', () => {
 			await shareWallpaper('wlpr_abc123');
 
 			expect(mockWriteText).toHaveBeenCalledWith(
-				'https://example.com/wallpapers/wlpr_abc123',
+				buildExpectedUrl('https://example.com', 'wlpr_abc123'),
 			);
 		});
 
@@ -208,7 +213,7 @@ describe('wallpaper-share service', () => {
 			await shareWallpaper('wlpr_test');
 
 			expect(mockWriteText).toHaveBeenCalledWith(
-				'https://wallpaperdb.com/wallpapers/wlpr_test',
+				buildExpectedUrl('https://wallpaperdb.com', 'wlpr_test'),
 			);
 		});
 
@@ -223,8 +228,29 @@ describe('wallpaper-share service', () => {
 			await shareWallpaper('wlpr_01JFABC123');
 
 			expect(mockWriteText).toHaveBeenCalledWith(
-				'https://example.com/wallpapers/wlpr_01JFABC123',
+				buildExpectedUrl('https://example.com', 'wlpr_01JFABC123'),
 			);
+		});
+
+		it('includes VITE_BASE_PATH in URL when set', async () => {
+			const mockWriteText = vi.fn().mockResolvedValue(undefined);
+			Object.defineProperty(navigator, 'clipboard', {
+				value: { writeText: mockWriteText },
+				writable: true,
+				configurable: true,
+			});
+
+			await shareWallpaper('wlpr_test');
+
+			expect(mockWriteText).toHaveBeenCalledWith(
+				expect.stringContaining('/wallpapers/wlpr_test'),
+			);
+
+			const calledUrl = mockWriteText.mock.calls[0][0] as string;
+			const basePath = import.meta.env.VITE_BASE_PATH || '';
+			if (basePath) {
+				expect(calledUrl).toContain(basePath);
+			}
 		});
 	});
 });

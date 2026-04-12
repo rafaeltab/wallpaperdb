@@ -4,14 +4,13 @@ services:
   # PostgreSQL - Metadata Database
   postgres:
     image: postgres:16-alpine
-    container_name: wallpaperdb-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wallpaperdb}
       POSTGRES_USER: ${POSTGRES_USER:-wallpaperdb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wallpaperdb}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d
@@ -24,15 +23,19 @@ services:
   # MinIO - Object Storage
   minio:
     image: minio/minio:latest
-    container_name: wallpaperdb-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # Tells the MinIO console where browser redirects should point.
+      # Required for OAuth callbacks to work correctly behind Caddy's /minio prefix.
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:${INGRESS_PORT:-8000}/minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      # Console port removed — accessible via Caddy at /minio in Phase 8.
+      # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+      # - "9001:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -44,7 +47,6 @@ services:
   # MinIO Client - Initialize buckets
   minio-init:
     image: minio/mc:latest
-    container_name: wallpaperdb-minio-init
     depends_on:
       minio:
         condition: service_healthy
@@ -61,7 +63,6 @@ services:
   # OpenSearch - Search Engine
   opensearch:
     image: opensearchproject/opensearch:2.11.0
-    container_name: wallpaperdb-opensearch
     restart: unless-stopped
     environment:
       - discovery.type=single-node
@@ -76,8 +77,10 @@ services:
         soft: 65536
         hard: 65536
     ports:
-      - "9200:9200"
-      - "9600:9600"
+      - "${OPENSEARCH_HOST_PORT:-9200}:9200"
+      # Performance analytics port removed — not needed for development.
+      # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+      # - "9600:9600"
     volumes:
       - opensearch-data:/usr/share/opensearch/data
       - ./opensearch/init:/docker-entrypoint-initdb.d
@@ -90,21 +93,24 @@ services:
   # OpenSearch Dashboards
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.11.0
-    container_name: wallpaperdb-opensearch-dashboards
     restart: unless-stopped
-    ports:
-      - "5601:5601"
+    # Dashboard port removed — accessible via Caddy at /opensearch-dashboards in Phase 8.
+    # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+    # ports:
+    #   - "5601:5601"
     environment:
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+      # Caddy sub-path support: Dashboards rewrites all internal URLs to include this prefix.
+      SERVER_BASEPATH: /opensearch-dashboards
+      SERVER_REWRITEBASEPATH: "true"
     depends_on:
       opensearch:
         condition: service_healthy
 
   # NATS - Message Queue
   nats:
-    image: nats:latest
-    container_name: wallpaperdb-nats
+    image: nats:2-alpine
     restart: unless-stopped
     command:
       - "-js"
@@ -112,8 +118,10 @@ services:
       - "8222"
       - "--store_dir=/data"
     ports:
-      - "4222:4222"
-      - "8222:8222"
+      - "${NATS_HOST_PORT:-4222}:4222"
+      # Monitoring port removed — accessible via Caddy at /nats in Phase 8.
+      # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+      # - "8222:8222"
     volumes:
       - nats-data:/data
     healthcheck:
@@ -122,17 +130,33 @@ services:
       timeout: 5s
       retries: 5
 
+  # NATS Setup - One-shot stream initialization (mirrors minio-init pattern)
+  nats-setup:
+    image: natsio/nats-box:latest
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      - NATS_SERVER=nats://nats:4222
+    volumes:
+      - ./nats/init:/scripts:ro
+    entrypoint: ["/scripts/setup-streams.sh"]
+    restart: on-failure
+
   # pgAdmin - Database Administration
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: wallpaperdb-pgadmin
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
       PGADMIN_CONFIG_SERVER_MODE: "False"
-    ports:
-      - "5050:80"
+      # Caddy sub-path support: pgAdmin serves all routes under this prefix.
+      SCRIPT_NAME: /pgadmin
+    # pgAdmin port removed — accessible via Caddy at /pgadmin in Phase 8.
+    # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+    # ports:
+    #   - "5050:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
       - ./postgres/pgadmin-servers.json:/pgadmin4/servers.json:ro
@@ -143,11 +167,10 @@ services:
   # Redis - Distributed Rate Limiting
   redis:
     image: redis:7-alpine
-    container_name: wallpaperdb-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -159,15 +182,19 @@ services:
   # Grafana LGTM Stack - All-in-one observability (Loki, Grafana, Tempo, Mimir)
   lgtm:
     image: grafana/otel-lgtm:latest
-    container_name: wallpaperdb-lgtm
     restart: unless-stopped
     ports:
-      - "3000:3000"   # Grafana
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
+      # Grafana port removed — accessible via Caddy at /grafana in Phase 8.
+      # Uncomment for direct access without Caddy (conflicts in multi-worktree setups):
+      # - "3000:3000"
+      - "${OTEL_GRPC_HOST_PORT:-4317}:4317"   # OTLP gRPC
+      - "${OTEL_HTTP_HOST_PORT:-4318}:4318"   # OTLP HTTP
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Caddy sub-path support: Grafana serves all routes under /grafana.
+      - GF_SERVER_ROOT_URL=http://localhost:${INGRESS_PORT:-8000}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
     volumes:
       - lgtm-data:/data
       - ./grafana/dashboards:/otel-lgtm/custom-dashboards
@@ -190,4 +217,4 @@ volumes:
 
 networks:
   default:
-    name: wallpaperdb-network
+    name: ${COMPOSE_PROJECT_NAME:-wallpaperdb}_network

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 3005",
+    "dev": "docker compose -p $COMPOSE_PROJECT_NAME -f ../../infra/docker-compose.apps.yml watch web",
     "build": "tsc && vite build",
     "preview": "vite preview --port 3005",
     "format": "biome format --write .",

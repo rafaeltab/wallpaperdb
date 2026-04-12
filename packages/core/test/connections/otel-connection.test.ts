@@ -5,11 +5,12 @@ import { OtelConnection } from "../../src/connections/otel-connection.js";
 import type { OtelConfig } from "../../src/connections/types.js";
 
 describe("OtelConnection (Integration)", () => {
-  let createdSdks: NodeSDK[] = [];
+  let createdSdks: (NodeSDK | null)[] = [];
 
   afterEach(async () => {
     // Cleanup any SDKs created during tests
     for (const sdk of createdSdks) {
+      if (!sdk) continue;
       try {
         await shutdownOtelSdk(sdk);
       } catch {
@@ -39,6 +40,7 @@ describe("OtelConnection (Integration)", () => {
     it("should apply custom options", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-service-custom",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config, {
@@ -57,6 +59,7 @@ describe("OtelConnection (Integration)", () => {
     it("should shutdown SDK on close", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-service-shutdown",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config);
@@ -74,6 +77,7 @@ describe("OtelConnection (Integration)", () => {
     it("should wrap pre-initialized SDK", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-service-wrapped",
+        otelEndpoint: "http://localhost:4318",
       };
 
       // Create SDK outside connection (simulates otel-init.ts pattern)
@@ -93,6 +97,7 @@ describe("OtelConnection (Integration)", () => {
     it("should not shutdown external SDK on close", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-service-external",
+        otelEndpoint: "http://localhost:4318",
       };
 
       // Create SDK outside connection
@@ -112,7 +117,7 @@ describe("OtelConnection (Integration)", () => {
     });
 
     it("should throw if accessing before initialize", () => {
-      const config: OtelConfig = { otelServiceName: "test" };
+      const config: OtelConfig = { otelServiceName: "test", otelEndpoint: "http://localhost:4318" };
       const connection = new OtelConnection(config);
 
       expect(() => connection.getClient()).toThrow();
@@ -123,6 +128,7 @@ describe("OtelConnection (Integration)", () => {
     it("should return true when initialized", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-health",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config);
@@ -139,6 +145,7 @@ describe("OtelConnection (Integration)", () => {
     it("should return false when not initialized", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-health-not-init",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config);
@@ -152,6 +159,7 @@ describe("OtelConnection (Integration)", () => {
     it("should be idempotent - same SDK returned on multiple initialize calls", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-idempotent",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config);
@@ -170,6 +178,7 @@ describe("OtelConnection (Integration)", () => {
     it("should be safe to call close multiple times", async () => {
       const config: OtelConfig = {
         otelServiceName: "test-multiple-close",
+        otelEndpoint: "http://localhost:4318",
       };
 
       const connection = new OtelConnection(config);

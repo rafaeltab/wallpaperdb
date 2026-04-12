@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RedisConfigSchema = z.object({
-  redisHost: z.string().default("localhost"),
+  redisHost: z.string().min(1).default("localhost"),
   redisPort: z.number().int().positive().default(6379),
   redisPassword: z.string().optional(),
   redisEnabled: z.boolean().default(true),

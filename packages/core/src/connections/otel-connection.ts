@@ -18,7 +18,7 @@ export interface OtelConnectionOptions {
    * When provided, the connection wraps the existing SDK instead of creating a new one.
    * The connection will NOT shutdown this SDK on close() (external lifecycle).
    */
-  existingSdk?: NodeSDK;
+  existingSdk?: NodeSDK | null;
 }
 
 /**
@@ -65,8 +65,14 @@ export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
     }
 
     // Pattern A: Create SDK in connection
-    // Default endpoint if not provided (for testing/development)
-    const endpoint = this.config.otelEndpoint || "http://localhost:4318";
+    if (!this.config.otelEndpoint) {
+      throw new Error(
+        "OTEL_EXPORTER_OTLP_ENDPOINT is required when using OtelConnection. " +
+        "Set the environment variable or disable OTEL."
+      );
+    }
+
+    const endpoint = this.config.otelEndpoint;
 
     const traceExporter = new OTLPTraceExporter({
       url: `${endpoint}/v1/traces`,

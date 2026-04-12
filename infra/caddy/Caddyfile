@@ -1,0 +1,91 @@
+# WallpaperDB Caddy Ingress
+#
+# Provides a single host port ({$INGRESS_PORT}) with path-prefix routing to all
+# application services and infrastructure admin UIs.
+#
+# Port scheme (per worktree slot):
+#   Slot 0  →  INGRESS_PORT=8000
+#   Slot 1  →  INGRESS_PORT=8010
+#   Slot N  →  INGRESS_PORT=8000 + N*10
+#
+# Service routing summary:
+#   /ingestor/*               → ingestor:3001          (prefix stripped)
+#   /media/*                  → media:3003             (prefix stripped)
+#   /gateway/*                → gateway:3004           (prefix stripped)
+#   /variant-generator/*      → variant-generator:3006 (prefix stripped)
+#   /web/*                    → web:3005               (prefix kept — Vite base=/web)
+#   /grafana/*                → lgtm:3000              (prefix kept — GF_SERVER_SERVE_FROM_SUB_PATH)
+#   /minio/*                  → minio:9001             (prefix kept — MinIO console)
+#   /pgadmin/*                → pgadmin:80             (prefix kept — SCRIPT_NAME=/pgadmin)
+#   /opensearch-dashboards/*  → opensearch-dashboards:5601 (prefix kept — SERVER_BASEPATH)
+#   /nats/*                   → nats:8222              (prefix stripped — plain HTTP API)
+
+:{$INGRESS_PORT} {
+
+    # -------------------------------------------------------------------------
+    # Application services
+    # These services have no knowledge of a path prefix; Caddy strips it before
+    # forwarding so they receive requests at their own root paths.
+    # -------------------------------------------------------------------------
+
+    handle_path /ingestor/* {
+        reverse_proxy ingestor:3001
+    }
+
+    handle_path /media/* {
+        reverse_proxy media:3003
+    }
+
+    handle_path /gateway/* {
+        reverse_proxy gateway:3004
+    }
+
+    handle_path /variant-generator/* {
+        reverse_proxy variant-generator:3006
+    }
+
+    # -------------------------------------------------------------------------
+    # Web frontend
+    # Vite is configured with base: '/web' (VITE_BASE_PATH=/web).
+    # The prefix is kept so that asset URLs (/web/assets/...) round-trip correctly.
+    # -------------------------------------------------------------------------
+
+    handle /web/* {
+        reverse_proxy web:3005
+    }
+
+    # Redirect bare /web to /web/ so the SPA entry point loads cleanly.
+    redir /web /web/ permanent
+
+    # -------------------------------------------------------------------------
+    # Admin UIs
+    # Each UI is configured via environment variables to understand its sub-path
+    # (see infra/docker-compose.yml). The prefix is preserved when proxying.
+    # -------------------------------------------------------------------------
+
+    # Grafana LGTM — GF_SERVER_SERVE_FROM_SUB_PATH=true
+    handle /grafana/* {
+        reverse_proxy lgtm:3000
+    }
+
+    # MinIO Console — MINIO_BROWSER_REDIRECT_URL=.../minio
+    # Note: MinIO console sub-path support is a known risk (see plan known risks #1).
+    handle /minio/* {
+        reverse_proxy minio:9001
+    }
+
+    # pgAdmin — SCRIPT_NAME=/pgadmin
+    handle /pgadmin/* {
+        reverse_proxy pgadmin:80
+    }
+
+    # OpenSearch Dashboards — SERVER_BASEPATH=/opensearch-dashboards
+    handle /opensearch-dashboards/* {
+        reverse_proxy opensearch-dashboards:5601
+    }
+
+    # NATS Monitoring HTTP API — no sub-path config, prefix stripped
+    handle_path /nats/* {
+        reverse_proxy nats:8222
+    }
+}

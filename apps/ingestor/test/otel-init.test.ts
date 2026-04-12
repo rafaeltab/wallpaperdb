@@ -28,11 +28,13 @@ describe("OTEL Initialization", () => {
     });
 
     it("should return null when no endpoint is provided", () => {
+        // When otelEndpoint is empty string (Zod requires url), createOtelSdk returns null
         const config: OtelConfig = {
-            otelEndpoint: undefined,
+            otelEndpoint: "" as unknown as string, // bypass TS to test runtime behavior
             otelServiceName: "ingestor",
         };
-        const sdk = initializeOtel(config);
+        const sdk = initializeOtel(config as any);
+        // initializeOtel checks for falsy otelEndpoint
         expect(sdk).toBeNull();
         expect(getOtelSdk()).toBeNull();
     });

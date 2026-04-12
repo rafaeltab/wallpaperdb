@@ -25,9 +25,13 @@ export interface OtelOptions {
  * });
  * ```
  */
-export function createOtelSdk(config: OtelConfig, options: OtelOptions = {}): NodeSDK {
-  // Default endpoint if not provided (for testing/development)
-  const endpoint = config.otelEndpoint || "http://localhost:4318";
+export function createOtelSdk(config: OtelConfig, options: OtelOptions = {}): NodeSDK | null {
+  if (!config.otelEndpoint) {
+    console.log("OpenTelemetry disabled: OTEL_EXPORTER_OTLP_ENDPOINT not set");
+    return null;
+  }
+
+  const endpoint = config.otelEndpoint;
 
   const traceExporter = new OTLPTraceExporter({
     url: `${endpoint}/v1/traces`,
@@ -60,6 +64,7 @@ export function createOtelSdk(config: OtelConfig, options: OtelOptions = {}): No
 /**
  * Shuts down an OpenTelemetry SDK instance.
  */
-export async function shutdownOtelSdk(sdk: NodeSDK): Promise<void> {
+export async function shutdownOtelSdk(sdk: NodeSDK | null): Promise<void> {
+  if (!sdk) return;
   await sdk.shutdown();
 }

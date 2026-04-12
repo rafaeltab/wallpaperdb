@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "docker compose -p $COMPOSE_PROJECT_NAME -f ../../infra/docker-compose.apps.yml watch gateway",
     "gen:swagger": "tsx src/gen_swagger.ts",
     "build": "node --experimental-strip-types esbuild.config.ts",
     "build:docker": "docker build -t wallpaperdb-gateway:latest -f Dockerfile ../..",

@@ -94,7 +94,7 @@ export function loadConfig(): Config {
 
   const raw = {
     // Server
-    port: parseIntEnv(process.env.PORT, 3004), // Different port from other services
+    port: parseIntEnv(process.env.PORT, 3006), // Different port from other services
     nodeEnv,
 
     // S3/MinIO

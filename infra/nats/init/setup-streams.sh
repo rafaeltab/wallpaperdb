@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Setup all required NATS JetStream streams for WallpaperDB
 # Run this after starting the NATS infrastructure
 
@@ -19,7 +19,7 @@ create_stream_if_not_exists() {
 
   echo "Checking stream: $stream_name"
 
-  if nats stream info "$stream_name" --server "$NATS_SERVER" &>/dev/null; then
+  if nats stream info "$stream_name" --server "$NATS_SERVER" >/dev/null 2>&1; then
     echo "  ✓ Stream $stream_name already exists"
   else
     echo "  → Creating stream $stream_name with subjects: $subjects"

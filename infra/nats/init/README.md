@@ -32,14 +32,6 @@ make nats-setup-streams
 NATS_SERVER=nats://other-host:4222 ./infra/nats/init/setup-streams.sh
 ```
 
-### `create-wallpaper-stream.sh`
-Creates only the WALLPAPER stream.
-
-**Usage:**
-```bash
-./infra/nats/init/create-wallpaper-stream.sh
-```
-
 ## Stream Definitions
 
 ### WALLPAPER Stream

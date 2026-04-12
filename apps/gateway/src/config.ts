@@ -65,7 +65,7 @@ export function loadConfig(): Config {
     nodeEnv,
 
     // OpenSearch
-    opensearchUrl: getEnv('OPENSEARCH_URL', 'http://localhost:9200'),
+    opensearchUrl: process.env.OPENSEARCH_URL,
     opensearchIndex: getEnv('OPENSEARCH_INDEX', 'wallpapers'),
     opensearchPassword: getEnv('OPENSEARCH_PASSWORD'),
     opensearchUsername: getEnv('OPENSEARCH_USERNAME'),
@@ -75,8 +75,8 @@ export function loadConfig(): Config {
     natsStream: getEnv('NATS_STREAM', 'WALLPAPER'),
 
     // Redis
-    redisHost: getEnv('REDIS_HOST', 'localhost'),
-    redisPort: parseIntEnv(process.env.REDIS_PORT, 6379),
+    redisHost: process.env.REDIS_HOST,
+    redisPort: parseIntEnv(process.env.REDIS_PORT),
     redisPassword: process.env.REDIS_PASSWORD,
     redisEnabled: getEnv('REDIS_ENABLED', 'true') === 'true',
 

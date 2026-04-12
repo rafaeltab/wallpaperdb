@@ -1,6 +1,9 @@
 .turbo
 node_modules
 
+# Worktree slot assignment output
+.worktree
+
 # Environment files
 .env
 .env.local

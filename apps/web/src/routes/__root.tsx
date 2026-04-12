@@ -18,7 +18,10 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootLayout() {
   const routerState = useRouterState();
 
-  // Check if we're on the wallpaper details page
+  // Check if we're on the wallpaper details page.
+  // NOTE: TanStack Router strips the basepath (VITE_BASE_PATH) from location.pathname in
+  // router state, so this check works correctly regardless of sub-path deployment.
+  // e.g. at basepath="/web", navigating to /web/wallpapers/123 → pathname is /wallpapers/123.
   const isWallpaperDetailsPage = routerState.location.pathname.startsWith('/wallpapers/');
 
   const handleClose = () => {

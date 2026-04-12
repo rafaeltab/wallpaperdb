@@ -5,8 +5,6 @@ export default defineConfig({
 	out: "./drizzle",
 	dialect: "postgresql",
 	dbCredentials: {
-		url:
-			process.env.DATABASE_URL ??
-			"postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_media",
+		url: process.env.DATABASE_URL ?? (() => { throw new Error('DATABASE_URL environment variable is required') })(),
 	},
 });

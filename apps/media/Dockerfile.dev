@@ -1,0 +1,34 @@
+# Development Dockerfile for @wallpaperdb/media
+#
+# Build context: repo root (pass -f apps/media/Dockerfile.dev to docker build)
+# The entire monorepo is copied so workspace dependencies are available.
+# node_modules are baked into the image; the entrypoint re-installs if
+# pnpm-lock.yaml changes (e.g. via docker compose watch sync).
+
+FROM node:22-alpine
+
+# System dependencies required by native packages (sharp, pg, etc.)
+RUN apk update && apk add --no-cache libc6-compat
+
+# Set up pnpm via corepack (version must match packageManager in root package.json)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@10.18.3 --activate
+
+WORKDIR /app
+
+# Copy the entire monorepo (build context is repo root)
+COPY . .
+
+# Install all workspace dependencies and record the lockfile hash so the
+# entrypoint can detect changes and re-install when the lockfile is synced.
+RUN pnpm install --frozen-lockfile && \
+    sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
+
+# Install the shared entrypoint script
+RUN cp scripts/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
+
+WORKDIR /app/apps/media
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["pnpm", "exec", "tsx", "watch", "src/index.ts"]

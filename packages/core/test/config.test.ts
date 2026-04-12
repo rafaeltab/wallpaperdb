@@ -97,11 +97,23 @@ describe("Config Schemas", () => {
   });
 
   describe("RedisConfigSchema", () => {
-    it("should validate valid config with defaults", () => {
+    it("should apply defaults for missing fields", () => {
       const config = RedisConfigSchema.parse({});
 
       expect(config.redisHost).toBe("localhost");
       expect(config.redisPort).toBe(6379);
+      expect(config.redisEnabled).toBe(true);
+      expect(config.redisPassword).toBeUndefined();
+    });
+
+    it("should validate valid config with explicit fields", () => {
+      const config = RedisConfigSchema.parse({
+        redisHost: "redis.example.com",
+        redisPort: 6380,
+      });
+
+      expect(config.redisHost).toBe("redis.example.com");
+      expect(config.redisPort).toBe(6380);
       expect(config.redisEnabled).toBe(true);
       expect(config.redisPassword).toBeUndefined();
     });
@@ -139,6 +151,19 @@ describe("Config Schemas", () => {
           otelServiceName: "",
         })
       ).toThrow();
+    });
+
+    it("should accept missing otelEndpoint", () => {
+      const config = OtelConfigSchema.parse({});
+      expect(config.otelEndpoint).toBeUndefined();
+      expect(config.otelServiceName).toBe("wallpaperdb");
+    });
+
+    it("should apply default service name", () => {
+      const config = OtelConfigSchema.parse({
+        otelEndpoint: "http://localhost:4318",
+      });
+      expect(config.otelServiceName).toBe("wallpaperdb");
     });
   });
 });
@@ -313,12 +338,13 @@ describe("Config Composition Utilities", () => {
         port: 8080,
         nodeEnv: "production",
         redisHost: "redis.local",
+        redisPort: 6379,
       });
 
       expect(result.port).toBe(8080);
       expect(result.nodeEnv).toBe("production");
       expect(result.redisHost).toBe("redis.local");
-      expect(result.redisPort).toBe(6379); // default
+      expect(result.redisPort).toBe(6379);
       expect(result.customField).toBe("custom"); // default
     });
   });

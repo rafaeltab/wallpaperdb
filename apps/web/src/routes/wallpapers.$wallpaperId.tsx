@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useParams } from '@tanstack/react-router';
-import { ChevronDown, ChevronUp, Download, PanelRight, Share } from 'lucide-react';
+import { ChevronDown, Download, PanelRight, Share } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -266,16 +266,6 @@ export function WallpaperDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Mobile peek indicator */}
-      {isMobile && !isPanelOpen && (
-        <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2">
-          <Button variant="secondary" onClick={() => setIsPanelOpen(true)} className="shadow-lg">
-            <ChevronUp className="mr-2 h-4 w-4" />
-            View Details
-          </Button>
-        </div>
-      )}
 
       {/* Metadata panel */}
       <Sheet open={isPanelOpen} onOpenChange={setIsPanelOpen}>

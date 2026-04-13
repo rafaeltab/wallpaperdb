@@ -5,7 +5,9 @@ import {
   ChevronUp,
   Copy,
   Loader2,
+  Play,
   RefreshCw,
+  Square,
   X,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -27,7 +29,10 @@ export interface UploadQueueToastProps {
   };
   progress: number;
   isPaused: boolean;
+  isStopped?: boolean;
   pausedUntil: number | null;
+  onStopQueue?: () => void;
+  onResumeQueue?: () => void;
   onRetryFailed: () => void;
   onClearCompleted: () => void;
   onNavigateToUpload: () => void;
@@ -55,7 +60,10 @@ export function UploadQueueToast({
   counts,
   progress,
   isPaused,
+  isStopped = false,
   pausedUntil,
+  onStopQueue,
+  onResumeQueue,
   onRetryFailed,
   onClearCompleted,
   onNavigateToUpload,
@@ -64,13 +72,14 @@ export function UploadQueueToast({
   const timeRemaining = useCountdown(pausedUntil);
 
   const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isComplete = !isUploading && !isPaused;
+  const isComplete = !isUploading && !isPaused && !isStopped;
   const hasFailures = counts.failed > 0;
   const completedCount = counts.success + counts.failed + counts.duplicate;
 
-  // Determine header text
   let headerText = '';
-  if (isPaused && timeRemaining) {
+  if (isStopped) {
+    headerText = 'Stopped';
+  } else if (isPaused && timeRemaining) {
     headerText = `Paused (resuming in ${timeRemaining})`;
   } else if (isPaused) {
     headerText = 'Paused';
@@ -79,6 +88,9 @@ export function UploadQueueToast({
   } else {
     headerText = `Uploading ${completedCount}/${counts.total} files`;
   }
+
+  const showStopButton = !isStopped && (isUploading || isPaused);
+  const showResumeButton = isStopped;
 
   const handleToastClick = (e: React.MouseEvent) => {
     // Don't navigate if clicking on buttons
@@ -177,6 +189,36 @@ export function UploadQueueToast({
 
       {/* Action buttons */}
       <div className="flex gap-2">
+        {showStopButton && (
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="stop-queue-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStopQueue?.();
+            }}
+            className="flex-1"
+          >
+            <Square className="h-3 w-3 mr-1" />
+            Stop
+          </Button>
+        )}
+        {showResumeButton && (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="resume-queue-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onResumeQueue?.();
+            }}
+            className="flex-1"
+          >
+            <Play className="h-3 w-3 mr-1" />
+            Resume
+          </Button>
+        )}
         {hasFailures && (
           <Button
             variant="outline"

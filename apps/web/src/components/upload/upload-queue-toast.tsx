@@ -8,10 +8,11 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import type { QueuedFile } from '@/contexts/upload-queue-context';
+import { useCountdown } from '@/hooks/useCountdown';
 import { cn } from '@/lib/utils';
 
 export interface UploadQueueToastProps {
@@ -49,16 +50,6 @@ function getStatusIcon(status: QueuedFile['status']) {
   }
 }
 
-function formatTimeRemaining(ms: number): string {
-  const seconds = Math.max(0, Math.ceil(ms / 1000));
-  if (seconds >= 60) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-  }
-  return `${seconds}s`;
-}
-
 export function UploadQueueToast({
   files,
   counts,
@@ -70,34 +61,12 @@ export function UploadQueueToast({
   onNavigateToUpload,
 }: UploadQueueToastProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState<string | null>(null);
+  const timeRemaining = useCountdown(pausedUntil);
 
   const isUploading = counts.uploading > 0 || counts.pending > 0;
   const isComplete = !isUploading && !isPaused;
   const hasFailures = counts.failed > 0;
   const completedCount = counts.success + counts.failed + counts.duplicate;
-
-  // Update countdown timer
-  useEffect(() => {
-    if (!pausedUntil) {
-      setTimeRemaining(null);
-      return;
-    }
-
-    const updateRemaining = () => {
-      const remaining = pausedUntil - Date.now();
-      if (remaining <= 0) {
-        setTimeRemaining(null);
-      } else {
-        setTimeRemaining(formatTimeRemaining(remaining));
-      }
-    };
-
-    updateRemaining();
-    const interval = setInterval(updateRemaining, 1000);
-
-    return () => clearInterval(interval);
-  }, [pausedUntil]);
 
   // Determine header text
   let headerText = '';

@@ -1,4 +1,4 @@
-import { Play, RefreshCw, Square, Trash2 } from 'lucide-react';
+import { Check, Play, RefreshCw, Square, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface UploadActionButtonsProps {

@@ -406,6 +406,79 @@ describe('UploadQueueToast', () => {
     expect(onResumeQueue).toHaveBeenCalledTimes(1);
   });
 
+  it('applies stopped variant to progress bar when queue is stopped', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={50}
+        isPaused={false}
+        isStopped={true}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    expect(indicator).toHaveAttribute('data-variant', 'stopped');
+  });
+
+  it('applies default variant to progress bar when queue is running', () => {
+    const files: QueuedFile[] = [
+      createQueuedFile('1', 'uploading'),
+      createQueuedFile('2', 'pending'),
+    ];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 2, pending: 1, uploading: 1, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={false}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    expect(indicator).not.toHaveAttribute('data-variant', 'stopped');
+  });
+
+  it('applies default variant to progress bar when queue is paused', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+    const pausedUntil = Date.now() + 45000;
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={true}
+        isStopped={false}
+        pausedUntil={pausedUntil}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+    expect(indicator).not.toHaveAttribute('data-variant', 'stopped');
+  });
+
   it('shows Stopped header text when queue is stopped', () => {
     const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
 

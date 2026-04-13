@@ -115,7 +115,7 @@ function UploadPage() {
                   <span className="text-muted-foreground">{statusText}</span>
                   <span className="font-medium">{progress}%</span>
                 </div>
-                <Progress value={progress} />
+                <Progress value={progress} variant={state.isStopped ? 'stopped' : 'default'} />
               </div>
 
               {/* Status Summary */}

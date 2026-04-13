@@ -1,26 +1,26 @@
 {
-  "name": "@wallpaperdb/test-logger",
-  "version": "0.1.0",
-  "type": "module",
-  "private": true,
-  "exports": {
-    ".": {
-      "import": "./src/index.ts",
-      "types": "./src/index.ts"
-    }
-  },
-  "scripts": {
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write .",
-    "check-types": "tsc --noEmit"
-  },
-  "dependencies": {
-    "pino": "^9.0.0"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "typescript": "^5.7.2"
-  }
+	"name": "@wallpaperdb/test-logger",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"exports": {
+		".": {
+			"import": "./src/index.ts",
+			"types": "./src/index.ts"
+		}
+	},
+	"scripts": {
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"lint": "biome lint .",
+		"lint:fix": "biome lint --write .",
+		"check-types": "tsc --noEmit"
+	},
+	"dependencies": {
+		"pino": "^9.0.0"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.8",
+		"typescript": "^5.7.2"
+	}
 }

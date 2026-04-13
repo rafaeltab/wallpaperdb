@@ -239,11 +239,7 @@ describe('Dynamic Items Integration', () => {
 
         return (
           <div>
-            <MuuriGrid
-              layoutDuration={300}
-              onLayoutStart={onLayoutStart}
-              onLayoutEnd={onLayoutEnd}
-            >
+            <MuuriGrid layoutDuration={300} onLayoutStart={onLayoutStart} onLayoutEnd={onLayoutEnd}>
               {items.map((id) => (
                 <MuuriItem key={id}>
                   <div data-testid={`item-${id}`} style={{ width: 100, height: 100 }}>

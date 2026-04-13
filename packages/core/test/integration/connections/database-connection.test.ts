@@ -170,9 +170,7 @@ describe("DatabaseConnection (Integration)", () => {
 
     const connection = new DatabaseConnection(config, testSchema);
 
-    expect(() => connection.getClient()).toThrow(
-      "DatabaseConnection not initialized"
-    );
+    expect(() => connection.getClient()).toThrow("DatabaseConnection not initialized");
   });
 
   it("should cleanup properly on close", async () => {

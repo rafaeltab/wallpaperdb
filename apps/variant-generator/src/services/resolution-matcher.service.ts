@@ -84,10 +84,7 @@ export class ResolutionMatcherService {
         span.setAttribute('category', category);
         span.setAttribute('total_presets', presets.length);
         span.setAttribute('applicable_presets', applicable.length);
-        span.setAttribute(
-          'preset_labels',
-          applicable.map((p) => p.label).join(', ')
-        );
+        span.setAttribute('preset_labels', applicable.map((p) => p.label).join(', '));
 
         recordCounter('variant_generator.presets_selected', applicable.length, {
           category,

@@ -68,7 +68,7 @@ export class OtelConnection extends BaseConnection<NodeSDK, OtelConfig> {
     if (!this.config.otelEndpoint) {
       throw new Error(
         "OTEL_EXPORTER_OTLP_ENDPOINT is required when using OtelConnection. " +
-        "Set the environment variable or disable OTEL."
+          "Set the environment variable or disable OTEL."
       );
     }
 

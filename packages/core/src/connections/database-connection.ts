@@ -1,8 +1,8 @@
-import { instrumentDrizzleClient } from '@kubiks/otel-drizzle';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import pg from 'pg';
-import { BaseConnection } from './base/base-connection.js';
-import type { DatabaseConfig } from './types.js';
+import { instrumentDrizzleClient } from "@kubiks/otel-drizzle";
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import pg from "pg";
+import { BaseConnection } from "./base/base-connection.js";
+import type { DatabaseConfig } from "./types.js";
 
 const { Pool } = pg;
 
@@ -55,7 +55,7 @@ export type DatabaseClient<TSchema extends Record<string, unknown> = Record<stri
  * ```
  */
 export class DatabaseConnection<
-  TSchema extends Record<string, unknown> = Record<string, never>
+  TSchema extends Record<string, unknown> = Record<string, never>,
 > extends BaseConnection<DatabaseClient<TSchema>, DatabaseConfig> {
   constructor(
     config: DatabaseConfig,
@@ -78,7 +78,7 @@ export class DatabaseConnection<
     // Instrument Drizzle client for OpenTelemetry tracing
     if (this.options.enableOtel !== false) {
       instrumentDrizzleClient(db, {
-        dbSystem: this.options.dbSystem ?? 'postgresql',
+        dbSystem: this.options.dbSystem ?? "postgresql",
         captureQueryText: this.options.captureQueryText ?? true,
         maxQueryTextLength: this.options.maxQueryTextLength ?? 2000,
       });
@@ -99,13 +99,13 @@ export class DatabaseConnection<
   async checkHealth(): Promise<boolean> {
     try {
       const connection = await this.getClient().pool.connect();
-      await connection.query('SELECT 1');
+      await connection.query("SELECT 1");
       connection.release();
       return true;
     } catch (error) {
       // Keep console.error here as this is low-level infrastructure
       // and may be called before logger is initialized
-      console.error('Database health check failed:', error);
+      console.error("Database health check failed:", error);
       return false;
     }
   }

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Schema for the wallpaper.variant.uploaded event.
@@ -14,7 +14,7 @@ import { z } from 'zod';
  */
 export const WallpaperVariantUploadedEventSchema = z.object({
   eventId: z.string().min(1),
-  eventType: z.literal('wallpaper.variant.uploaded'),
+  eventType: z.literal("wallpaper.variant.uploaded"),
   timestamp: z.string().datetime(),
 
   variant: z.object({
@@ -27,7 +27,7 @@ export const WallpaperVariantUploadedEventSchema = z.object({
     aspectRatio: z.number().positive(), // width / height
 
     // Format information
-    format: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    format: z.enum(["image/jpeg", "image/png", "image/webp"]),
 
     // File metadata
     fileSizeBytes: z.number().int().positive(),
@@ -43,4 +43,4 @@ export const WallpaperVariantUploadedEventSchema = z.object({
 
 export type WallpaperVariantUploadedEvent = z.infer<typeof WallpaperVariantUploadedEventSchema>;
 
-export const WALLPAPER_VARIANT_UPLOADED_SUBJECT = 'wallpaper.variant.uploaded' as const;
+export const WALLPAPER_VARIANT_UPLOADED_SUBJECT = "wallpaper.variant.uploaded" as const;

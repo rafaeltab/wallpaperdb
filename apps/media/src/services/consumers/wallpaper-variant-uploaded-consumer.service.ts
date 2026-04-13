@@ -51,10 +51,7 @@ export class WallpaperVariantUploadedConsumerService extends BaseEventConsumer<
     super(consumerConfig);
   }
 
-  async handleEvent(
-    event: WallpaperVariantUploadedEvent,
-    _context: MessageContext
-  ): Promise<void> {
+  async handleEvent(event: WallpaperVariantUploadedEvent, _context: MessageContext): Promise<void> {
     console.log(
       `[WallpaperVariantUploadedConsumer] Processing event ${event.eventId} for wallpaper ${event.variant.wallpaperId}`
     );

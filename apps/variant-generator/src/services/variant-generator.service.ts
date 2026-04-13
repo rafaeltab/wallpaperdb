@@ -42,7 +42,9 @@ export class VariantGeneratorService {
    * @param wallpaper - The wallpaper.uploaded event data
    * @returns Array of generated variant metadata
    */
-  async generateVariants(wallpaper: WallpaperUploadedEvent['wallpaper']): Promise<GeneratedVariant[]> {
+  async generateVariants(
+    wallpaper: WallpaperUploadedEvent['wallpaper']
+  ): Promise<GeneratedVariant[]> {
     return await withSpan(
       'variant-generator.generate_all',
       {

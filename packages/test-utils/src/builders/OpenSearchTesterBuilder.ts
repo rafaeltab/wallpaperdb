@@ -155,7 +155,10 @@ export class OpenSearchTesterBuilder extends BaseTesterBuilder<
             username: started.getUsername(),
           };
 
-          logger.debug({ networked: endpoint.networked, fromHost: endpoint.fromHost }, 'OpenSearch started');
+          logger.debug(
+            { networked: endpoint.networked, fromHost: endpoint.fromHost },
+            'OpenSearch started'
+          );
         });
 
         this.addDestroyHook(async () => {

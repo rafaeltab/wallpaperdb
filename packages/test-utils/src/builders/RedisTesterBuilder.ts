@@ -159,7 +159,14 @@ export class RedisTesterBuilder extends BaseTesterBuilder<
             options: options,
           };
 
-          logger.debug({ networked: endpoints.networked, fromHost: endpoints.fromHost, fromHostDockerInternal: endpoints.fromHostDockerInternal }, 'Redis started');
+          logger.debug(
+            {
+              networked: endpoints.networked,
+              fromHost: endpoints.fromHost,
+              fromHostDockerInternal: endpoints.fromHostDockerInternal,
+            },
+            'Redis started'
+          );
         });
 
         this.addDestroyHook(async () => {

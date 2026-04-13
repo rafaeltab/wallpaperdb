@@ -79,10 +79,7 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
         `[WallpaperUploadedConsumer] Successfully generated ${variants.length} variants for wallpaper ${event.wallpaper.id} in ${durationMs}ms`
       );
     } catch (error) {
-      console.error(
-        `[WallpaperUploadedConsumer] Failed to process event ${event.eventId}:`,
-        error
-      );
+      console.error(`[WallpaperUploadedConsumer] Failed to process event ${event.eventId}:`, error);
       throw error; // Re-throw for retry logic
     }
   }

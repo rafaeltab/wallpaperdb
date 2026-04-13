@@ -140,6 +140,7 @@ export function UploadQueueToast({
       {/* Progress bar */}
       <Progress
         value={progress}
+        variant={isStopped ? 'stopped' : 'default'}
         className="h-2 mb-3"
         aria-valuenow={progress}
         aria-valuemin={0}

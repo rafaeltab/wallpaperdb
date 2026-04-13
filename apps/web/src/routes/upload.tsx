@@ -1,18 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import {
-  AlertCircle,
-  Check,
-  Copy,
-  FileImage,
-  FileVideo,
-  Loader2,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react';
+import { AlertCircle, Check, Copy, FileImage, FileVideo, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
 import { UploadDropZone } from '@/components/upload/upload-drop-zone';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
@@ -46,13 +37,23 @@ function getStatusIcon(status: string) {
 }
 
 function UploadPage() {
-  const { state, counts, progress, addFiles, clearCompleted, retryFailed, cancelAll } =
-    useUploadQueue();
+  const {
+    state,
+    counts,
+    progress,
+    addFiles,
+    clearCompleted,
+    retryFailed,
+    cancelAll,
+    stopQueue,
+    resumeQueue,
+  } = useUploadQueue();
   const queryClient = useQueryClient();
 
   const hasFiles = state.files.length > 0;
   const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isComplete = hasFiles && !isUploading && !state.isPaused;
+  const isRunning = isUploading && !state.isPaused && !state.isStopped;
+  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
   const hasFailures = counts.failed > 0;
 
   const handleFilesSelected = (files: File[]) => {
@@ -98,13 +99,15 @@ function UploadPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {isUploading
-                      ? `Uploading ${counts.success + counts.failed + counts.duplicate}/${counts.total}...`
-                      : state.isPaused
-                        ? 'Paused (rate limited)'
-                        : isComplete
-                          ? 'Upload complete'
-                          : 'Ready to upload'}
+                    {state.isStopped
+                      ? 'Stopped'
+                      : isUploading
+                        ? `Uploading ${counts.success + counts.failed + counts.duplicate}/${counts.total}...`
+                        : state.isPaused
+                          ? 'Paused (rate limited)'
+                          : isComplete
+                            ? 'Upload complete'
+                            : 'Ready to upload'}
                   </span>
                   <span className="font-medium">{progress}%</span>
                 </div>
@@ -170,29 +173,18 @@ function UploadPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2">
-                {hasFailures && (
-                  <Button
-                    variant="outline"
-                    onClick={retryFailed}
-                    disabled={isUploading}
-                    className="flex-1"
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Retry failed
-                  </Button>
-                )}
-                {isComplete && (
-                  <Button variant="outline" onClick={clearCompleted} className="flex-1">
-                    <Check className="mr-2 h-4 w-4" />
-                    Clear completed
-                  </Button>
-                )}
-                <Button variant="ghost" onClick={handleClearAll} disabled={isUploading}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clear all
-                </Button>
-              </div>
+              <UploadActionButtons
+                isRunning={isRunning}
+                isPaused={state.isPaused}
+                isStopped={state.isStopped}
+                hasFailures={hasFailures}
+                isComplete={isComplete}
+                onStopQueue={stopQueue}
+                onResumeQueue={resumeQueue}
+                onClearAll={handleClearAll}
+                onRetryFailed={retryFailed}
+                onClearCompleted={clearCompleted}
+              />
             </div>
           )}
         </CardContent>

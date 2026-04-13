@@ -55,6 +55,7 @@ export interface UploadQueueState {
   files: QueuedFile[];
   isProcessing: boolean;
   isPaused: boolean;
+  isStopped: boolean;
   pausedUntil: number | null;
 }
 
@@ -66,7 +67,8 @@ export type UploadQueueAction =
   | { type: 'UPLOAD_FAILED'; payload: { fileId: string; error: UploadError } }
   | { type: 'UPLOAD_DUPLICATE'; payload: { fileId: string; response: UploadResponse } }
   | { type: 'PAUSE_QUEUE'; payload: { pausedUntil: number } }
-  | { type: 'RESUME_QUEUE' }
+  | { type: 'RESUME_QUEUE'; payload?: { now?: number } }
+  | { type: 'STOP_QUEUE' }
   | { type: 'CLEAR_COMPLETED' }
   | { type: 'RETRY_FAILED' }
   | { type: 'CANCEL_ALL' }
@@ -82,6 +84,7 @@ const initialState: UploadQueueState = {
   files: [],
   isProcessing: false,
   isPaused: false,
+  isStopped: false,
   pausedUntil: null,
 };
 
@@ -122,32 +125,44 @@ export function uploadQueueReducer(
 
     case 'UPLOAD_SUCCESS': {
       const { fileId, response } = action.payload;
-      return {
-        ...state,
-        files: state.files.map((f) =>
-          f.id === fileId ? { ...f, status: 'success' as const, response } : f
-        ),
-      };
+      const updatedFiles = state.files.map((f) =>
+        f.id === fileId ? { ...f, status: 'success' as const, response } : f
+      );
+      if (
+        state.isStopped &&
+        !updatedFiles.some((f) => f.status === 'pending' || f.status === 'uploading')
+      ) {
+        return { ...initialState };
+      }
+      return { ...state, files: updatedFiles };
     }
 
     case 'UPLOAD_FAILED': {
       const { fileId, error } = action.payload;
-      return {
-        ...state,
-        files: state.files.map((f) =>
-          f.id === fileId ? { ...f, status: 'failed' as const, error } : f
-        ),
-      };
+      const updatedFiles = state.files.map((f) =>
+        f.id === fileId ? { ...f, status: 'failed' as const, error } : f
+      );
+      if (
+        state.isStopped &&
+        !updatedFiles.some((f) => f.status === 'pending' || f.status === 'uploading')
+      ) {
+        return { ...initialState };
+      }
+      return { ...state, files: updatedFiles };
     }
 
     case 'UPLOAD_DUPLICATE': {
       const { fileId, response } = action.payload;
-      return {
-        ...state,
-        files: state.files.map((f) =>
-          f.id === fileId ? { ...f, status: 'duplicate' as const, response } : f
-        ),
-      };
+      const updatedFiles = state.files.map((f) =>
+        f.id === fileId ? { ...f, status: 'duplicate' as const, response } : f
+      );
+      if (
+        state.isStopped &&
+        !updatedFiles.some((f) => f.status === 'pending' || f.status === 'uploading')
+      ) {
+        return { ...initialState };
+      }
+      return { ...state, files: updatedFiles };
     }
 
     case 'PAUSE_QUEUE': {
@@ -159,7 +174,32 @@ export function uploadQueueReducer(
       };
     }
 
+    case 'STOP_QUEUE': {
+      return {
+        ...state,
+        isStopped: true,
+        isPaused: false,
+      };
+    }
+
     case 'RESUME_QUEUE': {
+      if (state.isStopped) {
+        const now = action.payload?.now ?? Date.now();
+        const insideRateLimit = state.pausedUntil !== null && state.pausedUntil > now;
+        if (insideRateLimit) {
+          return {
+            ...state,
+            isStopped: false,
+            isPaused: true,
+          };
+        }
+        return {
+          ...state,
+          isStopped: false,
+          isPaused: false,
+          pausedUntil: null,
+        };
+      }
       return {
         ...state,
         isPaused: false,
@@ -209,6 +249,8 @@ interface UploadQueueContextValue {
   clearCompleted: () => void;
   retryFailed: () => void;
   cancelAll: () => void;
+  stopQueue: () => void;
+  resumeQueue: () => void;
   // Computed values
   counts: {
     total: number;
@@ -278,10 +320,30 @@ export function UploadQueueProvider({ children }: UploadQueueProviderProps) {
     }
   }, []);
 
+  const stopQueue = useCallback(() => {
+    dispatch({ type: 'STOP_QUEUE' });
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const resumeQueue = useCallback(() => {
+    const now = Date.now();
+    dispatch({ type: 'RESUME_QUEUE', payload: { now } });
+    if (state.pausedUntil && state.pausedUntil > now) {
+      const remainingMs = state.pausedUntil - now;
+      resumeTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'RESUME_QUEUE', payload: { now: Date.now() } });
+        dispatch({ type: 'RETRY_FAILED' });
+      }, remainingMs);
+    }
+  }, [state.pausedUntil]);
+
   // Process the next pending file
   const processNextFile = useCallback(async () => {
-    // Don't process if paused
-    if (state.isPaused) return;
+    // Don't process if paused or stopped
+    if (state.isPaused || state.isStopped) return;
 
     // Find the next pending file
     const nextFile = state.files.find((f) => f.status === 'pending');
@@ -345,18 +407,18 @@ export function UploadQueueProvider({ children }: UploadQueueProviderProps) {
         },
       });
     }
-  }, [state.files, state.isPaused]);
+  }, [state.files, state.isPaused, state.isStopped]);
 
   // Auto-process pending files
   useEffect(() => {
     const hasPending = state.files.some((f) => f.status === 'pending');
     const hasUploading = state.files.some((f) => f.status === 'uploading');
 
-    // Start processing if we have pending files and not currently uploading
-    if (hasPending && !hasUploading && !state.isPaused) {
+    // Start processing if we have pending files and not currently uploading and not stopped
+    if (hasPending && !hasUploading && !state.isPaused && !state.isStopped) {
       processNextFile();
     }
-  }, [state.files, state.isPaused, processNextFile]);
+  }, [state.files, state.isPaused, state.isStopped, processNextFile]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -373,6 +435,8 @@ export function UploadQueueProvider({ children }: UploadQueueProviderProps) {
     clearCompleted,
     retryFailed,
     cancelAll,
+    stopQueue,
+    resumeQueue,
     counts,
     progress,
   };

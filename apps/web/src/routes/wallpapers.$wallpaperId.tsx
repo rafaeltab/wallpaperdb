@@ -213,7 +213,7 @@ export function WallpaperDetailPage() {
                     <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuContent align="end" className="w-auto">
                   <DropdownMenuLabel>Select variant</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {wallpaper.variants.map((variant, index) => {

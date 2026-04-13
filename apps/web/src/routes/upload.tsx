@@ -7,6 +7,8 @@ import { UploadDropZone } from '@/components/upload/upload-drop-zone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { MAX_FILES_PER_BATCH, useUploadQueue } from '@/contexts/upload-queue-context';
+import { useCountdown } from '@/hooks/useCountdown';
+import { getQueueStatusText } from '@/lib/utils/upload-queue';
 import { cn } from '@/lib/utils';
 
 export const Route = createFileRoute('/upload')({
@@ -55,6 +57,18 @@ function UploadPage() {
   const isRunning = isUploading && !state.isPaused && !state.isStopped;
   const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
   const hasFailures = counts.failed > 0;
+  const timeRemaining = useCountdown(state.pausedUntil);
+
+  const statusText = getQueueStatusText({
+    isStopped: state.isStopped,
+    isPaused: state.isPaused,
+    isUploading,
+    isComplete,
+    hasFiles,
+    completedCount: counts.success + counts.failed + counts.duplicate,
+    totalCount: counts.total,
+    timeRemaining,
+  });
 
   const handleFilesSelected = (files: File[]) => {
     const remainingCapacity = MAX_FILES_PER_BATCH - state.files.length;
@@ -98,17 +112,7 @@ function UploadPage() {
               {/* Overall Progress */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {state.isStopped
-                      ? 'Stopped'
-                      : isUploading
-                        ? `Uploading ${counts.success + counts.failed + counts.duplicate}/${counts.total}...`
-                        : state.isPaused
-                          ? 'Paused (rate limited)'
-                          : isComplete
-                            ? 'Upload complete'
-                            : 'Ready to upload'}
-                  </span>
+                  <span className="text-muted-foreground">{statusText}</span>
                   <span className="font-medium">{progress}%</span>
                 </div>
                 <Progress value={progress} />

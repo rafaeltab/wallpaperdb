@@ -6,7 +6,16 @@ import { useUploadQueue } from '@/contexts/upload-queue-context';
 const AUTO_DISMISS_DELAY = 5000; // 5 seconds
 
 export function UploadQueueToastManager() {
-  const { state, counts, progress, clearCompleted, retryFailed, cancelAll } = useUploadQueue();
+  const {
+    state,
+    counts,
+    progress,
+    clearCompleted,
+    retryFailed,
+    cancelAll,
+    stopQueue,
+    resumeQueue,
+  } = useUploadQueue();
   const router = useRouter();
   const [isVisible, setIsVisible] = useState(false);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,7 +79,10 @@ export function UploadQueueToastManager() {
         counts={counts}
         progress={progress}
         isPaused={state.isPaused}
+        isStopped={state.isStopped}
         pausedUntil={state.pausedUntil}
+        onStopQueue={stopQueue}
+        onResumeQueue={resumeQueue}
         onRetryFailed={retryFailed}
         onClearCompleted={handleDismiss}
         onNavigateToUpload={handleNavigateToUpload}

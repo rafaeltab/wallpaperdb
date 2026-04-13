@@ -236,4 +236,195 @@ describe('UploadQueueToast', () => {
 
     expect(onClearCompleted).toHaveBeenCalledTimes(1);
   });
+
+  it('shows Stop button when queue is running', () => {
+    const files: QueuedFile[] = [
+      createQueuedFile('1', 'uploading'),
+      createQueuedFile('2', 'pending'),
+    ];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 2, pending: 1, uploading: 1, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={false}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('stop-queue-button')).toBeInTheDocument();
+  });
+
+  it('shows Stop button when queue is paused', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+    const pausedUntil = Date.now() + 45000;
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={true}
+        isStopped={false}
+        pausedUntil={pausedUntil}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.getByTestId('stop-queue-button')).toBeInTheDocument();
+  });
+
+  it('does not show Stop button when queue is stopped', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={true}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('stop-queue-button')).not.toBeInTheDocument();
+  });
+
+  it('clicking Stop dispatches onStopQueue', () => {
+    const onStopQueue = vi.fn();
+    const files: QueuedFile[] = [
+      createQueuedFile('1', 'uploading'),
+      createQueuedFile('2', 'pending'),
+    ];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 2, pending: 1, uploading: 1, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={false}
+        pausedUntil={null}
+        onStopQueue={onStopQueue}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('stop-queue-button'));
+    expect(onStopQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Stopped label and Resume button when queue is stopped', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={true}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Stopped')).toBeInTheDocument();
+    expect(screen.getByTestId('resume-queue-button')).toBeInTheDocument();
+  });
+
+  it('does not show Resume button when queue is running', () => {
+    const files: QueuedFile[] = [
+      createQueuedFile('1', 'uploading'),
+      createQueuedFile('2', 'pending'),
+    ];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 2, pending: 1, uploading: 1, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={false}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('resume-queue-button')).not.toBeInTheDocument();
+  });
+
+  it('clicking Resume dispatches onResumeQueue', () => {
+    const onResumeQueue = vi.fn();
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={true}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={onResumeQueue}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('resume-queue-button'));
+    expect(onResumeQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Stopped header text when queue is stopped', () => {
+    const files: QueuedFile[] = [createQueuedFile('1', 'pending')];
+
+    render(
+      <UploadQueueToast
+        files={files}
+        counts={{ total: 1, pending: 1, uploading: 0, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        isStopped={true}
+        pausedUntil={null}
+        onStopQueue={vi.fn()}
+        onResumeQueue={vi.fn()}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Stopped')).toBeInTheDocument();
+  });
 });

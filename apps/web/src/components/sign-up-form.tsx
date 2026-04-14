@@ -84,12 +84,15 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
 
     const basePath = import.meta.env.VITE_BASE_PATH || '';
     const signUpUrl = `${basePath}/sign-up`.replace(/\/+/g, '/');
+    const redirectComplete =
+      `${basePath}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`.replace(/\/+/g, '/') ||
+      '/';
 
     try {
       await signUp.authenticateWithRedirect({
         strategy,
         redirectUrl: signUpUrl,
-        redirectUrlComplete: redirectUrl,
+        redirectUrlComplete: redirectComplete,
       });
     } catch (err: unknown) {
       const message =

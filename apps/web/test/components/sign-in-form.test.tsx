@@ -4,17 +4,21 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('@clerk/clerk-react', () => ({
   useSignIn: vi.fn(),
-  useClerk: vi.fn(),
 }));
 
-import { useClerk, useSignIn } from '@clerk/clerk-react';
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
+    <a href={to} {...props}>{children}</a>
+  ),
+}));
+
+import { useSignIn } from '@clerk/clerk-react';
 import { SignInForm } from '@/components/sign-in-form';
 
 describe('SignInForm', () => {
   const mockCreate = vi.fn();
   const mockSetActive = vi.fn();
   const mockAuthenticateWithRedirect = vi.fn();
-  const mockRedirectToSignUp = vi.fn();
   const mockOnSuccess = vi.fn();
 
   function mockSignInReturn(overrides: Record<string, unknown> = {}) {
@@ -32,7 +36,6 @@ describe('SignInForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useSignIn as Mock).mockReturnValue(mockSignInReturn());
-    (useClerk as Mock).mockReturnValue({ redirectToSignUp: mockRedirectToSignUp });
   });
 
   it('renders the sign-in form with email and password fields', () => {
@@ -53,7 +56,9 @@ describe('SignInForm', () => {
   it('renders a link to the sign-up page', () => {
     render(<SignInForm onSuccess={mockOnSuccess} />);
 
-    expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument();
+    const signUpLink = screen.getByRole('link', { name: /sign up/i });
+    expect(signUpLink).toBeInTheDocument();
+    expect(signUpLink).toHaveAttribute('href', '/sign-up');
   });
 
   it('shows loading state when sign-in is in progress', async () => {
@@ -107,12 +112,10 @@ describe('SignInForm', () => {
     });
   });
 
-  it('calls redirectToSignUp when sign-up link is clicked', async () => {
-    const user = userEvent.setup();
+  it('sign-up link navigates to /sign-up', async () => {
     render(<SignInForm onSuccess={mockOnSuccess} />);
 
-    await user.click(screen.getByRole('button', { name: /sign up/i }));
-
-    expect(mockRedirectToSignUp).toHaveBeenCalledOnce();
+    const signUpLink = screen.getByRole('link', { name: /sign up/i });
+    expect(signUpLink).toHaveAttribute('href', '/sign-up');
   });
 });

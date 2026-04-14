@@ -39,6 +39,7 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
         await setActive({ session: result.createdSessionId });
         onSuccess(redirectUrl);
       } else {
+        await signUp.prepareEmailAddressVerification();
         setPendingVerification(true);
       }
     } catch (err: unknown) {

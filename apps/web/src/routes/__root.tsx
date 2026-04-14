@@ -7,6 +7,7 @@ import { HeaderLayout } from '@/components/header-layout';
 import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { UserMenu } from '@/components/user-menu';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -56,7 +57,9 @@ function RootLayout() {
                     <X className="h-4 w-4" />
                   </Button>
                 </>
-              ) : null
+              ) : (
+                <UserMenu />
+              )
             }
           />
         </header>

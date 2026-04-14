@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearTokenProvider, setTokenProvider } from '@/lib/auth/token-provider';
 import { uploadWallpaperWithDetails } from '@/lib/api/ingestor';
 
 // Mock fetch globally
@@ -171,5 +172,65 @@ describe('uploadWallpaperWithDetails', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.type).toBe('server');
+  });
+
+  describe('auth headers', () => {
+    afterEach(() => {
+      clearTokenProvider();
+    });
+
+    it('includes Authorization header when token is available', async () => {
+      setTokenProvider(async () => 'test-jwt-token');
+
+      const responseData = createSuccessResponse('processing');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(responseData),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).toHaveProperty('Authorization', 'Bearer test-jwt-token');
+    });
+
+    it('does not include Authorization header when no token provider is set', async () => {
+      clearTokenProvider();
+
+      const responseData = createSuccessResponse('processing');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(responseData),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).not.toHaveProperty('Authorization');
+    });
+
+    it('does not include Authorization header when token provider returns null', async () => {
+      setTokenProvider(async () => null);
+
+      const responseData = createSuccessResponse('processing');
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(responseData),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).not.toHaveProperty('Authorization');
+    });
   });
 });

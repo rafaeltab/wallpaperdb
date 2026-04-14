@@ -1,4 +1,4 @@
-import { useSignIn } from '@clerk/clerk-react';
+import { useClerk, useSignUp } from '@clerk/clerk-react';
 import { Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link } from '@tanstack/react-router';
@@ -7,16 +7,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
-interface SignInFormProps {
+interface SignUpFormProps {
   onSuccess: (redirectTo: string) => void;
 }
 
-export function SignInForm({ onSuccess }: SignInFormProps) {
-  const { isLoaded, signIn } = useSignIn();
+export function SignUpForm({ onSuccess }: SignUpFormProps) {
+  const { isLoaded, signUp } = useSignUp();
+  const { setActive } = useClerk();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
   const [redirectUrl] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('redirect') || '/';
@@ -30,47 +33,120 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
     setIsSubmitting(true);
 
     try {
-      const result = await signIn.create({ identifier: email, password });
-      await signIn.setActive({ session: result.createdSessionId });
-      onSuccess(redirectUrl);
+      const result = await signUp.create({ emailAddress: email, password });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        onSuccess(redirectUrl);
+      } else {
+        setPendingVerification(true);
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'errors' in err
           ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign in failed. Please try again.';
+          : 'Sign up failed. Please try again.';
       setError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleOAuthSignIn = async (strategy: 'oauth_google' | 'oauth_github') => {
+  const handleVerification = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!isLoaded) return;
+
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await signUp.attemptEmailAddressVerification({ code: verificationCode });
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        onSuccess(redirectUrl);
+      } else {
+        setError('Verification failed. Please try again.');
+      }
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'errors' in err
+          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
+          : 'Verification failed. Please try again.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOAuthSignUp = async (strategy: 'oauth_google' | 'oauth_github') => {
     if (!isLoaded) return;
     setError(null);
 
     const basePath = import.meta.env.VITE_BASE_PATH || '';
-    const signInUrl = `${basePath}/sign-in`.replace(/\/+/g, '/');
+    const signUpUrl = `${basePath}/sign-up`.replace(/\/+/g, '/');
 
     try {
-      await signIn.authenticateWithRedirect({
+      await signUp.authenticateWithRedirect({
         strategy,
-        redirectUrl: signInUrl,
+        redirectUrl: signUpUrl,
         redirectUrlComplete: redirectUrl,
       });
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'errors' in err
           ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign in failed. Please try again.';
+          : 'Sign up failed. Please try again.';
       setError(message);
     }
   };
 
+  if (pendingVerification) {
+    return (
+      <Card className="border-0 shadow-none sm:border sm:shadow-sm">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Verify your email</CardTitle>
+          <CardDescription>
+            We sent a verification code to {email}. Enter it below to complete your sign-up.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleVerification} className="grid gap-4">
+            {error && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                {error}
+              </div>
+            )}
+            <Field>
+              <FieldLabel htmlFor="verificationCode">Verification code</FieldLabel>
+              <Input
+                id="verificationCode"
+                type="text"
+                placeholder="Enter verification code"
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value)}
+                required
+                disabled={isSubmitting}
+                autoComplete="one-time-code"
+              />
+            </Field>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Verifying...' : 'Verify email'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-0 shadow-none sm:border sm:shadow-sm">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>Enter your credentials to access your account</CardDescription>
+        <CardTitle className="text-2xl">Sign up</CardTitle>
+        <CardDescription>Create an account to get started</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
@@ -100,17 +176,17 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
             <Input
               id="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="Create a password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isSubmitting}
-              autoComplete="current-password"
+              autoComplete="new-password"
             />
           </Field>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+            {isSubmitting ? 'Signing up...' : 'Sign up'}
           </Button>
         </form>
 
@@ -124,9 +200,9 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignIn('oauth_google')}
+            onClick={() => handleOAuthSignUp('oauth_google')}
             disabled={isSubmitting}
-            aria-label="Sign in with Google"
+            aria-label="Sign up with Google"
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -151,9 +227,9 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignIn('oauth_github')}
+            onClick={() => handleOAuthSignUp('oauth_github')}
             disabled={isSubmitting}
-            aria-label="Sign in with GitHub"
+            aria-label="Sign up with GitHub"
           >
             <svg
               className="mr-2 h-4 w-4"
@@ -168,12 +244,12 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
         </div>
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
+          Already have an account?{' '}
           <Link
-            to="/sign-up"
+            to="/sign-in"
             className="text-primary underline underline-offset-4 hover:text-primary/80"
           >
-            Sign up
+            Sign in
           </Link>
         </p>
       </CardContent>

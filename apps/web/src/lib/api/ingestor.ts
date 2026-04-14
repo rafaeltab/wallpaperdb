@@ -1,3 +1,5 @@
+import { getAuthToken } from '@/lib/auth/token-provider';
+
 const INGESTOR_URL = import.meta.env.VITE_INGESTOR_URL || 'http://localhost:3001';
 
 export interface UploadResponse {
@@ -46,9 +48,16 @@ export async function uploadWallpaperWithDetails(
   formData.append('userId', userId);
 
   try {
+    const token = await getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${INGESTOR_URL}/upload`, {
       method: 'POST',
       body: formData,
+      headers,
     });
 
     if (response.ok) {
@@ -132,10 +141,16 @@ export async function uploadWallpaper(file: File, userId: string): Promise<Uploa
   formData.append('file', file);
   formData.append('userId', userId);
 
+  const token = await getAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${INGESTOR_URL}/upload`, {
     method: 'POST',
     body: formData,
-    // Future: Add auth headers
+    headers,
   });
 
   if (!response.ok) {

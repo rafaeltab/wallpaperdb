@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearTokenProvider, setTokenProvider } from '@/lib/auth/token-provider';
-import { uploadWallpaperWithDetails } from '@/lib/api/ingestor';
+import { uploadWallpaper, uploadWallpaperWithDetails } from '@/lib/api/ingestor';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -174,6 +174,23 @@ describe('uploadWallpaperWithDetails', () => {
     expect(result.error?.type).toBe('server');
   });
 
+  it('sends userId in FormData', async () => {
+    const responseData = createSuccessResponse('processing');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(responseData),
+      headers: new Headers(),
+    });
+
+    await uploadWallpaperWithDetails(createMockFile(), 'demo_user_42');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = init.body as FormData;
+    expect(body.get('userId')).toBe('demo_user_42');
+  });
+
   describe('auth headers', () => {
     afterEach(() => {
       clearTokenProvider();
@@ -231,6 +248,173 @@ describe('uploadWallpaperWithDetails', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
       expect(fetchOptions.headers).not.toHaveProperty('Authorization');
+    });
+
+    it('uses refreshed token on subsequent requests', async () => {
+      let callCount = 0;
+      setTokenProvider(async () => {
+        callCount++;
+        return callCount === 1 ? 'first-token' : 'second-token';
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+      await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+      const options1 = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(options1.headers).toHaveProperty('Authorization', 'Bearer first-token');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+      await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+      const options2 = mockFetch.mock.calls[1][1] as RequestInit;
+      expect(options2.headers).toHaveProperty('Authorization', 'Bearer second-token');
+    });
+  });
+});
+
+describe('uploadWallpaper', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns UploadResponse on success', async () => {
+    const responseData = createSuccessResponse('processing');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(responseData),
+      headers: new Headers(),
+    });
+
+    const result = await uploadWallpaper(createMockFile(), 'user_1');
+
+    expect(result.wallpaperId).toBe('wlpr_123');
+    expect(result.userId).toBe('user_1');
+    expect(result.uploadState).toBe('processing');
+  });
+
+  it('throws on server error', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ detail: 'Internal server error' }),
+      headers: new Headers(),
+    });
+
+    await expect(uploadWallpaper(createMockFile(), 'user_1')).rejects.toThrow('Internal server error');
+  });
+
+  it('sends userId in FormData', async () => {
+    const responseData = createSuccessResponse('processing');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(responseData),
+      headers: new Headers(),
+    });
+
+    await uploadWallpaper(createMockFile(), 'demo_user_42');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = init.body as FormData;
+    expect(body.get('userId')).toBe('demo_user_42');
+  });
+
+  describe('auth headers', () => {
+    afterEach(() => {
+      clearTokenProvider();
+    });
+
+    it('includes Authorization header when token is available', async () => {
+      setTokenProvider(async () => 'test-jwt-token');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaper(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).toHaveProperty('Authorization', 'Bearer test-jwt-token');
+    });
+
+    it('does not include Authorization header when no token provider is set', async () => {
+      clearTokenProvider();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaper(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).not.toHaveProperty('Authorization');
+    });
+
+    it('does not include Authorization header when token provider returns null', async () => {
+      setTokenProvider(async () => null);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+
+      await uploadWallpaper(createMockFile(), 'user_1');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(fetchOptions.headers).not.toHaveProperty('Authorization');
+    });
+
+    it('uses refreshed token on subsequent requests', async () => {
+      let callCount = 0;
+      setTokenProvider(async () => {
+        callCount++;
+        return callCount === 1 ? 'first-token' : 'second-token';
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+      await uploadWallpaper(createMockFile(), 'user_1');
+      const options1 = mockFetch.mock.calls[0][1] as RequestInit;
+      expect(options1.headers).toHaveProperty('Authorization', 'Bearer first-token');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(createSuccessResponse('processing')),
+        headers: new Headers(),
+      });
+      await uploadWallpaper(createMockFile(), 'user_1');
+      const options2 = mockFetch.mock.calls[1][1] as RequestInit;
+      expect(options2.headers).toHaveProperty('Authorization', 'Bearer second-token');
     });
   });
 });

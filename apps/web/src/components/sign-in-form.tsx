@@ -50,12 +50,15 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
 
     const basePath = import.meta.env.VITE_BASE_PATH || '';
     const signInUrl = `${basePath}/sign-in`.replace(/\/+/g, '/');
+    const redirectComplete =
+      `${basePath}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`.replace(/\/+/g, '/') ||
+      '/';
 
     try {
       await signIn.authenticateWithRedirect({
         strategy,
         redirectUrl: signInUrl,
-        redirectUrlComplete: redirectUrl,
+        redirectUrlComplete: redirectComplete,
       });
     } catch (err: unknown) {
       const message =

@@ -102,6 +102,6 @@ describe('UserMenu', () => {
     const signOutItem = screen.getByRole('menuitem', { name: /sign out/i });
     await user.click(signOutItem);
 
-    expect(mockSignOut).toHaveBeenCalledOnce();
+    expect(mockSignOut).toHaveBeenCalledWith({ redirectUrl: '/web/' });
   });
 });

@@ -1,4 +1,5 @@
 import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
+import { Link } from '@tanstack/react-router';
 import { LogOut, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,10 +21,10 @@ export function UserMenu() {
   if (!isSignedIn) {
     return (
       <Button asChild variant="ghost" size="sm">
-        <a href="/sign-in">
+        <Link to="/sign-in">
           <LogIn className="mr-2 h-4 w-4" />
           Sign in
-        </a>
+        </Link>
       </Button>
     );
   }

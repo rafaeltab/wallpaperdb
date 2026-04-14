@@ -19,6 +19,7 @@ import { SignUpForm } from '@/components/sign-up-form';
 describe('SignUpForm', () => {
   const mockCreate = vi.fn();
   const mockAuthenticateWithRedirect = vi.fn();
+  const mockPrepareEmailAddressVerification = vi.fn();
   const mockSetActive = vi.fn();
   const mockOnSuccess = vi.fn();
 
@@ -28,6 +29,7 @@ describe('SignUpForm', () => {
       signUp: {
         create: mockCreate,
         authenticateWithRedirect: mockAuthenticateWithRedirect,
+        prepareEmailAddressVerification: mockPrepareEmailAddressVerification,
       },
       ...overrides,
     };
@@ -176,5 +178,45 @@ describe('SignUpForm', () => {
     });
 
     vi.stubGlobal('location', originalLocation);
+  });
+
+  it('shows verification form and calls prepareEmailAddressVerification when sign-up requires verification', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'missing_requirements',
+    });
+    mockPrepareEmailAddressVerification.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    render(<SignUpForm onSuccess={mockOnSuccess} />);
+
+    await user.type(screen.getByLabelText(/email/i), 'new@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
+    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
+
+    await waitFor(() => {
+      expect(mockPrepareEmailAddressVerification).toHaveBeenCalledOnce();
+      expect(screen.getByText(/verify your email/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays error when prepareEmailAddressVerification fails', async () => {
+    mockCreate.mockResolvedValue({
+      status: 'missing_requirements',
+    });
+    mockPrepareEmailAddressVerification.mockRejectedValue({
+      errors: [{ message: 'Could not send verification email' }],
+    });
+
+    const user = userEvent.setup();
+    render(<SignUpForm onSuccess={mockOnSuccess} />);
+
+    await user.type(screen.getByLabelText(/email/i), 'new@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
+    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/could not send verification email/i);
+    });
   });
 });

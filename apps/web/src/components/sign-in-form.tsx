@@ -48,10 +48,13 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
     if (!isLoaded) return;
     setError(null);
 
+    const basePath = import.meta.env.VITE_BASE_PATH || '';
+    const signInUrl = `${basePath}/sign-in`.replace(/\/+/g, '/');
+
     try {
       await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: window.location.origin + (import.meta.env.VITE_BASE_PATH || ''),
+        redirectUrl: signInUrl,
         redirectUrlComplete: redirectUrl,
       });
     } catch (err: unknown) {

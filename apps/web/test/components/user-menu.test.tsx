@@ -8,6 +8,14 @@ vi.mock('@clerk/clerk-react', () => ({
   useClerk: vi.fn(),
 }));
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { UserMenu } from '@/components/user-menu';
 
@@ -25,7 +33,7 @@ describe('UserMenu', () => {
 
     render(<UserMenu />);
 
-    expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
   });
 
   it('returns null when auth is not loaded', () => {

@@ -42,7 +42,13 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => void signOut()}>
+        <DropdownMenuItem
+          onClick={() => {
+            const basePath = import.meta.env.VITE_BASE_PATH || '';
+            const homeUrl = `${basePath}/`.replace(/\/+/g, '/');
+            void signOut({ redirectUrl: homeUrl });
+          }}
+        >
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>

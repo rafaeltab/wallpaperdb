@@ -490,6 +490,7 @@ function buildServiceOverrides() {
 				`http://localhost:${ctx.ports.INGRESS_PORT}/media`,
 		},
 		"apps/variant-generator": {},
+		"apps/color-extractor": {},
 		"apps/web": {
 			VITE_BASE_PATH: "/web",
 			VITE_GATEWAY_URL: (ctx) =>
@@ -644,6 +645,7 @@ function generateBrunoEnv(repoRoot, ports) {
 		baseUrl: `http://localhost:${ingressPort}/ingestor`,
 		mediaBaseUrl: `http://localhost:${ingressPort}/media`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,
+		colorExtractorBaseUrl: `http://localhost:${ingressPort}/color-extractor`,
 	};
 
 	const lines = example.split("\n");

@@ -634,6 +634,63 @@ function generateAppEnvFiles(repoRoot, ports) {
 	});
 }
 
+// ─── Bruno Environment Generation ─────────────────────────────────────────────
+
+/**
+ * Generates `api/environments/local.bru` from `api/environments/local.bru.example`,
+ * overriding the dynamic URL variables with ingress-based URLs computed for this
+ * worktree's slot.
+ *
+ * Bruno is an API client that stores request collections in `api/`. Each request
+ * references variables like {{baseUrl}}, {{gatewayBaseUrl}}, and {{mediaBaseUrl}}
+ * that are resolved from the active environment file.
+ *
+ * Idempotent: only writes the file when the content has changed.
+ */
+function generateBrunoEnv(repoRoot, ports) {
+	const examplePath = join(repoRoot, "api", "environments", "local.bru.example");
+	const envPath = join(repoRoot, "api", "environments", "local.bru");
+
+	const example = readFileSafe(examplePath);
+	if (example === null) {
+		console.warn(
+			`\n⚠️  Could not read ${examplePath} — skipping Bruno environment generation.`,
+		);
+		return;
+	}
+
+	const ingressPort = ports.INGRESS_PORT;
+
+	const overrides = {
+		baseUrl: `http://localhost:${ingressPort}/ingestor`,
+		mediaBaseUrl: `http://localhost:${ingressPort}/media`,
+		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,
+	};
+
+	const lines = example.split("\n");
+	const seen = new Set();
+	const updatedLines = lines.map((line) => {
+		const match = line.match(/^(\s*)([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
+		if (match) {
+			const [, indent, key] = match;
+			if (key in overrides) {
+				seen.add(key);
+				return `${indent}${key}: ${overrides[key]}`;
+			}
+		}
+		return line;
+	});
+
+	const newContent = updatedLines.join("\n");
+
+	const existing = readFileSafe(envPath);
+	if (existing === newContent.trimEnd()) {
+		return;
+	}
+
+	writeFileSync(envPath, newContent, "utf8");
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -682,10 +739,12 @@ function main() {
 	const worktreeUnchanged = existingContent === newContent.trim();
 
 	if (worktreeUnchanged) {
-		// .worktree file is up-to-date; still regenerate infra/.env and app
-		// .env files in case they were deleted or example files changed.
+		// .worktree file is up-to-date; still regenerate infra/.env, app
+		// .env files, and Bruno env in case they were deleted or example
+		// files changed.
 		generateInfraEnv(repoRoot, projectName, ports);
 		generateAppEnvFiles(repoRoot, ports);
+		generateBrunoEnv(repoRoot, ports);
 		console.log(
 			`[setup-worktree] Worktree slot ${slot} already assigned. ` +
 				`Ingress: http://localhost:${ports.INGRESS_PORT} — no changes needed.`,
@@ -697,9 +756,10 @@ function main() {
 	// 9. Write .worktree file
 	writeFileSync(worktreeFilePath, newContent, "utf8");
 
-	// 9b. Generate infra/.env and app .env files
+	// 9b. Generate infra/.env, app .env files, and Bruno environment
 	generateInfraEnv(repoRoot, projectName, ports);
 	generateAppEnvFiles(repoRoot, ports);
+	generateBrunoEnv(repoRoot, ports);
 
 	// 10. Summary
 	console.log(

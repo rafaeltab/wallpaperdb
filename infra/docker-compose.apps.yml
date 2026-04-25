@@ -99,6 +99,27 @@ services:
         - action: rebuild
           path: ../pnpm-lock.yaml
 
+  color-extractor:
+    build:
+      context: ..
+      dockerfile: apps/color-extractor/Dockerfile.dev
+    env_file:
+      - path: ../apps/color-extractor/.env
+        required: false
+    develop:
+      watch:
+        - action: sync
+          path: ../apps/color-extractor/src
+          target: /app/apps/color-extractor/src
+        - action: sync+restart
+          path: ../packages
+          target: /app/packages
+        - action: sync
+          path: ../apps/color-extractor/package.json
+          target: /app/apps/color-extractor/package.json
+        - action: rebuild
+          path: ../pnpm-lock.yaml
+
   web:
     build:
       context: ..
@@ -139,6 +160,7 @@ services:
       - media
       - gateway
       - variant-generator
+      - color-extractor
       - web
 
 networks:

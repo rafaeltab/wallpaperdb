@@ -1,0 +1,125 @@
+---
+title: Color Extractor Service
+description: Dominant color palette extraction service for wallpapers
+---
+
+The Color Extractor Service extracts dominant color palettes from stored wallpaper images. It connects to MinIO to read wallpaper files and NATS JetStream for event-driven processing.
+
+**Status:** 🚧 Under Development
+
+## Quick Start
+
+```bash
+# Start infrastructure
+make infra-start
+
+# Run color-extractor in development mode
+make color-extractor-dev
+
+# The service starts on http://localhost:3007
+```
+
+## Architecture
+
+The Color Extractor is a stateless service with no database dependency. It reads wallpaper images from MinIO object storage and extracts dominant color palettes using image processing algorithms.
+
+### Connections
+
+| Connection | Purpose |
+|---|---|
+| MinIO (S3) | Read wallpaper image files |
+| NATS JetStream | Event consumption (future) |
+| OpenTelemetry | Traces and metrics |
+
+### Health Checks
+
+The service exposes two health endpoints:
+
+- **`GET /health`** — Returns the health status of the service and its dependencies (MinIO, NATS, OTel)
+- **`GET /ready`** — Returns whether the service is ready to accept traffic
+
+## Configuration
+
+Environment variables (Zod-validated):
+
+```bash
+# Server
+PORT=3007
+NODE_ENV=development
+
+# MinIO/S3
+S3_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_BUCKET=wallpapers
+S3_REGION=us-east-1
+
+# NATS
+NATS_URL=nats://localhost:4222
+NATS_STREAM=WALLPAPER
+
+# OpenTelemetry
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=wallpaperdb-color-extractor
+```
+
+## Testing
+
+```bash
+make color-extractor-test          # All tests
+make color-extractor-test-watch    # Watch mode
+```
+
+## API Reference
+
+### GET /health
+
+Health check with dependency status.
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "minio": true,
+    "nats": true,
+    "otel": true
+  }
+}
+```
+
+### GET /ready
+
+Readiness probe for Kubernetes.
+
+**Response (200):**
+```json
+{
+  "ready": true
+}
+```
+
+## Deployment
+
+### Docker
+
+```bash
+make color-extractor-docker-build  # Build image
+make color-extractor-docker-run    # Run container
+make color-extractor-docker-logs   # View logs
+make color-extractor-docker-stop   # Stop container
+```
+
+### Caddy Proxy
+
+The service is accessible via the Caddy ingress at `/color-extractor/*`:
+
+```bash
+curl http://localhost:8000/color-extractor/health
+```
+
+## Related Documentation
+
+- [Services Overview](/docs/services) - All services
+- [Package: Core](/docs/packages/core) - Shared infrastructure
+- [Package: Events](/docs/packages/events) - Event schemas

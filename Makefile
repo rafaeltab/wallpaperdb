@@ -7,6 +7,8 @@
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         variant-generator-dev variant-generator-build variant-generator-start variant-generator-test variant-generator-test-watch variant-generator-format variant-generator-lint variant-generator-check \
+        color-extractor-dev color-extractor-build color-extractor-start color-extractor-test color-extractor-test-watch color-extractor-format color-extractor-lint color-extractor-check \
+        color-extractor-docker-build color-extractor-docker-run color-extractor-docker-stop color-extractor-docker-logs \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
@@ -94,6 +96,15 @@ help:
 	@echo "  make variant-generator-format     - Format variant-generator code"
 	@echo "  make variant-generator-lint       - Lint variant-generator code"
 	@echo ""
+	@echo "Color Extractor Service:"
+	@echo "  make color-extractor-dev        - Start color-extractor in development mode"
+	@echo "  make color-extractor-build      - Build color-extractor for production"
+	@echo "  make color-extractor-start      - Start color-extractor in production mode"
+	@echo "  make color-extractor-test       - Run color-extractor tests"
+	@echo "  make color-extractor-test-watch - Run color-extractor tests in watch mode"
+	@echo "  make color-extractor-format     - Format color-extractor code"
+	@echo "  make color-extractor-lint       - Lint color-extractor code"
+	@echo ""
 	@echo "Gateway Service:"
 	@echo "  make gateway-dev        - Start gateway service in development mode"
 	@echo "  make gateway-build      - Build gateway service for production"
@@ -133,6 +144,12 @@ help:
 	@echo "  make ingestor-e2e-test       - Run E2E tests against Docker container"
 	@echo "  make ingestor-e2e-test-watch - Run E2E tests in watch mode"
 	@echo "  make ingestor-e2e-verify     - Verify no app code imports in E2E tests"
+	@echo ""
+	@echo "Color Extractor Docker:"
+	@echo "  make color-extractor-docker-build - Build color-extractor Docker image"
+	@echo "  make color-extractor-docker-run   - Run color-extractor Docker container (uses infra/.env)"
+	@echo "  make color-extractor-docker-stop  - Stop color-extractor Docker container"
+	@echo "  make color-extractor-docker-logs  - View color-extractor Docker container logs"
 	@echo ""
 	@echo "Documentation:"
 	@echo "  make docs-dev       - Start documentation dev server (http://localhost:3002)"
@@ -320,6 +337,67 @@ variant-generator-lint:
 
 variant-generator-check:
 	@turbo run check --filter=@wallpaperdb/variant-generator
+
+# Color Extractor service commands
+color-extractor-dev:
+	@turbo run dev --filter=@wallpaperdb/color-extractor
+
+color-extractor-build:
+	@turbo run build --filter=@wallpaperdb/color-extractor
+
+color-extractor-start:
+	@turbo run start --filter=@wallpaperdb/color-extractor
+
+color-extractor-test:
+	@turbo run test --filter=@wallpaperdb/color-extractor
+
+color-extractor-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/color-extractor
+
+color-extractor-format:
+	@turbo run format --filter=@wallpaperdb/color-extractor
+
+color-extractor-lint:
+	@turbo run lint --filter=@wallpaperdb/color-extractor
+
+color-extractor-check:
+	@turbo run check --filter=@wallpaperdb/color-extractor
+
+# Color Extractor Docker commands
+color-extractor-docker-build:
+	@echo "Building color-extractor Docker image..."
+	@docker build -t $(COMPOSE_PROJECT_NAME)-color-extractor:latest -f apps/color-extractor/Dockerfile .
+	@echo "✓ Docker image built: $(COMPOSE_PROJECT_NAME)-color-extractor:latest"
+
+color-extractor-docker-run:
+	@echo "Starting color-extractor Docker container..."
+	@if [ ! -f infra/.env ]; then \
+		echo "Error: infra/.env file not found. Run 'make infra-start' first."; \
+		exit 1; \
+	fi
+	@. ./infra/.env && docker run --rm -d \
+		-p 3007:3007 \
+		-e NODE_ENV=production \
+		-e PORT=3007 \
+		-e S3_ENDPOINT=http://host.docker.internal:$(MINIO_API_HOST_PORT) \
+		-e S3_ACCESS_KEY_ID=$$MINIO_ROOT_USER \
+		-e S3_SECRET_ACCESS_KEY=$$MINIO_ROOT_PASSWORD \
+		-e S3_BUCKET=wallpapers \
+		-e NATS_URL=nats://host.docker.internal:$(NATS_HOST_PORT) \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:$(OTEL_HTTP_HOST_PORT) \
+		--name $(COMPOSE_PROJECT_NAME)-color-extractor \
+		$(COMPOSE_PROJECT_NAME)-color-extractor:latest
+	@echo "✓ Color Extractor container started"
+	@echo "  Health: http://localhost:$(INGRESS_PORT)/color-extractor/health"
+	@echo "  Ready:  http://localhost:$(INGRESS_PORT)/color-extractor/ready"
+
+color-extractor-docker-stop:
+	@echo "Stopping color-extractor Docker container..."
+	@docker stop $(COMPOSE_PROJECT_NAME)-color-extractor 2>/dev/null || echo "Container not running"
+	@echo "✓ Color Extractor container stopped"
+
+color-extractor-docker-logs:
+	@docker logs -f $(COMPOSE_PROJECT_NAME)-color-extractor
 
 # Gateway service commands
 gateway-dev:

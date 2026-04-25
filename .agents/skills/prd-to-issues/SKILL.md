@@ -86,3 +86,7 @@ Reference by number from the parent PRD:
 </issue-template>
 
 Do NOT close or modify the parent PRD issue.
+
+### 6. Link sub-issues
+
+After creating all issues, link each child issue to the parent PRD as a sub-issue. See [sub-issues skill](../sub-issues/SKILL.md) for the API details. You need numeric issue IDs (not issue numbers) and the repo ID.

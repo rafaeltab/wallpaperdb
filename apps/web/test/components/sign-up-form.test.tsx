@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('@clerk/clerk-react', () => ({
+vi.mock('@clerk/react', () => ({
   useSignUp: vi.fn(),
   useClerk: vi.fn(),
 }));
@@ -18,7 +18,7 @@ vi.mock('@/routes/sso-callback', () => ({
   consumeSsoRedirect: vi.fn(),
 }));
 
-import { useClerk, useSignUp } from '@clerk/clerk-react';
+import { useClerk, useSignUp } from '@clerk/react';
 import { SignUpForm } from '@/components/sign-up-form';
 
 describe('SignUpForm', () => {

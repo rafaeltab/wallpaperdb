@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('@clerk/clerk-react', () => ({
+vi.mock('@clerk/react', () => ({
   useClerk: vi.fn(),
 }));
 
@@ -12,7 +12,7 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-import { useClerk } from '@clerk/clerk-react';
+import { useClerk } from '@clerk/react';
 import { Route, SSOCallbackPage, consumeSsoRedirect, storeSsoRedirect } from '@/routes/sso-callback';
 
 describe('SSOCallbackPage', () => {

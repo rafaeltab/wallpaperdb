@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
-vi.mock('@clerk/clerk-react', () => ({
+vi.mock('@clerk/react', () => ({
   useAuth: vi.fn(),
   useUser: vi.fn(),
   useClerk: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }));
 
-import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
+import { useAuth, useClerk, useUser } from '@clerk/react';
 import { UserMenu } from '@/components/user-menu';
 
 describe('UserMenu', () => {
@@ -79,6 +79,29 @@ describe('UserMenu', () => {
     await user.click(trigger);
 
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument();
+  });
+
+  it('shows disabled Profile link in dropdown when signed in', async () => {
+    (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true });
+    (useUser as Mock).mockReturnValue({
+      isLoaded: true,
+      user: {
+        fullName: 'Jane Smith',
+        imageUrl: 'https://example.com/avatar2.jpg',
+        primaryEmailAddress: { emailAddress: 'jane@example.com' },
+      },
+    });
+
+    const user = userEvent.setup();
+    render(<UserMenu />);
+
+    const trigger = screen.getByRole('button', { name: /jane smith/i });
+    await user.click(trigger);
+
+    const profileItem = screen.getByRole('menuitem', { name: /profile/i });
+    expect(profileItem).toBeInTheDocument();
+    expect(profileItem).toHaveAttribute('aria-disabled', 'true');
+    expect(profileItem).toHaveTextContent('Soon');
   });
 
   it('calls signOut when sign out is clicked', async () => {

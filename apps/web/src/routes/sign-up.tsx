@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { SignUpForm } from '@/components/sign-up-form';
 
@@ -24,11 +24,7 @@ function SignUpPage() {
     <div className="flex min-h-[calc(100svh-var(--header-height))]">
       <div className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-sm">
-          <SignUpForm
-            onSuccess={(redirectTo) => {
-              void navigate({ to: redirectTo });
-            }}
-          />
+          <SignUpForm />
         </div>
       </div>
       <div className="hidden lg:flex lg:flex-1 bg-muted items-center justify-center">

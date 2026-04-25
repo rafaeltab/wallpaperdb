@@ -1,11 +1,12 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import { Link } from '@tanstack/react-router';
-import { LogOut, LogIn } from 'lucide-react';
+import { LogOut, LogIn, UserIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -48,6 +49,12 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        <DropdownMenuItem disabled>
+          <UserIcon className="mr-2 h-4 w-4" />
+          Profile
+          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => void signOut({ redirectUrl: buildUrl('/') })}
         >

@@ -4,38 +4,41 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('@clerk/react', () => ({
   useSignUp: vi.fn(),
-  useClerk: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
     <a href={to} {...props}>{children}</a>
   ),
+  useNavigate: () => vi.fn(),
 }));
 
-vi.mock('@/routes/sso-callback', () => ({
-  storeSsoRedirect: vi.fn(),
-  consumeSsoRedirect: vi.fn(),
-}));
-
-import { useClerk, useSignUp } from '@clerk/react';
+import { useSignUp } from '@clerk/react';
 import { SignUpForm } from '@/components/sign-up-form';
 
 describe('SignUpForm', () => {
-  const mockCreate = vi.fn();
-  const mockAuthenticateWithRedirect = vi.fn();
-  const mockPrepareEmailAddressVerification = vi.fn();
-  const mockSetActive = vi.fn();
-  const mockOnSuccess = vi.fn();
+  const mockPassword = vi.fn();
+  const mockFinalize = vi.fn();
+  const mockSso = vi.fn();
+  const mockReset = vi.fn();
+  const mockSendEmailCode = vi.fn();
+  const mockVerifyEmailCode = vi.fn();
 
   function mockSignUpReturn(overrides: Record<string, unknown> = {}) {
     return {
-      isLoaded: true,
       signUp: {
-        create: mockCreate,
-        authenticateWithRedirect: mockAuthenticateWithRedirect,
-        prepareEmailAddressVerification: mockPrepareEmailAddressVerification,
+        password: mockPassword,
+        finalize: mockFinalize,
+        sso: mockSso,
+        reset: mockReset,
+        status: 'complete',
+        verifications: {
+          sendEmailCode: mockSendEmailCode,
+          verifyEmailCode: mockVerifyEmailCode,
+        },
       },
+      errors: null,
+      fetchStatus: 'idle',
       ...overrides,
     };
   }
@@ -43,11 +46,10 @@ describe('SignUpForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useSignUp as Mock).mockReturnValue(mockSignUpReturn());
-    (useClerk as Mock).mockReturnValue({ setActive: mockSetActive });
   });
 
-  it('renders the sign-up form with email, password, and confirm password fields', () => {
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+  it('renders the sign-up form with email and password fields', () => {
+    render(<SignUpForm />);
 
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
@@ -55,173 +57,259 @@ describe('SignUpForm', () => {
   });
 
   it('renders social login buttons for Google and GitHub', () => {
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     expect(screen.getByRole('button', { name: /sign up with google/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign up with github/i })).toBeInTheDocument();
   });
 
   it('renders a link to the sign-in page', () => {
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('shows loading state when sign-up is in progress', async () => {
-    mockCreate.mockReturnValue(new Promise(() => {}));
+  it('shows loading state when sign-up is in progress', () => {
+    (useSignUp as Mock).mockReturnValue(
+      mockSignUpReturn({ fetchStatus: 'fetching' }),
+    );
 
-    const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
-    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /signing up/i })).toBeDisabled();
-    });
+    expect(screen.getByRole('button', { name: /signing up/i })).toBeDisabled();
   });
 
   it('displays error message when sign-up fails', async () => {
-    mockCreate.mockRejectedValue({
-      errors: [{ message: 'Email address already exists' }],
-    });
+    mockPassword.mockResolvedValue({ error: null });
+    (useSignUp as Mock).mockReturnValue(
+      mockSignUpReturn({
+        errors: {
+          global: [{ code: 'signup_rate_limit_exceeded', message: 'Too many sign up attempts' }],
+          fields: { emailAddress: null, password: null },
+        },
+        signUp: {
+          password: mockPassword,
+          finalize: mockFinalize,
+          sso: mockSso,
+          reset: mockReset,
+          status: 'complete',
+          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+        },
+        fetchStatus: 'idle',
+      }),
+    );
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     await user.type(screen.getByLabelText(/email/i), 'taken@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
     await user.click(screen.getByRole('button', { name: /^sign up$/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/email address already exists/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(/too many sign up attempts/i);
     });
   });
 
-  it('calls onSuccess after successful sign-up', async () => {
-    mockCreate.mockResolvedValue({
-      createdSessionId: 'sess_123',
-      status: 'complete',
-    });
+  it('displays field-level error message', async () => {
+    mockPassword.mockResolvedValue({ error: null });
+    (useSignUp as Mock).mockReturnValue(
+      mockSignUpReturn({
+        errors: {
+          global: null,
+          fields: { emailAddress: { message: 'Invalid email format' }, password: null },
+        },
+        signUp: {
+          password: mockPassword,
+          finalize: mockFinalize,
+          sso: mockSso,
+          reset: mockReset,
+          status: 'complete',
+          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+        },
+        fetchStatus: 'idle',
+      }),
+    );
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
+
+    await user.type(screen.getByLabelText(/email/i), 'bad@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
+    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/invalid email format/i);
+    });
+  });
+
+  it('calls signUp.finalize after successful sign-up', async () => {
+    mockPassword.mockResolvedValue({ error: null });
+    mockFinalize.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    render(<SignUpForm />);
 
     await user.type(screen.getByLabelText(/email/i), 'new@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
     await user.click(screen.getByRole('button', { name: /^sign up$/i }));
 
     await waitFor(() => {
-      expect(mockOnSuccess).toHaveBeenCalledWith('/');
+      expect(mockFinalize).toHaveBeenCalledWith(
+        expect.objectContaining({ navigate: expect.any(Function) }),
+      );
     });
   });
 
-  it('calls authenticateWithRedirect for Google OAuth', async () => {
-    mockAuthenticateWithRedirect.mockResolvedValue(undefined);
+  it('does not call finalize when password returns an error', async () => {
+    mockPassword.mockResolvedValue({ error: { code: 'form_password_pwned' } });
+    mockFinalize.mockResolvedValue(undefined);
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
+
+    await user.type(screen.getByLabelText(/email/i), 'new@example.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
+    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
+
+    await waitFor(() => {
+      expect(mockPassword).toHaveBeenCalled();
+    });
+    expect(mockFinalize).not.toHaveBeenCalled();
+  });
+
+  it('calls signUp.sso for Google OAuth', async () => {
+    mockSso.mockResolvedValue(undefined);
+    mockReset.mockResolvedValue(undefined);
+
+    const user = userEvent.setup();
+    render(<SignUpForm />);
 
     await user.click(screen.getByRole('button', { name: /sign up with google/i }));
 
     await waitFor(() => {
-      expect(mockAuthenticateWithRedirect).toHaveBeenCalledWith(
+      expect(mockReset).toHaveBeenCalled();
+      expect(mockSso).toHaveBeenCalledWith(
         expect.objectContaining({ strategy: 'oauth_google' }),
       );
     });
   });
 
-  it('calls authenticateWithRedirect for GitHub OAuth', async () => {
-    mockAuthenticateWithRedirect.mockResolvedValue(undefined);
+  it('calls signUp.sso for GitHub OAuth', async () => {
+    mockSso.mockResolvedValue(undefined);
+    mockReset.mockResolvedValue(undefined);
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     await user.click(screen.getByRole('button', { name: /sign up with github/i }));
 
     await waitFor(() => {
-      expect(mockAuthenticateWithRedirect).toHaveBeenCalledWith(
+      expect(mockReset).toHaveBeenCalled();
+      expect(mockSso).toHaveBeenCalledWith(
         expect.objectContaining({ strategy: 'oauth_github' }),
       );
     });
   });
 
-  it('displays OAuth error when social sign-up fails', async () => {
-    mockAuthenticateWithRedirect.mockRejectedValue({
-      errors: [{ message: 'OAuth provider error' }],
-    });
+  it('shows verification form when sign-up requires verification', async () => {
+    mockPassword.mockResolvedValue({ error: null });
+    mockSendEmailCode.mockResolvedValue(undefined);
+
+    (useSignUp as Mock).mockReturnValue(
+      mockSignUpReturn({
+        signUp: {
+          password: mockPassword,
+          finalize: mockFinalize,
+          sso: mockSso,
+          reset: mockReset,
+          status: 'missing_requirements',
+          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+        },
+        fetchStatus: 'idle',
+      }),
+    );
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
-
-    await user.click(screen.getByRole('button', { name: /sign up with google/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/oauth provider error/i);
-    });
-  });
-
-  it('uses redirect search param on success', async () => {
-    mockCreate.mockResolvedValue({
-      createdSessionId: 'sess_123',
-      status: 'complete',
-    });
-
-    const originalLocation = window.location;
-    vi.stubGlobal('location', { ...originalLocation, search: '?redirect=/upload' });
-
-    const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     await user.type(screen.getByLabelText(/email/i), 'new@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
     await user.click(screen.getByRole('button', { name: /^sign up$/i }));
 
     await waitFor(() => {
-      expect(mockOnSuccess).toHaveBeenCalledWith('/upload');
-    });
-
-    vi.stubGlobal('location', originalLocation);
-  });
-
-  it('shows verification form and calls prepareEmailAddressVerification when sign-up requires verification', async () => {
-    mockCreate.mockResolvedValue({
-      status: 'missing_requirements',
-    });
-    mockPrepareEmailAddressVerification.mockResolvedValue(undefined);
-
-    const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
-
-    await user.type(screen.getByLabelText(/email/i), 'new@example.com');
-    await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
-    await user.click(screen.getByRole('button', { name: /^sign up$/i }));
-
-    await waitFor(() => {
-      expect(mockPrepareEmailAddressVerification).toHaveBeenCalledOnce();
+      expect(mockSendEmailCode).toHaveBeenCalledOnce();
       expect(screen.getByText(/verify your email/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
     });
   });
 
-  it('displays error when prepareEmailAddressVerification fails', async () => {
-    mockCreate.mockResolvedValue({
-      status: 'missing_requirements',
-    });
-    mockPrepareEmailAddressVerification.mockRejectedValue({
-      errors: [{ message: 'Could not send verification email' }],
+  it('displays verification error from fields when verification code fails', async () => {
+    mockPassword.mockResolvedValue({ error: null });
+    mockSendEmailCode.mockResolvedValue(undefined);
+
+    (useSignUp as Mock).mockReturnValue(
+      mockSignUpReturn({
+        errors: {
+          global: null,
+          fields: { code: { message: 'The verification code you entered is incorrect.' } },
+        },
+        signUp: {
+          password: mockPassword,
+          finalize: mockFinalize,
+          sso: mockSso,
+          reset: mockReset,
+          status: 'missing_requirements',
+          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+        },
+        fetchStatus: 'idle',
+      }),
+    );
+
+    (useSignUp as Mock).mockImplementation(() => {
+      const callCount = (useSignUp as Mock).mock.calls.length;
+      if (callCount <= 1) {
+        return mockSignUpReturn({
+          signUp: {
+            password: mockPassword,
+            finalize: mockFinalize,
+            sso: mockSso,
+            reset: mockReset,
+            status: 'complete',
+            verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+          },
+          errors: null,
+          fetchStatus: 'idle',
+        });
+      }
+      return mockSignUpReturn({
+        errors: {
+          global: null,
+          fields: { code: { message: 'The verification code you entered is incorrect.' } },
+        },
+        signUp: {
+          password: mockPassword,
+          finalize: mockFinalize,
+          sso: mockSso,
+          reset: mockReset,
+          status: 'missing_requirements',
+          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
+        },
+        fetchStatus: 'idle',
+      });
     });
 
     const user = userEvent.setup();
-    render(<SignUpForm onSuccess={mockOnSuccess} />);
+    render(<SignUpForm />);
 
     await user.type(screen.getByLabelText(/email/i), 'new@example.com');
     await user.type(screen.getByLabelText(/^password$/i), 'Password123!');
     await user.click(screen.getByRole('button', { name: /^sign up$/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(/could not send verification email/i);
+      expect(screen.getByText(/verify your email/i)).toBeInTheDocument();
     });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/verification code/i);
   });
 });

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { AlertCircle, Check, Copy, FileImage, FileVideo, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { UploadAuthGate } from '@/components/upload-auth-gate';
 import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
 import { UploadDropZone } from '@/components/upload/upload-drop-zone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -89,6 +90,7 @@ function UploadPage() {
   };
 
   return (
+    <UploadAuthGate>
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Card>
         <CardHeader>
@@ -194,5 +196,6 @@ function UploadPage() {
         </CardContent>
       </Card>
     </div>
+    </UploadAuthGate>
   );
 }

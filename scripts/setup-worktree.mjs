@@ -22,8 +22,18 @@ import {
 	readFileSync,
 	statSync,
 	writeFileSync,
+	appendFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve, relative } from "node:path";
+import {
+	parseEnvValues,
+	applyOverrides,
+	extractKeys,
+	filterApplicableSecrets,
+	syncKnownSecretsToContent,
+	resolveGenerateMarker,
+} from "./lib/env-pipeline.mjs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -417,221 +427,190 @@ function checkDockerComposeVersion() {
 	}
 }
 
-// ─── Infra .env Generation ────────────────────────────────────────────────────
+// ─── Env File Discovery ─────────────────────────────────────────────────────
 
 /**
- * Generates `infra/.env` from `infra/.env.example`, overriding the dynamic
- * port variables and COMPOSE_PROJECT_NAME with values computed for this
- * worktree's slot.
- *
- * Idempotent: only writes the file when the content has changed.
+ * Recursively find all `.env.example` files under `dir`.
+ * Returns relative paths from `dir`.
  */
-function generateInfraEnv(repoRoot, projectName, ports) {
-	const examplePath = join(repoRoot, "infra", ".env.example");
-	const envPath = join(repoRoot, "infra", ".env");
-
-	const example = readFileSafe(examplePath);
-	if (example === null) {
-		console.warn(
-			`\n⚠️  Could not read ${examplePath} — skipping infra/.env generation.`,
-		);
-		return;
-	}
-
-	/** Overrides to apply on top of the example file. */
-	const overrides = {
-		COMPOSE_PROJECT_NAME: projectName,
-		INGRESS_PORT: String(ports.INGRESS_PORT),
-		POSTGRES_HOST_PORT: String(ports.POSTGRES_HOST_PORT),
-		MINIO_API_HOST_PORT: String(ports.MINIO_API_HOST_PORT),
-		NATS_HOST_PORT: String(ports.NATS_HOST_PORT),
-		REDIS_HOST_PORT: String(ports.REDIS_HOST_PORT),
-		OPENSEARCH_HOST_PORT: String(ports.OPENSEARCH_HOST_PORT),
-		OTEL_HTTP_HOST_PORT: String(ports.OTEL_HTTP_HOST_PORT),
-		OTEL_GRPC_HOST_PORT: String(ports.OTEL_GRPC_HOST_PORT),
-	};
-
-	// Process the example file line by line, replacing known keys.
-	const lines = example.split("\n");
-	const seen = new Set();
-
-	const updatedLines = lines.map((line) => {
-		// Match KEY=value lines (ignore comments and blanks)
-		const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-		if (match) {
-			const key = match[1];
-			if (key in overrides) {
-				seen.add(key);
-				return `${key}=${overrides[key]}`;
-			}
-		}
-		return line;
-	});
-
-	// Append any override keys that were not present in the example file.
-	for (const [key, value] of Object.entries(overrides)) {
-		if (!seen.has(key)) {
-			updatedLines.push(`${key}=${value}`);
+function findEnvExamples(dir) {
+	const results = [];
+	const entries = readdirSync(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		if (entry.name === "node_modules") continue;
+		if (entry.isDirectory() && entry.name.startsWith(".")) continue;
+		const fullPath = join(dir, entry.name);
+		if (entry.isDirectory()) {
+			results.push(...findEnvExamples(fullPath));
+		} else if (entry.name === ".env.example") {
+			results.push(fullPath);
 		}
 	}
-
-	const newContent = updatedLines.join("\n");
-
-	// Idempotency check
-	const existing = readFileSafe(envPath);
-	if (existing === newContent.trimEnd()) {
-		return; // No change
-	}
-
-	writeFileSync(envPath, newContent, "utf8");
+	return results;
 }
 
-// ─── App .env Generation ──────────────────────────────────────────────────────
+// ─── Dotenv Parser ──────────────────────────────────────────────────────────
+// parseEnvValues is imported from ./lib/env-pipeline.mjs
 
-/**
- * Parse KEY=value lines from an env file string.
- * Returns a plain object mapping key → raw value string.
- * Lines that don't match KEY=value (comments, blanks) are ignored.
- */
-function parseEnvValues(content) {
-	const values = Object.create(null);
-	for (const line of content.split("\n")) {
-		const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-		if (match) {
-			values[match[1]] = match[2];
-		}
-	}
-	return values;
-}
+// ─── Override Maps ──────────────────────────────────────────────────────────
 
-/**
- * Generate a single app's .env file from its .env.example, applying the
- * given overrides.
- *
- * - Lines from .env.example whose key appears in `overrides` are replaced.
- * - Keys in `overrides` not present in .env.example are appended.
- * - When `special === 'gateway'`, CURSOR_SECRET is auto-generated on first
- *   run and preserved on subsequent runs (unless still the placeholder).
- * - Idempotent: the file is only written when content changes.
- */
-function generateAppEnv(repoRoot, appDir, overrides, special) {
-	const examplePath = join(repoRoot, appDir, ".env.example");
-	const envPath = join(repoRoot, appDir, ".env");
+const globalOverrides = {
+	S3_ENDPOINT: "http://minio:9000",
+	NATS_URL: "nats://nats:4222",
+	OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
+	REDIS_HOST: "redis",
+	REDIS_PORT: "6379",
+	REDIS_ENABLED: "true",
+};
 
-	const exampleContent = readFileSafe(examplePath);
-	if (exampleContent === null) {
-		console.warn(
-			`\n⚠️  Could not read ${examplePath} — skipping ${appDir}/.env generation.`,
-		);
-		return;
-	}
-
-	// Work with a mutable copy of overrides so we can inject CURSOR_SECRET.
-	const appliedOverrides = { ...overrides };
-
-	// Gateway: auto-generate CURSOR_SECRET on first run, preserve on re-runs.
-	if (special === "gateway") {
-		const existingEnv = readFileSafe(envPath);
-		const existingValues = existingEnv ? parseEnvValues(existingEnv) : {};
-		const existingSecret = existingValues.CURSOR_SECRET;
-		const isPlaceholder =
-			!existingSecret || existingSecret === "<REPLACE_WITH_RANDOM_SECRET>";
-		appliedOverrides.CURSOR_SECRET = isPlaceholder
-			? randomBytes(32).toString("hex")
-			: existingSecret;
-	}
-
-	// Process example file lines, replacing overridden keys.
-	const lines = exampleContent.split("\n");
-	const seen = new Set();
-	const updatedLines = lines.map((line) => {
-		const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-		if (match) {
-			const key = match[1];
-			if (key in appliedOverrides) {
-				seen.add(key);
-				return `${key}=${appliedOverrides[key]}`;
-			}
-		}
-		return line;
-	});
-
-	// Append keys that were not found in the example file.
-	for (const [key, value] of Object.entries(appliedOverrides)) {
-		if (!seen.has(key)) {
-			updatedLines.push(`${key}=${value}`);
-		}
-	}
-
-	const newContent = updatedLines.join("\n");
-
-	// Idempotency: only write if content has changed.
-	const existingContent = readFileSafe(envPath);
-	if (existingContent === newContent.trimEnd()) {
-		return;
-	}
-
-	writeFileSync(envPath, newContent, "utf8");
-}
-
-/**
- * Generate .env files for all 5 apps. Uses Docker-internal service hostnames
- * (postgres, minio, nats, redis, lgtm, opensearch) for server-side connections
- * and browser-reachable URLs (via the ingress) for client-side connections.
- *
- * Called from main() after slot assignment and port computation.
- *
- * NOTE: After generation, .env files point to Docker service names. Developers
- * running services on the host (without Docker) should restore host-based
- * values by running: cp apps/<name>/.env.example apps/<name>/.env
- * (or use `make env-host` if that target exists).
- */
-function generateAppEnvFiles(repoRoot, ports) {
-	const ingressPort = ports.INGRESS_PORT;
-
-	generateAppEnv(repoRoot, "apps/ingestor", {
-		DATABASE_URL:
-			"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_ingestor",
-		S3_ENDPOINT: "http://minio:9000",
-		NATS_URL: "nats://nats:4222",
-		REDIS_HOST: "redis",
-		REDIS_PORT: "6379",
-		REDIS_ENABLED: "true",
-		OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
-	});
-
-	generateAppEnv(repoRoot, "apps/media", {
-		DATABASE_URL:
-			"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_media",
-		S3_ENDPOINT: "http://minio:9000",
-		NATS_URL: "nats://nats:4222",
-		OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
-	});
-
-	generateAppEnv(
-		repoRoot,
-		"apps/gateway",
-		{
-			OPENSEARCH_URL: "http://opensearch:9200",
-			NATS_URL: "nats://nats:4222",
-			REDIS_HOST: "redis",
-			OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
-			MEDIA_SERVICE_URL: `http://localhost:${ingressPort}/media`,
+function buildServiceOverrides() {
+	return {
+		infra: {
+			COMPOSE_PROJECT_NAME: (ctx) => ctx.projectName,
+			INGRESS_PORT: (ctx) => String(ctx.ports.INGRESS_PORT),
+			POSTGRES_HOST_PORT: (ctx) => String(ctx.ports.POSTGRES_HOST_PORT),
+			MINIO_API_HOST_PORT: (ctx) => String(ctx.ports.MINIO_API_HOST_PORT),
+			NATS_HOST_PORT: (ctx) => String(ctx.ports.NATS_HOST_PORT),
+			REDIS_HOST_PORT: (ctx) => String(ctx.ports.REDIS_HOST_PORT),
+			OPENSEARCH_HOST_PORT: (ctx) => String(ctx.ports.OPENSEARCH_HOST_PORT),
+			OTEL_HTTP_HOST_PORT: (ctx) => String(ctx.ports.OTEL_HTTP_HOST_PORT),
+			OTEL_GRPC_HOST_PORT: (ctx) => String(ctx.ports.OTEL_GRPC_HOST_PORT),
 		},
-		"gateway",
+		"apps/ingestor": {
+			DATABASE_URL:
+				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_ingestor",
+		},
+		"apps/media": {
+			DATABASE_URL:
+				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_media",
+		},
+		"apps/gateway": {
+			OPENSEARCH_URL: "http://opensearch:9200",
+			MEDIA_SERVICE_URL: (ctx) =>
+				`http://localhost:${ctx.ports.INGRESS_PORT}/media`,
+		},
+		"apps/variant-generator": {},
+		"apps/web": {
+			VITE_BASE_PATH: "/web",
+			VITE_GATEWAY_URL: (ctx) =>
+				`http://localhost:${ctx.ports.INGRESS_PORT}/gateway/graphql`,
+			VITE_INGESTOR_URL: (ctx) =>
+				`http://localhost:${ctx.ports.INGRESS_PORT}/ingestor`,
+		},
+	};
+}
+
+// ─── User Secrets ───────────────────────────────────────────────────────────
+
+const knownUserSecrets = {
+	CURSOR_SECRET: () => randomBytes(32).toString("hex"),
+	VITE_CLERK_PUBLISHABLE_KEY: undefined,
+};
+
+function getSecretEnvPath() {
+	const configDir =
+		process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+	return join(configDir, "wallpaperdb", "secret.env");
+}
+
+function ensureSecretEnv(secretEnvPath) {
+	const dir = join(secretEnvPath, "..");
+	if (!existsSync(dir)) {
+		mkdirSync(dir, { recursive: true });
+	}
+
+	if (!existsSync(secretEnvPath)) {
+		const header =
+			"# You can use this file to store actual secret values needed by all worktrees\n";
+		writeFileSync(secretEnvPath, header, "utf8");
+	}
+}
+
+function syncKnownSecrets(secretEnvPath) {
+	const existing = existsSync(secretEnvPath)
+		? readFileSync(secretEnvPath, "utf8")
+		: "";
+	const updated = syncKnownSecretsToContent(existing, knownUserSecrets);
+	if (updated !== existing) {
+		writeFileSync(secretEnvPath, updated, "utf8");
+	}
+}
+
+function loadSecrets(secretEnvPath) {
+	if (!existsSync(secretEnvPath)) return {};
+	const content = readFileSync(secretEnvPath, "utf8");
+	const { secrets, content: updated } = resolveGenerateMarker(
+		content,
+		knownUserSecrets,
 	);
+	if (updated !== content) {
+		writeFileSync(secretEnvPath, updated, "utf8");
+	}
+	return secrets;
+}
 
-	generateAppEnv(repoRoot, "apps/variant-generator", {
-		S3_ENDPOINT: "http://minio:9000",
-		NATS_URL: "nats://nats:4222",
-		OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
-	});
+// ─── Unified .env Generation Pipeline ───────────────────────────────────────
 
-	generateAppEnv(repoRoot, "apps/web", {
-		VITE_BASE_PATH: "/web",
-		VITE_GATEWAY_URL: `http://localhost:${ingressPort}/gateway/graphql`,
-		VITE_INGESTOR_URL: `http://localhost:${ingressPort}/ingestor`,
-	});
+// applyOverrides is imported from ./lib/env-pipeline.mjs
+
+/**
+ * Generate all `.env` files using a unified 4-step pipeline:
+ *   1. Read `.env.example` as base
+ *   2. Apply global overrides
+ *   3. Apply service-specific overrides
+ *   4. Apply user secrets from `secret.env`
+ */
+function generateAllEnvFiles(repoRoot, projectName, ports) {
+	const ctx = { projectName, ports };
+	const serviceOverrides = buildServiceOverrides();
+	const secretEnvPath = getSecretEnvPath();
+
+	ensureSecretEnv(secretEnvPath);
+	syncKnownSecrets(secretEnvPath);
+	const secrets = loadSecrets(secretEnvPath);
+
+	const exampleFiles = findEnvExamples(repoRoot);
+
+	for (const examplePath of exampleFiles) {
+		const dir = relative(repoRoot, join(examplePath, ".."));
+		const envPath = join(repoRoot, dir, ".env");
+
+		const exampleContent = readFileSafe(examplePath);
+		if (exampleContent === null) {
+			console.warn(
+				`\n⚠️  Could not read ${examplePath} — skipping ${dir}/.env generation.`,
+			);
+			continue;
+		}
+
+		const exampleKeys = extractKeys(exampleContent);
+
+		let content = exampleContent;
+
+		const filteredGlobals = {};
+		for (const [key, val] of Object.entries(globalOverrides)) {
+			if (exampleKeys.has(key)) filteredGlobals[key] = val;
+		}
+		content = applyOverrides(content, filteredGlobals, ctx);
+
+		const svc = serviceOverrides[dir];
+		if (svc) {
+			content = applyOverrides(content, svc, ctx);
+		}
+
+		const applicableSecrets = filterApplicableSecrets(
+			secrets,
+			exampleKeys,
+			dir,
+			console.log,
+		);
+		content = applyOverrides(content, applicableSecrets, ctx);
+
+		const existing = readFileSafe(envPath);
+		if (existing === content.trimEnd()) continue;
+
+		writeFileSync(envPath, content, "utf8");
+	}
 }
 
 // ─── Bruno Environment Generation ─────────────────────────────────────────────
@@ -739,11 +718,7 @@ function main() {
 	const worktreeUnchanged = existingContent === newContent.trim();
 
 	if (worktreeUnchanged) {
-		// .worktree file is up-to-date; still regenerate infra/.env, app
-		// .env files, and Bruno env in case they were deleted or example
-		// files changed.
-		generateInfraEnv(repoRoot, projectName, ports);
-		generateAppEnvFiles(repoRoot, ports);
+		generateAllEnvFiles(repoRoot, projectName, ports);
 		generateBrunoEnv(repoRoot, ports);
 		console.log(
 			`[setup-worktree] Worktree slot ${slot} already assigned. ` +
@@ -756,9 +731,8 @@ function main() {
 	// 9. Write .worktree file
 	writeFileSync(worktreeFilePath, newContent, "utf8");
 
-	// 9b. Generate infra/.env, app .env files, and Bruno environment
-	generateInfraEnv(repoRoot, projectName, ports);
-	generateAppEnvFiles(repoRoot, ports);
+	// 9b. Generate .env files and Bruno environment
+	generateAllEnvFiles(repoRoot, projectName, ports);
 	generateBrunoEnv(repoRoot, ports);
 
 	// 10. Summary

@@ -13,6 +13,11 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }));
 
+vi.mock('@/routes/sso-callback', () => ({
+  storeSsoRedirect: vi.fn(),
+  consumeSsoRedirect: vi.fn(),
+}));
+
 import { useClerk, useSignUp } from '@clerk/clerk-react';
 import { SignUpForm } from '@/components/sign-up-form';
 

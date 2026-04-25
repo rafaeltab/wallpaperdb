@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/react';
 import { useEffect } from 'react';
 import { clearTokenProvider, setTokenProvider } from '@/lib/auth/token-provider';
 

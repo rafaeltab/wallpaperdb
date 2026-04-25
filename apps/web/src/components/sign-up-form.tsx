@@ -1,23 +1,24 @@
-import { useClerk, useSignUp } from '@clerk/clerk-react';
+import { useSignUp } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
-interface SignUpFormProps {
-  onSuccess: (redirectTo: string) => void;
+function buildUrl(path: string): string {
+  const basePath = import.meta.env.VITE_BASE_PATH || '';
+  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
+  return full.replace(/\/+/g, '/') || '/';
 }
 
-export function SignUpForm({ onSuccess }: SignUpFormProps) {
-  const { isLoaded, signUp } = useSignUp();
-  const { setActive } = useClerk();
+export function SignUpForm() {
+  const { signUp, errors, fetchStatus } = useSignUp();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [redirectUrl] = useState(() => {
@@ -25,83 +26,69 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
     return params.get('redirect') || '/';
   });
 
+  const isSubmitting = fetchStatus === 'fetching';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!signUp) return;
 
-    setError(null);
-    setIsSubmitting(true);
+    const { error } = await signUp.password({
+      emailAddress: email,
+      password,
+    });
 
-    try {
-      const result = await signUp.create({ emailAddress: email, password });
+    if (error) return;
 
-      if (result.status === 'complete') {
-        await setActive({ session: result.createdSessionId });
-        onSuccess(redirectUrl);
-      } else {
-        await signUp.prepareEmailAddressVerification();
-        setPendingVerification(true);
-      }
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'errors' in err
-          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign up failed. Please try again.';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
+    if (signUp.status === 'complete') {
+      await signUp.finalize({
+        navigate: async ({ session, decorateUrl }) => {
+          if (session?.currentTask) return;
+          const url = decorateUrl(redirectUrl);
+          if (url.startsWith('http')) {
+            window.location.href = url;
+          } else {
+            void navigate({ to: url });
+          }
+        },
+      });
+    } else if (signUp.status === 'missing_requirements') {
+      await signUp.verifications.sendEmailCode();
+      setPendingVerification(true);
     }
   };
 
   const handleVerification = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!signUp) return;
 
-    setError(null);
-    setIsSubmitting(true);
+    const { error } = await signUp.verifications.verifyEmailCode({ code: verificationCode });
 
-    try {
-      const result = await signUp.attemptEmailAddressVerification({ code: verificationCode });
-      if (result.status === 'complete') {
-        await setActive({ session: result.createdSessionId });
-        onSuccess(redirectUrl);
-      } else {
-        setError('Verification failed. Please try again.');
-      }
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'errors' in err
-          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Verification failed. Please try again.';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
+    if (error) return;
+
+    if (signUp.status === 'complete') {
+      await signUp.finalize({
+        navigate: async ({ session, decorateUrl }) => {
+          if (session?.currentTask) return;
+          const url = decorateUrl(redirectUrl);
+          if (url.startsWith('http')) {
+            window.location.href = url;
+          } else {
+            void navigate({ to: url });
+          }
+        },
+      });
     }
   };
 
   const handleOAuthSignUp = async (strategy: 'oauth_google' | 'oauth_github') => {
-    if (!isLoaded) return;
-    setError(null);
+    if (!signUp) return;
 
-    const basePath = import.meta.env.VITE_BASE_PATH || '';
-    const signUpUrl = `${basePath}/sign-up`.replace(/\/+/g, '/');
-    const redirectComplete =
-      `${basePath}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`.replace(/\/+/g, '/') ||
-      '/';
-
-    try {
-      await signUp.authenticateWithRedirect({
-        strategy,
-        redirectUrl: signUpUrl,
-        redirectUrlComplete: redirectComplete,
-      });
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'errors' in err
-          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign up failed. Please try again.';
-      setError(message);
-    }
+    await signUp.reset();
+    await signUp.sso({
+      strategy,
+      redirectUrl: buildUrl(redirectUrl),
+      redirectCallbackUrl: buildUrl('/sso-callback'),
+    });
   };
 
   if (pendingVerification) {
@@ -115,12 +102,20 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleVerification} className="grid gap-4">
-            {error && (
+            {(errors?.fields?.code) && (
               <div
                 role="alert"
                 className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
               >
-                {error}
+                {errors.fields.code.message}
+              </div>
+            )}
+            {formatClerkGlobalErrors(errors?.global) && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+              >
+                {formatClerkGlobalErrors(errors?.global)}
               </div>
             )}
             <Field>
@@ -137,8 +132,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
               />
             </Field>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Verifying...' : 'Verify email'}
+              {fetchStatus === 'fetching' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {fetchStatus === 'fetching' ? 'Verifying...' : 'Verify email'}
             </Button>
           </form>
         </CardContent>
@@ -154,12 +149,20 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          {error && (
+          {(errors?.fields?.emailAddress || errors?.fields?.password) && (
             <div
               role="alert"
               className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
-              {error}
+              {errors?.fields?.emailAddress?.message || errors?.fields?.password?.message}
+            </div>
+          )}
+          {formatClerkGlobalErrors(errors?.global) && (
+            <div
+              role="alert"
+              className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {formatClerkGlobalErrors(errors?.global)}
             </div>
           )}
           <Field>
@@ -188,9 +191,10 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
               autoComplete="new-password"
             />
           </Field>
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Signing up...' : 'Sign up'}
+          <div id="clerk-captcha" data-cl-size="flexible" />
+          <Button type="submit" className="w-full" disabled={isSubmitting || !signUp}>
+            {fetchStatus === 'fetching' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {fetchStatus === 'fetching' ? 'Signing up...' : 'Sign up'}
           </Button>
         </form>
 
@@ -204,8 +208,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignUp('oauth_google')}
-            disabled={isSubmitting}
+            onClick={() => void handleOAuthSignUp('oauth_google')}
+            disabled={isSubmitting || !signUp}
             aria-label="Sign up with Google"
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -231,8 +235,8 @@ export function SignUpForm({ onSuccess }: SignUpFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignUp('oauth_github')}
-            disabled={isSubmitting}
+            onClick={() => void handleOAuthSignUp('oauth_github')}
+            disabled={isSubmitting || !signUp}
             aria-label="Sign up with GitHub"
           >
             <svg

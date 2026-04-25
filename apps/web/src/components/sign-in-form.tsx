@@ -1,72 +1,73 @@
-import { useSignIn } from '@clerk/clerk-react';
+import { useSignIn } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { formatClerkGlobalErrors } from '@/lib/auth/clerk-errors';
 
-interface SignInFormProps {
-  onSuccess: (redirectTo: string) => void;
+function buildUrl(path: string): string {
+  const basePath = import.meta.env.VITE_BASE_PATH || '';
+  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
+  return full.replace(/\/+/g, '/') || '/';
 }
 
-export function SignInForm({ onSuccess }: SignInFormProps) {
-  const { isLoaded, signIn } = useSignIn();
+export function SignInForm() {
+  const { signIn, errors, fetchStatus } = useSignIn();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [redirectUrl] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('redirect') || '/';
   });
 
+  const isSubmitting = fetchStatus === 'fetching';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!signIn) return;
 
-    setError(null);
-    setIsSubmitting(true);
+    const { error } = await signIn.password({
+      emailAddress: email,
+      password,
+    });
 
-    try {
-      const result = await signIn.create({ identifier: email, password });
-      await signIn.setActive({ session: result.createdSessionId });
-      onSuccess(redirectUrl);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'errors' in err
-          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign in failed. Please try again.';
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
+    if (error) return;
+
+    if (signIn.status === 'complete') {
+      await signIn.finalize({
+        navigate: async ({ session, decorateUrl }) => {
+          if (session?.currentTask) return;
+          const url = decorateUrl(redirectUrl);
+          if (url.startsWith('http')) {
+            window.location.href = url;
+          } else {
+            void navigate({ to: url });
+          }
+        },
+      });
+    } else if (signIn.status === 'needs_second_factor') {
+      const emailCodeFactor = signIn.supportedSecondFactors?.find(
+        (factor) => factor.strategy === 'email_code',
+      );
+      if (emailCodeFactor) {
+        await signIn.mfa.sendEmailCode();
+      }
     }
   };
 
   const handleOAuthSignIn = async (strategy: 'oauth_google' | 'oauth_github') => {
-    if (!isLoaded) return;
-    setError(null);
+    if (!signIn) return;
 
-    const basePath = import.meta.env.VITE_BASE_PATH || '';
-    const signInUrl = `${basePath}/sign-in`.replace(/\/+/g, '/');
-    const redirectComplete =
-      `${basePath}${redirectUrl.startsWith('/') ? '' : '/'}${redirectUrl}`.replace(/\/+/g, '/') ||
-      '/';
-
-    try {
-      await signIn.authenticateWithRedirect({
-        strategy,
-        redirectUrl: signInUrl,
-        redirectUrlComplete: redirectComplete,
-      });
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'errors' in err
-          ? (err as { errors: Array<{ message: string }> }).errors[0]?.message
-          : 'Sign in failed. Please try again.';
-      setError(message);
-    }
+    await signIn.reset();
+    await signIn.sso({
+      strategy,
+      redirectUrl: buildUrl(redirectUrl),
+      redirectCallbackUrl: buildUrl('/sso-callback'),
+    });
   };
 
   return (
@@ -77,12 +78,20 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          {error && (
+          {formatClerkGlobalErrors(errors?.global) && (
             <div
               role="alert"
               className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
-              {error}
+              {formatClerkGlobalErrors(errors?.global)}
+            </div>
+          )}
+          {(errors?.fields?.identifier || errors?.fields?.password) && (
+            <div
+              role="alert"
+              className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              {errors?.fields?.identifier?.message || errors?.fields?.password?.message}
             </div>
           )}
           <Field>
@@ -111,9 +120,10 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
               autoComplete="current-password"
             />
           </Field>
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'Signing in...' : 'Sign in'}
+          <div id="clerk-captcha" data-cl-size="flexible" />
+          <Button type="submit" className="w-full" disabled={isSubmitting || !signIn}>
+            {fetchStatus === 'fetching' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {fetchStatus === 'fetching' ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
 
@@ -127,8 +137,8 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignIn('oauth_google')}
-            disabled={isSubmitting}
+            onClick={() => void handleOAuthSignIn('oauth_google')}
+            disabled={isSubmitting || !signIn}
             aria-label="Sign in with Google"
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -154,8 +164,8 @@ export function SignInForm({ onSuccess }: SignInFormProps) {
           <Button
             variant="outline"
             type="button"
-            onClick={() => handleOAuthSignIn('oauth_github')}
-            disabled={isSubmitting}
+            onClick={() => void handleOAuthSignIn('oauth_github')}
+            disabled={isSubmitting || !signIn}
             aria-label="Sign in with GitHub"
           >
             <svg

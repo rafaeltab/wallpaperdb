@@ -1,4 +1,4 @@
-import { useAuth, useClerk, useUser } from '@clerk/clerk-react';
+import { useAuth, useClerk, useUser } from '@clerk/react';
 import { Link } from '@tanstack/react-router';
 import { LogOut, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+function buildUrl(path: string): string {
+  const basePath = import.meta.env.VITE_BASE_PATH || '';
+  const full = `${basePath}${path.startsWith('/') ? '' : '/'}${path}`;
+  return full.replace(/\/+/g, '/') || '/';
+}
 
 export function UserMenu() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -43,11 +49,7 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem
-          onClick={() => {
-            const basePath = import.meta.env.VITE_BASE_PATH || '';
-            const homeUrl = `${basePath}/`.replace(/\/+/g, '/');
-            void signOut({ redirectUrl: homeUrl });
-          }}
+          onClick={() => void signOut({ redirectUrl: buildUrl('/') })}
         >
           <LogOut className="mr-2 h-4 w-4" />
           Sign out

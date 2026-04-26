@@ -82,7 +82,27 @@ describe("Auth Integration", () => {
             expect(response.statusCode).toBe(200);
         });
 
-        it("POST /upload without auth still works (temporary skipAuth)", async () => {
+        it("POST /upload without auth returns 401 Problem Details", async () => {
+            const filename = tester.fixtures.generateTestFilename("jpg");
+            const imageBuffer = await tester.fixtures.images.validJpeg();
+
+            const response = await uploadFile(fastify, {
+                file: imageBuffer,
+                filename,
+                mimeType: "image/jpeg",
+            });
+
+            expect(response.statusCode).toBe(401);
+
+            const body = JSON.parse(response.body);
+            expect(body.status).toBe(401);
+            expect(body.title).toBe("Unauthorized");
+            expect(body.type).toBe("https://wallpaperdb.example/problems/unauthorized");
+        });
+    });
+
+    describe("authenticated upload", () => {
+        it("POST /upload with valid auth proceeds normally", async () => {
             const userId = tester.fixtures.generateTestUserId();
             const filename = tester.fixtures.generateTestFilename("jpg");
             const imageBuffer = await tester.fixtures.images.validJpeg();
@@ -95,6 +115,9 @@ describe("Auth Integration", () => {
             });
 
             expect(response.statusCode).toBe(200);
+
+            const body = JSON.parse(response.body);
+            expect(body.id).toBeDefined();
         });
     });
 

@@ -1,3 +1,4 @@
+import type { User } from '@wallpaperdb/auth';
 import { RedisConnection } from '../connections/redis.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
@@ -9,11 +10,8 @@ export class RateLimitService {
     @inject(RedisConnection) private readonly redisConnection: RedisConnection
   ) {}
 
-  /**
-   * Check if a user has exceeded their rate limit
-   * Returns the number of remaining requests, or throws if limit exceeded
-   */
-  async checkRateLimit(userId: string): Promise<{ remaining: number; reset: number }> {
+  async checkRateLimit(user: User): Promise<{ remaining: number; reset: number }> {
+    const userId = user.id;
     const key = `wallpaperdb:ratelimit:user:${userId}`;
     const now = Date.now();
     const windowMs = this.config.rateLimitWindowMs;

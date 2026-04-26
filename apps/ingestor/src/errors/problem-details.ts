@@ -1,24 +1,6 @@
-// Re-export base class from core package
 import { ProblemDetailsError } from '@wallpaperdb/core/errors';
 export { ProblemDetailsError, type ProblemDetails } from '@wallpaperdb/core/errors';
 
-/**
- * 400 - Missing user id
- */
-export class MissingUserId extends ProblemDetailsError {
-  readonly type = 'https://wallpaperdb.example/problems/missing-user-id';
-  readonly title = 'Missing userId';
-  readonly status = 400;
-  readonly instance = '/upload';
-
-  constructor() {
-    super('A userId must be provided');
-  }
-}
-
-/**
- * 400 - Invalid file format
- */
 export class InvalidFileFormatError extends ProblemDetailsError {
   readonly type = 'https://wallpaperdb.example/problems/invalid-file-format';
   readonly title = 'Invalid File Format';

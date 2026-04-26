@@ -91,111 +91,113 @@ function UploadPage() {
 
   return (
     <UploadAuthGate>
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Upload Wallpapers</CardTitle>
-          <CardDescription>
-            Add wallpapers to your collection. Supported formats: JPEG, PNG, WebP (images) or MP4,
-            WebM (videos). You can upload up to {MAX_FILES_PER_BATCH} files at a time.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Drop Zone */}
-          <UploadDropZone
-            onFilesSelected={handleFilesSelected}
-            maxFiles={MAX_FILES_PER_BATCH - state.files.length}
-            disabled={isUploading}
-          />
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Upload Wallpapers</CardTitle>
+            <CardDescription>
+              Add wallpapers to your collection. Supported formats: JPEG, PNG, WebP (images) or MP4,
+              WebM (videos). You can upload up to {MAX_FILES_PER_BATCH} files at a time.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Drop Zone */}
+            <UploadDropZone
+              onFilesSelected={handleFilesSelected}
+              maxFiles={MAX_FILES_PER_BATCH - state.files.length}
+              disabled={isUploading}
+            />
 
-          {/* Progress Summary */}
-          {hasFiles && (
-            <div className="space-y-4">
-              {/* Overall Progress */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{statusText}</span>
-                  <span className="font-medium">{progress}%</span>
-                </div>
-                <Progress value={progress} variant={state.isStopped ? 'stopped' : 'default'} />
-              </div>
-
-              {/* Status Summary */}
-              <div className="flex flex-wrap gap-2">
-                {counts.success > 0 && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
-                    <Check className="h-3 w-3" />
-                    {counts.success} uploaded
-                  </span>
-                )}
-                {counts.duplicate > 0 && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded-full">
-                    <Copy className="h-3 w-3" />
-                    {counts.duplicate} duplicate{counts.duplicate !== 1 ? 's' : ''}
-                  </span>
-                )}
-                {counts.failed > 0 && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">
-                    <AlertCircle className="h-3 w-3" />
-                    {counts.failed} failed
-                  </span>
-                )}
-                {counts.pending > 0 && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded-full">
-                    {counts.pending} pending
-                  </span>
-                )}
-              </div>
-
-              {/* File List */}
-              <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
-                {state.files.map((queuedFile) => (
-                  <div
-                    key={queuedFile.id}
-                    className={cn(
-                      'flex items-center gap-3 p-3',
-                      queuedFile.status === 'failed' && 'bg-destructive/5'
-                    )}
-                  >
-                    <div className="flex-shrink-0">
-                      {queuedFile.file.type.startsWith('image/') ? (
-                        <FileImage className="h-6 w-6 text-muted-foreground" />
-                      ) : (
-                        <FileVideo className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{queuedFile.file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(queuedFile.file.size)}
-                        {queuedFile.error && (
-                          <span className="text-destructive ml-2">{queuedFile.error.message}</span>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0">{getStatusIcon(queuedFile.status)}</div>
+            {/* Progress Summary */}
+            {hasFiles && (
+              <div className="space-y-4">
+                {/* Overall Progress */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{statusText}</span>
+                    <span className="font-medium">{progress}%</span>
                   </div>
-                ))}
-              </div>
+                  <Progress value={progress} variant={state.isStopped ? 'stopped' : 'default'} />
+                </div>
 
-              {/* Action Buttons */}
-              <UploadActionButtons
-                isRunning={isRunning}
-                isPaused={state.isPaused}
-                isStopped={state.isStopped}
-                hasFailures={hasFailures}
-                isComplete={isComplete}
-                onStopQueue={stopQueue}
-                onResumeQueue={resumeQueue}
-                onClearAll={handleClearAll}
-                onRetryFailed={retryFailed}
-                onClearCompleted={clearCompleted}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                {/* Status Summary */}
+                <div className="flex flex-wrap gap-2">
+                  {counts.success > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
+                      <Check className="h-3 w-3" />
+                      {counts.success} uploaded
+                    </span>
+                  )}
+                  {counts.duplicate > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded-full">
+                      <Copy className="h-3 w-3" />
+                      {counts.duplicate} duplicate{counts.duplicate !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {counts.failed > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">
+                      <AlertCircle className="h-3 w-3" />
+                      {counts.failed} failed
+                    </span>
+                  )}
+                  {counts.pending > 0 && (
+                    <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded-full">
+                      {counts.pending} pending
+                    </span>
+                  )}
+                </div>
+
+                {/* File List */}
+                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                  {state.files.map((queuedFile) => (
+                    <div
+                      key={queuedFile.id}
+                      className={cn(
+                        'flex items-center gap-3 p-3',
+                        queuedFile.status === 'failed' && 'bg-destructive/5'
+                      )}
+                    >
+                      <div className="flex-shrink-0">
+                        {queuedFile.file.type.startsWith('image/') ? (
+                          <FileImage className="h-6 w-6 text-muted-foreground" />
+                        ) : (
+                          <FileVideo className="h-6 w-6 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{queuedFile.file.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(queuedFile.file.size)}
+                          {queuedFile.error && (
+                            <span className="text-destructive ml-2">
+                              {queuedFile.error.message}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">{getStatusIcon(queuedFile.status)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action Buttons */}
+                <UploadActionButtons
+                  isRunning={isRunning}
+                  isPaused={state.isPaused}
+                  isStopped={state.isStopped}
+                  hasFailures={hasFailures}
+                  isComplete={isComplete}
+                  onStopQueue={stopQueue}
+                  onResumeQueue={resumeQueue}
+                  onClearAll={handleClearAll}
+                  onRetryFailed={retryFailed}
+                  onClearCompleted={clearCompleted}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </UploadAuthGate>
   );
 }

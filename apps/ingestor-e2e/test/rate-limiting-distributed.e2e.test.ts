@@ -55,16 +55,6 @@ function createFormData(
     const boundary = `----WebKitFormBoundary${Math.random().toString(36).substring(2)}`;
     const parts: Buffer[] = [];
 
-    // Add userId field
-    parts.push(
-        Buffer.from(
-            `--${boundary}\r\n` +
-            `Content-Disposition: form-data; name="userId"\r\n\r\n` +
-            `${userId}\r\n`,
-        ),
-    );
-
-    // Add file field
     parts.push(
         Buffer.from(
             `--${boundary}\r\n` +
@@ -75,10 +65,13 @@ function createFormData(
     parts.push(imageBuffer);
     parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
 
+    const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
+
     return {
         body: Buffer.concat(parts),
         headers: {
             "content-type": `multipart/form-data; boundary=${boundary}`,
+            authorization: `Bearer ${encoded}`,
         },
     };
 }

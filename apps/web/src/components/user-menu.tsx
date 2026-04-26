@@ -55,9 +55,7 @@ export function UserMenu() {
           <span className="ml-auto text-xs text-muted-foreground">Soon</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => void signOut({ redirectUrl: buildUrl('/') })}
-        >
+        <DropdownMenuItem onClick={() => void signOut({ redirectUrl: buildUrl('/') })}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>

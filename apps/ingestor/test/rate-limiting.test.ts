@@ -8,6 +8,7 @@ import {
     RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
 import FormData from "form-data";
+import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { wallpapers } from "../src/db/schema.js";
 import {
@@ -17,26 +18,23 @@ import {
 } from "./builders/index.js";
 import { createTestImage } from "./fixtures.js";
 
-/**
- * Rate Limiting Tests
- *
- * Tests verify that rate limiting is properly applied per user:
- * - Users can upload within their rate limit
- * - Uploads beyond limit are rejected with 429
- * - Rate limits are isolated per user
- * - Rate limits reset after time window
- * - Proper RFC 7807 error responses
- */
+function mockAuthHeader(userId: string): Record<string, string> {
+    const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
+    return { authorization: `Bearer ${encoded}` };
+}
 
-// Global counter for unique test IDs (ensures no collisions across fast-running tests)
+function injectUpload(app: FastifyInstance, form: FormData, userId: string) {
+    return app.inject({
+        method: "POST",
+        url: "/upload",
+        headers: { ...form.getHeaders(), ...mockAuthHeader(userId) },
+        payload: form,
+    });
+}
+
 let testIdCounter = 0;
 
 describe("Rate Limiting", () => {
-    /**
-     * Subclass pattern for custom rate limit configuration.
-     * The InProcessIngestorTesterBuilder requires constructor options,
-     * so we create a subclass that passes the desired config.
-     */
     class RateLimitIngestorTesterBuilder extends InProcessIngestorTesterBuilder {
         constructor() {
             super({
@@ -88,18 +86,15 @@ describe("Rate Limiting", () => {
     });
 
     beforeEach(async () => {
-        // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
     });
 
     it("should allow uploads within rate limit", async () => {
         const userId = `user_ratelimit_test_${++testIdCounter}`;
-
         const db = tester.getDrizzle();
+        const app = tester.getApp();
 
-        // Make 5 uploads (well within limit of 10)
         for (let i = 0; i < 5; i++) {
-            // Create unique image for each upload (avoid deduplication)
             const testImage = await createTestImage({
                 width: 1920,
                 height: 1080,
@@ -111,31 +106,22 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app, form, userId);
             expect(response.statusCode).toBe(200);
             const body = JSON.parse(response.body);
             expect(body.id).toBeDefined();
         }
 
-        // Verify all 5 uploads are in database
         const allUploads = await db.select().from(wallpapers);
         expect(allUploads.length).toBe(5);
     });
 
     it("should return 429 when user exceeds rate limit", async () => {
         const userId = `user_exceed_limit_${++testIdCounter}`;
-
         const db = tester.getDrizzle();
+        const app = tester.getApp();
 
-        // Make 15 uploads (hit the limit)
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -148,19 +134,11 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app, form, userId);
             expect(response.statusCode).toBe(200);
         }
 
-        // 16th upload should be rate limited
         const testImage11 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -172,26 +150,18 @@ describe("Rate Limiting", () => {
             filename: "test-11.jpg",
             contentType: "image/jpeg",
         });
-        form.append("userId", userId);
 
-        const response = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: form.getHeaders(),
-            payload: form,
-        });
-
+        const response = await injectUpload(app, form, userId);
         expect(response.statusCode).toBe(429);
 
-        // Verify only 10 uploads in database (11th was rejected)
         const allUploads = await db.select().from(wallpapers);
         expect(allUploads.length).toBe(15);
     });
 
     it("should return RFC 7807 Problem Details on rate limit exceeded", async () => {
         const userId = `user_rfc7807_test_${++testIdCounter}`;
+        const app = tester.getApp();
 
-        // Hit the rate limit (15 uploads)
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -204,17 +174,10 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
+            await injectUpload(app, form, userId);
         }
 
-        // Exceed limit
         const testImageExceed = await createTestImage({
             width: 1920,
             height: 1080,
@@ -226,24 +189,14 @@ describe("Rate Limiting", () => {
             filename: "test-exceed.jpg",
             contentType: "image/jpeg",
         });
-        form.append("userId", userId);
 
-        const response = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: form.getHeaders(),
-            payload: form,
-        });
+        const response = await injectUpload(app, form, userId);
 
         expect(response.statusCode).toBe(429);
-        expect(response.headers["content-type"]).toContain(
-            "application/problem+json",
-        );
+        expect(response.headers["content-type"]).toContain("application/problem+json");
 
         const body = JSON.parse(response.body);
-        expect(body.type).toBe(
-            "https://wallpaperdb.example/problems/rate-limit-exceeded",
-        );
+        expect(body.type).toBe("https://wallpaperdb.example/problems/rate-limit-exceeded");
         expect(body.title).toBe("Rate Limit Exceeded");
         expect(body.status).toBe(429);
         expect(body.detail).toBeDefined();
@@ -256,8 +209,8 @@ describe("Rate Limiting", () => {
         const timestamp = ++testIdCounter;
         const userA = `user_a_isolation_${timestamp}`;
         const userB = `user_b_isolation_${timestamp}`;
+        const app = tester.getApp();
 
-        // User A: Hit rate limit (10 uploads)
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -270,19 +223,11 @@ describe("Rate Limiting", () => {
                 filename: `userA-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userA);
 
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app, form, userA);
             expect(response.statusCode).toBe(200);
         }
 
-        // User A: 16th upload should fail
         const testImageA11 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -294,18 +239,10 @@ describe("Rate Limiting", () => {
             filename: "userA-11.jpg",
             contentType: "image/jpeg",
         });
-        formA11.append("userId", userA);
 
-        const responseA11 = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: formA11.getHeaders(),
-            payload: formA11,
-        });
-
+        const responseA11 = await injectUpload(app, formA11, userA);
         expect(responseA11.statusCode).toBe(429);
 
-        // User B: First upload should succeed (independent rate limit)
         const testImageB1 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -317,26 +254,18 @@ describe("Rate Limiting", () => {
             filename: "userB-1.jpg",
             contentType: "image/jpeg",
         });
-        formB1.append("userId", userB);
 
-        const responseB1 = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: formB1.getHeaders(),
-            payload: formB1,
-        });
-
+        const responseB1 = await injectUpload(app, formB1, userB);
         expect(responseB1.statusCode).toBe(200);
 
-        // Verify: 10 from User A, 1 from User B
         const allUploads = await tester.getDrizzle().select().from(wallpapers);
         expect(allUploads.length).toBe(16);
     });
 
     it("should reset rate limit after time window expires", async () => {
         const userId = `user_reset_test_${++testIdCounter}`;
+        const app = tester.getApp();
 
-        // Hit the rate limit (15 uploads)
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -349,19 +278,11 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app, form, userId);
             expect(response.statusCode).toBe(200);
         }
 
-        // Verify rate limit is active
         const testImageExceed = await createTestImage({
             width: 1920,
             height: 1080,
@@ -373,21 +294,12 @@ describe("Rate Limiting", () => {
             filename: "test-exceed.jpg",
             contentType: "image/jpeg",
         });
-        formExceed.append("userId", userId);
 
-        const responseExceed = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: formExceed.getHeaders(),
-            payload: formExceed,
-        });
-
+        const responseExceed = await injectUpload(app, formExceed, userId);
         expect(responseExceed.statusCode).toBe(429);
 
-        // Wait for rate limit window to expire (5 seconds + buffer)
         await new Promise((resolve) => setTimeout(resolve, 5500));
 
-        // After window expires, upload should succeed
         const testImageAfterReset = await createTestImage({
             width: 1920,
             height: 1080,
@@ -399,15 +311,8 @@ describe("Rate Limiting", () => {
             filename: "test-after-reset.jpg",
             contentType: "image/jpeg",
         });
-        formAfterReset.append("userId", userId);
 
-        const responseAfterReset = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: formAfterReset.getHeaders(),
-            payload: formAfterReset,
-        });
-
+        const responseAfterReset = await injectUpload(app, formAfterReset, userId);
         expect(responseAfterReset.statusCode).toBe(200);
     });
 
@@ -425,31 +330,22 @@ describe("Rate Limiting", () => {
             filename: "test-headers.jpg",
             contentType: "image/jpeg",
         });
-        form.append("userId", userId);
 
-        const response = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: form.getHeaders(),
-            payload: form,
-        });
-
+        const response = await injectUpload(tester.getApp(), form, userId);
         expect(response.statusCode).toBe(200);
 
-        // Check for rate limit headers
         expect(response.headers["x-ratelimit-limit"]).toBeDefined();
         expect(response.headers["x-ratelimit-remaining"]).toBeDefined();
         expect(response.headers["x-ratelimit-reset"]).toBeDefined();
 
-        // Verify values are reasonable
         expect(Number(response.headers["x-ratelimit-limit"])).toBe(15);
         expect(Number(response.headers["x-ratelimit-remaining"])).toBeLessThan(15);
     });
 
     it("should not rate limit health and ready endpoints", async () => {
         const userId = `user_health_test_${++testIdCounter}`;
+        const app = tester.getApp();
 
-        // Hit rate limit on /upload
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -462,17 +358,10 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
+            await injectUpload(app, form, userId);
         }
 
-        // Verify /upload is rate limited
         const testImageExceed = await createTestImage({
             width: 1920,
             height: 1080,
@@ -484,37 +373,23 @@ describe("Rate Limiting", () => {
             filename: "test-exceed.jpg",
             contentType: "image/jpeg",
         });
-        formExceed.append("userId", userId);
 
-        const uploadResponse = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: formExceed.getHeaders(),
-            payload: formExceed,
-        });
-
+        const uploadResponse = await injectUpload(app, formExceed, userId);
         expect(uploadResponse.statusCode).toBe(429);
 
-        // Health and ready should still work (call many times)
         for (let i = 0; i < 50; i++) {
-            const healthResponse = await tester.getApp().inject({
-                method: "GET",
-                url: "/health",
-            });
+            const healthResponse = await app.inject({ method: "GET", url: "/health" });
             expect(healthResponse.statusCode).toBe(200);
 
-            const readyResponse = await tester.getApp().inject({
-                method: "GET",
-                url: "/ready",
-            });
+            const readyResponse = await app.inject({ method: "GET", url: "/ready" });
             expect(readyResponse.statusCode).toBe(200);
         }
     });
 
     it("should include Retry-After header when rate limited", async () => {
         const userId = `user_retry_after_test_${++testIdCounter}`;
+        const app = tester.getApp();
 
-        // Hit the rate limit
         for (let i = 0; i < 15; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -527,17 +402,10 @@ describe("Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            await tester.getApp().inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
+            await injectUpload(app, form, userId);
         }
 
-        // Exceed limit
         const testImageExceed = await createTestImage({
             width: 1920,
             height: 1080,
@@ -549,21 +417,14 @@ describe("Rate Limiting", () => {
             filename: "test-exceed.jpg",
             contentType: "image/jpeg",
         });
-        form.append("userId", userId);
 
-        const response = await tester.getApp().inject({
-            method: "POST",
-            url: "/upload",
-            headers: form.getHeaders(),
-            payload: form,
-        });
+        const response = await injectUpload(app, form, userId);
 
         expect(response.statusCode).toBe(429);
         expect(response.headers["retry-after"]).toBeDefined();
 
-        // Should be a number in seconds
         const retryAfter = Number(response.headers["retry-after"]);
         expect(retryAfter).toBeGreaterThan(0);
-        expect(retryAfter).toBeLessThanOrEqual(5); // Should be <= window size (5 seconds)
+        expect(retryAfter).toBeLessThanOrEqual(5);
     });
 });

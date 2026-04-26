@@ -14,7 +14,7 @@ import {
     IngestorMigrationsTesterBuilder,
     InProcessIngestorTesterBuilder,
 } from "./builders/index.js";
-import { uploadFile, uploadFileWithoutUserId } from "./helpers.js";
+import { uploadFile } from "./helpers.js";
 
 describe("Validation Integration Tests", () => {
     const setup = () => {
@@ -385,21 +385,19 @@ describe("Validation Integration Tests", () => {
         it("should reject request without file", async () => {
             const userId = tester.fixtures.generateTestUserId();
 
-            // Create a request without file
             const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
             const formData = [
-                `--${boundary}`,
-                `Content-Disposition: form-data; name="userId"`,
-                "",
-                userId,
                 `--${boundary}--`,
             ].join("\r\n");
+
+            const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
 
             const response = await fastify.inject({
                 method: "POST",
                 url: "/upload",
                 headers: {
                     "content-type": `multipart/form-data; boundary=${boundary}`,
+                    authorization: `Bearer ${encoded}`,
                 },
                 payload: Buffer.from(formData, "binary"),
             });
@@ -409,26 +407,6 @@ describe("Validation Integration Tests", () => {
             const body = JSON.parse(response.body);
             expect(body.type).toContain("missing-file");
             expect(body.title).toBe("Missing File");
-            expect(body.status).toBe(400);
-        });
-    });
-
-    describe("Missing UserId Validation", () => {
-        it("should reject request without userId field", async () => {
-            const filename = tester.fixtures.generateTestFilename("jpg");
-            const imageBuffer = await tester.fixtures.images.validJpeg();
-
-            const response = await uploadFileWithoutUserId(fastify, {
-                file: imageBuffer,
-                filename,
-                mimeType: "image/jpeg",
-            });
-
-            expect(response.statusCode).toBe(400);
-
-            const body = JSON.parse(response.body);
-            expect(body.type).toContain("missing-user-id");
-            expect(body.title).toBe("Missing userId");
             expect(body.status).toBe(400);
         });
     });

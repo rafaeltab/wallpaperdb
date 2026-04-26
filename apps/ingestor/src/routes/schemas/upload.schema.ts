@@ -70,17 +70,13 @@ The file content is validated by detecting the actual MIME type from the file by
  */
 export const uploadBodySchemaForDocs = {
   type: 'object',
-  required: ['file', 'userId'],
+  required: ['file'],
   properties: {
     file: {
       type: 'string',
       format: 'binary',
       description:
         'The wallpaper file to upload. Must be a valid image (JPEG, PNG, WebP) or video (MP4, WebM).',
-    },
-    userId: {
-      type: 'string',
-      description: 'User ID performing the upload. Used for rate limiting and ownership tracking.',
     },
   },
 };

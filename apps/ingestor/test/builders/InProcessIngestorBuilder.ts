@@ -111,6 +111,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                         nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";
                     process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
                         "http://localhost:4318/v1/traces";
+                    process.env.CLERK_SECRET_KEY = "test-clerk-secret-key";
 
                     if (redis === undefined) {
                         process.env.REDIS_ENABLED = "false"; // Disable Redis by default

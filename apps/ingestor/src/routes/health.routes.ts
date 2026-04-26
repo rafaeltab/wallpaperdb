@@ -16,6 +16,7 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get(
     '/health',
     {
+      config: { skipAuth: true },
       schema: {
         summary: 'Health check',
         description:
@@ -45,6 +46,7 @@ async function healthRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get(
     '/ready',
     {
+      config: { skipAuth: true },
       schema: {
         summary: 'Readiness check',
         description:

@@ -3,6 +3,8 @@ export {
   registerOpenAPI,
   type OpenAPIOptions,
   type OpenAPIServer,
+  type SecuritySchemes,
+  type SecurityScheme,
 } from "./plugin.js";
 
 // Schemas

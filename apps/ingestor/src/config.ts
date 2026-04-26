@@ -29,6 +29,8 @@ const configSchema = z.object({
   ...RedisConfigSchema.shape,
   // OTEL config
   ...OtelConfigSchema.shape,
+  // Clerk config
+  clerkDomain: z.string().min(1).optional(),
   // Ingestor-specific config (reconciliation, rate limiting)
   reconciliationIntervalMs: z
     .number()
@@ -81,6 +83,9 @@ export function loadConfig(): Config {
     redisPort: parseIntEnv(process.env.REDIS_PORT),
     redisPassword: process.env.REDIS_PASSWORD,
     redisEnabled: parseBoolEnv(process.env.REDIS_ENABLED, true),
+
+    // Clerk
+    clerkDomain: process.env.CLERK_DOMAIN,
 
     // Ingestor-specific
     reconciliationIntervalMs: parseIntEnv(

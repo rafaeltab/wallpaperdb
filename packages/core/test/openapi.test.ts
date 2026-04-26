@@ -156,6 +156,54 @@ describe("OpenAPI Plugin Registration", () => {
     expect(spec.components.schemas.ReadyResponse).toBeDefined();
   });
 
+  it("should not include any security schemes by default", async () => {
+    await registerOpenAPI(app, {
+      title: "Test API",
+      version: "1.0.0",
+    });
+
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/documentation/json",
+    });
+
+    const spec = JSON.parse(response.payload);
+    expect(spec.components?.securitySchemes).toBeUndefined();
+  });
+
+  it("should include custom security schemes when provided", async () => {
+    await registerOpenAPI(app, {
+      title: "Test API",
+      version: "1.0.0",
+      securitySchemes: {
+        clerkOAuth: {
+          type: "oauth2",
+          flows: {
+            authorizationCode: {
+              authorizationUrl: "https://example.clerk.accounts.dev/oauth/authorize",
+              tokenUrl: "https://example.clerk.accounts.dev/oauth/token",
+              scopes: {},
+            },
+          },
+        },
+      },
+    });
+
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/documentation/json",
+    });
+
+    const spec = JSON.parse(response.payload);
+    expect(spec.components.securitySchemes).toBeDefined();
+    expect(spec.components.securitySchemes.clerkOAuth).toBeDefined();
+    expect(spec.components.securitySchemes.clerkOAuth.type).toBe("oauth2");
+  });
+
   it("should serve Swagger UI at /documentation", async () => {
     await registerOpenAPI(app, {
       title: "Test API",

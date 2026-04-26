@@ -37,6 +37,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
     "@opentelemetry/sdk-metrics": "^1.29.0",
     "@opentelemetry/sdk-node": "^0.56.0",
+    "@wallpaperdb/auth": "workspace:*",
     "@wallpaperdb/core": "workspace:*",
     "@wallpaperdb/events": "workspace:*",
     "@wallpaperdb/url-ipv4-resolver": "workspace:*",

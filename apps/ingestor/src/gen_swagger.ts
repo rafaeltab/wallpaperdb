@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import { getClerkSecuritySchemes } from '@wallpaperdb/auth';
 import Fastify from 'fastify';
 import { registerRoutes } from './routes/index.js';
 import {
@@ -25,6 +26,9 @@ async function generateSwagger(): Promise<string> {
     description:
       'Wallpaper upload and ingestion service. Accepts wallpaper uploads, validates files, stores them in object storage, and publishes events for downstream processing.',
     servers: [{ url: `http://localhost:3001`, description: 'Local development server' }],
+    securitySchemes: getClerkSecuritySchemes({
+      clerkDomain: process.env.CLERK_DOMAIN || 'https://clerk.example.com',
+    }),
     additionalSchemas: {
       UploadSuccessResponse: UploadSuccessResponseJsonSchema,
     },

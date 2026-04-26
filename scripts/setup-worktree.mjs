@@ -506,6 +506,7 @@ function buildServiceOverrides() {
 const knownUserSecrets = {
 	CURSOR_SECRET: () => randomBytes(32).toString("hex"),
 	VITE_CLERK_PUBLISHABLE_KEY: undefined,
+    CLERK_DOMAIN: undefined
 };
 
 function getSecretEnvPath() {

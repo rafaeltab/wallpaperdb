@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { container } from 'tsyringe';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import { getClerkSecuritySchemes } from '@wallpaperdb/auth';
 import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { RedisConnection } from './connections/redis.js';
@@ -97,6 +98,9 @@ export async function createApp(
       config.nodeEnv === 'production'
         ? undefined
         : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
+    securitySchemes: config.clerkDomain
+      ? getClerkSecuritySchemes({ clerkDomain: config.clerkDomain })
+      : undefined,
     additionalSchemas: {
       UploadSuccessResponse: UploadSuccessResponseJsonSchema,
     },

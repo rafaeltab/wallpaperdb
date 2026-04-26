@@ -40,6 +40,44 @@ export interface MultipartBodySchema {
 }
 
 /**
+ * OpenAPI 3.0 Security Scheme Object.
+ * @see https://swagger.io/specification/#security-scheme-object
+ */
+export type SecuritySchemes = Record<string, SecurityScheme>;
+
+export type SecurityScheme =
+  | { type: "apiKey"; in: "query" | "header" | "cookie"; name: string; description?: string }
+  | { type: "http"; scheme: string; bearerFormat?: string; description?: string }
+  | {
+      type: "oauth2";
+      flows: {
+        implicit?: {
+          authorizationUrl: string;
+          refreshUrl?: string;
+          scopes: Record<string, string>;
+        };
+        password?: {
+          tokenUrl: string;
+          refreshUrl?: string;
+          scopes: Record<string, string>;
+        };
+        clientCredentials?: {
+          tokenUrl: string;
+          refreshUrl?: string;
+          scopes: Record<string, string>;
+        };
+        authorizationCode?: {
+          authorizationUrl: string;
+          tokenUrl: string;
+          refreshUrl?: string;
+          scopes: Record<string, string>;
+        };
+      };
+      description?: string;
+    }
+  | { type: "openIdConnect"; openIdConnectUrl: string; description?: string };
+
+/**
  * Options for registering OpenAPI documentation.
  */
 export interface OpenAPIOptions {
@@ -63,6 +101,8 @@ export interface OpenAPIOptions {
    * Fastify doesn't validate multipart bodies, so these are for docs only.
    */
   multipartBodies?: MultipartBodySchema[];
+  /** Security schemes to include in the OpenAPI spec */
+  securitySchemes?: SecuritySchemes;
 }
 
 /**
@@ -131,6 +171,12 @@ export async function registerOpenAPI(
     }
   }
 
+  const openapiComponents: Record<string, unknown> = {};
+
+  if (options.securitySchemes) {
+    openapiComponents.securitySchemes = options.securitySchemes;
+  }
+
   // Register @fastify/swagger for OpenAPI spec generation
   const swaggerOptions: SwaggerOptions = {
     openapi: {
@@ -141,17 +187,7 @@ export async function registerOpenAPI(
         description: options.description,
       },
       servers: options.servers,
-      components: {
-        securitySchemes: {
-          // Common auth scheme (can be extended per-service)
-          userId: {
-            type: "apiKey",
-            in: "header",
-            name: "x-user-id",
-            description: "User ID for authentication",
-          },
-        },
-      },
+      ...(Object.keys(openapiComponents).length > 0 ? { components: openapiComponents } : {}),
     },
     // refResolver tells swagger to use the schemas we added via addSchema
     refResolver: {

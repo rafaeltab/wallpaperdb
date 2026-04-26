@@ -141,7 +141,7 @@ export default async function uploadRoutes(fastify: FastifyInstance) {
   });
 
   // POST /upload - Upload a wallpaper
-  fastify.post('/upload', { schema: uploadRouteSchema }, uploadHandler);
+  fastify.post('/upload', { config: { skipAuth: true }, schema: uploadRouteSchema }, uploadHandler);
 }
 
 function parseUserId(data: MultipartFile): string {

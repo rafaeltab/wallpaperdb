@@ -31,6 +31,7 @@ const configSchema = z.object({
   ...OtelConfigSchema.shape,
   // Clerk config
   clerkDomain: z.string().min(1).optional(),
+  clerkSecretKey: z.string().min(1),
   // Ingestor-specific config (reconciliation, rate limiting)
   reconciliationIntervalMs: z
     .number()
@@ -86,6 +87,7 @@ export function loadConfig(): Config {
 
     // Clerk
     clerkDomain: process.env.CLERK_DOMAIN,
+    clerkSecretKey: process.env.CLERK_SECRET_KEY,
 
     // Ingestor-specific
     reconciliationIntervalMs: parseIntEnv(

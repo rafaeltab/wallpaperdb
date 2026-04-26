@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import { container } from 'tsyringe';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import { getClerkSecuritySchemes } from '@wallpaperdb/auth';
+import { getClerkSecuritySchemes, registerAuth } from '@wallpaperdb/auth';
 import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { RedisConnection } from './connections/redis.js';
@@ -32,6 +32,10 @@ declare module 'fastify' {
     connectionsState: ConnectionsState;
     rateLimitService: RateLimitService;
     container: typeof container;
+  }
+
+  interface FastifyContextConfig {
+    skipAuth?: boolean;
   }
 }
 
@@ -86,6 +90,11 @@ export async function createApp(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
+  });
+
+  await registerAuth(fastify, {
+    secretKey: config.clerkSecretKey,
+    testMode: config.nodeEnv !== 'production',
   });
 
   // Register OpenAPI documentation

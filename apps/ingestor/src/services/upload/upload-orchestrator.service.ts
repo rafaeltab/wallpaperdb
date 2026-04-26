@@ -1,4 +1,5 @@
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
+import type { User } from '@wallpaperdb/auth';
 import { and, eq, inArray } from 'drizzle-orm';
 import { inject, injectable } from 'tsyringe';
 import { ulid } from 'ulid';
@@ -16,7 +17,7 @@ export interface UploadParams {
   buffer: Buffer;
   originalFilename: string;
   providedMimeType: string;
-  userId: string;
+  user: User;
 }
 
 export interface UploadResult {
@@ -54,11 +55,9 @@ export class UploadOrchestrator {
     @inject('TimeService') private readonly timeService: TimeService
   ) {}
 
-  /**
-   * Execute the full upload workflow.
-   */
   async handleUpload(params: UploadParams): Promise<UploadResult> {
-    const { buffer, originalFilename, providedMimeType, userId } = params;
+    const { buffer, originalFilename, providedMimeType, user } = params;
+    const userId = user.id;
     const startTime = Date.now();
 
     return await withSpan(
@@ -66,10 +65,8 @@ export class UploadOrchestrator {
       { [Attributes.USER_ID]: userId },
       async (span) => {
         try {
-          // Step 1: Get user validation limits
-          const limits = await this.validationLimitsService.getLimitsForUser(userId);
+          const limits = await this.validationLimitsService.getLimitsForUser(user);
 
-          // Step 2: Process file (hash, validate, extract metadata)
           const fileMetadata = await this.fileProcessorService.process(
             buffer,
             originalFilename,
@@ -77,15 +74,13 @@ export class UploadOrchestrator {
             providedMimeType
           );
 
-          // Add file metadata to span
           span.setAttribute(Attributes.FILE_TYPE, fileMetadata.fileType);
           span.setAttribute(Attributes.FILE_MIME_TYPE, fileMetadata.mimeType);
           span.setAttribute(Attributes.FILE_SIZE_BYTES, fileMetadata.fileSizeBytes);
           span.setAttribute(Attributes.FILE_WIDTH, fileMetadata.width);
           span.setAttribute(Attributes.FILE_HEIGHT, fileMetadata.height);
 
-          // Step 3: Check for duplicate upload (by content hash)
-          const existing = await this.checkDuplicate(userId, fileMetadata.contentHash);
+          const existing = await this.checkDuplicate(user, fileMetadata.contentHash);
           if (existing) {
             this.recordUploadMetrics(
               'duplicate',
@@ -96,13 +91,11 @@ export class UploadOrchestrator {
             return this.createIdempotentResponse(existing);
           }
 
-          // Step 4: Generate ID and record intent (write-ahead)
           const wallpaperId = `wlpr_${ulid()}`;
           span.setAttribute(Attributes.WALLPAPER_ID, wallpaperId);
-          await this.recordIntent(wallpaperId, userId, fileMetadata.contentHash);
+          await this.recordIntent(wallpaperId, user, fileMetadata.contentHash);
 
           try {
-            // Step 5-7: Execute upload workflow
             const result = await this.executeUpload(wallpaperId, params, fileMetadata);
             this.recordUploadMetrics(
               'success',
@@ -112,7 +105,6 @@ export class UploadOrchestrator {
             );
             return result;
           } catch (error) {
-            // Mark as failed and rethrow
             await this.markAsFailed(wallpaperId, error);
             throw error;
           }
@@ -144,13 +136,11 @@ export class UploadOrchestrator {
     recordHistogram('upload.file_size_bytes', fileSizeBytes, { [Attributes.FILE_TYPE]: fileType });
   }
 
-  /**
-   * Check if a wallpaper with the same content hash already exists.
-   */
   private async checkDuplicate(
-    userId: string,
+    user: User,
     contentHash: string
   ): Promise<typeof wallpapers.$inferSelect | null> {
+    const userId = user.id;
     return await withSpan(
       'upload.orchestrator.check_duplicate',
       { [Attributes.USER_ID]: userId, [Attributes.FILE_HASH]: contentHash },
@@ -189,14 +179,8 @@ export class UploadOrchestrator {
     };
   }
 
-  /**
-   * Record upload intent (write-ahead log).
-   */
-  private async recordIntent(
-    wallpaperId: string,
-    userId: string,
-    contentHash: string
-  ): Promise<void> {
+  private async recordIntent(wallpaperId: string, user: User, contentHash: string): Promise<void> {
+    const userId = user.id;
     return await withSpan(
       'upload.orchestrator.record_intent',
       {
@@ -216,24 +200,21 @@ export class UploadOrchestrator {
     );
   }
 
-  /**
-   * Execute the upload workflow: upload to storage, update metadata, publish event.
-   */
   private async executeUpload(
     wallpaperId: string,
     params: UploadParams,
     fileMetadata: Awaited<ReturnType<FileProcessorService['process']>>
   ): Promise<UploadResult> {
+    const userId = params.user.id;
     return await withSpan(
       'upload.orchestrator.execute_upload',
       {
         [Attributes.WALLPAPER_ID]: wallpaperId,
-        [Attributes.USER_ID]: params.userId,
+        [Attributes.USER_ID]: userId,
         [Attributes.FILE_TYPE]: fileMetadata.fileType,
         [Attributes.FILE_SIZE_BYTES]: fileMetadata.fileSizeBytes,
       },
       async (span) => {
-        // Step 5: Transition to 'uploading' and upload to MinIO
         await this.stateMachine.transitionToUploading(wallpaperId);
 
         const storageResult = await this.storageService.upload(
@@ -241,7 +222,7 @@ export class UploadOrchestrator {
           params.buffer,
           fileMetadata.mimeType,
           fileMetadata.extension,
-          params.userId
+          userId
         );
 
         span.setAttribute(Attributes.STORAGE_BUCKET, storageResult.storageBucket);

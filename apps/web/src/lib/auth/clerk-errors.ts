@@ -1,7 +1,8 @@
 const CLERK_ERROR_MESSAGES: Record<string, string> = {
   form_identifier_not_found: 'No account found with this email.',
   form_password_incorrect: 'The password you entered is incorrect.',
-  form_password_pwned: 'This password has been compromised in a data breach. Please choose a different one.',
+  form_password_pwned:
+    'This password has been compromised in a data breach. Please choose a different one.',
   form_code_incorrect: 'The verification code you entered is incorrect.',
   strategy_for_user_invalid: 'This sign-in method is not available for your account.',
   not_allowed_to_sign_up: 'Sign up is not available right now.',
@@ -20,10 +21,13 @@ const CLERK_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export function formatClerkGlobalErrors(
-  errors: { code: string; longMessage?: string; message: string }[] | null | undefined,
+  errors: { code: string; longMessage?: string; message: string }[] | null | undefined
 ): string | null {
   if (!errors?.length) return null;
   return errors
-    .map((e) => CLERK_ERROR_MESSAGES[e.code] ?? e.longMessage ?? 'Something went wrong. Please try again.')
+    .map(
+      (e) =>
+        CLERK_ERROR_MESSAGES[e.code] ?? e.longMessage ?? 'Something went wrong. Please try again.'
+    )
     .join(', ');
 }

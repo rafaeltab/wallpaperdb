@@ -54,21 +54,25 @@ export async function cleanupDatabase(_config: Config) {
   // await pool.end();
 }
 
+function mockAuthHeader(userId: string): Record<string, string> {
+  const encoded = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+  return { authorization: `Bearer ${encoded}` };
+}
+
 /**
- * Upload a file using multipart/form-data
+ * Upload a file using multipart/form-data with auth header
  */
 export async function uploadFile(
   fastify: FastifyInstance,
   options: {
     file: Buffer;
     filename: string;
-    userId: string;
+    userId?: string;
     mimeType?: string;
   }
 ) {
   const { file, filename, userId, mimeType = 'image/jpeg' } = options;
 
-  // Create multipart form data manually
   const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
   const formData = [
     `--${boundary}`,
@@ -76,53 +80,21 @@ export async function uploadFile(
     `Content-Type: ${mimeType}`,
     '',
     file.toString('binary'),
-    `--${boundary}`,
-    `Content-Disposition: form-data; name="userId"`,
-    '',
-    userId,
     `--${boundary}--`,
   ].join('\r\n');
 
-  return fastify.inject({
-    method: 'POST',
-    url: '/upload',
-    headers: {
-      'content-type': `multipart/form-data; boundary=${boundary}`,
-    },
-    payload: Buffer.from(formData, 'binary'),
-  });
-}
+  const headers: Record<string, string> = {
+    'content-type': `multipart/form-data; boundary=${boundary}`,
+  };
 
-/**
- * Upload a file without userId field (to test missing userId error)
- */
-export async function uploadFileWithoutUserId(
-  fastify: FastifyInstance,
-  options: {
-    file: Buffer;
-    filename: string;
-    mimeType?: string;
+  if (userId) {
+    Object.assign(headers, mockAuthHeader(userId));
   }
-) {
-  const { file, filename, mimeType = 'image/jpeg' } = options;
-
-  // Create multipart form data without userId field
-  const boundary = `----WebKitFormBoundary${Math.random().toString(36)}`;
-  const formData = [
-    `--${boundary}`,
-    `Content-Disposition: form-data; name="file"; filename="${filename}"`,
-    `Content-Type: ${mimeType}`,
-    '',
-    file.toString('binary'),
-    `--${boundary}--`,
-  ].join('\r\n');
 
   return fastify.inject({
     method: 'POST',
     url: '/upload',
-    headers: {
-      'content-type': `multipart/form-data; boundary=${boundary}`,
-    },
+    headers,
     payload: Buffer.from(formData, 'binary'),
   });
 }

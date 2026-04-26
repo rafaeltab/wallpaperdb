@@ -76,6 +76,11 @@ function generateTestUserId(): string {
     return `user_e2e_${Math.random().toString(36).substring(7)}`;
 }
 
+function mockAuthHeader(userId: string): Record<string, string> {
+    const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
+    return { authorization: `Bearer ${encoded}` };
+}
+
 describe("Upload E2E", () => {
     const setup = () => {
         // Build test environment with builder composition
@@ -126,23 +131,21 @@ describe("Upload E2E", () => {
     });
 
     test("upload JPEG wallpaper creates S3 object and database record", async () => {
-        // Arrange: Create test image and form data
         const testImage = await createTestJpeg();
         const userId = generateTestUserId();
         const filename = `test-wallpaper-${Date.now()}.jpg`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
             filename,
         );
 
-        // Act: Upload via HTTP to Docker container
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Verify: HTTP response
@@ -188,22 +191,20 @@ describe("Upload E2E", () => {
     });
 
     test("upload invalid file returns 400 error without creating side effects", async () => {
-        // Arrange: Create invalid file
         const invalidFile = Buffer.from("This is not an image");
         const userId = generateTestUserId();
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([invalidFile], { type: "text/plain" }),
             "invalid.txt",
         );
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Verify: HTTP error response
@@ -229,14 +230,11 @@ describe("Upload E2E", () => {
     });
 
     test("uploading duplicate file returns already_uploaded status without creating duplicate records", async () => {
-        // Arrange: Create test image and user
         const testImage = await createTestJpeg();
         const userId = generateTestUserId();
         const filename = `duplicate-test-${Date.now()}.jpg`;
 
-        // Act: Upload the same image twice
         const formData1 = new FormData();
-        formData1.append("userId", userId);
         formData1.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
@@ -246,6 +244,7 @@ describe("Upload E2E", () => {
         const response1 = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData1,
+            headers: mockAuthHeader(userId),
         });
 
         // Verify first upload succeeded
@@ -258,7 +257,6 @@ describe("Upload E2E", () => {
 
         // Upload the same file again with the same user
         const formData2 = new FormData();
-        formData2.append("userId", userId);
         formData2.append(
             "file",
             new Blob([testImage], { type: "image/jpeg" }),
@@ -268,6 +266,7 @@ describe("Upload E2E", () => {
         const response2 = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData2,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: Second upload returns 200 with already_uploaded status (idempotency)
@@ -298,23 +297,21 @@ describe("Upload E2E", () => {
     });
 
     test("upload PNG wallpaper creates S3 object and database record", async () => {
-        // Arrange: Create test PNG image and form data
         const testImage = await createTestPng();
         const userId = generateTestUserId();
         const filename = `test-wallpaper-${Date.now()}.png`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/png" }),
             filename,
         );
 
-        // Act: Upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP response
@@ -359,23 +356,21 @@ describe("Upload E2E", () => {
     });
 
     test("upload WebP wallpaper creates S3 object and database record", async () => {
-        // Arrange: Create test WebP image and form data
         const testImage = await createTestWebP();
         const userId = generateTestUserId();
         const filename = `test-wallpaper-${Date.now()}.webp`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([testImage], { type: "image/webp" }),
             filename,
         );
 
-        // Act: Upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP response
@@ -420,23 +415,21 @@ describe("Upload E2E", () => {
     });
 
     test("upload image below minimum dimensions returns 400 error", async () => {
-        // Arrange: Create test image below minimum dimensions (640x480, need 1280x720)
         const smallImage = await createSmallTestJpeg();
         const userId = generateTestUserId();
         const filename = `small-wallpaper-${Date.now()}.jpg`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([smallImage], { type: "image/jpeg" }),
             filename,
         );
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP error response
@@ -459,8 +452,7 @@ describe("Upload E2E", () => {
         expect(dbResult).toHaveLength(0);
     });
 
-    test("upload without userId returns 400 error", async () => {
-        // Arrange: Create test image but omit userId
+    test("upload without auth returns 401 error", async () => {
         const testImage = await createTestJpeg();
         const filename = `test-wallpaper-${Date.now()}.jpg`;
 
@@ -470,20 +462,16 @@ describe("Upload E2E", () => {
             new Blob([testImage], { type: "image/jpeg" }),
             filename,
         );
-        // Intentionally omit userId
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
         });
 
-        // Assert: HTTP error response
-        expect(response.statusCode).toBe(400);
+        expect(response.statusCode).toBe(401);
         const body = (await response.body.json()) as object;
         expect(body).toHaveProperty("type");
-        // Note: Validation order changed - file validation happens first
-        expect((body as { type: unknown }).type).toMatch(/missing-(user-id|file)/);
+        expect((body as { type: unknown }).type).toMatch(/unauthorized/);
 
         // Verify: No S3 object created
         const s3Objects = await tester.minio.listObjects(
@@ -497,23 +485,21 @@ describe("Upload E2E", () => {
     });
 
     test("upload empty file returns 400 error", async () => {
-        // Arrange: Create empty file (0 bytes)
         const emptyFile = Buffer.alloc(0);
         const userId = generateTestUserId();
         const filename = `empty-file-${Date.now()}.jpg`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([emptyFile], { type: "image/jpeg" }),
             filename,
         );
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP error response
@@ -537,17 +523,14 @@ describe("Upload E2E", () => {
     });
 
     test("upload with no file field returns 400 error", async () => {
-        // Arrange: Create form data with only userId, no file
         const userId = generateTestUserId();
 
         const formData = new FormData();
-        formData.append("userId", userId);
-        // Intentionally omit file field
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP error response
@@ -568,49 +551,25 @@ describe("Upload E2E", () => {
     });
 
     test("upload video file returns 400 error (format not supported)", async () => {
-        // Arrange: Create minimal MP4 file header (video format not supported)
-        // This is a minimal valid MP4 file signature
         const mp4Header = Buffer.from([
-            0x00,
-            0x00,
-            0x00,
-            0x18,
-            0x66,
-            0x74,
-            0x79,
-            0x70, // ftyp box
-            0x6d,
-            0x70,
-            0x34,
-            0x32,
-            0x00,
-            0x00,
-            0x00,
-            0x00, // mp42
-            0x6d,
-            0x70,
-            0x34,
-            0x32,
-            0x69,
-            0x73,
-            0x6f,
-            0x6d, // isommp42
+            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+            0x6d, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00,
+            0x6d, 0x70, 0x34, 0x32, 0x69, 0x73, 0x6f, 0x6d,
         ]);
         const userId = generateTestUserId();
         const filename = `test-video-${Date.now()}.mp4`;
 
         const formData = new FormData();
-        formData.append("userId", userId);
         formData.append(
             "file",
             new Blob([mp4Header], { type: "video/mp4" }),
             filename,
         );
 
-        // Act: Attempt upload via HTTP
         const response = await request(`${baseUrl}/upload`, {
             method: "POST",
             body: formData,
+            headers: mockAuthHeader(userId),
         });
 
         // Assert: HTTP error response (video not supported)

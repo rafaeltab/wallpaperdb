@@ -12,13 +12,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "healthy",
-              "unhealthy",
-              "degraded",
-              "error",
-              "shutting_down"
-            ],
+            "enum": ["healthy", "unhealthy", "degraded", "error", "shutting_down"],
             "description": "Overall health status of the service"
           },
           "checks": {
@@ -41,11 +35,7 @@
             "description": "Duration of all checks in milliseconds"
           }
         },
-        "required": [
-          "status",
-          "checks",
-          "timestamp"
-        ],
+        "required": ["status", "checks", "timestamp"],
         "additionalProperties": false
       },
       "ReadyResponse": {
@@ -64,10 +54,7 @@
             "description": "Reason if service is not ready"
           }
         },
-        "required": [
-          "ready",
-          "timestamp"
-        ],
+        "required": ["ready", "timestamp"],
         "additionalProperties": false
       },
       "ProblemDetails": {
@@ -142,10 +129,7 @@
                   "description": "Error code for programmatic handling"
                 }
               },
-              "required": [
-                "field",
-                "message"
-              ],
+              "required": ["field", "message"],
               "additionalProperties": false
             },
             "description": "Array of validation errors"
@@ -160,9 +144,7 @@
     "/health": {
       "get": {
         "summary": "Health check",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "description": "Returns health status of the media service and its dependencies. Checks database, object storage, and message queue connectivity.",
         "responses": {
           "200": {
@@ -191,9 +173,7 @@
     "/ready": {
       "get": {
         "summary": "Readiness check",
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "description": "Returns 200 if service is ready to handle requests, 503 otherwise. Use for Kubernetes readiness probes.",
         "responses": {
           "200": {

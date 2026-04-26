@@ -7,7 +7,7 @@ import { ClerkAuthService } from "./clerk-auth-service.js";
 import { MockAuthService } from "./mock-auth-service.js";
 
 export interface RegisterAuthOptions {
-  secretKey: string;
+  secretKey?: string;
   testMode?: boolean;
 }
 

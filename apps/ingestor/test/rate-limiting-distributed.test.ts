@@ -21,19 +21,19 @@ import { createTestLogger } from "@wallpaperdb/test-logger";
 
 const logger = createTestLogger("rate-limiting-distributed");
 
-/**
- * E2E Multi-Instance Rate Limiting Tests
- *
- * These tests verify that rate limiting works correctly when multiple
- * service instances share the same Redis store.
- *
- * Test Scenarios:
- * 1. Multiple instances enforce same rate limit (not per-instance)
- * 2. Rate limit counter is shared across all instances
- * 3. One instance hitting limit blocks requests on other instances
- * 4. Rate limits are isolated per user across instances
- * 5. Rate limit resets after time window expires
- */
+function mockAuthHeader(userId: string): Record<string, string> {
+    const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
+    return { authorization: `Bearer ${encoded}` };
+}
+
+function injectUpload(app: FastifyInstance, form: FormData, userId: string) {
+    return app.inject({
+        method: "POST",
+        url: "/upload",
+        headers: { ...form.getHeaders(), ...mockAuthHeader(userId) },
+        payload: form,
+    });
+}
 
 describe("Multi-Instance Rate Limiting", () => {
     const setup = () => {
@@ -79,8 +79,7 @@ describe("Multi-Instance Rate Limiting", () => {
 
         const config = loadConfig();
 
-        // Start 3 app instances
-        const config1 = { ...config, port: 0 }; // Use random port
+        const config1 = { ...config, port: 0 };
         const config2 = { ...config, port: 0 };
         const config3 = { ...config, port: 0 };
 
@@ -93,7 +92,7 @@ describe("Multi-Instance Rate Limiting", () => {
         await app3.ready();
 
         logger.debug("All instances started");
-    }, 120000); // 2 minute timeout for container startup
+    }, 120000);
 
     afterAll(async () => {
         await app1.close();
@@ -105,11 +104,9 @@ describe("Multi-Instance Rate Limiting", () => {
     it("should enforce rate limit across all instances (not per-instance)", async () => {
         const userId = "user_distributed_test";
 
-        // Make 10 requests distributed across 3 instances (rate limit = 10)
         const requests: Promise<LightMyRequestResponse>[] = [];
 
         for (let i = 0; i < 10; i++) {
-            // Create unique image for each upload (to avoid deduplication)
             const testImage = await createTestImage({
                 width: 1920,
                 height: 1080,
@@ -122,28 +119,16 @@ describe("Multi-Instance Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            // Round-robin across instances
             const app = [app1, app2, app3][i % 3];
-
-            requests.push(
-                app.inject({
-                    method: "POST",
-                    url: "/upload",
-                    headers: form.getHeaders(),
-                    payload: form,
-                }),
-            );
+            requests.push(injectUpload(app, form, userId));
         }
 
         const responses = await Promise.all(requests);
 
-        // All 10 should succeed (exactly at limit)
         const successCount = responses.filter((r) => r.statusCode === 200).length;
         expect(successCount).toBe(10);
 
-        // 11th request should fail on ANY instance
         const testImage11 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -155,22 +140,12 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "test-11.jpg",
             contentType: "image/jpeg",
         });
-        form11.append("userId", userId);
 
-        const response11 = await app1.inject({
-            method: "POST",
-            url: "/upload",
-            headers: form11.getHeaders(),
-            payload: form11,
-        });
-
+        const response11 = await injectUpload(app1, form11, userId);
         expect(response11.statusCode).toBe(429);
 
-        // Verify error format
         const body = JSON.parse(response11.body);
-        expect(body.type).toBe(
-            "https://wallpaperdb.example/problems/rate-limit-exceeded",
-        );
+        expect(body.type).toBe("https://wallpaperdb.example/problems/rate-limit-exceeded");
         expect(body.status).toBe(429);
         expect(body.retryAfter).toBeDefined();
     });
@@ -178,7 +153,6 @@ describe("Multi-Instance Rate Limiting", () => {
     it("should share rate limit counter across instances", async () => {
         const userId = "user_counter_test";
 
-        // Instance 1: Make 5 requests
         for (let i = 0; i < 5; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -191,25 +165,14 @@ describe("Multi-Instance Rate Limiting", () => {
                 filename: `app1-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            const response = await app1.inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app1, form, userId);
             expect(response.statusCode).toBe(200);
 
-            // Check rate limit headers
             expect(response.headers["x-ratelimit-limit"]).toBe("10");
-            expect(Number(response.headers["x-ratelimit-remaining"])).toBe(
-                10 - (i + 1),
-            );
+            expect(Number(response.headers["x-ratelimit-remaining"])).toBe(10 - (i + 1));
         }
 
-        // Instance 2: Make 5 more requests (should reach limit)
         for (let i = 0; i < 5; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -222,19 +185,11 @@ describe("Multi-Instance Rate Limiting", () => {
                 filename: `app2-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
-            const response = await app2.inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
-
+            const response = await injectUpload(app2, form, userId);
             expect(response.statusCode).toBe(200);
         }
 
-        // Instance 3: 11th request should fail
         const testImage11 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -246,21 +201,13 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "app3-exceed.jpg",
             contentType: "image/jpeg",
         });
-        form11.append("userId", userId);
 
-        const response11 = await app3.inject({
-            method: "POST",
-            url: "/upload",
-            headers: form11.getHeaders(),
-            payload: form11,
-        });
-
+        const response11 = await injectUpload(app3, form11, userId);
         expect(response11.statusCode).toBe(429);
         expect(response11.headers["x-ratelimit-remaining"]).toBe("0");
     });
 
     it("should isolate rate limits per user across instances", async () => {
-        // User A: Hit limit on instance 1
         for (let i = 0; i < 10; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -273,17 +220,10 @@ describe("Multi-Instance Rate Limiting", () => {
                 filename: `userA-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", "user_a_isolated");
 
-            await app1.inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
+            await injectUpload(app1, form, "user_a_isolated");
         }
 
-        // User A: Verify rate limited on instance 2
         const testImageA11 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -295,18 +235,10 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "userA-exceed.jpg",
             contentType: "image/jpeg",
         });
-        formA11.append("userId", "user_a_isolated");
 
-        const responseA11 = await app2.inject({
-            method: "POST",
-            url: "/upload",
-            headers: formA11.getHeaders(),
-            payload: formA11,
-        });
-
+        const responseA11 = await injectUpload(app2, formA11, "user_a_isolated");
         expect(responseA11.statusCode).toBe(429);
 
-        // User B: Should still be able to upload on instance 3
         const testImageB1 = await createTestImage({
             width: 1920,
             height: 1080,
@@ -318,22 +250,14 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "userB-1.jpg",
             contentType: "image/jpeg",
         });
-        formB1.append("userId", "user_b_isolated");
 
-        const responseB1 = await app3.inject({
-            method: "POST",
-            url: "/upload",
-            headers: formB1.getHeaders(),
-            payload: formB1,
-        });
-
+        const responseB1 = await injectUpload(app3, formB1, "user_b_isolated");
         expect(responseB1.statusCode).toBe(200);
     });
 
     it("should reset rate limit after time window expires", async () => {
         const userId = "user_reset_test";
 
-        // Hit rate limit across instances
         for (let i = 0; i < 10; i++) {
             const testImage = await createTestImage({
                 width: 1920,
@@ -346,18 +270,11 @@ describe("Multi-Instance Rate Limiting", () => {
                 filename: `test-${i}.jpg`,
                 contentType: "image/jpeg",
             });
-            form.append("userId", userId);
 
             const app = [app1, app2, app3][i % 3];
-            await app.inject({
-                method: "POST",
-                url: "/upload",
-                headers: form.getHeaders(),
-                payload: form,
-            });
+            await injectUpload(app, form, userId);
         }
 
-        // Verify rate limited
         const testImageExceed = await createTestImage({
             width: 1920,
             height: 1080,
@@ -369,22 +286,13 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "test-exceed.jpg",
             contentType: "image/jpeg",
         });
-        formExceed.append("userId", userId);
 
-        const responseExceed = await app1.inject({
-            method: "POST",
-            url: "/upload",
-            headers: formExceed.getHeaders(),
-            payload: formExceed,
-        });
-
+        const responseExceed = await injectUpload(app1, formExceed, userId);
         expect(responseExceed.statusCode).toBe(429);
 
-        // Wait for window to expire (10 seconds + buffer)
         logger.debug("Waiting for rate limit window to expire...");
         await new Promise((resolve) => setTimeout(resolve, 11000));
 
-        // After reset, should be able to upload again
         const testImageAfterReset = await createTestImage({
             width: 1920,
             height: 1080,
@@ -396,15 +304,8 @@ describe("Multi-Instance Rate Limiting", () => {
             filename: "test-after-reset.jpg",
             contentType: "image/jpeg",
         });
-        formAfterReset.append("userId", userId);
 
-        const responseAfterReset = await app2.inject({
-            method: "POST",
-            url: "/upload",
-            headers: formAfterReset.getHeaders(),
-            payload: formAfterReset,
-        });
-
+        const responseAfterReset = await injectUpload(app2, formAfterReset, userId);
         expect(responseAfterReset.statusCode).toBe(200);
-    }, 30000); // Extended timeout for waiting
+    }, 30000);
 });

@@ -31,7 +31,7 @@ const configSchema = z.object({
   ...OtelConfigSchema.shape,
   // Clerk config
   clerkDomain: z.string().min(1).optional(),
-  clerkSecretKey: z.string().min(1),
+  clerkSecretKey: z.string().min(1).optional(),
   // Ingestor-specific config (reconciliation, rate limiting)
   reconciliationIntervalMs: z
     .number()

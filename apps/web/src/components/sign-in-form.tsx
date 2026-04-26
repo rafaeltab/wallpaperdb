@@ -51,7 +51,7 @@ export function SignInForm() {
       });
     } else if (signIn.status === 'needs_second_factor') {
       const emailCodeFactor = signIn.supportedSecondFactors?.find(
-        (factor) => factor.strategy === 'email_code',
+        (factor) => factor.strategy === 'email_code'
       );
       if (emailCodeFactor) {
         await signIn.mfa.sendEmailCode();

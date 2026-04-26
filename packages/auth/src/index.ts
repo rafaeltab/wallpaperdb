@@ -2,6 +2,12 @@ export interface User {
   id: string;
 }
 
+export type { IAuthService } from "./i-auth-service.js";
+export { IAuthServiceToken } from "./i-auth-service.js";
+export { ClerkAuthService } from "./clerk-auth-service.js";
+export { MockAuthService } from "./mock-auth-service.js";
+export { registerAuth, type RegisterAuthOptions } from "./register-auth.js";
+
 export interface ClerkSecuritySchemesOptions {
   clerkDomain: string;
 }

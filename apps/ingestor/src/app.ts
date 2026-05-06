@@ -94,7 +94,7 @@ export async function createApp(
 
   await registerAuth(fastify, {
     secretKey: config.clerkSecretKey,
-    testMode: config.nodeEnv !== 'production',
+    testMode: config.nodeEnv === 'test',
   });
 
   // Register OpenAPI documentation

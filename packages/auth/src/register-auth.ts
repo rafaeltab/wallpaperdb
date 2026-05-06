@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import type { FastifyInstance } from "fastify";
 import { container } from "tsyringe";
+import { trace } from "@opentelemetry/api";
 import { IAuthServiceToken } from "./i-auth-service.js";
 import type { IAuthService } from "./i-auth-service.js";
 import { ClerkAuthService } from "./clerk-auth-service.js";
@@ -43,7 +44,7 @@ export async function registerAuth(
     await app.register(clerkPlugin, { secretKey });
   }
 
-  app.addHook("onRequest", async (request, reply) => {
+  app.addHook("preHandler", async (request, reply) => {
     const routeConfig = request.routeOptions.config as RouteConfigWithAuth | undefined;
     if (routeConfig?.skipAuth) {
       return;
@@ -60,5 +61,7 @@ export async function registerAuth(
         instance: request.url,
       });
     }
+
+    trace.getActiveSpan()?.addEvent("auth.user_resolved", { "user.id": user.id });
   });
 }

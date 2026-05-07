@@ -29,6 +29,8 @@ interface SearchHit {
   sort?: unknown[];
 }
 
+const COLOR_SORT_K = 10_000;
+
 /**
  * Repository for wallpaper documents in OpenSearch
  */
@@ -212,6 +214,7 @@ export class WallpaperRepository {
       aspectRatio?: number;
       format?: string;
     };
+    colorVector?: number[];
     searchAfter?: CursorValue[];
     size?: number;
     sortOrder?: 'asc' | 'desc';
@@ -235,10 +238,11 @@ export class WallpaperRepository {
         span.setAttribute('search.sort.order', sortOrder);
 
         const must: unknown[] = [];
+        const filter: unknown[] = [];
 
         // User filter
         if (params.userId) {
-          must.push({ term: { userId: params.userId } });
+          filter.push({ term: { userId: params.userId } });
         }
 
         // Variant filters using nested query
@@ -270,7 +274,7 @@ export class WallpaperRepository {
           }
 
           if (variantMust.length > 0) {
-            must.push({
+            filter.push({
               nested: {
                 path: 'variants',
                 query: {
@@ -283,16 +287,28 @@ export class WallpaperRepository {
           }
         }
 
+        if (params.colorVector) {
+          must.push({
+            knn: {
+              colorHistogram: {
+                vector: params.colorVector,
+                k: COLOR_SORT_K,
+              },
+            },
+          });
+        }
+
         try {
           const body: {
             query: {
               bool: {
                 must: unknown[];
+                filter?: unknown[];
               };
             };
             search_after?: CursorValue[];
             size: number;
-            sort: Array<{ wallpaperId: 'asc' | 'desc' }>;
+            sort: Array<Record<string, 'asc' | 'desc'>>;
           } = {
             query: {
               bool: {
@@ -300,8 +316,17 @@ export class WallpaperRepository {
               },
             },
             size: pageSize,
-            sort: [{ wallpaperId: sortOrder }],
+            sort: params.colorVector
+              ? [
+                  { _score: sortOrder },
+                  { wallpaperId: sortOrder === 'desc' ? 'asc' : 'desc' },
+                ]
+              : [{ wallpaperId: sortOrder }],
           };
+
+          if (filter.length > 0) {
+            body.query.bool.filter = filter;
+          }
 
           if (params.searchAfter) {
             body.search_after = params.searchAfter;

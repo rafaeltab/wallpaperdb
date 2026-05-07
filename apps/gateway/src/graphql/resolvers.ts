@@ -2,6 +2,10 @@ import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaper
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
+import {
+  ColorSortService,
+  type ColorInput as ColorSortColorInput,
+} from '../services/color-sort.service.js';
 import { CursorService, type CursorValue } from '../services/cursor.service.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
@@ -30,6 +34,11 @@ interface WallpaperFilter {
 
 interface SearchArgs {
   filter?: WallpaperFilter;
+  sort?: {
+    color?: {
+      colors: ColorSortColorInput[];
+    };
+  };
   first?: number;
   after?: string;
   last?: number;
@@ -62,6 +71,8 @@ interface Wallpaper {
  */
 @singleton()
 export class Resolvers {
+  private readonly colorSortService = new ColorSortService();
+
   constructor(
     @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
     @inject(CursorService) private readonly cursorService: CursorService,
@@ -95,6 +106,17 @@ export class Resolvers {
   private async searchWallpapers(args: SearchArgs) {
     const limit = args.first ?? args.last ?? 10;
     const isBackwardPagination = args.last !== undefined && args.before !== undefined;
+    const colorSort = args.sort?.color;
+    const colorVector = colorSort
+      ? this.colorSortService.buildQueryVector({ colors: colorSort.colors })
+      : undefined;
+    const sortOrder = colorVector
+      ? isBackwardPagination
+        ? 'asc'
+        : 'desc'
+      : isBackwardPagination
+        ? 'desc'
+        : 'asc';
 
     return await withSpan(
       'graphql.resolve.searchWallpapers',
@@ -122,9 +144,10 @@ export class Resolvers {
         const result = await this.repository.search({
           userId: args.filter?.userId,
           variantFilters: args.filter?.variants,
+          colorVector,
           searchAfter,
           size: limit + 1, // Fetch one extra to determine hasNextPage
-          sortOrder: isBackwardPagination ? 'desc' : 'asc',
+          sortOrder,
         });
 
         // Check if there are more results

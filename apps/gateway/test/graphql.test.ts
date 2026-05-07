@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 const logger = createTestLogger("graphql.test");
 import type { WallpaperDocument } from "../src/repositories/wallpaper.repository.js";
 import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { ColorSortService } from "../src/services/color-sort.service.js";
 import { tester } from "./setup.js";
 
 describe("GraphQL API Integration", () => {
@@ -427,6 +428,396 @@ describe("GraphQL API Integration", () => {
             expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
                 "wlpr_gql_005",
             );
+        });
+
+        it("should rank color-sorted results by similarity and exclude wallpapers without color data", async () => {
+            const colorSortService = new ColorSortService();
+            const redVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#FF0000", amount: 1 }],
+            });
+            const blueVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#0000FF", amount: 1 }],
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_red",
+                userId: "user_gql_color_sort",
+                variants: [],
+                colorHistogram: redVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_blue",
+                userId: "user_gql_color_sort",
+                variants: [],
+                colorHistogram: blueVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_none",
+                userId: "user_gql_color_sort",
+                variants: [],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query = `
+				query {
+					searchWallpapers(
+						filter: { userId: "user_gql_color_sort" }
+						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            expect(result.errors).toBeUndefined();
+            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
+                "wlpr_gql_color_red",
+            );
+            expect(
+                result.data.searchWallpapers.edges.map(
+                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+                ),
+            ).not.toContain("wlpr_gql_color_none");
+        });
+
+        it("should combine color sort with metadata filters", async () => {
+            const colorSortService = new ColorSortService();
+            const redVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#FF0000", amount: 1 }],
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_filter_match",
+                userId: "user_gql_color_filter",
+                variants: [
+                    {
+                        width: 1920,
+                        height: 1080,
+                        aspectRatio: 1920 / 1080,
+                        format: "image/jpeg",
+                        fileSizeBytes: 500000,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                colorHistogram: redVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_filter_wrong_user",
+                userId: "user_gql_color_filter_other",
+                variants: [
+                    {
+                        width: 1920,
+                        height: 1080,
+                        aspectRatio: 1920 / 1080,
+                        format: "image/jpeg",
+                        fileSizeBytes: 500000,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                colorHistogram: redVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_filter_wrong_variant",
+                userId: "user_gql_color_filter",
+                variants: [
+                    {
+                        width: 2560,
+                        height: 1440,
+                        aspectRatio: 2560 / 1440,
+                        format: "image/webp",
+                        fileSizeBytes: 600000,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                colorHistogram: redVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query = `
+				query {
+					searchWallpapers(
+						filter: {
+							userId: "user_gql_color_filter"
+							variants: { width: 1920, format: "image/jpeg" }
+						}
+						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            expect(result.errors).toBeUndefined();
+            expect(result.data.searchWallpapers.edges).toHaveLength(1);
+            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
+                "wlpr_gql_color_filter_match",
+            );
+        });
+
+        it("should paginate across color-sorted pages", async () => {
+            const colorSortService = new ColorSortService();
+            const queryVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#FF0000", amount: 1 }],
+            });
+            const blueVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#0000FF", amount: 1 }],
+            });
+            const greenVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#00FF00", amount: 1 }],
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_page_0",
+                userId: "user_gql_color_page",
+                variants: [],
+                colorHistogram: queryVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_page_1",
+                userId: "user_gql_color_page",
+                variants: [],
+                colorHistogram: blueVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_color_page_2",
+                userId: "user_gql_color_page",
+                variants: [],
+                colorHistogram: greenVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query1 = `
+				query {
+					searchWallpapers(
+						filter: { userId: "user_gql_color_page" }
+						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
+						first: 2
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+						pageInfo {
+							hasNextPage
+							endCursor
+						}
+					}
+				}
+			`;
+
+            const response1 = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query: query1 }),
+            });
+
+            expect(response1.statusCode).toBe(200);
+            const result1 = JSON.parse(response1.body);
+            expect(result1.errors).toBeUndefined();
+            expect(result1.data.searchWallpapers.edges).toHaveLength(2);
+            expect(result1.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
+                "wlpr_gql_color_page_0",
+            );
+            expect(result1.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
+
+            const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
+            const firstPageIds = result1.data.searchWallpapers.edges.map(
+                (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+            );
+
+            const query2 = `
+				query {
+					searchWallpapers(
+						filter: { userId: "user_gql_color_page" }
+						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
+						first: 2
+						after: "${cursor}"
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+						pageInfo {
+							hasPreviousPage
+						}
+					}
+				}
+			`;
+
+            const response2 = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query: query2 }),
+            });
+
+            expect(response2.statusCode).toBe(200);
+            const result2 = JSON.parse(response2.body);
+            expect(result2.errors).toBeUndefined();
+            expect(result2.data.searchWallpapers.edges).toHaveLength(1);
+            expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
+
+            const secondPageIds = result2.data.searchWallpapers.edges.map(
+                (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+            );
+
+            expect([...firstPageIds, ...secondPageIds].sort()).toEqual([
+                "wlpr_gql_color_page_0",
+                "wlpr_gql_color_page_1",
+                "wlpr_gql_color_page_2",
+            ]);
+        });
+
+        it("should still return wallpapers without color data for unsorted queries", async () => {
+            const colorSortService = new ColorSortService();
+            const redVector = colorSortService.buildQueryVector({
+                colors: [{ color: "#FF0000", amount: 1 }],
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_unsorted_color",
+                userId: "user_gql_unsorted_color",
+                variants: [],
+                colorHistogram: redVector,
+                colorSpace: "oklab-query-vector",
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_unsorted_no_color",
+                userId: "user_gql_unsorted_color",
+                variants: [],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query = `
+				query {
+					searchWallpapers(filter: { userId: "user_gql_unsorted_color" }) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            expect(result.errors).toBeUndefined();
+            expect(
+                result.data.searchWallpapers.edges.map(
+                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+                ),
+            ).toEqual([
+                "wlpr_gql_unsorted_color",
+                "wlpr_gql_unsorted_no_color",
+            ]);
+        });
+
+        it("should return a clear GraphQL error for invalid color sort input", async () => {
+            const query = `
+				query {
+					searchWallpapers(
+						sort: { color: { colors: [{ color: "not-a-hex", amount: 1 }] } }
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            expect(result.errors).toBeDefined();
+            expect(result.errors[0].message).toContain("Invalid hex color");
         });
     });
 

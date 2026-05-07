@@ -1,6 +1,7 @@
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
 import { OpenSearchConnection } from '../connections/opensearch.js';
+import type { CursorValue } from '../services/cursor.service.js';
 import { IndexManagerService } from '../services/index-manager.service.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
@@ -19,6 +20,11 @@ export interface WallpaperDocument {
   variants: Variant[];
   uploadedAt: string;
   updatedAt: string;
+}
+
+interface SearchHit {
+  _source: WallpaperDocument;
+  sort?: unknown[];
 }
 
 /**
@@ -158,12 +164,13 @@ export class WallpaperRepository {
       aspectRatio?: number;
       format?: string;
     };
-    from?: number;
+    searchAfter?: CursorValue[];
     size?: number;
-  }): Promise<{ documents: WallpaperDocument[]; total: number }> {
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{ documents: WallpaperDocument[]; cursorValues: CursorValue[][]; total: number }> {
     const indexName = this.indexManager.getIndexName();
     const pageSize = params.size ?? 10;
-    const offset = params.from ?? 0;
+    const sortOrder = params.sortOrder ?? 'asc';
 
     return await withSpan(
       'opensearch.search',
@@ -171,12 +178,13 @@ export class WallpaperRepository {
         [GatewayAttributes.OPENSEARCH_INDEX]: indexName,
         [GatewayAttributes.OPENSEARCH_OPERATION]: 'search',
         [GatewayAttributes.SEARCH_PAGE_SIZE]: pageSize,
-        [GatewayAttributes.SEARCH_OFFSET]: offset,
         [GatewayAttributes.SEARCH_FILTER_USER_ID]: params.userId ?? 'none',
         [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: params.variantFilters ? 'true' : 'false',
       },
       async (span) => {
         const startTime = Date.now();
+        span.setAttribute('search.cursor.present', params.searchAfter ? 'true' : 'false');
+        span.setAttribute('search.sort.order', sortOrder);
 
         const must: unknown[] = [];
 
@@ -228,22 +236,46 @@ export class WallpaperRepository {
         }
 
         try {
+          const body: {
+            query: {
+              bool: {
+                must: unknown[];
+              };
+            };
+            search_after?: CursorValue[];
+            size: number;
+            sort: Array<{ wallpaperId: 'asc' | 'desc' }>;
+          } = {
+            query: {
+              bool: {
+                must: must.length > 0 ? must : [{ match_all: {} }],
+              },
+            },
+            size: pageSize,
+            sort: [{ wallpaperId: sortOrder }],
+          };
+
+          if (params.searchAfter) {
+            body.search_after = params.searchAfter;
+          }
+
           const result = await this.openSearchConnection.getClient().search({
             index: indexName,
-            body: {
-              query: {
-                bool: {
-                  must: must.length > 0 ? must : [{ match_all: {} }],
-                },
-              },
-              from: offset,
-              size: pageSize,
-            },
+            body,
           });
 
-          const documents = result.body.hits.hits.map(
-            (hit: { _source: WallpaperDocument }) => hit._source
-          );
+          const hits = result.body.hits.hits as SearchHit[];
+          const documents = hits.map((hit) => hit._source);
+          const cursorValues = hits.map((hit) => {
+            if (
+              Array.isArray(hit.sort) &&
+              hit.sort.every((value) => typeof value === 'number' || typeof value === 'string')
+            ) {
+              return hit.sort as CursorValue[];
+            }
+
+            return [hit._source.wallpaperId];
+          });
           const total = result.body.hits.total.value as number;
 
           span.setAttribute(GatewayAttributes.SEARCH_TOTAL_RESULTS, total);
@@ -253,7 +285,7 @@ export class WallpaperRepository {
             [GatewayAttributes.OPENSEARCH_INDEX]: indexName,
           });
 
-          return { documents, total };
+          return { documents, cursorValues, total };
         } catch (error) {
           this.recordOperationMetrics('search', false, startTime);
           throw error;

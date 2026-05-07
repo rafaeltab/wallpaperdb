@@ -211,5 +211,39 @@ describe("OpenSearch Integration", () => {
             expect(result.total).toBe(0);
             expect(result.documents).toEqual([]);
         });
+
+        it("should paginate deterministically with search_after", async () => {
+            for (let i = 0; i < 4; i++) {
+                await repository.upsert({
+                    wallpaperId: `wlpr_test_page_${i}`,
+                    userId: "user_search_after",
+                    variants: [],
+                    uploadedAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+
+            const firstPage = await repository.search({
+                userId: "user_search_after",
+                size: 2,
+            });
+
+            expect(firstPage.documents.map((doc) => doc.wallpaperId)).toEqual([
+                "wlpr_test_page_0",
+                "wlpr_test_page_1",
+            ]);
+            expect(firstPage.cursorValues.at(-1)).toEqual(["wlpr_test_page_1"]);
+
+            const secondPage = await repository.search({
+                userId: "user_search_after",
+                searchAfter: firstPage.cursorValues.at(-1),
+                size: 2,
+            });
+
+            expect(secondPage.documents.map((doc) => doc.wallpaperId)).toEqual([
+                "wlpr_test_page_2",
+                "wlpr_test_page_3",
+            ]);
+        });
     });
 });

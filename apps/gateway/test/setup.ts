@@ -5,7 +5,9 @@ import {
     NatsTesterBuilder,
     OpenSearchTesterBuilder,
 } from "@wallpaperdb/test-utils";
+import { container } from "tsyringe";
 import { afterEach, beforeAll } from "vitest";
+import { IndexManagerService } from "../src/services/index-manager.service.js";
 import { InProcessGatewayTesterBuilder } from "./builders/InProcessGatewayBuilder.js";
 
 const setup = () => {
@@ -21,6 +23,7 @@ const setup = () => {
     t
         .withNats((n) => n.withJetstream())
         .withStream("WALLPAPER")
+        .withNatsAutoCleanup()
         .withOpenSearch()
         .withInProcessApp();
 
@@ -43,6 +46,9 @@ beforeAll(async () => {
 
 afterEach(async () => {
     await tester.cleanup();
+    const indexManager = container.resolve(IndexManagerService);
+    await indexManager.deleteIndex();
+    await indexManager.createIndex();
 });
 
 declare global {

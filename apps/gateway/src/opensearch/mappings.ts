@@ -11,6 +11,11 @@
  * - format enum for easy filtering by image type
  */
 export const wallpapersIndexMapping = {
+  settings: {
+    index: {
+      knn: true,
+    },
+  },
   properties: {
     wallpaperId: { type: 'keyword' },
     userId: { type: 'keyword' },
@@ -27,6 +32,17 @@ export const wallpapersIndexMapping = {
         createdAt: { type: 'date' },
       },
     },
+
+    colorHistogram: {
+      type: 'knn_vector',
+      dimension: 64,
+      method: {
+        name: 'hnsw',
+        engine: 'lucene',
+        space_type: 'cosinesimil',
+      },
+    },
+    colorSpace: { type: 'keyword' },
 
     // Timestamps
     uploadedAt: { type: 'date' },

@@ -1,7 +1,9 @@
 import "reflect-metadata";
 import {
+    WALLPAPER_COLORS_EXTRACTED_SUBJECT,
     WALLPAPER_UPLOADED_SUBJECT,
     WALLPAPER_VARIANT_AVAILABLE_SUBJECT,
+    type WallpaperColorsExtractedEvent,
     type WallpaperUploadedEvent,
     type WallpaperVariantAvailableEvent,
 } from "@wallpaperdb/events";
@@ -219,6 +221,85 @@ describe("Event Consumers Integration", () => {
             expect(doc?.variants).toHaveLength(2);
             expect(doc?.variants[0].format).toBe("image/webp");
             expect(doc?.variants[1].format).toBe("image/png");
+        });
+    });
+
+    describe("WallpaperColorsExtractedConsumer", () => {
+        it("should add color data to an existing wallpaper document without clobbering other fields", async () => {
+            const uploadEvent: WallpaperUploadedEvent = {
+                eventId: "evt_008",
+                eventType: "wallpaper.uploaded",
+                timestamp: new Date().toISOString(),
+                wallpaper: {
+                    id: "wlpr_consumer_005",
+                    userId: "user_005",
+                    fileType: "image",
+                    mimeType: "image/jpeg",
+                    fileSizeBytes: 1024000,
+                    width: 1920,
+                    height: 1080,
+                    aspectRatio: 1920 / 1080,
+                    storageKey: "wlpr_consumer_005/original.jpg",
+                    storageBucket: "wallpapers",
+                    originalFilename: "test.jpg",
+                    uploadedAt: new Date().toISOString(),
+                },
+            };
+
+            const variantEvent: WallpaperVariantAvailableEvent = {
+                eventId: "evt_009",
+                eventType: "wallpaper.variant.available",
+                timestamp: new Date().toISOString(),
+                variant: {
+                    wallpaperId: "wlpr_consumer_005",
+                    width: 1920,
+                    height: 1080,
+                    aspectRatio: 1920 / 1080,
+                    format: "image/jpeg",
+                    fileSizeBytes: 500000,
+                    createdAt: new Date().toISOString(),
+                },
+            };
+
+            const colorHistogram = Array.from({ length: 64 }, (_, index) =>
+                index === 0 ? 1 : 0,
+            );
+
+            const colorsEvent: WallpaperColorsExtractedEvent = {
+                eventId: "evt_010",
+                eventType: "wallpaper.colors.extracted",
+                timestamp: new Date().toISOString(),
+                wallpaperId: "wlpr_consumer_005",
+                colorHistogram,
+                colorSpace: "hsv",
+            };
+
+            await tester.nats.publishEvent(WALLPAPER_UPLOADED_SUBJECT, uploadEvent);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            await tester.nats.publishEvent(
+                WALLPAPER_VARIANT_AVAILABLE_SUBJECT,
+                variantEvent,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            await tester.nats.publishEvent(
+                WALLPAPER_COLORS_EXTRACTED_SUBJECT,
+                colorsEvent,
+            );
+            await tester.nats.publishEvent(
+                WALLPAPER_COLORS_EXTRACTED_SUBJECT,
+                colorsEvent,
+            );
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            const doc = await container.resolve(WallpaperRepository).findById("wlpr_consumer_005");
+            expect(doc).not.toBeNull();
+            expect(doc?.variants).toHaveLength(1);
+            expect(doc?.variants[0]?.format).toBe("image/jpeg");
+            expect(doc?.colorHistogram).toEqual(colorHistogram);
+            expect(doc?.colorSpace).toBe("hsv");
         });
     });
 });

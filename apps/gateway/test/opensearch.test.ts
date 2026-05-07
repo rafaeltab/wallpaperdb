@@ -24,6 +24,28 @@ describe("OpenSearch Integration", () => {
 
             expect(exists.body).toBe(true);
         });
+
+        it("should enable kNN and map color fields on the wallpapers index", async () => {
+            const index = await client.indices.get({
+                index: "wallpapers",
+            });
+
+            const wallpaperIndex = index.body.wallpapers;
+
+            expect(wallpaperIndex.settings.index.knn).toBe("true");
+            expect(wallpaperIndex.mappings.properties.colorHistogram).toMatchObject({
+                type: "knn_vector",
+                dimension: 64,
+                method: {
+                    name: "hnsw",
+                    engine: "lucene",
+                    space_type: "cosinesimil",
+                },
+            });
+            expect(wallpaperIndex.mappings.properties.colorSpace).toEqual({
+                type: "keyword",
+            });
+        });
     });
 
     describe("WallpaperRepository", () => {

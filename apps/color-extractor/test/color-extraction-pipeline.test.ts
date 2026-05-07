@@ -105,8 +105,8 @@ describe('Color Extraction Pipeline', () => {
     expect(msgCount).toBeGreaterThanOrEqual(2);
 
     const consumer = await js.consumers.get('WALLPAPER', {
-      filter_subject: 'wallpaper.colors.extracted',
-    } as any);
+      filterSubjects: 'wallpaper.colors.extracted',
+    });
     const msg = await consumer.next({ expires: 5000 });
 
     expect(msg).toBeDefined();
@@ -137,8 +137,8 @@ describe('Color Extraction Pipeline', () => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const consumer = await js.consumers.get('WALLPAPER', {
-      filter_subject: 'wallpaper.colors.extracted',
-    } as any);
+      filterSubjects: 'wallpaper.colors.extracted',
+    });
 
     const msg = await consumer.next({ expires: 3000 });
 

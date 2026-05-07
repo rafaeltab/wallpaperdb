@@ -43,13 +43,15 @@ describe('MinioHistogramProvider', () => {
   ): Promise<Buffer> {
     const { r = 255, g = 0, b = 0, a } = options ?? {};
     const channels = a !== undefined ? 4 : 3;
-    const background: Record<string, number> = { r, g, b };
-    if (a !== undefined) background.a = a;
+    const background =
+      a !== undefined
+        ? `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(2)})`
+        : { r, g, b };
 
     return sharp({
       create: { width, height, channels, background },
     })
-      .raw()
+      .png()
       .toBuffer();
   }
 

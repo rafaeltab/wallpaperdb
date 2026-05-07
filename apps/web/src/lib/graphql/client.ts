@@ -6,12 +6,12 @@ const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:3004/g
 const authMiddleware: RequestMiddleware = async (request) => {
   const token = await getAuthToken();
   if (token) {
+    const headers = new Headers(request.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+
     return {
       ...request,
-      headers: {
-        ...(request.headers as Record<string, string>),
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
     };
   }
   return request;

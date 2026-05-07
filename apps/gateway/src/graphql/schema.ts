@@ -110,6 +110,46 @@ export const schema = `#graphql
 	}
 
 	"""
+	Sort options for wallpaper search
+	"""
+	input WallpaperSort {
+		"""
+		Rank results by color similarity
+		"""
+		color: ColorSort
+	}
+
+	"""
+	Color sort input
+	"""
+	input ColorSort {
+		"""
+		Desired colors and their relative amounts
+		"""
+		colors: [ColorInput!]!
+	}
+
+	"""
+	A color preference for color-sorted search
+	"""
+	input ColorInput {
+		"""
+		Hex color in #RRGGBB format
+		"""
+		color: String!
+
+		"""
+		Relative amount for this color contribution
+		"""
+		amount: Float!
+
+		"""
+		Optional spread from 0 to 1
+		"""
+		spread: Float
+	}
+
+	"""
 	An edge in a connection
 	"""
 	type WallpaperEdge {
@@ -168,6 +208,11 @@ export const schema = `#graphql
 			Filter criteria
 			"""
 			filter: WallpaperFilter
+
+			"""
+			Sort criteria
+			"""
+			sort: WallpaperSort
 
 			"""
 			Number of items to return (forward pagination)

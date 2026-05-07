@@ -14,6 +14,7 @@
 #   /gateway/*                → gateway:3004           (prefix stripped)
 #   /variant-generator/*      → variant-generator:3006 (prefix stripped)
 #   /color-extractor/*        → color-extractor:3007   (prefix stripped)
+#   /user/*                   → user:3009              (prefix stripped)
 #   /web/*                    → web:3005               (prefix kept — Vite base=/web)
 #   /grafana/*                → lgtm:3000              (prefix kept — GF_SERVER_SERVE_FROM_SUB_PATH)
 #   /minio/*                  → minio:9001             (prefix kept — MinIO console)
@@ -47,6 +48,10 @@
 
     handle_path /color-extractor/* {
         reverse_proxy color-extractor:3007
+    }
+
+    handle_path /user/* {
+        reverse_proxy user:3009
     }
 
     # -------------------------------------------------------------------------

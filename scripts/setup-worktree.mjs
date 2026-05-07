@@ -489,6 +489,10 @@ function buildServiceOverrides() {
 			MEDIA_SERVICE_URL: (ctx) =>
 				`http://localhost:${ctx.ports.INGRESS_PORT}/media`,
 		},
+		"apps/user": {
+			DATABASE_URL:
+				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_user",
+		},
 		"apps/variant-generator": {},
 		"apps/color-extractor": {},
 		"apps/web": {
@@ -506,7 +510,9 @@ function buildServiceOverrides() {
 const knownUserSecrets = {
 	CURSOR_SECRET: () => randomBytes(32).toString("hex"),
 	VITE_CLERK_PUBLISHABLE_KEY: undefined,
-    CLERK_DOMAIN: undefined
+	CLERK_DOMAIN: undefined,
+	CLERK_SECRET_KEY: undefined,
+	CLERK_PUBLISHABLE_KEY: undefined,
 };
 
 function getSecretEnvPath() {
@@ -647,6 +653,7 @@ function generateBrunoEnv(repoRoot, ports) {
 		mediaBaseUrl: `http://localhost:${ingressPort}/media`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,
 		colorExtractorBaseUrl: `http://localhost:${ingressPort}/color-extractor`,
+		userBaseUrl: `http://localhost:${ingressPort}/user`,
 	};
 
 	const lines = example.split("\n");

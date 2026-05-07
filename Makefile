@@ -1,10 +1,12 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
-        migrate psql psql-ingestor psql-media db-studio-ingestor db-studio-media \
+        migrate psql psql-ingestor psql-media psql-user db-studio-ingestor db-studio-media db-studio-user \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
+        user-dev user-build user-start user-test user-test-watch user-format user-lint user-check \
+        user-docker-build user-docker-run user-docker-stop user-docker-logs \
         media-dev media-build media-start media-test media-test-watch media-format media-lint media-check \
         variant-generator-dev variant-generator-build variant-generator-start variant-generator-test variant-generator-test-watch variant-generator-format variant-generator-lint variant-generator-check \
         color-extractor-dev color-extractor-build color-extractor-start color-extractor-test color-extractor-test-watch color-extractor-format color-extractor-lint color-extractor-check \
@@ -66,8 +68,10 @@ help:
 	@echo "  make psql               - Open psql shell (default database)"
 	@echo "  make psql-ingestor      - Open psql shell (wallpaperdb_ingestor database)"
 	@echo "  make psql-media         - Open psql shell (wallpaperdb_media database)"
+	@echo "  make psql-user          - Open psql shell (wallpaperdb_user database)"
 	@echo "  make db-studio-ingestor - Start Drizzle Studio for ingestor"
 	@echo "  make db-studio-media    - Start Drizzle Studio for media"
+	@echo "  make db-studio-user     - Start Drizzle Studio for user"
 	@echo ""
 	@echo "Ingestor Service:"
 	@echo "  make ingestor-dev        - Start ingestor in development mode"
@@ -77,6 +81,15 @@ help:
 	@echo "  make ingestor-test-watch - Run ingestor tests in watch mode"
 	@echo "  make ingestor-format     - Format ingestor code"
 	@echo "  make ingestor-lint       - Lint ingestor code"
+	@echo ""
+	@echo "User Service:"
+	@echo "  make user-dev        - Start user service in development mode"
+	@echo "  make user-build      - Build user service for production"
+	@echo "  make user-start      - Start user service in production mode"
+	@echo "  make user-test       - Run user service tests"
+	@echo "  make user-test-watch - Run user service tests in watch mode"
+	@echo "  make user-format     - Format user service code"
+	@echo "  make user-lint       - Lint user service code"
 	@echo ""
 	@echo "Media Service:"
 	@echo "  make media-dev        - Start media service in development mode"
@@ -139,6 +152,12 @@ help:
 	@echo "  make ingestor-docker-run   - Run ingestor Docker container (uses infra/.env)"
 	@echo "  make ingestor-docker-stop  - Stop ingestor Docker container"
 	@echo "  make ingestor-docker-logs  - View ingestor Docker container logs"
+	@echo ""
+	@echo "User Docker:"
+	@echo "  make user-docker-build - Build user Docker image"
+	@echo "  make user-docker-run   - Run user Docker container (uses infra/.env)"
+	@echo "  make user-docker-stop  - Stop user Docker container"
+	@echo "  make user-docker-logs  - View user Docker container logs"
 	@echo ""
 	@echo "Ingestor E2E Tests:"
 	@echo "  make ingestor-e2e-test       - Run E2E tests against Docker container"
@@ -257,11 +276,17 @@ psql-ingestor:
 psql-media:
 	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb -d wallpaperdb_media
 
+psql-user:
+	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb -d wallpaperdb_user
+
 db-studio-ingestor:
 	@pnpm --filter @wallpaperdb/ingestor db:studio
 
 db-studio-media:
 	@pnpm --filter @wallpaperdb/media db:studio
+
+db-studio-user:
+	@pnpm --filter @wallpaperdb/user db:studio
 
 # Ingestor service commands
 ingestor-dev:
@@ -287,6 +312,31 @@ ingestor-lint:
 
 ingestor-check:
 	@turbo run check --filter=@wallpaperdb/ingestor
+
+# User service commands
+user-dev:
+	@turbo run dev --filter=@wallpaperdb/user
+
+user-build:
+	@turbo run build --filter=@wallpaperdb/user
+
+user-start:
+	@turbo run start --filter=@wallpaperdb/user
+
+user-test:
+	@turbo run test --filter=@wallpaperdb/user
+
+user-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/user
+
+user-format:
+	@turbo run format --filter=@wallpaperdb/user
+
+user-lint:
+	@turbo run lint --filter=@wallpaperdb/user
+
+user-check:
+	@turbo run check --filter=@wallpaperdb/user
 
 # Media service commands
 media-dev:
@@ -511,6 +561,39 @@ ingestor-docker-stop:
 ingestor-docker-logs:
 	@docker logs -f $(COMPOSE_PROJECT_NAME)-ingestor
 
+# User Docker commands
+user-docker-build:
+	@echo "Building user Docker image..."
+	@docker build -t $(COMPOSE_PROJECT_NAME)-user:latest -f apps/user/Dockerfile .
+	@echo "✓ Docker image built: $(COMPOSE_PROJECT_NAME)-user:latest"
+
+user-docker-run:
+	@echo "Starting user Docker container..."
+	@if [ ! -f infra/.env ]; then \
+		echo "Error: infra/.env file not found. Run 'make infra-start' first."; \
+		exit 1; \
+	fi
+	@. ./infra/.env && docker run --rm -d \
+		-p 3009:3009 \
+		-e NODE_ENV=production \
+		-e PORT=3009 \
+		-e DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@host.docker.internal:$(POSTGRES_HOST_PORT)/$$POSTGRES_DB \
+		-e NATS_URL=nats://host.docker.internal:$(NATS_HOST_PORT) \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:$(OTEL_HTTP_HOST_PORT) \
+		--name $(COMPOSE_PROJECT_NAME)-user \
+		$(COMPOSE_PROJECT_NAME)-user:latest
+	@echo "✓ User container started"
+	@echo "  Health: http://localhost:$(INGRESS_PORT)/user/health"
+	@echo "  Ready:  http://localhost:$(INGRESS_PORT)/user/ready"
+
+user-docker-stop:
+	@echo "Stopping user Docker container..."
+	@docker stop $(COMPOSE_PROJECT_NAME)-user 2>/dev/null || echo "Container not running"
+	@echo "✓ User container stopped"
+
+user-docker-logs:
+	@docker logs -f $(COMPOSE_PROJECT_NAME)-user
+
 # Ingestor E2E test commands
 ingestor-e2e-test:
 	@echo "Running E2E tests (builds Docker image first)..."
@@ -656,5 +739,5 @@ clean:
 	@echo "Cleaning TypeScript incremental build cache..."
 	@find . -name "*.tsbuildinfo" -not -path "*/node_modules/*" -delete
 	@echo "Cleaning generated OpenAPI specs..."
-	@rm -f apps/ingestor/swagger.json apps/media/swagger.json
+	@rm -f apps/ingestor/swagger.json apps/media/swagger.json apps/user/swagger.json
 	@echo "✓ Clean complete"

@@ -144,6 +144,26 @@ Extracts dominant colors and color palettes from wallpapers.
 - Consumes: `wallpaper.uploaded`
 - Publishes: `wallpaper.colors.extracted`
 
+### User Service
+**Status:** 🚧 In Development
+
+Manages user identities, profiles, and Clerk webhook processing.
+
+**Key Features:**
+- Clerk webhook processing for user lifecycle events
+- User profile persistence in PostgreSQL
+- NATS event publishing for user-related changes
+
+**API Endpoints:**
+- `GET /health` - Health check with dependency status
+- `GET /ready` - Readiness probe
+
+**Event-driven:**
+- Consumes: Clerk webhooks (HTTP)
+- Publishes: user events (NATS)
+
+[View Full Documentation →](/docs/services/user)
+
 ### Tagging Service
 **Status:** 📋 Planned
 
@@ -207,6 +227,7 @@ Ingestor → wallpaper.uploaded → {
 | Thumbnail | 3003 | ✓ | ✓ | ✓ | - | 📋 Planned |
 | Quality | 3006 | ✓ | ✓ | ✓ | - | 📋 Planned |
 | Color | 3007 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| User | 3009 | ✓ | - | ✓ (publish) | - | 🚧 In Development |
 | Tagging | 3008 | ✓ | - | - | - | 📋 Planned |
 
 ### Shared Infrastructure
@@ -302,9 +323,10 @@ make build
 - Phase 5: Web Frontend (~2 weeks)
 
 **Priority Order (Remaining):**
-1. Thumbnail Extractor (event consumer pattern)
-2. Quality/Color Enrichment (parallel processing)
-3. Tagging Service (CRUD API)
+1. User Service (Clerk webhooks, profile management)
+2. Thumbnail Extractor (event consumer pattern)
+3. Quality/Color Enrichment (parallel processing)
+4. Tagging Service (CRUD API)
 
 ## Architecture Decisions
 

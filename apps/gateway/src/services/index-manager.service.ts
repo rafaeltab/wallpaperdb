@@ -41,7 +41,10 @@ export class IndexManagerService {
         await client.indices.create({
           index: this.indexName,
           body: {
-            mappings: wallpapersIndexMapping,
+            settings: wallpapersIndexMapping.settings,
+            mappings: {
+              properties: wallpapersIndexMapping.properties,
+            },
           },
         });
 

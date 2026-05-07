@@ -9,6 +9,7 @@ import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { OpenSearchConnection } from './connections/opensearch.js';
 import { RedisConnection } from './connections/redis.js';
+import { WallpaperColorsExtractedConsumer } from './consumers/wallpaper-colors-extracted.consumer.js';
 import { WallpaperUploadedConsumer } from './consumers/wallpaper-uploaded.consumer.js';
 import { WallpaperVariantAvailableConsumer } from './consumers/wallpaper-variant-available.consumer.js';
 import { RateLimitExceededError } from './errors/graphql-errors.js';
@@ -233,6 +234,10 @@ export async function createApp(
     await uploadedConsumer.start();
     fastify.log.info('WallpaperUploadedConsumer started');
 
+    const colorsConsumer = container.resolve(WallpaperColorsExtractedConsumer);
+    await colorsConsumer.start();
+    fastify.log.info('WallpaperColorsExtractedConsumer started');
+
     // Mark connections as initialized
     fastify.connectionsState.connectionsInitialized = true;
   } catch (error) {
@@ -260,6 +265,9 @@ export async function createApp(
 
     const variantConsumer = container.resolve(WallpaperVariantAvailableConsumer);
     await variantConsumer.stop();
+
+    const colorsConsumer = container.resolve(WallpaperColorsExtractedConsumer);
+    await colorsConsumer.stop();
     fastify.log.info('Event consumers stopped');
 
     fastify.log.info('Closing NATS connection...');

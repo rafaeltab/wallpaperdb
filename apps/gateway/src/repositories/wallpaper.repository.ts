@@ -18,6 +18,8 @@ export interface WallpaperDocument {
   wallpaperId: string;
   userId: string;
   variants: Variant[];
+  colorHistogram?: number[];
+  colorSpace?: string;
   uploadedAt: string;
   updatedAt: string;
 }
@@ -107,6 +109,55 @@ export class WallpaperRepository {
           this.recordOperationMetrics('add_variant', true, startTime);
         } catch (error) {
           this.recordOperationMetrics('add_variant', false, startTime);
+          throw error;
+        }
+      }
+    );
+  }
+
+  /**
+   * Add extracted color data to a wallpaper document
+   */
+  async addColorData(
+    wallpaperId: string,
+    colorData: { colorHistogram: number[]; colorSpace: string }
+  ): Promise<void> {
+    const indexName = this.indexManager.getIndexName();
+    return await withSpan(
+      'opensearch.add_color_data',
+      {
+        [GatewayAttributes.OPENSEARCH_INDEX]: indexName,
+        [GatewayAttributes.OPENSEARCH_OPERATION]: 'add_color_data',
+        [GatewayAttributes.OPENSEARCH_DOC_ID]: wallpaperId,
+        [Attributes.WALLPAPER_ID]: wallpaperId,
+      },
+      async () => {
+        const startTime = Date.now();
+        try {
+          await this.openSearchConnection.getClient().update({
+            index: indexName,
+            id: wallpaperId,
+            body: {
+              script: {
+                source: `
+                  ctx._source.colorHistogram = params.colorHistogram;
+                  ctx._source.colorSpace = params.colorSpace;
+                  ctx._source.updatedAt = params.updatedAt;
+                `,
+                params: {
+                  colorHistogram: colorData.colorHistogram,
+                  colorSpace: colorData.colorSpace,
+                  updatedAt: new Date().toISOString(),
+                },
+              },
+            },
+            refresh: true,
+            retry_on_conflict: 3,
+          });
+
+          this.recordOperationMetrics('add_color_data', true, startTime);
+        } catch (error) {
+          this.recordOperationMetrics('add_color_data', false, startTime);
           throw error;
         }
       }

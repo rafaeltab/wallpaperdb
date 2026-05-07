@@ -16,7 +16,6 @@
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
     "test": "vitest run",
-    "test:unit": "vitest run --coverage",
     "test:integration": "vitest run --coverage",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",

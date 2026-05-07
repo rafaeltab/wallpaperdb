@@ -120,6 +120,29 @@ services:
         - action: rebuild
           path: ../pnpm-lock.yaml
 
+  user:
+    build:
+      context: ..
+      dockerfile: apps/user/Dockerfile.dev
+    environment:
+      RUN_DB_MIGRATE: "true"
+    env_file:
+      - path: ../apps/user/.env
+        required: false
+    develop:
+      watch:
+        - action: sync
+          path: ../apps/user/src
+          target: /app/apps/user/src
+        - action: sync+restart
+          path: ../packages
+          target: /app/packages
+        - action: sync
+          path: ../apps/user/package.json
+          target: /app/apps/user/package.json
+        - action: rebuild
+          path: ../pnpm-lock.yaml
+
   web:
     build:
       context: ..
@@ -161,6 +184,7 @@ services:
       - gateway
       - variant-generator
       - color-extractor
+      - user
       - web
 
 networks:

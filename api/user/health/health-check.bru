@@ -1,0 +1,22 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{userBaseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the user service is healthy (all dependencies operational).
+
+  Returns 200 if healthy, 503 if unhealthy.
+
+  Response includes status of:
+  - database (PostgreSQL)
+  - nats (message queue)
+  - otel (OpenTelemetry)
+}

@@ -1,0 +1,40 @@
+import 'reflect-metadata';
+import { writeFile } from 'node:fs/promises';
+import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import Fastify from 'fastify';
+import { registerRoutes } from './routes/index.js';
+import { container } from 'tsyringe';
+
+async function generateSwagger(): Promise<string> {
+  container.register('config', {
+    useValue: {},
+  });
+
+  const fastify = Fastify({
+    logger: false,
+  });
+
+  await registerOpenAPI(fastify, {
+    title: 'WallpaperDB User API',
+    version: '1.0.0',
+    description:
+      'User management service. Tracks user sign-ups, profiles, and publishes user events via NATS.',
+    servers: [{ url: `http://localhost:3009`, description: 'Local development server' }],
+  });
+
+  await registerRoutes(fastify);
+
+  await fastify.ready();
+
+  const swagger = fastify.swagger();
+
+  try {
+    await fastify.close();
+  } catch (_) {}
+
+  return JSON.stringify(swagger, null, 2);
+}
+
+const swagger = await generateSwagger();
+
+writeFile('swagger.json', swagger);

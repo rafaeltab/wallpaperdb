@@ -108,6 +108,22 @@ docs {
 
 Add a new page at `apps/docs/content/docs/services/<service>.mdx` describing the service's role in the system. Follow the pattern of existing service docs pages.
 
+### 9. Update `scripts/setup-worktree.mjs`
+
+This script generates `.env` files for every worktree with Docker-internal hostnames and per-slot ports. When adding a new service, you **must** update it so `pnpm install` produces correct `.env` files in every worktree. There are four places to check:
+
+1. **`buildServiceOverrides()`** — Add an `"apps/<service>"` entry with Docker-internal overrides. Common overrides:
+   - `DATABASE_URL`: Change `localhost` to `postgres` and use the Docker-internal port `5432`, e.g. `"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_<service>"` (only for services that use PostgreSQL)
+   - Use an empty object `{}` if the global overrides (NATS, S3, OTEL, Redis) are sufficient
+
+2. **`knownUserSecrets`** — If the new service's `.env.example` introduces a new secret key (e.g. API keys, auth tokens), add it here with `undefined` as the value so it gets synced to `~/.config/wallpaperdb/secret.env` for all worktrees.
+
+3. **`generateBrunoEnv()`** — If you added a `<service>BaseUrl` variable to `api/environments/local.bru.example`, add it to the `overrides` object in this function so it gets the correct ingress-based URL for each worktree slot.
+
+4. **`lib/env-pipeline.mjs` `knownUserSecrets` export** — Keep this in sync with the copy in `setup-worktree.mjs`. The exported constant should match the same set of keys.
+
+After editing, run `node scripts/setup-worktree.mjs` to verify the output and check that the new service's `.env` is generated correctly.
+
 ### Roadmap
 
 See `plans/multi-service-architecture.md` for the strategic roadmap and rationale.

@@ -1,0 +1,166 @@
+---
+title: User Service
+description: User management service for tracking sign-ups and profiles
+---
+
+The User Service manages user identities within WallpaperDB. It receives Clerk webhook events for sign-ups and profile changes, persists user data to PostgreSQL, and publishes user events via NATS for downstream consumers.
+
+**Status:** 🚧 In Development
+
+## Quick Start
+
+```bash
+# Start infrastructure
+make infra-start
+
+# Run user service in development mode
+make user-dev
+
+# The service starts on http://localhost:3009
+```
+
+## Features
+
+### Core Functionality
+- **Clerk webhook processing** for user lifecycle events (sign-up, profile changes)
+- **User profile persistence** in PostgreSQL
+- **NATS event publishing** for user-related changes
+- **Health checks** for database and message queue connectivity
+
+### Observability
+- **OpenTelemetry** traces and metrics
+- **Structured logging** with Pino
+- **Health checks** for all dependencies
+
+## Architecture
+
+### Event Flow
+
+```
+Clerk → webhook → User Service → PostgreSQL (persist)
+                                    ↓
+                              NATS (publish events)
+                                    ↓
+                              Downstream consumers
+```
+
+### Database Schema
+
+```typescript
+users {
+  id: text                    // Primary key
+  email: varchar(255)         // User email
+  username: varchar(100)      // Optional username
+  imageUrl: text              // Avatar URL
+  clerkId: text               // Clerk external ID
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+```
+
+## API Reference
+
+### GET /health
+
+Health check with dependency status.
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "database": { "status": "healthy" },
+    "nats": { "status": "healthy" },
+    "otel": { "status": "healthy" }
+  }
+}
+```
+
+### GET /ready
+
+Kubernetes-style readiness probe.
+
+**Response (200):**
+```json
+{
+  "ready": true
+}
+```
+
+## Configuration
+
+Environment variables (Zod-validated):
+
+```bash
+# Server
+PORT=3009
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_user
+
+# NATS
+NATS_URL=nats://localhost:4222
+NATS_STREAM=WALLPAPER
+
+# OpenTelemetry
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=user
+
+# Clerk
+CLERK_SECRET_KEY=sk_test_...
+CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+## Testing
+
+```bash
+make user-test          # All tests
+make user-test-watch    # Watch mode
+```
+
+## Deployment
+
+### Docker
+
+```bash
+make user-docker-build  # Build image
+make user-docker-run    # Run container
+make user-docker-logs   # View logs
+make user-docker-stop   # Stop container
+```
+
+### Production Build
+
+```bash
+make user-build  # TypeScript compilation
+make user-start  # Run production build
+```
+
+## Project Structure
+
+```
+apps/user/
+├── src/
+│   ├── app.ts                    # Fastify app factory
+│   ├── index.ts                  # Entry point
+│   ├── config.ts                 # Zod-validated config
+│   ├── connections/              # Singleton connection managers
+│   │   ├── database.ts          # PostgreSQL pool
+│   │   └── nats.ts              # NATS client
+│   ├── db/schema.ts              # Drizzle schema
+│   ├── routes/                   # HTTP handlers
+│   │   └── health.routes.ts     # /health, /ready
+│   └── services/                 # Business logic
+│       └── health.service.ts    # Health checks
+├── test/                         # Tests
+├── drizzle/                      # Database migrations
+├── package.json
+└── tsconfig.json
+```
+
+## Related Documentation
+
+- [Services Overview](/docs/services) - All services
+- [Package: Core](/docs/packages/core) - Shared infrastructure
+- [Package: Events](/docs/packages/events) - Event schemas

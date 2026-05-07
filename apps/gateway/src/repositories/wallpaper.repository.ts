@@ -82,29 +82,26 @@ export class WallpaperRepository {
         [GatewayAttributes.OPENSEARCH_DOC_ID]: wallpaperId,
         [Attributes.WALLPAPER_ID]: wallpaperId,
       },
-      async (span) => {
+      async () => {
         const startTime = Date.now();
         try {
-          // Get existing document
-          const result = await this.openSearchConnection.getClient().get({
+          await this.openSearchConnection.getClient().update({
             index: indexName,
             id: wallpaperId,
-          });
-
-          const doc = result.body._source as WallpaperDocument;
-
-          // Add new variant
-          doc.variants.push(variant);
-          doc.updatedAt = new Date().toISOString();
-
-          span.setAttribute('variant.count', doc.variants.length);
-
-          // Update document
-          await this.openSearchConnection.getClient().index({
-            index: indexName,
-            id: wallpaperId,
-            body: doc,
+            body: {
+              script: {
+                source: `
+                  ctx._source.variants.add(params.variant);
+                  ctx._source.updatedAt = params.updatedAt;
+                `,
+                params: {
+                  variant,
+                  updatedAt: new Date().toISOString(),
+                },
+              },
+            },
             refresh: true,
+            retry_on_conflict: 3,
           });
 
           this.recordOperationMetrics('add_variant', true, startTime);

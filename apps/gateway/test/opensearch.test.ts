@@ -70,6 +70,133 @@ describe("OpenSearch Integration", () => {
             expect(doc?.variants[0].format).toBe("image/jpeg");
         });
 
+        it("should not lose variants when addVariant is called concurrently", async () => {
+            await repository.upsert({
+                wallpaperId: "wlpr_test_concurrent_001",
+                userId: "user_concurrent",
+                variants: [],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const variant1 = {
+                width: 1920,
+                height: 1080,
+                aspectRatio: 1920 / 1080,
+                format: "image/jpeg" as const,
+                fileSizeBytes: 500000,
+                createdAt: new Date().toISOString(),
+            };
+            const variant2 = {
+                width: 2560,
+                height: 1440,
+                aspectRatio: 2560 / 1440,
+                format: "image/webp" as const,
+                fileSizeBytes: 600000,
+                createdAt: new Date().toISOString(),
+            };
+
+            await Promise.all([
+                repository.addVariant("wlpr_test_concurrent_001", variant1),
+                repository.addVariant("wlpr_test_concurrent_001", variant2),
+            ]);
+
+            const doc = await repository.findById("wlpr_test_concurrent_001");
+            expect(doc?.variants).toHaveLength(2);
+        });
+
+        it("should preserve unrelated concurrent partial updates when adding a variant", async () => {
+            await repository.upsert({
+                wallpaperId: "wlpr_test_concurrent_partial_001",
+                userId: "user_concurrent_partial",
+                variants: [],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const colorHistogram = Array.from({ length: 64 }, (_, index) =>
+                index === 0 ? 1 : 0,
+            );
+
+            await Promise.all([
+                repository.addVariant("wlpr_test_concurrent_partial_001", {
+                    width: 1920,
+                    height: 1080,
+                    aspectRatio: 1920 / 1080,
+                    format: "image/jpeg",
+                    fileSizeBytes: 500000,
+                    createdAt: new Date().toISOString(),
+                }),
+                client.update({
+                    index: "wallpapers",
+                    id: "wlpr_test_concurrent_partial_001",
+                    body: {
+                        script: {
+                            source: `
+                                ctx._source.colorHistogram = params.colorHistogram;
+                                ctx._source.colorSpace = params.colorSpace;
+                                ctx._source.updatedAt = params.updatedAt;
+                            `,
+                            params: {
+                                colorHistogram,
+                                colorSpace: "HSV_64_BIN",
+                                updatedAt: new Date().toISOString(),
+                            },
+                        },
+                    },
+                    refresh: true,
+                    retry_on_conflict: 3,
+                }),
+            ]);
+
+            const result = await client.get({
+                index: "wallpapers",
+                id: "wlpr_test_concurrent_partial_001",
+            });
+
+            const doc = result.body._source as {
+                variants: Array<{ width: number }>;
+                colorHistogram: number[];
+                colorSpace: string;
+            };
+
+            expect(doc.variants).toHaveLength(1);
+            expect(doc.variants[0]?.width).toBe(1920);
+            expect(doc.colorHistogram).toEqual(colorHistogram);
+            expect(doc.colorSpace).toBe("HSV_64_BIN");
+        });
+
+        it("should update updatedAt when adding a variant", async () => {
+            const uploadedAt = new Date("2025-01-01T00:00:00Z").toISOString();
+            const originalUpdatedAt = new Date("2025-01-01T00:00:00Z").toISOString();
+
+            await repository.upsert({
+                wallpaperId: "wlpr_test_updated_at",
+                userId: "user_updated_at",
+                variants: [],
+                uploadedAt,
+                updatedAt: originalUpdatedAt,
+            });
+
+            const beforeUpdate = await repository.findById("wlpr_test_updated_at");
+            expect(beforeUpdate?.updatedAt).toBe(originalUpdatedAt);
+
+            await repository.addVariant("wlpr_test_updated_at", {
+                width: 1920,
+                height: 1080,
+                aspectRatio: 1920 / 1080,
+                format: "image/jpeg",
+                fileSizeBytes: 500000,
+                createdAt: new Date().toISOString(),
+            });
+
+            const afterUpdate = await repository.findById("wlpr_test_updated_at");
+            expect(afterUpdate?.updatedAt).not.toBe(originalUpdatedAt);
+            expect(new Date(afterUpdate!.updatedAt).getTime()).toBeGreaterThan(
+                new Date(originalUpdatedAt).getTime(),
+            );
+        });
+
         it("should return null for non-existent wallpaper", async () => {
             const doc = await repository.findById("wlpr_nonexistent");
             expect(doc).toBeNull();

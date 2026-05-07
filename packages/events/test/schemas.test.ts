@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   WALLPAPER_UPLOADED_SUBJECT,
   WALLPAPER_VARIANT_AVAILABLE_SUBJECT,
+  WALLPAPER_COLORS_EXTRACTED_SUBJECT,
   WallpaperUploadedEventSchema,
   type WallpaperVariantAvailableEvent,
   WallpaperVariantAvailableEventSchema,
+  WallpaperColorsExtractedEventSchema,
 } from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
@@ -166,6 +168,58 @@ describe("Event Schemas", () => {
   describe("WALLPAPER_VARIANT_AVAILABLE_SUBJECT", () => {
     it("should have the correct subject name", () => {
       expect(WALLPAPER_VARIANT_AVAILABLE_SUBJECT).toBe("wallpaper.variant.available");
+    });
+  });
+
+  describe("WallpaperColorsExtractedEventSchema", () => {
+    const validEvent = {
+      eventId: "evt_01HXYZ123456789",
+      eventType: "wallpaper.colors.extracted" as const,
+      timestamp: new Date().toISOString(),
+      wallpaperId: "wlpr_01HXYZ123456789",
+      colorHistogram: new Array(64).fill(0).map((_, i) => (i === 0 ? 1.0 : 0)) as number[],
+      colorSpace: "hsv",
+    };
+
+    it("should validate a correct event", () => {
+      const result = WallpaperColorsExtractedEventSchema.safeParse(validEvent);
+      expect(result.success).toBe(true);
+    });
+
+    it("should reject event with wrong eventType", () => {
+      const invalid = { ...validEvent, eventType: "wrong.type" };
+      const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with missing wallpaperId", () => {
+      const { wallpaperId: _id, ...invalid } = validEvent;
+      const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with empty colorHistogram", () => {
+      const invalid = { ...validEvent, colorHistogram: [] };
+      const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with empty colorSpace", () => {
+      const invalid = { ...validEvent, colorSpace: "" };
+      const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it("should reject event with invalid timestamp", () => {
+      const invalid = { ...validEvent, timestamp: "not-a-date" };
+      const result = WallpaperColorsExtractedEventSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("WALLPAPER_COLORS_EXTRACTED_SUBJECT", () => {
+    it("should have the correct subject name", () => {
+      expect(WALLPAPER_COLORS_EXTRACTED_SUBJECT).toBe("wallpaper.colors.extracted");
     });
   });
 });

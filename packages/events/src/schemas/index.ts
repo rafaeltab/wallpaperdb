@@ -21,3 +21,9 @@ export {
   type WallpaperVariantUploadedEvent,
   WALLPAPER_VARIANT_UPLOADED_SUBJECT,
 } from "./wallpaper-variant-uploaded.js";
+
+export {
+  WallpaperColorsExtractedEventSchema,
+  type WallpaperColorsExtractedEvent,
+  WALLPAPER_COLORS_EXTRACTED_SUBJECT,
+} from "./wallpaper-colors-extracted.js";

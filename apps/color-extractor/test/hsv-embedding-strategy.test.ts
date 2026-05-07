@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { describe, it, expect } from "vitest";
 import { HsvEmbeddingStrategy } from "../src/services/hsv-embedding-strategy";
 

@@ -11,8 +11,8 @@ post {
 }
 
 body:graphql {
-  query SearchWallpapers($first: Int, $filter: WallpaperFilter) {
-    searchWallpapers(first: $first, filter: $filter) {
+  query SearchWallpapers($first: Int, $filter: WallpaperFilter, $sort: WallpaperSort) {
+    searchWallpapers(first: $first, filter: $filter, sort: $sort) {
       edges {
         node {
           wallpaperId
@@ -43,7 +43,28 @@ body:graphql {
 body:graphql:vars {
   {
     "first": 10,
-    "filter": null
+    "filter": {},
+    "sort": {
+      "color": {
+        "colors": [
+          {
+            "color": "#FF0000",
+            "amount": 0.3,
+            "spread": 0.2
+          },
+          {
+            "color": "#00FF00",
+            "amount": 0.3,
+            "spread": 0.2
+          },
+          {
+            "color": "#0000FF",
+            "amount": 0.3,
+            "spread": 0.2
+          }
+        ]
+      }
+    }
   }
 }
 

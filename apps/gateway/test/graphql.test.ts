@@ -247,6 +247,11 @@ describe("GraphQL API Integration", () => {
             expect(response1.statusCode).toBe(200);
             const result1 = JSON.parse(response1.body);
             expect(result1.data.searchWallpapers.edges).toHaveLength(2);
+            expect(
+                result1.data.searchWallpapers.edges.map(
+                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+                ),
+            ).toEqual(["wlpr_gql_page_0", "wlpr_gql_page_1"]);
             expect(result1.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
 
             const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
@@ -284,6 +289,85 @@ describe("GraphQL API Integration", () => {
             expect(response2.statusCode).toBe(200);
             const result2 = JSON.parse(response2.body);
             expect(result2.data.searchWallpapers.edges).toHaveLength(2);
+            expect(
+                result2.data.searchWallpapers.edges.map(
+                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+                ),
+            ).toEqual(["wlpr_gql_page_2", "wlpr_gql_page_3"]);
+            expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
+        });
+
+        it("should support pagination with last/before", async () => {
+            for (let i = 0; i < 5; i++) {
+                await container.resolve(WallpaperRepository).upsert({
+                    wallpaperId: `wlpr_gql_back_${i}`,
+                    userId: "user_gql_backward_pagination",
+                    variants: [],
+                    uploadedAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+
+            const query1 = `
+				query {
+					searchWallpapers(filter: { userId: "user_gql_backward_pagination" }, first: 4) {
+						pageInfo {
+							endCursor
+						}
+					}
+				}
+			`;
+
+            const response1 = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query: query1 }),
+            });
+
+            expect(response1.statusCode).toBe(200);
+            const result1 = JSON.parse(response1.body);
+            const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
+
+            const query2 = `
+				query {
+					searchWallpapers(
+						filter: { userId: "user_gql_backward_pagination" }
+						last: 2
+						before: "${cursor}"
+					) {
+						edges {
+							node {
+								wallpaperId
+							}
+						}
+						pageInfo {
+							hasNextPage
+							hasPreviousPage
+						}
+					}
+				}
+			`;
+
+            const response2 = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                },
+                payload: JSON.stringify({ query: query2 }),
+            });
+
+            expect(response2.statusCode).toBe(200);
+            const result2 = JSON.parse(response2.body);
+            expect(
+                result2.data.searchWallpapers.edges.map(
+                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
+                ),
+            ).toEqual(["wlpr_gql_back_1", "wlpr_gql_back_2"]);
+            expect(result2.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
             expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
         });
 

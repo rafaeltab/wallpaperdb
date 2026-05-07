@@ -2,7 +2,7 @@ import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaper
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
-import { CursorService } from '../services/cursor.service.js';
+import { CursorService, type CursorValue } from '../services/cursor.service.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
 /**
@@ -94,6 +94,7 @@ export class Resolvers {
    */
   private async searchWallpapers(args: SearchArgs) {
     const limit = args.first ?? args.last ?? 10;
+    const isBackwardPagination = args.last !== undefined && args.before !== undefined;
 
     return await withSpan(
       'graphql.resolve.searchWallpapers',
@@ -108,31 +109,33 @@ export class Resolvers {
         const startTime = Date.now();
 
         // Decode cursor if provided
-        let offset = 0;
+        let searchAfter: CursorValue[] | undefined;
         if (args.after) {
-          offset = this.cursorService.decode(args.after);
+          searchAfter = this.cursorService.decode(args.after);
         } else if (args.before) {
-          offset = this.cursorService.decode(args.before);
+          searchAfter = this.cursorService.decode(args.before);
         }
 
-        // If using 'last', we need to adjust offset for backward pagination
-        if (args.last && args.before) {
-          offset = Math.max(0, offset - args.last);
-        }
+        span.setAttribute('search.cursor.present', searchAfter ? 'true' : 'false');
 
-        span.setAttribute(GatewayAttributes.SEARCH_OFFSET, offset);
-
-        // Search with offset and limit
+        // Backward pagination walks the same cursor values in reverse order.
         const result = await this.repository.search({
           userId: args.filter?.userId,
           variantFilters: args.filter?.variants,
-          from: offset,
+          searchAfter,
           size: limit + 1, // Fetch one extra to determine hasNextPage
+          sortOrder: isBackwardPagination ? 'desc' : 'asc',
         });
 
         // Check if there are more results
         const hasMore = result.documents.length > limit;
-        const documents = hasMore ? result.documents.slice(0, limit) : result.documents;
+        let documents = hasMore ? result.documents.slice(0, limit) : result.documents;
+        let cursorValues = hasMore ? result.cursorValues.slice(0, limit) : result.cursorValues;
+
+        if (isBackwardPagination) {
+          documents = [...documents].reverse();
+          cursorValues = [...cursorValues].reverse();
+        }
 
         // Attach wallpaperId to variants for URL resolution
         const edges = documents.map((doc: Wallpaper) => ({
@@ -146,12 +149,14 @@ export class Resolvers {
         }));
 
         // Generate cursors
-        const startCursor = edges.length > 0 ? this.cursorService.encode(offset) : null;
-        const endCursor =
-          edges.length > 0 ? this.cursorService.encode(offset + edges.length) : null;
+        const startCursor = cursorValues[0] ? this.cursorService.encode(cursorValues[0]) : null;
+        const lastCursorValues = cursorValues.at(-1);
+        const endCursor = lastCursorValues ? this.cursorService.encode(lastCursorValues) : null;
 
-        const hasNextPage = hasMore && !args.last;
-        const hasPreviousPage = offset > 0;
+        const hasNextPage = isBackwardPagination
+          ? Boolean(args.before && edges.length > 0)
+          : hasMore;
+        const hasPreviousPage = isBackwardPagination ? hasMore : Boolean(args.after);
 
         // Record span attributes and metrics
         span.setAttribute(GatewayAttributes.SEARCH_TOTAL_RESULTS, result.total);

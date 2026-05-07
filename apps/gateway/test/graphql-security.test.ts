@@ -543,7 +543,7 @@ describe('GraphQL Security', () => {
     it('should reject expired cursors', async () => {
       // Manually create expired cursor by encoding with past timestamp
       const expiredPayload = JSON.stringify({
-        offset: 10,
+        values: ['wlpr_expired_cursor'],
         timestamp: Date.now() - 8 * 24 * 60 * 60 * 1000, // 8 days ago (past 7 day expiration)
       });
 

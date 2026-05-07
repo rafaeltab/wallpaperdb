@@ -3,6 +3,8 @@ import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { InvalidCursorError } from '../errors/graphql-errors.js';
 
+export type CursorValue = number | string;
+
 /**
  * Service for encoding/decoding secure cursors with HMAC signatures
  */
@@ -15,10 +17,10 @@ export class CursorService {
   }
 
   /**
-   * Encode offset into opaque cursor with HMAC signature
+   * Encode search_after values into opaque cursor with HMAC signature
    */
-  encode(offset: number): string {
-    const payload = JSON.stringify({ offset, timestamp: Date.now() });
+  encode(values: CursorValue[]): string {
+    const payload = JSON.stringify({ values, timestamp: Date.now() });
     const signature = crypto.createHmac('sha256', this.secret).update(payload).digest('hex');
 
     const cursor = Buffer.from(
@@ -34,7 +36,7 @@ export class CursorService {
   /**
    * Decode cursor and verify signature
    */
-  decode(cursor: string): number {
+  decode(cursor: string): CursorValue[] {
     try {
       const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf-8'));
 
@@ -50,7 +52,7 @@ export class CursorService {
         throw new Error('Invalid cursor signature');
       }
 
-      const { offset, timestamp } = JSON.parse(payload);
+      const { values, timestamp } = JSON.parse(payload);
 
       // Check cursor age
       const age = Date.now() - timestamp;
@@ -58,7 +60,14 @@ export class CursorService {
         throw new Error('Cursor expired');
       }
 
-      return offset;
+      if (
+        !Array.isArray(values) ||
+        values.some((value) => typeof value !== 'number' && typeof value !== 'string')
+      ) {
+        throw new Error('Invalid cursor payload');
+      }
+
+      return values;
     } catch (error) {
       throw new InvalidCursorError(
         error instanceof Error ? error.message : 'Invalid or expired cursor'

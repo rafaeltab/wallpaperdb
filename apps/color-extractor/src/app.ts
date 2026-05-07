@@ -7,6 +7,7 @@ import { MinioConnection } from './connections/minio.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
+import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -17,6 +18,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     connectionsState: ConnectionsState;
     container: typeof container;
+    consumer: WallpaperUploadedConsumerService;
   }
 }
 
@@ -96,8 +98,26 @@ export async function createApp(
     throw error;
   }
 
+  fastify.log.info('Starting event consumers...');
+  try {
+    const consumer = container.resolve(WallpaperUploadedConsumerService);
+
+    await consumer.start();
+    fastify.log.info('Event consumers started');
+
+    fastify.decorate('consumer', consumer);
+  } catch (error) {
+    fastify.log.error({ err: error }, 'Failed to start event consumers');
+    throw error;
+  }
+
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
+
+    if (fastify.consumer) {
+      fastify.log.info('Stopping event consumers...');
+      await fastify.consumer.stop();
+    }
 
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(MinioConnection).close();

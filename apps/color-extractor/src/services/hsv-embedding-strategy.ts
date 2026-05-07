@@ -10,6 +10,9 @@ const ACHROMATIC_BINS = 16;
 const TOTAL_BINS = CHROMATIC_BINS + ACHROMATIC_BINS;
 const ACHROMATIC_SATURATION_THRESHOLD = 0.1;
 
+import { injectable } from 'tsyringe';
+
+@injectable()
 export class HsvEmbeddingStrategy implements IColorEmbeddingStrategy {
   computeHistogram(rgbaPixels: Uint8Array): number[] {
     const bins = new Float64Array(TOTAL_BINS);

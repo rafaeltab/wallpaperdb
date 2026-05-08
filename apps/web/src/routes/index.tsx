@@ -29,7 +29,7 @@ import {
 } from '@/lib/browse-filters';
 
 const COLOR_INPUT_DEBOUNCE_MS = 300;
-const DEFAULT_BROWSE_COLOR = '#000000';
+const FALLBACK_COLOR_INPUT_VALUE = '#FFFFFF';
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -41,7 +41,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const { isOpen } = useBrowseFilterPanel();
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
-  const [draftColor, setDraftColor] = useState(color ?? DEFAULT_BROWSE_COLOR);
+  const [draftColor, setDraftColor] = useState(color ?? FALLBACK_COLOR_INPUT_VALUE);
   const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
 
   const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
@@ -136,12 +136,12 @@ export function HomePage() {
       colorChangeTimeoutRef.current = undefined;
     }
 
-    setDraftColor(DEFAULT_BROWSE_COLOR);
+    setDraftColor(FALLBACK_COLOR_INPUT_VALUE);
     handleColorChange(undefined);
   }, [handleColorChange]);
 
   useEffect(() => {
-    setDraftColor(color ?? DEFAULT_BROWSE_COLOR);
+    setDraftColor(color ?? FALLBACK_COLOR_INPUT_VALUE);
   }, [color]);
 
   useEffect(() => {
@@ -252,7 +252,7 @@ function BrowseFilterPanel({
                   onInput={(event) => onColorInputChange(event.currentTarget.value)}
                 />
                 <span className="text-muted-foreground text-xs font-medium uppercase">
-                  {draftColor}
+                  {selectedColor ?? 'No color selected'}
                 </span>
                 <Button
                   type="button"

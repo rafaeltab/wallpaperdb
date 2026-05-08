@@ -114,11 +114,14 @@
             "inputs": [
                 "src/**",
                 "test/**",
+                "playwright.config.ts",
                 "vitest.*.ts",
                 "package.json"
             ],
             "outputs": [
-                "coverage/**"
+                "coverage/**",
+                "playwright-report/**",
+                "test-results/**"
             ],
             "dependsOn": [
                 "^build",

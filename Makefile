@@ -15,6 +15,7 @@
         tags-docker-build tags-docker-run tags-docker-stop tags-docker-logs \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
+        web-e2e-test web-e2e-test-ui web-e2e-test-unit web-e2e-check-types \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
@@ -148,6 +149,12 @@ help:
 	@echo "  make web-format     - Format web frontend code"
 	@echo "  make web-lint       - Lint web frontend code"
 	@echo "  make web-check      - Type check web frontend"
+	@echo ""
+	@echo "Browser E2E Workspace:"
+	@echo "  make web-e2e-test        - Run browser E2E tests"
+	@echo "  make web-e2e-test-ui     - Run browser E2E tests in Playwright UI mode"
+	@echo "  make web-e2e-test-unit   - Run browser E2E workspace unit tests"
+	@echo "  make web-e2e-check-types - Type check browser E2E workspace"
 	@echo ""
 	@echo "React Muuri Package:"
 	@echo "  make react-muuri-build          - Build react-muuri package"
@@ -690,6 +697,23 @@ ingestor-e2e-verify:
 docs-dev:
 	@echo "Starting documentation dev server..."
 	@turbo run dev --filter=@wallpaperdb/docs
+
+# Browser E2E commands
+web-e2e-test:
+	@echo "Running browser E2E tests..."
+	@turbo run test:e2e --filter=@wallpaperdb/web-e2e --concurrency=1
+
+web-e2e-test-ui:
+	@echo "Running browser E2E tests in Playwright UI mode..."
+	@turbo run test:e2e:ui --filter=@wallpaperdb/web-e2e --concurrency=1
+
+web-e2e-test-unit:
+	@echo "Running browser E2E workspace unit tests..."
+	@turbo run test:unit --filter=@wallpaperdb/web-e2e
+
+web-e2e-check-types:
+	@echo "Type checking browser E2E workspace..."
+	@turbo run check-types --filter=@wallpaperdb/web-e2e
 
 docs-build:
 	@echo "Building documentation..."

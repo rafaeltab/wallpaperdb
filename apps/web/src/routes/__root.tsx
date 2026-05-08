@@ -3,6 +3,10 @@ import { createRootRouteWithContext, Link, Outlet, useRouterState } from '@tanst
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Image, X } from 'lucide-react';
 import { AppSidebar } from '@/components/app-sidebar';
+import {
+  BrowseFilterPanelProvider,
+  useBrowseFilterPanel,
+} from '@/components/browse-filter-panel-context';
 import { HeaderLayout } from '@/components/header-layout';
 import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
@@ -25,6 +29,26 @@ function RootLayout() {
   // router state, so this check works correctly regardless of sub-path deployment.
   // e.g. at basepath="/web", navigating to /web/wallpapers/123 → pathname is /wallpapers/123.
   const isWallpaperDetailsPage = routerState.location.pathname.startsWith('/wallpapers/');
+  const isBrowsePage = routerState.location.pathname === '/';
+
+  return (
+    <BrowseFilterPanelProvider>
+      <RootLayoutContent
+        isBrowsePage={isBrowsePage}
+        isWallpaperDetailsPage={isWallpaperDetailsPage}
+      />
+    </BrowseFilterPanelProvider>
+  );
+}
+
+function RootLayoutContent({
+  isBrowsePage,
+  isWallpaperDetailsPage,
+}: {
+  isBrowsePage: boolean;
+  isWallpaperDetailsPage: boolean;
+}) {
+  const { isOpen, toggle } = useBrowseFilterPanel();
 
   const handleClose = () => {
     // Close the current tab/window
@@ -48,7 +72,13 @@ function RootLayout() {
                 </Link>
               </>
             }
-            center={<SearchBar />}
+            center={
+              <SearchBar
+                showFilterToggle={isBrowsePage}
+                isFilterPanelOpen={isOpen}
+                onToggleFilters={isBrowsePage ? toggle : undefined}
+              />
+            }
             right={
               isWallpaperDetailsPage ? (
                 <>

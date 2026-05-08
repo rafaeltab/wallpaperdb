@@ -1,5 +1,6 @@
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Kbd } from '@/components/ui/kbd';
 
@@ -13,7 +14,17 @@ function useIsMac() {
   return isMac;
 }
 
-export function SearchBar() {
+interface SearchBarProps {
+  showFilterToggle?: boolean;
+  isFilterPanelOpen?: boolean;
+  onToggleFilters?: () => void;
+}
+
+export function SearchBar({
+  showFilterToggle = false,
+  isFilterPanelOpen = false,
+  onToggleFilters,
+}: SearchBarProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMac = useIsMac();
 
@@ -37,6 +48,20 @@ export function SearchBar() {
       </InputGroupAddon>
       <InputGroupInput ref={inputRef} type="search" placeholder="Search wallpapers..." />
       <InputGroupAddon align="inline-end" className="hidden sm:flex">
+        {showFilterToggle && onToggleFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Toggle filters"
+            aria-pressed={isFilterPanelOpen}
+            onClick={onToggleFilters}
+            className="h-7 px-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="hidden md:inline">Filters</span>
+          </Button>
+        ) : null}
         {isMac ? <Kbd>⌘</Kbd> : <Kbd>Ctrl</Kbd>}
         <Kbd>K</Kbd>
       </InputGroupAddon>

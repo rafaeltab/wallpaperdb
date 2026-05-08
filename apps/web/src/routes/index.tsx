@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AlertCircle, ArrowLeft, ImageOff, Upload } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
 import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
@@ -11,10 +11,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import {
+  BROWSE_ASPECT_RATIO_OPTIONS,
   BROWSE_FORMAT_OPTIONS,
+  getAspectRatioBadgeLabel,
+  getAspectRatioFilterValue,
+  getAspectRatioLabel,
   buildWallpaperFilter,
   getFormatBadgeLabel,
   parseBrowseSearch,
+  resolveClosestAspectRatioPreset,
+  type BrowseAspectRatioPresetValue,
+  type BrowseAspectRatioValue,
   type BrowseFormatValue,
 } from '@/lib/browse-filters';
 
@@ -24,14 +31,18 @@ export const Route = createFileRoute('/')({
 });
 
 export function HomePage() {
-  const { after, format } = Route.useSearch();
+  const { after, format, aspectRatio } = Route.useSearch();
   const navigate = useNavigate();
   const { isOpen } = useBrowseFilterPanel();
+  const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
 
   const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
     useWallpaperInfiniteQuery({
       initialCursor: after ?? null,
-      filter: buildWallpaperFilter(format),
+      filter: buildWallpaperFilter(
+        format,
+        getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
+      ),
     });
 
   const handleLoadMore = useCallback(() => {
@@ -42,10 +53,32 @@ export function HomePage() {
     (nextFormat?: BrowseFormatValue) => {
       void navigate({
         to: '/',
-        search: (previous: { after?: string; format?: BrowseFormatValue }) => ({
+        search: (previous: {
+          after?: string;
+          format?: BrowseFormatValue;
+          aspectRatio?: BrowseAspectRatioValue;
+        }) => ({
           ...previous,
           after: undefined,
           format: nextFormat,
+        }),
+      });
+    },
+    [navigate]
+  );
+
+  const handleAspectRatioChange = useCallback(
+    (nextAspectRatio?: BrowseAspectRatioValue) => {
+      void navigate({
+        to: '/',
+        search: (previous: {
+          after?: string;
+          format?: BrowseFormatValue;
+          aspectRatio?: BrowseAspectRatioValue;
+        }) => ({
+          ...previous,
+          after: undefined,
+          aspectRatio: nextAspectRatio,
         }),
       });
     },
@@ -68,7 +101,10 @@ export function HomePage() {
         <BrowseFilterPanel
           isOpen={isOpen}
           selectedFormat={format}
+          selectedAspectRatio={aspectRatio}
+          deviceAspectRatioPreset={deviceAspectRatioPreset}
           onFormatChange={handleFormatChange}
+          onAspectRatioChange={handleAspectRatioChange}
         />
         <EmptyState hasCursor={!!after} />
       </div>
@@ -80,7 +116,10 @@ export function HomePage() {
       <BrowseFilterPanel
         isOpen={isOpen}
         selectedFormat={format}
+        selectedAspectRatio={aspectRatio}
+        deviceAspectRatioPreset={deviceAspectRatioPreset}
         onFormatChange={handleFormatChange}
+        onAspectRatioChange={handleAspectRatioChange}
       />
       <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
       <LoadMoreTrigger
@@ -95,54 +134,135 @@ export function HomePage() {
 function BrowseFilterPanel({
   isOpen,
   selectedFormat,
+  selectedAspectRatio,
+  deviceAspectRatioPreset,
   onFormatChange,
+  onAspectRatioChange,
 }: {
   isOpen: boolean;
   selectedFormat?: BrowseFormatValue;
+  selectedAspectRatio?: BrowseAspectRatioValue;
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue;
   onFormatChange: (format?: BrowseFormatValue) => void;
+  onAspectRatioChange: (aspectRatio?: BrowseAspectRatioValue) => void;
 }) {
   return (
     <section className="border-b bg-muted/20 px-4 py-3">
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         {isOpen ? (
-          <div className="flex flex-col gap-2">
-            <div>
-              <p className="text-sm font-medium text-foreground">Format</p>
-              <p className="text-muted-foreground text-xs">
-                Limit results to a specific wallpaper file type.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {BROWSE_FORMAT_OPTIONS.map((option) => {
-                const isSelected = option.value === (selectedFormat ?? 'any');
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-sm font-medium text-foreground">Format</p>
+                <p className="text-muted-foreground text-xs">
+                  Limit results to a specific wallpaper file type.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BROWSE_FORMAT_OPTIONS.map((option) => {
+                  const isSelected = option.value === (selectedFormat ?? 'any');
 
-                return (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={isSelected ? 'secondary' : 'outline'}
-                    size="sm"
-                    onClick={() =>
-                      onFormatChange(option.value === 'any' ? undefined : option.value)
-                    }
-                    aria-pressed={isSelected}
-                  >
-                    {option.label}
-                  </Button>
-                );
-              })}
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={isSelected ? 'secondary' : 'outline'}
+                      size="sm"
+                      onClick={() =>
+                        onFormatChange(option.value === 'any' ? undefined : option.value)
+                      }
+                      aria-pressed={isSelected}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="text-sm font-medium text-foreground">Aspect ratio</p>
+                <p className="text-muted-foreground text-xs">
+                  Match results to common display and crop shapes.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {BROWSE_ASPECT_RATIO_OPTIONS.map((option) => {
+                  const isSelected = option.value === (selectedAspectRatio ?? 'any');
+
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={isSelected ? 'secondary' : 'outline'}
+                      size="sm"
+                      onClick={() =>
+                        onAspectRatioChange(option.value === 'any' ? undefined : option.value)
+                      }
+                      aria-pressed={isSelected}
+                    >
+                      {option.value === 'device'
+                        ? getAspectRatioLabel(option.value, deviceAspectRatioPreset)
+                        : option.label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         ) : null}
 
-        {!isOpen && selectedFormat ? (
+        {!isOpen && (selectedFormat || selectedAspectRatio) ? (
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{getFormatBadgeLabel(selectedFormat)}</Badge>
+            {selectedFormat ? <Badge variant="outline">{getFormatBadgeLabel(selectedFormat)}</Badge> : null}
+            {selectedAspectRatio ? (
+              <Badge variant="outline">
+                {getAspectRatioBadgeLabel(selectedAspectRatio, deviceAspectRatioPreset)}
+              </Badge>
+            ) : null}
           </div>
         ) : null}
       </div>
     </section>
   );
+}
+
+function useDeviceAspectRatioPreset(): BrowseAspectRatioPresetValue {
+  const [deviceAspectRatioPreset, setDeviceAspectRatioPreset] = useState<BrowseAspectRatioPresetValue>(
+    () => getDeviceAspectRatioPreset(),
+  );
+
+  useEffect(() => {
+    const syncDeviceAspectRatioPreset = () => {
+      setDeviceAspectRatioPreset(getDeviceAspectRatioPreset());
+    };
+
+    syncDeviceAspectRatioPreset();
+
+    const intervalId = window.setInterval(syncDeviceAspectRatioPreset, 1000);
+    window.addEventListener('resize', syncDeviceAspectRatioPreset);
+    window.addEventListener('orientationchange', syncDeviceAspectRatioPreset);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('resize', syncDeviceAspectRatioPreset);
+      window.removeEventListener('orientationchange', syncDeviceAspectRatioPreset);
+    };
+  }, []);
+
+  return deviceAspectRatioPreset;
+}
+
+function getDeviceAspectRatioPreset(): BrowseAspectRatioPresetValue {
+  const width = window.screen?.width;
+  const height = window.screen?.height;
+
+  if (typeof width !== 'number' || typeof height !== 'number' || width <= 0 || height <= 0) {
+    return '16-9';
+  }
+
+  return resolveClosestAspectRatioPreset(width / height);
 }
 
 function LoadingState() {

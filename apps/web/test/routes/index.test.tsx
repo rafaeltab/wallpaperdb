@@ -5,6 +5,17 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 const mockUseSearch = vi.fn(() => ({}));
 const mockNavigate = vi.fn();
 
+function setScreenSize(width: number, height: number) {
+  Object.defineProperty(window, 'screen', {
+    configurable: true,
+    value: {
+      ...window.screen,
+      width,
+      height,
+    },
+  });
+}
+
 vi.mock('@tanstack/react-router', () => ({
   createFileRoute: () => (config: Record<string, unknown>) => ({
     ...config,
@@ -45,7 +56,8 @@ import { HomePage } from '@/routes/index';
 describe('HomePage browse filters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined });
+    setScreenSize(1920, 1080);
+    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: false,
       setIsOpen: vi.fn(),
@@ -88,7 +100,7 @@ describe('HomePage browse filters', () => {
   });
 
   it('passes the selected URL-backed format into wallpaper search', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: 'png' });
+    mockUseSearch.mockReturnValue({ after: undefined, format: 'png', aspectRatio: undefined });
 
     render(<HomePage />);
 
@@ -98,8 +110,30 @@ describe('HomePage browse filters', () => {
     });
   });
 
+  it('passes the selected URL-backed aspect ratio into wallpaper search', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: '21-9' });
+
+    render(<HomePage />);
+
+    expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
+      filter: { variants: { aspectRatio: 21 / 9 } },
+      initialCursor: null,
+    });
+  });
+
+  it('resolves the device aspect ratio before querying wallpapers', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+
+    render(<HomePage />);
+
+    expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
+      filter: { variants: { aspectRatio: 16 / 9 } },
+      initialCursor: null,
+    });
+  });
+
   it('shows the active format as a neutral badge when the panel is collapsed', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: 'png' });
+    mockUseSearch.mockReturnValue({ after: undefined, format: 'png', aspectRatio: undefined });
 
     render(<HomePage />);
 
@@ -107,10 +141,18 @@ describe('HomePage browse filters', () => {
     expect(screen.queryByText('JPEG')).not.toBeInTheDocument();
   });
 
+  it('shows the resolved device aspect ratio as a neutral badge when the panel is collapsed', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+
+    render(<HomePage />);
+
+    expect(screen.getByText('Aspect ratio: Device 16:9')).toBeInTheDocument();
+  });
+
   it('updates the route search state when a format is selected', async () => {
     const user = userEvent.setup();
 
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: undefined });
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: undefined, aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: true,
       setIsOpen: vi.fn(),
@@ -127,9 +169,50 @@ describe('HomePage browse filters', () => {
     });
 
     const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(navigateCall.search({ after: 'cursor_123', format: undefined })).toEqual({
+    expect(navigateCall.search({ after: 'cursor_123', format: undefined, aspectRatio: undefined })).toEqual({
       after: undefined,
       format: 'png',
+      aspectRatio: undefined,
     });
+  });
+
+  it('updates the route search state when an aspect ratio is selected', async () => {
+    const user = userEvent.setup();
+
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: 'png', aspectRatio: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({
+      isOpen: true,
+      setIsOpen: vi.fn(),
+      toggle: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    await user.click(screen.getByRole('button', { name: '16:10' }));
+
+    const navigateCall = mockNavigate.mock.calls[0][0];
+    expect(navigateCall.search({ after: 'cursor_123', format: 'png', aspectRatio: undefined })).toEqual({
+      after: undefined,
+      format: 'png',
+      aspectRatio: '16-10',
+    });
+  });
+
+  it('updates the device label when the active display context changes', async () => {
+    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+    (useBrowseFilterPanel as Mock).mockReturnValue({
+      isOpen: true,
+      setIsOpen: vi.fn(),
+      toggle: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    expect(screen.getByRole('button', { name: 'Device 16:9' })).toBeInTheDocument();
+
+    setScreenSize(1080, 1920);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(await screen.findByRole('button', { name: 'Device 9:16' })).toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AlertCircle, ArrowLeft, ImageOff, Upload } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
 import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import {
@@ -17,6 +18,8 @@ import {
   getAspectRatioFilterValue,
   getAspectRatioLabel,
   buildWallpaperFilter,
+  buildWallpaperSort,
+  getColorBadgeLabel,
   getFormatBadgeLabel,
   parseBrowseSearch,
   resolveClosestAspectRatioPreset,
@@ -25,16 +28,21 @@ import {
   type BrowseFormatValue,
 } from '@/lib/browse-filters';
 
+const COLOR_INPUT_DEBOUNCE_MS = 300;
+const DEFAULT_BROWSE_COLOR = '#000000';
+
 export const Route = createFileRoute('/')({
   component: HomePage,
   validateSearch: parseBrowseSearch,
 });
 
 export function HomePage() {
-  const { after, format, aspectRatio } = Route.useSearch();
+  const { after, color, format, aspectRatio } = Route.useSearch();
   const navigate = useNavigate();
   const { isOpen } = useBrowseFilterPanel();
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
+  const [draftColor, setDraftColor] = useState(color ?? DEFAULT_BROWSE_COLOR);
+  const colorChangeTimeoutRef = useRef<number | undefined>(undefined);
 
   const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
     useWallpaperInfiniteQuery({
@@ -43,6 +51,7 @@ export function HomePage() {
         format,
         getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
       ),
+      sort: buildWallpaperSort(color),
     });
 
   const handleLoadMore = useCallback(() => {
@@ -85,6 +94,63 @@ export function HomePage() {
     [navigate]
   );
 
+  const handleColorChange = useCallback(
+    (nextColor?: string) => {
+      void navigate({
+        to: '/',
+        search: (previous: {
+          after?: string;
+          color?: string;
+          format?: BrowseFormatValue;
+          aspectRatio?: BrowseAspectRatioValue;
+        }) => ({
+          ...previous,
+          after: undefined,
+          color: nextColor,
+        }),
+      });
+    },
+    [navigate]
+  );
+
+  const handleColorInputChange = useCallback(
+    (nextColor: string) => {
+      const normalizedColor = nextColor.toUpperCase();
+
+      setDraftColor(normalizedColor);
+
+      if (colorChangeTimeoutRef.current) {
+        window.clearTimeout(colorChangeTimeoutRef.current);
+      }
+
+      colorChangeTimeoutRef.current = window.setTimeout(() => {
+        handleColorChange(normalizedColor);
+      }, COLOR_INPUT_DEBOUNCE_MS);
+    },
+    [handleColorChange]
+  );
+
+  const handleClearColor = useCallback(() => {
+    if (colorChangeTimeoutRef.current) {
+      window.clearTimeout(colorChangeTimeoutRef.current);
+      colorChangeTimeoutRef.current = undefined;
+    }
+
+    setDraftColor(DEFAULT_BROWSE_COLOR);
+    handleColorChange(undefined);
+  }, [handleColorChange]);
+
+  useEffect(() => {
+    setDraftColor(color ?? DEFAULT_BROWSE_COLOR);
+  }, [color]);
+
+  useEffect(() => {
+    return () => {
+      if (colorChangeTimeoutRef.current) {
+        window.clearTimeout(colorChangeTimeoutRef.current);
+      }
+    };
+  }, []);
   if (isLoading) {
     return <LoadingState />;
   }
@@ -100,9 +166,13 @@ export function HomePage() {
       <div>
         <BrowseFilterPanel
           isOpen={isOpen}
+          draftColor={draftColor}
+          selectedColor={color}
           selectedFormat={format}
           selectedAspectRatio={aspectRatio}
           deviceAspectRatioPreset={deviceAspectRatioPreset}
+          onClearColor={handleClearColor}
+          onColorInputChange={handleColorInputChange}
           onFormatChange={handleFormatChange}
           onAspectRatioChange={handleAspectRatioChange}
         />
@@ -115,9 +185,13 @@ export function HomePage() {
     <div>
       <BrowseFilterPanel
         isOpen={isOpen}
+        draftColor={draftColor}
+        selectedColor={color}
         selectedFormat={format}
         selectedAspectRatio={aspectRatio}
         deviceAspectRatioPreset={deviceAspectRatioPreset}
+        onClearColor={handleClearColor}
+        onColorInputChange={handleColorInputChange}
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
       />
@@ -132,17 +206,25 @@ export function HomePage() {
 }
 
 function BrowseFilterPanel({
+  draftColor,
   isOpen,
+  selectedColor,
   selectedFormat,
   selectedAspectRatio,
   deviceAspectRatioPreset,
+  onClearColor,
+  onColorInputChange,
   onFormatChange,
   onAspectRatioChange,
 }: {
+  draftColor: string;
   isOpen: boolean;
+  selectedColor?: string;
   selectedFormat?: BrowseFormatValue;
   selectedAspectRatio?: BrowseAspectRatioValue;
   deviceAspectRatioPreset: BrowseAspectRatioPresetValue;
+  onClearColor: () => void;
+  onColorInputChange: (color: string) => void;
   onFormatChange: (format?: BrowseFormatValue) => void;
   onAspectRatioChange: (aspectRatio?: BrowseAspectRatioValue) => void;
 }) {
@@ -151,6 +233,39 @@ function BrowseFilterPanel({
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         {isOpen ? (
           <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div>
+                <label htmlFor="browse-color" className="text-sm font-medium text-foreground">
+                  Color
+                </label>
+                <p id="browse-color-description" className="text-muted-foreground text-xs">
+                  Bias results toward a specific visual tone.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  id="browse-color"
+                  type="color"
+                  value={draftColor}
+                  aria-describedby="browse-color-description"
+                  className="h-10 w-14 cursor-pointer p-1"
+                  onInput={(event) => onColorInputChange(event.currentTarget.value)}
+                />
+                <span className="text-muted-foreground text-xs font-medium uppercase">
+                  {draftColor}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onClearColor}
+                  disabled={!selectedColor}
+                >
+                  Clear color
+                </Button>
+              </div>
+            </div>
+
             <div className="flex flex-col gap-2">
               <div>
                 <p className="text-sm font-medium text-foreground">Format</p>
@@ -213,9 +328,22 @@ function BrowseFilterPanel({
           </div>
         ) : null}
 
-        {!isOpen && (selectedFormat || selectedAspectRatio) ? (
+        {!isOpen && (selectedColor || selectedFormat || selectedAspectRatio) ? (
           <div className="flex flex-wrap gap-2">
-            {selectedFormat ? <Badge variant="outline">{getFormatBadgeLabel(selectedFormat)}</Badge> : null}
+            {selectedColor ? (
+              <Badge variant="outline">
+                <span
+                  data-testid="active-color-dot"
+                  aria-hidden="true"
+                  className="size-2 rounded-full border border-black/10"
+                  style={{ backgroundColor: selectedColor }}
+                />
+                {getColorBadgeLabel(selectedColor)}
+              </Badge>
+            ) : null}
+            {selectedFormat ? (
+              <Badge variant="outline">{getFormatBadgeLabel(selectedFormat)}</Badge>
+            ) : null}
             {selectedAspectRatio ? (
               <Badge variant="outline">
                 {getAspectRatioBadgeLabel(selectedAspectRatio, deviceAspectRatioPreset)}

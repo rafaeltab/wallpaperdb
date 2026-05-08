@@ -1,5 +1,4 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 const mockUseSearch = vi.fn(() => ({}));
@@ -57,7 +56,7 @@ describe('HomePage browse filters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setScreenSize(1920, 1080);
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: undefined });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: false,
       setIsOpen: vi.fn(),
@@ -100,40 +99,59 @@ describe('HomePage browse filters', () => {
   });
 
   it('passes the selected URL-backed format into wallpaper search', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: 'png', aspectRatio: undefined });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: 'png', aspectRatio: undefined });
 
     render(<HomePage />);
 
     expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
       filter: { variants: { format: 'image/png' } },
       initialCursor: null,
+      sort: undefined,
     });
   });
 
   it('passes the selected URL-backed aspect ratio into wallpaper search', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: '21-9' });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: '21-9' });
 
     render(<HomePage />);
 
     expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
       filter: { variants: { aspectRatio: 21 / 9 } },
       initialCursor: null,
+      sort: undefined,
+    });
+  });
+
+  it('passes the selected URL-backed color into wallpaper search sort', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, color: '#ff0000', format: undefined, aspectRatio: undefined });
+
+    render(<HomePage />);
+
+    expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
+      filter: undefined,
+      initialCursor: null,
+      sort: {
+        color: {
+          colors: [{ amount: 1, color: '#FF0000' }],
+        },
+      },
     });
   });
 
   it('resolves the device aspect ratio before querying wallpapers', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: 'device' });
 
     render(<HomePage />);
 
     expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
       filter: { variants: { aspectRatio: 16 / 9 } },
       initialCursor: null,
+      sort: undefined,
     });
   });
 
   it('shows the active format as a neutral badge when the panel is collapsed', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: 'png', aspectRatio: undefined });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: 'png', aspectRatio: undefined });
 
     render(<HomePage />);
 
@@ -142,17 +160,24 @@ describe('HomePage browse filters', () => {
   });
 
   it('shows the resolved device aspect ratio as a neutral badge when the panel is collapsed', () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: 'device' });
 
     render(<HomePage />);
 
     expect(screen.getByText('Aspect ratio: Device 16:9')).toBeInTheDocument();
   });
 
-  it('updates the route search state when a format is selected', async () => {
-    const user = userEvent.setup();
+  it('shows the active color as a neutral badge with a colored dot when the panel is collapsed', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, color: '#ff0000', format: undefined, aspectRatio: undefined });
 
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: undefined, aspectRatio: undefined });
+    render(<HomePage />);
+
+    expect(screen.getByText('Color: #FF0000')).toBeInTheDocument();
+    expect(screen.getByTestId('active-color-dot')).toHaveStyle({ backgroundColor: '#FF0000' });
+  });
+
+  it('updates the route search state when a format is selected', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: undefined, aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: true,
       setIsOpen: vi.fn(),
@@ -161,7 +186,7 @@ describe('HomePage browse filters', () => {
 
     render(<HomePage />);
 
-    await user.click(screen.getByRole('button', { name: 'PNG' }));
+    fireEvent.click(screen.getByRole('button', { name: 'PNG' }));
 
     expect(mockNavigate).toHaveBeenCalledWith({
       search: expect.any(Function),
@@ -169,17 +194,18 @@ describe('HomePage browse filters', () => {
     });
 
     const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(navigateCall.search({ after: 'cursor_123', format: undefined, aspectRatio: undefined })).toEqual({
+    expect(navigateCall.search({ after: 'cursor_123', color: undefined, format: undefined, aspectRatio: undefined })).toEqual({
       after: undefined,
+      color: undefined,
       format: 'png',
       aspectRatio: undefined,
     });
   });
 
-  it('updates the route search state when an aspect ratio is selected', async () => {
-    const user = userEvent.setup();
+  it('debounces route search updates when the color changes', () => {
+    vi.useFakeTimers();
 
-    mockUseSearch.mockReturnValue({ after: 'cursor_123', format: 'png', aspectRatio: undefined });
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: true,
       setIsOpen: vi.fn(),
@@ -188,18 +214,57 @@ describe('HomePage browse filters', () => {
 
     render(<HomePage />);
 
-    await user.click(screen.getByRole('button', { name: '16:10' }));
+    fireEvent.input(screen.getByLabelText('Color'), {
+      target: { value: '#00ff00' },
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(299);
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      search: expect.any(Function),
+      to: '/',
+    });
 
     const navigateCall = mockNavigate.mock.calls[0][0];
-    expect(navigateCall.search({ after: 'cursor_123', format: 'png', aspectRatio: undefined })).toEqual({
+    expect(
+      navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined })
+    ).toEqual({
       after: undefined,
+      color: '#00FF00',
+      format: 'png',
+      aspectRatio: undefined,
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('updates the route search state when an aspect ratio is selected', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({
+      isOpen: true,
+      setIsOpen: vi.fn(),
+      toggle: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '16:10' }));
+
+    const navigateCall = mockNavigate.mock.calls[0][0];
+    expect(navigateCall.search({ after: 'cursor_123', color: undefined, format: 'png', aspectRatio: undefined })).toEqual({
+      after: undefined,
+      color: undefined,
       format: 'png',
       aspectRatio: '16-10',
     });
   });
 
   it('updates the device label when the active display context changes', async () => {
-    mockUseSearch.mockReturnValue({ after: undefined, format: undefined, aspectRatio: 'device' });
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: 'device' });
     (useBrowseFilterPanel as Mock).mockReturnValue({
       isOpen: true,
       setIsOpen: vi.fn(),
@@ -214,5 +279,31 @@ describe('HomePage browse filters', () => {
     window.dispatchEvent(new Event('resize'));
 
     expect(await screen.findByRole('button', { name: 'Device 9:16' })).toBeInTheDocument();
+  });
+
+  it('clears the color filter immediately', () => {
+    mockUseSearch.mockReturnValue({ after: 'cursor_123', color: '#FF0000', format: 'png', aspectRatio: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({
+      isOpen: true,
+      setIsOpen: vi.fn(),
+      toggle: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear color' }));
+
+    expect(mockNavigate).toHaveBeenCalledWith({
+      search: expect.any(Function),
+      to: '/',
+    });
+
+    const navigateCall = mockNavigate.mock.calls[0][0];
+    expect(navigateCall.search({ after: 'cursor_123', color: '#FF0000', format: 'png', aspectRatio: undefined })).toEqual({
+      after: undefined,
+      color: undefined,
+      format: 'png',
+      aspectRatio: undefined,
+    });
   });
 });

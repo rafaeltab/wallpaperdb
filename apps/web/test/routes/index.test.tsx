@@ -176,6 +176,20 @@ describe('HomePage browse filters', () => {
     expect(screen.getByTestId('active-color-dot')).toHaveStyle({ backgroundColor: '#FF0000' });
   });
 
+  it('does not show black as a fake selected color when the color filter is unset', () => {
+    mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: undefined });
+    (useBrowseFilterPanel as Mock).mockReturnValue({
+      isOpen: true,
+      setIsOpen: vi.fn(),
+      toggle: vi.fn(),
+    });
+
+    render(<HomePage />);
+
+    expect(screen.getByText('No color selected')).toBeInTheDocument();
+    expect(screen.queryByText('#000000')).not.toBeInTheDocument();
+  });
+
   it('updates the route search state when a format is selected', () => {
     mockUseSearch.mockReturnValue({ after: 'cursor_123', color: undefined, format: undefined, aspectRatio: undefined });
     (useBrowseFilterPanel as Mock).mockReturnValue({

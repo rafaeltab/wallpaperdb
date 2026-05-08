@@ -81,6 +81,8 @@ export const knownUserSecrets = {
 	CLERK_DOMAIN: undefined,
 	CLERK_SECRET_KEY: undefined,
 	CLERK_PUBLISHABLE_KEY: undefined,
+	E2E_BASE_TEST_EMAIL: undefined,
+	E2E_BASE_TEST_PASSWORD: undefined,
 };
 
 export function syncKnownSecretsToContent(existingContent, secrets) {

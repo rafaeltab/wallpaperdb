@@ -1,4 +1,4 @@
-import type { WallpaperFilter } from '@/lib/graphql/types';
+import type { WallpaperFilter, WallpaperSort } from '@/lib/graphql/types';
 
 export const BROWSE_FORMAT_OPTIONS = [
   { value: 'any', label: 'Any' },
@@ -29,11 +29,13 @@ export interface BrowseSearchState {
   after?: string;
   format?: BrowseFormatValue;
   aspectRatio?: BrowseAspectRatioValue;
+  color?: string;
 }
 
 export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearchState {
   return {
     after: typeof search.after === 'string' ? search.after : undefined,
+    color: normalizeBrowseColorValue(search.color),
     format: isBrowseFormatValue(search.format) ? search.format : undefined,
     aspectRatio: isBrowseAspectRatioValue(search.aspectRatio) ? search.aspectRatio : undefined,
   };
@@ -78,6 +80,24 @@ export function buildAspectRatioFilter(
       aspectRatio: resolvedAspectRatio,
     },
   };
+}
+
+export function buildWallpaperSort(color?: string): WallpaperSort | undefined {
+  const normalizedColor = normalizeBrowseColorValue(color);
+
+  if (!normalizedColor) {
+    return undefined;
+  }
+
+  return {
+    color: {
+      colors: [{ amount: 1, color: normalizedColor }],
+    },
+  };
+}
+
+export function getColorBadgeLabel(color: string): string {
+  return `Color: ${normalizeBrowseColorValue(color) ?? color.toUpperCase()}`;
 }
 
 export function getFormatBadgeLabel(format: BrowseFormatValue): string {
@@ -161,4 +181,12 @@ function isBrowseAspectRatioValue(value: unknown): value is BrowseAspectRatioVal
 
 function getAspectRatioPresetLabel(aspectRatio: BrowseAspectRatioPresetValue): string {
   return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === aspectRatio)?.label ?? aspectRatio;
+}
+
+function normalizeBrowseColorValue(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : undefined;
 }

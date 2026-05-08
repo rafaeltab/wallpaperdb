@@ -3,10 +3,11 @@ import { gql } from 'graphql-request';
 export const SEARCH_WALLPAPERS = gql`
   query SearchWallpapers(
     $filter: WallpaperFilter
+    $sort: WallpaperSort
     $first: Int
     $after: String
   ) {
-    searchWallpapers(filter: $filter, first: $first, after: $after) {
+    searchWallpapers(filter: $filter, sort: $sort, first: $first, after: $after) {
       edges {
         node {
           wallpaperId

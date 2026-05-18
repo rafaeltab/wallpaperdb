@@ -4,7 +4,6 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 
 vi.mock('@clerk/react', () => ({
   useSignIn: vi.fn(),
-  useClerk: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-router', () => ({
@@ -14,12 +13,12 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
 }));
 
-import { useClerk, useSignIn } from '@clerk/react';
+import { useSignIn } from '@clerk/react';
 import { SignInForm } from '@/components/sign-in-form';
 
 describe('SignInForm', () => {
   const mockPassword = vi.fn();
-  const mockSetActive = vi.fn();
+  const mockFinalize = vi.fn();
   const mockSso = vi.fn();
   const mockReset = vi.fn();
   const mockSendEmailCode = vi.fn();
@@ -28,6 +27,7 @@ describe('SignInForm', () => {
     return {
       signIn: {
         password: mockPassword,
+        finalize: mockFinalize,
         sso: mockSso,
         reset: mockReset,
         status: 'complete',
@@ -43,7 +43,6 @@ describe('SignInForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (useSignIn as Mock).mockReturnValue(mockSignInReturn());
-    (useClerk as Mock).mockReturnValue({ setActive: mockSetActive });
   });
 
   it('renders the sign-in form with email and password fields', () => {
@@ -93,6 +92,7 @@ describe('SignInForm', () => {
         },
         signIn: {
           password: mockPassword,
+          finalize: mockFinalize,
           sso: mockSso,
           reset: mockReset,
           status: 'complete',
@@ -129,6 +129,7 @@ describe('SignInForm', () => {
         },
         signIn: {
           password: mockPassword,
+          finalize: mockFinalize,
           sso: mockSso,
           reset: mockReset,
           status: 'complete',
@@ -151,13 +152,12 @@ describe('SignInForm', () => {
     });
   });
 
-  it('activates the created session after successful sign-in', async () => {
+  it('calls signIn.finalize after successful sign-in', async () => {
     mockPassword.mockResolvedValue({
       error: null,
       status: 'complete',
-      createdSessionId: 'sess_123',
     });
-    mockSetActive.mockResolvedValue(undefined);
+    mockFinalize.mockResolvedValue(undefined);
 
     const user = userEvent.setup();
     render(<SignInForm />);
@@ -167,18 +167,15 @@ describe('SignInForm', () => {
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
     await waitFor(() => {
-      expect(mockSetActive).toHaveBeenCalledWith(
-        expect.objectContaining({ session: 'sess_123' }),
-      );
-      expect(mockSetActive).toHaveBeenCalledWith(
+      expect(mockFinalize).toHaveBeenCalledWith(
         expect.objectContaining({ navigate: expect.any(Function) }),
       );
     });
   });
 
-  it('does not activate a session when password returns an error', async () => {
+  it('does not call finalize when password returns an error', async () => {
     mockPassword.mockResolvedValue({ error: { code: 'form_password_incorrect' } });
-    mockSetActive.mockResolvedValue(undefined);
+    mockFinalize.mockResolvedValue(undefined);
 
     const user = userEvent.setup();
     render(<SignInForm />);
@@ -190,7 +187,7 @@ describe('SignInForm', () => {
     await waitFor(() => {
       expect(mockPassword).toHaveBeenCalled();
     });
-    expect(mockSetActive).not.toHaveBeenCalled();
+    expect(mockFinalize).not.toHaveBeenCalled();
   });
 
   it('calls signIn.sso for Google OAuth', async () => {
@@ -235,6 +232,7 @@ describe('SignInForm', () => {
       mockSignInReturn({
         signIn: {
           password: mockPassword,
+          finalize: mockFinalize,
           sso: mockSso,
           reset: mockReset,
           status: 'needs_second_factor',

@@ -1,6 +1,6 @@
-import { useClerk, useSignIn } from '@clerk/react';
+import { useSignIn } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,10 +16,10 @@ function buildUrl(path: string): string {
 
 export function SignInForm() {
   const { signIn, errors, fetchStatus } = useSignIn();
-  const clerk = useClerk();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isAwaitingSignInStatus, setIsAwaitingSignInStatus] = useState(false);
   const [redirectUrl] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('redirect') || '/';
@@ -27,39 +27,39 @@ export function SignInForm() {
 
   const isSubmitting = fetchStatus === 'fetching';
 
-  const activateSession = async (createdSessionId: string) => {
-    await clerk.setActive({
-      session: createdSessionId,
-      navigate: async ({ session, decorateUrl }) => {
-        if (session?.currentTask) return;
-        const url = decorateUrl(redirectUrl);
-        if (url.startsWith('http')) {
-          window.location.href = url;
-        } else {
-          void navigate({ to: url });
-        }
-      },
-    });
-  };
+  useEffect(() => {
+    if (!signIn || !isAwaitingSignInStatus) return;
 
-  const resolveCreatedSessionId = async (preferredSessionId?: string) => {
-    const immediateSessionId =
-      preferredSessionId || signIn.createdSessionId || clerk.client?.lastActiveSessionId;
-
-    if (immediateSessionId) {
-      return immediateSessionId;
-    }
-
-    for (let attempt = 0; attempt < 20; attempt += 1) {
-      await new Promise((resolve) => window.setTimeout(resolve, 100));
-      const nextSessionId = signIn.createdSessionId || clerk.client?.lastActiveSessionId;
-      if (nextSessionId) {
-        return nextSessionId;
+    const finalizeSignIn = async () => {
+      if (signIn.status === 'complete') {
+        setIsAwaitingSignInStatus(false);
+        await signIn.finalize({
+          navigate: async ({ session, decorateUrl }) => {
+            if (session?.currentTask) return;
+            const url = decorateUrl(redirectUrl);
+            if (url.startsWith('http')) {
+              window.location.href = url;
+            } else {
+              void navigate({ to: url });
+            }
+          },
+        });
+        return;
       }
-    }
 
-    return undefined;
-  };
+      if (signIn.status === 'needs_second_factor' || signIn.status === 'needs_client_trust') {
+        setIsAwaitingSignInStatus(false);
+        const emailCodeFactor = signIn.supportedSecondFactors?.find(
+          (factor) => factor.strategy === 'email_code'
+        );
+        if (emailCodeFactor) {
+          await signIn.mfa.sendEmailCode();
+        }
+      }
+    };
+
+    void finalizeSignIn();
+  }, [isAwaitingSignInStatus, navigate, redirectUrl, signIn]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -72,18 +72,7 @@ export function SignInForm() {
 
     if (result.error) return;
 
-    const createdSessionId = await resolveCreatedSessionId(result.createdSessionId);
-
-    if (createdSessionId) {
-      await activateSession(createdSessionId);
-    } else if (signIn.status === 'needs_second_factor' || signIn.status === 'needs_client_trust') {
-      const emailCodeFactor = signIn.supportedSecondFactors?.find(
-        (factor) => factor.strategy === 'email_code'
-      );
-      if (emailCodeFactor) {
-        await signIn.mfa.sendEmailCode();
-      }
-    }
+    setIsAwaitingSignInStatus(true);
   };
 
   const handleOAuthSignIn = async (strategy: 'oauth_google' | 'oauth_github') => {

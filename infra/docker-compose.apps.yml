@@ -20,6 +20,12 @@ services:
     env_file:
       - path: ../apps/ingestor/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -43,6 +49,12 @@ services:
     env_file:
       - path: ../apps/media/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3003/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -64,6 +76,12 @@ services:
     env_file:
       - path: ../apps/gateway/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3004/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -85,6 +103,12 @@ services:
     env_file:
       - path: ../apps/variant-generator/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3006/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -106,6 +130,12 @@ services:
     env_file:
       - path: ../apps/color-extractor/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3007/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -129,6 +159,12 @@ services:
     env_file:
       - path: ../apps/tags/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3008/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -152,6 +188,12 @@ services:
     env_file:
       - path: ../apps/user/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3009/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -173,6 +215,12 @@ services:
     env_file:
       - path: ../apps/web/.env
         required: false
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3005/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     develop:
       watch:
         - action: sync
@@ -202,14 +250,22 @@ services:
     environment:
       - INGRESS_PORT=${INGRESS_PORT:-8000}
     depends_on:
-      - ingestor
-      - media
-      - gateway
-      - variant-generator
-      - color-extractor
-      - tags
-      - user
-      - web
+      ingestor:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      variant-generator:
+        condition: service_healthy
+      color-extractor:
+        condition: service_healthy
+      tags:
+        condition: service_healthy
+      user:
+        condition: service_healthy
+      web:
+        condition: service_healthy
 
 networks:
   default:

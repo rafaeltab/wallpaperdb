@@ -9,6 +9,8 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: wallpaperdb
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,8 +33,43 @@ jobs:
       - name: Build
         run: turbo run build
 
+      - name: Install Playwright browsers
+        run: pnpm --filter @wallpaperdb/web-e2e exec playwright install --with-deps chromium
+
+      - name: Start infrastructure
+        run: make infra-start
+
+      - name: Start application stack for browser E2E
+        run: make apps-start
+
       - name: Run E2E tests
         run: make test-e2e
 
+      - name: Capture browser E2E service diagnostics
+        if: failure()
+        run: |
+          mkdir -p artifacts/web-e2e
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f infra/docker-compose.yml logs --no-color > artifacts/web-e2e/infra.log
+          docker compose -p "$COMPOSE_PROJECT_NAME" -f infra/docker-compose.apps.yml logs --no-color > artifacts/web-e2e/apps.log
+
+      - name: Upload browser E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-e2e-failure-artifacts
+          if-no-files-found: ignore
+          path: |
+            apps/web-e2e/playwright-report
+            apps/web-e2e/test-results
+            artifacts/web-e2e
+
       - name: Verify E2E test isolation
         run: make ingestor-e2e-verify
+
+      - name: Stop application stack
+        if: always()
+        run: make apps-stop
+
+      - name: Stop infrastructure
+        if: always()
+        run: make infra-stop

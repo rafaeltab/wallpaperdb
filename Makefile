@@ -1,4 +1,4 @@
-.PHONY: infra-start infra-stop infra-reset infra-logs \
+.PHONY: infra-start infra-stop infra-reset infra-logs apps-start apps-stop \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
         migrate psql psql-ingestor psql-media psql-tags psql-user db-studio-ingestor db-studio-media db-studio-user \
@@ -55,6 +55,8 @@ help:
 	@echo "  make infra-stop     - Stop all infrastructure services"
 	@echo "  make infra-reset    - Reset all infrastructure data (WARNING: deletes all data)"
 	@echo "  make infra-logs     - Tail logs from all infrastructure services"
+	@echo "  make apps-start     - Start all application services"
+	@echo "  make apps-stop      - Stop all application services"
 	@echo ""
 	@echo "Redis:"
 	@echo "  make redis-cli      - Connect to Redis CLI"
@@ -265,6 +267,12 @@ infra-reset:
 
 infra-logs:
 	@$(INFRA_COMPOSE) logs -f
+
+apps-start:
+	@$(APPS_COMPOSE) up -d --build
+
+apps-stop:
+	@$(APPS_COMPOSE) down
 
 # Redis commands
 redis-cli:

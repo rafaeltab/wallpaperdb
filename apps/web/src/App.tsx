@@ -1,7 +1,7 @@
 import { ClerkProvider } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { createRouter, RouterProvider, useNavigate } from '@tanstack/react-router';
+import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { AuthBridge } from '@/components/auth-bridge';
 import { ThemeProvider } from '@/components/theme-provider';
 import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
@@ -36,19 +36,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-function ClerkProviderWithNav({ children }: { children: React.ReactNode }) {
-  const navigate = useNavigate();
-
-  return (
-    <ClerkProvider
-      publishableKey={PUBLISHABLE_KEY!}
-      navigate={(to) => void navigate({ to: to as string })}
-    >
-      {children}
-    </ClerkProvider>
-  );
-}
-
 function App() {
   if (!PUBLISHABLE_KEY) {
     return (
@@ -64,7 +51,7 @@ function App() {
   }
 
   return (
-    <ClerkProviderWithNav>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY!}>
       <AuthBridge>
         <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
           <QueryClientProvider client={queryClient}>
@@ -77,7 +64,7 @@ function App() {
           </QueryClientProvider>
         </ThemeProvider>
       </AuthBridge>
-    </ClerkProviderWithNav>
+    </ClerkProvider>
   );
 }
 

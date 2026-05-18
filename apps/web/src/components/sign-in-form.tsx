@@ -1,4 +1,4 @@
-import { useSignIn } from '@clerk/react';
+import { useClerk, useSignIn } from '@clerk/react';
 import { Loader2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from '@tanstack/react-router';
@@ -16,6 +16,7 @@ function buildUrl(path: string): string {
 
 export function SignInForm() {
   const { signIn, errors, fetchStatus } = useSignIn();
+  const clerk = useClerk();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,30 +27,56 @@ export function SignInForm() {
 
   const isSubmitting = fetchStatus === 'fetching';
 
+  const activateSession = async (createdSessionId: string) => {
+    await clerk.setActive({
+      session: createdSessionId,
+      navigate: async ({ session, decorateUrl }) => {
+        if (session?.currentTask) return;
+        const url = decorateUrl(redirectUrl);
+        if (url.startsWith('http')) {
+          window.location.href = url;
+        } else {
+          void navigate({ to: url });
+        }
+      },
+    });
+  };
+
+  const resolveCreatedSessionId = async (preferredSessionId?: string) => {
+    const immediateSessionId =
+      preferredSessionId || signIn.createdSessionId || clerk.client?.lastActiveSessionId;
+
+    if (immediateSessionId) {
+      return immediateSessionId;
+    }
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      const nextSessionId = signIn.createdSessionId || clerk.client?.lastActiveSessionId;
+      if (nextSessionId) {
+        return nextSessionId;
+      }
+    }
+
+    return undefined;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!signIn) return;
 
-    const { error } = await signIn.password({
+    const result = await signIn.password({
       emailAddress: email,
       password,
     });
 
-    if (error) return;
+    if (result.error) return;
 
-    if (signIn.status === 'complete') {
-      await signIn.finalize({
-        navigate: async ({ session, decorateUrl }) => {
-          if (session?.currentTask) return;
-          const url = decorateUrl(redirectUrl);
-          if (url.startsWith('http')) {
-            window.location.href = url;
-          } else {
-            void navigate({ to: url });
-          }
-        },
-      });
-    } else if (signIn.status === 'needs_second_factor') {
+    const createdSessionId = await resolveCreatedSessionId(result.createdSessionId);
+
+    if (createdSessionId) {
+      await activateSession(createdSessionId);
+    } else if (signIn.status === 'needs_second_factor' || signIn.status === 'needs_client_trust') {
       const emailCodeFactor = signIn.supportedSecondFactors?.find(
         (factor) => factor.strategy === 'email_code'
       );

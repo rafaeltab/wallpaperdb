@@ -9,7 +9,14 @@ export function buildWebE2EConfig(
   env: WebE2EEnv,
 ): Pick<
   PlaywrightTestConfig,
-  "fullyParallel" | "projects" | "retries" | "testDir" | "use" | "workers"
+  | "fullyParallel"
+  | "outputDir"
+  | "projects"
+  | "reporter"
+  | "retries"
+  | "testDir"
+  | "use"
+  | "workers"
 > {
   const authSetupProjectName = `setup:${BASE_USER_AUTH.name}`;
 
@@ -18,8 +25,13 @@ export function buildWebE2EConfig(
     fullyParallel: false,
     workers: 1,
     retries: env.CI ? 1 : 0,
+    outputDir: "test-results",
+    reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
     use: {
       baseURL: buildWebE2EBaseUrl(env),
+      screenshot: "only-on-failure",
+      trace: "retain-on-failure",
+      video: "retain-on-failure",
     },
     projects: [
       {

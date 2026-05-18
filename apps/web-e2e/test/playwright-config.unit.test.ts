@@ -64,6 +64,23 @@ describe("buildWebE2EConfig", () => {
     expect(ciConfig.retries).toBe(1);
   });
 
+  it("retains Playwright failure artifacts in stable workspace paths", () => {
+    const config = buildWebE2EConfig({} as NodeJS.ProcessEnv);
+
+    expect(config.outputDir).toBe("test-results");
+    expect(config.use).toEqual(
+      expect.objectContaining({
+        screenshot: "only-on-failure",
+        trace: "retain-on-failure",
+        video: "retain-on-failure",
+      }),
+    );
+    expect(config.reporter).toEqual([
+      ["list"],
+      ["html", { open: "never", outputFolder: "playwright-report" }],
+    ]);
+  });
+
   it("keeps auth setup isolated from dependent browser specs", () => {
     const config = buildWebE2EConfig({} as NodeJS.ProcessEnv);
 

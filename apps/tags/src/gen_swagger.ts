@@ -18,7 +18,7 @@ async function generateSwagger(): Promise<string> {
     title: 'WallpaperDB Tags API',
     version: '1.0.0',
     description:
-      'Tags service scaffold. Defines the HTTP surface and database model for tag management, wallpaper tag assignments, and tag suggestions.',
+      'Tags service shell. Only operational endpoints are exposed today while PostgreSQL and NATS integrations are wired for future work.',
     servers: [{ url: 'http://localhost:3008', description: 'Local development server' }],
   });
 

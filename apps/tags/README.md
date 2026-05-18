@@ -4,9 +4,9 @@ Provides the initial service shell for future tagging work.
 
 ## Key Capabilities
 
-- Starts a Fastify service with OpenAPI, health, and readiness endpoints
-- Connects to PostgreSQL and NATS so domain behavior can be added incrementally
-- Provides health and readiness endpoints for infrastructure monitoring and orchestration
+- Starts a Fastify service with OpenAPI plus health and readiness endpoints
+- Connects to PostgreSQL and NATS so domain behavior can be added later
+- Intentionally does not expose tag-specific routes or define a persistence schema yet
 
 ## Technology Choices
 

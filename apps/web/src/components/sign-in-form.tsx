@@ -77,9 +77,10 @@ export function SignInForm() {
         <CardDescription>Enter your credentials to access your account</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form data-testid="sign-in-form" onSubmit={handleSubmit} className="grid gap-4">
           {formatClerkGlobalErrors(errors?.global) && (
             <div
+              data-testid="sign-in-error-alert"
               role="alert"
               className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
@@ -88,6 +89,7 @@ export function SignInForm() {
           )}
           {(errors?.fields?.identifier || errors?.fields?.password) && (
             <div
+              data-testid="sign-in-error-alert"
               role="alert"
               className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
             >
@@ -97,6 +99,7 @@ export function SignInForm() {
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
+              data-testid="sign-in-email-input"
               id="email"
               type="email"
               placeholder="you@example.com"
@@ -110,6 +113,7 @@ export function SignInForm() {
           <Field>
             <FieldLabel htmlFor="password">Password</FieldLabel>
             <Input
+              data-testid="sign-in-password-input"
               id="password"
               type="password"
               placeholder="Enter your password"
@@ -121,7 +125,12 @@ export function SignInForm() {
             />
           </Field>
           <div id="clerk-captcha" data-cl-size="flexible" />
-          <Button type="submit" className="w-full" disabled={isSubmitting || !signIn}>
+          <Button
+            data-testid="sign-in-submit-button"
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting || !signIn}
+          >
             {fetchStatus === 'fetching' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {fetchStatus === 'fetching' ? 'Signing in...' : 'Sign in'}
           </Button>

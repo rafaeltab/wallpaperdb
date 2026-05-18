@@ -23,6 +23,7 @@ describe('UploadActionButtons', () => {
     it('shows Stop uploading button', () => {
       renderActionButtons({ isRunning: true });
 
+      expect(screen.getByTestId('stop-uploading-button')).toBeInTheDocument();
       expect(screen.getByText('Stop uploading')).toBeInTheDocument();
     });
 
@@ -51,12 +52,14 @@ describe('UploadActionButtons', () => {
     it('shows Resume uploading button', () => {
       renderActionButtons({ isStopped: true });
 
+      expect(screen.getByTestId('resume-uploading-button')).toBeInTheDocument();
       expect(screen.getByText('Resume uploading')).toBeInTheDocument();
     });
 
     it('shows Clear all button', () => {
       renderActionButtons({ isStopped: true });
 
+      expect(screen.getByTestId('clear-all-button')).toBeInTheDocument();
       expect(screen.getByText('Clear all')).toBeInTheDocument();
     });
 
@@ -120,7 +123,7 @@ describe('UploadActionButtons', () => {
     it('shows Retry failed button disabled when running with failures', () => {
       renderActionButtons({ isRunning: true, hasFailures: true });
 
-      const button = screen.getByText('Retry failed').closest('button');
+      const button = screen.getByTestId('retry-failed-button');
       expect(button).toBeDisabled();
     });
 

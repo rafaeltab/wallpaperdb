@@ -13,7 +13,7 @@ export function UploadAuthGate({ children }: { children: React.ReactNode }) {
 
   if (!isSignedIn) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div data-testid="upload-auth-gate" className="max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
@@ -26,7 +26,11 @@ export function UploadAuthGate({ children }: { children: React.ReactNode }) {
           </CardHeader>
           <CardContent className="flex justify-center">
             <Button asChild size="lg">
-              <Link to="/sign-in" search={{ redirect: '/upload' }}>
+              <Link
+                to="/sign-in"
+                search={{ redirect: '/upload' }}
+                data-testid="upload-auth-gate-sign-in-link"
+              >
                 Sign in to upload
               </Link>
             </Button>

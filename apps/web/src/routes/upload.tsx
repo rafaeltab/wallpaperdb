@@ -39,7 +39,7 @@ function getStatusIcon(status: string) {
   }
 }
 
-function UploadPage() {
+export function UploadPage() {
   const {
     state,
     counts,
@@ -91,7 +91,7 @@ function UploadPage() {
 
   return (
     <UploadAuthGate>
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div data-testid="upload-page" className="max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Upload Wallpapers</CardTitle>
@@ -114,43 +114,67 @@ function UploadPage() {
                 {/* Overall Progress */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{statusText}</span>
-                    <span className="font-medium">{progress}%</span>
+                    <span data-testid="upload-progress-status" className="text-muted-foreground">
+                      {statusText}
+                    </span>
+                    <span data-testid="upload-progress-percent" className="font-medium">
+                      {progress}%
+                    </span>
                   </div>
-                  <Progress value={progress} variant={state.isStopped ? 'stopped' : 'default'} />
+                  <Progress
+                    data-testid="upload-progress-bar"
+                    value={progress}
+                    variant={state.isStopped ? 'stopped' : 'default'}
+                  />
                 </div>
 
                 {/* Status Summary */}
-                <div className="flex flex-wrap gap-2">
+                <div data-testid="upload-status-summary" className="flex flex-wrap gap-2">
                   {counts.success > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full">
+                    <span
+                      data-testid="upload-success-count"
+                      className="inline-flex items-center gap-1 text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-1 rounded-full"
+                    >
                       <Check className="h-3 w-3" />
                       {counts.success} uploaded
                     </span>
                   )}
                   {counts.duplicate > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded-full">
+                    <span
+                      data-testid="upload-duplicate-count"
+                      className="inline-flex items-center gap-1 text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded-full"
+                    >
                       <Copy className="h-3 w-3" />
                       {counts.duplicate} duplicate{counts.duplicate !== 1 ? 's' : ''}
                     </span>
                   )}
                   {counts.failed > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">
+                    <span
+                      data-testid="upload-failed-count"
+                      className="inline-flex items-center gap-1 text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full"
+                    >
                       <AlertCircle className="h-3 w-3" />
                       {counts.failed} failed
                     </span>
                   )}
                   {counts.pending > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded-full">
+                    <span
+                      data-testid="upload-pending-count"
+                      className="inline-flex items-center gap-1 text-xs bg-muted px-2 py-1 rounded-full"
+                    >
                       {counts.pending} pending
                     </span>
                   )}
                 </div>
 
                 {/* File List */}
-                <div className="border rounded-lg divide-y max-h-64 overflow-y-auto">
+                <div
+                  data-testid="upload-file-list"
+                  className="border rounded-lg divide-y max-h-64 overflow-y-auto"
+                >
                   {state.files.map((queuedFile) => (
                     <div
+                      data-testid="upload-file-item"
                       key={queuedFile.id}
                       className={cn(
                         'flex items-center gap-3 p-3',

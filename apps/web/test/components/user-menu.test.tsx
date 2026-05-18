@@ -33,6 +33,7 @@ describe('UserMenu', () => {
 
     render(<UserMenu />);
 
+    expect(screen.getByTestId('user-menu-sign-in-link')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sign in/i })).toHaveAttribute('href', '/sign-in');
   });
 
@@ -58,6 +59,8 @@ describe('UserMenu', () => {
 
     render(<UserMenu />);
 
+    expect(screen.getByTestId('user-menu-trigger')).toBeInTheDocument();
+    expect(screen.getByTestId('user-menu-user-name')).toHaveTextContent('John Doe');
     expect(screen.getByText('John Doe')).toBeInTheDocument();
   });
 

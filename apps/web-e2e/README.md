@@ -8,6 +8,7 @@ Browser-based end-to-end workspace for the WallpaperDB web application using Pla
 - Targets the same Caddy-ingress `/web` route used during integrated local development
 - Starts with a Chromium-only, single-worker configuration so future flows can optimize for reliability first
 - Verifies the ingress-routed local stack before Playwright starts and prints `/ready` plus `/health` diagnostics when a service is not ready
+- Uses a dedicated Playwright auth setup project to log in the seeded base user once and reuse saved browser state across authenticated specs
 
 ## Technology Choices
 

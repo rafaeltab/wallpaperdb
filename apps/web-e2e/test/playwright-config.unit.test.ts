@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
+import { BASE_USER_AUTH, resolveAuthCredentials } from "../src/auth-state";
 import {
   buildIngressOrigin,
   buildWebE2EBaseUrl,
@@ -26,7 +27,18 @@ describe("buildWebE2EConfig", () => {
     expect(config.fullyParallel).toBe(false);
     expect(config.workers).toBe(1);
     expect(config.use?.baseURL).toBe("http://localhost:8120/web");
+    expect(
+      config.projects?.find((project) => project.name === "chromium")?.dependencies,
+    ).toEqual(["setup:base-user"]);
+    expect(
+      config.projects?.find((project) => project.name === "chromium")?.use,
+    ).toEqual(
+      expect.objectContaining({
+        storageState: BASE_USER_AUTH.storageStatePath,
+      }),
+    );
     expect(config.projects?.map((project) => project.name)).toEqual([
+      "setup:base-user",
       "chromium",
     ]);
   });
@@ -46,6 +58,42 @@ describe("buildWebE2EConfig", () => {
 
     expect(localConfig.retries).toBe(0);
     expect(ciConfig.retries).toBe(1);
+  });
+
+  it("keeps auth setup isolated from dependent browser specs", () => {
+    const config = buildWebE2EConfig({} as NodeJS.ProcessEnv);
+
+    const setupProject = config.projects?.find(
+      (project) => project.name === "setup:base-user",
+    );
+    const chromiumProject = config.projects?.find(
+      (project) => project.name === "chromium",
+    );
+
+    expect(String(setupProject?.testMatch)).toContain("\\.setup\\.ts");
+    expect(String(chromiumProject?.testIgnore)).toContain("\\.setup\\.ts");
+  });
+});
+
+describe("auth state contract", () => {
+  it("reads the seeded base-user credentials from environment", () => {
+    expect(
+      resolveAuthCredentials({
+        E2E_BASE_TEST_EMAIL: " test.base@example.com ",
+        E2E_BASE_TEST_PASSWORD: " secret ",
+      } as NodeJS.ProcessEnv),
+    ).toEqual({
+      email: "test.base@example.com",
+      password: "secret",
+    });
+  });
+
+  it("fails clearly when required auth environment values are missing", () => {
+    expect(() =>
+      resolveAuthCredentials({
+        E2E_BASE_TEST_EMAIL: "",
+      } as NodeJS.ProcessEnv),
+    ).toThrowError(/E2E_BASE_TEST_EMAIL and E2E_BASE_TEST_PASSWORD/);
   });
 });
 

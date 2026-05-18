@@ -33,31 +33,52 @@ export function UploadActionButtons({
   return (
     <div className="flex gap-2">
       {hasFailures && (
-        <Button variant="outline" onClick={onRetryFailed} disabled={isRunning} className="flex-1">
+        <Button
+          data-testid="retry-failed-button"
+          variant="outline"
+          onClick={onRetryFailed}
+          disabled={isRunning}
+          className="flex-1"
+        >
           <RefreshCw className="mr-2 h-4 w-4" />
           Retry failed
         </Button>
       )}
       {showStopButton && (
-        <Button variant="ghost" onClick={onStopQueue} className="flex-1">
+        <Button
+          data-testid="stop-uploading-button"
+          variant="ghost"
+          onClick={onStopQueue}
+          className="flex-1"
+        >
           <Square className="mr-2 h-4 w-4" />
           Stop uploading
         </Button>
       )}
       {showResumeButton && (
-        <Button variant="outline" onClick={onResumeQueue} className="flex-1">
+        <Button
+          data-testid="resume-uploading-button"
+          variant="outline"
+          onClick={onResumeQueue}
+          className="flex-1"
+        >
           <Play className="mr-2 h-4 w-4" />
           Resume uploading
         </Button>
       )}
       {showClearAllButton && !showStopButton && (
-        <Button variant="ghost" onClick={onClearAll}>
+        <Button data-testid="clear-all-button" variant="ghost" onClick={onClearAll}>
           <Trash2 className="mr-2 h-4 w-4" />
           Clear all
         </Button>
       )}
       {isComplete && !isStopped && (
-        <Button variant="outline" onClick={onClearCompleted} className="flex-1">
+        <Button
+          data-testid="clear-completed-button"
+          variant="outline"
+          onClick={onClearCompleted}
+          className="flex-1"
+        >
           <Check className="mr-2 h-4 w-4" />
           Clear completed
         </Button>

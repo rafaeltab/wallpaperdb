@@ -28,7 +28,7 @@ export function UserMenu() {
   if (!isSignedIn) {
     return (
       <Button asChild variant="ghost" size="sm">
-        <Link to="/sign-in">
+        <Link to="/sign-in" data-testid="user-menu-sign-in-link">
           <LogIn className="mr-2 h-4 w-4" />
           Sign in
         </Link>
@@ -41,9 +41,9 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2">
+        <Button data-testid="user-menu-trigger" variant="ghost" size="sm" className="gap-2">
           <img src={user.imageUrl} alt="" className="h-6 w-6 rounded-full" aria-hidden="true" />
-          <span className="hidden sm:inline">
+          <span data-testid="user-menu-user-name" className="hidden sm:inline">
             {user.fullName || user.primaryEmailAddress?.emailAddress}
           </span>
         </Button>

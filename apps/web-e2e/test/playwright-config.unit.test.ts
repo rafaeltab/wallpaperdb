@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -203,5 +203,17 @@ describe("workspace commands", () => {
     expect(packageJson.scripts["test:e2e:ui"]).toContain(
       "node --experimental-strip-types ./src/verify-environment.ts &&",
     );
+  });
+
+  it("commits two image fixtures for the first authenticated upload flow", () => {
+    const fixturePaths = [
+      new URL("../fixtures/fixture-a.png", import.meta.url),
+      new URL("../fixtures/fixture-b.jpg", import.meta.url),
+    ];
+
+    for (const fixturePath of fixturePaths) {
+      expect(existsSync(fixturePath)).toBe(true);
+      expect(statSync(fixturePath).size).toBeGreaterThan(0);
+    }
   });
 });

@@ -45,6 +45,8 @@ describe('UploadAuthGate', () => {
       </UploadAuthGate>,
     );
 
+    expect(screen.getByTestId('upload-auth-gate')).toBeInTheDocument();
+    expect(screen.getByTestId('upload-auth-gate-sign-in-link')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sign in to upload/i })).toHaveAttribute(
       'href',
       '/sign-in?redirect=%2Fupload',

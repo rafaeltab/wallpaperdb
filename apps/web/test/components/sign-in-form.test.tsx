@@ -48,6 +48,10 @@ describe('SignInForm', () => {
   it('renders the sign-in form with email and password fields', () => {
     render(<SignInForm />);
 
+    expect(screen.getByTestId('sign-in-form')).toBeInTheDocument();
+    expect(screen.getByTestId('sign-in-email-input')).toBeInTheDocument();
+    expect(screen.getByTestId('sign-in-password-input')).toBeInTheDocument();
+    expect(screen.getByTestId('sign-in-submit-button')).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^sign in$/i })).toBeInTheDocument();
@@ -107,6 +111,7 @@ describe('SignInForm', () => {
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
     await waitFor(() => {
+      expect(screen.getByTestId('sign-in-error-alert')).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(/password you entered is incorrect/i);
     });
   });

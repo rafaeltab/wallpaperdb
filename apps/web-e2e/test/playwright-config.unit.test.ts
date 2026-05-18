@@ -2,7 +2,11 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { BASE_USER_AUTH, resolveAuthCredentials } from "../src/auth-state";
+import {
+  BASE_USER_AUTH,
+  ensureAuthPersonaBypassesClientTrust,
+  resolveAuthCredentials,
+} from "../src/auth-state";
 import {
   buildIngressOrigin,
   buildWebE2EBaseUrl,
@@ -94,6 +98,52 @@ describe("auth state contract", () => {
         E2E_BASE_TEST_EMAIL: "",
       } as NodeJS.ProcessEnv),
     ).toThrowError(/E2E_BASE_TEST_EMAIL and E2E_BASE_TEST_PASSWORD/);
+  });
+
+  it("enables Clerk client trust bypass for the configured base user", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "user_123",
+              bypass_client_trust: false,
+              email_addresses: [{ email_address: "test.base@example.com" }],
+            },
+          ]),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+
+    await expect(
+      ensureAuthPersonaBypassesClientTrust(
+        {
+          E2E_BASE_TEST_EMAIL: "test.base@example.com",
+          E2E_BASE_TEST_PASSWORD: "secret",
+          CLERK_SECRET_KEY: "sk_test_123",
+        } as NodeJS.ProcessEnv,
+        BASE_USER_AUTH,
+        fetchMock,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.clerk.com/v1/users?email_address=test.base%40example.com",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer sk_test_123" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.clerk.com/v1/users/user_123",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ bypass_client_trust: true }),
+      }),
+    );
   });
 });
 

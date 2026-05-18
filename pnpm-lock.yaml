@@ -668,9 +668,6 @@ importers:
       '@fastify/swagger-ui':
         specifier: ^5.0.0
         version: 5.2.3
-      '@kubiks/otel-drizzle':
-        specifier: ^2.1.0
-        version: 2.1.0(@opentelemetry/api@1.9.0)(drizzle-orm@0.38.4(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@types/react@19.2.7)(pg@8.16.3)(postgres@3.4.7)(react@19.2.3))
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -698,9 +695,6 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
-      drizzle-orm:
-        specifier: ^0.38.3
-        version: 0.38.4(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@types/react@19.2.7)(pg@8.16.3)(postgres@3.4.7)(react@19.2.3)
       fastify:
         specifier: ^5.2.0
         version: 5.6.2
@@ -710,9 +704,6 @@ importers:
       nats:
         specifier: ^2.29.1
         version: 2.29.3
-      pg:
-        specifier: ^8.13.1
-        version: 8.16.3
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -729,15 +720,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.10
-      '@testcontainers/postgresql':
-        specifier: ^11.9.0
-        version: 11.11.0
       '@types/node':
         specifier: ^22.10.2
         version: 22.19.3
-      '@types/pg':
-        specifier: ^8.11.10
-        version: 8.16.0
       '@wallpaperdb/test-logger':
         specifier: workspace:*
         version: link:../../packages/test-logger
@@ -750,18 +735,12 @@ importers:
       '@wallpaperdb/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
-      drizzle-kit:
-        specifier: ^0.30.1
-        version: 0.30.6
       esbuild:
         specifier: ^0.25.12
         version: 0.25.12
       pino-pretty:
         specifier: ^13.0.0
         version: 13.1.3
-      postgres:
-        specifier: ^3.4.3
-        version: 3.4.7
       testcontainers:
         specifier: ^11.9.0
         version: 11.11.0

@@ -65,7 +65,7 @@ export async function createApp(
     title: 'WallpaperDB Tags API',
     version: '1.0.0',
     description:
-      'Tags service shell. Domain routes and persistence schema will be added incrementally.',
+      'Tags service shell. Only operational endpoints are exposed today while PostgreSQL and NATS integrations are wired for future work.',
     servers:
       config.nodeEnv === 'production'
         ? undefined

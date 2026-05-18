@@ -26,7 +26,7 @@ describe('tags shell routes', () => {
         ready: true,
         timestamp: new Date().toISOString(),
       }),
-    } as HealthService);
+    } as unknown as HealthService);
 
     const app = Fastify();
     apps.push(app);
@@ -59,7 +59,7 @@ describe('tags shell routes', () => {
         ready: true,
         timestamp: new Date().toISOString(),
       }),
-    } as HealthService);
+    } as unknown as HealthService);
 
     const app = Fastify();
     apps.push(app);

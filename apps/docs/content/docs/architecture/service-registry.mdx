@@ -17,7 +17,7 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 | **Thumbnail Extractor** | 3003 | 📋 Planned | - | MinIO, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
 | **Quality Enrichment** | 3006 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
 | **Color Enrichment** | 3007 | 📋 Planned | wallpaperdb_colors | PostgreSQL, MinIO, NATS | `colors.extracted` | `wallpaper.uploaded` |
-| **Tagging** | 3008 | 📋 Planned | wallpaperdb_tags | PostgreSQL, OpenSearch | - | - |
+| **Tagging** | 3008 | 🚧 In Development | wallpaperdb_tags | PostgreSQL, NATS | - | - |
 
 ## Service Details
 
@@ -347,48 +347,34 @@ NATS_URL=nats://localhost:4222
 OPENSEARCH_URL=http://localhost:9200
 ```
 
-### Tagging (3006)
+### Tagging (3008)
 
-**Status:** 📋 Planned
+**Status:** 🚧 In Development
 
-**Purpose:** Tag management and suggestions
+**Purpose:** Reserved service shell for future tagging capabilities
 
-**Key Features:**
-- Tag CRUD operations
-- Tag suggestions (based on content)
-- Tag relationships (synonyms, hierarchies)
-- Full-text search via OpenSearch
+**Current Features:**
+- Service scaffold with Fastify and TSyringe
+- PostgreSQL and NATS connection lifecycle management
+- Health and readiness endpoints
 
 **Dependencies:**
 - PostgreSQL (wallpaperdb_tags)
-- OpenSearch (tag search index)
+- NATS JetStream
 
 **API Endpoints:**
-- `GET /tags` - List all tags
-- `GET /tags/:id` - Get tag details
-- `POST /tags` - Create tag
-- `PUT /tags/:id` - Update tag
-- `DELETE /tags/:id` - Delete tag
-- `GET /tags/suggestions` - Get tag suggestions
+- `GET /health` - Health check
+- `GET /ready` - Readiness check
 
-**Database Schema:**
-```typescript
-{
-  id: text,
-  name: text,
-  category: text,              // 'style', 'color', 'subject', etc.
-  synonyms: jsonb,             // Array of synonym tag IDs
-  parentId: text,              // For hierarchical tags
-  usageCount: integer,         // Number of wallpapers with this tag
-  createdAt: timestamp
-}
-```
+**Implementation Note:**
+
+The service exists as a shell only. Domain routes, event contracts, and persistence schema are intentionally undefined until the tagging model is designed.
 
 **Configuration:**
 ```bash
-PORT=3006
+PORT=3008
 DATABASE_URL=postgresql://...
-OPENSEARCH_URL=http://localhost:9200
+NATS_URL=nats://localhost:4222
 ```
 
 
@@ -435,7 +421,7 @@ OPENSEARCH_URL=http://localhost:9200
 | Gateway | wallpaperdb_gateway | wallpapers | Search index sync |
 | Quality | wallpaperdb_quality | quality_analysis | Quality scores (planned) |
 | Colors | wallpaperdb_colors | color_analysis | Color palettes (planned) |
-| Tagging | wallpaperdb_tags | tags, wallpaper_tags | Tag management (planned) |
+| Tagging | wallpaperdb_tags | - | Reserved service shell |
 
 **Shared schema (replicated):**
 ```typescript

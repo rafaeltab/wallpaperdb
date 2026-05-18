@@ -493,6 +493,10 @@ function buildServiceOverrides() {
 			DATABASE_URL:
 				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_user",
 		},
+		"apps/tags": {
+			DATABASE_URL:
+				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_tags",
+		},
 		"apps/variant-generator": {},
 		"apps/color-extractor": {},
 		"apps/web": {
@@ -653,6 +657,7 @@ function generateBrunoEnv(repoRoot, ports) {
 		mediaBaseUrl: `http://localhost:${ingressPort}/media`,
 		gatewayBaseUrl: `http://localhost:${ingressPort}/gateway`,
 		colorExtractorBaseUrl: `http://localhost:${ingressPort}/color-extractor`,
+		tagsBaseUrl: `http://localhost:${ingressPort}/tagging`,
 		userBaseUrl: `http://localhost:${ingressPort}/user`,
 	};
 

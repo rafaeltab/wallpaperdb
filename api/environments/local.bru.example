@@ -3,6 +3,7 @@ vars {
   mediaBaseUrl: http://localhost:8000/media
   gatewayBaseUrl: http://localhost:8000/gateway
   colorExtractorBaseUrl: http://localhost:8000/color-extractor
+  tagsBaseUrl: http://localhost:8000/tagging
   userBaseUrl: http://localhost:8000/user
   userId: test-user-123
 }

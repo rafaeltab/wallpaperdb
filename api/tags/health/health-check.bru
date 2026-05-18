@@ -1,0 +1,22 @@
+meta {
+  name: Health Check
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{tagsBaseUrl}}/health
+  body: none
+  auth: none
+}
+
+docs {
+  Check if the tags service shell is healthy.
+
+  Returns 200 if healthy, 503 if unhealthy.
+
+  Response includes status of:
+  - database (PostgreSQL)
+  - nats (message queue)
+  - otel (OpenTelemetry)
+}

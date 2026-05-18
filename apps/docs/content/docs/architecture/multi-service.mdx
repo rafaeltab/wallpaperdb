@@ -102,9 +102,9 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `colors.extracted`
 
-**9. Tagging Service** (📋 Planned)
-- Purpose: Tag management and suggestions
-- Dependencies: PostgreSQL, OpenSearch
+**9. Tagging Service** (🚧 In Development)
+- Purpose: Reserved service shell for future tagging capabilities
+- Dependencies: PostgreSQL, NATS
 - Database: `wallpaperdb_tags`
 
 
@@ -479,7 +479,7 @@ const wallpaper = await response.json();
 **Each service has its own database:**
 - `wallpaperdb_ingestor` - Ingestor state machine
 - `wallpaperdb_media` - Media metadata, variants
-- `wallpaperdb_tags` - Tags and relationships
+- `wallpaperdb_tags` - Reserved for the tagging service shell
 
 **Benefits:**
 - Service isolation

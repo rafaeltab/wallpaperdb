@@ -165,19 +165,18 @@ Manages user identities, profiles, and Clerk webhook processing.
 [View Full Documentation →](/docs/services/user)
 
 ### Tagging Service
-**Status:** 📋 Planned
+**Status:** 🚧 In Development
 
-Tag management and assignment for wallpapers.
+Minimal service shell for future tagging work.
 
-**Planned Features:**
-- Manual tag assignment
-- Tag CRUD operations
-- Tag hierarchy management
-- Search by tags
+**Current Scope:**
+- Tag service scaffold with PostgreSQL and NATS wiring
+- Health and readiness endpoints only
 
 **API-driven:**
-- REST API for tag management
-- GraphQL integration
+- Operational endpoints only for now
+
+[View Full Documentation →](/docs/services/tags)
 
 ### Gateway
 **Status:** 📋 Planned
@@ -228,7 +227,7 @@ Ingestor → wallpaper.uploaded → {
 | Quality | 3006 | ✓ | ✓ | ✓ | - | 📋 Planned |
 | Color | 3007 | ✓ | ✓ | ✓ | - | 📋 Planned |
 | User | 3009 | ✓ | - | ✓ (publish) | - | 🚧 In Development |
-| Tagging | 3008 | ✓ | - | - | - | 📋 Planned |
+| Tagging | 3008 | ✓ | - | ✓ | - | 🚧 In Development |
 
 ### Shared Infrastructure
 

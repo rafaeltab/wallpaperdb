@@ -1,7 +1,7 @@
 .PHONY: infra-start infra-stop infra-reset infra-logs \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
-        migrate psql psql-ingestor psql-media psql-user db-studio-ingestor db-studio-media db-studio-user \
+        migrate psql psql-ingestor psql-media psql-tags psql-user db-studio-ingestor db-studio-media db-studio-user \
         ingestor-dev ingestor-build ingestor-start ingestor-test ingestor-test-watch ingestor-format ingestor-lint ingestor-check \
         ingestor-docker-build ingestor-docker-run ingestor-docker-stop ingestor-docker-logs \
         ingestor-e2e-test ingestor-e2e-test-watch ingestor-e2e-verify \
@@ -11,6 +11,8 @@
         variant-generator-dev variant-generator-build variant-generator-start variant-generator-test variant-generator-test-watch variant-generator-format variant-generator-lint variant-generator-check \
         color-extractor-dev color-extractor-build color-extractor-start color-extractor-test color-extractor-test-watch color-extractor-format color-extractor-lint color-extractor-check \
         color-extractor-docker-build color-extractor-docker-run color-extractor-docker-stop color-extractor-docker-logs \
+        tags-dev tags-build tags-start tags-test tags-test-watch tags-format tags-lint tags-check \
+        tags-docker-build tags-docker-run tags-docker-stop tags-docker-logs \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
@@ -68,6 +70,7 @@ help:
 	@echo "  make psql               - Open psql shell (default database)"
 	@echo "  make psql-ingestor      - Open psql shell (wallpaperdb_ingestor database)"
 	@echo "  make psql-media         - Open psql shell (wallpaperdb_media database)"
+	@echo "  make psql-tags          - Open psql shell (wallpaperdb_tags database)"
 	@echo "  make psql-user          - Open psql shell (wallpaperdb_user database)"
 	@echo "  make db-studio-ingestor - Start Drizzle Studio for ingestor"
 	@echo "  make db-studio-media    - Start Drizzle Studio for media"
@@ -118,6 +121,15 @@ help:
 	@echo "  make color-extractor-format     - Format color-extractor code"
 	@echo "  make color-extractor-lint       - Lint color-extractor code"
 	@echo ""
+	@echo "Tags Service:"
+	@echo "  make tags-dev        - Start tags service in development mode"
+	@echo "  make tags-build      - Build tags service for production"
+	@echo "  make tags-start      - Start tags service in production mode"
+	@echo "  make tags-test       - Run tags service tests"
+	@echo "  make tags-test-watch - Run tags service tests in watch mode"
+	@echo "  make tags-format     - Format tags service code"
+	@echo "  make tags-lint       - Lint tags service code"
+	@echo ""
 	@echo "Gateway Service:"
 	@echo "  make gateway-dev        - Start gateway service in development mode"
 	@echo "  make gateway-build      - Build gateway service for production"
@@ -158,6 +170,12 @@ help:
 	@echo "  make user-docker-run   - Run user Docker container (uses infra/.env)"
 	@echo "  make user-docker-stop  - Stop user Docker container"
 	@echo "  make user-docker-logs  - View user Docker container logs"
+	@echo ""
+	@echo "Tags Docker:"
+	@echo "  make tags-docker-build - Build tags Docker image"
+	@echo "  make tags-docker-run   - Run tags Docker container (uses infra/.env)"
+	@echo "  make tags-docker-stop  - Stop tags Docker container"
+	@echo "  make tags-docker-logs  - View tags Docker container logs"
 	@echo ""
 	@echo "Ingestor E2E Tests:"
 	@echo "  make ingestor-e2e-test       - Run E2E tests against Docker container"
@@ -276,6 +294,9 @@ psql-ingestor:
 psql-media:
 	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb -d wallpaperdb_media
 
+psql-tags:
+	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb -d wallpaperdb_tags
+
 psql-user:
 	@$(INFRA_COMPOSE) exec postgres psql -U wallpaperdb -d wallpaperdb_user
 
@@ -337,6 +358,31 @@ user-lint:
 
 user-check:
 	@turbo run check --filter=@wallpaperdb/user
+
+# Tags service commands
+tags-dev:
+	@turbo run dev --filter=@wallpaperdb/tags
+
+tags-build:
+	@turbo run build --filter=@wallpaperdb/tags
+
+tags-start:
+	@turbo run start --filter=@wallpaperdb/tags
+
+tags-test:
+	@turbo run test --filter=@wallpaperdb/tags
+
+tags-test-watch:
+	@turbo run test:watch --filter=@wallpaperdb/tags
+
+tags-format:
+	@turbo run format --filter=@wallpaperdb/tags
+
+tags-lint:
+	@turbo run lint --filter=@wallpaperdb/tags
+
+tags-check:
+	@turbo run check --filter=@wallpaperdb/tags
 
 # Media service commands
 media-dev:
@@ -593,6 +639,39 @@ user-docker-stop:
 
 user-docker-logs:
 	@docker logs -f $(COMPOSE_PROJECT_NAME)-user
+
+# Tags Docker commands
+tags-docker-build:
+	@echo "Building tags Docker image..."
+	@docker build -t $(COMPOSE_PROJECT_NAME)-tags:latest -f apps/tags/Dockerfile .
+	@echo "✓ Docker image built: $(COMPOSE_PROJECT_NAME)-tags:latest"
+
+tags-docker-run:
+	@echo "Starting tags Docker container..."
+	@if [ ! -f infra/.env ]; then \
+		echo "Error: infra/.env file not found. Run 'make infra-start' first."; \
+		exit 1; \
+	fi
+	@. ./infra/.env && docker run --rm -d \
+		-p 3008:3008 \
+		-e NODE_ENV=production \
+		-e PORT=3008 \
+		-e DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@host.docker.internal:$(POSTGRES_HOST_PORT)/$$POSTGRES_DB \
+		-e NATS_URL=nats://host.docker.internal:$(NATS_HOST_PORT) \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:$(OTEL_HTTP_HOST_PORT) \
+		--name $(COMPOSE_PROJECT_NAME)-tags \
+		$(COMPOSE_PROJECT_NAME)-tags:latest
+	@echo "✓ Tags container started"
+	@echo "  Health: http://localhost:$(INGRESS_PORT)/tagging/health"
+	@echo "  Ready:  http://localhost:$(INGRESS_PORT)/tagging/ready"
+
+tags-docker-stop:
+	@echo "Stopping tags Docker container..."
+	@docker stop $(COMPOSE_PROJECT_NAME)-tags 2>/dev/null || echo "Container not running"
+	@echo "✓ Tags container stopped"
+
+tags-docker-logs:
+	@docker logs -f $(COMPOSE_PROJECT_NAME)-tags
 
 # Ingestor E2E test commands
 ingestor-e2e-test:

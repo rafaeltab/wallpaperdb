@@ -1,0 +1,53 @@
+---
+title: Tags Service
+description: Minimal tagging service shell
+---
+
+The Tags Service is currently a minimal shell that reserves runtime wiring for future tagging work without committing to a domain interface or storage model yet.
+
+**Status:** 🚧 In Development
+
+## Quick Start
+
+```bash
+# Start infrastructure
+make infra-start
+
+# Run tags service in development mode
+make tags-dev
+
+# The service starts on http://localhost:3008
+```
+
+## Implemented Today
+
+- Fastify service scaffold with OpenAPI registration
+- PostgreSQL and NATS connection lifecycle management
+- Health and readiness endpoints
+
+## Current API Surface
+
+### Health
+
+- `GET /health`
+- `GET /ready`
+
+No domain routes are published yet. The shell is intentionally limited to operational endpoints until the tagging model is defined.
+
+## Configuration
+
+```bash
+PORT=3008
+NODE_ENV=development
+DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb_tags
+NATS_URL=nats://localhost:4222
+NATS_STREAM=WALLPAPER
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=tags
+```
+
+## Related Documentation
+
+- [Services Overview](/docs/services)
+- [Service Registry](/docs/architecture/service-registry)
+- [Package: Core](/docs/packages/core)

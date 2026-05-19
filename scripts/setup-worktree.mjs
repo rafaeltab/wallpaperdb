@@ -624,6 +624,19 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
 		);
 		content = applyOverrides(content, applicableSecrets, ctx);
 
+		const envOverrides = {};
+		for (const key of exampleKeys) {
+			if (key in process.env) {
+				envOverrides[key] = process.env[key];
+			}
+		}
+		if (Object.keys(envOverrides).length > 0) {
+			console.log(
+				`[setup-worktree] Overriding from environment: ${Object.keys(envOverrides).join(", ")}`,
+			);
+			content = applyOverrides(content, envOverrides, ctx);
+		}
+
 		const existing = readFileSafe(envPath);
 		if (existing === content.trimEnd()) continue;
 

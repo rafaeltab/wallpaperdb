@@ -191,6 +191,22 @@ describe('uploadWallpaperWithDetails', () => {
     expect(body.get('userId')).toBe('demo_user_42');
   });
 
+  it('uses same-origin ingestor URL from generated web config', async () => {
+    const responseData = createSuccessResponse('processing');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(responseData),
+      headers: new Headers(),
+    });
+
+    await uploadWallpaperWithDetails(createMockFile(), 'user_1');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/ingestor/upload');
+  });
+
   describe('auth headers', () => {
     afterEach(() => {
       clearTokenProvider();

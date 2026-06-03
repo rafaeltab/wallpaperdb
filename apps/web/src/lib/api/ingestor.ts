@@ -1,6 +1,6 @@
 import { getAuthToken } from '@/lib/auth/token-provider';
 
-const INGESTOR_URL = import.meta.env.VITE_INGESTOR_URL || 'http://localhost:3001';
+const INGESTOR_URL = import.meta.env.VITE_INGESTOR_URL || '/ingestor';
 
 export interface UploadResponse {
   wallpaperId: string;

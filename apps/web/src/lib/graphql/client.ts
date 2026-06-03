@@ -1,7 +1,17 @@
 import { GraphQLClient, type RequestMiddleware } from 'graphql-request';
 import { getAuthToken } from '@/lib/auth/token-provider';
 
-const GATEWAY_URL = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:3004/graphql';
+function resolveGatewayUrl(url: string): string {
+  if (url.startsWith('/') && typeof window !== 'undefined') {
+    return new URL(url, window.location.origin).toString();
+  }
+
+  return url;
+}
+
+const GATEWAY_URL = resolveGatewayUrl(
+  import.meta.env.VITE_GATEWAY_URL || '/gateway/graphql'
+);
 
 const authMiddleware: RequestMiddleware = async (request) => {
   const token = await getAuthToken();

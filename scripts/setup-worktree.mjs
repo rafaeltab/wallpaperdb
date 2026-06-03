@@ -503,10 +503,8 @@ function buildServiceOverrides() {
 		"apps/color-extractor": {},
 		"apps/web": {
 			VITE_BASE_PATH: "/web",
-			VITE_GATEWAY_URL: (ctx) =>
-				`http://localhost:${ctx.ports.INGRESS_PORT}/gateway/graphql`,
-			VITE_INGESTOR_URL: (ctx) =>
-				`http://localhost:${ctx.ports.INGRESS_PORT}/ingestor`,
+			VITE_GATEWAY_URL: "/gateway/graphql",
+			VITE_INGESTOR_URL: "/ingestor",
 		},
 		"apps/web-e2e": {
 			PLAYWRIGHT_BASE_URL: (ctx) =>

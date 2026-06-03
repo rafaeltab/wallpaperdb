@@ -40,6 +40,22 @@ describe('graphqlClient auth middleware', () => {
     expect(headers.get('content-type')).toBe('application/json');
   });
 
+  it('uses same-origin gateway URL from generated web config', async () => {
+    clearTokenProvider();
+
+    mockFetch.mockResolvedValueOnce(
+      createGraphQLResponse({ wallpapers: { edges: [] } })
+    );
+
+    await graphqlClient.request('{ wallpapers { edges { node { wallpaperId } } } }');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    const [url] = mockFetch.mock.calls[0];
+    expect(url.toString()).toBe(
+      new URL('/gateway/graphql', window.location.origin).toString()
+    );
+  });
+
   it('does not include Authorization header when no token provider is set', async () => {
     clearTokenProvider();
 

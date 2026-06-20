@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     port: 3005,
     host: true, // Needed inside Docker
-    allowedHosts: ['zerotwo'],
+    allowedHosts: ['zerotwo', 'zerotwo.bun-shiner.ts.net'],
   },
   resolve: {
     alias: {

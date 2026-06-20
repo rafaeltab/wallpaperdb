@@ -488,6 +488,8 @@ function buildServiceOverrides() {
 			OPENSEARCH_URL: "http://opensearch:9200",
 			MEDIA_SERVICE_URL: (ctx) =>
 				`http://localhost:${ctx.ports.INGRESS_PORT}/media`,
+			MEDIA_PUBLIC_PATH: "/media",
+			MEDIA_PUBLIC_BASE_URL: "",
 		},
 		"apps/user": {
 			DATABASE_URL:

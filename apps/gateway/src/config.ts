@@ -31,6 +31,8 @@ const configSchema = z.object({
   // OTEL config
   ...OtelConfigSchema.shape,
   mediaServiceUrl: z.string().url(),
+  mediaPublicBaseUrl: z.string().url().optional(),
+  mediaPublicPath: z.string().min(1).default('/media'),
 
   // GraphQL Security
   graphqlMaxDepth: z.number().int().positive().default(5),
@@ -85,6 +87,8 @@ export function loadConfig(): Config {
     otelServiceName: getEnv('OTEL_SERVICE_NAME', 'gateway'),
 
     mediaServiceUrl: getEnv('MEDIA_SERVICE_URL'),
+    mediaPublicBaseUrl: process.env.MEDIA_PUBLIC_BASE_URL || undefined,
+    mediaPublicPath: getEnv('MEDIA_PUBLIC_PATH', '/media'),
 
     // GraphQL Security
     graphqlMaxDepth: parseIntEnv(process.env.GRAPHQL_MAX_DEPTH, 5),

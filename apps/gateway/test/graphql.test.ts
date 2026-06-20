@@ -152,7 +152,7 @@ describe("GraphQL API Integration", () => {
             expect(found.node.variants[0].width).toBe(1920);
         });
 
-        it("should return variant URLs with MEDIA_SERVICE_URL", async () => {
+        it("should return variant URLs with MEDIA_SERVICE_URL when no public request origin is available", async () => {
             // Environment variable set in the setup
 
             await container.resolve(WallpaperRepository).upsert({
@@ -204,6 +204,107 @@ describe("GraphQL API Integration", () => {
             const variant = result.data.searchWallpapers.edges[0].node.variants[0];
             expect(variant.url).toBe(
                 `${process.env.MEDIA_SERVICE_URL}/wallpapers/wlpr_gql_004?w=2560&h=1440&format=image/webp`,
+            );
+        });
+
+        it("should return variant URLs from the browser request origin", async () => {
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_origin_001",
+                userId: "user_gql_origin_001",
+                variants: [
+                    {
+                        width: 3840,
+                        height: 2160,
+                        aspectRatio: 3840 / 2160,
+                        format: "image/webp",
+                        fileSizeBytes: 900000,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query = `
+				query {
+					searchWallpapers(filter: { userId: "user_gql_origin_001" }) {
+						edges {
+							node {
+								variants {
+									url
+								}
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                    origin: "https://zerotwo.bun-shiner.ts.net",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            const variant = result.data.searchWallpapers.edges[0].node.variants[0];
+            expect(variant.url).toBe(
+                "https://zerotwo.bun-shiner.ts.net/media/wallpapers/wlpr_gql_origin_001?w=3840&h=2160&format=image/webp",
+            );
+        });
+
+        it("should return variant URLs from forwarded proxy headers", async () => {
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_forwarded_001",
+                userId: "user_gql_forwarded_001",
+                variants: [
+                    {
+                        width: 1920,
+                        height: 1080,
+                        aspectRatio: 1920 / 1080,
+                        format: "image/jpeg",
+                        fileSizeBytes: 500000,
+                        createdAt: new Date().toISOString(),
+                    },
+                ],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const query = `
+				query {
+					searchWallpapers(filter: { userId: "user_gql_forwarded_001" }) {
+						edges {
+							node {
+								variants {
+									url
+								}
+							}
+						}
+					}
+				}
+			`;
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: {
+                    "content-type": "application/json",
+                    "x-forwarded-proto": "http",
+                    "x-forwarded-host": "zerotwo:8000",
+                },
+                payload: JSON.stringify({ query }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            const result = JSON.parse(response.body);
+            const variant = result.data.searchWallpapers.edges[0].node.variants[0];
+            expect(variant.url).toBe(
+                "http://zerotwo:8000/media/wallpapers/wlpr_gql_forwarded_001?w=1920&h=1080&format=image/jpeg",
             );
         });
 

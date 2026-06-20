@@ -10,6 +10,34 @@ import { UploadQueueProvider } from '@/contexts/upload-queue-context';
 import { routeTree } from './routeTree.gen';
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const CLERK_DOMAIN = import.meta.env.VITE_CLERK_DOMAIN?.trim();
+const CLERK_IS_SATELLITE = import.meta.env.VITE_CLERK_IS_SATELLITE === 'true';
+const CLERK_SIGN_IN_URL = import.meta.env.VITE_CLERK_SIGN_IN_URL?.trim();
+const CLERK_SIGN_UP_URL = import.meta.env.VITE_CLERK_SIGN_UP_URL?.trim();
+const CLERK_SIGN_IN_FALLBACK_REDIRECT_URL =
+  import.meta.env.VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL?.trim();
+const CLERK_SIGN_UP_FALLBACK_REDIRECT_URL =
+  import.meta.env.VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL?.trim();
+
+function buildAppPath(path: string): string {
+  const basePath = import.meta.env.VITE_BASE_PATH || '';
+  const normalizedBasePath = basePath === '/' ? '' : basePath.replace(/\/+$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  return `${normalizedBasePath}${normalizedPath}` || '/';
+}
+
+const clerkProviderProps = {
+  publishableKey: PUBLISHABLE_KEY!,
+  signInUrl: CLERK_SIGN_IN_URL || buildAppPath('/sign-in'),
+  signUpUrl: CLERK_SIGN_UP_URL || buildAppPath('/sign-up'),
+  signInFallbackRedirectUrl: CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || buildAppPath('/'),
+  signUpFallbackRedirectUrl: CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || buildAppPath('/'),
+  afterSignOutUrl: buildAppPath('/'),
+  ...(CLERK_IS_SATELLITE && CLERK_DOMAIN
+    ? { isSatellite: true as const, domain: CLERK_DOMAIN }
+    : {}),
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,7 +79,7 @@ function App() {
   }
 
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY!}>
+    <ClerkProvider {...clerkProviderProps}>
       <AuthBridge>
         <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
           <QueryClientProvider client={queryClient}>

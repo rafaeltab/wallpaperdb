@@ -1,0 +1,36 @@
+services:
+  postgres:
+    security_opt:
+      - apparmor=unconfined
+  minio:
+    security_opt:
+      - apparmor=unconfined
+  minio-init:
+    security_opt:
+      - apparmor=unconfined
+  opensearch:
+    security_opt:
+      - apparmor=unconfined
+  opensearch-dashboards:
+    security_opt:
+      - apparmor=unconfined
+  nats:
+    security_opt:
+      - apparmor=unconfined
+  nats-setup:
+    security_opt:
+      - apparmor=unconfined
+  pgadmin:
+    security_opt:
+      - apparmor=unconfined
+  redis:
+    security_opt:
+      - apparmor=unconfined
+  lgtm:
+    security_opt:
+      - apparmor=unconfined
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

@@ -1,0 +1,28 @@
+services:
+  ingestor:
+    security_opt:
+      - apparmor=unconfined
+  media:
+    security_opt:
+      - apparmor=unconfined
+  gateway:
+    security_opt:
+      - apparmor=unconfined
+  variant-generator:
+    security_opt:
+      - apparmor=unconfined
+  color-extractor:
+    security_opt:
+      - apparmor=unconfined
+  tags:
+    security_opt:
+      - apparmor=unconfined
+  user:
+    security_opt:
+      - apparmor=unconfined
+  web:
+    security_opt:
+      - apparmor=unconfined
+  caddy:
+    security_opt:
+      - apparmor=unconfined

@@ -1,3 +1,4 @@
+import type { IncomingHttpHeaders } from 'node:http';
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
@@ -49,6 +50,16 @@ interface GetWallpaperArgs {
   wallpaperId: string;
 }
 
+interface GraphQLContext {
+  reply?: {
+    request?: {
+      headers: IncomingHttpHeaders;
+      hostname?: string;
+      protocol?: string;
+    };
+  };
+}
+
 interface Variant {
   width: number;
   height: number;
@@ -93,8 +104,12 @@ export class Resolvers {
         },
       },
       Variant: {
-        url: (parent: Variant & { __wallpaperId?: string }) => {
-          return this.getVariantUrl(parent);
+        url: (
+          parent: Variant & { __wallpaperId?: string },
+          _args: unknown,
+          context: GraphQLContext
+        ) => {
+          return this.getVariantUrl(parent, context);
         },
       },
     };
@@ -264,10 +279,76 @@ export class Resolvers {
   /**
    * Get URL for a variant (field resolver)
    */
-  private getVariantUrl(variant: Variant & { __wallpaperId?: string }): string {
-    const mediaServiceUrl = this.config.mediaServiceUrl;
+  private getVariantUrl(
+    variant: Variant & { __wallpaperId?: string },
+    context?: GraphQLContext
+  ): string {
+    const mediaServiceUrl = this.getPublicMediaBaseUrl(context);
     const wallpaperId = variant.__wallpaperId;
 
     return `${mediaServiceUrl}/wallpapers/${wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`;
   }
+
+  private getPublicMediaBaseUrl(context?: GraphQLContext): string {
+    if (this.config.mediaPublicBaseUrl) {
+      return trimTrailingSlash(this.config.mediaPublicBaseUrl);
+    }
+
+    const requestOrigin = getRequestOrigin(context);
+    if (!requestOrigin) {
+      return trimTrailingSlash(this.config.mediaServiceUrl);
+    }
+
+    const mediaPath = this.config.mediaPublicPath.startsWith('/')
+      ? this.config.mediaPublicPath
+      : `/${this.config.mediaPublicPath}`;
+
+    return `${requestOrigin}${trimTrailingSlash(mediaPath)}`;
+  }
+}
+
+function getRequestOrigin(context?: GraphQLContext): string | undefined {
+  const request = context?.reply?.request;
+  if (!request) {
+    return undefined;
+  }
+
+  const origin = firstHeaderValue(request.headers.origin);
+  if (origin && isHttpOrigin(origin)) {
+    return trimTrailingSlash(origin);
+  }
+
+  const forwardedProto = firstHeaderValue(request.headers['x-forwarded-proto']);
+  const forwardedHost = firstHeaderValue(request.headers['x-forwarded-host']);
+
+  if (!forwardedProto || !forwardedHost) {
+    return undefined;
+  }
+
+  const normalizedProtocol = forwardedProto.split(',')[0]?.trim();
+  const normalizedHost = forwardedHost.split(',')[0]?.trim();
+
+  if (!normalizedHost || !normalizedProtocol) {
+    return undefined;
+  }
+
+  const forwardedOrigin = `${normalizedProtocol}://${normalizedHost}`;
+  return isHttpOrigin(forwardedOrigin) ? forwardedOrigin : undefined;
+}
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isHttpOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.pathname === '/';
+  } catch {
+    return false;
+  }
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
 }

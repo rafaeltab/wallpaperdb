@@ -201,7 +201,7 @@ services:
       - ./grafana/provisioning/dashboards/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/wallpaperdb.yaml
       - ./grafana/provisioning/alerting:/otel-lgtm/grafana/conf/provisioning/alerting
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 5

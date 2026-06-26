@@ -8,15 +8,19 @@
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
-        "coverage:merge": "mkdir -p coverage && cat packages/*/coverage/lcov.info apps/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || cat packages/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || echo 'No coverage files found'"
+        "coverage:merge": "mkdir -p coverage && cat packages/*/coverage/lcov.info apps/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || cat packages/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || echo 'No coverage files found'",
+        "sandcastle": "tsx .sandcastle/main.ts"
     },
     "peerDependencies": {
         "graphql": "16.12.0"
     },
     "devDependencies": {
-        "graphql": "16.12.0",
+        "@ai-hero/sandcastle": "^0.10.0",
+        "@types/node": "^26.0.1",
         "@vitest/coverage-v8": "^3.0.0",
         "@vitest/ui": "^3.0.0",
+        "graphql": "16.12.0",
+        "tsx": "^4.22.4",
         "turbo": "^2.6.1",
         "typescript": "^5.7.2",
         "vitest": "^3.0.0"

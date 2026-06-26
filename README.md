@@ -4,6 +4,8 @@
 
 A wallpaper management system built as an event-driven microservices platform. Users upload wallpapers; the system validates, stores, and enriches them, making them searchable and retrievable at any resolution.
 
+![WallpaperDB screenshot](screenshot.png)
+
 ## System Capabilities
 
 - **Upload and validation** — accepts wallpaper uploads, validates them against content-based rules, and durably persists them with guaranteed eventual consistency across partial failures

@@ -1,6 +1,9 @@
 .turbo
 node_modules
 
+# Local OpenCode/Sandcastle auth state
+.sandcastle/.opencode/auth.json
+
 # Worktree slot assignment output
 .worktree
 

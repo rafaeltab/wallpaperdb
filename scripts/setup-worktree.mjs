@@ -525,10 +525,21 @@ const knownUserSecrets = {
 	E2E_BASE_TEST_PASSWORD: undefined,
 };
 
-function getSecretEnvPath() {
+function getSecretEnvPaths() {
 	const configDir =
 		process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
-	return join(configDir, "wallpaperdb", "secret.env");
+	const wallpaperdbConfigDir = join(configDir, "wallpaperdb");
+	return {
+		primary: join(wallpaperdbConfigDir, "secrets.env"),
+		legacy: join(wallpaperdbConfigDir, "secret.env"),
+	};
+}
+
+function resolveSecretEnvPath() {
+	const paths = getSecretEnvPaths();
+	if (existsSync(paths.primary)) return paths.primary;
+	if (existsSync(paths.legacy)) return paths.legacy;
+	return paths.primary;
 }
 
 function ensureSecretEnv(secretEnvPath) {
@@ -576,12 +587,12 @@ function loadSecrets(secretEnvPath) {
  *   1. Read `.env.example` as base
  *   2. Apply global overrides
  *   3. Apply service-specific overrides
- *   4. Apply user secrets from `secret.env`
+ *   4. Apply user secrets from `secrets.env` (or legacy `secret.env`)
  */
 function generateAllEnvFiles(repoRoot, projectName, ports) {
 	const ctx = { projectName, ports };
 	const serviceOverrides = buildServiceOverrides();
-	const secretEnvPath = getSecretEnvPath();
+	const secretEnvPath = resolveSecretEnvPath();
 
 	ensureSecretEnv(secretEnvPath);
 	syncKnownSecrets(secretEnvPath);

@@ -8,7 +8,7 @@
 FROM node:22-alpine
 
 # System dependencies required by native packages (sharp, pg, etc.)
-RUN apk update && apk add --no-cache libc6-compat
+RUN apk update && apk add --no-cache libc6-compat python3 make g++
 
 # Set up pnpm via corepack (version must match packageManager in root package.json)
 ENV PNPM_HOME="/pnpm"

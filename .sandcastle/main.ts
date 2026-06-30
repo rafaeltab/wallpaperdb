@@ -24,9 +24,14 @@ const sandboxProvider = docker({
   network: "host",
   env: {
     CI: "true",
-    DOCKER_HOST: "tcp://127.0.0.1:2375",
+    DOCKER_HOST: "unix:///var/run/docker.sock",
   },
   mounts: [
+    {
+      hostPath: "/var/run/docker.sock",
+      sandboxPath: "/var/run/docker.sock",
+      readonly: false,
+    },
     // Reuse the host OpenCode OAuth subscription credential inside the sandbox.
     // Mount only auth.json; OpenCode still needs its data dir writable for repo metadata.
     {

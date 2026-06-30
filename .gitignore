@@ -1,5 +1,6 @@
 .turbo
 node_modules
+.pnpm-store
 
 # Worktree slot assignment output
 .worktree

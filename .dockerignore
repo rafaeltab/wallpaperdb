@@ -17,6 +17,10 @@ coverage
 .env.local
 .env*.local
 
+# Agent / local sandbox artifacts (can contain nested worktrees and gigabytes of data)
+.sandcastle
+.agents
+
 # IDE
 .vscode
 .idea

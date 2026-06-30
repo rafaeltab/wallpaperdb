@@ -45,6 +45,7 @@ Pick the highest-priority open issue that is not blocked by another open issue.
 - Do not close an issue until you have committed the fix and verified tests pass.
 - Do not leave commented-out code or TODO comments in committed code.
 - If you are blocked (missing context, failing tests you cannot fix, external dependency), leave a comment on the issue and move on — do not close it.
+- Before creating or editing GitHub PRs, issues, or comments with multi-line Markdown, load and follow the `github-markdown-bodies` skill. Use `--body-file`, not inline `--body "...\n..."`, then verify GitHub received real newlines.
 
 # Done
 

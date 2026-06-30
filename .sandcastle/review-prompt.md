@@ -47,8 +47,8 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 If you find improvements to make:
 
 1. Make the changes directly on this branch
-2. Run the relevant focused tests, then run `make ci` to ensure nothing is broken
-3. Commit describing the refinements
+2. Run the relevant focused tests. For doc/screenshot-only changes, verify the screenshot artifact semantically instead of blocking on unrelated full-suite integration failures already documented in open follow-up issues.
+3. Commit describing the refinements if you changed files
 
 If the code is already clean and well-structured, do nothing.
 

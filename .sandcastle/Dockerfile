@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install Docker CLI and Compose plugin from Docker's apt repository so
 # `make ci`, Testcontainers, `make infra-start`, and `make dev` can reach the
-# host/LXD daemon through DOCKER_HOST=tcp://127.0.0.1:2375.
+# direct host Docker daemon through the bind-mounted /var/run/docker.sock.
 RUN install -m 0755 -d /etc/apt/keyrings \
   && curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc \
   && chmod a+r /etc/apt/keyrings/docker.asc \

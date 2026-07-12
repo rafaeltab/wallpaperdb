@@ -27,3 +27,6 @@ coverage
 
 # TanStack Router generated files
 **/routeTree.gen.ts
+
+.pnpm-store/
+

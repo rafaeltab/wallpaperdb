@@ -32,15 +32,16 @@ describe("OpenSearch Integration", () => {
                     },
                 },
             });
-            expect(() =>
-                indexManager.register({
-                    key: "duplicate-profiles",
-                    name: indexName,
-                    mapping: { properties: {} },
-                }),
-            ).toThrow(`Index name already registered: ${indexName}`);
 
             try {
+                expect(() =>
+                    indexManager.register({
+                        key: "duplicate-profiles",
+                        name: indexName,
+                        mapping: { properties: {} },
+                    }),
+                ).toThrow(`Index name already registered: ${indexName}`);
+
                 await indexManager.createIndex("profiles");
 
                 expect(indexManager.getIndexName("profiles")).toBe(indexName);

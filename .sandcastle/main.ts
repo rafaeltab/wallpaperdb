@@ -9,6 +9,8 @@ import { createPullRequest } from "./github.js";
 import { parsePlan } from "./plan.js";
 import { createSandboxResources } from "./sandbox.js";
 
+import type { Issue } from "./plan.js";
+
 const config = loadConfig();
 const { sandboxProvider, hooks } = createSandboxResources(config);
 const streamAgentOutputToTerminal = true;
@@ -30,17 +32,25 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
     completionTimeoutSeconds: 120,
   });
 
-  const plannedIssue = parsePlan(planning.output);
-  if (!plannedIssue) {
+  const issues = parsePlan(planning.output);
+  if (issues.length === 0) {
     console.log("Planner found no actionable issues. Stopping.");
     break;
   }
 
-  const { branch } = plannedIssue;
-  console.log(`Planning complete for #${plannedIssue.number}: ${plannedIssue.title} → ${branch}`);
+  console.log(`Planning complete. ${issues.length} issue(s) to work on:`);
+  for (const issue of issues) {
+    console.log(`  #${issue.number}: ${issue.title} → ${issue.branch}`);
+  }
 
+  for (const issue of issues) {
+    await handleIssue(issue);
+  }
+}
+
+async function handleIssue(issue: Issue) {
   const sandbox = await sandcastle.createSandbox({
-    branch,
+    branch: issue.branch,
     sandbox: sandboxProvider,
     hooks,
     timeouts: { gitSetupMs: 60_000, commitCollectionMs: 120_000 },
@@ -50,10 +60,9 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
 
   try {
     const promptArgs = {
-      TASK_ID: plannedIssue.number,
-      ISSUE_TITLE: plannedIssue.title,
-      BRANCH: branch,
-      PLAN: plannedIssue.plan,
+      ISSUE_NUMBER: issue.number,
+      ISSUE_TITLE: issue.title,
+      BRANCH: issue.branch,
     };
 
     console.log(`Starting implementer`);
@@ -71,10 +80,10 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
 
     if (!implement.commits.length) {
       console.log("Implementation agent made no commits; backlog is empty or blocked. Stopping.");
-      break;
+      return;
     }
 
-    console.log(`\nImplementation complete on branch: ${branch}`);
+    console.log(`\nImplementation complete on branch: ${issue.branch}`);
     console.log(`Implementation commits: ${implement.commits.length}`);
 
     const review = await sandbox.run({
@@ -93,9 +102,9 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
       "The implementer/reviewer prompts require the agent to run `make ci` inside the sandbox before closing the issue.",
     );
 
-    createPullRequest(branch, implement.commits.length, review.commits.length, config.prBaseBranch);
+    createPullRequest(issue.branch, implement.commits.length, review.commits.length, config.prBaseBranch);
   } finally {
-    cleanupDockerResources(branch, config.enableDockerCleanup);
+    cleanupDockerResources(issue.branch, config.enableDockerCleanup);
     await sandbox.close();
   }
 }

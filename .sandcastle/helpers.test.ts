@@ -9,16 +9,26 @@ import { parsePlan } from "./plan.js";
 import { prepareTurboCacheDirectory } from "./sandbox.js";
 
 describe("parsePlan", () => {
-  it("accepts a valid deterministic issue plan", () => {
+  it("accepts valid deterministic issue plans", () => {
     expect(
-      parsePlan(JSON.stringify({ issue: { number: 42, title: "Fix it", branch: "sandcastle/issue-42", plan: "Do it" } })),
-    ).toEqual({ number: 42, title: "Fix it", branch: "sandcastle/issue-42", plan: "Do it" });
+      parsePlan(
+        JSON.stringify({
+          issues: [
+            { number: 42, title: "Fix it", branch: "sandcastle/issue-42" },
+            { number: 43, title: "Fix that too", branch: "sandcastle/issue-43" },
+          ],
+        }),
+      ),
+    ).toEqual([
+      { number: 42, title: "Fix it", branch: "sandcastle/issue-42" },
+      { number: 43, title: "Fix that too", branch: "sandcastle/issue-43" },
+    ]);
   });
 
-  it("returns undefined for an empty backlog and rejects a mismatched branch", () => {
-    expect(parsePlan('{"issue":null}')).toBeUndefined();
+  it("returns an empty list for an empty backlog and rejects a mismatched branch", () => {
+    expect(parsePlan('{"issues":[]}')).toEqual([]);
     expect(() =>
-      parsePlan(JSON.stringify({ issue: { number: 42, title: "Fix it", branch: "other", plan: "Do it" } })),
+      parsePlan(JSON.stringify({ issues: [{ number: 42, title: "Fix it", branch: "other" }] })),
     ).toThrow("Planner returned an invalid issue plan");
   });
 });

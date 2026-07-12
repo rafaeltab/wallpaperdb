@@ -46,6 +46,8 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
     timeouts: { gitSetupMs: 60_000, commitCollectionMs: 120_000 },
   });
 
+  console.log(`Sandbox prepared.`);
+
   try {
     const promptArgs = {
       TASK_ID: plannedIssue.number,
@@ -53,6 +55,8 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
       BRANCH: branch,
       PLAN: plannedIssue.plan,
     };
+
+    console.log(`Starting implementer`);
 
     const implement = await sandbox.run({
       name: "implementer",

@@ -1,10 +1,16 @@
 # Context
 
-## Open issues
+## Selected issue
 
-!`gh issue list --state open --label Sandcastle --limit 100 --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
+#{{TASK_ID}}: {{ISSUE_TITLE}}
 
-The list above has already been filtered to issues ready for work and is the sole source of truth for what work exists. Do not run your own unfiltered query to find more issues — if the list is empty, there is nothing to do.
+Branch: `{{BRANCH}}`
+
+## Planner handoff
+
+{{PLAN}}
+
+The planner selected this issue from the filtered backlog. Work only on this issue; do not select or substitute another one.
 
 ## Recent RALPH commits (last 10)
 
@@ -23,12 +29,12 @@ Work on issues in this order:
 3. **Polish** — improving existing functionality (error messages, UX, docs)
 4. **Refactors** — internal cleanups with no user-visible change
 
-Pick the highest-priority open issue that is not blocked by another open issue.
+The planner has already selected the highest-priority actionable issue.
 
 ## Workflow
 
 1. **Explore** — read the issue carefully. Pull in the parent PRD if referenced. Read the relevant source files and tests before writing any code.
-2. **Plan** — decide what to change and why. Keep the change as small as possible.
+2. **Confirm the plan** — validate the planner handoff against the issue and repository. Keep the change as small as possible.
 3. **Execute** — use RGR (Red → Green → Repeat → Refactor): write a failing test first, then write the implementation to pass it.
 4. **Verify** — run the narrowest relevant tests while implementing, then run the full `make ci` suite inside the sandbox before committing. Fix any failures before proceeding.
 5. **Commit** — make a single git commit. The message MUST:

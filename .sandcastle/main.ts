@@ -1,12 +1,11 @@
 // Sequential Sandcastle loop for WallpaperDB.
 //
 // Workflow per iteration:
-//   1. Create a Docker-backed Sandcastle sandbox on a fresh branch.
-//   2. Run OpenCode as the implementation agent for one GitHub issue.
+//   1. Run an OpenCode planning agent to select one issue and produce a plan.
+//   2. Run a separate OpenCode implementation agent with that plan.
 //   3. Run OpenCode again as the review/fix agent on the same branch.
-//   4. The prompts require the agents to run the full `make ci` suite inside the sandbox.
-//   5. Push the completed branch and open a GitHub pull request.
-//   6. Clean up Docker resources created by the sandboxed worktree.
+//   4. Push the reviewed branch and open a GitHub pull request.
+//   5. Clean up Docker resources created by the sandboxed worktree.
 //
 // Usage:
 //   pnpm sandcastle
@@ -162,6 +161,25 @@ function createPullRequest(branch: string, implementCommitCount: number, reviewC
   }
 }
 
+type PlannedIssue = { number: number; title: string; branch: string; plan: string };
+
+function parsePlan(rawPlan: string): PlannedIssue | undefined {
+  const parsed = JSON.parse(rawPlan) as { issue?: unknown };
+  if (parsed.issue === null || parsed.issue === undefined) return undefined;
+
+  const issue = parsed.issue as Partial<PlannedIssue>;
+  if (
+    !Number.isInteger(issue.number) ||
+    typeof issue.title !== "string" ||
+    issue.branch !== `sandcastle/issue-${issue.number}` ||
+    typeof issue.plan !== "string" ||
+    issue.plan.trim().length === 0
+  ) {
+    throw new Error(`Planner returned an invalid issue plan: ${rawPlan}`);
+  }
+  return issue as PlannedIssue;
+}
+
 function branchToSlug(branch: string) {
   const maxTotal = 63;
   const prefix = "wallpaperdb-";
@@ -283,7 +301,25 @@ const hooks = {
 for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   console.log(`\n=== Sandcastle iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
-  const branch = `sandcastle/opencode-review/${Date.now()}`;
+  const planning = await sandcastle.run({
+    name: "planner",
+    maxIterations: 1,
+    sandbox: sandboxProvider,
+    hooks,
+    agent: sandcastle.opencode(MODEL, { agent: "plan", variant: MODEL_VARIANT }),
+    promptFile: "./.sandcastle/plan-prompt.md",
+    output: sandcastle.Output.string({ tag: "plan" }),
+    idleTimeoutSeconds: 1_200,
+    completionTimeoutSeconds: 120,
+  });
+  const plannedIssue = parsePlan(planning.output);
+  if (!plannedIssue) {
+    console.log("Planner found no actionable issues. Stopping.");
+    break;
+  }
+
+  const { branch } = plannedIssue;
+  console.log(`Planning complete for #${plannedIssue.number}: ${plannedIssue.title} → ${branch}`);
   const sandbox = await sandcastle.createSandbox({
     branch,
     sandbox: sandboxProvider,
@@ -300,6 +336,12 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       maxIterations: 1,
       agent: sandcastle.opencode(MODEL, { agent: "build", variant: MODEL_VARIANT }),
       promptFile: "./.sandcastle/implement-prompt.md",
+      promptArgs: {
+        TASK_ID: plannedIssue.number,
+        ISSUE_TITLE: plannedIssue.title,
+        BRANCH: branch,
+        PLAN: plannedIssue.plan,
+      },
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });
@@ -317,7 +359,12 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       maxIterations: 1,
       agent: sandcastle.opencode(MODEL, { agent: "build", variant: MODEL_VARIANT }),
       promptFile: "./.sandcastle/review-prompt.md",
-      promptArgs: { BRANCH: branch },
+      promptArgs: {
+        TASK_ID: plannedIssue.number,
+        ISSUE_TITLE: plannedIssue.title,
+        BRANCH: branch,
+        PLAN: plannedIssue.plan,
+      },
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });

@@ -48,6 +48,8 @@ By default it runs up to 10 iterations. Override with:
 SANDCASTLE_MAX_ITERATIONS=1 pnpm sandcastle
 ```
 
+OpenCode defaults to `openai/gpt-5.6` with the `medium` reasoning variant. Override either setting with `SANDCASTLE_OPENCODE_MODEL` or `SANDCASTLE_OPENCODE_VARIANT`.
+
 Sandcastle looks for open GitHub issues labeled `Sandcastle`. Each iteration creates a branch named `sandcastle/opencode-review/<timestamp>`, starts the Docker sandbox, runs `pnpm install --frozen-lockfile` in the sandbox before any agent starts, runs an OpenCode implementation pass, then runs an OpenCode review/fix pass. The prompts require `make ci` to run inside the Docker sandbox before closing the issue. After the full implement/review cycle completes, the runner pushes the branch and creates a pull request against the repository default branch.
 
 At the end of every iteration, Sandcastle also cleans Docker resources for that worktree. Cleanup uses the same `COMPOSE_PROJECT_NAME` derived by `scripts/setup-worktree.mjs`, runs `docker compose down --volumes --remove-orphans` for both compose files, then removes any remaining containers, networks, and volumes whose names include that project name.

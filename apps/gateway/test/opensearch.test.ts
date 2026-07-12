@@ -3,6 +3,7 @@ import { Client } from "@opensearch-project/opensearch";
 import { container } from "tsyringe";
 import { beforeAll, describe, expect, it } from "vitest";
 import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { IndexManagerService } from "../src/services/index-manager.service.js";
 import { tester } from "./setup.js";
 
 describe("OpenSearch Integration", () => {
@@ -17,6 +18,39 @@ describe("OpenSearch Integration", () => {
     }, 60000);
 
     describe("IndexManagerService", () => {
+        it("should manage independently mapped named indexes", async () => {
+            const indexManager = container.resolve(IndexManagerService);
+            const indexName = "test-profiles";
+
+            indexManager.register({
+                key: "profiles",
+                name: indexName,
+                mapping: {
+                    properties: {
+                        profileId: { type: "keyword" },
+                        displayName: { type: "text" },
+                    },
+                },
+            });
+
+            try {
+                await indexManager.createIndex();
+
+                expect(indexManager.getIndexName("profiles")).toBe(indexName);
+                const index = await client.indices.get({ index: indexName });
+                expect(index.body[indexName].mappings.properties).toMatchObject({
+                    profileId: { type: "keyword" },
+                    displayName: { type: "text" },
+                });
+
+                await indexManager.deleteIndex();
+                expect((await client.indices.exists({ index: indexName })).body).toBe(false);
+                expect((await client.indices.exists({ index: "wallpapers" })).body).toBe(false);
+            } finally {
+                indexManager.unregister("profiles");
+            }
+        });
+
         it("should create the wallpapers index", async () => {
             const exists = await client.indices.exists({
                 index: "wallpapers",

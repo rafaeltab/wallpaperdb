@@ -27,3 +27,9 @@ export {
   type WallpaperColorsExtractedEvent,
   WALLPAPER_COLORS_EXTRACTED_SUBJECT,
 } from "./wallpaper-colors-extracted.js";
+
+export {
+  PROFILE_CREATED_SUBJECT,
+  ProfileCreatedEventSchema,
+  type ProfileCreatedEvent,
+} from "./profile-created.js";

@@ -7,9 +7,43 @@ import {
   type WallpaperVariantAvailableEvent,
   WallpaperVariantAvailableEventSchema,
   WallpaperColorsExtractedEventSchema,
+  PROFILE_CREATED_SUBJECT,
+  ProfileCreatedEventSchema,
 } from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
+  describe("ProfileCreatedEventSchema", () => {
+    const timestamp = new Date().toISOString();
+    const event = {
+      eventId: "evt_01HXYZ123456789",
+      eventType: PROFILE_CREATED_SUBJECT,
+      timestamp,
+      profile: {
+        id: "user_123",
+        displayName: "Ada Lovelace",
+        handle: "ada-lovelace",
+        biographyMarkdown: "",
+        pictureAssetId: null,
+        version: 1,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    };
+
+    it("validates a profile creation event", () => {
+      expect(ProfileCreatedEventSchema.safeParse(event).success).toBe(true);
+    });
+
+    it("rejects an invalid profile version", () => {
+      expect(
+        ProfileCreatedEventSchema.safeParse({
+          ...event,
+          profile: { ...event.profile, version: 0 },
+        }).success
+      ).toBe(false);
+    });
+  });
+
   describe("WallpaperUploadedEventSchema", () => {
     const validEvent = {
       eventId: "evt_01HXYZ123456789",

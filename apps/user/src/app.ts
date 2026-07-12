@@ -1,12 +1,14 @@
-import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import { container } from 'tsyringe';
+import { registerAuth } from '@wallpaperdb/auth';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { container } from 'tsyringe';
 import type { Config } from './config.js';
-import { NatsConnectionManager } from './connections/nats.js';
 import { DatabaseConnection } from './connections/database.js';
-import { registerRoutes } from './routes/index.js';
+import { NatsConnectionManager } from './connections/nats.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
+import { registerRoutes } from './routes/index.js';
+import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -29,6 +31,7 @@ export async function createApp(
   options?: { logger?: boolean; enableOtel?: boolean }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
+  container.register(IdentityProviderToken, { useClass: ClerkIdentityProvider });
 
   const otelSdk = getOtelSdk();
   if (otelSdk) {
@@ -59,6 +62,11 @@ export async function createApp(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
+  });
+
+  await registerAuth(fastify, {
+    secretKey: config.clerkSecretKey,
+    testMode: config.nodeEnv === 'test',
   });
 
   await registerOpenAPI(fastify, {

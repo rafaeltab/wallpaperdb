@@ -1,5 +1,13 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1783888681699,
+      "tag": "0000_parallel_shocker",
+      "breakpoints": true
+    }
+  ]
 }

@@ -11,6 +11,8 @@ import { createSandboxResources } from "./sandbox.js";
 
 const config = loadConfig();
 const { sandboxProvider, hooks } = createSandboxResources(config);
+const streamAgentOutputToTerminal = true;
+const logging = streamAgentOutputToTerminal ? ({ type: "stdout" } as const) : undefined;
 
 for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
   console.log(`\n=== Sandcastle iteration ${iteration}/${config.maxIterations} ===\n`);
@@ -23,6 +25,7 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
     agent: sandcastle.opencode(config.model, { agent: "plan", variant: config.modelVariant }),
     promptFile: "./.sandcastle/plan-prompt.md",
     output: sandcastle.Output.string({ tag: "plan" }),
+    logging,
     idleTimeoutSeconds: 1_200,
     completionTimeoutSeconds: 120,
   });
@@ -57,6 +60,7 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
       agent: sandcastle.opencode(config.model, { agent: "build", variant: config.modelVariant }),
       promptFile: "./.sandcastle/implement-prompt.md",
       promptArgs,
+      logging,
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });
@@ -75,6 +79,7 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
       agent: sandcastle.opencode(config.model, { agent: "build", variant: config.modelVariant }),
       promptFile: "./.sandcastle/review-prompt.md",
       promptArgs,
+      logging,
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });

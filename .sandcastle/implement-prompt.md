@@ -1,60 +1,62 @@
-# Context
+# TASK
 
-## Selected issue
+Fix issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
 
-#{{TASK_ID}}: {{ISSUE_TITLE}}
+Pull in the issue using `gh issue view`, with comments. If it has a parent PRD, pull that in too.
 
-Branch: `{{BRANCH}}`
+Only work on the issue specified.
 
-## Planner handoff
+Work on branch {{BRANCH}}. Make commits, run tests, and close the issue when done.
 
-{{PLAN}}
+# CONTEXT
 
-The planner selected this issue from the filtered backlog. Work only on this issue; do not select or substitute another one.
+Here are the last 10 commits:
 
-## Recent RALPH commits (last 10)
+<recent-commits>
 
-!`git log --oneline --grep="RALPH" -10`
+!`git log -n 10 --format="%H%n%ad%n%B---" --date=short`
 
-# Task
+</recent-commits>
 
-You are RALPH — an autonomous coding agent working through issues one at a time.
+# EXPLORATION
 
-## Priority order
+Explore the repo and fill your context window with relevant information that will allow you to complete the task.
 
-Work on issues in this order:
+Pay extra attention to test files that touch the relevant parts of the code.
 
-1. **Bug fixes** — broken behaviour affecting users
-2. **Tracer bullets** — thin end-to-end slices that prove an approach works
-3. **Polish** — improving existing functionality (error messages, UX, docs)
-4. **Refactors** — internal cleanups with no user-visible change
+# EXECUTION
 
-The planner has already selected the highest-priority actionable issue.
+If applicable, use RGR to complete the task.
 
-## Workflow
+1. RED: write one test
+2. GREEN: write the implementation to pass that test
+3. REPEAT until done
+4. REFACTOR the code
 
-1. **Explore** — read the issue carefully. Pull in the parent PRD if referenced. Read the relevant source files and tests before writing any code.
-2. **Confirm the plan** — validate the planner handoff against the issue and repository. Keep the change as small as possible.
-3. **Execute** — use RGR (Red → Green → Repeat → Refactor): write a failing test first, then write the implementation to pass it.
-4. **Verify** — run the narrowest relevant tests while implementing, then run the full `make ci` suite inside the sandbox before committing. Fix any failures before proceeding.
-5. **Commit** — make a single git commit. The message MUST:
-   - Start with `RALPH:` prefix
-   - Include the task completed and any PRD reference
-   - List key decisions made
-   - List files changed
-   - Note any blockers for the next iteration
-6. **Close** — close the issue with `gh issue close <ID> --comment "Completed by Sandcastle"` explaining what was done.
+# FEEDBACK LOOPS
 
-## Rules
+Before committing, run `make ci` to ensure the tests pass.
 
-- Work on **one issue per iteration**. Do not attempt multiple issues in a single iteration.
-- Do not close an issue until you have committed the fix and verified tests pass.
-- Do not leave commented-out code or TODO comments in committed code.
-- If you are blocked (missing context, failing tests you cannot fix, external dependency), leave a comment on the issue and move on — do not close it.
-- Before creating or editing GitHub PRs, issues, or comments with multi-line Markdown, load and follow the `github-markdown-bodies` skill. Use `--body-file`, not inline `--body "...\n..."`, then verify GitHub received real newlines.
+# COMMIT
 
-# Done
+Make a git commit. The commit message must:
 
-When all actionable issues are complete (or you are blocked on all remaining ones), or the open-issues block at the top of this prompt is empty, output the completion signal:
+1. Start with `RALPH:` prefix
+2. Include task completed + PRD reference
+3. Key decisions made
+4. Files changed
+5. Blockers or notes for next iteration
 
-<promise>COMPLETE</promise>
+Keep it concise.
+
+# THE ISSUE
+
+If the task is not complete, leave a comment on the GitHub issue with what was done.
+
+Do not close the issue - this will be done later.
+
+Once complete, output <promise>COMPLETE</promise>.
+
+# FINAL RULES
+
+ONLY WORK ON A SINGLE TASK.

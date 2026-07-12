@@ -20,7 +20,8 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 
 const MAX_ITERATIONS = Number(process.env.SANDCASTLE_MAX_ITERATIONS ?? "10");
-const MODEL = process.env.SANDCASTLE_OPENCODE_MODEL ?? "openai/gpt-5.5";
+const MODEL = process.env.SANDCASTLE_OPENCODE_MODEL ?? "openai/gpt-5.6";
+const MODEL_VARIANT = process.env.SANDCASTLE_OPENCODE_VARIANT ?? "medium";
 const IMAGE_NAME = process.env.SANDCASTLE_IMAGE_NAME ?? "wallpaperdb-sandcastle:opencode";
 const PR_BASE_BRANCH = process.env.SANDCASTLE_PR_BASE_BRANCH;
 const ENABLE_DOCKER_CLEANUP = process.env.SANDCASTLE_DOCKER_CLEANUP !== "false";
@@ -297,7 +298,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     const implement = await sandbox.run({
       name: "implementer",
       maxIterations: 1,
-      agent: sandcastle.opencode(MODEL, { agent: "build" }),
+      agent: sandcastle.opencode(MODEL, { agent: "build", variant: MODEL_VARIANT }),
       promptFile: "./.sandcastle/implement-prompt.md",
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
@@ -314,7 +315,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     const review = await sandbox.run({
       name: "reviewer",
       maxIterations: 1,
-      agent: sandcastle.opencode(MODEL, { agent: "build" }),
+      agent: sandcastle.opencode(MODEL, { agent: "build", variant: MODEL_VARIANT }),
       promptFile: "./.sandcastle/review-prompt.md",
       promptArgs: { BRANCH: branch },
       idleTimeoutSeconds: 1_200,

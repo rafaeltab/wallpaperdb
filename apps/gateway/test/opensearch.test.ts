@@ -32,9 +32,16 @@ describe("OpenSearch Integration", () => {
                     },
                 },
             });
+            expect(() =>
+                indexManager.register({
+                    key: "duplicate-profiles",
+                    name: indexName,
+                    mapping: { properties: {} },
+                }),
+            ).toThrow(`Index name already registered: ${indexName}`);
 
             try {
-                await indexManager.createIndex();
+                await indexManager.createIndex("profiles");
 
                 expect(indexManager.getIndexName("profiles")).toBe(indexName);
                 const index = await client.indices.get({ index: indexName });
@@ -43,9 +50,9 @@ describe("OpenSearch Integration", () => {
                     displayName: { type: "text" },
                 });
 
-                await indexManager.deleteIndex();
+                await indexManager.deleteIndex("profiles");
                 expect((await client.indices.exists({ index: indexName })).body).toBe(false);
-                expect((await client.indices.exists({ index: "wallpapers" })).body).toBe(false);
+                expect((await client.indices.exists({ index: "wallpapers" })).body).toBe(true);
             } finally {
                 indexManager.unregister("profiles");
             }

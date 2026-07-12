@@ -28,6 +28,9 @@ export class IndexManagerService {
     if (this.definitions.has(definition.key)) {
       throw new Error(`Index definition already registered: ${definition.key}`);
     }
+    if ([...this.definitions.values()].some(({ name }) => name === definition.name)) {
+      throw new Error(`Index name already registered: ${definition.name}`);
+    }
 
     this.definitions.set(definition.key, definition);
   }
@@ -39,7 +42,12 @@ export class IndexManagerService {
   /**
    * Create all registered indexes with their mappings.
    */
-  async createIndex(): Promise<void> {
+  async createIndex(key?: string): Promise<void> {
+    if (key) {
+      await this.createDefinition(this.getDefinition(key));
+      return;
+    }
+
     for (const definition of this.definitions.values()) {
       await this.createDefinition(definition);
     }
@@ -91,7 +99,12 @@ export class IndexManagerService {
   /**
    * Delete all registered indexes (for testing).
    */
-  async deleteIndex(): Promise<void> {
+  async deleteIndex(key?: string): Promise<void> {
+    if (key) {
+      await this.deleteDefinition(this.getDefinition(key));
+      return;
+    }
+
     for (const definition of this.definitions.values()) {
       await this.deleteDefinition(definition);
     }
@@ -135,11 +148,15 @@ export class IndexManagerService {
    * Get the physical index name for a registered projection.
    */
   getIndexName(key = wallpaperIndexDefinition.key): string {
+    return this.getDefinition(key).name;
+  }
+
+  private getDefinition(key: string): IndexDefinition {
     const definition = this.definitions.get(key);
     if (!definition) {
       throw new Error(`Unknown index definition: ${key}`);
     }
 
-    return definition.name;
+    return definition;
   }
 }

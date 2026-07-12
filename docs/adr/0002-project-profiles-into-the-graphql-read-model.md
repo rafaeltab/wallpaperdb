@@ -1,0 +1,3 @@
+# Project Profiles into the GraphQL read model
+
+The User service owns Profile state and authenticated REST commands, recording each accepted transition in a transactional outbox. It publishes versioned Profile events containing the change and current public snapshot; the gateway consumes them idempotently into OpenSearch and exposes Profiles through GraphQL, accepting eventual consistency in exchange for searchable, independently served reads. NATS events are retained indefinitely for projection rebuilds as a temporary decision pending the cross-application privacy and retention review in GitHub issue #162.

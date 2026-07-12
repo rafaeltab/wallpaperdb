@@ -18,7 +18,7 @@ export function loadConfig(): SandcastleConfig {
 
   return {
     maxIterations: Number(process.env.SANDCASTLE_MAX_ITERATIONS ?? "10"),
-    model: process.env.SANDCASTLE_OPENCODE_MODEL ?? "openai/gpt-5.6",
+    model: process.env.SANDCASTLE_OPENCODE_MODEL ?? "openai/gpt-5.6-sol",
     modelVariant: process.env.SANDCASTLE_OPENCODE_VARIANT ?? "medium",
     imageName: process.env.SANDCASTLE_IMAGE_NAME ?? "wallpaperdb-sandcastle:opencode",
     prBaseBranch: process.env.SANDCASTLE_PR_BASE_BRANCH,

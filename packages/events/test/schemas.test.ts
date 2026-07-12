@@ -7,9 +7,41 @@ import {
   type WallpaperVariantAvailableEvent,
   WallpaperVariantAvailableEventSchema,
   WallpaperColorsExtractedEventSchema,
+  PROFILE_CREATED_SUBJECT,
+  ProfileCreatedEventSchema,
 } from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
+  describe("ProfileCreatedEventSchema", () => {
+    const event = {
+      eventId: "pevt_01HXYZ123456789",
+      eventType: "profile.created" as const,
+      timestamp: "2026-07-12T12:00:00.000Z",
+      profileVersion: 1,
+      change: { type: "created" as const },
+      profile: {
+        id: "user_123",
+        handle: "ada-lovelace",
+        displayName: "Ada Lovelace",
+        biographyMarkdown: "",
+        pictureAssetId: null,
+        version: 1,
+        createdAt: "2026-07-12T12:00:00.000Z",
+        updatedAt: "2026-07-12T12:00:00.000Z",
+      },
+    };
+
+    it("validates the complete public creation event", () => {
+      expect(ProfileCreatedEventSchema.parse(event)).toEqual(event);
+      expect(PROFILE_CREATED_SUBJECT).toBe("profile.created");
+    });
+
+    it("rejects private Clerk fields and mismatched versions", () => {
+      expect(ProfileCreatedEventSchema.safeParse({ ...event, email: "private@example.test" }).success).toBe(false);
+      expect(ProfileCreatedEventSchema.safeParse({ ...event, profileVersion: 0 }).success).toBe(false);
+    });
+  });
+
   describe("WallpaperUploadedEventSchema", () => {
     const validEvent = {
       eventId: "evt_01HXYZ123456789",

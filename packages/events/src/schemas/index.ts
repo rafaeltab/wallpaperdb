@@ -27,3 +27,11 @@ export {
   type WallpaperColorsExtractedEvent,
   WALLPAPER_COLORS_EXTRACTED_SUBJECT,
 } from "./wallpaper-colors-extracted.js";
+
+export {
+  PROFILE_CREATED_SUBJECT,
+  ProfileCreatedEventSchema,
+  PublicProfileSnapshotSchema,
+  type ProfileCreatedEvent,
+  type PublicProfileSnapshot,
+} from "./profile-created.js";

@@ -1,12 +1,20 @@
-import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import { container } from 'tsyringe';
+import { getClerkSecuritySchemes, registerAuth } from '@wallpaperdb/auth';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { container } from 'tsyringe';
 import type { Config } from './config.js';
-import { NatsConnectionManager } from './connections/nats.js';
 import { DatabaseConnection } from './connections/database.js';
-import { registerRoutes } from './routes/index.js';
+import { NatsConnectionManager } from './connections/nats.js';
+import { ClerkIdentityProvider } from './identity/clerk.js';
+import { type IdentityProvider, IdentityProviderToken } from './identity/identity-provider.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
+import { registerRoutes } from './routes/index.js';
+import {
+  defaultProfileServiceDependencies,
+  type ProfileServiceDependencies,
+  ProfileServiceDependenciesToken,
+} from './services/profile.service.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -26,9 +34,20 @@ declare module 'fastify' {
 
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean }
+  options?: {
+    logger?: boolean;
+    enableOtel?: boolean;
+    identityProvider?: IdentityProvider;
+    profileDependencies?: ProfileServiceDependencies;
+  }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
+  const identityProvider =
+    options?.identityProvider ?? new ClerkIdentityProvider(config.clerkSecretKey ?? '');
+  container.register(IdentityProviderToken, { useValue: identityProvider });
+  container.register(ProfileServiceDependenciesToken, {
+    useValue: options?.profileDependencies ?? defaultProfileServiceDependencies,
+  });
 
   const otelSdk = getOtelSdk();
   if (otelSdk) {
@@ -61,6 +80,11 @@ export async function createApp(
     credentials: true,
   });
 
+  await registerAuth(fastify, {
+    secretKey: config.clerkSecretKey,
+    testMode: config.nodeEnv === 'test',
+  });
+
   await registerOpenAPI(fastify, {
     title: 'WallpaperDB User API',
     version: '1.0.0',
@@ -70,6 +94,9 @@ export async function createApp(
       config.nodeEnv === 'production'
         ? undefined
         : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
+    securitySchemes: config.clerkDomain
+      ? getClerkSecuritySchemes({ clerkDomain: config.clerkDomain })
+      : undefined,
   });
 
   fastify.decorate('container', container);

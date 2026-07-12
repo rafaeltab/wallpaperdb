@@ -1,12 +1,12 @@
 import {
-  HealthAggregator,
   type HealthResponse as CoreHealthResponse,
   type ReadyResponse as CoreReadyResponse,
+  HealthAggregator,
 } from '@wallpaperdb/core/health';
-import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
+import { NatsConnectionManager } from '../connections/nats.js';
 import { getOtelSdk } from '../otel-init.js';
 
 export type HealthResponse = CoreHealthResponse;

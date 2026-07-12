@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import Fastify from 'fastify';
-import { registerRoutes } from './routes/index.js';
 import { container } from 'tsyringe';
+import { registerRoutes } from './routes/index.js';
 
 async function generateSwagger(): Promise<string> {
   container.register('config', {

@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { AuthBridge } from '@/components/auth-bridge';
+import { ProfileProvider } from '@/components/profile-bootstrap';
 import { ThemeProvider } from '@/components/theme-provider';
 import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
 import { Toaster } from '@/components/ui/sonner';
@@ -80,18 +81,20 @@ function App() {
 
   return (
     <ClerkProvider {...clerkProviderProps}>
-      <AuthBridge>
-        <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
-          <QueryClientProvider client={queryClient}>
-            <UploadQueueProvider>
-              <RouterProvider router={router} />
-              <UploadQueueToastManager />
-              <Toaster />
-              <ReactQueryDevtools initialIsOpen={false} />
-            </UploadQueueProvider>
-          </QueryClientProvider>
-        </ThemeProvider>
-      </AuthBridge>
+      <QueryClientProvider client={queryClient}>
+        <AuthBridge>
+          <ProfileProvider>
+            <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
+              <UploadQueueProvider>
+                <RouterProvider router={router} />
+                <UploadQueueToastManager />
+                <Toaster />
+                <ReactQueryDevtools initialIsOpen={false} />
+              </UploadQueueProvider>
+            </ThemeProvider>
+          </ProfileProvider>
+        </AuthBridge>
+      </QueryClientProvider>
     </ClerkProvider>
   );
 }

@@ -505,6 +505,7 @@ function buildServiceOverrides() {
 			VITE_BASE_PATH: "/web",
 			VITE_GATEWAY_URL: "/gateway/graphql",
 			VITE_INGESTOR_URL: "/ingestor",
+			VITE_USER_URL: "/user",
 		},
 		"apps/web-e2e": {
 			PLAYWRIGHT_BASE_URL: (ctx) =>

@@ -2,21 +2,13 @@ import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
 export default defineBaseConfig({
   test: {
-    name: 'color-extractor',
+    name: 'color-extractor-all',
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],
-    exclude: ['test/**/*.integration.test.ts'],
     testTimeout: 120000,
     hookTimeout: 60000,
     maxConcurrency: 5,
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
-      },
-    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

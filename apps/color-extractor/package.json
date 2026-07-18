@@ -15,6 +15,7 @@
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
     "test": "vitest run",
+    "test:unit": "vitest run --coverage",
     "test:integration": "vitest run --coverage --config vitest.integration.config.ts",
     "test:all": "vitest run --coverage --config vitest.all.config.ts",
     "test:watch": "vitest"

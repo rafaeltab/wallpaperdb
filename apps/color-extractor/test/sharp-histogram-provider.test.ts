@@ -32,12 +32,12 @@ describe('SharpHistogramProvider', () => {
 
     expectNormalized(histogram);
     expect(histogram[3]).toBeCloseTo(1, 3);
-    expect(histogram.filter((_, index) => index !== 3)).toEqual(
-      expect.arrayContaining(histogram.filter((_, index) => index !== 3).map(() => 0))
-    );
+    histogram.forEach((value, index) => {
+      if (index !== 3) expect(value).toBe(0);
+    });
   });
 
-  it('weights alpha and handles a large image', async () => {
+  it('handles a large image with alpha', async () => {
     const histogram = await providerFor(
       await image(3840, 2160, { r: 0, g: 0, b: 255, alpha: 0.5 })
     ).extractHistogram('unused', 'unused');

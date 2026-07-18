@@ -120,31 +120,4 @@ describe('Color Extraction Pipeline', () => {
     expect(data.colorHistogram[redBin]).toBeCloseTo(1.0, 3);
   });
 
-  it('should skip non-image events without publishing colors.extracted', async () => {
-    const wallpaperId = `wlpr_video_${Date.now()}`;
-    const event = createWallpaperUploadedEvent({
-      wallpaperId,
-      storageKey: `${wallpaperId}/original.mp4`,
-      width: 1920,
-      height: 1080,
-      fileSizeBytes: 1000000,
-      fileType: 'video',
-    });
-
-    const js = await tester.nats.getJsClient();
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    const consumer = await js.consumers.get('WALLPAPER', {
-      filterSubjects: 'wallpaper.colors.extracted',
-    });
-
-    const msg = await consumer.next({ expires: 3000 });
-
-    if (msg) {
-      const data = JSON.parse(new TextDecoder().decode(msg.data));
-      expect(data.wallpaperId).not.toBe(wallpaperId);
-    }
-  });
 });

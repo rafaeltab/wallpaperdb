@@ -8,7 +8,7 @@
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
-        "coverage:merge": "mkdir -p coverage && cat packages/*/coverage/lcov.info apps/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || cat packages/*/coverage/lcov.info > coverage/lcov.info 2>/dev/null || echo 'No coverage files found'",
+        "coverage:merge": "mkdir -p coverage && find packages apps -path '*/coverage/*' -name lcov.info -exec cat {} + > coverage/lcov.info",
         "sandcastle": "tsx .sandcastle/main.ts"
     },
     "peerDependencies": {

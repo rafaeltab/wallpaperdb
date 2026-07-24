@@ -55,7 +55,7 @@ class ConvergenceRun {
           this.state = "LOCAL_FIXING";
         },
         local_passed: () => {
-          this.state = this.prCreated ? "UPDATING_DRAFT_PR" : "PRE_PR_REVIEWING";
+          this.state = "REVIEWING";
         },
       },
       LOCAL_FIXING: {
@@ -64,12 +64,16 @@ class ConvergenceRun {
           this.state = "LOCAL_VERIFYING";
         },
       },
-      PRE_PR_REVIEWING: {
-        pre_review_changed: ({ sha }) => {
+      REVIEWING: {
+        review_changed: ({ reviewedSha = this.head, sha }) => {
+          this.requireCurrentHead(reviewedSha);
+          if (this.recordUnsuccessfulCycle("automatic review changed code")) return;
           this.replaceHead(sha);
           this.state = "LOCAL_VERIFYING";
         },
-        pre_review_stable: () => {
+        review_stable: ({ sha = this.head } = {}) => {
+          this.requireCurrentHead(sha);
+          this.reviewStableFor = sha;
           this.state = "UPDATING_DRAFT_PR";
         },
       },
@@ -91,8 +95,11 @@ class ConvergenceRun {
         },
         ci_green: ({ sha = this.head } = {}) => {
           this.requireCurrentHead(sha);
+          if (this.reviewStableFor !== sha) {
+            throw new Error(`green CI for ${sha} cannot converge without a no-change review for that SHA`);
+          }
           this.ciGreenFor = sha;
-          this.state = "FINAL_REVIEWING";
+          this.state = "CONFIRMING_PROMOTION";
         },
         stale_ci_result: ({ sha }) => {
           if (sha === this.head) throw new Error("stale_ci_result must refer to an old SHA");
@@ -110,22 +117,6 @@ class ConvergenceRun {
           if (this.recordUnsuccessfulCycle("deterministic CI failure; code changed")) return;
           this.replaceHead(sha);
           this.state = "LOCAL_VERIFYING";
-        },
-      },
-      FINAL_REVIEWING: {
-        final_review_changed: ({ reviewedSha = this.head, sha }) => {
-          this.requireCurrentHead(reviewedSha);
-          if (this.recordUnsuccessfulCycle("green CI followed by reviewer change")) return;
-          this.replaceHead(sha);
-          this.state = "LOCAL_VERIFYING";
-        },
-        final_review_stable: ({ sha = this.head } = {}) => {
-          this.requireCurrentHead(sha);
-          if (this.ciGreenFor !== sha) {
-            throw new Error(`cannot promote ${sha}: authoritative CI is not green for current head`);
-          }
-          this.reviewStableFor = sha;
-          this.state = "CONFIRMING_PROMOTION";
         },
       },
       CONFIRMING_PROMOTION: {
@@ -208,7 +199,7 @@ function reachFirstCi(name, sha = "A") {
   return new ConvergenceRun(name)
     .dispatch("implemented", { sha })
     .dispatch("local_passed")
-    .dispatch("pre_review_stable")
+    .dispatch("review_stable", { sha })
     .dispatch("pr_updated", { sha });
 }
 
@@ -216,7 +207,6 @@ const scenarios = {
   happy() {
     reachFirstCi("happy")
       .dispatch("ci_green", { sha: "A" })
-      .dispatch("final_review_stable", { sha: "A" })
       .dispatch("convergence_confirmed", { sha: "A" });
   },
   "code-fix"() {
@@ -224,9 +214,9 @@ const scenarios = {
       .dispatch("ci_failed", { sha: "A" })
       .dispatch("fixer_changed_code", { sha: "B", evidence: "unit lane failed deterministically" })
       .dispatch("local_passed")
+      .dispatch("review_stable", { sha: "B" })
       .dispatch("pr_updated", { sha: "B" })
       .dispatch("ci_green", { sha: "B" })
-      .dispatch("final_review_stable", { sha: "B" })
       .dispatch("convergence_confirmed", { sha: "B" });
   },
   flake() {
@@ -234,17 +224,17 @@ const scenarios = {
       .dispatch("ci_failed", { sha: "A" })
       .dispatch("fixer_rerun_flake", { evidence: "same browser timeout in unchanged test" })
       .dispatch("ci_green", { sha: "A" })
-      .dispatch("final_review_stable", { sha: "A" })
       .dispatch("convergence_confirmed", { sha: "A" });
   },
   "review-change"() {
-    reachFirstCi("review-change")
-      .dispatch("ci_green", { sha: "A" })
-      .dispatch("final_review_changed", { sha: "B" })
+    new ConvergenceRun("review-change")
+      .dispatch("implemented", { sha: "A" })
       .dispatch("local_passed")
+      .dispatch("review_changed", { reviewedSha: "A", sha: "B" })
+      .dispatch("local_passed")
+      .dispatch("review_stable", { sha: "B" })
       .dispatch("pr_updated", { sha: "B" })
       .dispatch("ci_green", { sha: "B" })
-      .dispatch("final_review_stable", { sha: "B" })
       .dispatch("convergence_confirmed", { sha: "B" });
   },
   "stale-event"() {
@@ -252,6 +242,7 @@ const scenarios = {
       .dispatch("ci_failed", { sha: "A" })
       .dispatch("fixer_changed_code", { sha: "B", evidence: "compile failure fixed" })
       .dispatch("local_passed")
+      .dispatch("review_stable", { sha: "B" })
       .dispatch("pr_updated", { sha: "B" });
     try {
       run.dispatch("ci_green", { sha: "A" });
@@ -259,7 +250,8 @@ const scenarios = {
       console.log(`\n[stale-event] correctly rejected: ${error.message}`);
       run.print("stale result rejected; state unchanged");
     }
-    run.dispatch("ci_green", { sha: "B" }).dispatch("final_review_stable", { sha: "B" })
+    run
+      .dispatch("ci_green", { sha: "B" })
       .dispatch("convergence_confirmed", { sha: "B" });
   },
   quarantine() {

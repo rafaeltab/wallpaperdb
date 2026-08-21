@@ -8,6 +8,17 @@ import { NatsConnectionManager } from './connections/nats.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
+import { ColorExtractionProcessor } from './services/color-extraction-processor.js';
+import { EventsService } from './services/events.service.js';
+import { HsvEmbeddingStrategy } from './services/hsv-embedding-strategy.js';
+import { MinioImageReader } from './services/minio-image-reader.js';
+import {
+  COLORS_EXTRACTED_PUBLISHER,
+  COLOR_EXTRACTION_USE_CASE,
+  HISTOGRAM_PROVIDER,
+  IMAGE_READER,
+} from './services/ports.js';
+import { SharpHistogramProvider } from './services/sharp-histogram-provider.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -27,6 +38,16 @@ export async function createApp(
   options?: { logger?: boolean; enableOtel?: boolean }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
+  container.registerSingleton(MinioConnection, MinioConnection);
+  container.registerSingleton(NatsConnectionManager, NatsConnectionManager);
+  container.register(HsvEmbeddingStrategy, { useClass: HsvEmbeddingStrategy });
+  container.register(IMAGE_READER, { useClass: MinioImageReader });
+  container.register(HISTOGRAM_PROVIDER, { useClass: SharpHistogramProvider });
+  container.register(COLORS_EXTRACTED_PUBLISHER, { useClass: EventsService });
+  container.register(COLOR_EXTRACTION_USE_CASE, { useClass: ColorExtractionProcessor });
+  container.register(WallpaperUploadedConsumerService, {
+    useClass: WallpaperUploadedConsumerService,
+  });
 
   const fastify = Fastify({
     logger:

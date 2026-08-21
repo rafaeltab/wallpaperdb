@@ -1,7 +1,11 @@
 import { recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
 import { OpenSearchConnection } from '../connections/opensearch.js';
-import { wallpapersIndexMapping } from '../opensearch/mappings.js';
+import {
+  gatewayIndexDefinitions,
+  type IndexDefinition,
+  wallpaperIndexDefinition,
+} from '../opensearch/index-definitions.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
 
 /**
@@ -9,20 +13,51 @@ import { GatewayAttributes } from '../telemetry/attributes.js';
  */
 @singleton()
 export class IndexManagerService {
-  private readonly indexName = 'wallpapers';
+  private readonly definitions = new Map(
+    gatewayIndexDefinitions.map((definition) => [definition.key, definition])
+  );
 
   constructor(
     @inject(OpenSearchConnection) private readonly openSearchConnection: OpenSearchConnection
   ) {}
 
   /**
-   * Create the wallpapers index with mappings
+   * Register an independently managed projected index.
    */
-  async createIndex(): Promise<void> {
+  register(definition: IndexDefinition): void {
+    if (this.definitions.has(definition.key)) {
+      throw new Error(`Index definition already registered: ${definition.key}`);
+    }
+    if ([...this.definitions.values()].some(({ name }) => name === definition.name)) {
+      throw new Error(`Index name already registered: ${definition.name}`);
+    }
+
+    this.definitions.set(definition.key, definition);
+  }
+
+  unregister(key: string): void {
+    this.definitions.delete(key);
+  }
+
+  /**
+   * Create all registered indexes with their mappings.
+   */
+  async createIndex(key?: string): Promise<void> {
+    if (key) {
+      await this.createDefinition(this.getDefinition(key));
+      return;
+    }
+
+    for (const definition of this.definitions.values()) {
+      await this.createDefinition(definition);
+    }
+  }
+
+  private async createDefinition(definition: IndexDefinition): Promise<void> {
     return await withSpan(
       'opensearch.index.create',
       {
-        [GatewayAttributes.OPENSEARCH_INDEX]: this.indexName,
+        [GatewayAttributes.OPENSEARCH_INDEX]: definition.name,
         [GatewayAttributes.OPENSEARCH_OPERATION]: 'create_index',
       },
       async (span) => {
@@ -30,7 +65,7 @@ export class IndexManagerService {
         const client = this.openSearchConnection.getClient();
 
         const exists = await client.indices.exists({
-          index: this.indexName,
+          index: definition.name,
         });
 
         if (exists.body) {
@@ -39,11 +74,11 @@ export class IndexManagerService {
         }
 
         await client.indices.create({
-          index: this.indexName,
+          index: definition.name,
           body: {
-            settings: wallpapersIndexMapping.settings,
+            settings: definition.mapping.settings,
             mappings: {
-              properties: wallpapersIndexMapping.properties,
+              properties: definition.mapping.properties,
             },
           },
         });
@@ -51,9 +86,10 @@ export class IndexManagerService {
         span.setAttribute('index.already_exists', false);
         const durationMs = Date.now() - startTime;
         recordCounter('opensearch.index.created.total', 1, {
-          [GatewayAttributes.OPENSEARCH_INDEX]: this.indexName,
+          [GatewayAttributes.OPENSEARCH_INDEX]: definition.name,
         });
         recordHistogram('opensearch.index.operation_duration_ms', durationMs, {
+          [GatewayAttributes.OPENSEARCH_INDEX]: definition.name,
           [GatewayAttributes.OPENSEARCH_OPERATION]: 'create_index',
         });
       }
@@ -61,13 +97,24 @@ export class IndexManagerService {
   }
 
   /**
-   * Delete the wallpapers index (for testing)
+   * Delete all registered indexes (for testing).
    */
-  async deleteIndex(): Promise<void> {
+  async deleteIndex(key?: string): Promise<void> {
+    if (key) {
+      await this.deleteDefinition(this.getDefinition(key));
+      return;
+    }
+
+    for (const definition of this.definitions.values()) {
+      await this.deleteDefinition(definition);
+    }
+  }
+
+  private async deleteDefinition(definition: IndexDefinition): Promise<void> {
     return await withSpan(
       'opensearch.index.delete',
       {
-        [GatewayAttributes.OPENSEARCH_INDEX]: this.indexName,
+        [GatewayAttributes.OPENSEARCH_INDEX]: definition.name,
         [GatewayAttributes.OPENSEARCH_OPERATION]: 'delete_index',
       },
       async (span) => {
@@ -75,7 +122,7 @@ export class IndexManagerService {
         const client = this.openSearchConnection.getClient();
 
         const exists = await client.indices.exists({
-          index: this.indexName,
+          index: definition.name,
         });
 
         if (!exists.body) {
@@ -84,12 +131,13 @@ export class IndexManagerService {
         }
 
         await client.indices.delete({
-          index: this.indexName,
+          index: definition.name,
         });
 
         span.setAttribute('index.existed', true);
         const durationMs = Date.now() - startTime;
         recordHistogram('opensearch.index.operation_duration_ms', durationMs, {
+          [GatewayAttributes.OPENSEARCH_INDEX]: definition.name,
           [GatewayAttributes.OPENSEARCH_OPERATION]: 'delete_index',
         });
       }
@@ -97,9 +145,18 @@ export class IndexManagerService {
   }
 
   /**
-   * Get the index name
+   * Get the physical index name for a registered projection.
    */
-  getIndexName(): string {
-    return this.indexName;
+  getIndexName(key = wallpaperIndexDefinition.key): string {
+    return this.getDefinition(key).name;
+  }
+
+  private getDefinition(key: string): IndexDefinition {
+    const definition = this.definitions.get(key);
+    if (!definition) {
+      throw new Error(`Unknown index definition: ${key}`);
+    }
+
+    return definition;
   }
 }

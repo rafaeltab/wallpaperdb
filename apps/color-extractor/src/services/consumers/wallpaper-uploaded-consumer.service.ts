@@ -13,7 +13,18 @@ import { NatsConnectionManager } from '../../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { z } from 'zod';
 import type { Config } from '../../config.js';
-import { ColorExtractionProcessor } from '../color-extraction-processor.js';
+import { COLOR_EXTRACTION_USE_CASE, type ColorExtractionUseCase } from '../ports.js';
+
+export async function processWallpaperUploaded(
+  useCase: ColorExtractionUseCase,
+  event: WallpaperUploadedEvent
+): Promise<boolean> {
+  if (event.wallpaper.fileType !== 'image') {
+    return false;
+  }
+  await useCase.extractColors(event.wallpaper);
+  return true;
+}
 
 @injectable()
 export class WallpaperUploadedConsumerService extends BaseEventConsumer<
@@ -24,7 +35,7 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
   protected readonly eventType = 'wallpaper.uploaded';
 
   constructor(
-    @inject(ColorExtractionProcessor) private readonly processor: ColorExtractionProcessor,
+    @inject(COLOR_EXTRACTION_USE_CASE) private readonly processor: ColorExtractionUseCase,
     @inject(NatsConnectionManager) natsConnection: NatsConnectionManager,
     @inject('config') config: Config
   ) {
@@ -44,17 +55,16 @@ export class WallpaperUploadedConsumerService extends BaseEventConsumer<
       `[ColorExtractorConsumer] Processing event ${event.eventId} for wallpaper ${event.wallpaper.id}`
     );
 
-    if (event.wallpaper.fileType !== 'image') {
-      console.log(
-        `[ColorExtractorConsumer] Skipping non-image file ${event.wallpaper.id} (type: ${event.wallpaper.fileType})`
-      );
-      return;
-    }
-
     try {
       const startTime = Date.now();
 
-      await this.processor.extractColors(event.wallpaper);
+      const processed = await processWallpaperUploaded(this.processor, event);
+      if (!processed) {
+        console.log(
+          `[ColorExtractorConsumer] Skipping non-image file ${event.wallpaper.id} (type: ${event.wallpaper.fileType})`
+        );
+        return;
+      }
 
       const durationMs = Date.now() - startTime;
 

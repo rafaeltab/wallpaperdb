@@ -56,4 +56,8 @@ If you find improvements to make:
 
 If the code is already clean and well-structured, do nothing.
 
+# COMPLETION
+
+If the issue was completed close the issue.
+
 Once complete, output <promise>COMPLETE</promise>.

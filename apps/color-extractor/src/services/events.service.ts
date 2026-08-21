@@ -2,9 +2,10 @@ import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
 import { WallpaperColorsExtractedPublisher } from './publishers/wallpaper-colors-extracted.publisher.js';
+import type { ColorsExtractedPublisher } from './ports.js';
 
 @injectable()
-export class EventsService {
+export class EventsService implements ColorsExtractedPublisher {
   private publisher: WallpaperColorsExtractedPublisher | null = null;
 
   constructor(

@@ -1,13 +1,18 @@
-import { inject, injectable } from 'tsyringe';
-import { MinioHistogramProvider } from './minio-histogram-provider.js';
-import { EventsService } from './events.service.js';
 import type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
+import { inject, injectable } from 'tsyringe';
+import {
+  COLORS_EXTRACTED_PUBLISHER,
+  HISTOGRAM_PROVIDER,
+  type ColorsExtractedPublisher,
+  type ColorExtractionUseCase,
+  type ImageHistogramProvider,
+} from './ports.js';
 
 @injectable()
-export class ColorExtractionProcessor {
+export class ColorExtractionProcessor implements ColorExtractionUseCase {
   constructor(
-    @inject(MinioHistogramProvider) private readonly histogramProvider: MinioHistogramProvider,
-    @inject(EventsService) private readonly events: EventsService
+    @inject(HISTOGRAM_PROVIDER) private readonly histogramProvider: ImageHistogramProvider,
+    @inject(COLORS_EXTRACTED_PUBLISHER) private readonly events: ColorsExtractedPublisher
   ) {}
 
   async extractColors(wallpaper: WallpaperUploadedEvent['wallpaper']): Promise<void> {

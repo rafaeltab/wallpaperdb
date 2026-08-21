@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,43 +32,37 @@ describe("getDockerProjectName", () => {
 });
 
 describe("prepareTurboCacheDirectory", () => {
-  it("pre-creates one cache shared by linked worktrees", () => {
+  it("pre-creates the shared cache under XDG_CACHE_HOME", () => {
     const fixtureDir = mkdtempSync(join(tmpdir(), "wallpaperdb-turbo-cache-"));
-    const repository = join(fixtureDir, "repository");
-    const worktree = join(fixtureDir, "worktree");
 
     try {
-      execFileSync("git", ["init", "--quiet", repository]);
-      execFileSync("git", [
-        "-C",
-        repository,
-        "-c",
-        "user.name=Test",
-        "-c",
-        "user.email=test@example.com",
-        "commit",
-        "--allow-empty",
-        "--quiet",
-        "-m",
-        "initial",
-      ]);
-      execFileSync("git", [
-        "-C",
-        repository,
-        "worktree",
-        "add",
-        "--quiet",
-        "-b",
-        "cache-test",
-        worktree,
-      ]);
+      const cacheDir = prepareTurboCacheDirectory({
+        env: { XDG_CACHE_HOME: fixtureDir },
+        homeDir: join(fixtureDir, "home"),
+      });
 
-      const repositoryCache = prepareTurboCacheDirectory(repository);
-      const worktreeCache = prepareTurboCacheDirectory(worktree);
+      expect(cacheDir).toBe(join(fixtureDir, "wallpaperdb", "turbo"));
+      expect(existsSync(cacheDir)).toBe(true);
+    } finally {
+      rmSync(fixtureDir, { recursive: true, force: true });
+    }
+  });
 
-      expect(worktreeCache).toBe(repositoryCache);
-      expect(repositoryCache).toBe(join(repository, ".git", "sandcastle", "turbo-cache"));
-      expect(existsSync(repositoryCache)).toBe(true);
+  it.each([
+    ["unset", undefined],
+    ["relative", "relative/cache"],
+  ])("falls back to the user cache directory for an %s XDG_CACHE_HOME", (_case, xdgCacheHome) => {
+    const fixtureDir = mkdtempSync(join(tmpdir(), "wallpaperdb-turbo-cache-"));
+    const homeDir = join(fixtureDir, "home");
+
+    try {
+      const cacheDir = prepareTurboCacheDirectory({
+        env: { XDG_CACHE_HOME: xdgCacheHome },
+        homeDir,
+      });
+
+      expect(cacheDir).toBe(join(homeDir, ".cache", "wallpaperdb", "turbo"));
+      expect(existsSync(cacheDir)).toBe(true);
     } finally {
       rmSync(fixtureDir, { recursive: true, force: true });
     }

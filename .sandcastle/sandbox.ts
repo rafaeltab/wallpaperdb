@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 
@@ -55,15 +56,18 @@ export function createSandboxResources(config: SandcastleConfig) {
   return { sandboxProvider, hooks };
 }
 
-export function prepareTurboCacheDirectory(cwd = process.cwd()): string {
-  // The common Git directory is shared by every linked worktree, so planner,
-  // implementer, and reviewer sandboxes all reuse one project-local cache.
-  const gitCommonDir = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  }).trim();
-  const cacheDir = resolve(gitCommonDir, "sandcastle", "turbo-cache");
+type TurboCacheDirectoryOptions = {
+  env?: NodeJS.ProcessEnv;
+  homeDir?: string;
+};
+
+export function prepareTurboCacheDirectory(options: TurboCacheDirectoryOptions = {}): string {
+  const { env = process.env, homeDir = homedir() } = options;
+  const configuredCacheHome = env.XDG_CACHE_HOME;
+  const cacheHome = configuredCacheHome && isAbsolute(configuredCacheHome)
+    ? configuredCacheHome
+    : join(homeDir, ".cache");
+  const cacheDir = join(cacheHome, "wallpaperdb", "turbo");
   mkdirSync(cacheDir, { recursive: true });
   return cacheDir;
 }

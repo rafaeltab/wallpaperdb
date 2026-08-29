@@ -89,7 +89,7 @@ describe('ProfileBootstrap', () => {
     await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toBeUndefined());
   });
 
-  it('isolates account changes from the previous user session', async () => {
+  it('isolates User changes from the previous session', async () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(profile);
     const rendered = renderBootstrap();
     await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));

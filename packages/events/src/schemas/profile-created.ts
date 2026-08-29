@@ -10,6 +10,7 @@ export const ProfileCreatedEventSchema = z.object({
     id: z.string().min(1),
     displayName: z.string().min(1),
     handle: z.string().min(1),
+    claimGeneration: z.number().int().positive(),
     biographyMarkdown: z.string(),
     pictureAssetId: z.string().min(1).nullable(),
     version: z.number().int().positive(),

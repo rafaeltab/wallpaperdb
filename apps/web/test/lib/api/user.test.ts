@@ -68,7 +68,7 @@ describe('User API client', () => {
     expect(error).toMatchObject({ status: 503, message: 'Clerk is unavailable' });
   });
 
-  it('rejects malformed and cross-account Profile responses', async () => {
+  it('rejects malformed and cross-User Profile responses', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'user_123' }), { status: 200 }))
@@ -79,7 +79,7 @@ describe('User API client', () => {
     await expect(client.ensureProfile()).rejects.toMatchObject({ status: 502 });
     await expect(client.ensureProfile({ expectedProfileId: 'user_456' })).rejects.toMatchObject({
       status: 502,
-      message: 'User API returned a Profile for another account',
+      message: 'User API returned a Profile for another User',
     });
   });
 });

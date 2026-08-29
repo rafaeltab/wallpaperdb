@@ -8,6 +8,13 @@
       "when": 1783888681699,
       "tag": "0000_parallel_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788037371210,
+      "tag": "0001_wild_carnage",
+      "breakpoints": true
     }
   ]
 }

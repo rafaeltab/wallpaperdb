@@ -22,6 +22,7 @@ describe("Event Schemas", () => {
         id: "user_123",
         displayName: "Ada Lovelace",
         handle: "ada-lovelace",
+        claimGeneration: 1,
         biographyMarkdown: "",
         pictureAssetId: null,
         version: 1,

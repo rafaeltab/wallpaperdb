@@ -19,7 +19,7 @@
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
-        worktree-remove sandcastle-check-types sandcastle-stream-smoke sandcastle-test \
+        worktree-remove sandcastle-check-types \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force clean help
 
 # ─── Worktree-Aware Variables ────────────────────────────────────────────────
@@ -210,8 +210,6 @@ help:
 	@echo "Worktree:"
 	@echo "  make worktree-remove - Tear down this worktree's containers and release its slot"
 	@echo "  make sandcastle-check-types - Type check the Sandcastle runner"
-	@echo "  make sandcastle-stream-smoke - Exercise agent text, bash, and file-read streaming"
-	@echo "  make sandcastle-test - Run Sandcastle runner unit tests"
 	@echo ""
 	@echo "All Services:"
 	@echo "  make dev        - Start all services in development mode"
@@ -761,12 +759,6 @@ worktree-remove:
 sandcastle-check-types:
 	@pnpm sandcastle:check-types
 
-sandcastle-stream-smoke:
-	@pnpm sandcastle:stream-smoke
-
-sandcastle-test:
-	@pnpm sandcastle:test
-
 # All services commands
 dev:
 	@scripts/check-infra.sh || \
@@ -826,7 +818,7 @@ check-types-force:
 	@turbo run check-types --force
 
 ci:
-	@$(MAKE) sandcastle-check-types sandcastle-test
+	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally..."
 	@start_time=$$(date +%s); \
 	turbo run build lint check-types test:unit test:integration && \
@@ -839,7 +831,7 @@ ci:
 	echo "✓ Coverage report: coverage/lcov.info"
 
 ci-force:
-	@$(MAKE) sandcastle-check-types sandcastle-test
+	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally (no cache)..."
 	@start_time=$$(date +%s); \
 	turbo run build lint check-types test:unit test:integration --force && \

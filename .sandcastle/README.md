@@ -42,30 +42,6 @@ pnpm exec sandcastle docker build-image --image-name wallpaperdb-sandcastle:open
 pnpm sandcastle
 ```
 
-## Diagnose agent output streaming
-
-Run the reusable-sandbox implementer path without selecting or implementing an issue:
-
-```sh
-make sandcastle-stream-smoke
-```
-
-The smoke agent only prints a greeting, runs one `printf` command, reads
-`.sandcastle/CODING_STANDARDS.md`, and emits a completion marker. It does not edit files, commit,
-access GitHub, or start the planner/reviewer phases.
-
-To include every raw OpenCode JSON line in the terminal, use:
-
-```sh
-SANDCASTLE_STREAM_VERBOSE=true make sandcastle-stream-smoke
-```
-
-Raw mode is intentionally noisy. It distinguishes an agent/transport failure from a Sandcastle
-parser or terminal-display failure. Once upstream issue
-[mattpocock/sandcastle#966](https://github.com/mattpocock/sandcastle/issues/966) is fixed and this
-project upgrades, run the smoke test in normal mode and remove the reusable-sandbox verbose
-workaround after parsed agent text and tool calls render correctly.
-
 By default it runs up to 10 iterations. Override with:
 
 ```sh
@@ -75,6 +51,11 @@ SANDCASTLE_MAX_ITERATIONS=1 pnpm sandcastle
 OpenCode defaults to `openai/gpt-5.6` with the `medium` reasoning variant. Override either setting with `SANDCASTLE_OPENCODE_MODEL` or `SANDCASTLE_OPENCODE_VARIANT`.
 
 Sandcastle looks for open GitHub issues labeled `Sandcastle`. Each iteration first runs an OpenCode planning agent, which selects one actionable issue and returns a detailed plan. The runner then creates the deterministic `sandcastle/issue-<number>` branch and starts a separate OpenCode implementation agent with that plan. Only after implementation commits exist does a reviewer agent review, fix, and verify the result on the same branch. The prompts require `make ci` to run inside the Docker sandbox before closing the issue. Only after review completes does the runner push the branch and create a pull request against the repository default branch. All phases and iterations run sequentially.
+
+Implementer and reviewer runs temporarily stream raw OpenCode JSON events so their progress remains
+visible. Planner output stays in Sandcastle's readable normal mode. Remove the verbose workaround
+after [mattpocock/sandcastle#966](https://github.com/mattpocock/sandcastle/issues/966) is fixed and
+this project upgrades to a release containing the fix.
 
 At the end of every iteration, Sandcastle also cleans Docker resources for that worktree. Cleanup uses the same `COMPOSE_PROJECT_NAME` derived by `scripts/setup-worktree.mjs`, runs `docker compose down --volumes --remove-orphans` for both compose files, then removes any remaining containers, networks, and volumes whose names include that project name.
 

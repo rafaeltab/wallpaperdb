@@ -42,6 +42,30 @@ pnpm exec sandcastle docker build-image --image-name wallpaperdb-sandcastle:open
 pnpm sandcastle
 ```
 
+By default it runs up to 10 iterations. Override with:
+
+```sh
+SANDCASTLE_MAX_ITERATIONS=1 pnpm sandcastle
+```
+
+OpenCode defaults to `openai/gpt-5.6` with the `medium` reasoning variant. Override either setting with `SANDCASTLE_OPENCODE_MODEL` or `SANDCASTLE_OPENCODE_VARIANT`.
+
+Sandcastle looks for open GitHub issues labeled `Sandcastle`. Each iteration first runs an OpenCode planning agent, which selects one actionable issue and returns a detailed plan. The runner then creates the deterministic `sandcastle/issue-<number>` branch and starts a separate OpenCode implementation agent with that plan. Only after implementation commits exist does a reviewer agent review, fix, and verify the result on the same branch. The prompts require `make ci` to run inside the Docker sandbox before closing the issue. Only after review completes does the runner push the branch and create a pull request against the repository default branch. All phases and iterations run sequentially.
+
+At the end of every iteration, Sandcastle also cleans Docker resources for that worktree. Cleanup uses the same `COMPOSE_PROJECT_NAME` derived by `scripts/setup-worktree.mjs`, runs `docker compose down --volumes --remove-orphans` for both compose files, then removes any remaining containers, networks, and volumes whose names include that project name.
+
+Disable Docker cleanup with:
+
+```sh
+SANDCASTLE_DOCKER_CLEANUP=false pnpm sandcastle
+```
+
+Override the pull request base branch with:
+
+```sh
+SANDCASTLE_PR_BASE_BRANCH=my-base pnpm sandcastle
+```
+
 ## Diagnose agent output streaming
 
 Run the reusable-sandbox implementer path without selecting or implementing an issue:
@@ -68,27 +92,3 @@ workaround after parsed agent text and tool calls render correctly.
 
 The normal workflow temporarily uses this noisy raw mode for implementer and reviewer runs so
 their progress remains visible. Planner output stays in Sandcastle's readable normal mode.
-
-By default it runs up to 10 iterations. Override with:
-
-```sh
-SANDCASTLE_MAX_ITERATIONS=1 pnpm sandcastle
-```
-
-OpenCode defaults to `openai/gpt-5.6` with the `medium` reasoning variant. Override either setting with `SANDCASTLE_OPENCODE_MODEL` or `SANDCASTLE_OPENCODE_VARIANT`.
-
-Sandcastle looks for open GitHub issues labeled `Sandcastle`. Each iteration first runs an OpenCode planning agent, which selects one actionable issue and returns a detailed plan. The runner then creates the deterministic `sandcastle/issue-<number>` branch and starts a separate OpenCode implementation agent with that plan. Only after implementation commits exist does a reviewer agent review, fix, and verify the result on the same branch. The prompts require `make ci` to run inside the Docker sandbox before closing the issue. Only after review completes does the runner push the branch and create a pull request against the repository default branch. All phases and iterations run sequentially.
-
-At the end of every iteration, Sandcastle also cleans Docker resources for that worktree. Cleanup uses the same `COMPOSE_PROJECT_NAME` derived by `scripts/setup-worktree.mjs`, runs `docker compose down --volumes --remove-orphans` for both compose files, then removes any remaining containers, networks, and volumes whose names include that project name.
-
-Disable Docker cleanup with:
-
-```sh
-SANDCASTLE_DOCKER_CLEANUP=false pnpm sandcastle
-```
-
-Override the pull request base branch with:
-
-```sh
-SANDCASTLE_PR_BASE_BRANCH=my-base pnpm sandcastle
-```

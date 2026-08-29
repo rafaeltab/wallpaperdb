@@ -209,6 +209,8 @@ help:
 	@echo ""
 	@echo "Worktree:"
 	@echo "  make worktree-remove - Tear down this worktree's containers and release its slot"
+	@echo ""
+	@echo "Sandcastle:"
 	@echo "  make sandcastle-check-types - Type check the Sandcastle runner"
 	@echo "  make sandcastle-stream-smoke - Exercise agent text, bash, and file-read streaming"
 	@echo "  make sandcastle-test - Run Sandcastle runner unit tests"
@@ -755,9 +757,11 @@ openapi-verify:
 		exit 1; \
 	fi
 
+# Worktree commands
 worktree-remove:
 	@node scripts/teardown-worktree.mjs
 
+# Sandcastle commands
 sandcastle-check-types:
 	@pnpm sandcastle:check-types
 

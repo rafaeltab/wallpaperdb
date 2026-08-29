@@ -1,15 +1,16 @@
 # @wallpaperdb/user
 
-Manages user identities within WallpaperDB by processing Clerk webhook events for sign-ups and profile changes, persisting user data to PostgreSQL, and publishing user events via NATS for downstream consumers.
+Owns WallpaperDB Profiles. It verifies Clerk-authenticated Users, persists public Profile state in PostgreSQL, and records typed Profile events for downstream consumers.
 
 ## Key Capabilities
 
-- Receives and processes Clerk webhooks for user lifecycle events (sign-up, profile update, deletion)
-- Persists user profiles and identity data to a dedicated PostgreSQL database
-- Publishes domain events to NATS when user state changes, enabling downstream services to react without direct coupling
+- Idempotently creates or returns the signed-in User's Profile through `POST /profile/me/ensure`
+- Derives unique, configurable Handles from Clerk identity data or a generated fallback
+- Atomically persists Profile state, Handle claims, and typed outbox events
 - Provides health and readiness endpoints for infrastructure monitoring
 
 ## Technology Choices
 
-- **Clerk** as the external identity provider — the service consumes webhook events rather than managing authentication itself
+- **Clerk** as the external identity provider and JWT authority; Clerk user IDs are Profile IDs
+- **PostgreSQL** as the authority for Profile state and case-insensitive Handle claims
 - **TSyringe** for dependency injection, following the same pattern as other WallpaperDB services

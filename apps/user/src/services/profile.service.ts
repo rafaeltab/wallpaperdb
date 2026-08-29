@@ -18,9 +18,14 @@ import {
 const RESERVED_HANDLES = new Set([
   'admin',
   'api',
+  'docs',
   'help',
+  'health',
   'login',
+  'openapi',
   'profile',
+  'profiles',
+  'ready',
   'security',
   'settings',
   'sign-in',
@@ -79,6 +84,7 @@ export class ProfileService {
       const suffix = attempt === 0 ? '' : `-${ulid().slice(-6).toLowerCase()}`;
       const stemLength = this.config.profileHandleMaxLength - suffix.length;
       const handle = `${base.slice(0, stemLength).replace(/-+$/g, '')}${suffix}`;
+      if (RESERVED_HANDLES.has(handle)) continue;
 
       try {
         return await this.database.getClient().db.transaction(async (tx) => {

@@ -6,6 +6,7 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { loadConfig } from "./config.js";
 import { cleanupDockerResources } from "./docker-resources.js";
 import { createPullRequest } from "./github.js";
+import { plannerLogging, reusableSandboxLogging } from "./logging.js";
 import { parsePlan } from "./plan.js";
 import { createSandboxResources } from "./sandbox.js";
 
@@ -13,8 +14,6 @@ import type { Issue } from "./plan.js";
 
 const config = loadConfig();
 const { sandboxProvider, hooks } = createSandboxResources(config);
-const streamAgentOutputToTerminal = true;
-const logging = streamAgentOutputToTerminal ? ({ type: "stdout" } as const) : undefined;
 
 for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
   console.log(`\n=== Sandcastle iteration ${iteration}/${config.maxIterations} ===\n`);
@@ -27,7 +26,7 @@ for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
     agent: sandcastle.opencode(config.model, { agent: "plan", variant: config.modelVariant }),
     promptFile: "./.sandcastle/plan-prompt.md",
     output: sandcastle.Output.string({ tag: "plan" }),
-    logging,
+    logging: plannerLogging,
     idleTimeoutSeconds: 1_200,
     completionTimeoutSeconds: 120,
   });
@@ -73,7 +72,7 @@ async function handleIssue(issue: Issue) {
       agent: sandcastle.opencode(config.model, { agent: "build", variant: config.modelVariant }),
       promptFile: "./.sandcastle/implement-prompt.md",
       promptArgs,
-      logging,
+      logging: reusableSandboxLogging,
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });
@@ -92,7 +91,7 @@ async function handleIssue(issue: Issue) {
       agent: sandcastle.opencode(config.model, { agent: "build", variant: config.modelVariant }),
       promptFile: "./.sandcastle/review-prompt.md",
       promptArgs,
-      logging,
+      logging: reusableSandboxLogging,
       idleTimeoutSeconds: 1_200,
       completionTimeoutSeconds: 120,
     });

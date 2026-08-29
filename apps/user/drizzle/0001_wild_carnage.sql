@@ -1,0 +1,1 @@
+ALTER TABLE "handle_claims" ADD COLUMN "claim_generation" bigserial NOT NULL;

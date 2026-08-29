@@ -66,7 +66,7 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
         throw new UserApiError('User API returned a malformed Profile', 502);
       }
       if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
-        throw new UserApiError('User API returned a Profile for another account', 502);
+        throw new UserApiError('User API returned a Profile for another User', 502);
       }
       return profile;
     },

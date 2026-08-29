@@ -18,10 +18,16 @@ import {
 const RESERVED_HANDLES = new Set([
   'admin',
   'api',
+  'color-extractor',
+  'documentation',
   'docs',
+  'gateway',
+  'graphql',
   'help',
   'health',
+  'ingestor',
   'login',
+  'media',
   'openapi',
   'profile',
   'profiles',
@@ -30,7 +36,13 @@ const RESERVED_HANDLES = new Set([
   'settings',
   'sign-in',
   'sign-up',
+  'sso-callback',
   'support',
+  'tags',
+  'upload',
+  'user',
+  'variant-generator',
+  'wallpapers',
 ]);
 const FALLBACK_ADJECTIVES = ['quiet', 'bright', 'silver', 'wild'];
 const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
@@ -96,7 +108,10 @@ export class ProfileService {
             .insert(profiles)
             .values({ id: userId, displayName, handle, version: 1, createdAt: now, updatedAt: now })
             .returning();
-          await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' });
+          const [claim] = await tx
+            .insert(handleClaims)
+            .values({ handle, profileId: userId, kind: 'profile' })
+            .returning();
 
           const event: ProfileCreatedEvent = {
             eventId: `evt_${ulid()}`,
@@ -106,6 +121,7 @@ export class ProfileService {
               id: profile.id,
               displayName: profile.displayName,
               handle: profile.handle,
+              claimGeneration: claim.claimGeneration,
               biographyMarkdown: profile.biographyMarkdown,
               pictureAssetId: profile.pictureAssetId,
               version: profile.version,

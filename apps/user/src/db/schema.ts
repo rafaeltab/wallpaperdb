@@ -1,6 +1,15 @@
 import type { ProfileCreatedEvent } from '@wallpaperdb/events';
 import { sql } from 'drizzle-orm';
-import { index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  bigserial,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 export const profiles = pgTable(
   'profiles',
@@ -26,6 +35,7 @@ export const handleClaims = pgTable(
       .notNull()
       .references(() => profiles.id),
     kind: text('kind').notNull(),
+    claimGeneration: bigserial('claim_generation', { mode: 'number' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

@@ -23,7 +23,7 @@ make user-dev
 
 ### Core Functionality
 - **Authenticated Profile creation** through an idempotent ensure command
-- **Unique Handle allocation** with normalization, reserved-name protection, and collision retries
+- **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
 - **Health checks** for database and message queue connectivity
 
@@ -54,6 +54,14 @@ profiles {
   version: integer
   createdAt: timestamp
   updatedAt: timestamp
+}
+
+handleClaims {
+  handle: text                // Case-insensitively unique claim
+  profileId: text
+  kind: text
+  claimGeneration: bigserial // Monotonic projection conflict tiebreaker
+  createdAt: timestamp
 }
 ```
 

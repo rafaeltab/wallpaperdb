@@ -18,10 +18,11 @@ import {
 } from '../src/services/clerk-identity.service.js';
 import { ProfileService } from '../src/services/profile.service.js';
 
-const migrationPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  '../drizzle/0000_parallel_shocker.sql'
-);
+const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
+const migrationPaths = [
+  join(migrationDirectory, '0000_parallel_shocker.sql'),
+  join(migrationDirectory, '0001_wild_carnage.sql'),
+];
 
 class FakeIdentityProvider implements IdentityProvider {
   readonly identities = new Map<string, ExternalIdentity>();
@@ -46,7 +47,9 @@ describe('POST /profile/me/ensure', () => {
     postgresContainer = await new PostgreSqlContainer('postgres:16-alpine').start();
     const databaseUrl = postgresContainer.getConnectionUri();
     sql = postgres(databaseUrl, { max: 10 });
-    await sql.unsafe(readFileSync(migrationPath, 'utf8'));
+    for (const migrationPath of migrationPaths) {
+      await sql.unsafe(readFileSync(migrationPath, 'utf8'));
+    }
     config = {
       port: 3009,
       nodeEnv: 'test',
@@ -115,8 +118,15 @@ describe('POST /profile/me/ensure', () => {
     const events = await sql`select payload from outbox_events`;
     expect(events[0].payload).toMatchObject({
       eventType: 'profile.created',
-      profile: { id: 'user_1', biographyMarkdown: '', pictureAssetId: null },
+      profile: {
+        id: 'user_1',
+        claimGeneration: expect.any(Number),
+        biographyMarkdown: '',
+        pictureAssetId: null,
+      },
     });
+    const claims = await sql`select claim_generation from handle_claims`;
+    expect(Number(claims[0].claim_generation)).toBeGreaterThan(0);
   });
 
   it('returns the existing profile without creating another event', async () => {
@@ -150,6 +160,10 @@ describe('POST /profile/me/ensure', () => {
     expect(new Set(handles).size).toBe(2);
     expect(handles).toContain('same-name');
     expect(handles.find((handle) => handle !== 'same-name')).toMatch(/^same-name-[a-z0-9]{6}$/);
+    const claims = await sql`select claim_generation from handle_claims order by claim_generation`;
+    expect(Number(claims[1].claim_generation)).toBeGreaterThan(
+      Number(claims[0].claim_generation)
+    );
   });
 
   it('avoids reserved handles and respects the configured maximum length', async () => {
@@ -163,10 +177,24 @@ describe('POST /profile/me/ensure', () => {
       firstName: null,
       lastName: null,
     });
+    identities.identities.set('route', {
+      displayName: 'GraphQL',
+      firstName: null,
+      lastName: null,
+    });
+    identities.identities.set('api', {
+      displayName: 'Tags',
+      firstName: null,
+      lastName: null,
+    });
     const reserved = await service().ensure('reserved');
     const long = await service().ensure('long');
+    const route = await service().ensure('route');
+    const api = await service().ensure('api');
     expect(reserved.handle).toBe('admin-profile');
     expect(long.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
+    expect(route.handle).toBe('graphql-profile');
+    expect(api.handle).toBe('tags-profile');
   });
 
   it('does not recreate a reserved handle when applying the configured maximum length', async () => {

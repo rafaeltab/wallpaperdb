@@ -42,6 +42,30 @@ pnpm exec sandcastle docker build-image --image-name wallpaperdb-sandcastle:open
 pnpm sandcastle
 ```
 
+## Diagnose agent output streaming
+
+Run the reusable-sandbox implementer path without selecting or implementing an issue:
+
+```sh
+make sandcastle-stream-smoke
+```
+
+The smoke agent only prints a greeting, runs one `printf` command, reads
+`.sandcastle/CODING_STANDARDS.md`, and emits a completion marker. It does not edit files, commit,
+access GitHub, or start the planner/reviewer phases.
+
+To include every raw OpenCode JSON line in the terminal, use:
+
+```sh
+SANDCASTLE_STREAM_VERBOSE=true make sandcastle-stream-smoke
+```
+
+Raw mode is intentionally noisy. It distinguishes an agent/transport failure from a Sandcastle
+parser or terminal-display failure. Once upstream issue
+[mattpocock/sandcastle#966](https://github.com/mattpocock/sandcastle/issues/966) is fixed and this
+project upgrades, run the smoke test in normal mode and remove the reusable-sandbox verbose
+workaround after parsed agent text and tool calls render correctly.
+
 By default it runs up to 10 iterations. Override with:
 
 ```sh

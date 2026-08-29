@@ -66,6 +66,9 @@ parser or terminal-display failure. Once upstream issue
 project upgrades, run the smoke test in normal mode and remove the reusable-sandbox verbose
 workaround after parsed agent text and tool calls render correctly.
 
+The normal workflow temporarily uses this noisy raw mode for implementer and reviewer runs so
+their progress remains visible. Planner output stays in Sandcastle's readable normal mode.
+
 By default it runs up to 10 iterations. Override with:
 
 ```sh

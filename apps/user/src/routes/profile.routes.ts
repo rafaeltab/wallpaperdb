@@ -11,10 +11,12 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
       return reply.code(200).send(profile);
     } catch (error) {
       if (error instanceof IdentityUnavailableError) {
-        return reply.code(503).send({
+        return reply.code(503).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/identity-unavailable',
           title: 'Identity service unavailable',
           status: 503,
+          detail: 'Clerk identity lookup failed',
+          instance: request.url,
         });
       }
       throw error;

@@ -169,6 +169,24 @@ describe('POST /profile/me/ensure', () => {
     expect(long.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
   });
 
+  it('does not recreate a reserved handle when applying the configured maximum length', async () => {
+    identities.identities.set('reserved', {
+      displayName: 'Security',
+      firstName: null,
+      lastName: null,
+    });
+    const previousMaximum = config.profileHandleMaxLength;
+    config.profileHandleMaxLength = 8;
+
+    try {
+      const profile = await service().ensure('reserved');
+      expect(profile.handle).not.toBe('security');
+      expect(profile.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
+    } finally {
+      config.profileHandleMaxLength = previousMaximum;
+    }
+  });
+
   it('is idempotent under concurrent ensures for the same user', async () => {
     identities.identities.set('same', { displayName: 'Concurrent', firstName: null, lastName: null });
     const results = await Promise.all(Array.from({ length: 8 }, () => service().ensure('same')));
@@ -181,6 +199,14 @@ describe('POST /profile/me/ensure', () => {
     identities.error = new Error('Clerk unavailable');
     const response = await request('user_1');
     expect(response.statusCode).toBe(503);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.json()).toEqual({
+      type: 'https://wallpaperdb.example/problems/identity-unavailable',
+      title: 'Identity service unavailable',
+      status: 503,
+      detail: 'Clerk identity lookup failed',
+      instance: '/profile/me/ensure',
+    });
     expect((await sql`select * from profiles`).length).toBe(0);
     expect((await sql`select * from handle_claims`).length).toBe(0);
     expect((await sql`select * from outbox_events`).length).toBe(0);

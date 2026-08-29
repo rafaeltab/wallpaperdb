@@ -3,7 +3,7 @@ title: User Service
 description: User management service for tracking sign-ups and profiles
 ---
 
-The User Service manages user identities within WallpaperDB. It receives Clerk webhook events for sign-ups and profile changes, persists user data to PostgreSQL, and publishes user events via NATS for downstream consumers.
+The User Service owns WallpaperDB's public Profiles. It verifies Clerk-authenticated Users, persists authoritative Profile state and Handle claims in PostgreSQL, and records typed Profile events for downstream consumers.
 
 **Status:** 🚧 In Development
 
@@ -22,9 +22,9 @@ make user-dev
 ## Features
 
 ### Core Functionality
-- **Clerk webhook processing** for user lifecycle events (sign-up, profile changes)
-- **User profile persistence** in PostgreSQL
-- **NATS event publishing** for user-related changes
+- **Authenticated Profile creation** through an idempotent ensure command
+- **Unique Handle allocation** with normalization, reserved-name protection, and collision retries
+- **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
 - **Health checks** for database and message queue connectivity
 
 ### Observability
@@ -37,28 +37,31 @@ make user-dev
 ### Event Flow
 
 ```
-Clerk → webhook → User Service → PostgreSQL (persist)
-                                    ↓
-                              NATS (publish events)
-                                    ↓
-                              Downstream consumers
+Web + Clerk JWT → User Service → PostgreSQL (Profile + Handle claim)
+                                      ↓ same transaction
+                                Profile event outbox
 ```
 
 ### Database Schema
 
 ```typescript
-users {
-  id: text                    // Primary key
-  email: varchar(255)         // User email
-  username: varchar(100)      // Optional username
-  imageUrl: text              // Avatar URL
-  clerkId: text               // Clerk external ID
+profiles {
+  id: text                    // Clerk user ID and primary key
+  displayName: text
+  handle: text                // Case-insensitively unique
+  biographyMarkdown: text
+  pictureAssetId: text | null
+  version: integer
   createdAt: timestamp
   updatedAt: timestamp
 }
 ```
 
 ## API Reference
+
+### POST /profile/me/ensure
+
+Verifies the Clerk bearer token and idempotently creates or returns the signed-in User's authoritative Profile. A failed Clerk identity lookup returns `503 Service Unavailable` and persists nothing.
 
 ### GET /health
 
@@ -110,6 +113,10 @@ OTEL_SERVICE_NAME=user
 # Clerk
 CLERK_SECRET_KEY=sk_test_...
 CLERK_PUBLISHABLE_KEY=pk_test_...
+
+# Profile Handles
+PROFILE_HANDLE_MIN_LENGTH=1
+PROFILE_HANDLE_MAX_LENGTH=30
 ```
 
 ## Testing
@@ -150,9 +157,11 @@ apps/user/
 │   │   └── nats.ts              # NATS client
 │   ├── db/schema.ts              # Drizzle schema
 │   ├── routes/                   # HTTP handlers
-│   │   └── health.routes.ts     # /health, /ready
+│   │   ├── health.routes.ts     # /health, /ready
+│   │   └── profile.routes.ts    # Authenticated Profile commands
 │   └── services/                 # Business logic
-│       └── health.service.ts    # Health checks
+│       ├── health.service.ts    # Health checks
+│       └── profile.service.ts   # Profile ensure and Handle allocation
 ├── test/                         # Tests
 ├── drizzle/                      # Database migrations
 ├── package.json

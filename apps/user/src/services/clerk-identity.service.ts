@@ -25,7 +25,8 @@ export class ClerkIdentityProvider implements IdentityProvider {
   async getIdentity(userId: string): Promise<ExternalIdentity> {
     const user = await this.clerk.users.getUser(userId);
     return {
-      displayName: user.username,
+      // Clerk usernames are identifiers, not WallpaperDB Profile Display names.
+      displayName: null,
       firstName: user.firstName,
       lastName: user.lastName,
     };

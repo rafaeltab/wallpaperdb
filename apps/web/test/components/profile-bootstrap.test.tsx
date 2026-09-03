@@ -110,4 +110,34 @@ describe('ProfileBootstrap', () => {
       })
     );
   });
+
+  it('does not cancel the new User ensure request when the signed-in User changes', async () => {
+    vi.mocked(userApi.ensureProfile).mockResolvedValueOnce(profile);
+    const rendered = renderBootstrap();
+    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));
+
+    let resolveEnsure: ((profile: Profile) => void) | undefined;
+    vi.mocked(userApi.ensureProfile).mockImplementationOnce(
+      ({ signal }) =>
+        new Promise((resolve, reject) => {
+          resolveEnsure = resolve;
+          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+        })
+    );
+    auth({ userId: 'user_456' });
+    rendered.rerender(
+      <QueryClientProvider client={rendered.queryClient}>
+        <ProfileBootstrap />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => expect(userApi.ensureProfile).toHaveBeenCalledTimes(2));
+    await act(async () => resolveEnsure?.({ ...profile, id: 'user_456' }));
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_456'))).toEqual({
+        ...profile,
+        id: 'user_456',
+      })
+    );
+  });
 });

@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import Fastify from 'fastify';
+import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
+import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { container } from 'tsyringe';
-import { registerAuth } from '@wallpaperdb/auth';
+import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import { DatabaseConnection } from '../src/connections/database.js';
-import profileRoutes from '../src/routes/profile.routes.js';
 import {
   IdentityProviderToken,
   type ExternalIdentity,
@@ -38,13 +38,18 @@ class FakeIdentityProvider implements IdentityProvider {
 
 describe('POST /profile/me/ensure', () => {
   let postgresContainer: StartedPostgreSqlContainer;
+  let natsContainer: StartedNatsContainer;
   let sql: ReturnType<typeof postgres>;
+  let app: FastifyInstance;
   let database: DatabaseConnection;
-  let identities: FakeIdentityProvider;
+  const identities = new FakeIdentityProvider();
   let config: Config;
 
   beforeAll(async () => {
-    postgresContainer = await new PostgreSqlContainer('postgres:16-alpine').start();
+    [postgresContainer, natsContainer] = await Promise.all([
+      new PostgreSqlContainer('postgres:16-alpine').start(),
+      createNatsContainer(),
+    ]);
     const databaseUrl = postgresContainer.getConnectionUri();
     sql = postgres(databaseUrl, { max: 10 });
     for (const migrationPath of migrationPaths) {
@@ -54,25 +59,28 @@ describe('POST /profile/me/ensure', () => {
       port: 3009,
       nodeEnv: 'test',
       databaseUrl,
-      natsUrl: 'nats://127.0.0.1:4222',
+      natsUrl: natsContainer.getConnectionUrl(),
       natsStream: 'WALLPAPER',
       otelServiceName: 'user-test',
       profileHandleMinLength: 1,
       profileHandleMaxLength: 20,
     };
-    database = new DatabaseConnection(config);
-    await database.initialize();
+    container.clearInstances();
+    app = await createApp(config, { logger: false, enableOtel: false });
+    container.register(IdentityProviderToken, { useValue: identities });
+    database = container.resolve(DatabaseConnection);
   });
 
   beforeEach(async () => {
     await sql`truncate table outbox_events, handle_claims, profiles cascade`;
-    identities = new FakeIdentityProvider();
+    identities.identities.clear();
+    identities.error = null;
   });
 
   afterAll(async () => {
-    await database.close();
+    await app.close();
     await sql.end();
-    await postgresContainer.stop();
+    await Promise.all([postgresContainer.stop(), natsContainer.stop()]);
   });
 
   function service(): ProfileService {
@@ -80,21 +88,12 @@ describe('POST /profile/me/ensure', () => {
   }
 
   async function request(userId: string) {
-    container.clearInstances();
-    container.register('config', { useValue: config });
-    container.register(IdentityProviderToken, { useValue: identities });
-    container.register(DatabaseConnection, { useValue: database });
-    const app = Fastify();
-    await registerAuth(app, { testMode: true });
-    await app.register(profileRoutes);
     const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
-    const response = await app.inject({
+    return app.inject({
       method: 'POST',
       url: '/profile/me/ensure',
       headers: { authorization: `Bearer ${token}` },
     });
-    await app.close();
-    return response;
   }
 
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
@@ -148,6 +147,7 @@ describe('POST /profile/me/ensure', () => {
     expect(full.displayName).toBe('Grace Hopper');
     expect(full.handle).toBe('grace-hopper');
     expect(fallback.displayName).toMatch(/^(quiet|bright|silver|wild) (aurora|canvas|horizon|pixel)$/);
+    expect(fallback.handle).toBe(fallback.displayName.replace(' ', '-'));
   });
 
   it('claims collision suffixes atomically for different users', async () => {
@@ -163,6 +163,26 @@ describe('POST /profile/me/ensure', () => {
     expect(Number(claims[1].claim_generation)).toBeGreaterThan(
       Number(claims[0].claim_generation)
     );
+  });
+
+  it('keeps collision handles within a short configured maximum', async () => {
+    for (const id of ['short-one', 'short-two']) {
+      identities.identities.set(id, { displayName: 'Ada', firstName: null, lastName: null });
+    }
+    const previousMaximum = config.profileHandleMaxLength;
+    config.profileHandleMaxLength = 3;
+
+    try {
+      const profiles = await Promise.all([
+        service().ensure('short-one'),
+        service().ensure('short-two'),
+      ]);
+
+      expect(new Set(profiles.map((profile) => profile.handle)).size).toBe(2);
+      expect(profiles.every((profile) => profile.handle.length <= 3)).toBe(true);
+    } finally {
+      config.profileHandleMaxLength = previousMaximum;
+    }
   });
 
   it('avoids reserved handles and respects the configured maximum length', async () => {

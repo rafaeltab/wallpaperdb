@@ -12,12 +12,11 @@ The sandbox uses ignored local files for credentials:
 Refresh them with:
 
 ```sh
-umask 077
-mkdir -p .sandcastle/.opencode
-gh auth token | awk '{ print "GH_TOKEN=" $0 }' > .sandcastle/.env
-cp ~/.local/share/opencode/auth.json .sandcastle/.opencode/auth.json
-chmod 600 .sandcastle/.env .sandcastle/.opencode/auth.json
+make sandcastle-auth
 ```
+
+Run `gh auth login` and sign in to OpenCode first. The command fails without changing the credential files if
+either source credential is unavailable.
 
 The Docker sandbox talks to the direct host Docker daemon via `DOCKER_HOST=unix:///var/run/docker.sock` and a bind-mounted `/var/run/docker.sock`. The sandbox user is added to the host Docker socket group, so the old LXD TCP Docker API proxy is no longer needed.
 

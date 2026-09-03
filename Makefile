@@ -19,7 +19,7 @@
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
-        worktree-remove sandcastle-check-types \
+        worktree-remove sandcastle-auth sandcastle-check-types \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force clean help
 
 # ─── Worktree-Aware Variables ────────────────────────────────────────────────
@@ -44,6 +44,10 @@ export INGRESS_PORT
 # Uses deferred expansion (=) so COMPOSE_PROJECT_NAME is resolved at use time.
 INFRA_COMPOSE = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compose.yml
 APPS_COMPOSE  = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compose.apps.yml
+
+SANDCASTLE_AUTH_DIR ?= .sandcastle
+SANDCASTLE_OPENCODE_AUTH ?= $(HOME)/.local/share/opencode/auth.json
+GITHUB_CLI ?= gh
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -209,6 +213,7 @@ help:
 	@echo ""
 	@echo "Worktree:"
 	@echo "  make worktree-remove - Tear down this worktree's containers and release its slot"
+	@echo "  make sandcastle-auth - Refresh local Sandcastle credentials"
 	@echo "  make sandcastle-check-types - Type check the Sandcastle runner"
 	@echo ""
 	@echo "All Services:"
@@ -755,6 +760,30 @@ openapi-verify:
 
 worktree-remove:
 	@node scripts/teardown-worktree.mjs
+
+sandcastle-auth:
+	@if ! command -v "$(GITHUB_CLI)" >/dev/null 2>&1; then \
+		echo "GitHub CLI not found. Install 'gh' and run 'gh auth login' first."; \
+		exit 1; \
+	fi
+	@if [ ! -f "$(SANDCASTLE_OPENCODE_AUTH)" ]; then \
+		echo "OpenCode auth not found at $(SANDCASTLE_OPENCODE_AUTH). Sign in to OpenCode first."; \
+		exit 1; \
+	fi
+	@github_token="$$( "$(GITHUB_CLI)" auth token )" || { \
+		echo "Unable to read GitHub credentials. Run 'gh auth login' first."; \
+		exit 1; \
+	}; \
+	if [ -z "$$github_token" ]; then \
+		echo "GitHub CLI returned an empty token. Run 'gh auth login' first."; \
+		exit 1; \
+	fi; \
+	umask 077; \
+	mkdir -p "$(SANDCASTLE_AUTH_DIR)/.opencode"; \
+	printf 'GH_TOKEN=%s\n' "$$github_token" > "$(SANDCASTLE_AUTH_DIR)/.env"; \
+	cp "$(SANDCASTLE_OPENCODE_AUTH)" "$(SANDCASTLE_AUTH_DIR)/.opencode/auth.json"; \
+	chmod 600 "$(SANDCASTLE_AUTH_DIR)/.env" "$(SANDCASTLE_AUTH_DIR)/.opencode/auth.json"; \
+	echo "Sandcastle credentials refreshed in $(SANDCASTLE_AUTH_DIR)."
 
 sandcastle-check-types:
 	@pnpm sandcastle:check-types

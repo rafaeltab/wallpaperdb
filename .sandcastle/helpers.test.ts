@@ -5,8 +5,71 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { getDockerProjectName } from "./docker-resources.js";
+import { buildPullRequestBody, parsePullRequestDetails } from "./github.js";
 import { parsePlan } from "./plan.js";
 import { prepareTurboCacheDirectory } from "./sandbox.js";
+
+describe("parsePullRequestDetails", () => {
+  it("extracts reviewer-authored pull request metadata", () => {
+    expect(
+      parsePullRequestDetails(`Review complete.
+<pull-request>
+{
+  "title": "feat(web): add wallpaper favorites",
+  "summary": [
+    "Let signed-in users save wallpapers to their favorites.",
+    "Keep favorite state synchronized across gallery views."
+  ],
+  "testing": ["make ci"]
+}
+</pull-request>
+<promise>COMPLETE</promise>`),
+    ).toEqual({
+      title: "feat(web): add wallpaper favorites",
+      summary: [
+        "Let signed-in users save wallpapers to their favorites.",
+        "Keep favorite state synchronized across gallery views.",
+      ],
+      testing: ["make ci"],
+    });
+  });
+
+  it.each([
+    ["missing tags", '{"title":"feat: improve output","summary":["Useful summary"],"testing":["make ci"]}'],
+    ["invalid JSON", "<pull-request>not JSON</pull-request>"],
+    [
+      "missing fields",
+      '<pull-request>{"title":"feat: improve output","summary":[],"testing":["make ci"]}</pull-request>',
+    ],
+  ])("rejects %s", (_case, output) => {
+    expect(() => parsePullRequestDetails(output)).toThrow("Reviewer returned invalid pull request details");
+  });
+});
+
+describe("buildPullRequestBody", () => {
+  it("renders a useful summary, test plan, and closing issue reference", () => {
+    expect(
+      buildPullRequestBody(
+        42,
+        {
+          title: "feat(web): add wallpaper favorites",
+          summary: ["Let signed-in users save wallpapers.", "Synchronize favorite state across gallery views."],
+          testing: ["make web-test", "make ci"],
+        },
+      ),
+    ).toBe(`## Summary
+
+- Let signed-in users save wallpapers.
+- Synchronize favorite state across gallery views.
+
+## Test plan
+
+- \`make web-test\`
+- \`make ci\`
+
+Closes #42`);
+  });
+});
 
 describe("parsePlan", () => {
   it("accepts valid deterministic issue plans", () => {

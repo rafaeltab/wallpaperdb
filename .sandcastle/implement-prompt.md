@@ -39,21 +39,21 @@ Before committing, run `make ci` to ensure the tests pass.
 
 # COMMIT
 
-Make a git commit. The commit message must:
+Create one or more cohesive commits. Each commit message must:
 
-1. Start with `RALPH:` prefix
-2. Include task completed + PRD reference
-3. Key decisions made
-4. Files changed
-5. Blockers or notes for next iteration
+1. Follow Conventional Commits: `type(optional-scope): concise imperative summary`
+2. Describe the specific outcome of the change, not the automation or workflow that produced it
+3. Keep the subject at 72 characters or fewer
+4. Use a body only when it adds useful context about why the change was made or records an important tradeoff
+5. End with a `Refs #{{ISSUE_NUMBER}}` footer
 
-Keep it concise.
+Do not use a generic prefix such as `RALPH:` or `Sandcastle:`. Do not inventory files, test commands, or iteration notes in the commit message.
 
 # THE ISSUE
 
 If the task is not complete, leave a comment on the GitHub issue with what was done.
 
-Do not close the issue - this will be done later.
+Do not close the issue. The pull request will close it when merged.
 
 Once complete, output <promise>COMPLETE</promise>.
 

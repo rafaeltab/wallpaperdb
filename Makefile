@@ -19,7 +19,7 @@
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
         openapi-generate docs-generate openapi-verify \
-        worktree-remove sandcastle-auth sandcastle-check-types \
+        worktree-remove sandcastle-auth sandcastle-test sandcastle-check-types \
         dev build test test-watch test-unit test-integration test-e2e test-ui coverage-summary format lint check-types ci ci-force clean help
 
 # ─── Worktree-Aware Variables ────────────────────────────────────────────────
@@ -215,6 +215,7 @@ help:
 	@echo "Worktree:"
 	@echo "  make worktree-remove - Tear down this worktree's containers and release its slot"
 	@echo "  make sandcastle-auth - Refresh local Sandcastle credentials"
+	@echo "  make sandcastle-test - Run Sandcastle runner unit tests"
 	@echo "  make sandcastle-check-types - Type check the Sandcastle runner"
 	@echo ""
 	@echo "All Services:"
@@ -786,6 +787,9 @@ sandcastle-auth:
 	chmod 600 "$(SANDCASTLE_AUTH_DIR)/.env" "$(SANDCASTLE_AUTH_DIR)/.opencode/auth.json"; \
 	echo "Sandcastle credentials refreshed in $(SANDCASTLE_AUTH_DIR)."
 
+sandcastle-test:
+	@pnpm sandcastle:test
+
 sandcastle-check-types:
 	@pnpm sandcastle:check-types
 
@@ -847,6 +851,7 @@ check-types-force:
 	@$(TURBO) run check-types --force
 
 ci:
+	@$(MAKE) sandcastle-test
 	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally..."
 	@set -e; \
@@ -861,6 +866,7 @@ ci:
 	echo "✓ Coverage report: coverage/lcov.info"
 
 ci-force:
+	@$(MAKE) sandcastle-test
 	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally (no cache)..."
 	@set -e; \

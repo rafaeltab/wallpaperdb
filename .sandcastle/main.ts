@@ -5,7 +5,7 @@ import * as sandcastle from "@ai-hero/sandcastle";
 
 import { loadConfig } from "./config.js";
 import { cleanupDockerResources } from "./docker-resources.js";
-import { createPullRequest } from "./github.js";
+import { createPullRequest, getDefaultBranch, parsePullRequestDetails } from "./github.js";
 import { plannerLogging, reusableSandboxLogging } from "./logging.js";
 import { parsePlan } from "./plan.js";
 import { createSandboxResources } from "./sandbox.js";
@@ -14,6 +14,7 @@ import type { Issue } from "./plan.js";
 
 const config = loadConfig();
 const { sandboxProvider, hooks } = createSandboxResources(config);
+const baseBranch = getDefaultBranch(config.prBaseBranch);
 
 for (let iteration = 1; iteration <= config.maxIterations; iteration++) {
   console.log(`\n=== Sandcastle iteration ${iteration}/${config.maxIterations} ===\n`);
@@ -62,6 +63,7 @@ async function handleIssue(issue: Issue) {
       ISSUE_NUMBER: issue.number,
       ISSUE_TITLE: issue.title,
       BRANCH: issue.branch,
+      BASE_BRANCH: baseBranch,
     };
 
     console.log(`Starting implementer`);
@@ -98,10 +100,11 @@ async function handleIssue(issue: Issue) {
 
     console.log(`Review complete. Review commits: ${review.commits.length}`);
     console.log(
-      "The implementer/reviewer prompts require the agent to run `make ci` inside the sandbox before closing the issue.",
+      "The implementer/reviewer prompts require the agent to run `make ci` inside the sandbox before opening the pull request.",
     );
 
-    createPullRequest(issue.branch, implement.commits.length, review.commits.length, config.prBaseBranch);
+    const pullRequestDetails = parsePullRequestDetails(review.stdout);
+    createPullRequest(issue, pullRequestDetails, baseBranch);
   } finally {
     cleanupDockerResources(issue.branch, config.enableDockerCleanup);
     await sandbox.close();

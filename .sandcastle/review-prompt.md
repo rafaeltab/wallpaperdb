@@ -20,11 +20,11 @@ Here are the last 10 commits:
 
 </issue>
 
-<diff-to-main>
+<diff-to-base>
 
-!`git diff main..HEAD`
+!`git diff {{BASE_BRANCH}}..HEAD`
 
-</diff-to-main>
+</diff-to-base>
 
 # REVIEW PROCESS
 
@@ -56,12 +56,24 @@ If you find improvements to make:
 
 1. Make the changes directly on this branch
 2. Run `make ci` to ensure nothing is broken
-3. Commit with a message starting with `RALPH: Review -` describing the refinements
+3. Commit the refinements using Conventional Commits. Use a specific, imperative subject of 72 characters or fewer and end the message with a `Refs #{{ISSUE_NUMBER}}` footer.
 
 If the code is already clean and well-structured, do nothing.
 
 # COMPLETION
 
-If the issue was completed close the issue.
+Do not close the issue. The pull request will close it when merged.
 
-Once complete, output <promise>COMPLETE</promise>.
+Summarize the complete branch for its pull request, including the implementation and any review refinements. Produce:
+
+- A Conventional Commit-style title of 72 characters or fewer that names the delivered outcome
+- One to three summary items explaining the important behavior and design choices
+- The exact validation commands that passed
+
+Output the result as valid JSON inside `<pull-request>` tags using this exact shape:
+
+<pull-request>
+{"title":"feat(scope): describe the delivered outcome","summary":["Describe an important outcome."],"testing":["make ci"]}
+</pull-request>
+
+Then output <promise>COMPLETE</promise>.

@@ -9,6 +9,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
+import { Wait } from 'testcontainers';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import { dockerStartSemaphore } from '../utils/semaphore.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
@@ -315,6 +316,9 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
 
             // Longer timeout when using Docker networks - health check may be slower
             container.withStartupTimeout(90000);
+            // @testcontainers/minio waits for the live endpoint, which can respond before
+            // MinIO is ready to serve S3 requests such as CreateBucket.
+            container.withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000));
 
             const dockerNetwork = this.docker.network;
             if (dockerNetwork) {

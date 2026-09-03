@@ -62,6 +62,18 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
 }
 
+function withCollisionSuffix(base: string, maximumLength: number): string {
+  const randomLength = Math.min(6, Math.max(1, maximumLength - 2));
+  const random = ulid().slice(-randomLength).toLowerCase();
+
+  if (maximumLength === 1) return random;
+  if (maximumLength === 2) return `${base.slice(0, 1)}${random}`;
+
+  const stemLength = maximumLength - random.length - 1;
+  const stem = base.slice(0, stemLength).replace(/-+$/g, '');
+  return `${stem}-${random}`;
+}
+
 @singleton()
 export class ProfileService {
   constructor(
@@ -93,9 +105,10 @@ export class ProfileService {
       : minimumPaddedSlug;
 
     for (let attempt = 0; attempt < 100; attempt++) {
-      const suffix = attempt === 0 ? '' : `-${ulid().slice(-6).toLowerCase()}`;
-      const stemLength = this.config.profileHandleMaxLength - suffix.length;
-      const handle = `${base.slice(0, stemLength).replace(/-+$/g, '')}${suffix}`;
+      const handle =
+        attempt === 0
+          ? base.slice(0, this.config.profileHandleMaxLength).replace(/-+$/g, '')
+          : withCollisionSuffix(base, this.config.profileHandleMaxLength);
       if (RESERVED_HANDLES.has(handle)) continue;
 
       try {

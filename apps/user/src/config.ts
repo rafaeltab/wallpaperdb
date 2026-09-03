@@ -20,7 +20,7 @@ const configSchema = z
     clerkSecretKey: z.string().min(1).optional(),
     clerkPublishableKey: z.string().min(1).optional(),
     profileHandleMinLength: z.number().int().min(1).max(63),
-    profileHandleMaxLength: z.number().int().min(8).max(64),
+    profileHandleMaxLength: z.number().int().min(1).max(64),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {

@@ -12,7 +12,8 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 | **Ingestor** | 3001 | ✅ Production | wallpaperdb_ingestor | PostgreSQL, MinIO, NATS, Redis | `wallpaper.uploaded` | - |
 | **Media** | 3002 | ✅ Production | wallpaperdb_media | PostgreSQL, MinIO, Redis | `wallpaper.variant.available` | `wallpaper.uploaded`, `wallpaper.variant.uploaded` |
 | **Variant Generator** | 3004 | ✅ Production | - | MinIO, NATS | `wallpaper.variant.uploaded` | `wallpaper.uploaded` |
-| **Gateway** | 3000 | ✅ Production | wallpaperdb_gateway | PostgreSQL, OpenSearch, NATS, Redis | - | `wallpaper.uploaded`, `wallpaper.variant.available` |
+| **Gateway** | 3000 | ✅ Production | wallpaperdb_gateway | PostgreSQL, OpenSearch, NATS, Redis | - | `wallpaper.uploaded`, `wallpaper.variant.available`, `profile.created` |
+| **User** | 3009 | ✅ Production | wallpaperdb_user | PostgreSQL, NATS, Clerk | `profile.created` | - |
 | **Web Frontend** | 3005 | ✅ Production | - | Gateway (GraphQL) | - | - |
 | **Thumbnail Extractor** | 3003 | 📋 Planned | - | MinIO, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
 | **Quality Enrichment** | 3006 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
@@ -154,6 +155,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - OpenSearch integration for fast wallpaper search
 - Variant-based filtering (resolution, aspect ratio, format)
 - Event-driven metadata synchronization
+- Eventually consistent public Profile reads by ID and Handle
 - Cursor-based pagination
 
 **Dependencies:**
@@ -165,12 +167,25 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 **Events Consumed:**
 - `wallpaper.uploaded` - Index wallpaper metadata
 - `wallpaper.variant.available` - Update variant availability
+- `profile.created` - Project the latest public Profile snapshot
 
 **GraphQL Schema:**
 ```graphql
 type Query {
   searchWallpapers(filter: WallpaperFilter, first: Int, after: String): WallpaperConnection!
   getWallpaper(wallpaperId: ID!): Wallpaper
+  profile(id: ID!): Profile
+  profileByHandle(handle: String!): Profile
+}
+
+type Profile {
+  id: ID!
+  handle: String!
+  displayName: String!
+  biographyMarkdown: String!
+  picture: ProfilePicture
+  canonicalPath: String!
+  version: Int!
 }
 
 type Wallpaper {
@@ -198,6 +213,38 @@ REDIS_URL=redis://localhost:6379
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ```
 
+### User (3009)
+
+**Status:** ✅ Production
+
+**Purpose:** Own authenticated User Profiles and their public identity.
+
+The User service stores authoritative Profile state in PostgreSQL. Profile changes and their
+outbox record are committed atomically, then a background publisher retries `profile.created`
+delivery through NATS with the stable event ID as the JetStream message ID. Events contain only
+the public Profile snapshot; Clerk-private data remains inside the User boundary.
+
+**Dependencies:**
+- PostgreSQL (wallpaperdb_user)
+- NATS (`PROFILE` stream)
+- Clerk (identity lookup during Profile creation)
+
+**Events Published:**
+- `profile.created` - Complete public snapshot of a newly recorded Profile
+
+**API Endpoints:**
+- `POST /profile/me/ensure` - Idempotently create or return the signed-in User's Profile
+
+**Configuration:**
+```bash
+PORT=3009
+DATABASE_URL=postgresql://...
+NATS_URL=nats://localhost:4222
+CLERK_SECRET_KEY=...
+PROFILE_HANDLE_MIN_LENGTH=1
+PROFILE_HANDLE_MAX_LENGTH=30
+```
+
 ### Web Frontend (3005)
 
 **Status:** ✅ Production
@@ -208,6 +255,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - Wallpaper upload interface
 - Muuri grid layout for responsive wallpaper browsing
 - Integration with Gateway GraphQL API
+- Canonical public Profile pages at `/profiles/@:handle`
 - Responsive design
 
 **Dependencies:**

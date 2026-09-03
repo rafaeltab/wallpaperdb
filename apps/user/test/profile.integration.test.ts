@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { FakeTimerService } from '@wallpaperdb/core/timer';
+import type { ProfileCreatedEvent } from '@wallpaperdb/events';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
@@ -11,12 +13,17 @@ import { container } from 'tsyringe';
 import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import { DatabaseConnection } from '../src/connections/database.js';
+import { NatsConnectionManager } from '../src/connections/nats.js';
 import {
   IdentityProviderToken,
   type ExternalIdentity,
   type IdentityProvider,
 } from '../src/services/clerk-identity.service.js';
 import { ProfileService } from '../src/services/profile.service.js';
+import {
+  type ProfileEventPublisher,
+  ProfileOutboxPublisherWorker,
+} from '../src/services/profile-outbox-publisher.service.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const migrationPaths = [
@@ -33,6 +40,19 @@ class FakeIdentityProvider implements IdentityProvider {
     return (
       this.identities.get(userId) ?? { displayName: null, firstName: null, lastName: null }
     );
+  }
+}
+
+class FakeProfileEventPublisher implements ProfileEventPublisher {
+  readonly events: ProfileCreatedEvent[] = [];
+  failuresRemaining = 0;
+
+  async publish(event: ProfileCreatedEvent): Promise<void> {
+    if (this.failuresRemaining > 0) {
+      this.failuresRemaining--;
+      throw new Error('NATS unavailable');
+    }
+    this.events.push(event);
   }
 }
 
@@ -116,6 +136,7 @@ describe('POST /profile/me/ensure', () => {
     const events = await sql`select payload from outbox_events`;
     expect(events[0].payload).toMatchObject({
       eventType: 'profile.created',
+      change: { type: 'created' },
       profile: {
         id: 'user_1',
         claimGeneration: expect.any(Number),
@@ -270,5 +291,151 @@ describe('POST /profile/me/ensure', () => {
     } finally {
       await sql.unsafe('drop trigger reject_outbox on outbox_events; drop function reject_outbox()');
     }
+  });
+
+  it('marks an outbox event published only after acknowledged publication', async () => {
+    identities.identities.set('user_1', { displayName: 'Ada', firstName: null, lastName: null });
+    await service().ensure('user_1');
+    const publisher = new FakeProfileEventPublisher();
+    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
+
+    await worker.publishPending();
+
+    const [stored] = await sql`select id, published_at from outbox_events`;
+    expect(publisher.events).toHaveLength(1);
+    expect(publisher.events[0].eventId).toBe(stored.id);
+    expect(stored.published_at).not.toBeNull();
+  });
+
+  it('publishes outbox rows recorded before typed changes were added', async () => {
+    const timestamp = new Date().toISOString();
+    await sql`
+      insert into outbox_events (id, subject, aggregate_id, payload)
+      values (
+        'evt_legacy',
+        'profile.created',
+        'user_legacy',
+        ${sql.json({
+          eventId: 'evt_legacy',
+          eventType: 'profile.created',
+          timestamp,
+          profile: {
+            id: 'user_legacy',
+            displayName: 'Legacy Profile',
+            handle: 'legacy-profile',
+            claimGeneration: 1,
+            biographyMarkdown: '',
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        })}
+      )
+    `;
+    const publisher = new FakeProfileEventPublisher();
+    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
+
+    await worker.publishPending();
+
+    expect(publisher.events).toMatchObject([
+      { eventId: 'evt_legacy', change: { type: 'created' } },
+    ]);
+    expect((await sql`select published_at from outbox_events`)[0].published_at).not.toBeNull();
+  });
+
+  it('leaves failed publications retryable', async () => {
+    identities.identities.set('user_1', { displayName: 'Ada', firstName: null, lastName: null });
+    await service().ensure('user_1');
+    const publisher = new FakeProfileEventPublisher();
+    publisher.failuresRemaining = 1;
+    const timer = new FakeTimerService();
+    const worker = new ProfileOutboxPublisherWorker(
+      database,
+      publisher,
+      { error: () => {} },
+      timer
+    );
+
+    worker.start();
+    await worker.publishPending();
+    expect((await sql`select published_at from outbox_events`)[0].published_at).toBeNull();
+
+    await timer.tickAsync(1_000);
+    expect(publisher.events).toHaveLength(1);
+    expect((await sql`select published_at from outbox_events`)[0].published_at).not.toBeNull();
+    await worker.stop();
+  });
+
+  it('leaves unrelated outbox subjects for their owning publisher', async () => {
+    const timestamp = new Date().toISOString();
+    await sql`
+      insert into outbox_events (id, subject, aggregate_id, payload)
+      values (
+        'evt_unrelated',
+        'wallpaper.uploaded',
+        'wallpaper_1',
+        ${sql.json({
+          eventId: 'evt_unrelated',
+          eventType: 'profile.created',
+          timestamp,
+          change: { type: 'created' },
+          profile: {
+            id: 'user_unrelated',
+            displayName: 'Wrong Publisher',
+            handle: 'wrong-publisher',
+            claimGeneration: 1,
+            biographyMarkdown: '',
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        })}
+      )
+    `;
+    identities.identities.set('user_profile', {
+      displayName: 'Profile Event',
+      firstName: null,
+      lastName: null,
+    });
+    await service().ensure('user_profile');
+    const publisher = new FakeProfileEventPublisher();
+    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
+
+    await worker.publishPending();
+
+    expect(publisher.events.map((event) => event.profile.id)).toEqual(['user_profile']);
+    const [unrelated] = await sql`
+      select published_at from outbox_events where id = 'evt_unrelated'
+    `;
+    expect(unrelated.published_at).toBeNull();
+  });
+
+  it('publishes through the production NATS adapter started by createApp', async () => {
+    const nats = container.resolve(NatsConnectionManager).getClient();
+    await nats.jetstreamManager().then((manager) =>
+      manager.streams.add({
+        name: 'PROFILE',
+        subjects: ['profile.>'],
+      })
+    );
+    identities.identities.set('user_real_nats', {
+      displayName: 'Real NATS',
+      firstName: null,
+      lastName: null,
+    });
+
+    await request('user_real_nats');
+
+    await expect.poll(
+      async () => {
+        const [event] = await sql`
+          select published_at from outbox_events where aggregate_id = 'user_real_nats'
+        `;
+        return event?.published_at;
+      },
+      { timeout: 5_000 }
+    ).not.toBeNull();
   });
 });

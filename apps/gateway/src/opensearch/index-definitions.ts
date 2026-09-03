@@ -1,4 +1,4 @@
-import { wallpapersIndexMapping } from './mappings.js';
+import { profilesIndexMapping, wallpapersIndexMapping } from './mappings.js';
 
 export interface IndexDefinition {
   key: string;
@@ -15,4 +15,13 @@ export const wallpaperIndexDefinition = {
   mapping: wallpapersIndexMapping,
 } satisfies IndexDefinition;
 
-export const gatewayIndexDefinitions: readonly IndexDefinition[] = [wallpaperIndexDefinition];
+export const profileIndexDefinition = {
+  key: 'profiles',
+  name: 'profiles',
+  mapping: profilesIndexMapping,
+} satisfies IndexDefinition;
+
+export const gatewayIndexDefinitions: readonly IndexDefinition[] = [
+  wallpaperIndexDefinition,
+  profileIndexDefinition,
+];

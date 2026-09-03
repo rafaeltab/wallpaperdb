@@ -199,7 +199,37 @@ export const schema = `#graphql
 		pageInfo: PageInfo!
 	}
 
+	"""
+	A public Profile snapshot
+	"""
+	type Profile {
+		id: ID!
+		handle: String!
+		displayName: String!
+		biographyMarkdown: String!
+		picture: ProfilePicture
+		canonicalPath: String!
+		version: Int!
+		createdAt: String!
+		updatedAt: String!
+	}
+
+	type ProfilePicture {
+		id: ID!
+		url: String!
+	}
+
 	type Query {
+		"""
+		Get a Profile by its immutable Profile ID
+		"""
+		profile(id: ID!): Profile
+
+		"""
+		Get a Profile by its exact current Handle
+		"""
+		profileByHandle(handle: String!): Profile
+
 		"""
 		Search for wallpapers with optional filters and pagination
 		"""

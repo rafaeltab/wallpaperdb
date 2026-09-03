@@ -18,6 +18,7 @@ describe("Event Schemas", () => {
       eventId: "evt_01HXYZ123456789",
       eventType: PROFILE_CREATED_SUBJECT,
       timestamp,
+      change: { type: "created" as const },
       profile: {
         id: "user_123",
         displayName: "Ada Lovelace",
@@ -40,6 +41,20 @@ describe("Event Schemas", () => {
         ProfileCreatedEventSchema.safeParse({
           ...event,
           profile: { ...event.profile, version: 0 },
+        }).success
+      ).toBe(false);
+    });
+
+    it("requires a typed change", () => {
+      const { change: _change, ...withoutChange } = event;
+      expect(ProfileCreatedEventSchema.safeParse(withoutChange).success).toBe(false);
+    });
+
+    it("rejects fields outside the public Profile contract", () => {
+      expect(
+        ProfileCreatedEventSchema.safeParse({
+          ...event,
+          profile: { ...event.profile, clerkEmail: "ada@example.com" },
         }).success
       ).toBe(false);
     });

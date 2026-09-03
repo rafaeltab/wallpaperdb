@@ -9,6 +9,7 @@ import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { OpenSearchConnection } from './connections/opensearch.js';
 import { RedisConnection } from './connections/redis.js';
+import { ProfileCreatedConsumer } from './consumers/profile-created.consumer.js';
 import { WallpaperColorsExtractedConsumer } from './consumers/wallpaper-colors-extracted.consumer.js';
 import { WallpaperUploadedConsumer } from './consumers/wallpaper-uploaded.consumer.js';
 import { WallpaperVariantAvailableConsumer } from './consumers/wallpaper-variant-available.consumer.js';
@@ -219,6 +220,9 @@ export async function createApp(
     await opensearch.initialize();
     fastify.log.info('OpenSearch connection established');
 
+    await container.resolve(IndexManagerService).createIndex();
+    fastify.log.info('Required OpenSearch indexes are ready');
+
     // Connect to NATS
     const natsManager = container.resolve(NatsConnectionManager);
     await natsManager.initialize();
@@ -238,17 +242,14 @@ export async function createApp(
     await colorsConsumer.start();
     fastify.log.info('WallpaperColorsExtractedConsumer started');
 
+    const profileConsumer = container.resolve(ProfileCreatedConsumer);
+    await profileConsumer.start();
+    fastify.log.info('ProfileCreatedConsumer started');
+
     // Mark connections as initialized
     fastify.connectionsState.connectionsInitialized = true;
   } catch (error) {
     fastify.log.error({ err: error }, 'Failed to initialize connections');
-    throw error;
-  }
-
-  try {
-    await container.resolve(IndexManagerService).createIndex();
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to create required indexes');
     throw error;
   }
 
@@ -268,6 +269,9 @@ export async function createApp(
 
     const colorsConsumer = container.resolve(WallpaperColorsExtractedConsumer);
     await colorsConsumer.stop();
+
+    const profileConsumer = container.resolve(ProfileCreatedConsumer);
+    await profileConsumer.stop();
     fastify.log.info('Event consumers stopped');
 
     fastify.log.info('Closing NATS connection...');

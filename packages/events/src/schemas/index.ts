@@ -32,4 +32,6 @@ export {
   PROFILE_CREATED_SUBJECT,
   ProfileCreatedEventSchema,
   type ProfileCreatedEvent,
+  type PublicProfileSnapshot,
+  PublicProfileSnapshotSchema,
 } from "./profile-created.js";

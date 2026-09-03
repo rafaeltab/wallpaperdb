@@ -9,6 +9,10 @@ import { NatsConnectionManager } from './connections/nats.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
 import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
+import {
+  NatsProfileEventPublisher,
+  ProfileOutboxPublisherWorker,
+} from './services/profile-outbox-publisher.service.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -89,6 +93,8 @@ export async function createApp(
 
   fastify.log.info('Initializing connections...');
 
+  let outboxPublisher: ProfileOutboxPublisherWorker | null = null;
+
   try {
     await container.resolve(DatabaseConnection).initialize();
     fastify.log.info('Database connection pool created');
@@ -96,6 +102,11 @@ export async function createApp(
     await container.resolve(NatsConnectionManager).initialize();
     fastify.log.info('NATS connection created');
 
+    outboxPublisher = new ProfileOutboxPublisherWorker(
+      container.resolve(DatabaseConnection),
+      new NatsProfileEventPublisher(container.resolve(NatsConnectionManager), config),
+      fastify.log
+    );
     fastify.connectionsState.connectionsInitialized = true;
     fastify.log.info('All connections initialized successfully');
   } catch (error) {
@@ -105,12 +116,16 @@ export async function createApp(
 
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
+    await outboxPublisher?.stop();
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
     await shutdownOtel();
   });
 
   await registerRoutes(fastify, config);
+
+  outboxPublisher?.start();
+  fastify.log.info('Profile outbox publisher started');
 
   return fastify;
 }

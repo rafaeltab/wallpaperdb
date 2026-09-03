@@ -23,6 +23,7 @@ const setup = () => {
     t
         .withNats((n) => n.withJetstream())
         .withStream("WALLPAPER")
+        .withStream("PROFILE")
         .withNatsAutoCleanup()
         .withOpenSearch()
         .withInProcessApp();

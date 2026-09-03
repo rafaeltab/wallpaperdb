@@ -46,6 +46,14 @@ Used by:
 - **Ingestor Service**: Publishes `wallpaper.uploaded` events
 - **Media Service**: Consumes `wallpaper.uploaded` events
 
+### PROFILE Stream
+- **Subjects**: `profile.>` (e.g., `profile.created`)
+- **Storage**: File-based persistence
+- **Retention**: Limits-based
+- **Max Age**: Unlimited pending the cross-application retention review in issue #162
+
+Used by the User Service transactional outbox and downstream Profile projections.
+
 ## Management Commands
 
 View all streams:

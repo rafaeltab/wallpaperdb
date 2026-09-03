@@ -59,3 +59,17 @@ export interface VariantFilter {
   aspectRatio?: number;
   format?: string;
 }
+
+export interface ProfilePicture {
+  id: string;
+  url: string;
+}
+
+export interface Profile {
+  id: string;
+  handle: string;
+  displayName: string;
+  biographyMarkdown: string;
+  picture: ProfilePicture | null;
+  canonicalPath: string;
+}

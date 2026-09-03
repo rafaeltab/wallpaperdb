@@ -122,6 +122,19 @@ describe("BaseEventPublisher", () => {
       expect(parsedEvent.data.message).toBe("hello");
     });
 
+    it("uses the stable event ID for JetStream deduplication", async () => {
+      const event: TestEvent = {
+        eventId: "test-id-123",
+        eventType: "test.event",
+        timestamp: new Date().toISOString(),
+        data: { message: "hello", count: 42 },
+      };
+
+      await publisher.publish(event);
+
+      expect(publishedMessages[0].options).toMatchObject({ msgID: event.eventId });
+    });
+
     it("should reject invalid event with validation error", async () => {
       const invalidEvent = {
         eventId: "test-id-123",

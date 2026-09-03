@@ -2,11 +2,8 @@ import { z } from "zod";
 
 export const PROFILE_CREATED_SUBJECT = "profile.created" as const;
 
-export const ProfileCreatedEventSchema = z.object({
-  eventId: z.string().min(1),
-  eventType: z.literal(PROFILE_CREATED_SUBJECT),
-  timestamp: z.string().datetime(),
-  profile: z.object({
+export const PublicProfileSnapshotSchema = z
+  .object({
     id: z.string().min(1),
     displayName: z.string().min(1),
     handle: z.string().min(1),
@@ -16,7 +13,19 @@ export const ProfileCreatedEventSchema = z.object({
     version: z.number().int().positive(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
-  }),
-});
+  })
+  .strict();
+
+export type PublicProfileSnapshot = z.infer<typeof PublicProfileSnapshotSchema>;
+
+export const ProfileCreatedEventSchema = z
+  .object({
+    eventId: z.string().min(1),
+    eventType: z.literal(PROFILE_CREATED_SUBJECT),
+    timestamp: z.string().datetime(),
+    change: z.object({ type: z.literal("created") }).strict(),
+    profile: PublicProfileSnapshotSchema,
+  })
+  .strict();
 
 export type ProfileCreatedEvent = z.infer<typeof ProfileCreatedEventSchema>;

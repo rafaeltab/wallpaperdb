@@ -49,3 +49,17 @@ export const wallpapersIndexMapping = {
     updatedAt: { type: 'date' },
   },
 };
+
+export const profilesIndexMapping = {
+  properties: {
+    id: { type: 'keyword' },
+    displayName: { type: 'text' },
+    handle: { type: 'keyword' },
+    claimGeneration: { type: 'long' },
+    biographyMarkdown: { type: 'text', index: false },
+    pictureAssetId: { type: 'keyword' },
+    version: { type: 'long' },
+    createdAt: { type: 'date' },
+    updatedAt: { type: 'date' },
+  },
+};

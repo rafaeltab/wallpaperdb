@@ -16,6 +16,7 @@ echo ""
 create_stream_if_not_exists() {
   local stream_name=$1
   local subjects=$2
+  local max_age=${3:-1y}
 
   echo "Checking stream: $stream_name"
 
@@ -29,7 +30,7 @@ create_stream_if_not_exists() {
       --retention limits \
       --max-msgs=-1 \
       --max-bytes=-1 \
-      --max-age=1y \
+      --max-age="$max_age" \
       --max-msg-size=-1 \
       --discard old \
       --server "$NATS_SERVER" \
@@ -42,6 +43,9 @@ create_stream_if_not_exists() {
 # Create WALLPAPER stream
 # Handles: wallpaper.uploaded, wallpaper.processed, wallpaper.deleted, etc.
 create_stream_if_not_exists "WALLPAPER" "wallpaper.>"
+
+# Profile state changes are retained independently for read-model rebuilds.
+create_stream_if_not_exists "PROFILE" "profile.>" "0"
 
 # Add more streams here as needed
 # Example:

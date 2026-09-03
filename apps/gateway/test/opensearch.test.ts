@@ -20,10 +20,10 @@ describe("OpenSearch Integration", () => {
     describe("IndexManagerService", () => {
         it("should manage independently mapped named indexes", async () => {
             const indexManager = container.resolve(IndexManagerService);
-            const indexName = "test-profiles";
+            const indexName = "test-secondary-index";
 
             indexManager.register({
-                key: "profiles",
+                key: "secondary-index",
                 name: indexName,
                 mapping: {
                     properties: {
@@ -42,20 +42,20 @@ describe("OpenSearch Integration", () => {
                     }),
                 ).toThrow(`Index name already registered: ${indexName}`);
 
-                await indexManager.createIndex("profiles");
+                await indexManager.createIndex("secondary-index");
 
-                expect(indexManager.getIndexName("profiles")).toBe(indexName);
+                expect(indexManager.getIndexName("secondary-index")).toBe(indexName);
                 const index = await client.indices.get({ index: indexName });
                 expect(index.body[indexName].mappings.properties).toMatchObject({
                     profileId: { type: "keyword" },
                     displayName: { type: "text" },
                 });
 
-                await indexManager.deleteIndex("profiles");
+                await indexManager.deleteIndex("secondary-index");
                 expect((await client.indices.exists({ index: indexName })).body).toBe(false);
                 expect((await client.indices.exists({ index: "wallpapers" })).body).toBe(true);
             } finally {
-                indexManager.unregister("profiles");
+                indexManager.unregister("secondary-index");
             }
         });
 

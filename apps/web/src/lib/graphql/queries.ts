@@ -54,3 +54,35 @@ export const GET_WALLPAPER = gql`
     }
   }
 `;
+
+export const GET_PROFILE = gql`
+  query GetProfile($id: ID!) {
+    profile(id: $id) {
+      id
+      handle
+      displayName
+      biographyMarkdown
+      picture {
+        id
+        url
+      }
+      canonicalPath
+    }
+  }
+`;
+
+export const GET_PROFILE_BY_HANDLE = gql`
+  query GetProfileByHandle($handle: String!) {
+    profileByHandle(handle: $handle) {
+      id
+      handle
+      displayName
+      biographyMarkdown
+      picture {
+        id
+        url
+      }
+      canonicalPath
+    }
+  }
+`;

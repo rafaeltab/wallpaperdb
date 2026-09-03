@@ -2,10 +2,11 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
+import { type ProfileDocument, ProfileRepository } from '../repositories/profile.repository.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
 import {
-  ColorSortService,
   type ColorInput as ColorSortColorInput,
+  ColorSortService,
 } from '../services/color-sort.service.js';
 import { CursorService, type CursorValue } from '../services/cursor.service.js';
 import { GatewayAttributes } from '../telemetry/attributes.js';
@@ -50,6 +51,14 @@ interface GetWallpaperArgs {
   wallpaperId: string;
 }
 
+interface ProfileArgs {
+  id: string;
+}
+
+interface ProfileByHandleArgs {
+  handle: string;
+}
+
 interface GraphQLContext {
   reply?: {
     request?: {
@@ -86,6 +95,7 @@ export class Resolvers {
 
   constructor(
     @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
+    @inject(ProfileRepository) private readonly profileRepository: ProfileRepository,
     @inject(CursorService) private readonly cursorService: CursorService,
     @inject('config') private readonly config: Config
   ) {}
@@ -101,6 +111,22 @@ export class Resolvers {
         },
         getWallpaper: async (_parent: unknown, args: GetWallpaperArgs) => {
           return await this.getWallpaper(args);
+        },
+        profile: async (_parent: unknown, args: ProfileArgs) => {
+          return await this.profileRepository.findById(args.id);
+        },
+        profileByHandle: async (_parent: unknown, args: ProfileByHandleArgs) => {
+          return await this.profileRepository.findByHandle(args.handle);
+        },
+      },
+      Profile: {
+        canonicalPath: (profile: ProfileDocument) => `/profiles/@${profile.handle}`,
+        picture: (profile: ProfileDocument, _args: unknown, context: GraphQLContext) => {
+          if (!profile.pictureAssetId) return null;
+          return {
+            id: profile.pictureAssetId,
+            url: `${this.getPublicMediaBaseUrl(context)}/profile-pictures/${profile.pictureAssetId}`,
+          };
         },
       },
       Variant: {

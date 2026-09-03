@@ -130,6 +130,7 @@ export class ProfileService {
             eventId: `evt_${ulid()}`,
             eventType: PROFILE_CREATED_SUBJECT,
             timestamp: now.toISOString(),
+            change: { type: 'created' },
             profile: {
               id: profile.id,
               displayName: profile.displayName,

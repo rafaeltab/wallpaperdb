@@ -137,7 +137,10 @@ export abstract class BaseEventPublisher<TSchema extends z.ZodType> {
           const data = JSON.stringify(validatedEvent);
           const encoder = new TextEncoder();
 
-          await this.js.publish(this.subject, encoder.encode(data), { headers: hdrs });
+          await this.js.publish(this.subject, encoder.encode(data), {
+            headers: hdrs,
+            msgID: validatedEvent.eventId,
+          });
 
           // Record success metrics
           const duration = Date.now() - startTime;

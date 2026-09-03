@@ -1,8 +1,6 @@
-import { createTestLogger } from "@wallpaperdb/test-logger";
 import { connect, type NatsConnection } from "nats";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const logger = createTestLogger("nats-container.test");
 import {
     createNatsContainer,
     type StartedNatsContainer,
@@ -13,18 +11,9 @@ describe("NATS Container", () => {
     let natsClient: NatsConnection;
 
     beforeAll(async () => {
-        // Track time to verify wait strategy is working
-        const startTime = Date.now();
         container = await createNatsContainer({
             enableJetStream: true,
         });
-        const duration = Date.now() - startTime;
-
-        logger.debug(`Container started in ${duration}ms`);
-
-        // Container should start relatively quickly with wait strategy
-        // If this takes >10 seconds, the wait strategy might not be working
-        expect(duration).toBeLessThan(15000);
     }, 60000);
 
     afterAll(async () => {

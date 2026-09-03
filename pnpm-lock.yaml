@@ -12,8 +12,8 @@ importers:
   .:
     devDependencies:
       '@ai-hero/sandcastle':
-        specifier: ^0.10.0
-        version: 0.10.0
+        specifier: npm:@rafaeltab/sandcastle@0.13.0-fork.0
+        version: '@rafaeltab/sandcastle@0.13.0-fork.0'
       '@types/node':
         specifier: ^26.0.1
         version: 26.0.1
@@ -1551,18 +1551,6 @@ packages:
 
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
-
-  '@ai-hero/sandcastle@0.10.0':
-    resolution: {integrity: sha512-7iUX90cF/RWP80OfcOf/1fkJyoPRAJo4ICyttpWWokKoFGGnuQ82lvxKpU3IEiWPbwT/g8O2PotTzgiimtQT7g==}
-    hasBin: true
-    peerDependencies:
-      '@daytona/sdk': ^0.164.0
-      '@vercel/sandbox': '>=1.0.0'
-    peerDependenciesMeta:
-      '@daytona/sdk':
-        optional: true
-      '@vercel/sandbox':
-        optional: true
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -4729,6 +4717,18 @@ packages:
 
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
+
+  '@rafaeltab/sandcastle@0.13.0-fork.0':
+    resolution: {integrity: sha512-7FqNu25fUY9jjAi40PgloyLMkGcBCGnelh8Ae/aqoZs5xYDo+YPYkPDCo/ZEBtvYpaYg2Fd0Ik0lnXQyRZmopw==}
+    hasBin: true
+    peerDependencies:
+      '@daytona/sdk': ^0.164.0
+      '@vercel/sandbox': '>=2.0.0 <4'
+    peerDependenciesMeta:
+      '@daytona/sdk':
+        optional: true
+      '@vercel/sandbox':
+        optional: true
 
   '@redis/bloom@1.2.0':
     resolution: {integrity: sha512-HG2DFjYKbpNmVXsa0keLHp/3leGJz1mjh09f2RLGGLQZzSHpkmZWuwJbAvo3QcRY8p80m5+ZdXZdYOSBLlp7Cg==}
@@ -9766,10 +9766,6 @@ snapshots:
 
   '@adobe/css-tools@4.4.4': {}
 
-  '@ai-hero/sandcastle@0.10.0':
-    dependencies:
-      '@clack/prompts': 1.6.0
-
   '@alloc/quick-lru@5.2.0': {}
 
   '@ampproject/remapping@2.3.0':
@@ -13304,6 +13300,10 @@ snapshots:
       '@types/react-dom': 19.2.3(@types/react@19.2.7)
 
   '@radix-ui/rect@1.1.1': {}
+
+  '@rafaeltab/sandcastle@0.13.0-fork.0':
+    dependencies:
+      '@clack/prompts': 1.6.0
 
   '@redis/bloom@1.2.0(@redis/client@1.6.1)':
     dependencies:

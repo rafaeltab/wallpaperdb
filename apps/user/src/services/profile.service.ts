@@ -1,13 +1,13 @@
 import {
   PROFILE_CREATED_SUBJECT,
-  ProfileCreatedEventSchema,
   type ProfileCreatedEvent,
+  ProfileCreatedEventSchema,
 } from '@wallpaperdb/events';
 import { eq } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
-import type { DatabaseConnection } from '../connections/database.js';
+import { DatabaseConnection } from '../connections/database.js';
 import { handleClaims, outboxEvents, type Profile, profiles } from '../db/schema.js';
 import {
   type ExternalIdentity,
@@ -65,7 +65,7 @@ function isUniqueViolation(error: unknown): boolean {
 @singleton()
 export class ProfileService {
   constructor(
-    private readonly database: DatabaseConnection,
+    @inject(DatabaseConnection) private readonly database: DatabaseConnection,
     @inject(IdentityProviderToken) private readonly identities: IdentityProvider,
     @inject('config') private readonly config: Config
   ) {}

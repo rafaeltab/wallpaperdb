@@ -84,7 +84,6 @@ describe('POST /profile/me/ensure', () => {
     container.register('config', { useValue: config });
     container.register(IdentityProviderToken, { useValue: identities });
     container.register(DatabaseConnection, { useValue: database });
-    container.register(ProfileService, { useValue: service() });
     const app = Fastify();
     await registerAuth(app, { testMode: true });
     await app.register(profileRoutes);

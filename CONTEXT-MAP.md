@@ -3,6 +3,7 @@
 ## Contexts
 
 - [User](./apps/user/CONTEXT.md) - owns Profiles and their community-facing identity
+- [Native Desktop](./apps/native-prototype/CONTEXT.md) - owns the local wallpaper library and display assignments in the Hyprland prototype
 
 Additional contexts are documented lazily as their domain language is resolved.
 

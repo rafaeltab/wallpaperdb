@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Afterglow</title>
+    <style>
+      body {
+        font-family: "Noto Sans", sans-serif;
+        color: #e9dfed;
+      }
+      video {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: hue-rotate(320deg) brightness(0.7);
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .caption {
+        position: absolute;
+        left: 7%;
+        bottom: 9%;
+        font-size: 11px;
+        letter-spacing: 5px;
+        opacity: 0.55;
+      }
+      .clock {
+        position: absolute;
+        right: 7%;
+        bottom: 9%;
+        font-size: 12px;
+        letter-spacing: 3px;
+        opacity: 0.6;
+      }
+      .title {
+        position: absolute;
+        left: 7%;
+        top: 20%;
+        font-size: clamp(40px, 5vw, 96px);
+        letter-spacing: -3px;
+        font-weight: 250;
+      }
+      .subtitle {
+        position: absolute;
+        left: 7%;
+        top: 17%;
+        font-size: 10px;
+        letter-spacing: 5px;
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene">
+      <video src="background.mp4" autoplay muted loop playsinline></video
+      ><canvas></canvas>
+      <div class="subtitle">THE WORLD CAN WAIT</div>
+      <div class="title">Stay a little longer.</div>
+      <div class="caption">AFTERGLOW / WALLPAPERDB</div>
+      <div class="clock"></div>
+    </div>
+    <script>
+      const canvas = document.querySelector("canvas"),
+        ctx = canvas.getContext("2d"),
+        W = wallpaper.canvas.width,
+        H = wallpaper.canvas.height;
+      document.querySelector(".title").style.fontSize =
+        Math.min(96, Math.max(40, W * 0.05)) + "px";
+      const ratio = Math.min(1, 1920 / W);
+      canvas.width = W * ratio;
+      canvas.height = H * ratio;
+      ctx.scale(ratio, ratio);
+      let pulse = 0,
+        variant = 0,
+        lastSecond = "",
+        level = 0;
+      wallpaper.on("signal", () => {
+        pulse = 1;
+        variant = (variant + 1) % 3;
+      });
+      wallpaper.on("frame", ({ time, dt, date, pointer, audio }) => {
+        level += (audio.rms - level) * Math.min(1, dt * 8);
+        pulse = Math.max(0, pulse - dt * 0.5);
+        const second = date.toLocaleTimeString();
+        if (second !== lastSecond) {
+          lastSecond = second;
+          document.querySelector(".clock").textContent =
+            date.toLocaleDateString([], { month: "short", day: "numeric" }) +
+            " / " +
+            second;
+        }
+        ctx.clearRect(0, 0, W, H);
+        for (let j = 0; j < 4; j++) {
+          ctx.beginPath();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = `hsla(${320 + variant * 35 + j * 8},65%,80%,${0.15 + j * 0.09 + level * 0.4})`;
+          for (let x = 0; x <= W; x += 8) {
+            const envelope = Math.sin((x / W) * Math.PI),
+              band = audio.bands[Math.min(15, Math.floor((x / W) * 16))] || 0;
+            const y =
+              H * 0.68 +
+              Math.sin((x / W) * 18 + time * 0.7 + j * 0.7) *
+                (14 + band * H * 0.2 + level * 150 + pulse * 35) *
+                envelope +
+              (pointer.y - 0.5) * 20;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+        if (pulse) {
+          ctx.strokeStyle = `rgba(255,220,239,${pulse * 0.45})`;
+          ctx.beginPath();
+          ctx.arc(
+            pointer.x * W,
+            pointer.y * H,
+            (1 - pulse) * 350 + 15,
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+        }
+      });
+    </script>
+  </body>
+</html>

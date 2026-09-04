@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="wallpaperdb-token" content="__TOKEN__" />
+    <title>WallpaperDB · Desktop</title>
+    <link rel="stylesheet" href="/ui.css" />
+    <script defer src="/ui.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/" aria-label="WallpaperDB desktop home"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="3" />
+          <circle cx="9" cy="9" r="2" />
+          <path d="m4 19 7-7 4 4 3-3 3 3" /></svg
+        ><strong>WallpaperDB</strong
+        ><span class="desktop-label">Desktop</span></a
+      >
+      <div class="connection">
+        <i></i> Local library <span>·</span> Hyprland
+      </div>
+      <button id="import" class="primary small">＋ Import files</button>
+    </header>
+    <div class="shell">
+      <aside class="sidebar">
+        <p class="eyebrow">YOUR SPACE</p>
+        <button class="nav active" id="library-nav">
+          <span>▧</span> Wallpapers <b id="library-count">0</b>
+        </button>
+        <button class="nav" id="displays-nav">
+          <span>▱</span> Display layout
+        </button>
+        <div class="sidebar-bottom">
+          <div class="local-icon">↙</div>
+          <strong>Made for your desktop.</strong>
+          <p>
+            Your files, your displays.<br />Everything stays on this machine.
+          </p>
+          <button id="import-bundle" class="quiet">
+            Import a live folder ↗</button
+          ><span class="version">NATIVE PROTOTYPE · 0.1</span>
+        </div>
+      </aside>
+      <main>
+        <div class="page-title">
+          <div>
+            <p class="eyebrow accent">A LITTLE MORE ALIVE</p>
+            <h1>Your wallpapers</h1>
+            <p>Find a new atmosphere for your everyday.</p>
+          </div>
+          <button id="refresh" class="icon-button" aria-label="Refresh library">
+            ↻
+          </button>
+        </div>
+        <section class="display-section" aria-label="Display selection">
+          <div class="section-label">
+            <h2>Make it yours</h2>
+            <span id="display-hint">Select the displays to change</span>
+          </div>
+          <div class="display-workspace">
+            <div id="monitor-map" aria-label="Connected monitor layout"></div>
+            <div class="layout-controls">
+              <span class="field-label">WALLPAPER LAYOUT</span>
+              <div class="segmented">
+                <button id="independent" class="selected">Per display</button
+                ><button id="span">Span selection</button>
+              </div>
+              <p id="layout-explanation">
+                Fill each selected display independently.
+              </p>
+              <button id="clear" class="quiet">
+                Restore selected backgrounds
+              </button>
+            </div>
+          </div>
+        </section>
+        <section class="collection" aria-label="Wallpaper library">
+          <div class="toolbar">
+            <div class="tabs" role="tablist" aria-label="Wallpaper type">
+              <button
+                class="selected"
+                role="tab"
+                aria-selected="true"
+                data-filter="all"
+              >
+                All wallpapers <span id="all-count">0</span></button
+              ><button role="tab" aria-selected="false" data-filter="image">
+                Images</button
+              ><button role="tab" aria-selected="false" data-filter="video">
+                Videos</button
+              ><button role="tab" aria-selected="false" data-filter="live">
+                Live
+              </button>
+            </div>
+            <label class="search"
+              ><span>⌕</span
+              ><input
+                id="search"
+                type="search"
+                placeholder="Search your library"
+                aria-label="Search your library"
+              /><kbd>/</kbd></label
+            >
+          </div>
+          <div id="gallery" class="gallery"></div>
+          <div id="empty" hidden>
+            <h3>A little room for inspiration.</h3>
+            <p>
+              Import an image, video, or live wallpaper folder to get started.
+            </p>
+          </div>
+        </section>
+        <footer>
+          <span
+            ><i></i
+            ><span id="runtime-status">Connecting to your desktop…</span></span
+          ><span>LOCAL FIRST. ALWAYS YOURS.</span>
+        </footer>
+      </main>
+      <aside id="inspector" class="inspector" aria-label="Selected wallpaper">
+        <div class="inspector-label">
+          <span class="eyebrow">WALLPAPER DETAILS</span><span>↗</span>
+        </div>
+        <div id="detail-art" class="detail-art"></div>
+        <div id="detail-tags" class="detail-tags"></div>
+        <h2 id="detail-title">Choose your atmosphere</h2>
+        <p id="detail-description">Select a wallpaper from your collection.</p>
+        <div id="reactivity" class="reactivity">
+          <span class="field-label">BRING IT TO LIFE</span>
+          <div class="capabilities">
+            <span>♫ Audio</span><span>↖ Pointer</span><span>⌨ Keyboard</span
+            ><span>◷ Time</span>
+          </div>
+        </div>
+        <div class="setting">
+          <div>
+            <strong>System audio</strong>
+            <p>Let the scene feel your music</p>
+          </div>
+          <label class="switch"
+            ><input
+              type="checkbox"
+              id="audio"
+              aria-label="React to system audio" /><span></span
+          ></label>
+        </div>
+        <div class="setting">
+          <div>
+            <strong>Animation budget</strong>
+            <p>Balance motion and energy</p>
+          </div>
+          <select id="fps" aria-label="Animation frame rate">
+            <option value="15">15 fps</option>
+            <option value="30" selected>30 fps</option>
+            <option value="60">60 fps</option>
+          </select>
+        </div>
+        <div class="apply-area">
+          <p id="apply-target">Applying to DP-2</p>
+          <button id="apply" class="primary">
+            Apply wallpaper <span>↗</span>
+          </button>
+          <div class="playback">
+            <button id="pause" class="quiet">Ⅱ Pause</button
+            ><button id="pulse" class="quiet">✧ Send a pulse</button>
+          </div>
+          <p class="tip">
+            Space sends a pulse while this library is focused. Live scenes can
+            also use a Hyprland shortcut.
+          </p>
+        </div>
+        <div class="performance">
+          <i></i>
+          <div>
+            <strong>Easy on your system</strong>
+            <p>
+              Still images rest. Motion pauses on fullscreen displays and
+              sleeping monitors.
+            </p>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+    <div id="error" role="alert" hidden></div>
+  </body>
+</html>

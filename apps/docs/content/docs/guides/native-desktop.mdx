@@ -1,0 +1,51 @@
+---
+title: Native Desktop Prototype
+description: Run local image, video, and programmable wallpapers on Manjaro with Hyprland
+---
+
+The native desktop prototype lives in `apps/native-prototype`. It runs independently of the website and backend, with a Rust CLI and a native library window using WallpaperDB's dark theme and pink accent.
+
+## Start the library
+
+Use a terminal in your Hyprland session. Install the system dependencies listed in `apps/native-prototype/USAGE.md`, then run from the repository root:
+
+```sh
+make native
+```
+
+Select a monitor, select a bundled wallpaper, and press **Apply wallpaper**. The initial selection is DP-2. Import an image or video with the file chooser, or import a live folder containing `wallpaper.json`. Imports reference the original files, so keep them in place.
+
+Select several monitors and choose **Span selection** to display one continuous wallpaper. **Per display** fills each selected monitor independently. Different groups can run different wallpaper types. Closing the library keeps the wallpapers running.
+
+## Use the CLI
+
+```sh
+make native ARGS='monitors'
+make native ARGS='set "/absolute/path/image.jpg" --outputs DP-2'
+make native ARGS='set "/absolute/path/video.mp4" --outputs DP-2'
+make native ARGS='set apps/native-prototype/examples/rose-clock --outputs DP-2 --audio'
+make native ARGS='pause --outputs DP-2'
+make native ARGS='resume --outputs DP-2'
+make native ARGS='stop'
+```
+
+Audio reactivity uses the system playback monitor and is opt-in. Space in the library sends a pulse to selected wallpapers. Explicit Hyprland shortcuts and an optional desktop interaction mode are described in the usage guide.
+
+## Write a live wallpaper
+
+Live wallpapers are executable HTML and JavaScript programs that combine local images and videos with Canvas, DOM content, and time-based behavior. The host provides frame callbacks, audio levels and frequency bins, pointer coordinates, keyboard signals, and display geometry.
+
+Use `apps/native-prototype/AUTHORING.md` for the API contract and the bundled `rose-clock` and `tide` directories as examples. Use the host's frame loop and pause event to stop unnecessary work when a monitor is asleep, a fullscreen app covers it, or the user pauses playback.
+
+## Verify changes
+
+```sh
+make native-test
+make native-check
+make native-ui-test
+make native-verify
+```
+
+The UI test requires Chromium. The desktop acceptance run changes DP-2, briefly tests fullscreen and display sleep, plays a quiet audio test tone, and creates two temporary virtual outputs for spanning and hotplug checks. It removes those outputs and leaves a bundled live wallpaper on DP-2. Screenshots and measurements are written to `apps/native-prototype/verification/`.
+
+The prototype's `NOTES.md` records the verified behavior, performance, and remaining platform limitations. Backend integration should download assets into the local library and reuse the existing assignment API.

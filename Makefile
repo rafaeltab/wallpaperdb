@@ -1,4 +1,4 @@
-.PHONY: infra-start infra-stop infra-reset infra-logs apps-start apps-stop \
+.PHONY: native native-build native-test native-ui-test native-check native-format native-format-web native-assets native-verify infra-start infra-stop infra-reset infra-logs apps-start apps-stop \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
         migrate psql psql-ingestor psql-media psql-tags psql-user db-studio-ingestor db-studio-media db-studio-user \
@@ -52,6 +52,15 @@ TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 
 help:
 	@echo "WallpaperDB - Available commands:"
+	@echo "  make native ARGS='ui' - Run the native Hyprland wallpaper prototype"
+	@echo "  make native-build     - Build the native prototype"
+	@echo "  make native-test      - Test native layout, library, and scene behavior"
+	@echo "  make native-ui-test   - Exercise the real library UI using local Chromium"
+	@echo "  make native-check     - Check native Rust formatting and lints"
+	@echo "  make native-format    - Format the native Rust prototype"
+	@echo "  make native-format-web - Format the native library UI and example scenes"
+	@echo "  make native-assets    - Regenerate the bundled demonstration video"
+	@echo "  make native-verify    - Verify wallpaper modes on DP-2"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
 	@echo ""
@@ -792,6 +801,38 @@ sandcastle-test:
 
 sandcastle-check-types:
 	@pnpm sandcastle:check-types
+
+# Native desktop prototype (independent of the Node services)
+NATIVE_MANIFEST = apps/native-prototype/Cargo.toml
+NATIVE_CARGO_FLAGS ?= --release
+native:
+	@cargo run --manifest-path $(NATIVE_MANIFEST) $(NATIVE_CARGO_FLAGS) -- $(ARGS)
+
+native-build:
+	@cargo build --manifest-path $(NATIVE_MANIFEST) $(NATIVE_CARGO_FLAGS)
+
+native-test:
+	@cargo test --manifest-path $(NATIVE_MANIFEST)
+	@node --test apps/native-prototype/tests/runtime.test.mjs
+
+native-ui-test:
+	@node apps/native-prototype/scripts/ui-test.mjs
+
+native-check:
+	@cargo fmt --manifest-path $(NATIVE_MANIFEST) --check
+	@cargo clippy --manifest-path $(NATIVE_MANIFEST) --all-targets -- -D warnings
+
+native-format:
+	@cargo fmt --manifest-path $(NATIVE_MANIFEST)
+
+native-format-web:
+	@npx --yes prettier@3.6.2 --write 'apps/native-prototype/{ui,runtime,tests,scripts,examples}/**/*.{js,mjs,css,html,json}'
+
+native-assets:
+	@python3 apps/native-prototype/scripts/generate-assets.py
+
+native-verify:
+	@python3 apps/native-prototype/scripts/verify.py
 
 # All services commands
 dev:

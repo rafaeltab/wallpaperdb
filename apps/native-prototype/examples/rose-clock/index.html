@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Rose hour</title>
+    <style>
+      body {
+        font-family: "Noto Sans", sans-serif;
+        color: #ffedf5;
+      }
+      #scene {
+        background: #171322;
+      }
+      .landscape {
+        position: absolute;
+        inset: -3%;
+        width: 106%;
+        height: 106%;
+        object-fit: cover;
+        will-change: transform;
+      }
+      .shade {
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(90deg, #11122480, transparent 65%),
+          linear-gradient(0deg, #13132055, transparent 50%);
+      }
+      .clock {
+        position: absolute;
+        left: 8%;
+        top: 27%;
+      }
+      .eyebrow {
+        font-size: 12px;
+        letter-spacing: 7px;
+        opacity: 0.5;
+        text-transform: uppercase;
+      }
+      .time {
+        font-size: clamp(60px, 7vw, 140px);
+        line-height: 1.2;
+        font-weight: 250;
+        letter-spacing: -6px;
+        margin: 8px 0;
+      }
+      .date {
+        font-size: 15px;
+        letter-spacing: 2px;
+        opacity: 0.6;
+      }
+      .caption {
+        position: absolute;
+        left: 8%;
+        bottom: 9%;
+        font-size: 11px;
+        letter-spacing: 4px;
+        opacity: 0.45;
+      }
+      canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .audio-caption {
+        position: absolute;
+        right: 8%;
+        bottom: 9%;
+        font-size: 9px;
+        letter-spacing: 3px;
+        opacity: 0.4;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene">
+      <img class="landscape" src="background.svg" alt="" />
+      <div class="shade"></div>
+      <canvas></canvas>
+      <div class="clock">
+        <div class="eyebrow">Take a moment</div>
+        <div class="time"></div>
+        <div class="date"></div>
+      </div>
+      <div class="caption">ROSE HOUR / WALLPAPERDB</div>
+      <div class="audio-caption">MOVE · LISTEN · BREATHE</div>
+    </div>
+    <script>
+      const canvas = document.querySelector("canvas"),
+        ctx = canvas.getContext("2d"),
+        image = document.querySelector(".landscape");
+      const W = wallpaper.canvas.width,
+        H = wallpaper.canvas.height;
+      document.querySelector(".time").style.fontSize =
+        Math.min(140, Math.max(60, W * 0.07)) + "px";
+      // Cap the backing resolution; compositor scales the canvas and keeps text sharp.
+      const ratio = Math.min(1, 1920 / W);
+      canvas.width = Math.round(W * ratio);
+      canvas.height = Math.round(H * ratio);
+      ctx.scale(ratio, ratio);
+      let pulse = 0,
+        hue = 0,
+        lastMinute = "",
+        level = 0;
+      wallpaper.on("signal", (event) => {
+        pulse = 1;
+        if (event.name === "key") hue = (hue + 24) % 180;
+      });
+      wallpaper.on("frame", ({ time, dt, date, pointer, audio }) => {
+        level += (audio.rms - level) * Math.min(1, dt * 9);
+        pulse = Math.max(0, pulse - dt * 0.6);
+        const key = date.getHours() + ":" + date.getMinutes();
+        if (key !== lastMinute) {
+          lastMinute = key;
+          document.querySelector(".time").textContent = date.toLocaleTimeString(
+            [],
+            { hour: "2-digit", minute: "2-digit" },
+          );
+          document.querySelector(".date").textContent = date.toLocaleDateString(
+            [],
+            { weekday: "long", month: "long", day: "numeric" },
+          );
+        }
+        image.style.transform = `translate(${(pointer.x - 0.5) * -18}px,${(pointer.y - 0.5) * -12}px) scale(${1 + level * 0.06})`;
+        ctx.clearRect(0, 0, W, H);
+        for (let i = 0; i < 65; i++) {
+          const x =
+            ((((i * 137.3 + Math.sin(time * 0.1 + i) * 15) % W) + W) % W) +
+            (pointer.x - 0.5) * 15;
+          const y = (i * 97.7 + time * (2 + (i % 3))) % (H * 0.85);
+          ctx.fillStyle = `hsla(${338 + hue},70%,85%,${0.12 + 0.24 * (0.5 + 0.5 * Math.sin(time + i)) + level * 0.6})`;
+          ctx.beginPath();
+          ctx.arc(x, y, 1 + (i % 3) * 0.3 + pulse * 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        const center = W * 0.78,
+          base = H * 0.86;
+        for (let i = 0; i < 48; i++) {
+          const energy = audio.bands[i % 16] || 0;
+          const height =
+            3 +
+            energy * H * 0.22 +
+            level * H * 0.12 +
+            pulse * 25 * Math.sin((i / 48) * Math.PI);
+          ctx.fillStyle = `hsla(${335 + hue + i * 0.6},60%,78%,${0.25 + level})`;
+          ctx.fillRect(center + (i - 24) * 5, base - height, 2, height);
+        }
+        if (pulse > 0) {
+          ctx.strokeStyle = `hsla(${335 + hue},80%,85%,${pulse * 0.4})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(
+            W * pointer.x,
+            H * pointer.y,
+            (1 - pulse) * 240 + 20,
+            0,
+            Math.PI * 2,
+          );
+          ctx.stroke();
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+{
+  "title": "Afterglow",
+  "entry": "index.html",
+  "preview": "background.svg",
+  "description": "A moving landscape, a living waveform. Music shapes the horizon; your pointer and keyboard leave ripples in the evening.",
+  "tags": ["audio", "pointer", "keyboard", "clock", "video"]
+}

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -38,6 +38,12 @@ describe('SignInForm', () => {
       fetchStatus: 'idle',
       ...overrides,
     };
+  }
+
+  async function submitCredentials(email: string, password: string) {
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: email } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: password } });
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
   }
 
   beforeEach(() => {
@@ -103,14 +109,15 @@ describe('SignInForm', () => {
       }),
     );
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await submitCredentials('test@example.com', 'wrongpassword');
 
     await waitFor(() => {
+      expect(mockPassword).toHaveBeenCalledWith({
+        emailAddress: 'test@example.com',
+        password: 'wrongpassword',
+      });
       expect(screen.getByTestId('sign-in-error-alert')).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(/password you entered is incorrect/i);
     });
@@ -140,14 +147,15 @@ describe('SignInForm', () => {
       }),
     );
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'bad@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await submitCredentials('bad@example.com', 'password123');
 
     await waitFor(() => {
+      expect(mockPassword).toHaveBeenCalledWith({
+        emailAddress: 'bad@example.com',
+        password: 'password123',
+      });
       expect(screen.getByRole('alert')).toHaveTextContent(/invalid email/i);
     });
   });
@@ -159,12 +167,9 @@ describe('SignInForm', () => {
     });
     mockFinalize.mockResolvedValue(undefined);
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await submitCredentials('test@example.com', 'password123');
 
     await waitFor(() => {
       expect(mockFinalize).toHaveBeenCalledWith(
@@ -177,12 +182,9 @@ describe('SignInForm', () => {
     mockPassword.mockResolvedValue({ error: { code: 'form_password_incorrect' } });
     mockFinalize.mockResolvedValue(undefined);
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrongpassword');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await submitCredentials('test@example.com', 'wrongpassword');
 
     await waitFor(() => {
       expect(mockPassword).toHaveBeenCalled();
@@ -194,10 +196,9 @@ describe('SignInForm', () => {
     mockSso.mockResolvedValue(undefined);
     mockReset.mockResolvedValue(undefined);
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.click(screen.getByRole('button', { name: /sign in with google/i }));
+    await userEvent.click(screen.getByRole('button', { name: /sign in with google/i }));
 
     await waitFor(() => {
       expect(mockReset).toHaveBeenCalled();
@@ -211,10 +212,9 @@ describe('SignInForm', () => {
     mockSso.mockResolvedValue(undefined);
     mockReset.mockResolvedValue(undefined);
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.click(screen.getByRole('button', { name: /sign in with github/i }));
+    await userEvent.click(screen.getByRole('button', { name: /sign in with github/i }));
 
     await waitFor(() => {
       expect(mockReset).toHaveBeenCalled();
@@ -243,12 +243,9 @@ describe('SignInForm', () => {
       }),
     );
 
-    const user = userEvent.setup();
     render(<SignInForm />);
 
-    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
-    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+    await submitCredentials('test@example.com', 'password123');
 
     await waitFor(() => {
       expect(mockSendEmailCode).toHaveBeenCalledOnce();

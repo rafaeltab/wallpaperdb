@@ -1,6 +1,6 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import type { DocumentNode, FieldNode, ValueNode } from 'graphql';
-import { visit } from 'graphql';
+import type { DocumentNode, FieldNode, GraphQLSchema, ValueNode } from 'graphql';
+import { TypeInfo, visit, visitWithTypeInfo } from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { BreadthLimitError, ComplexityLimitError } from '../errors/graphql-errors.js';
@@ -20,6 +20,7 @@ export class QueryComplexityService {
 
     // Expensive nested fields
     'Wallpaper.variants': 5, // Array of variants
+    'Profile.wallpapers': 10,
 
     // Computed fields
     'Variant.url': 1, // Cheap computed field
@@ -30,7 +31,7 @@ export class QueryComplexityService {
 
   // Average nested list sizes (based on actual data patterns)
   private readonly AVERAGE_NESTED_SIZES: Record<string, number> = {
-    variants: 5, // Average variants per wallpaper
+    'Wallpaper.variants': 5, // Average variants per wallpaper
   };
 
   // Note: LIST_MULTIPLIER is implicit in cost calculations (see getListMultiplier)
@@ -38,23 +39,32 @@ export class QueryComplexityService {
   /**
    * Calculate the complexity of a GraphQL document
    */
-  calculateComplexity(document: DocumentNode, variables: Record<string, unknown>): number {
+  calculateComplexity(
+    schema: GraphQLSchema,
+    document: DocumentNode,
+    variables: Record<string, unknown>
+  ): number {
     let totalCost = 0;
+    const typeInfo = new TypeInfo(schema);
 
-    visit(document, {
-      Field: (node) => {
-        const fieldName = this.getFieldName(node);
-        const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
+    visit(
+      document,
+      visitWithTypeInfo(typeInfo, {
+        Field: (node) => {
+          const parentType = typeInfo.getParentType();
+          const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
+          const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
 
-        // Calculate list multiplier from arguments (first, last)
-        const listMultiplier = this.getListMultiplier(node, variables);
+          // Calculate list multiplier from arguments (first, last)
+          const listMultiplier = this.getListMultiplier(node, variables);
 
-        // Calculate nested multiplier for nested lists
-        const nestedMultiplier = this.getNestedMultiplier(node);
+          // Calculate nested multiplier for nested lists
+          const nestedMultiplier = this.getNestedMultiplier(fieldName);
 
-        totalCost += fieldCost * listMultiplier * nestedMultiplier;
-      },
-    });
+          totalCost += fieldCost * listMultiplier * nestedMultiplier;
+        },
+      })
+    );
 
     return totalCost;
   }
@@ -120,15 +130,6 @@ export class QueryComplexityService {
   }
 
   /**
-   * Get fully qualified field name (Type.field)
-   */
-  private getFieldName(node: FieldNode): string {
-    // For now, return just the field name
-    // In a more sophisticated implementation, we'd track the parent type
-    return node.name.value;
-  }
-
-  /**
    * Get list multiplier from pagination arguments
    */
   private getListMultiplier(node: FieldNode, variables: Record<string, unknown>): number {
@@ -153,9 +154,7 @@ export class QueryComplexityService {
   /**
    * Get nested list multiplier for fields that return nested lists
    */
-  private getNestedMultiplier(node: FieldNode): number {
-    const fieldName = node.name.value;
-
+  private getNestedMultiplier(fieldName: string): number {
     // Check if this field returns a nested list
     if (this.AVERAGE_NESTED_SIZES[fieldName]) {
       return this.AVERAGE_NESTED_SIZES[fieldName];

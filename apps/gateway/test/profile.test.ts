@@ -1,8 +1,9 @@
 import "reflect-metadata";
 import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT } from "@wallpaperdb/events";
 import { container } from "tsyringe";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ProfileRepository } from "../src/repositories/profile.repository.js";
+import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
 import { tester } from "./setup.js";
 
 interface ProfileSnapshot {
@@ -287,5 +288,164 @@ describe("Profile projection integration", () => {
             missingId: null,
             noPicture: { picture: null },
         });
+    });
+
+    it("paginates only the wallpapers owned by a Profile", async () => {
+        const timestamp = "2026-03-01T00:00:00.000Z";
+        await container.resolve(ProfileRepository).project({
+            id: "user_profile_wallpapers",
+            displayName: "Wallpaper Owner",
+            handle: "wallpaper-owner",
+            claimGeneration: 1,
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        });
+
+        const wallpaperRepository = container.resolve(WallpaperRepository);
+        for (const [wallpaperId, userId] of [
+            ["wlpr_profile_001", "user_profile_wallpapers"],
+            ["wlpr_profile_002", "user_profile_wallpapers"],
+            ["wlpr_profile_003", "user_profile_wallpapers"],
+            ["wlpr_other_profile", "user_other_profile"],
+        ]) {
+            await wallpaperRepository.upsert({
+                wallpaperId,
+                userId,
+                variants: [],
+                uploadedAt: timestamp,
+                updatedAt: timestamp,
+            });
+        }
+
+        const firstPage = await query(`
+            query {
+                profile(id: "user_profile_wallpapers") {
+                    wallpapers(first: 2) {
+                        edges { node { wallpaperId profileId } }
+                        pageInfo { hasNextPage endCursor }
+                    }
+                }
+            }
+        `);
+
+        expect(firstPage.errors).toBeUndefined();
+        expect(firstPage.data.profile.wallpapers.edges).toEqual([
+            { node: { wallpaperId: "wlpr_profile_001", profileId: "user_profile_wallpapers" } },
+            { node: { wallpaperId: "wlpr_profile_002", profileId: "user_profile_wallpapers" } },
+        ]);
+        expect(firstPage.data.profile.wallpapers.pageInfo.hasNextPage).toBe(true);
+
+        const secondPage = await query(`
+            query {
+                profile(id: "user_profile_wallpapers") {
+                    wallpapers(first: 2, after: "${firstPage.data.profile.wallpapers.pageInfo.endCursor}") {
+                        edges { node { wallpaperId profileId } }
+                        pageInfo { hasNextPage hasPreviousPage }
+                    }
+                }
+            }
+        `);
+
+        expect(secondPage.errors).toBeUndefined();
+        expect(secondPage.data.profile.wallpapers).toEqual({
+            edges: [
+                { node: { wallpaperId: "wlpr_profile_003", profileId: "user_profile_wallpapers" } },
+            ],
+            pageInfo: { hasNextPage: false, hasPreviousPage: true },
+        });
+    });
+
+    it("batch-resolves nullable Profile relationships for wallpaper results", async () => {
+        const timestamp = "2026-03-02T00:00:00.000Z";
+        const profileRepository = container.resolve(ProfileRepository);
+        for (const [id, handle] of [
+            ["user_profile_batch_a", "batch-a"],
+            ["user_profile_batch_b", "batch-b"],
+        ]) {
+            await profileRepository.project({
+                id,
+                displayName: handle,
+                handle,
+                claimGeneration: 1,
+                biographyMarkdown: "",
+                pictureAssetId: null,
+                version: 1,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+            });
+        }
+
+        const wallpaperRepository = container.resolve(WallpaperRepository);
+        for (const [wallpaperId, userId] of [
+            ["wlpr_batch_001", "user_profile_batch_a"],
+            ["wlpr_batch_002", "user_profile_batch_a"],
+            ["wlpr_batch_003", "user_profile_batch_b"],
+            ["wlpr_batch_004", "user_profile_missing"],
+        ]) {
+            await wallpaperRepository.upsert({
+                wallpaperId,
+                userId,
+                variants: [],
+                uploadedAt: timestamp,
+                updatedAt: timestamp,
+            });
+        }
+
+        const findByIds = vi.spyOn(profileRepository, "findByIds");
+        const result = await query(`
+            query {
+                searchWallpapers(first: 10) {
+                    edges {
+                        node {
+                            wallpaperId
+                            profileId
+                            profile { id handle }
+                        }
+                    }
+                }
+            }
+        `);
+
+        expect(result.errors).toBeUndefined();
+        expect(result.data.searchWallpapers.edges).toEqual([
+            {
+                node: {
+                    wallpaperId: "wlpr_batch_001",
+                    profileId: "user_profile_batch_a",
+                    profile: { id: "user_profile_batch_a", handle: "batch-a" },
+                },
+            },
+            {
+                node: {
+                    wallpaperId: "wlpr_batch_002",
+                    profileId: "user_profile_batch_a",
+                    profile: { id: "user_profile_batch_a", handle: "batch-a" },
+                },
+            },
+            {
+                node: {
+                    wallpaperId: "wlpr_batch_003",
+                    profileId: "user_profile_batch_b",
+                    profile: { id: "user_profile_batch_b", handle: "batch-b" },
+                },
+            },
+            {
+                node: {
+                    wallpaperId: "wlpr_batch_004",
+                    profileId: "user_profile_missing",
+                    profile: null,
+                },
+            },
+        ]);
+        expect(findByIds).toHaveBeenCalledTimes(1);
+        expect(findByIds).toHaveBeenCalledWith([
+            "user_profile_batch_a",
+            "user_profile_batch_a",
+            "user_profile_batch_b",
+            "user_profile_missing",
+        ]);
     });
 });

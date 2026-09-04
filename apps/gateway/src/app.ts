@@ -177,6 +177,7 @@ export async function createApp(
   await fastify.register(mercurius, {
     schema,
     resolvers: resolversInstance.getResolvers(),
+    loaders: resolversInstance.getLoaders(),
     graphiql: config.nodeEnv === 'development', // Enable GraphiQL in development
     path: '/graphql',
     queryDepth: config.graphqlMaxDepth, // Built-in depth limiting
@@ -188,19 +189,26 @@ export async function createApp(
     const complexityService = container.resolve(QueryComplexityService);
 
     // preExecution hook for complexity and breadth analysis
-    fastify.graphql.addHook('preExecution', async (_schema, document, _context, variables) => {
-      return await withSpan('graphql.security_check', {}, async (span) => {
-        // Check breadth (unique fields and aliases)
-        complexityService.checkBreadth(document);
+    fastify.graphql.addHook(
+      'preExecution',
+      async (graphqlSchema, document, _context, variables) => {
+        return await withSpan('graphql.security_check', {}, async (span) => {
+          // Check breadth (unique fields and aliases)
+          complexityService.checkBreadth(document);
 
-        // Calculate and validate complexity
-        const complexity = complexityService.calculateComplexity(document, variables ?? {});
-        span.setAttribute('graphql.complexity', complexity);
-        recordHistogram('graphql.query.complexity', complexity);
+          // Calculate and validate complexity
+          const complexity = complexityService.calculateComplexity(
+            graphqlSchema,
+            document,
+            variables ?? {}
+          );
+          span.setAttribute('graphql.complexity', complexity);
+          recordHistogram('graphql.query.complexity', complexity);
 
-        complexityService.validateComplexity(complexity);
-      });
-    });
+          complexityService.validateComplexity(complexity);
+        });
+      }
+    );
   });
 
   // Initialize connections

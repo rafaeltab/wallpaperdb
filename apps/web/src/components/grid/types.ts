@@ -18,7 +18,7 @@ export interface GridItem {
   aspectRatio: number;
   /** Optional metadata for custom rendering or logic */
   metadata?: {
-    userId?: string;
+    profileId?: string;
     uploadedAt?: string;
     variantCount?: number;
     /** Full wallpaper object for actions (download, share, view) */

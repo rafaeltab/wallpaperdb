@@ -70,7 +70,7 @@ describe('HomePage browse filters', () => {
               {
                 node: {
                   wallpaperId: 'wlpr_123',
-                  userId: 'user_1',
+                  profileId: 'user_1',
                   variants: [
                     {
                       width: 1920,

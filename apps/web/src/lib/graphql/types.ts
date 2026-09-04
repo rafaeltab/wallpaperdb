@@ -2,7 +2,8 @@
 
 export interface Wallpaper {
   wallpaperId: string;
-  userId: string;
+  profileId: string;
+  profile?: Profile | null;
   variants: Variant[];
   uploadedAt: string;
   updatedAt: string;
@@ -35,7 +36,7 @@ export interface WallpaperConnection {
 }
 
 export interface WallpaperFilter {
-  userId?: string;
+  profileId?: string;
   variants?: VariantFilter;
 }
 

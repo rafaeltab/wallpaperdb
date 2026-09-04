@@ -98,7 +98,7 @@ export function wallpaperToGridItem(wallpaper: Wallpaper): GridItem | null {
     height: variant.height,
     aspectRatio: variant.aspectRatio,
     metadata: {
-      userId: wallpaper.userId,
+      profileId: wallpaper.profileId,
       uploadedAt: wallpaper.uploadedAt,
       variantCount: wallpaper.variants.length,
       wallpaper: wallpaper, // Store full wallpaper for actions (download, share, view)

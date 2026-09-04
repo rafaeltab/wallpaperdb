@@ -1,4 +1,10 @@
+import type { ReactNode } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
+import { WallpaperGrid } from '@/components/WallpaperGrid';
+import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import type { Profile } from '@/lib/graphql/types';
+import { ProfilePicture } from './profile-picture';
 
 interface PublicProfilePageProps {
   profile: Profile;
@@ -36,38 +42,56 @@ export function PublicProfilePage({ profile }: PublicProfilePageProps) {
           </div>
         </div>
       </section>
+
+      <ProfileWallpapers profileId={profile.id} />
     </div>
   );
 }
 
-function ProfilePicture({ profile }: PublicProfilePageProps) {
-  const accessibleName = `${profile.displayName}'s profile picture`;
-  const className =
-    'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl';
+function ProfileWallpapers({ profileId }: { profileId: string }) {
+  const { data, isLoading, isFetchingNextPage, error, hasNextPage, fetchNextPage } =
+    useWallpaperInfiniteQuery({ filter: { profileId } });
+  const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
+  let content: ReactNode;
 
-  if (profile.picture) {
-    return <img className={className} src={profile.picture.url} alt={accessibleName} />;
+  if (error && wallpapers.length === 0) {
+    content = (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load wallpapers</AlertTitle>
+        <AlertDescription>Please try again later.</AlertDescription>
+      </Alert>
+    );
+  } else if (wallpapers.length > 0 || isLoading) {
+    content = (
+      <>
+        <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isLoading || isFetchingNextPage} />
+        {error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>Could not load more wallpapers</AlertTitle>
+            <AlertDescription>Your loaded wallpapers are still available.</AlertDescription>
+          </Alert>
+        )}
+        <LoadMoreTrigger
+          onLoadMore={() => void fetchNextPage()}
+          hasMore={Boolean(hasNextPage)}
+          isLoading={isFetchingNextPage}
+        />
+      </>
+    );
+  } else {
+    content = (
+      <p className="rounded-xl border border-dashed px-5 py-10 text-center text-muted-foreground">
+        No wallpapers yet.
+      </p>
+    );
   }
 
   return (
-    <div
-      role="img"
-      aria-label={accessibleName}
-      className={className}
-      style={{ backgroundColor: fallbackColor(profile.id) }}
-    >
-      {initials(profile.displayName)}
-    </div>
+    <section className="mt-10" aria-labelledby="profile-wallpapers-heading">
+      <h2 id="profile-wallpapers-heading" className="mb-5 text-2xl font-bold tracking-tight">
+        Wallpapers
+      </h2>
+      {content}
+    </section>
   );
-}
-
-function initials(displayName: string): string {
-  const words = displayName.trim().split(/\s+/).filter(Boolean);
-  return `${words[0]?.[0] ?? '?'}${words.length > 1 ? (words.at(-1)?.[0] ?? '') : ''}`.toUpperCase();
-}
-
-function fallbackColor(profileId: string): string {
-  let hash = 0;
-  for (const character of profileId) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return `hsl(${hash % 360} 58% 42%)`;
 }

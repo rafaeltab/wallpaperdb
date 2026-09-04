@@ -50,6 +50,20 @@ export class ProfileRepository {
     }
   }
 
+  async findByIds(ids: string[]): Promise<Array<ProfileDocument | null>> {
+    if (ids.length === 0) return [];
+
+    const result = await this.openSearchConnection.getClient().mget({
+      index: this.indexManager.getIndexName(profileIndexDefinition.key),
+      body: { ids },
+    });
+
+    return result.body.docs.map((document: { found?: boolean; _source?: ProfileDocument }) => {
+      if (document.found === false) return null;
+      return document._source ?? null;
+    });
+  }
+
   async findByHandle(handle: string): Promise<ProfileDocument | null> {
     const result = await this.openSearchConnection.getClient().search({
       index: this.indexManager.getIndexName(profileIndexDefinition.key),

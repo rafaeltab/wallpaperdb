@@ -48,6 +48,7 @@ APPS_COMPOSE  = docker compose -p $(COMPOSE_PROJECT_NAME) -f infra/docker-compos
 SANDCASTLE_AUTH_DIR ?= .sandcastle
 SANDCASTLE_OPENCODE_AUTH ?= $(HOME)/.local/share/opencode/auth.json
 GITHUB_CLI ?= gh
+TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 
 help:
 	@echo "WallpaperDB - Available commands:"
@@ -303,7 +304,7 @@ nats-stream-info:
 # Database commands
 migrate:
 	@echo "Running database migrations..."
-	@turbo run db:migrate
+	@$(TURBO) run db:migrate
 	@echo "✓ Database migrations completed"
 
 psql:
@@ -332,153 +333,153 @@ db-studio-user:
 
 # Ingestor service commands
 ingestor-dev:
-	@turbo run dev --filter=@wallpaperdb/ingestor
+	@$(TURBO) run dev --filter=@wallpaperdb/ingestor
 
 ingestor-build:
-	@turbo run build --filter=@wallpaperdb/ingestor
+	@$(TURBO) run build --filter=@wallpaperdb/ingestor
 
 ingestor-start:
-	@turbo run start --filter=@wallpaperdb/ingestor
+	@$(TURBO) run start --filter=@wallpaperdb/ingestor
 
 ingestor-test:
-	@turbo run test --filter=@wallpaperdb/ingestor
+	@$(TURBO) run test --filter=@wallpaperdb/ingestor
 
 ingestor-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/ingestor
+	@$(TURBO) run test:watch --filter=@wallpaperdb/ingestor
 
 ingestor-format:
-	@turbo run format --filter=@wallpaperdb/ingestor
+	@$(TURBO) run format --filter=@wallpaperdb/ingestor
 
 ingestor-lint:
-	@turbo run lint --filter=@wallpaperdb/ingestor
+	@$(TURBO) run lint --filter=@wallpaperdb/ingestor
 
 ingestor-check:
-	@turbo run check --filter=@wallpaperdb/ingestor
+	@$(TURBO) run check --filter=@wallpaperdb/ingestor
 
 # User service commands
 user-dev:
-	@turbo run dev --filter=@wallpaperdb/user
+	@$(TURBO) run dev --filter=@wallpaperdb/user
 
 user-build:
-	@turbo run build --filter=@wallpaperdb/user
+	@$(TURBO) run build --filter=@wallpaperdb/user
 
 user-start:
-	@turbo run start --filter=@wallpaperdb/user
+	@$(TURBO) run start --filter=@wallpaperdb/user
 
 user-test:
-	@turbo run test --filter=@wallpaperdb/user
+	@$(TURBO) run test --filter=@wallpaperdb/user
 
 user-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/user
+	@$(TURBO) run test:watch --filter=@wallpaperdb/user
 
 user-format:
-	@turbo run format --filter=@wallpaperdb/user
+	@$(TURBO) run format --filter=@wallpaperdb/user
 
 user-lint:
-	@turbo run lint --filter=@wallpaperdb/user
+	@$(TURBO) run lint --filter=@wallpaperdb/user
 
 user-check:
-	@turbo run check --filter=@wallpaperdb/user
+	@$(TURBO) run check --filter=@wallpaperdb/user
 
 # Tags service commands
 tags-dev:
-	@turbo run dev --filter=@wallpaperdb/tags
+	@$(TURBO) run dev --filter=@wallpaperdb/tags
 
 tags-build:
-	@turbo run build --filter=@wallpaperdb/tags
+	@$(TURBO) run build --filter=@wallpaperdb/tags
 
 tags-start:
-	@turbo run start --filter=@wallpaperdb/tags
+	@$(TURBO) run start --filter=@wallpaperdb/tags
 
 tags-test:
-	@turbo run test --filter=@wallpaperdb/tags
+	@$(TURBO) run test --filter=@wallpaperdb/tags
 
 tags-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/tags
+	@$(TURBO) run test:watch --filter=@wallpaperdb/tags
 
 tags-format:
-	@turbo run format --filter=@wallpaperdb/tags
+	@$(TURBO) run format --filter=@wallpaperdb/tags
 
 tags-lint:
-	@turbo run lint --filter=@wallpaperdb/tags
+	@$(TURBO) run lint --filter=@wallpaperdb/tags
 
 tags-check:
-	@turbo run check --filter=@wallpaperdb/tags
+	@$(TURBO) run check --filter=@wallpaperdb/tags
 
 # Media service commands
 media-dev:
-	@turbo run dev --filter=@wallpaperdb/media
+	@$(TURBO) run dev --filter=@wallpaperdb/media
 
 media-build:
-	@turbo run build --filter=@wallpaperdb/media
+	@$(TURBO) run build --filter=@wallpaperdb/media
 
 media-start:
-	@turbo run start --filter=@wallpaperdb/media
+	@$(TURBO) run start --filter=@wallpaperdb/media
 
 media-test:
-	@turbo run test --filter=@wallpaperdb/media
+	@$(TURBO) run test --filter=@wallpaperdb/media
 
 media-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/media
+	@$(TURBO) run test:watch --filter=@wallpaperdb/media
 
 media-format:
-	@turbo run format --filter=@wallpaperdb/media
+	@$(TURBO) run format --filter=@wallpaperdb/media
 
 media-lint:
-	@turbo run lint --filter=@wallpaperdb/media
+	@$(TURBO) run lint --filter=@wallpaperdb/media
 
 media-check:
-	@turbo run check --filter=@wallpaperdb/media
+	@$(TURBO) run check --filter=@wallpaperdb/media
 
 # Variant Generator service commands
 variant-generator-dev:
-	@turbo run dev --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run dev --filter=@wallpaperdb/variant-generator
 
 variant-generator-build:
-	@turbo run build --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run build --filter=@wallpaperdb/variant-generator
 
 variant-generator-start:
-	@turbo run start --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run start --filter=@wallpaperdb/variant-generator
 
 variant-generator-test:
-	@turbo run test --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run test --filter=@wallpaperdb/variant-generator
 
 variant-generator-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run test:watch --filter=@wallpaperdb/variant-generator
 
 variant-generator-format:
-	@turbo run format --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run format --filter=@wallpaperdb/variant-generator
 
 variant-generator-lint:
-	@turbo run lint --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run lint --filter=@wallpaperdb/variant-generator
 
 variant-generator-check:
-	@turbo run check --filter=@wallpaperdb/variant-generator
+	@$(TURBO) run check --filter=@wallpaperdb/variant-generator
 
 # Color Extractor service commands
 color-extractor-dev:
-	@turbo run dev --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run dev --filter=@wallpaperdb/color-extractor
 
 color-extractor-build:
-	@turbo run build --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run build --filter=@wallpaperdb/color-extractor
 
 color-extractor-start:
-	@turbo run start --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run start --filter=@wallpaperdb/color-extractor
 
 color-extractor-test:
-	@turbo run test --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run test --filter=@wallpaperdb/color-extractor
 
 color-extractor-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run test:watch --filter=@wallpaperdb/color-extractor
 
 color-extractor-format:
-	@turbo run format --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run format --filter=@wallpaperdb/color-extractor
 
 color-extractor-lint:
-	@turbo run lint --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run lint --filter=@wallpaperdb/color-extractor
 
 color-extractor-check:
-	@turbo run check --filter=@wallpaperdb/color-extractor
+	@$(TURBO) run check --filter=@wallpaperdb/color-extractor
 
 # Color Extractor Docker commands
 color-extractor-docker-build:
@@ -518,72 +519,72 @@ color-extractor-docker-logs:
 
 # Gateway service commands
 gateway-dev:
-	@turbo run dev --filter=@wallpaperdb/gateway
+	@$(TURBO) run dev --filter=@wallpaperdb/gateway
 
 gateway-build:
-	@turbo run build --filter=@wallpaperdb/gateway
+	@$(TURBO) run build --filter=@wallpaperdb/gateway
 
 gateway-start:
-	@turbo run start --filter=@wallpaperdb/gateway
+	@$(TURBO) run start --filter=@wallpaperdb/gateway
 
 gateway-test:
-	@turbo run test --filter=@wallpaperdb/gateway
+	@$(TURBO) run test --filter=@wallpaperdb/gateway
 
 gateway-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/gateway
+	@$(TURBO) run test:watch --filter=@wallpaperdb/gateway
 
 gateway-format:
-	@turbo run format --filter=@wallpaperdb/gateway
+	@$(TURBO) run format --filter=@wallpaperdb/gateway
 
 gateway-lint:
-	@turbo run lint --filter=@wallpaperdb/gateway
+	@$(TURBO) run lint --filter=@wallpaperdb/gateway
 
 gateway-check:
-	@turbo run check --filter=@wallpaperdb/gateway
+	@$(TURBO) run check --filter=@wallpaperdb/gateway
 
 # Web frontend commands
 web-dev:
-	@turbo run dev --filter=@wallpaperdb/web
+	@$(TURBO) run dev --filter=@wallpaperdb/web
 
 web-build:
-	@turbo run build --filter=@wallpaperdb/web
+	@$(TURBO) run build --filter=@wallpaperdb/web
 
 web-preview:
-	@turbo run preview --filter=@wallpaperdb/web
+	@$(TURBO) run preview --filter=@wallpaperdb/web
 
 web-format:
-	@turbo run format --filter=@wallpaperdb/web
+	@$(TURBO) run format --filter=@wallpaperdb/web
 
 web-lint:
-	@turbo run lint --filter=@wallpaperdb/web
+	@$(TURBO) run lint --filter=@wallpaperdb/web
 
 web-check:
-	@turbo run check-types --filter=@wallpaperdb/web
+	@$(TURBO) run check-types --filter=@wallpaperdb/web
 
 web-test:
-	@turbo run test --filter=@wallpaperdb/web
+	@$(TURBO) run test --filter=@wallpaperdb/web
 
 web-test-watch:
 	@pnpm --filter @wallpaperdb/web test:watch
 
 # React Muuri package commands
 react-muuri-build:
-	@turbo run build --filter=@wallpaperdb/react-muuri
+	@$(TURBO) run build --filter=@wallpaperdb/react-muuri
 
 react-muuri-test:
-	@turbo run test --filter=@wallpaperdb/react-muuri
+	@$(TURBO) run test --filter=@wallpaperdb/react-muuri
 
 react-muuri-test-watch:
 	@pnpm --filter @wallpaperdb/react-muuri test:watch
 
 react-muuri-format:
-	@turbo run format --filter=@wallpaperdb/react-muuri
+	@$(TURBO) run format --filter=@wallpaperdb/react-muuri
 
 react-muuri-lint:
-	@turbo run lint --filter=@wallpaperdb/react-muuri
+	@$(TURBO) run lint --filter=@wallpaperdb/react-muuri
 
 react-muuri-check:
-	@turbo run check-types --filter=@wallpaperdb/react-muuri
+	@$(TURBO) run check-types --filter=@wallpaperdb/react-muuri
 
 react-muuri-storybook:
 	@pnpm --filter @wallpaperdb/react-muuri storybook
@@ -697,10 +698,10 @@ tags-docker-logs:
 # Ingestor E2E test commands
 ingestor-e2e-test:
 	@echo "Running E2E tests (builds Docker image first)..."
-	@turbo run test --filter=@wallpaperdb/ingestor-e2e
+	@$(TURBO) run test --filter=@wallpaperdb/ingestor-e2e
 
 ingestor-e2e-test-watch:
-	@turbo run test:watch --filter=@wallpaperdb/ingestor-e2e
+	@$(TURBO) run test:watch --filter=@wallpaperdb/ingestor-e2e
 
 ingestor-e2e-verify:
 	@echo "Verifying E2E tests don't import application code..."
@@ -710,32 +711,32 @@ ingestor-e2e-verify:
 # Documentation commands
 docs-dev:
 	@echo "Starting documentation dev server..."
-	@turbo run dev --filter=@wallpaperdb/docs
+	@$(TURBO) run dev --filter=@wallpaperdb/docs
 
 # Browser E2E commands
 web-e2e-test:
 	@echo "Running browser E2E tests..."
-	@turbo run test:e2e --filter=@wallpaperdb/web-e2e --concurrency=1
+	@$(TURBO) run test:e2e --filter=@wallpaperdb/web-e2e --concurrency=1
 
 web-e2e-test-ui:
 	@echo "Running browser E2E tests in Playwright UI mode..."
-	@turbo run test:e2e:ui --filter=@wallpaperdb/web-e2e --concurrency=1
+	@$(TURBO) run test:e2e:ui --filter=@wallpaperdb/web-e2e --concurrency=1
 
 web-e2e-test-unit:
 	@echo "Running browser E2E workspace unit tests..."
-	@turbo run test:unit --filter=@wallpaperdb/web-e2e
+	@$(TURBO) run test:unit --filter=@wallpaperdb/web-e2e
 
 web-e2e-check-types:
 	@echo "Type checking browser E2E workspace..."
-	@turbo run check-types --filter=@wallpaperdb/web-e2e
+	@$(TURBO) run check-types --filter=@wallpaperdb/web-e2e
 
 docs-build:
 	@echo "Building documentation..."
-	@turbo run build --filter=@wallpaperdb/docs
+	@$(TURBO) run build --filter=@wallpaperdb/docs
 
 docs-start:
 	@echo "Starting documentation production server..."
-	@turbo run start --filter=@wallpaperdb/docs
+	@$(TURBO) run start --filter=@wallpaperdb/docs
 
 # OpenAPI commands
 openapi-generate:
@@ -795,26 +796,26 @@ dev:
 	@$(APPS_COMPOSE) watch
 
 build:
-	@turbo run build
+	@$(TURBO) run build
 
 test:
-	@turbo run test
+	@$(TURBO) run test
 
 test-watch:
-	@turbo run test:watch
+	@$(TURBO) run test:watch
 
 # Test commands by intensity
 test-unit:
 	@echo "Running unit tests (fast, no containers)..."
-	@turbo run test:unit
+	@$(TURBO) run test:unit
 
 test-integration:
 	@echo "Running integration tests (uses Testcontainers)..."
-	@turbo run test:integration --concurrency=1
+	@$(TURBO) run test:integration --concurrency=1
 
 test-e2e:
 	@echo "Running E2E tests (heavy container usage, sequential)..."
-	@turbo run test:e2e --concurrency=1
+	@$(TURBO) run test:e2e --concurrency=1
 
 test-ui:
 	@echo "Starting Vitest UI..."
@@ -824,34 +825,34 @@ coverage-summary:
 	@node scripts/coverage-summary.js
 
 format:
-	@turbo run format --log-order grouped
+	@$(TURBO) run format --log-order grouped
 
 lint:
-	@turbo run lint --log-order grouped
+	@$(TURBO) run lint --log-order grouped
 
 lint-fix:
-	@turbo run lint:fix --log-order grouped
+	@$(TURBO) run lint:fix --log-order grouped
 
 check:
-	@turbo run build lint check-types --log-order grouped
+	@$(TURBO) run build lint check-types --log-order grouped
 
 install:
 	pnpm install
 
-# CI/Local Parity commands
 check-types:
-	@turbo run check-types
+	@$(TURBO) run check-types
 
 # CI/Local Parity commands
 check-types-force:
-	@turbo run check-types --force
+	@$(TURBO) run check-types --force
 
 ci:
 	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally..."
-	@start_time=$$(date +%s); \
-	turbo run build lint check-types test:unit test:integration && \
-	turbo run test:e2e --concurrency=1 && \
+	@set -e; \
+	start_time=$$(date +%s); \
+	$(TURBO) run build lint check-types test:unit test:integration && \
+	$(TURBO) run test:e2e --concurrency=1 && \
 	pnpm coverage:merge && \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \
@@ -862,9 +863,10 @@ ci:
 ci-force:
 	@$(MAKE) sandcastle-check-types
 	@echo "Running full CI checks locally (no cache)..."
-	@start_time=$$(date +%s); \
-	turbo run build lint check-types test:unit test:integration --force && \
-	turbo run test:e2e --concurrency=1 --force && \
+	@set -e; \
+	start_time=$$(date +%s); \
+	$(TURBO) run build lint check-types test:unit test:integration --force && \
+	$(TURBO) run test:e2e --concurrency=1 --force && \
 	pnpm coverage:merge && \
 	end_time=$$(date +%s); \
 	duration=$$((end_time - start_time)); \

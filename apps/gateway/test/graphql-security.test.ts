@@ -1,7 +1,9 @@
 import 'reflect-metadata';
+import { buildSchema, parse } from 'graphql';
 import { container } from 'tsyringe';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
+import { QueryComplexityService } from '../src/services/query-complexity.service.js';
 import { tester } from './setup.js';
 
 describe('GraphQL Security', () => {
@@ -161,7 +163,7 @@ describe('GraphQL Security', () => {
       // and verify queries under the limit pass
       
       // Count actual unique fields in this query:
-      // searchWallpapers, edges, node, wallpaperId, userId, uploadedAt, updatedAt,
+      // searchWallpapers, edges, node, wallpaperId, profileId, uploadedAt, updatedAt,
       // variants, width, height, aspectRatio, format, fileSizeBytes, createdAt, url,
       // pageInfo, hasNextPage, hasPreviousPage, startCursor, endCursor = 20 fields
       // This is within our limit of 50, so it should pass
@@ -171,7 +173,7 @@ describe('GraphQL Security', () => {
             edges {
               node {
                 wallpaperId
-                userId
+                profileId
                 uploadedAt
                 updatedAt
                 variants {
@@ -245,6 +247,54 @@ describe('GraphQL Security', () => {
   });
 
   describe('Query Complexity Analysis', () => {
+    it('does not apply Profile.wallpapers cost to an unrelated field with the same name', () => {
+      const collisionSchema = buildSchema(`
+        type Query { wallpapers(first: Int): WallpaperConnection! }
+        type WallpaperConnection { edges: [WallpaperEdge!]! }
+        type WallpaperEdge { node: Wallpaper! }
+        type Wallpaper { wallpaperId: ID! }
+      `);
+      const document = parse(`
+        query {
+          wallpapers(first: 100) {
+            edges { node { wallpaperId } }
+          }
+        }
+      `);
+
+      const complexity = container
+        .resolve(QueryComplexityService)
+        .calculateComplexity(collisionSchema, document, {});
+
+      expect(complexity).toBe(103);
+    });
+
+    it('prices Profile wallpaper connections as search operations', async () => {
+      const query = `
+        query {
+          profile(id: "user_complexity") {
+            wallpapers(first: 100) {
+              edges { node { wallpaperId } }
+            }
+          }
+        }
+      `;
+
+      const response = await tester.getApp().inject({
+        method: 'POST',
+        url: '/graphql',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': '10.0.2.0',
+        },
+        payload: JSON.stringify({ query }),
+      });
+
+      expect(response.statusCode).toBe(200);
+      const result = JSON.parse(response.body);
+      expect(result.errors?.[0].extensions?.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    });
+
     it('should calculate simple query complexity', async () => {
       // Simple query should succeed (complexity well under 1000)
       const query = `
@@ -472,7 +522,7 @@ describe('GraphQL Security', () => {
       // Get a valid cursor by requesting first page
       const query1 = `
         query {
-          searchWallpapers(filter: { userId: "user_cursor_test" }, first: 2) {
+          searchWallpapers(filter: { profileId: "user_cursor_test" }, first: 2) {
             edges {
               node {
                 wallpaperId
@@ -510,7 +560,7 @@ describe('GraphQL Security', () => {
       const query2 = `
         query {
           searchWallpapers(
-            filter: { userId: "user_cursor_test" }
+            filter: { profileId: "user_cursor_test" }
             first: 2
             after: "${tamperedCursor}"
           ) {

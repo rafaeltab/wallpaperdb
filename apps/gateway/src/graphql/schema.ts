@@ -9,9 +9,19 @@ export const schema = `#graphql
 		wallpaperId: ID!
 
 		"""
-		User who uploaded this wallpaper
+		Immutable public Profile ID of the contributor
 		"""
-		userId: String!
+		profileId: ID!
+
+		"""
+		Deprecated contributor identifier retained during the Profile ID migration
+		"""
+		userId: String! @deprecated(reason: "Use profileId")
+
+		"""
+		Public contributor Profile when its projection is available
+		"""
+		profile: Profile
 
 		"""
 		Available variants (pre-generated sizes/formats)
@@ -74,9 +84,14 @@ export const schema = `#graphql
 	"""
 	input WallpaperFilter {
 		"""
-		Filter by user ID
+		Filter by public Profile ID
 		"""
-		userId: String
+		profileId: ID
+
+		"""
+		Deprecated contributor filter retained during the Profile ID migration
+		"""
+		userId: String @deprecated(reason: "Use profileId")
 
 		"""
 		Filter by variant properties
@@ -212,6 +227,7 @@ export const schema = `#graphql
 		version: Int!
 		createdAt: String!
 		updatedAt: String!
+		wallpapers(first: Int, after: String, last: Int, before: String): WallpaperConnection!
 	}
 
 	type ProfilePicture {

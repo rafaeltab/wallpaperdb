@@ -42,7 +42,7 @@ vi.mock('@tanstack/react-router', () => ({
 describe('WallpaperCard', () => {
 	const mockWallpaper: Wallpaper = {
 		wallpaperId: 'wlpr_test123',
-		userId: 'user_456',
+		profileId: 'user_456',
 		variants: [
 			{
 				width: 1920,

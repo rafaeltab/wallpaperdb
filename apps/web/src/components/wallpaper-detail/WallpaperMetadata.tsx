@@ -1,5 +1,7 @@
+import { Link } from '@tanstack/react-router';
 import { Copy, Keyboard } from 'lucide-react';
 import { toast } from 'sonner';
+import { ProfilePicture } from '@/components/profile/profile-picture';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +43,7 @@ export function WallpaperMetadata({
       <div>
         <h2 className="text-lg font-semibold">Wallpaper Details</h2>
       </div>
+      <ContributorCard wallpaper={wallpaper} />
       {/* Information Card */}
       <Card>
         <CardHeader className="pb-3">
@@ -72,14 +75,6 @@ export function WallpaperMetadata({
           <div>
             <div className="text-sm text-muted-foreground">Updated</div>
             <div className="text-sm">{formatDate(wallpaper.updatedAt)}</div>
-          </div>
-
-          <Separator />
-
-          {/* User ID */}
-          <div>
-            <div className="text-sm text-muted-foreground">User ID</div>
-            <div className="font-mono text-sm">{wallpaper.userId}</div>
           </div>
         </CardContent>
       </Card>
@@ -142,5 +137,51 @@ export function WallpaperMetadata({
         </div>
       </details>
     </div>
+  );
+}
+
+function ContributorCard({ wallpaper }: { wallpaper: Wallpaper }) {
+  const profile = wallpaper.profile;
+  const pictureClassName =
+    'flex size-12 shrink-0 items-center justify-center rounded-xl object-cover text-sm font-bold text-white';
+
+  if (!profile) {
+    const unknownProfile = {
+      id: wallpaper.profileId,
+      displayName: 'Unknown Profile',
+      picture: null,
+    };
+
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-3 py-4">
+          <ProfilePicture profile={unknownProfile} className={pictureClassName} />
+          <div className="min-w-0">
+            <div className="font-medium">Unknown Profile</div>
+            <div className="truncate font-mono text-xs text-muted-foreground">
+              {wallpaper.profileId}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="py-4">
+        <Link
+          to="/profiles/@{$handle}"
+          params={{ handle: profile.handle }}
+          className="flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ProfilePicture profile={profile} className={pictureClassName} />
+          <div className="min-w-0">
+            <div className="truncate font-medium">{profile.displayName}</div>
+            <div className="truncate text-sm text-muted-foreground">@{profile.handle}</div>
+          </div>
+        </Link>
+      </CardContent>
+    </Card>
   );
 }

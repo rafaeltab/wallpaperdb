@@ -25,6 +25,7 @@ function validateWallpaperId(wallpaperId: string): void {
 }
 
 interface WallpaperFilter {
+  profileId?: string;
   userId?: string;
   variants?: {
     width?: number;
@@ -128,6 +129,16 @@ export class Resolvers {
             url: `${this.getPublicMediaBaseUrl(context)}/profile-pictures/${profile.pictureAssetId}`,
           };
         },
+        wallpapers: async (profile: ProfileDocument, args: SearchArgs) => {
+          return await this.searchWallpapers({
+            ...args,
+            filter: { profileId: profile.id },
+          });
+        },
+      },
+      Wallpaper: {
+        profileId: (wallpaper: Wallpaper) => wallpaper.userId,
+        userId: (wallpaper: Wallpaper) => wallpaper.userId,
       },
       Variant: {
         url: (
@@ -141,11 +152,22 @@ export class Resolvers {
     };
   }
 
+  getLoaders() {
+    return {
+      Wallpaper: {
+        profile: async (queries: Array<{ obj: Wallpaper }>) => {
+          return await this.profileRepository.findByIds(queries.map(({ obj }) => obj.userId));
+        },
+      },
+    };
+  }
+
   /**
    * Search wallpapers with filters and pagination
    */
   private async searchWallpapers(args: SearchArgs) {
     const limit = args.first ?? args.last ?? 10;
+    const profileId = args.filter?.profileId ?? args.filter?.userId;
     const isBackwardPagination = args.last !== undefined && args.before !== undefined;
     const colorSort = args.sort?.color;
     const colorVector = colorSort
@@ -165,7 +187,7 @@ export class Resolvers {
         [GatewayAttributes.GRAPHQL_OPERATION_NAME]: 'searchWallpapers',
         [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
         [GatewayAttributes.SEARCH_PAGE_SIZE]: limit,
-        [GatewayAttributes.SEARCH_FILTER_USER_ID]: args.filter?.userId ?? 'none',
+        [GatewayAttributes.SEARCH_FILTER_USER_ID]: profileId ?? 'none',
         [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: args.filter?.variants ? 'true' : 'false',
       },
       async (span) => {
@@ -183,7 +205,7 @@ export class Resolvers {
 
         // Backward pagination walks the same cursor values in reverse order.
         const result = await this.repository.search({
-          userId: args.filter?.userId,
+          userId: profileId,
           variantFilters: args.filter?.variants,
           colorVector,
           searchAfter,

@@ -4,8 +4,9 @@ The read-optimized query layer for WallpaperDB. Exposes a GraphQL API for browsi
 
 ## Key Capabilities
 
-- **GraphQL search and retrieval** — provides `searchWallpapers` (with optional user and variant filtering, plus bidirectional cursor-based pagination) and `getWallpaper` queries
-- **Event-driven read model** — consumes `wallpaper.uploaded` and `wallpaper.variant.available` events from NATS JetStream and projects them into an OpenSearch index, keeping the query layer in sync without polling or direct database access
+- **GraphQL search and retrieval** — provides `searchWallpapers` (with optional Profile and variant filtering, plus bidirectional cursor-based pagination) and `getWallpaper` queries
+- **Public contributor Profiles** — resolves nullable wallpaper contributors in batches, serves Profiles by ID or Handle, and exposes each Profile's paginated wallpapers without copying Profile fields into wallpaper documents
+- **Event-driven read model** — consumes wallpaper and Profile events from NATS JetStream and projects them into independent OpenSearch indexes, keeping the query layer in sync without polling or direct database access
 - **Public Profile reads** — projects versioned Profile events into a dedicated OpenSearch index and resolves exact Profiles by immutable ID or current Handle
 - **Nested variant filtering** — wallpaper documents in OpenSearch use a nested type for variants, enabling precise filtering by variant dimensions, aspect ratio, and format independently of the parent document
 - **Computed variant URLs** — the `url` field on each `Variant` is resolved at query time by constructing a request to the Media service, so variant URLs are never stale in the index

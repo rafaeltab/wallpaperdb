@@ -156,6 +156,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - Variant-based filtering (resolution, aspect ratio, format)
 - Event-driven metadata synchronization
 - Eventually consistent public Profile reads by ID and Handle
+- Batched nullable contributor resolution and Profile-owned wallpaper galleries
 - Cursor-based pagination
 
 **Dependencies:**
@@ -168,6 +169,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - `wallpaper.uploaded` - Index wallpaper metadata
 - `wallpaper.variant.available` - Update variant availability
 - `profile.created` - Project the latest public Profile snapshot
+- `profile.updated` - Apply a newer public Profile snapshot
 
 **GraphQL Schema:**
 ```graphql
@@ -186,11 +188,14 @@ type Profile {
   picture: ProfilePicture
   canonicalPath: String!
   version: Int!
+  wallpapers(first: Int, after: String, last: Int, before: String): WallpaperConnection!
 }
 
 type Wallpaper {
   wallpaperId: ID!
-  userId: ID!
+  profileId: ID!
+  userId: String! @deprecated(reason: "Use profileId")
+  profile: Profile
   variants: [WallpaperVariant!]!
   uploadedAt: DateTime!
 }
@@ -249,13 +254,14 @@ PROFILE_HANDLE_MAX_LENGTH=30
 
 **Status:** ✅ Production
 
-**Purpose:** React-based user interface for browsing and uploading wallpapers
+**Purpose:** React-based user interface for browsing and uploading wallpapers and viewing public contributor Profiles
 
 **Key Features:**
 - Wallpaper upload interface
 - Muuri grid layout for responsive wallpaper browsing
 - Integration with Gateway GraphQL API
-- Canonical public Profile pages at `/profiles/@:handle`
+- Canonical public Profile pages at `/profiles/@:handle` with paginated contributor galleries
+- Contributor attribution and missing-Profile fallbacks on wallpaper details
 - Responsive design
 
 **Dependencies:**

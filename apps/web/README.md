@@ -5,7 +5,8 @@ The React-based frontend for WallpaperDB, giving users a browsing and upload int
 ## Key Capabilities
 
 - **Wallpaper gallery** — infinite-scroll masonry grid that fetches wallpapers via cursor-based pagination from the Gateway's GraphQL API
-- **Wallpaper detail view** — full-screen display of a wallpaper with variant selection, download-by-variant, sharing, and a collapsible metadata panel; supports keyboard shortcuts
+- **Wallpaper detail view** — full-screen display of a wallpaper with contributor attribution, variant selection, download-by-variant, sharing, and a collapsible metadata panel; supports keyboard shortcuts
+- **Public contributor Profiles** — canonical Handle routes show public identity and an infinitely paginated gallery of the contributor's wallpapers
 - **Multi-file upload queue** — drag-and-drop or file-picker upload that processes files sequentially, surfaces per-file status (pending, uploading, success, failed, duplicate), and automatically pauses and resumes the queue when the Ingestor reports a rate limit
 - **Theme support** — light, dark, and system-preference themes persisted across sessions
 

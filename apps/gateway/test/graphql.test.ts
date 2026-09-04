@@ -18,7 +18,7 @@ describe("GraphQL API Integration", () => {
 						edges {
 							node {
 								wallpaperId
-								userId
+								profileId
 							}
 						}
 						pageInfo {
@@ -46,7 +46,7 @@ describe("GraphQL API Integration", () => {
             expect(result.data.searchWallpapers.pageInfo.hasNextPage).toBe(false);
         });
 
-        it("should search wallpapers by userId", async () => {
+        it("should search wallpapers by profileId", async () => {
             // Create test data
             await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_001",
@@ -66,11 +66,11 @@ describe("GraphQL API Integration", () => {
 
             const query = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_001" }) {
+					searchWallpapers(filter: { profileId: "user_gql_001" }) {
 						edges {
 							node {
 								wallpaperId
-								userId
+								profileId
 							}
 						}
 					}
@@ -92,9 +92,45 @@ describe("GraphQL API Integration", () => {
             expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
                 "wlpr_gql_001",
             );
-            expect(result.data.searchWallpapers.edges[0].node.userId).toBe(
+            expect(result.data.searchWallpapers.edges[0].node.profileId).toBe(
                 "user_gql_001",
             );
+        });
+
+        it("keeps the deprecated userId field and filter working during migration", async () => {
+            await container.resolve(WallpaperRepository).upsert({
+                wallpaperId: "wlpr_gql_legacy_user_id",
+                userId: "user_gql_legacy",
+                variants: [],
+                uploadedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
+            const response = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                headers: { "content-type": "application/json" },
+                payload: JSON.stringify({
+                    query: `
+                        query {
+                            searchWallpapers(filter: { userId: "user_gql_legacy" }) {
+                                edges { node { wallpaperId userId profileId } }
+                            }
+                        }
+                    `,
+                }),
+            });
+
+            expect(response.statusCode).toBe(200);
+            expect(JSON.parse(response.body).data.searchWallpapers.edges).toEqual([
+                {
+                    node: {
+                        wallpaperId: "wlpr_gql_legacy_user_id",
+                        userId: "user_gql_legacy",
+                        profileId: "user_gql_legacy",
+                    },
+                },
+            ]);
         });
 
         it("should search wallpapers by variant width", async () => {
@@ -174,7 +210,7 @@ describe("GraphQL API Integration", () => {
 
             const query = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_004" }) {
+					searchWallpapers(filter: { profileId: "user_gql_004" }) {
 						edges {
 							node {
 								wallpaperId
@@ -227,7 +263,7 @@ describe("GraphQL API Integration", () => {
 
             const query = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_origin_001" }) {
+					searchWallpapers(filter: { profileId: "user_gql_origin_001" }) {
 						edges {
 							node {
 								variants {
@@ -277,7 +313,7 @@ describe("GraphQL API Integration", () => {
 
             const query = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_forwarded_001" }) {
+					searchWallpapers(filter: { profileId: "user_gql_forwarded_001" }) {
 						edges {
 							node {
 								variants {
@@ -323,7 +359,7 @@ describe("GraphQL API Integration", () => {
             // Get first page
             const query1 = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_pagination" }, first: 2) {
+					searchWallpapers(filter: { profileId: "user_gql_pagination" }, first: 2) {
 						edges {
 							node {
 								wallpaperId
@@ -362,7 +398,7 @@ describe("GraphQL API Integration", () => {
             const query2 = `
 				query {
 					searchWallpapers(
-						filter: { userId: "user_gql_pagination" }
+						filter: { profileId: "user_gql_pagination" }
 						first: 2
 						after: "${cursor}"
 					) {
@@ -412,7 +448,7 @@ describe("GraphQL API Integration", () => {
 
             const query1 = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_backward_pagination" }, first: 4) {
+					searchWallpapers(filter: { profileId: "user_gql_backward_pagination" }, first: 4) {
 						pageInfo {
 							endCursor
 						}
@@ -436,7 +472,7 @@ describe("GraphQL API Integration", () => {
             const query2 = `
 				query {
 					searchWallpapers(
-						filter: { userId: "user_gql_backward_pagination" }
+						filter: { profileId: "user_gql_backward_pagination" }
 						last: 2
 						before: "${cursor}"
 					) {
@@ -473,7 +509,7 @@ describe("GraphQL API Integration", () => {
             expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
         });
 
-        it("should combine userId and variant filters", async () => {
+        it("should combine profileId and variant filters", async () => {
             await container.resolve(WallpaperRepository).upsert({
                 wallpaperId: "wlpr_gql_005",
                 userId: "user_gql_005",
@@ -495,14 +531,14 @@ describe("GraphQL API Integration", () => {
 				query {
 					searchWallpapers(
 						filter: {
-							userId: "user_gql_005"
+							profileId: "user_gql_005"
 							variants: { width: 3840, format: "image/png" }
 						}
 					) {
 						edges {
 							node {
 								wallpaperId
-								userId
+								profileId
 								variants {
 									width
 									format
@@ -571,7 +607,7 @@ describe("GraphQL API Integration", () => {
             const query = `
 				query {
 					searchWallpapers(
-						filter: { userId: "user_gql_color_sort" }
+						filter: { profileId: "user_gql_color_sort" }
 						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
 					) {
 						edges {
@@ -672,7 +708,7 @@ describe("GraphQL API Integration", () => {
 				query {
 					searchWallpapers(
 						filter: {
-							userId: "user_gql_color_filter"
+							profileId: "user_gql_color_filter"
 							variants: { width: 1920, format: "image/jpeg" }
 						}
 						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
@@ -747,7 +783,7 @@ describe("GraphQL API Integration", () => {
             const query1 = `
 				query {
 					searchWallpapers(
-						filter: { userId: "user_gql_color_page" }
+						filter: { profileId: "user_gql_color_page" }
 						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
 						first: 2
 					) {
@@ -790,7 +826,7 @@ describe("GraphQL API Integration", () => {
             const query2 = `
 				query {
 					searchWallpapers(
-						filter: { userId: "user_gql_color_page" }
+						filter: { profileId: "user_gql_color_page" }
 						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
 						first: 2
 						after: "${cursor}"
@@ -859,7 +895,7 @@ describe("GraphQL API Integration", () => {
 
             const query = `
 				query {
-					searchWallpapers(filter: { userId: "user_gql_unsorted_color" }) {
+					searchWallpapers(filter: { profileId: "user_gql_unsorted_color" }) {
 						edges {
 							node {
 								wallpaperId
@@ -950,7 +986,7 @@ describe("GraphQL API Integration", () => {
 					query {
 						getWallpaper(wallpaperId: "wlpr_01234567890123456789012345") {
 							wallpaperId
-							userId
+							profileId
 							variants {
 								width
 								height
@@ -981,7 +1017,7 @@ describe("GraphQL API Integration", () => {
                 expect(result.data.getWallpaper).toBeDefined();
                 expect(result.data.getWallpaper).toEqual({
                     wallpaperId: "wlpr_01234567890123456789012345",
-                    userId: "user_get_001",
+                    profileId: "user_get_001",
                     variants: [
                         {
                             width: 1920,
@@ -1122,7 +1158,7 @@ describe("GraphQL API Integration", () => {
 					query {
 						getWallpaper(wallpaperId: "wlpr_nonexistent_123456789012") {
 							wallpaperId
-							userId
+							profileId
 						}
 					}
 				`;
@@ -1147,7 +1183,7 @@ describe("GraphQL API Integration", () => {
 					query {
 						getWallpaper(wallpaperId: "wlpr_does_not_exist") {
 							wallpaperId
-							userId
+							profileId
 							variants {
 								width
 								url

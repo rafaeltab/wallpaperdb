@@ -26,6 +26,29 @@ vi.mock('@clerk/react', () => ({
   }),
 }));
 
+// This test only verifies that the production App tree mounts ProfileBootstrap.
+// Stub unrelated providers so their routing, toast, and upload behavior cannot
+// turn this focused wiring check into a slow whole-application integration test.
+vi.mock('@tanstack/react-query-devtools', () => ({ ReactQueryDevtools: () => null }));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-router')>()),
+  createRouter: () => ({}),
+  RouterProvider: () => null,
+}));
+vi.mock('@/components/auth-bridge', () => ({
+  AuthBridge: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/components/theme-provider', () => ({
+  ThemeProvider: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
+vi.mock('@/components/upload/upload-queue-toast-manager', () => ({
+  UploadQueueToastManager: () => null,
+}));
+vi.mock('@/contexts/upload-queue-context', () => ({
+  UploadQueueProvider: ({ children }: { children: ReactNode }) => children,
+}));
+
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return { ...original, userApi: { ensureProfile } };

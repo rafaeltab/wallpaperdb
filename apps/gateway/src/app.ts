@@ -10,6 +10,7 @@ import { NatsConnectionManager } from './connections/nats.js';
 import { OpenSearchConnection } from './connections/opensearch.js';
 import { RedisConnection } from './connections/redis.js';
 import { ProfileCreatedConsumer } from './consumers/profile-created.consumer.js';
+import { ProfileUpdatedConsumer } from './consumers/profile-updated.consumer.js';
 import { WallpaperColorsExtractedConsumer } from './consumers/wallpaper-colors-extracted.consumer.js';
 import { WallpaperUploadedConsumer } from './consumers/wallpaper-uploaded.consumer.js';
 import { WallpaperVariantAvailableConsumer } from './consumers/wallpaper-variant-available.consumer.js';
@@ -246,6 +247,10 @@ export async function createApp(
     await profileConsumer.start();
     fastify.log.info('ProfileCreatedConsumer started');
 
+    const profileUpdatedConsumer = container.resolve(ProfileUpdatedConsumer);
+    await profileUpdatedConsumer.start();
+    fastify.log.info('ProfileUpdatedConsumer started');
+
     // Mark connections as initialized
     fastify.connectionsState.connectionsInitialized = true;
   } catch (error) {
@@ -272,6 +277,9 @@ export async function createApp(
 
     const profileConsumer = container.resolve(ProfileCreatedConsumer);
     await profileConsumer.stop();
+
+    const profileUpdatedConsumer = container.resolve(ProfileUpdatedConsumer);
+    await profileUpdatedConsumer.stop();
     fastify.log.info('Event consumers stopped');
 
     fastify.log.info('Closing NATS connection...');

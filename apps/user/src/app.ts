@@ -1,4 +1,3 @@
-import cors from '@fastify/cors';
 import { registerAuth } from '@wallpaperdb/auth';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -6,6 +5,7 @@ import { container } from 'tsyringe';
 import type { Config } from './config.js';
 import { DatabaseConnection } from './connections/database.js';
 import { NatsConnectionManager } from './connections/nats.js';
+import { registerUserCors } from './http/cors.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
 import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
@@ -61,12 +61,7 @@ export async function createApp(
         : false,
   });
 
-  await fastify.register(cors, {
-    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  });
+  await registerUserCors(fastify, config.nodeEnv);
 
   await registerAuth(fastify, {
     secretKey: config.clerkSecretKey,

@@ -22,6 +22,20 @@ describe('User service configuration', () => {
     expect(loadConfig().profileHandleMaxLength).toBe(3);
   });
 
+  it('defaults the Display-name maximum when the environment value is missing or invalid', () => {
+    delete process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH;
+    expect(loadConfig().profileDisplayNameMaxLength).toBe(80);
+
+    process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH = 'not-a-number';
+    expect(loadConfig().profileDisplayNameMaxLength).toBe(80);
+  });
+
+  it('rejects a non-positive Display-name maximum', () => {
+    process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH = '0';
+
+    expect(() => loadConfig()).toThrow();
+  });
+
   it('rejects a Handle minimum above the configured maximum', () => {
     process.env.PROFILE_HANDLE_MIN_LENGTH = '4';
     process.env.PROFILE_HANDLE_MAX_LENGTH = '3';

@@ -21,6 +21,7 @@ const configSchema = z
     clerkPublishableKey: z.string().min(1).optional(),
     profileHandleMinLength: z.number().int().min(1).max(63),
     profileHandleMaxLength: z.number().int().min(1).max(64),
+    profileDisplayNameMaxLength: z.number().int().positive(),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {
@@ -55,6 +56,7 @@ export function loadConfig(): Config {
     clerkPublishableKey: process.env.CLERK_PUBLISHABLE_KEY,
     profileHandleMinLength: parseIntEnv(process.env.PROFILE_HANDLE_MIN_LENGTH, 1),
     profileHandleMaxLength: parseIntEnv(process.env.PROFILE_HANDLE_MAX_LENGTH, 30),
+    profileDisplayNameMaxLength: parseIntEnv(process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH, 80),
   };
 
   return configSchema.parse(raw);

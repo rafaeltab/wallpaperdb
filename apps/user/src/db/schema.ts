@@ -1,4 +1,4 @@
-import type { ProfileCreatedEvent } from '@wallpaperdb/events';
+import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/events';
 import { sql } from 'drizzle-orm';
 import {
   bigserial,
@@ -50,7 +50,7 @@ export const outboxEvents = pgTable(
     id: text('id').primaryKey(),
     subject: text('subject').notNull(),
     aggregateId: text('aggregate_id').notNull(),
-    payload: jsonb('payload').$type<ProfileCreatedEvent>().notNull(),
+    payload: jsonb('payload').$type<ProfileCreatedEvent | ProfileUpdatedEvent>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp('published_at', { withTimezone: true }),
   },

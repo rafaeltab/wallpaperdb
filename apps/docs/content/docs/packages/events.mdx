@@ -78,6 +78,48 @@ const validated = WallpaperUploadedEventSchema.parse(event);
 - `originalFilename` - Original filename from upload
 - `uploadedAt` - ISO 8601 timestamp of upload
 
+### Profile Events
+
+The User service publishes complete public Profile snapshots so consumers can build their own
+version-aware projections without reading the command database.
+
+- `ProfileCreatedEventSchema` uses the `profile.created` subject and records a typed `created`
+  change.
+- `ProfileUpdatedEventSchema` uses the `profile.updated` subject. Display-name updates record the
+  previous and authoritative new value in a `display-name-changed` change.
+- Both contracts include the stable event ID, event timestamp, Profile version, Handle claim
+  generation, and the complete post-change public snapshot. They contain no Clerk-private fields.
+
+```typescript
+import {
+  PROFILE_UPDATED_SUBJECT,
+  ProfileUpdatedEventSchema,
+  type ProfileUpdatedEvent,
+} from "@wallpaperdb/events";
+
+const event: ProfileUpdatedEvent = ProfileUpdatedEventSchema.parse({
+  eventId: "evt_01HABCDEF123456789",
+  eventType: PROFILE_UPDATED_SUBJECT,
+  timestamp: "2026-01-02T00:00:00.000Z",
+  change: {
+    type: "display-name-changed",
+    before: "Ada Lovelace",
+    after: "Ada Byron",
+  },
+  profile: {
+    id: "user_123",
+    displayName: "Ada Byron",
+    handle: "ada-lovelace",
+    claimGeneration: 1,
+    biographyMarkdown: "",
+    pictureAssetId: null,
+    version: 2,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-02T00:00:00.000Z",
+  },
+});
+```
+
 ### Creating Custom Event Schemas
 
 While not explicitly exported, you can create custom events following the same pattern:

@@ -9,6 +9,8 @@ import {
   WallpaperColorsExtractedEventSchema,
   PROFILE_CREATED_SUBJECT,
   ProfileCreatedEventSchema,
+  PROFILE_UPDATED_SUBJECT,
+  ProfileUpdatedEventSchema,
 } from "../src/schemas/index.js";
 
 describe("Event Schemas", () => {
@@ -55,6 +57,50 @@ describe("Event Schemas", () => {
         ProfileCreatedEventSchema.safeParse({
           ...event,
           profile: { ...event.profile, clerkEmail: "ada@example.com" },
+        }).success
+      ).toBe(false);
+    });
+  });
+
+  describe("ProfileUpdatedEventSchema", () => {
+    const timestamp = new Date().toISOString();
+    const event = {
+      eventId: "evt_01HXYZ987654321",
+      eventType: PROFILE_UPDATED_SUBJECT,
+      timestamp,
+      change: {
+        type: "display-name-changed" as const,
+        before: "Ada Lovelace",
+        after: "Ada Byron",
+      },
+      profile: {
+        id: "user_123",
+        displayName: "Ada Byron",
+        handle: "ada-lovelace",
+        claimGeneration: 1,
+        biographyMarkdown: "",
+        pictureAssetId: null,
+        version: 2,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    };
+
+    it("validates a Display-name change with its before and after values", () => {
+      expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
+    });
+
+    it("rejects private or incomplete changes", () => {
+      expect(
+        ProfileUpdatedEventSchema.safeParse({
+          ...event,
+          profile: { ...event.profile, clerkEmail: "ada@example.com" },
+        }).success
+      ).toBe(false);
+      expect(
+        ProfileUpdatedEventSchema.safeParse({
+          ...event,
+          change: { type: "display-name-changed", after: "Ada Byron" },
         }).success
       ).toBe(false);
     });

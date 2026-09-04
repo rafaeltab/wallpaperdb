@@ -38,6 +38,49 @@ describe('User API client', () => {
     });
   });
 
+  it('patches the Display name with the last-seen Profile version', async () => {
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const updated = { ...profile, displayName: 'New Name', version: 2 };
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updated), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    vi.stubGlobal('fetch', fetch);
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
+
+    await expect(
+      client.updateProfile({ displayName: 'New Name', expectedVersion: 1 })
+    ).resolves.toEqual(updated);
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me', {
+      method: 'PATCH',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer fresh-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ displayName: 'New Name', expectedVersion: 1 }),
+    });
+  });
+
+  it('exposes a stale Profile edit as a conflict', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: 'Profile has changed since it was last loaded' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/problem+json' },
+        })
+      )
+    );
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider: async () => 'token' });
+
+    await expect(
+      client.updateProfile({ displayName: 'New Name', expectedVersion: 1 })
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it('does not send an ensure request without an auth token', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);

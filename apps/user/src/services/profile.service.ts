@@ -2,8 +2,11 @@ import {
   PROFILE_CREATED_SUBJECT,
   type ProfileCreatedEvent,
   ProfileCreatedEventSchema,
+  PROFILE_UPDATED_SUBJECT,
+  type ProfileUpdatedEvent,
+  ProfileUpdatedEventSchema,
 } from '@wallpaperdb/events';
-import { eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
@@ -48,6 +51,8 @@ const FALLBACK_ADJECTIVES = ['quiet', 'bright', 'silver', 'wild'];
 const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
 
 export class IdentityUnavailableError extends Error {}
+export class InvalidDisplayNameError extends Error {}
+export class ProfileVersionConflictError extends Error {}
 
 function slugify(value: string): string {
   return value
@@ -74,6 +79,10 @@ function withCollisionSuffix(base: string, maximumLength: number): string {
   return `${stem}-${random}`;
 }
 
+function normalizeDisplayName(value: string): string {
+  return value.replace(/\s+/gu, ' ').trim();
+}
+
 @singleton()
 export class ProfileService {
   constructor(
@@ -95,9 +104,16 @@ export class ProfileService {
       throw new IdentityUnavailableError('Clerk identity lookup failed', { cause: error });
     }
 
-    const fullName = [identity.firstName, identity.lastName].filter(Boolean).join(' ').trim();
+    const fullName = normalizeDisplayName(
+      [identity.firstName, identity.lastName].filter(Boolean).join(' ')
+    );
     const generated = `${FALLBACK_ADJECTIVES[this.hash(userId) % FALLBACK_ADJECTIVES.length]} ${FALLBACK_NOUNS[Math.floor(this.hash(userId) / FALLBACK_ADJECTIVES.length) % FALLBACK_NOUNS.length]}`;
-    const displayName = identity.displayName?.trim() || fullName || generated;
+    const selectedDisplayName =
+      normalizeDisplayName(identity.displayName ?? '') || fullName || generated;
+    const displayName = [...selectedDisplayName]
+      .slice(0, this.config.profileDisplayNameMaxLength)
+      .join('')
+      .trim();
     const slug = slugify(displayName) || `profile-${this.hash(userId)}`;
     const minimumPaddedSlug = slug.padEnd(this.config.profileHandleMinLength, '0');
     const base = RESERVED_HANDLES.has(minimumPaddedSlug)
@@ -161,6 +177,80 @@ export class ProfileService {
       }
     }
     throw new Error('Unable to claim a unique profile handle');
+  }
+
+  async updateDisplayName(
+    userId: string,
+    requestedDisplayName: string,
+    expectedVersion: number
+  ): Promise<Profile> {
+    const displayName = normalizeDisplayName(requestedDisplayName);
+    if (!displayName) throw new InvalidDisplayNameError('Display name must not be blank');
+    if ([...displayName].length > this.config.profileDisplayNameMaxLength) {
+      throw new InvalidDisplayNameError(
+        `Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`
+      );
+    }
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new InvalidDisplayNameError('Expected Profile version must be a positive integer');
+    }
+
+    return this.database.getClient().db.transaction(async (tx) => {
+      const current = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
+      if (!current || current.version !== expectedVersion) {
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      }
+      if (current.displayName === displayName) return current;
+
+      const now = new Date();
+      const [updated] = await tx
+        .update(profiles)
+        .set({
+          displayName,
+          version: sql`${profiles.version} + 1`,
+          updatedAt: now,
+        })
+        .where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion)))
+        .returning();
+      if (!updated) {
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      }
+
+      const claim = await tx.query.handleClaims.findFirst({
+        where: eq(handleClaims.handle, updated.handle),
+      });
+      if (!claim) throw new Error('Current Profile Handle claim is missing');
+
+      const event: ProfileUpdatedEvent = {
+        eventId: `evt_${ulid()}`,
+        eventType: PROFILE_UPDATED_SUBJECT,
+        timestamp: now.toISOString(),
+        change: {
+          type: 'display-name-changed',
+          before: current.displayName,
+          after: updated.displayName,
+        },
+        profile: {
+          id: updated.id,
+          displayName: updated.displayName,
+          handle: updated.handle,
+          claimGeneration: claim.claimGeneration,
+          biographyMarkdown: updated.biographyMarkdown,
+          pictureAssetId: updated.pictureAssetId,
+          version: updated.version,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      };
+      ProfileUpdatedEventSchema.parse(event);
+      await tx.insert(outboxEvents).values({
+        id: event.eventId,
+        subject: event.eventType,
+        aggregateId: userId,
+        payload: event,
+      });
+      return updated;
+    });
   }
 
   private hash(value: string): number {

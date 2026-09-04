@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { FakeTimerService } from '@wallpaperdb/core/timer';
-import type { ProfileCreatedEvent } from '@wallpaperdb/events';
+import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/events';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
@@ -44,10 +44,10 @@ class FakeIdentityProvider implements IdentityProvider {
 }
 
 class FakeProfileEventPublisher implements ProfileEventPublisher {
-  readonly events: ProfileCreatedEvent[] = [];
+  readonly events: Array<ProfileCreatedEvent | ProfileUpdatedEvent> = [];
   failuresRemaining = 0;
 
-  async publish(event: ProfileCreatedEvent): Promise<void> {
+  async publish(event: ProfileCreatedEvent | ProfileUpdatedEvent): Promise<void> {
     if (this.failuresRemaining > 0) {
       this.failuresRemaining--;
       throw new Error('NATS unavailable');
@@ -56,7 +56,7 @@ class FakeProfileEventPublisher implements ProfileEventPublisher {
   }
 }
 
-describe('POST /profile/me/ensure', () => {
+describe('Profile commands', () => {
   let postgresContainer: StartedPostgreSqlContainer;
   let natsContainer: StartedNatsContainer;
   let sql: ReturnType<typeof postgres>;
@@ -84,6 +84,7 @@ describe('POST /profile/me/ensure', () => {
       otelServiceName: 'user-test',
       profileHandleMinLength: 1,
       profileHandleMaxLength: 20,
+      profileDisplayNameMaxLength: 80,
     };
     container.clearInstances();
     app = await createApp(config, { logger: false, enableOtel: false });
@@ -113,6 +114,16 @@ describe('POST /profile/me/ensure', () => {
       method: 'POST',
       url: '/profile/me/ensure',
       headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  async function patch(userId: string, displayName: string, expectedVersion: number) {
+    const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+    return app.inject({
+      method: 'PATCH',
+      url: '/profile/me',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { displayName, expectedVersion },
     });
   }
 
@@ -157,6 +168,88 @@ describe('POST /profile/me/ensure', () => {
     expect((await sql`select * from outbox_events`).length).toBe(1);
   });
 
+  it('normalizes Unicode whitespace and records an atomic Display-name change', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    await service().ensure('user_1');
+
+    const response = await patch('user_1', '  Éowyn\t雪\nQueen  ', 1);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: 'user_1',
+      displayName: 'Éowyn 雪 Queen',
+      version: 2,
+    });
+    const rows = await sql`select subject, payload from outbox_events order by created_at, id`;
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toMatchObject({
+      subject: 'profile.updated',
+      payload: {
+        eventType: 'profile.updated',
+        change: { type: 'display-name-changed', before: 'Before', after: 'Éowyn 雪 Queen' },
+        profile: { displayName: 'Éowyn 雪 Queen', version: 2 },
+      },
+    });
+  });
+
+  it('rejects whitespace-only and over-limit Display names without changing state', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    await service().ensure('user_1');
+    const previousMaximum = config.profileDisplayNameMaxLength;
+    config.profileDisplayNameMaxLength = 3;
+
+    try {
+      const whitespace = await patch('user_1', ' \t\n ', 1);
+      const tooLong = await patch('user_1', '雪雪雪雪', 1);
+      expect(whitespace.statusCode).toBe(400);
+      expect(tooLong.statusCode).toBe(400);
+      expect((await sql`select display_name, version from profiles where id = 'user_1'`)[0]).toMatchObject({
+        display_name: 'Before',
+        version: 1,
+      });
+      expect((await sql`select * from outbox_events`).length).toBe(1);
+    } finally {
+      config.profileDisplayNameMaxLength = previousMaximum;
+    }
+  });
+
+  it('allows only one of two concurrent edits at the last-seen version', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    await service().ensure('user_1');
+
+    const responses = await Promise.all([
+      patch('user_1', 'First edit', 1),
+      patch('user_1', 'Second edit', 1),
+    ]);
+
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    const [stored] = await sql`select display_name, version from profiles where id = 'user_1'`;
+    expect(stored.version).toBe(2);
+    expect(['First edit', 'Second edit']).toContain(stored.display_name);
+    expect((await sql`select * from outbox_events where subject = 'profile.updated'`).length).toBe(1);
+  });
+
+  it('rolls back the Display name and version when recording its event fails', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    await service().ensure('user_1');
+    await sql.unsafe(`create function reject_update_event() returns trigger language plpgsql as $$ begin if new.subject = 'profile.updated' then raise exception 'update event rejected'; end if; return new; end $$`);
+    await sql.unsafe(`create trigger reject_update_event before insert on outbox_events for each row execute function reject_update_event()`);
+
+    try {
+      await expect(service().updateDisplayName('user_1', 'After', 1)).rejects.toThrow(
+        'update event rejected'
+      );
+      expect((await sql`select display_name, version from profiles where id = 'user_1'`)[0]).toMatchObject({
+        display_name: 'Before',
+        version: 1,
+      });
+    } finally {
+      await sql.unsafe(
+        'drop trigger reject_update_event on outbox_events; drop function reject_update_event()'
+      );
+    }
+  });
+
   it('prioritizes full name and then a stable generated fallback', async () => {
     identities.identities.set('full', {
       displayName: null,
@@ -169,6 +262,24 @@ describe('POST /profile/me/ensure', () => {
     expect(full.handle).toBe('grace-hopper');
     expect(fallback.displayName).toMatch(/^(quiet|bright|silver|wild) (aurora|canvas|horizon|pixel)$/);
     expect(fallback.handle).toBe(fallback.displayName.replace(' ', '-'));
+  });
+
+  it('normalizes and bounds the initial Display name with the configured policy', async () => {
+    identities.identities.set('bounded', {
+      displayName: '  Éowyn\t Snow  ',
+      firstName: null,
+      lastName: null,
+    });
+    const previousMaximum = config.profileDisplayNameMaxLength;
+    config.profileDisplayNameMaxLength = 5;
+
+    try {
+      const profile = await service().ensure('bounded');
+      expect(profile.displayName).toBe('Éowyn');
+      expect(profile.handle).toBe('eowyn');
+    } finally {
+      config.profileDisplayNameMaxLength = previousMaximum;
+    }
   });
 
   it('claims collision suffixes atomically for different users', async () => {
@@ -307,6 +418,25 @@ describe('POST /profile/me/ensure', () => {
     expect(stored.published_at).not.toBeNull();
   });
 
+  it('publishes recorded Display-name updates through the typed outbox publisher', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    await service().ensure('user_1');
+    await service().updateDisplayName('user_1', 'After', 1);
+    const publisher = new FakeProfileEventPublisher();
+    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
+
+    await worker.publishPending();
+
+    expect(publisher.events).toMatchObject([
+      { eventType: 'profile.created' },
+      {
+        eventType: 'profile.updated',
+        change: { type: 'display-name-changed', before: 'Before', after: 'After' },
+        profile: { displayName: 'After', version: 2 },
+      },
+    ]);
+  });
+
   it('publishes outbox rows recorded before typed changes were added', async () => {
     const timestamp = new Date().toISOString();
     await sql`
@@ -412,7 +542,7 @@ describe('POST /profile/me/ensure', () => {
     expect(unrelated.published_at).toBeNull();
   });
 
-  it('publishes through the production NATS adapter started by createApp', async () => {
+  it('publishes created and updated events through the production NATS adapter', async () => {
     const nats = container.resolve(NatsConnectionManager).getClient();
     await nats.jetstreamManager().then((manager) =>
       manager.streams.add({
@@ -426,16 +556,28 @@ describe('POST /profile/me/ensure', () => {
       lastName: null,
     });
 
-    await request('user_real_nats');
+    const ensureResponse = await request('user_real_nats');
+    expect(ensureResponse.statusCode).toBe(200);
+    const updateResponse = await patch('user_real_nats', 'Updated via real NATS', 1);
+    expect(updateResponse.statusCode).toBe(200);
 
     await expect.poll(
       async () => {
-        const [event] = await sql`
-          select published_at from outbox_events where aggregate_id = 'user_real_nats'
+        const events = await sql`
+          select subject, published_at
+          from outbox_events
+          where aggregate_id = 'user_real_nats'
+          order by subject
         `;
-        return event?.published_at;
+        return events.map((event) => ({
+          subject: event.subject,
+          published: event.published_at !== null,
+        }));
       },
       { timeout: 5_000 }
-    ).not.toBeNull();
+    ).toEqual([
+      { subject: 'profile.created', published: true },
+      { subject: 'profile.updated', published: true },
+    ]);
   });
 });

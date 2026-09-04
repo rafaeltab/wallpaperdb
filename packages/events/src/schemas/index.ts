@@ -35,3 +35,9 @@ export {
   type PublicProfileSnapshot,
   PublicProfileSnapshotSchema,
 } from "./profile-created.js";
+
+export {
+  PROFILE_UPDATED_SUBJECT,
+  ProfileUpdatedEventSchema,
+  type ProfileUpdatedEvent,
+} from "./profile-updated.js";

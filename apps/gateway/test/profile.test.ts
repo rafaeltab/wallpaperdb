@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { PROFILE_CREATED_SUBJECT } from "@wallpaperdb/events";
+import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT } from "@wallpaperdb/events";
 import { container } from "tsyringe";
 import { describe, expect, it } from "vitest";
 import { ProfileRepository } from "../src/repositories/profile.repository.js";
@@ -23,6 +23,24 @@ function profileCreated(profile: ProfileSnapshot, eventId: string) {
         eventType: PROFILE_CREATED_SUBJECT,
         timestamp: profile.updatedAt,
         change: { type: "created" },
+        profile,
+    };
+}
+
+function profileUpdated(
+    profile: ProfileSnapshot,
+    eventId: string,
+    before: string,
+) {
+    return {
+        eventId,
+        eventType: PROFILE_UPDATED_SUBJECT,
+        timestamp: profile.updatedAt,
+        change: {
+            type: "display-name-changed",
+            before,
+            after: profile.displayName,
+        },
         profile,
     };
 }
@@ -51,6 +69,42 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("projects an updated Display name through the public GraphQL Profile", async () => {
+        const createdAt = "2026-01-01T00:00:00.000Z";
+        const original = {
+            id: "user_display_name_update",
+            displayName: "Before",
+            handle: "before",
+            claimGeneration: 1,
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 1,
+            createdAt,
+            updatedAt: createdAt,
+        };
+        const updated = {
+            ...original,
+            displayName: "After",
+            version: 2,
+            updatedAt: "2026-01-02T00:00:00.000Z",
+        };
+
+        await tester.nats.publishEvent(
+            PROFILE_CREATED_SUBJECT,
+            profileCreated(original, "evt_display_name_created"),
+        );
+        await tester.nats.publishEvent(
+            PROFILE_UPDATED_SUBJECT,
+            profileUpdated(updated, "evt_display_name_updated", original.displayName),
+        );
+
+        const result = await eventually(
+            () => query(`query { profile(id: "user_display_name_update") { displayName version } }`),
+            (value) => value.data.profile?.version === 2,
+        );
+        expect(result.data.profile).toEqual({ displayName: "After", version: 2 });
+    });
+
     it("atomically ignores duplicate and stale Profile versions", async () => {
         const createdAt = "2026-01-01T00:00:00.000Z";
         const current = {

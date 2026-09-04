@@ -84,7 +84,7 @@ describe('UserMenu', () => {
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument();
   });
 
-  it('shows disabled Profile link in dropdown when signed in', async () => {
+  it('links to Profile settings when signed in', async () => {
     (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true });
     (useUser as Mock).mockReturnValue({
       isLoaded: true,
@@ -101,10 +101,8 @@ describe('UserMenu', () => {
     const trigger = screen.getByRole('button', { name: /jane smith/i });
     await user.click(trigger);
 
-    const profileItem = screen.getByRole('menuitem', { name: /profile/i });
-    expect(profileItem).toBeInTheDocument();
-    expect(profileItem).toHaveAttribute('aria-disabled', 'true');
-    expect(profileItem).toHaveTextContent('Soon');
+    const profileItem = screen.getByRole('menuitem', { name: /profile settings/i });
+    expect(profileItem).toHaveAttribute('href', '/settings/profile');
   });
 
   it('calls signOut when sign out is clicked', async () => {

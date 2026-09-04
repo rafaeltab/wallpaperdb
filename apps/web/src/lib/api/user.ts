@@ -32,6 +32,13 @@ interface EnsureProfileOptions {
   tokenProvider?: () => Promise<string | null>;
 }
 
+interface UpdateProfileOptions {
+  displayName: string;
+  expectedVersion: number;
+  expectedProfileId?: string;
+  tokenProvider?: () => Promise<string | null>;
+}
+
 export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOptions) {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
@@ -50,15 +57,38 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
       });
 
       if (!response.ok) {
-        let message = `User API request failed with status ${response.status}`;
-        try {
-          const body = (await response.json()) as { detail?: unknown; message?: unknown };
-          if (typeof body.detail === 'string') message = body.detail;
-          else if (typeof body.message === 'string') message = body.message;
-        } catch {
-          // Preserve the status-based message for non-JSON responses.
-        }
-        throw new UserApiError(message, response.status);
+        throw await userApiError(response);
+      }
+
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) {
+        throw new UserApiError('User API returned a malformed Profile', 502);
+      }
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
+    async updateProfile(options: UpdateProfileOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+
+      const response = await fetch(`${normalizedBaseUrl}/profile/me`, {
+        method: 'PATCH',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          displayName: options.displayName,
+          expectedVersion: options.expectedVersion,
+        }),
+      });
+
+      if (!response.ok) {
+        throw await userApiError(response);
       }
 
       const profile: unknown = await response.json();
@@ -71,6 +101,18 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
       return profile;
     },
   };
+}
+
+async function userApiError(response: Response): Promise<UserApiError> {
+  let message = `User API request failed with status ${response.status}`;
+  try {
+    const body = (await response.json()) as { detail?: unknown; message?: unknown };
+    if (typeof body.detail === 'string') message = body.detail;
+    else if (typeof body.message === 'string') message = body.message;
+  } catch {
+    // Preserve the status-based message for non-JSON responses.
+  }
+  return new UserApiError(message, response.status);
 }
 
 function isProfile(value: unknown): value is Profile {

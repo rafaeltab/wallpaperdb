@@ -4,8 +4,11 @@ import {
   PROFILE_CREATED_SUBJECT,
   type ProfileCreatedEvent,
   ProfileCreatedEventSchema,
+  PROFILE_UPDATED_SUBJECT,
+  type ProfileUpdatedEvent,
+  ProfileUpdatedEventSchema,
 } from '@wallpaperdb/events';
-import { and, asc, eq, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Config } from '../config.js';
 import type { DatabaseConnection } from '../connections/database.js';
 import type { NatsConnectionManager } from '../connections/nats.js';
@@ -15,23 +18,46 @@ const PUBLISH_INTERVAL_MS = 1_000;
 const PUBLISH_BATCH_SIZE = 100;
 
 export interface ProfileEventPublisher {
-  publish(event: ProfileCreatedEvent): Promise<void>;
+  publish(event: ProfileCreatedEvent | ProfileUpdatedEvent): Promise<void>;
 }
 
 interface OutboxLogger {
   error(bindings: object, message: string): void;
 }
 
-export class NatsProfileEventPublisher
-  extends BaseEventPublisher<typeof ProfileCreatedEventSchema>
-  implements ProfileEventPublisher
-{
+class NatsProfileCreatedEventPublisher extends BaseEventPublisher<
+  typeof ProfileCreatedEventSchema
+> {
   protected readonly schema = ProfileCreatedEventSchema;
   protected readonly subject = PROFILE_CREATED_SUBJECT;
   protected readonly eventType = PROFILE_CREATED_SUBJECT;
+}
+
+class NatsProfileUpdatedEventPublisher extends BaseEventPublisher<
+  typeof ProfileUpdatedEventSchema
+> {
+  protected readonly schema = ProfileUpdatedEventSchema;
+  protected readonly subject = PROFILE_UPDATED_SUBJECT;
+  protected readonly eventType = PROFILE_UPDATED_SUBJECT;
+}
+
+export class NatsProfileEventPublisher implements ProfileEventPublisher {
+  private readonly created: NatsProfileCreatedEventPublisher;
+  private readonly updated: NatsProfileUpdatedEventPublisher;
 
   constructor(nats: NatsConnectionManager, config: Config) {
-    super({ natsConnection: nats.getClient(), serviceName: config.otelServiceName });
+    const publisherConfig = {
+      natsConnection: nats.getClient(),
+      serviceName: config.otelServiceName,
+    };
+    this.created = new NatsProfileCreatedEventPublisher(publisherConfig);
+    this.updated = new NatsProfileUpdatedEventPublisher(publisherConfig);
+  }
+
+  publish(event: ProfileCreatedEvent | ProfileUpdatedEvent): Promise<void> {
+    return event.eventType === PROFILE_CREATED_SUBJECT
+      ? this.created.publish(event)
+      : this.updated.publish(event);
   }
 }
 
@@ -80,20 +106,26 @@ export class ProfileOutboxPublisherWorker {
       .db.select()
       .from(outboxEvents)
       .where(
-        and(eq(outboxEvents.subject, PROFILE_CREATED_SUBJECT), isNull(outboxEvents.publishedAt))
+        and(
+          inArray(outboxEvents.subject, [PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT]),
+          isNull(outboxEvents.publishedAt)
+        )
       )
       .orderBy(asc(outboxEvents.createdAt), asc(outboxEvents.id))
       .limit(PUBLISH_BATCH_SIZE);
 
     for (const storedEvent of events) {
       try {
-        const payload = storedEvent.payload as ProfileCreatedEvent & {
+        const payload = storedEvent.payload as (ProfileCreatedEvent | ProfileUpdatedEvent) & {
           change?: { type: 'created' };
         };
-        const event = ProfileCreatedEventSchema.parse({
-          ...payload,
-          change: payload.change ?? { type: 'created' },
-        });
+        const event =
+          storedEvent.subject === PROFILE_CREATED_SUBJECT
+            ? ProfileCreatedEventSchema.parse({
+                ...payload,
+                change: payload.change ?? { type: 'created' },
+              })
+            : ProfileUpdatedEventSchema.parse(payload);
         await this.publisher.publish(event);
         await this.database
           .getClient()

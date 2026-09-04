@@ -23,6 +23,7 @@ make user-dev
 
 ### Core Functionality
 - **Authenticated Profile creation** through an idempotent ensure command
+- **Optimistic Profile editing** with authoritative command responses and conflict detection
 - **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
 - **Health checks** for database and message queue connectivity
@@ -70,6 +71,10 @@ handleClaims {
 ### POST /profile/me/ensure
 
 Verifies the Clerk bearer token and idempotently creates or returns the signed-in User's authoritative Profile. A failed Clerk identity lookup returns `503 Service Unavailable` and persists nothing.
+
+### PATCH /profile/me
+
+Updates the signed-in User's Display name. The request supplies `displayName` and the last-seen `expectedVersion`. Display names preserve casing and Unicode while trimming and collapsing whitespace, and default to an 80-Unicode-character limit. Stale versions return `409 Conflict` without changing Profile state or recording an event. A successful command returns the authoritative updated Profile immediately and records a versioned `profile.updated` event in the same transaction.
 
 ### GET /health
 
@@ -125,6 +130,7 @@ CLERK_PUBLISHABLE_KEY=pk_test_...
 # Profile Handles
 PROFILE_HANDLE_MIN_LENGTH=1
 PROFILE_HANDLE_MAX_LENGTH=30
+PROFILE_DISPLAY_NAME_MAX_LENGTH=80
 ```
 
 ## Testing

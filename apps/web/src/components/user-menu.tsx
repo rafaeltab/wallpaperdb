@@ -49,10 +49,11 @@ export function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled>
-          <UserIcon className="mr-2 h-4 w-4" />
-          Profile
-          <span className="ml-auto text-xs text-muted-foreground">Soon</span>
+        <DropdownMenuItem asChild>
+          <Link to="/settings/profile" aria-label="Profile settings">
+            <UserIcon className="mr-2 h-4 w-4" />
+            Profile settings
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => void signOut({ redirectUrl: buildUrl('/') })}>

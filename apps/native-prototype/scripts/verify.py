@@ -104,11 +104,36 @@ def passed(label):
 
 virtual = []
 original = api('status')
-original_pointer = hypr('-j', 'cursorpos')
 physical = hypr('-j', 'monitors')
 assert any(m['name'] == 'DP-2' for m in physical), 'DP-2 must be connected'
+target_monitor = next(m for m in physical if m['name'] == 'DP-2')
+ui_title = 'WallpaperDB · Desktop'
+def native_ui():
+    return next((w for w in hypr('-j', 'clients') if w['title'] == ui_title and w['class'] == 'wallpaperdb-native'), None)
+
+original_ui = native_ui()
+ui_rule = f'wallpaperdb-verification-{os.getpid()}'
+ui_confined = False
 baseline_layers = hypr('-j', 'layers')
 try:
+    # Scope a temporary rule before mapping our window. Moving it after mapping
+    # would briefly open it on whichever monitor the user is currently using.
+    for key, value in [
+        ('match:class', '^wallpaperdb-native$'),
+        ('match:title', '^WallpaperDB · Desktop$'),
+        ('monitor', 'DP-2'),
+        ('workspace', f"{target_monitor['activeWorkspace']['id']} silent"),
+        ('no_initial_focus', 'on'),
+        ('suppress_event', 'activate activatefocus'),
+        ('float', 'on'),
+        ('size', '1240 840'),
+        ('center', 'on'),
+    ]:
+        reply = hypr('keyword', f'windowrule[{ui_rule}]:{key}', value)
+        assert reply == 'ok', f'Cannot confine verification UI to DP-2: {reply}'
+    ui_confined = True
+    if original_ui:
+        hypr('dispatch', 'closewindow', 'address:' + original_ui['address'])
     report['versions']['hyprland'] = hypr('-j', 'version')
     report['versions']['webkitgtk'] = subprocess.check_output(['pkg-config', '--modversion', 'webkit2gtk-4.1'], text=True).strip()
     report['monitors'] = [{k: m[k] for k in ['name', 'width', 'height', 'x', 'y', 'scale', 'transform']} for m in physical]
@@ -163,12 +188,15 @@ try:
     set_wallpaper('rose-clock', audio=True)
     state = wait_for(lambda s: ready(s), 'image live scene')
     prior_pointer = surface(state)['telemetry']['pointer']
+    original_pointer = hypr('-j', 'cursorpos')
     hypr('dispatch', 'movecursor', '800 -650')
     # A person may still be using the mouse while this runs. Require actual
     # compositor-driven changes, rather than requiring the pointer to stay put.
     state = wait_for(lambda s: surface(s).get('telemetry', {}).get('pointer', {}) != prior_pointer, 'pointer input')
     pointer = surface(state)['telemetry']['pointer']
     assert math.isfinite(pointer['x']) and math.isfinite(pointer['y'])
+    if hypr('-j', 'cursorpos') == {'x': 800, 'y': -650}:
+        hypr('dispatch', 'movecursor', f'{original_pointer["x"]} {original_pointer["y"]}')
     api('signal', name='key', value='Space', outputs=['DP-2'])
     state = wait_for(lambda s: surface(s).get('telemetry', {}).get('signals', 0) >= 1, 'keyboard signal')
     assert surface(state)['telemetry']['lastSignal'] == {'name': 'key', 'value': 'Space'}
@@ -186,14 +214,14 @@ try:
     passed('Real output audio reaches the running scene (RMS and frequency bands)')
     measure('live_image_audio')
 
-    focused = hypr('-j', 'activewindow').get('address')
     api('ui')
     ui = None
     for _ in range(40):
-        ui = next((c for c in hypr('-j', 'clients') if c['title'] == 'WallpaperDB · Desktop'), None)
+        ui = native_ui()
         if ui: break
         time.sleep(.1)
     assert ui, 'Native library window did not open'
+    assert ui['monitor'] == target_monitor['id'], 'Library must map directly onto DP-2'
     address = 'address:' + ui['address']
     try:
         workspace = next(m for m in hypr('-j', 'monitors') if m['name'] == 'DP-2')['activeWorkspace']['id']
@@ -201,7 +229,6 @@ try:
         hypr('dispatch', 'setfloating', address)
         hypr('dispatch', 'resizewindowpixel', 'exact 1240 840,' + address)
         hypr('dispatch', 'movewindowpixel', 'exact 660 -960,' + address)
-        hypr('dispatch', 'focuswindow', address)
         time.sleep(1)
         previous_signals = surface(api('status'))['telemetry']['signals']
         hypr('dispatch', 'sendshortcut', ',space,' + address)
@@ -217,15 +244,6 @@ try:
         passed('Fullscreen native window automatically pauses and resumes the wallpaper')
     finally:
         hypr('dispatch', 'closewindow', address)
-        if focused and any(c['address'] == focused for c in hypr('-j', 'clients')):
-            hypr('dispatch', 'focuswindow', 'address:' + focused)
-    try:
-        hypr('dispatch', 'dpms', 'off DP-2')
-        wait_for(lambda s: surface(s).get('paused'), 'DPMS suspension')
-    finally:
-        hypr('dispatch', 'dpms', 'on DP-2')
-    wait_for(lambda s: not surface(s).get('paused'), 'DPMS resume')
-    passed('Turning DP-2 off pauses rendering; turning it on resumes')
 
     set_wallpaper('tide', audio=True)
     state = wait_for(lambda s: ready(s) and surface(s)['telemetry'].get('videos', [{}])[0].get('ready', 0) >= 3, 'video live scene', 20)
@@ -311,17 +329,31 @@ except BaseException as error:
 else:
     report['completed'] = True
 finally:
-    api('clear', outputs=virtual)
-    for name in virtual:
-        try: hypr('output', 'remove', name)
-        except subprocess.CalledProcessError: pass
-    hypr('dispatch', 'movecursor', f'{original_pointer["x"]} {original_pointer["y"]}')
-    set_wallpaper('rose-clock', audio=True)
-    after = hypr('-j', 'layers')
-    for name, layers in baseline_layers.items():
-        expected = {(l['namespace'], l['pid']) for l in layers['levels']['0'] if not l['namespace'].startswith('wallpaperdb') and l['pid'] not in [s.get('telemetry', {}).get('pid') for s in original['surfaces']]}
-        actual = {(l['namespace'], l['pid']) for l in after.get(name, {}).get('levels', {}).get('0', [])}
-        assert expected <= actual, f'Existing background process changed on {name}'
-    report['existing_backgrounds_preserved'] = True
-    (OUT / 'report.json').write_text(json.dumps(report, indent=2))
+    try:
+        api('clear', outputs=virtual)
+        for name in virtual:
+            try: hypr('output', 'remove', name)
+            except subprocess.CalledProcessError: pass
+        set_wallpaper('rose-clock', audio=True)
+        if original_ui and ui_confined:
+            api('ui')
+            restored_ui = None
+            for _ in range(40):
+                restored_ui = native_ui()
+                if restored_ui: break
+                time.sleep(.1)
+            assert restored_ui and restored_ui['monitor'] == target_monitor['id'], 'Restored library must stay on DP-2'
+        after = hypr('-j', 'layers')
+        for name, layers in baseline_layers.items():
+            expected = {(l['namespace'], l['pid']) for l in layers['levels']['0'] if not l['namespace'].startswith('wallpaperdb') and l['pid'] not in [s.get('telemetry', {}).get('pid') for s in original['surfaces']]}
+            actual = {(l['namespace'], l['pid']) for l in after.get(name, {}).get('levels', {}).get('0', [])}
+            assert expected <= actual, f'Existing background process changed on {name}'
+        report['existing_backgrounds_preserved'] = True
+    except BaseException as error:
+        report['completed'] = False
+        report['cleanup_failure'] = str(error)
+        raise
+    finally:
+        hypr('keyword', f'windowrule[{ui_rule}]:enable', 'false')
+        (OUT / 'report.json').write_text(json.dumps(report, indent=2))
 print(f'All {len(report["checks"])} acceptance checks passed. Evidence: {OUT}', flush=True)

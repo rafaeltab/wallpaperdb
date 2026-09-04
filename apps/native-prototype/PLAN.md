@@ -9,5 +9,5 @@ This is a functional prototype: local persistence, a finished selection UI, and 
 - [x] Shared audio input, pointer input, explicit keyboard events, date and time
 - [x] WallpaperDB-themed native library window
 - [x] Independent / spanning monitor groups, display changes, pause controls
-- [x] Automated tests and DP-2 verification with measurements; final physical-display retest limitation recorded in NOTES.md
+- [x] Automated tests and eighteen passing DP-2 acceptance checks with measurements
 - [x] Usage, authoring contract, decisions, and remaining limits

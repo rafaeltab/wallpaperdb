@@ -46,6 +46,6 @@ make native-ui-test
 make native-verify
 ```
 
-The UI test requires Chromium. The desktop acceptance run changes DP-2, briefly tests fullscreen and display sleep, plays a quiet audio test tone, and creates two temporary virtual outputs for spanning and hotplug checks. It removes those outputs and leaves a bundled live wallpaper on DP-2. Screenshots and measurements are written to `apps/native-prototype/verification/`.
+The UI test requires Chromium. The desktop acceptance run changes DP-2, briefly tests fullscreen, plays a quiet audio test tone, and creates two temporary virtual outputs for spanning and hotplug checks. Its library window opens directly on DP-2 without requesting focus, and the run issues no monitor power commands. It removes the temporary outputs and leaves a bundled live wallpaper on DP-2. Keep DP-2 powered on during verification. Screenshots and measurements are written to `apps/native-prototype/verification/`.
 
 The prototype's `NOTES.md` records the verified behavior, performance, and remaining platform limitations. Backend integration should download assets into the local library and reuse the existing assignment API.

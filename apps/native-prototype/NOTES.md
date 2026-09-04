@@ -4,35 +4,36 @@ Rust is a practical host for this desktop companion. The prototype provides a lo
 
 ## What was verified
 
-The development machine runs Manjaro, Hyprland 0.56.0 at commit `36b2e0cfe0c6094dbc47bd42a437431315bb3087`, WebKitGTK 2.52.5, Rust 1.89, and an RTX 4080 with NVIDIA driver 610.43.03. DP-2 is 1920×1080 at 144 Hz, positioned at `(320, -1080)`. Validation took place on 2026-09-04.
+The development machine runs Manjaro, Hyprland 0.56.0 at commit `36b2e0cfe0c6094dbc47bd42a437431315bb3087`, WebKitGTK 2.52.5, Rust 1.89, and an RTX 4080 with NVIDIA driver 610.43.03. DP-2 is 1920×1080 at 144 Hz, positioned at `(320, -1080)`. The complete physical-display acceptance run passed on 2026-09-05.
 
 - Seven Rust tests and four JavaScript runtime tests pass. Rust formatting, Clippy with warnings denied, and the optimized build pass.
 - Chromium automation exercises the real local API: library loading, search, filters, monitor selection, applying a wallpaper, pause/resume, button and keyboard signals, and layouts at 1440 px and 600 px wide. The native GTK window was also opened on DP-2, and a real Hyprland keyboard event reached its wallpaper.
-- An earlier complete 14-check desktop run passed on DP-2 using the compatibility renderer: stationary image equality, changing video frames, paused video equality, executable image and video scenes, pointer movement, keyboard signals, current date/time, real output audio, spanning groups, hotplug, and preservation of existing backgrounds. Later native-window fullscreen and DPMS pause/resume checks also passed.
-- The final seven layout checks passed on three temporary compositor outputs, including live video spanning, mixed assignments, hotplug, and rotation with 1.5× scaling. Measured media phase differences were 0.033 s for ordinary video and 0.001 s for the live video sample at the verification point. These are observations, not synchronization guarantees.
+- All eighteen desktop acceptance checks passed with DP-2 powered on: stationary image equality, changing video frames, paused video equality, executable image and video scenes, pointer movement, keyboard signals, current date/time, real output audio, fullscreen pause/resume, spanning groups, hotplug, and preservation of existing backgrounds.
+- Layout checks used real DP-2 plus two temporary compositor outputs, including live video spanning, mixed assignments, hotplug, and rotation with 1.5× scaling. Measured media phase differences were 0.067 s for ordinary video and 0.004 s for the live video sample at the verification point. These are observations, not synchronization guarantees.
 - Stop/restart checks verified cleanup of owned processes and restoration of saved groups and pause state. A second daemon was rejected without modifying the saved library. Pausing stops the supplied scene frame loop and releases audio capture.
 
-The final expanded **DP-2 acceptance run did not complete**. Screenshot requests began waiting indefinitely for DP-2 presentation; the verifier now times out rather than hanging. Both current and older grim capture protocols showed the problem, while virtual-output captures worked. A later DP-2/virtual video span also showed approximately 0.6 s timing separation, unlike the virtual-only run. The physical-display cause is unresolved; current telemetry alone does not prove that DP-2 is presenting every new frame. DP-2's original mode was restored, the library was reopened, and the user was asked to confirm the physical display state. Do not describe the final expanded desktop suite as fully passing.
+The earlier capture/timing failures did not recur after DP-2 was powered on. The original verifier had explicitly sent a DPMS-off command for a sleep test, followed by an on command; the user later confirmed the physical monitor was off despite Hyprland reporting it connected and awake. Physical monitor power commands have been removed from verification. A temporary window rule now places the library directly on DP-2 without requesting focus, and is disabled during cleanup. The application itself only observes display power state to pause rendering; it does not turn monitors off.
 
-Generated evidence lives in the ignored `verification/` directory: UI screenshots, earlier DP-2 image/video/live captures, virtual-output captures, `report.json` for the most recent formal attempt, and supplemental layout, performance, restart, and lifecycle reports. The verification script preserves existing background processes and removes its temporary outputs in cleanup.
+Generated evidence lives in the ignored `verification/` directory: UI screenshots, DP-2 image/video/live captures, virtual-output captures, `report.json` for the successful eighteen-check run, and supplemental layout, performance, restart, and lifecycle reports. The verification script preserves existing background processes and removes its temporary outputs in cleanup.
 
 Repository-wide `make ci` and `make format` could not run because this checkout lacks its Node workspace dependencies (`node_modules`, Vitest, and Turbo). Native checks do not require that installation; native Rust and web assets were formatted separately. The documentation site was not built.
 
 ## Performance observations
 
-Four-second samples of the optimized daemon and its child processes, with the library window closed, on DP-2:
+Four-second samples of the optimized daemon and its child processes, with the library window closed and DP-2 powered on, from the successful 2026-09-05 run:
 
-| Content | CPU, percent of one core | Summed RSS |
+| Content | CPU, percent of one core | Proportional RSS |
 | --- | ---: | ---: |
-| Native stationary image | 0.25% | 388 MiB |
-| Ordinary 1280×720 video | 2.23% | 874 MiB |
-| Rose hour, audio enabled | 62.13% | 805 MiB |
-| Afterglow video scene, audio enabled | 102.79% | 858 MiB |
-| Paused live video | 0.25% | 844 MiB |
+| Native stationary image | 0.50% | 129 MiB |
+| Ordinary 1280×720 video | 4.46% | 394 MiB |
+| Paused ordinary video | 2.48% | 394 MiB |
+| Rose hour, audio enabled | 64.87% | 280 MiB |
+| Afterglow video scene, audio enabled | 113.55% | 350 MiB |
+| Paused live video | 0.50% | 323 MiB |
 
-100% means one logical CPU core, not the whole machine. RSS sums count shared library and graphics mappings repeatedly and exclude a complete GPU-memory accounting. These are short observations in an active desktop session, not controlled benchmarks; the later physical-presentation problem also limits conclusions about playback smoothness. The verifier additionally records proportional RSS when `/proc` permits it. After the final UI-close change explicitly terminated the library's dedicated web process, the image measured 0.25% CPU / 122 MiB proportional RSS and the live image 63.5% CPU / 277 MiB proportional RSS. The follow-up record is `lifecycle-report.json`.
+100% means one logical CPU core, not the whole machine. Proportional RSS divides shared mappings among the processes using them; it does not provide complete GPU-memory accounting. These are short observations in an active desktop session, not controlled benchmarks. The verifier records both proportional and summed RSS when `/proc` permits it. Closing the library explicitly terminates its dedicated web process.
 
-Ordinary video reported `hwdec: nvdec`. Live scene frame callbacks were capped at a requested 30 fps; the live video sample reported 26 fps during the measured interval. Native still images have no animation loop. A single audio sampler is shared across active groups. Fullscreen, display sleep, and manual pause suppress cooperative scene work. Closing a scene terminates its dedicated web process.
+Ordinary video reported `hwdec: nvdec`. Live scene frame callbacks were capped at a requested 30 fps. Native still images have no animation loop. A single audio sampler is shared across active groups. Fullscreen, display sleep, and manual pause suppress cooperative scene work. Closing a scene terminates its dedicated web process.
 
 ## Platform decisions and next work
 

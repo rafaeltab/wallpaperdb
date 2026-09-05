@@ -132,6 +132,39 @@
         <div id="detail-tags" class="detail-tags"></div>
         <h2 id="detail-title">Choose your atmosphere</h2>
         <p id="detail-description">Select a wallpaper from your collection.</p>
+        <div class="experiment-panel">
+          <label class="field-label" for="experiment"
+            >RENDERER EXPERIMENT</label
+          >
+          <select id="experiment" aria-label="Renderer experiment">
+            <option value="baseline">Original · WebKit / mpvpaper</option>
+            <option value="chromium">Chromium · SDR compatibility copy</option>
+            <option value="chromium-dmabuf">
+              Chromium · DMA-BUF experiment
+            </option>
+            <option value="gpu">Native · Lua / GLSL + libmpv</option>
+          </select>
+          <p id="experiment-note">
+            The original image, video, and HTML runtime.
+          </p>
+          <label class="hdr-choice"
+            ><input id="hdr" type="checkbox" /> Float16 HDR output</label
+          >
+          <label class="hdr-choice"
+            ><input id="keep-playing" type="checkbox" /> Keep playing behind
+            fullscreen apps</label
+          >
+          <p class="tip">
+            HDR requests a color-managed surface. Enable HDR on your display
+            separately; SDR baselines remain available.
+          </p>
+          <details>
+            <summary>Live experiment diagnostics</summary>
+            <pre id="experiment-stats">
+Apply an experiment to see its actual renderer.</pre
+            >
+          </details>
+        </div>
         <div id="reactivity" class="reactivity">
           <span class="field-label">BRING IT TO LIFE</span>
           <div class="capabilities">
@@ -179,7 +212,7 @@
         <div class="performance">
           <i></i>
           <div>
-            <strong>Easy on your system</strong>
+            <strong>Measure the difference</strong>
             <p>
               Still images rest. Motion pauses on fullscreen displays and
               sleeping monitors.

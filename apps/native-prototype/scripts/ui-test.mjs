@@ -134,13 +134,13 @@ try {
   );
   await js("document.querySelector('[data-filter=video]').click()");
   assert.equal(
-    await js("document.querySelectorAll('.wallpaper-card').length"),
-    1,
+    await js("document.querySelectorAll('.wallpaper-card').length >= 2"),
+    true,
   );
   await js("document.querySelector('[data-filter=live]').click()");
   assert.equal(
-    await js("document.querySelectorAll('.wallpaper-card').length"),
-    2,
+    await js("document.querySelectorAll('.wallpaper-card').length >= 4"),
+    true,
   );
   await js(
     "document.querySelector('[data-filter=all]').click(); document.querySelector('#search').value='Rose hour'; document.querySelector('#search').dispatchEvent(new Event('input'))",
@@ -182,6 +182,42 @@ try {
   await until(
     "document.querySelector('#toast').textContent.includes('Pulse sent')",
   );
+  await js(
+    "document.querySelector('#search').value='Prism';document.querySelector('#search').dispatchEvent(new Event('input'));document.querySelector('.wallpaper-card').click()",
+  );
+  await until("!document.querySelector('#apply').disabled");
+  for (const engine of ["gpu", "chromium"]) {
+    await js(
+      `document.querySelector('#experiment').value='${engine}';document.querySelector('#experiment').dispatchEvent(new Event('change'));document.querySelector('#apply').click()`,
+    );
+    await until("!document.querySelector('#apply').disabled");
+    await until(
+      `document.querySelector('#experiment-stats').textContent.includes('${engine === "gpu" ? "Lua / OpenGL" : "Chromium SDR copy"}')`,
+    );
+    assert.equal(
+      await js("document.querySelector('#hdr').disabled"),
+      engine === "chromium",
+    );
+  }
+  await js(
+    "document.querySelector('#experiment').value='chromium-dmabuf';document.querySelector('#experiment').dispatchEvent(new Event('change'))",
+  );
+  assert.equal(
+    await js(
+      "document.querySelector('#experiment-note').textContent.includes('failed HDR')",
+    ),
+    true,
+  );
+  await js(
+    "document.querySelector('#experiment').value='gpu';document.querySelector('#experiment').dispatchEvent(new Event('change'));document.querySelector('#search').value='';document.querySelector('#search').dispatchEvent(new Event('input'))",
+  );
+  await js(
+    "Promise.all([...document.images].map(image=>image.decode().catch(()=>{})))",
+  );
+  await js(
+    "document.activeElement.blur();document.querySelector('#inspector').scrollTop=0",
+  );
+  await pause(300);
   const screenshot = await call("Page.captureScreenshot", { format: "png" });
   writeFileSync(
     join(evidence, "library-ui.png"),

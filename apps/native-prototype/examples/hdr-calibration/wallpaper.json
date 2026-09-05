@@ -1,0 +1,7 @@
+{
+  "title": "HDR signal laboratory",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "description": "Known luminance patches: 0.1, 1, 10, 80, 203, 300, 400 and 800 nits. Native Lua/GLSL and Chromium WebGPU implementations. Read back actual content and inspect output metadata.",
+  "tags": ["experiment", "HDR", "calibration", "WebGPU", "Lua"]
+}

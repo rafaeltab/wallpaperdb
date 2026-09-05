@@ -1,2 +1,4 @@
 /target/
 /verification/
+/lab/build/
+__pycache__/

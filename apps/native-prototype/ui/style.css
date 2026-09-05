@@ -857,3 +857,66 @@ select {
     display: none;
   }
 }
+.experiment-panel {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid #633f58;
+  border-radius: 12px;
+  background: #211a25;
+}
+.experiment-panel select {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.experiment-panel p,
+.experiment-panel summary {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c0afbd;
+}
+.hdr-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.experiment-panel pre {
+  font-size: 10px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+@media (min-width: 621px) {
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: #101010;
+  }
+  .inspector {
+    position: sticky;
+    top: 72px;
+    align-self: start;
+    height: calc(100vh - 72px);
+    overflow-y: auto;
+    padding-bottom: 0;
+  }
+  .inspector > * {
+    flex-shrink: 0;
+  }
+  .apply-area {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #131313;
+    padding: 12px 0;
+    box-shadow: 0 -15px 20px #131313;
+  }
+  .apply-area > .tip {
+    display: none;
+  }
+}

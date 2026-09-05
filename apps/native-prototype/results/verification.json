@@ -1,0 +1,70 @@
+{
+  "scope": "Final renderer laboratory verification on this Manjaro/Hyprland workstation",
+  "native_tests": {
+    "rust": 12,
+    "javascript": 4,
+    "result": "passed"
+  },
+  "format_and_lints": "make native-check passed; C/Python and web sources formatted through native Make targets",
+  "desktop": {
+    "checks": [
+      "A disconnected producer exits explicitly instead of spinning on a closed socket",
+      "gpu: rose-clock/background.png, actual visible content and expected motion",
+      "gpu: Drifting dusk.mp4, actual visible content and expected motion",
+      "gpu: prism, actual visible content and expected motion",
+      "gpu: rose-clock, actual visible content and expected motion",
+      "gpu: tide, actual visible content and expected motion",
+      "gpu: semantic keyboard signal, pause, resume",
+      "chromium: rose-clock/background.png, actual visible content and expected motion",
+      "chromium: Drifting dusk.mp4, actual visible content and expected motion",
+      "chromium: prism, actual visible content and expected motion",
+      "chromium: rose-clock, actual visible content and expected motion",
+      "chromium: tide, actual visible content and expected motion",
+      "chromium: semantic keyboard signal, pause, resume",
+      "Native composition receives playback audio and actual desktop pointer",
+      "gpu: one shared producer/decoder across a span plus an independent group",
+      "chromium: one shared producer/decoder across a span plus an independent group",
+      "gpu: independent players have unique artifacts and suspend per output",
+      "gpu: a retained static span repaints its initially hidden member",
+      "gpu: a span suspends after a member disconnects and reconnects",
+      "chromium: independent players have unique artifacts and suspend per output",
+      "chromium: a retained static span repaints its initially hidden member",
+      "chromium: a span suspends after a member disconnects and reconnects",
+      "Native library opens on DP-2; fullscreen suspension and resumption work"
+    ],
+    "count": 23,
+    "result": "passed",
+    "raw_report": "verification/lab-1788650065/report.json"
+  },
+  "hdr": {
+    "summary": "results/hdr.json",
+    "native_passes": 4,
+    "chromium_dmabuf_failures": 4,
+    "display_settings_restored": true
+  },
+  "library_ui": {
+    "result": "passed",
+    "screenshot": "verification/library-ui.png",
+    "final_desktop_screenshot": "verification/library-final-dp2.png"
+  },
+  "interactive_report": {
+    "result": "passed",
+    "checks": [
+      "12-run selector",
+      "metrics table",
+      "presentation plot",
+      "CPU/GPU plots",
+      "time-window input",
+      "no JavaScript exceptions"
+    ]
+  },
+  "repository_checks": {
+    "make ci": "could not run: Node workspace vitest is not installed",
+    "make format": "could not run: Node workspace turbo is not installed"
+  },
+  "binaries_sha256": {
+    "target/release/wallpaperdb-native": "9d815e5eccc3c9917180e483b69f09d4a399b9a71306eae66fdd3d02923f3aa6",
+    "lab/build/presenter": "b6a56b609f11ad731e846ad9373641420fc1b53d77e3d0e5528f0455adb074ef",
+    "lab/build/dmabuf.node": "2dcd538fb67c48490b29d9e7378d881b3feeb926999295e12cd6efc233922c08"
+  }
+}

@@ -1,4 +1,5 @@
 mod audio;
+mod experiment;
 mod model;
 mod platform;
 mod render;
@@ -51,6 +52,18 @@ enum Commands {
         fps: u32,
         #[arg(long)]
         audio: bool,
+        /// baseline, chromium, chromium-dmabuf, or gpu (Lua/GLSL + libmpv).
+        #[arg(long, default_value = "baseline")]
+        experiment: String,
+        /// Request real floating-point HDR presentation (experimental renderers only).
+        #[arg(long)]
+        hdr: bool,
+        /// Keep rendering behind fullscreen windows for controlled profiling.
+        #[arg(long)]
+        keep_playing: bool,
+        /// Write detailed frame CSV for profiling (can grow while running).
+        #[arg(long)]
+        trace: bool,
     },
     /// Remove only this app's wallpaper from selected outputs, revealing the previous background.
     Clear {
@@ -111,12 +124,16 @@ fn run() -> Result<()> {
                     span,
                     fps,
                     audio,
+                    experiment,
+                    hdr,
+                    keep_playing,
+                    trace,
                 } => {
                     let source = PathBuf::from(&source)
                         .canonicalize()
                         .map(|p| p.to_string_lossy().into_owned())
                         .unwrap_or(source);
-                    json!({"op":"set","source":source,"outputs":outputs,"span":span,"fps":fps,"audio":audio})
+                    json!({"op":"set","source":source,"outputs":outputs,"span":span,"fps":fps,"audio":audio,"experiment":experiment,"hdr":hdr,"keep_playing":keep_playing,"trace":trace})
                 }
                 Commands::Clear { outputs } => json!({"op":"clear","outputs":outputs}),
                 Commands::Pause { outputs } => {
@@ -207,6 +224,7 @@ impl Desktop {
         let mut additions = Vec::new();
         let mut desired = Vec::new();
         for group in &next.groups {
+            let mut player = None;
             let item = next
                 .items
                 .iter()
@@ -220,12 +238,29 @@ impl Desktop {
                 let signature = render::signature(group, item, monitor, &self.monitors);
                 desired.push(signature.clone());
                 if !self.surfaces.iter().any(|s| s.signature == signature) {
+                    let experiment = if group.experiment != "baseline" {
+                        if !group.span || player.is_none() {
+                            let mut assigned = group.clone();
+                            if !group.span {
+                                assigned.outputs = vec![monitor.name.clone()];
+                            }
+                            player = Some(Rc::new(RefCell::new(experiment::Player::new(
+                                &assigned,
+                                item,
+                                &self.monitors,
+                            )?)));
+                        }
+                        player.clone()
+                    } else {
+                        None
+                    };
                     additions.push(render::Surface::new(
                         group,
                         item,
                         monitor,
                         &self.monitors,
                         self.epoch,
+                        experiment,
                     )?);
                 }
             }
@@ -266,6 +301,10 @@ impl Desktop {
                     fps: request["fps"].as_u64().unwrap_or(30).try_into()?,
                     audio: request["audio"].as_bool().unwrap_or(false),
                     paused: false,
+                    experiment: request["experiment"].as_str().unwrap_or("baseline").into(),
+                    hdr: request["hdr"].as_bool().unwrap_or(false),
+                    keep_playing: request["keep_playing"].as_bool().unwrap_or(false),
+                    trace: request["trace"].as_bool().unwrap_or(false),
                 };
                 next.assign(group, &self.monitors)?;
                 self.apply(next, true)?;
@@ -340,6 +379,7 @@ impl Desktop {
             "signal" => {
                 let name = request["name"].as_str().context("Missing signal name")?;
                 let event = json!({"name":name,"value":request["value"]});
+                let mut sent = std::collections::HashSet::new();
                 for surface in &self.surfaces {
                     if outputs.is_empty() || outputs.contains(&surface.output) {
                         if let Some(web) = &surface.web {
@@ -347,6 +387,11 @@ impl Desktop {
                                 web,
                                 &format!("window.__wallpaperHost?.signal({event})"),
                             );
+                        }
+                        if let Some(player) = &surface.experiment {
+                            if sent.insert(Rc::as_ptr(player)) {
+                                player.borrow_mut().send(&json!({"signal":event}));
+                            }
                         }
                     }
                 }
@@ -358,6 +403,9 @@ impl Desktop {
                     .iter_mut()
                     .find(|s| s.output == output)
                     .context("No wallpaper on that monitor")?;
+                if surface.experiment.is_some() {
+                    bail!("Experiments use pointer tracking and explicit signal commands; focused desktop interaction belongs to the baseline.");
+                }
                 surface.interact(request["enabled"].as_bool().unwrap_or(false));
             }
             "ui" => {
@@ -405,16 +453,23 @@ impl Desktop {
         let animated = self
             .surfaces
             .iter()
-            .any(|s| s.web.is_some() || s.video.is_some());
+            .any(|s| s.web.is_some() || s.video.is_some() || s.experiment.is_some());
         if !animated {
             self.audio.set_active(false);
             return;
         }
         let cursor = platform::hypr("j/cursorpos").unwrap_or(Value::Null);
+        let powered_off: Vec<_> = self
+            .monitors
+            .iter()
+            .filter(|m| !m.powered)
+            .map(|m| m.name.clone())
+            .collect();
         let audio_active = self.surfaces.iter().any(|s| {
-            s.web.is_some()
+            (s.web.is_some() || s.experiment.is_some())
                 && s.group.audio
-                && !self.suspended.contains(&s.output)
+                && (!self.suspended.contains(&s.output) || s.group.keep_playing)
+                && !powered_off.contains(&s.output)
                 && !self
                     .library
                     .groups
@@ -423,13 +478,63 @@ impl Desktop {
         });
         self.audio.set_active(audio_active);
         let audio = self.audio.levels.lock().unwrap().clone();
+        let mut sent = std::collections::HashSet::new();
         for surface in &mut self.surfaces {
-            let paused = self.suspended.contains(&surface.output)
+            let paused = (self.suspended.contains(&surface.output) && !surface.group.keep_playing)
+                || powered_off.contains(&surface.output)
                 || self
                     .library
                     .groups
                     .iter()
                     .any(|g| g.id == surface.group.id && g.paused);
+            if let Some(player) = &surface.experiment {
+                if sent.insert(Rc::as_ptr(player)) {
+                    let hidden = if surface.group.keep_playing {
+                        &powered_off
+                    } else {
+                        &self.suspended
+                    };
+                    let all_hidden = if surface.group.span {
+                        self.monitors
+                            .iter()
+                            .filter(|m| !m.disabled && surface.group.outputs.contains(&m.name))
+                            .all(|m| hidden.contains(&m.name))
+                    } else {
+                        hidden.contains(&surface.output)
+                    };
+                    let manual = self
+                        .library
+                        .groups
+                        .iter()
+                        .any(|g| g.id == surface.group.id && g.paused);
+                    let px = cursor["x"].as_f64().unwrap_or(0.);
+                    let py = cursor["y"].as_f64().unwrap_or(0.);
+                    let inside = self.monitors.iter().any(|monitor| {
+                        let rect = monitor.rect();
+                        (if surface.group.span {
+                            surface.group.outputs.contains(&monitor.name)
+                        } else {
+                            surface.output == monitor.name
+                        }) && px >= monitor.x as f64
+                            && py >= monitor.y as f64
+                            && px < (monitor.x + rect.width) as f64
+                            && py < (monitor.y + rect.height) as f64
+                    });
+                    let pointer = json!({"x":(px-(surface.monitor.x-surface.crop.x) as f64)/surface.canvas.width as f64,"y":(py-(surface.monitor.y-surface.crop.y) as f64)/surface.canvas.height as f64,"inside":inside});
+                    let mut input =
+                        json!({"paused":manual||all_hidden,"pointer":pointer,"hidden":hidden});
+                    if surface.group.audio {
+                        input["audio"] = json!(audio);
+                    }
+                    let mut player = player.borrow_mut();
+                    player.send(&input);
+                    *surface.telemetry.borrow_mut() = player.snapshot();
+                } else {
+                    *surface.telemetry.borrow_mut() = player.borrow_mut().snapshot();
+                }
+                surface.paused = paused;
+                continue;
+            }
             if let Some(video) = &mut surface.video {
                 video.tick(paused, paused != surface.paused);
                 *surface.telemetry.borrow_mut() = video.telemetry.clone();
@@ -493,6 +598,10 @@ fn daemon(port: u16) -> Result<()> {
         "Drifting dusk.mp4",
         "rose-clock",
         "tide",
+        "prism",
+        "hdr-calibration",
+        "HDR reference.avif",
+        "HDR reference.mkv",
     ] {
         if examples.join(sample).exists() {
             let _ = library.import(&examples.join(sample));

@@ -11,6 +11,7 @@
     frames: 0,
     fps: 0,
     error: null,
+    intervals_ms: [],
   };
   function emit(name, value) {
     for (const fn of listeners.get(name) || []) {
@@ -40,6 +41,7 @@
         viewport: config.viewport,
       }),
     );
+    state.intervals_ms = [];
   }
   let timer,
     last = performance.now(),
@@ -58,6 +60,7 @@
       return;
     }
     const dt = Math.min((now - last) / 1000, 0.1);
+    if (state.intervals_ms.length < 512) state.intervals_ms.push(now - last);
     last = now;
     state.frames++;
     frameCount++;

@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>HDR signal laboratory</title>
+    <style>
+      html,
+      body,
+      #scene,
+      canvas {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      #diagnostic {
+        position: absolute;
+        bottom: 12px;
+        left: 20px;
+        color: white;
+        font: 14px sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="scene">
+      <canvas id="canvas"></canvas>
+      <div id="diagnostic"></div>
+    </div>
+    <script src="scene.js"></script>
+  </body>
+</html>

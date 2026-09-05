@@ -53,6 +53,10 @@ TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 help:
 	@echo "WallpaperDB - Available commands:"
 	@echo "  make native ARGS='ui' - Run the native Hyprland wallpaper prototype"
+	@echo "  make native-lab       - Build the renderer experiments and open the library"
+	@echo "  make native-lab-build - Build the native presenter and Chromium transport"
+	@echo "  make native-lab-assets - Regenerate HDR fixtures and native scene assets"
+	@echo "  make native-lab-format - Format the experiment C and Python sources"
 	@echo "  make native-build     - Build the native prototype"
 	@echo "  make native-test      - Test native layout, library, and scene behavior"
 	@echo "  make native-ui-test   - Exercise the real library UI using local Chromium"
@@ -61,6 +65,9 @@ help:
 	@echo "  make native-format-web - Format the native library UI and example scenes"
 	@echo "  make native-assets    - Regenerate the bundled demonstration video"
 	@echo "  make native-verify    - Verify wallpaper modes on DP-2"
+	@echo "  make native-lab-verify - Check renderer experiments on DP-2 and virtual outputs"
+	@echo "  make native-hdr       - Probe HDR on DP-5, then restore its display settings"
+	@echo "  make native-profile   - Run sustained frame-time comparisons on DP-2"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
 	@echo ""
@@ -826,13 +833,37 @@ native-format:
 	@cargo fmt --manifest-path $(NATIVE_MANIFEST)
 
 native-format-web:
-	@npx --yes prettier@3.6.2 --write 'apps/native-prototype/{ui,runtime,tests,scripts,examples}/**/*.{js,mjs,css,html,json}'
+	@npx --yes prettier@3.6.2 --write 'apps/native-prototype/{ui,runtime,tests,scripts,examples,lab}/**/*.{js,mjs,cjs,css,html,json}' --ignore-path apps/native-prototype/.prettierignore
 
 native-assets:
 	@python3 apps/native-prototype/scripts/generate-assets.py
 
 native-verify:
 	@python3 apps/native-prototype/scripts/verify.py
+
+.PHONY: native-lab native-lab-build native-profile native-hdr native-lab-verify native-lab-format
+native-lab: native-lab-build
+	@$(MAKE) native ARGS='ui'
+
+native-lab-format:
+	@clang-format -i apps/native-prototype/lab/presenter.c apps/native-prototype/lab/dmabuf.c
+	@test -x apps/native-prototype/lab/build/format-env/bin/black || (python3 -m venv apps/native-prototype/lab/build/format-env && apps/native-prototype/lab/build/format-env/bin/pip -q install black==25.1.0)
+	@apps/native-prototype/lab/build/format-env/bin/black apps/native-prototype/scripts/{profile,hdr,lab_common,lab-assets,lab-verify}.py --line-length 100
+
+native-lab-verify:
+	@python3 apps/native-prototype/scripts/lab-verify.py $(ARGS)
+.PHONY: native-lab-assets
+native-lab-assets:
+	@python3 apps/native-prototype/scripts/lab-assets.py
+
+native-lab-build:
+	@$(MAKE) -C apps/native-prototype/lab
+
+native-profile:
+	@python3 apps/native-prototype/scripts/profile.py $(ARGS)
+
+native-hdr:
+	@python3 apps/native-prototype/scripts/hdr.py $(ARGS)
 
 # All services commands
 dev:

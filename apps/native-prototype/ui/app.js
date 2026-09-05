@@ -52,6 +52,17 @@ function preview(item) {
 }
 function detail() {
   const item = state.items.find((i) => i.id === selected);
+  const experiment = $("experiment").value;
+  $("hdr").disabled = ["baseline", "chromium"].includes(experiment);
+  if (["baseline", "chromium"].includes(experiment)) $("hdr").checked = false;
+  $("experiment-note").textContent = {
+    baseline: "The original image, video, and HTML runtime. SDR presentation.",
+    chromium:
+      "HTML / JavaScript in Chromium. SDR bitmap transfer: compatible, but includes CPU copies.",
+    "chromium-dmabuf":
+      "Accelerated shared textures. Experimental: black SDR buffers and failed HDR imports on the tested NVIDIA driver.",
+    gpu: "Lua drives native GLSL effects. Live bundles need scene.lua; images and videos use libmpv.",
+  }[experiment];
   $("apply").disabled = !item || !outputs.size || busy;
   $("apply-target").textContent = outputs.size
     ? `Apply to ${[...outputs].join(" + ")}${span && outputs.size > 1 ? " · spanning" : ""}`
@@ -173,6 +184,18 @@ function update(next) {
   $("runtime-status").textContent = state.surfaces.length
     ? `${state.surfaces.length} display${state.surfaces.length === 1 ? "" : "s"} connected · ${running} active${frames.some((f) => f > 0) ? ` · ${Math.max(...frames)} fps` : ""}`
     : "Ready when you are · No wallpapers applied";
+  $("experiment-stats").textContent = JSON.stringify(
+    state.surfaces
+      .filter((s) => outputs.has(s.output))
+      .map((s) => ({
+        output: s.output,
+        experiment: s.group,
+        paused: s.paused,
+        ...s.telemetry,
+      })),
+    null,
+    2,
+  );
   const failure =
     state.warning ||
     state.surfaces.find((s) => s.telemetry.error)?.telemetry.error;
@@ -203,9 +226,13 @@ $("apply").onclick = () =>
       span,
       fps: Number($("fps").value),
       audio: $("audio").checked,
+      experiment: $("experiment").value,
+      hdr: $("hdr").checked,
+      keep_playing: $("keep-playing").checked,
     },
     "A new atmosphere. Wallpaper applied.",
   );
+$("experiment").onchange = detail;
 $("import").onclick = () => action({ op: "choose" });
 $("import-bundle").onclick = () => action({ op: "choose", folder: true });
 $("refresh").onclick = () =>

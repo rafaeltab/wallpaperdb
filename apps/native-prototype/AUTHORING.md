@@ -1,6 +1,6 @@
 # Executable live wallpapers
 
-A live wallpaper is a local HTML/JavaScript program. It can manipulate the DOM, use Canvas 2D or WebGL, and combine images and `<video>` elements. The bundled `rose-clock` and `tide` directories are complete examples; their behavior lives in JavaScript, not in the JSON manifest.
+The original baseline runs local HTML/JavaScript programs. The laboratory also runs these programs in Chromium, or a sibling `scene.lua` with GLSL in the native renderer; see [laboratory authoring](LAB.md#writing-native-scenes). It can manipulate the DOM, use Canvas 2D or WebGL, and combine images and `<video>` elements. The bundled `rose-clock` and `tide` directories are complete examples; their behavior lives in JavaScript, not in the JSON manifest.
 
 A bundle contains a `wallpaper.json` like this:
 
@@ -68,7 +68,7 @@ The host mutes and loops videos. Spanning groups periodically align their videos
 
 Use the host's `frame` callback so fullscreen / DPMS / user pause can stop your work. Independent timers, CSS animations, workers, or additional animation loops do not inherit this cooperative pause contract. Listen for `pause` to stop custom work. Cap canvas backing resolution, reuse buffers, and update clock DOM only when the displayed value changes. Still images should be imported as images to use the zero-animation native path.
 
-Each active live output has its own webview and decoder; spanning does not share textures or simulation state. This is a prototype tradeoff. The daemon shares audio input and sends only compact level data; it does not move video pixels through Rust or encode desktop frames.
+In the original WebKit baseline, each active live output has its own webview and decoder; spanning does not share textures or simulation state. This is a prototype tradeoff. The daemon shares audio input and sends only compact level data; it does not move video pixels through Rust or encode desktop frames.
 
 NVIDIA uses WebKit's compatibility renderer by default because its accelerated path stalled embedded video on the verified system. Live scenes therefore cost more CPU on that setup. Ordinary video files use a separate mpv hardware-decoding path. Prefer ordinary images/videos when no program is needed; reduce the live frame budget for quieter scenes. WebGL support depends on the installed WebKit/driver combination and was not part of this prototype's acceptance checks.
 

@@ -35,6 +35,17 @@ pub struct Group {
     pub audio: bool,
     #[serde(default)]
     pub paused: bool,
+    #[serde(default = "baseline")]
+    pub experiment: String,
+    #[serde(default)]
+    pub hdr: bool,
+    #[serde(default)]
+    pub keep_playing: bool,
+    #[serde(default)]
+    pub trace: bool,
+}
+fn baseline() -> String {
+    "baseline".into()
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -193,7 +204,7 @@ pub fn inspect(path: &Path) -> Result<Item> {
         .unwrap_or("")
         .to_lowercase();
     let kind = match extension.as_str() {
-        "png" | "jpg" | "jpeg" | "webp" | "bmp" | "svg" => Kind::Image,
+        "png" | "jpg" | "jpeg" | "webp" | "bmp" | "svg" | "avif" => Kind::Image,
         "mp4" | "webm" | "mkv" | "mov" | "m4v" | "ogv" => Kind::Video,
         "html" | "htm" => Kind::Live,
         _ => bail!("Unsupported file type: .{extension}"),
@@ -244,6 +255,13 @@ impl Library {
         }
         if !(1..=60).contains(&group.fps) {
             bail!("Frame rate must be between 1 and 60");
+        }
+        if !["baseline", "chromium", "chromium-dmabuf", "gpu"].contains(&group.experiment.as_str())
+        {
+            bail!("Unknown experiment: {}", group.experiment);
+        }
+        if group.hdr && ["baseline", "chromium"].contains(&group.experiment.as_str()) {
+            bail!("This experiment has an SDR presentation path. Select Chromium DMA-BUF or Lua / GPU to test HDR.");
         }
         let names: HashSet<_> = group.outputs.iter().collect();
         if names.len() != group.outputs.len() {
@@ -310,6 +328,10 @@ mod tests {
             fps: 30,
             audio: false,
             paused: false,
+            experiment: baseline(),
+            hdr: false,
+            keep_playing: false,
+            trace: false,
         }
     }
 
@@ -369,6 +391,14 @@ mod tests {
     }
 
     #[test]
+    fn original_saved_assignments_keep_the_original_renderer() {
+        let original = r#"{"id":"old","item":"wallpaper","outputs":["DP-2"],"span":false,"fps":30,"audio":false}"#;
+        let saved: Group = serde_json::from_str(original).unwrap();
+        assert_eq!(saved.experiment, "baseline");
+        assert!(!saved.hdr && !saved.keep_playing && !saved.paused && !saved.trace);
+    }
+
+    #[test]
     fn validation_never_mutates_existing_layout() {
         let mut library = Library {
             groups: vec![group(&["A"])],
@@ -381,6 +411,14 @@ mod tests {
         assert!(library
             .assign(group(&["A", "A"]), &[monitor("A", 0, 0)])
             .is_err());
+        let mut invalid = group(&["A"]);
+        invalid.experiment = "missing".into();
+        assert!(library
+            .assign(invalid.clone(), &[monitor("A", 0, 0)])
+            .is_err());
+        invalid.experiment = "chromium".into();
+        invalid.hdr = true;
+        assert!(library.assign(invalid, &[monitor("A", 0, 0)]).is_err());
         assert_eq!(before, serde_json::to_string(&library).unwrap());
     }
 

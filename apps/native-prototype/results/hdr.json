@@ -1,0 +1,380 @@
+{
+  "captured": "2026-09-06 Europe/Amsterdam",
+  "raw_report": "verification/hdr-1788650213/report.json",
+  "display": "DP-5, Dell Alienware AW2725DF, 2560x1440 at 359.98 Hz",
+  "gpu": "NVIDIA GeForce RTX4080",
+  "hyprland": "0.56.0",
+  "nvidia_driver": "610.43.03",
+  "electron": "42.7.0",
+  "chromium": "148.0.7778.280",
+  "mpv": "0.41.0",
+  "restored": true,
+  "scope": "Source content, FP16 surface, presentation and PQ/BT2020 output signaling; screenshots are SDR and physical luminance/wide-gamut accuracy were not measured.",
+  "checks": [
+    {
+      "experiment": "gpu",
+      "asset": "hdr-calibration",
+      "passed": true,
+      "state": "ready",
+      "output_format": "XBGR2101010",
+      "surface_color": "scRGB linear, 1 = 80 cd/m2",
+      "egl_bits": 16,
+      "egl_float": true,
+      "patches_scrgb": [
+        [
+          0.0012493133544921875,
+          0.0012493133544921875,
+          0.0012493133544921875
+        ],
+        [
+          0.0124969482421875,
+          0.0124969482421875,
+          0.0124969482421875
+        ],
+        [
+          0.125,
+          0.125,
+          0.125
+        ],
+        [
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          2.537109375,
+          2.537109375,
+          2.537109375
+        ],
+        [
+          3.75,
+          3.75,
+          3.75
+        ],
+        [
+          5.0,
+          5.0,
+          5.0
+        ],
+        [
+          10.0,
+          10.0,
+          10.0
+        ]
+      ],
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": null,
+      "output_eotf": 2,
+      "output_colorspace": 9,
+      "error": null
+    },
+    {
+      "experiment": "gpu",
+      "asset": "HDR reference.png",
+      "passed": true,
+      "state": "ready",
+      "output_format": "XBGR2101010",
+      "surface_color": "scRGB linear, 1 = 80 cd/m2",
+      "egl_bits": 16,
+      "egl_float": true,
+      "patches_scrgb": [
+        [
+          0.0012483596801757812,
+          0.0012483596801757812,
+          0.0012483596801757812
+        ],
+        [
+          0.01248931884765625,
+          0.01248931884765625,
+          0.01248931884765625
+        ],
+        [
+          0.124755859375,
+          0.124755859375,
+          0.124755859375
+        ],
+        [
+          0.99951171875,
+          0.99951171875,
+          0.99951171875
+        ],
+        [
+          2.533203125,
+          2.533203125,
+          2.533203125
+        ],
+        [
+          3.73828125,
+          3.73828125,
+          3.73828125
+        ],
+        [
+          4.98828125,
+          4.98828125,
+          4.98828125
+        ],
+        [
+          9.953125,
+          9.953125,
+          9.953125
+        ]
+      ],
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": "no",
+      "output_eotf": 2,
+      "output_colorspace": 9,
+      "error": null
+    },
+    {
+      "experiment": "gpu",
+      "asset": "HDR reference.avif",
+      "passed": true,
+      "state": "ready",
+      "output_format": "XBGR2101010",
+      "surface_color": "scRGB linear, 1 = 80 cd/m2",
+      "egl_bits": 16,
+      "egl_float": true,
+      "patches_scrgb": [
+        [
+          0.0012693405151367188,
+          0.0012693405151367188,
+          0.0012693405151367188
+        ],
+        [
+          0.01239776611328125,
+          0.01239776611328125,
+          0.012359619140625
+        ],
+        [
+          0.12548828125,
+          0.12548828125,
+          0.12548828125
+        ],
+        [
+          1.001953125,
+          1.001953125,
+          1.001953125
+        ],
+        [
+          2.533203125,
+          2.533203125,
+          2.533203125
+        ],
+        [
+          3.73828125,
+          3.73828125,
+          3.73828125
+        ],
+        [
+          5.01171875,
+          5.01171875,
+          5.01171875
+        ],
+        [
+          9.953125,
+          9.953125,
+          9.953125
+        ]
+      ],
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": "no",
+      "output_eotf": 2,
+      "output_colorspace": 9,
+      "error": null
+    },
+    {
+      "experiment": "gpu",
+      "asset": "HDR reference.mkv",
+      "passed": true,
+      "state": "ready",
+      "output_format": "XBGR2101010",
+      "surface_color": "scRGB linear, 1 = 80 cd/m2",
+      "egl_bits": 16,
+      "egl_float": true,
+      "patches_scrgb": [
+        [
+          0.0012979507446289062,
+          0.0012979507446289062,
+          0.0012979507446289062
+        ],
+        [
+          0.0124969482421875,
+          0.01255035400390625,
+          0.01251220703125
+        ],
+        [
+          0.1260986328125,
+          0.126708984375,
+          0.126220703125
+        ],
+        [
+          1.0166015625,
+          1.0166015625,
+          1.0166015625
+        ],
+        [
+          2.59375,
+          2.59375,
+          2.59375
+        ],
+        [
+          3.826171875,
+          3.826171875,
+          3.826171875
+        ],
+        [
+          5.01171875,
+          5.01171875,
+          5.01171875
+        ],
+        [
+          10.1328125,
+          10.1328125,
+          10.1328125
+        ]
+      ],
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": "nvdec",
+      "output_eotf": 2,
+      "output_colorspace": 9,
+      "error": null
+    },
+    {
+      "experiment": "chromium-dmabuf",
+      "asset": "hdr-calibration",
+      "passed": false,
+      "state": null,
+      "output_format": null,
+      "surface_color": null,
+      "egl_bits": null,
+      "egl_float": null,
+      "patches_scrgb": null,
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": null,
+      "output_eotf": null,
+      "output_colorspace": null,
+      "error": "Imported buffer is not sampleable as GL_TEXTURE_2D (EGL 0x3000 GL 0x0)"
+    },
+    {
+      "experiment": "chromium-dmabuf",
+      "asset": "HDR reference.png",
+      "passed": false,
+      "state": null,
+      "output_format": null,
+      "surface_color": null,
+      "egl_bits": null,
+      "egl_float": null,
+      "patches_scrgb": null,
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": null,
+      "output_eotf": null,
+      "output_colorspace": null,
+      "error": "Imported buffer is not sampleable as GL_TEXTURE_2D (EGL 0x3000 GL 0x0)"
+    },
+    {
+      "experiment": "chromium-dmabuf",
+      "asset": "HDR reference.avif",
+      "passed": false,
+      "state": null,
+      "output_format": null,
+      "surface_color": null,
+      "egl_bits": null,
+      "egl_float": null,
+      "patches_scrgb": null,
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": null,
+      "output_eotf": null,
+      "output_colorspace": null,
+      "error": "Imported buffer is not sampleable as GL_TEXTURE_2D (EGL 0x3000 GL 0x0)"
+    },
+    {
+      "experiment": "chromium-dmabuf",
+      "asset": "HDR reference.mkv",
+      "passed": false,
+      "state": null,
+      "output_format": null,
+      "surface_color": null,
+      "egl_bits": null,
+      "egl_float": null,
+      "patches_scrgb": null,
+      "expected_scrgb": [
+        0.00125,
+        0.0125,
+        0.125,
+        1,
+        2.5375,
+        3.75,
+        5,
+        10
+      ],
+      "hwdec": null,
+      "output_eotf": null,
+      "output_colorspace": null,
+      "error": "Imported buffer is not sampleable as GL_TEXTURE_2D (EGL 0x3000 GL 0x0)"
+    }
+  ],
+  "binary_sha256": "b6a56b609f11ad731e846ad9373641420fc1b53d77e3d0e5528f0455adb074ef"
+}

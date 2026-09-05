@@ -1,0 +1,7 @@
+{
+  "title": "Prism laboratory",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "description": "The same procedural light field in JavaScript/WebGL and Lua/GLSL. Move the pointer, play music, or send a pulse.",
+  "tags": ["experiment", "shader", "audio", "Lua", "JavaScript"]
+}

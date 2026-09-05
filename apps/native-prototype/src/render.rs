@@ -11,6 +11,7 @@ use webkit2gtk::{
 };
 
 pub struct Surface {
+    pub experiment: Option<Rc<RefCell<crate::experiment::Player>>>,
     pub window: gtk::Window,
     pub web: Option<WebView>,
     pub video: Option<crate::video::Video>,
@@ -27,7 +28,22 @@ pub struct Surface {
 
 pub fn signature(group: &Group, item: &Item, monitor: &Monitor, monitors: &[Monitor]) -> String {
     let (canvas, crop) = viewport(group, monitor, monitors);
-    json!([group, item.path, monitor.name, monitor.scale, canvas, crop]).to_string()
+    let local = json!([group, item.path, monitor.name, monitor.scale, canvas, crop]);
+    if !group.span || group.experiment == "baseline" {
+        return local.to_string();
+    }
+
+    // Every surface must be replaced together when its shared player's outputs change.
+    let mut members: Vec<_> = monitors
+        .iter()
+        .filter(|m| group.outputs.contains(&m.name) && !m.disabled)
+        .collect();
+    members.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+    let presentation: Vec<_> = members
+        .into_iter()
+        .map(|m| json!([m.name, m.x, m.y, m.width, m.height, m.scale, m.transform]))
+        .collect();
+    json!([local, presentation]).to_string()
 }
 
 pub fn webview(context: &WebContext) -> WebView {
@@ -65,6 +81,7 @@ impl Surface {
         monitor: &Monitor,
         monitors: &[Monitor],
         epoch: u64,
+        experiment: Option<Rc<RefCell<crate::experiment::Player>>>,
     ) -> Result<Self> {
         let display = gdk::Display::default().context("No Wayland display")?;
         let output = (0..display.n_monitors())
@@ -81,6 +98,24 @@ impl Surface {
             })?;
         let window = gtk::Window::new(gtk::WindowType::Toplevel);
         window.set_title("WallpaperDB background");
+        if experiment.is_some() {
+            let (canvas, crop) = viewport(group, monitor, monitors);
+            return Ok(Self {
+                experiment,
+                window,
+                web: None,
+                video: None,
+                output: monitor.name.clone(),
+                group: group.clone(),
+                canvas,
+                crop,
+                monitor: monitor.rect(),
+                signature: signature(group, item, monitor, monitors),
+                telemetry: Rc::new(RefCell::new(json!({"state":"loading"}))),
+                paused: false,
+                interactive: false,
+            });
+        }
         window.init_layer_shell();
         window.set_namespace(&format!("wallpaperdb-{}", monitor.name));
         window.set_layer(Layer::Background);
@@ -191,6 +226,7 @@ impl Surface {
             window.show_all();
         }
         Ok(Self {
+            experiment: None,
             window,
             web,
             video,
@@ -242,6 +278,156 @@ impl Drop for Surface {
             // Scene contexts are dedicated. A stuck third-party program should
             // not keep its web process alive after the wallpaper is replaced.
             web.terminate_web_process();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn layout() -> (Group, Item, Vec<Monitor>) {
+        let monitors = ["left", "middle", "right"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, name)| Monitor {
+                name: name.into(),
+                x: i as i32 * 100,
+                width: 100,
+                height: 100,
+                scale: 1.,
+                powered: true,
+                ..Default::default()
+            })
+            .collect::<Vec<_>>();
+        let group = Group {
+            id: "group".into(),
+            item: "scene".into(),
+            outputs: monitors.iter().map(|m| m.name.clone()).collect(),
+            span: true,
+            fps: 30,
+            audio: false,
+            paused: false,
+            experiment: "gpu".into(),
+            hdr: false,
+            keep_playing: false,
+            trace: false,
+        };
+        let item = Item {
+            id: "scene".into(),
+            title: "Scene".into(),
+            kind: Kind::Live,
+            path: "/scene/index.html".into(),
+            preview: None,
+            description: String::new(),
+            tags: vec![],
+        };
+        (group, item, monitors)
+    }
+
+    #[test]
+    fn shared_experiments_rebuild_after_middle_member_removal_without_changing_bounds() {
+        let (mut group, item, monitors) = layout();
+        let remaining = [monitors[0].clone(), monitors[2].clone()];
+        let mut disabled = monitors.clone();
+        disabled[1].disabled = true;
+
+        for experiment in ["gpu", "chromium", "chromium-dmabuf"] {
+            group.experiment = experiment.into();
+            for member in &remaining {
+                assert_eq!(
+                    viewport(&group, member, &monitors),
+                    viewport(&group, member, &remaining)
+                );
+                let before = signature(&group, &item, member, &monitors);
+                let after = signature(&group, &item, member, &remaining);
+                assert_ne!(before, after, "{experiment}: {}", member.name);
+                assert_eq!(after, signature(&group, &item, member, &disabled));
+            }
+        }
+    }
+
+    #[test]
+    fn every_shared_signature_changes_when_one_members_presentation_changes() {
+        let (mut group, item, monitors) = layout();
+        let mut moved = monitors.clone();
+        moved[1].x += 10;
+        let mut resized = monitors.clone();
+        resized[1].width = 80;
+        let mut scaled = monitors.clone();
+        scaled[1].width = 200;
+        scaled[1].height = 200;
+        scaled[1].scale = 2.;
+        let mut rotated = monitors.clone();
+        rotated[1].transform = 2;
+
+        for experiment in ["gpu", "chromium", "chromium-dmabuf"] {
+            group.experiment = experiment.into();
+            for (change, updated) in [
+                ("position", &moved),
+                ("resolution", &resized),
+                ("scale", &scaled),
+                ("rotation", &rotated),
+            ] {
+                for (before, after) in monitors.iter().zip(updated) {
+                    assert_eq!(
+                        viewport(&group, before, &monitors).0,
+                        viewport(&group, after, updated).0
+                    );
+                    assert_ne!(
+                        signature(&group, &item, before, &monitors),
+                        signature(&group, &item, after, updated),
+                        "{experiment}, {change}: {}",
+                        before.name
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn shared_signatures_ignore_output_order_power_and_unassigned_outputs() {
+        let (group, item, monitors) = layout();
+        let mut reordered = monitors.clone();
+        reordered.reverse();
+        reordered[1].powered = false;
+        reordered.push(Monitor {
+            name: "unassigned".into(),
+            x: 500,
+            ..monitors[0].clone()
+        });
+
+        for member in &monitors {
+            assert_eq!(
+                signature(&group, &item, member, &monitors),
+                signature(&group, &item, member, &reordered)
+            );
+        }
+    }
+
+    #[test]
+    fn baseline_and_independent_signatures_keep_other_members_local() {
+        let (mut group, item, monitors) = layout();
+        let remaining = [monitors[0].clone(), monitors[2].clone()];
+        let mut scaled = monitors.clone();
+        scaled[1].width = 200;
+        scaled[1].height = 200;
+        scaled[1].scale = 2.;
+
+        for (experiment, span) in [
+            ("baseline", true),
+            ("baseline", false),
+            ("gpu", false),
+            ("chromium", false),
+            ("chromium-dmabuf", false),
+        ] {
+            group.experiment = experiment.into();
+            group.span = span;
+            for member in &remaining {
+                let before = signature(&group, &item, member, &monitors);
+                assert_eq!(before, signature(&group, &item, member, &remaining));
+                assert_eq!(before, signature(&group, &item, member, &scaled));
+            }
         }
     }
 }

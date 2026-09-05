@@ -5,3 +5,5 @@ A native desktop prototype that turns a local wallpaper collection into images, 
 It provides a WallpaperDB-themed library window and CLI, independent or spanning display groups, audio and pointer reactivity, keyboard-triggered effects, and automatic suspension when a display sleeps or shows a fullscreen application.
 
 Rust owns the library, layout, process lifecycle, and compositor integration. GTK layer-shell displays still images; mpv renders videos; JavaScript scenes run in WebKitGTK and can combine images, videos, canvas graphics, and live inputs.
+
+The disposable [renderer laboratory](LAB.md) adds a per-assignment switch between that original baseline, Chromium HTML/JavaScript, and native Lua/GLSL with libmpv. It includes HDR reference fixtures, one producer per spanning group, desktop acceptance checks, and a sustained frame-time recorder with a competing GPU workload. Start it with `make native-lab` from the repository root. See [the measured results](RESULTS.md) for working paths and failed experiments.

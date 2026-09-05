@@ -8,11 +8,13 @@ make native
 
 This builds an optimized Rust binary, starts the background daemon, and opens the native library window. The first build downloads Rust crates. No website, database, Node dependency installation, login, or network connection is needed at runtime. Use a terminal in your Hyprland session; a single local session is also discovered automatically.
 
-The library starts with two images, an eight-second original video, and two executable live wallpaper bundles. **DP-2 is the initial UI selection.** Select a wallpaper and press **Apply wallpaper**. Import files with the native chooser; **Import a live folder** accepts a directory with `wallpaper.json`. Import records the existing file location; it does not copy or delete your original files. Keep imported files in place.
+The library includes original images, an eight-second video, executable live wallpaper bundles, and HDR reference fixtures. **DP-2 is the initial UI selection.** Select a wallpaper and press **Apply wallpaper**. Import files with the native chooser; **Import a live folder** accepts a directory with `wallpaper.json`. Import records the existing file location; it does not copy or delete your original files. Keep imported files in place.
 
 Select multiple monitors on the layout map and choose **Span selection** for one continuous scene. **Per display** fills every selected monitor separately. Applying a different wallpaper to one member removes that member from its previous group and recomputes the remaining group's span. Unselected outputs keep their assignments. Gaps, negative coordinates, rotation, and scaling are included in the logical canvas.
 
 Closing the library window releases its webview; wallpapers continue. The prototype does not edit Hyprland configuration or enable itself at login.
+
+For switchable Lua/GLSL and Chromium experiments, HDR previews, and sustained profiling, see [the renderer laboratory](LAB.md). The instructions below describe the original baseline.
 
 ## Manjaro dependencies
 

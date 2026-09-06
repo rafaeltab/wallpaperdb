@@ -186,14 +186,34 @@ try {
     "document.querySelector('#search').value='Prism';document.querySelector('#search').dispatchEvent(new Event('input'));document.querySelector('.wallpaper-card').click()",
   );
   await until("!document.querySelector('#apply').disabled");
-  for (const engine of ["gpu", "chromium"]) {
+  assert.deepEqual(
     await js(
-      `document.querySelector('#experiment').value='${engine}';document.querySelector('#experiment').dispatchEvent(new Event('change'));document.querySelector('#apply').click()`,
+      "Array.from(document.querySelector('#fps').options, o => +o.value).filter(v => v >= 120)",
+    ),
+    [120, 240, 360],
+  );
+  for (const engine of [
+    "gpu",
+    "gpu-paced",
+    "gpu-independent",
+    "gpu-independent-drop",
+    "chromium",
+  ]) {
+    await js(
+      `document.querySelector('#fps').value='360';document.querySelector('#experiment').value='${engine}';document.querySelector('#experiment').dispatchEvent(new Event('change'));document.querySelector('#apply').click()`,
     );
     await until("!document.querySelector('#apply').disabled");
     await until(
-      `document.querySelector('#experiment-stats').textContent.includes('${engine === "gpu" ? "Lua / OpenGL" : "Chromium SDR copy"}')`,
+      `document.querySelector('#experiment-stats').textContent.includes('${engine.startsWith("gpu") ? "Lua / OpenGL" : "Chromium SDR copy"}')`,
     );
+    if (engine === "gpu-independent-drop") {
+      assert.equal(
+        await js(
+          "document.querySelector('#experiment-note').textContent.includes('skip video frames')",
+        ),
+        true,
+      );
+    }
     assert.equal(
       await js("document.querySelector('#hdr').disabled"),
       engine === "chromium",

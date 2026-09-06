@@ -68,6 +68,11 @@ help:
 	@echo "  make native-lab-verify - Check renderer experiments on DP-2 and virtual outputs"
 	@echo "  make native-hdr       - Probe HDR on DP-5, then restore its display settings"
 	@echo "  make native-profile   - Run sustained frame-time comparisons on DP-2"
+	@echo "  make native-stress    - Run guarded 4K renderer comparisons (ARGS='--list' previews cases)"
+	@echo "  make native-stress-assets - Generate the bounded 4K media stress fixture"
+	@echo "  make native-stress-results - Assemble saved stress captures into an interactive report"
+	@echo "  make native-lab-test  - Test frame pacing and profiler evidence/guards"
+	@echo "  make native-benchmark-cover - Temporarily cover DP-5 black and inhibit idle/sleep"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
 	@echo ""
@@ -841,14 +846,14 @@ native-assets:
 native-verify:
 	@python3 apps/native-prototype/scripts/verify.py
 
-.PHONY: native-lab native-lab-build native-profile native-hdr native-lab-verify native-lab-format
+.PHONY: native-lab native-lab-build native-profile native-hdr native-lab-verify native-lab-format native-stress native-stress-assets native-stress-results native-lab-test
 native-lab: native-lab-build
 	@$(MAKE) native ARGS='ui'
 
 native-lab-format:
-	@clang-format -i apps/native-prototype/lab/presenter.c apps/native-prototype/lab/dmabuf.c
+	@clang-format -i apps/native-prototype/lab/presenter.c apps/native-prototype/lab/dmabuf.c apps/native-prototype/lab/pacing.h apps/native-prototype/lab/pacing_test.c apps/native-prototype/lab/media_texture.h apps/native-prototype/lab/media_texture_test.c apps/native-prototype/scripts/chromium-diagnostic/diagnostic.h
 	@test -x apps/native-prototype/lab/build/format-env/bin/black || (python3 -m venv apps/native-prototype/lab/build/format-env && apps/native-prototype/lab/build/format-env/bin/pip -q install black==25.1.0)
-	@apps/native-prototype/lab/build/format-env/bin/black apps/native-prototype/scripts/{profile,hdr,lab_common,lab-assets,lab-verify}.py --line-length 100
+	@apps/native-prototype/lab/build/format-env/bin/black apps/native-prototype/scripts/{profile,profile_test,cpu_audit,cpu_audit_test,independent_media_evidence,independent_media_evidence_test,hdr,lab_common,lab-assets,lab-verify,stress,stress_test,stress-assets,stress-results,stress_results_test,benchmark-cover,fixed-heavy-control}.py apps/native-prototype/scripts/high-fps/*.py apps/native-prototype/scripts/chromium-diagnostic/*.py --line-length 100
 
 native-lab-verify:
 	@python3 apps/native-prototype/scripts/lab-verify.py $(ARGS)
@@ -861,6 +866,64 @@ native-lab-build:
 
 native-profile:
 	@python3 apps/native-prototype/scripts/profile.py $(ARGS)
+
+native-stress:
+	@python3 apps/native-prototype/scripts/stress.py $(ARGS)
+
+native-stress-assets:
+	@python3 apps/native-prototype/scripts/stress-assets.py $(ARGS)
+
+native-stress-results:
+	@python3 apps/native-prototype/scripts/stress-results.py $(ARGS)
+
+.PHONY: native-stress-report-ui-test
+native-stress-report-ui-test:
+	@node apps/native-prototype/scripts/stress-report-ui-test.mjs $(ARGS)
+
+.PHONY: native-stress-video-assets native-stress-video native-cpu-audit
+native-stress-video-assets:
+	@python3 apps/native-prototype/scripts/high-fps/generate.py --prototype-root apps/native-prototype $(ARGS)
+
+native-stress-video:
+	@python3 apps/native-prototype/scripts/high-fps/run-controls.py --prototype-root apps/native-prototype $(ARGS)
+
+.PHONY: native-video-decode
+native-video-decode:
+	@python3 apps/native-prototype/scripts/high-fps/decode.py --prototype-root apps/native-prototype $(ARGS)
+
+.PHONY: native-fixed-control
+native-fixed-control:
+	@python3 apps/native-prototype/scripts/fixed-heavy-control.py --prototype-root apps/native-prototype $(ARGS)
+
+native-cpu-audit:
+	@python3 apps/native-prototype/scripts/cpu_audit.py $(ARGS)
+
+.PHONY: native-media-evidence
+native-media-evidence:
+	@python3 apps/native-prototype/scripts/independent_media_evidence.py $(ARGS)
+
+.PHONY: native-chromium-diagnostic-check native-chromium-diagnostic-prepare native-chromium-diagnostic
+native-chromium-diagnostic-check:
+	@python3 -m py_compile apps/native-prototype/scripts/chromium-diagnostic/*.py
+	@node --check apps/native-prototype/scripts/chromium-diagnostic/diagnostic.cjs
+
+native-chromium-diagnostic-prepare:
+	@python3 apps/native-prototype/scripts/chromium-diagnostic/prepare.py --root apps/native-prototype $(ARGS)
+
+native-chromium-diagnostic:
+	@python3 apps/native-prototype/scripts/chromium-diagnostic/guarded.py --root apps/native-prototype $(ARGS)
+
+.PHONY: native-chromium-diagnostic-analyze
+native-chromium-diagnostic-analyze:
+	@python3 apps/native-prototype/scripts/chromium-diagnostic/analyze.py $(ARGS)
+
+.PHONY: native-benchmark-cover
+native-benchmark-cover:
+	@systemd-inhibit --what=idle:sleep --mode=block --who='WallpaperDB stress lab' --why='Bounded unattended renderer measurements' python3 apps/native-prototype/scripts/benchmark-cover.py $(ARGS)
+
+native-lab-test:
+	@$(MAKE) -C apps/native-prototype/lab test
+	@python3 -m unittest discover -s apps/native-prototype/scripts -p '*_test.py'
 
 native-hdr:
 	@python3 apps/native-prototype/scripts/hdr.py $(ARGS)

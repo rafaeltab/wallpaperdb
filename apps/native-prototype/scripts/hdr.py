@@ -2,6 +2,65 @@
 
 import argparse, json, math, re, subprocess, time
 from lab_common import ROOT, api, assign, ready, hypr, capture, saved_assignments
+from stress import termination_cleanup
+
+
+def reference_pixels_match(stats):
+    expected = [0.1 / 80, 1 / 80, 10 / 80, 1, 203 / 80, 300 / 80, 5, 10]
+    patches = stats.get("probe_patches_scrgb", [])
+    return len(patches) == 8 and all(
+        len(p) == 3 and all(math.isfinite(c) and abs(c - e) < max(0.0003, e * 0.08) for c in p)
+        for p, e in zip(patches, expected)
+    )
+
+
+def current_stats(output):
+    return next(s["telemetry"] for s in api("status")["surfaces"] if s["output"] == output)
+
+
+def wait_stats(output, predicate, timeout=12):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        stats = current_stats(output)
+        if stats.get("error"):
+            raise RuntimeError(stats["error"])
+        if predicate(stats):
+            return stats
+        time.sleep(0.15)
+    raise AssertionError(f"Timed out waiting for HDR media lifecycle: {current_stats(output)}")
+
+
+def reuse_probe(output):
+    previous = current_stats(output).get("probe_frame", 0)
+    api("signal", name="lab-probe", value="media-reuse", outputs=[output])
+    return wait_stats(
+        output,
+        lambda s: s.get("probe_frame", 0) > previous and s.get("probe_reused_media"),
+    )
+
+
+def verify_live_media_reuse(output):
+    before = reuse_probe(output)
+    try:
+        api("pause", outputs=[output], paused=True)
+        paused = wait_stats(output, lambda s: s.get("paused"))
+        time.sleep(1.4)  # Require another report, not a stale paused snapshot.
+        settled = current_stats(output)
+        assert settled["frames"] == paused["frames"], "Scene advanced while paused"
+        assert (
+            settled["media_render_calls"] == paused["media_render_calls"]
+        ), "Video rendered while paused"
+    finally:
+        api("pause", outputs=[output], paused=False)
+    wait_stats(output, lambda s: not s.get("paused") and s["frames"] > paused["frames"])
+    after = reuse_probe(output)
+    return {
+        "before_pause": before,
+        "after_resume": after,
+        "passed": reference_pixels_match(before)
+        and reference_pixels_match(after)
+        and after["media_texture_reuse_frames"] > before["media_texture_reuse_frames"],
+    }, after
 
 
 def drm(output):
@@ -37,6 +96,7 @@ def drm(output):
     }
 
 
+@termination_cleanup()
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default="DP-5")
@@ -89,15 +149,28 @@ def main():
                 except KeyboardInterrupt:
                     return
             for engine in args.experiments.split(","):
-                for asset in [
-                    "hdr-calibration",
-                    "HDR reference.png",
-                    "HDR reference.avif",
-                    "HDR reference.mkv",
-                ]:
-                    row = {"experiment": engine, "asset": asset, "output_hdr": output_hdr}
+                cases = [
+                    (asset, 30, False)
+                    for asset in [
+                        "hdr-calibration",
+                        "HDR reference.png",
+                        "HDR reference.avif",
+                        "HDR reference.mkv",
+                    ]
+                ]
+                if engine in ("gpu-independent", "gpu-independent-drop"):
+                    fixture = ROOT / "scripts/fixtures/hdr-media-live"
+                    cases.extend((str(fixture), fps, True) for fps in [120, 360])
+                for asset, fps, live_media in cases:
+                    row = {
+                        "experiment": engine,
+                        "asset": asset,
+                        "output_hdr": output_hdr,
+                        "scene_fps": fps,
+                        "live_video_composition": live_media,
+                    }
                     try:
-                        assign(asset, engine, [args.output], hdr=True, keep_playing=True)
+                        assign(asset, engine, [args.output], fps=fps, hdr=True, keep_playing=True)
                         stats = ready(args.output, 25)
                         time.sleep(1)
                         stats = next(
@@ -106,16 +179,11 @@ def main():
                             if s["output"] == args.output
                         )
                         row["telemetry"] = stats
-                        patches = stats.get("probe_patches_scrgb", [])
                         # Source patches 203/400 nits must be distinct and survive the real renderer.
-                        expected = [0.1 / 80, 1 / 80, 10 / 80, 1, 203 / 80, 300 / 80, 5, 10]
-                        row["patches_match"] = len(patches) == 8 and all(
-                            len(p) == 3
-                            and all(
-                                math.isfinite(c) and abs(c - e) < max(0.0003, e * 0.08) for c in p
-                            )
-                            for p, e in zip(patches, expected)
-                        )
+                        if live_media:
+                            row["live_media_reuse"], stats = verify_live_media_reuse(args.output)
+                            row["telemetry"] = stats
+                        row["patches_match"] = reference_pixels_match(stats)
                         row["drm"] = drm(args.output)
                         row["output_format"] = next(
                             m["currentFormat"]
@@ -138,8 +206,11 @@ def main():
                             and stats.get("egl_bits", 0) >= 16
                             and stats.get("hdr")
                             and row["patches_match"]
+                            and (not live_media or row["live_media_reuse"]["passed"])
                         )
-                        shot = out / f'{engine}-{asset.replace(" ","-")}.png'
+                        asset_name = asset.rsplit("/", 1)[-1].replace(" ", "-")
+                        suffix = f"-{fps}" if live_media else ""
+                        shot = out / f"{engine}-{asset_name}{suffix}.png"
                         capture(shot, args.output, empty=True)
                         row["screenshot"] = shot.name
                     except Exception as error:

@@ -1,0 +1,6 @@
+{
+  "title": "HDR retained video verification",
+  "entry": "index.html",
+  "description": "Verification-only identity composition of the existing HDR reference video through the native live scene path.",
+  "tags": ["verification", "hdr", "native"]
+}

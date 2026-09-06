@@ -1,0 +1,709 @@
+{
+  "scope": "Prototype-specific checks; HDR signal and numeric renderer pixels, no calibrated panel photometry. Screenshots are SDR.",
+  "native_checks": {
+    "rust": 13,
+    "runtime_js": 6,
+    "python": 125,
+    "c_suites": [
+      "pacing",
+      "media_texture"
+    ],
+    "clippy": "passed",
+    "native_ui": "passed",
+    "portable_report_ui_checks": 12,
+    "drop_variant_desktop_checks": 18
+  },
+  "monorepo_checks": "make ci / make format could not complete because Node workspace dependencies including Vitest/Turbo are absent",
+  "hdr": {
+    "source": "../../verification/hdr-1788671446/report.json",
+    "report_sha256": "8e928a23a6448f8ca0ab920641a8726d473d4a9a1ecd4fff0e391ea1854cdac9",
+    "checks": [
+      {
+        "experiment": "gpu-independent",
+        "asset": "hdr-calibration",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012493133544921875,
+            0.0012493133544921875,
+            0.0012493133544921875
+          ],
+          [
+            0.0124969482421875,
+            0.0124969482421875,
+            0.0124969482421875
+          ],
+          [
+            0.125,
+            0.125,
+            0.125
+          ],
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            2.537109375,
+            2.537109375,
+            2.537109375
+          ],
+          [
+            3.75,
+            3.75,
+            3.75
+          ],
+          [
+            5.0,
+            5.0,
+            5.0
+          ],
+          [
+            10.0,
+            10.0,
+            10.0
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent",
+        "asset": "HDR reference.png",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012483596801757812,
+            0.0012483596801757812,
+            0.0012483596801757812
+          ],
+          [
+            0.01248931884765625,
+            0.01248931884765625,
+            0.01248931884765625
+          ],
+          [
+            0.124755859375,
+            0.124755859375,
+            0.124755859375
+          ],
+          [
+            0.99951171875,
+            0.99951171875,
+            0.99951171875
+          ],
+          [
+            2.533203125,
+            2.533203125,
+            2.533203125
+          ],
+          [
+            3.73828125,
+            3.73828125,
+            3.73828125
+          ],
+          [
+            4.98828125,
+            4.98828125,
+            4.98828125
+          ],
+          [
+            9.953125,
+            9.953125,
+            9.953125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent",
+        "asset": "HDR reference.avif",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012693405151367188,
+            0.0012693405151367188,
+            0.0012693405151367188
+          ],
+          [
+            0.01239776611328125,
+            0.01239776611328125,
+            0.012359619140625
+          ],
+          [
+            0.12548828125,
+            0.12548828125,
+            0.12548828125
+          ],
+          [
+            1.001953125,
+            1.001953125,
+            1.001953125
+          ],
+          [
+            2.533203125,
+            2.533203125,
+            2.533203125
+          ],
+          [
+            3.73828125,
+            3.73828125,
+            3.73828125
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            9.953125,
+            9.953125,
+            9.953125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent",
+        "asset": "HDR reference.mkv",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent",
+        "asset": "hdr-media-live",
+        "scene_target_fps": 120,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": true,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent",
+        "asset": "hdr-media-live",
+        "scene_target_fps": 360,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": true,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "hdr-calibration",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012493133544921875,
+            0.0012493133544921875,
+            0.0012493133544921875
+          ],
+          [
+            0.0124969482421875,
+            0.0124969482421875,
+            0.0124969482421875
+          ],
+          [
+            0.125,
+            0.125,
+            0.125
+          ],
+          [
+            1.0,
+            1.0,
+            1.0
+          ],
+          [
+            2.537109375,
+            2.537109375,
+            2.537109375
+          ],
+          [
+            3.75,
+            3.75,
+            3.75
+          ],
+          [
+            5.0,
+            5.0,
+            5.0
+          ],
+          [
+            10.0,
+            10.0,
+            10.0
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": null
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "HDR reference.png",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012483596801757812,
+            0.0012483596801757812,
+            0.0012483596801757812
+          ],
+          [
+            0.01248931884765625,
+            0.01248931884765625,
+            0.01248931884765625
+          ],
+          [
+            0.124755859375,
+            0.124755859375,
+            0.124755859375
+          ],
+          [
+            0.99951171875,
+            0.99951171875,
+            0.99951171875
+          ],
+          [
+            2.533203125,
+            2.533203125,
+            2.533203125
+          ],
+          [
+            3.73828125,
+            3.73828125,
+            3.73828125
+          ],
+          [
+            4.98828125,
+            4.98828125,
+            4.98828125
+          ],
+          [
+            9.953125,
+            9.953125,
+            9.953125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": "decoder+vo"
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "HDR reference.avif",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012693405151367188,
+            0.0012693405151367188,
+            0.0012693405151367188
+          ],
+          [
+            0.01239776611328125,
+            0.01239776611328125,
+            0.012359619140625
+          ],
+          [
+            0.12548828125,
+            0.12548828125,
+            0.12548828125
+          ],
+          [
+            1.001953125,
+            1.001953125,
+            1.001953125
+          ],
+          [
+            2.533203125,
+            2.533203125,
+            2.533203125
+          ],
+          [
+            3.73828125,
+            3.73828125,
+            3.73828125
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            9.953125,
+            9.953125,
+            9.953125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": "decoder+vo"
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "HDR reference.mkv",
+        "scene_target_fps": 30,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": null,
+        "framedrop_policy": "decoder+vo"
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "hdr-media-live",
+        "scene_target_fps": 120,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": true,
+        "framedrop_policy": "decoder+vo"
+      },
+      {
+        "experiment": "gpu-independent-drop",
+        "asset": "hdr-media-live",
+        "scene_target_fps": 360,
+        "passed": true,
+        "output_format": "XBGR2101010",
+        "egl_bits": 16,
+        "egl_float": true,
+        "surface_color": "scRGB linear, 1 = 80 cd/m2",
+        "patches_scrgb": [
+          [
+            0.0012979507446289062,
+            0.0012979507446289062,
+            0.0012979507446289062
+          ],
+          [
+            0.0124969482421875,
+            0.01255035400390625,
+            0.01251220703125
+          ],
+          [
+            0.1260986328125,
+            0.126708984375,
+            0.126220703125
+          ],
+          [
+            1.0166015625,
+            1.0166015625,
+            1.0166015625
+          ],
+          [
+            2.59375,
+            2.59375,
+            2.59375
+          ],
+          [
+            3.826171875,
+            3.826171875,
+            3.826171875
+          ],
+          [
+            5.01171875,
+            5.01171875,
+            5.01171875
+          ],
+          [
+            10.1328125,
+            10.1328125,
+            10.1328125
+          ]
+        ],
+        "patches_match": true,
+        "pq_eotf": 2,
+        "colorspace": 9,
+        "retained_video_reuse_passed": true,
+        "framedrop_policy": "decoder+vo"
+      }
+    ],
+    "display_settings_restored": true,
+    "restore_differences": {}
+  }
+}

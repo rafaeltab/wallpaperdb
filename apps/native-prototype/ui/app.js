@@ -61,8 +61,20 @@ function detail() {
       "HTML / JavaScript in Chromium. SDR bitmap transfer: compatible, but includes CPU copies.",
     "chromium-dmabuf":
       "Accelerated shared textures. Experimental: black SDR buffers and failed HDR imports on the tested NVIDIA driver.",
-    gpu: "Lua drives native GLSL effects. Live bundles need scene.lua; images and videos use libmpv.",
+    gpu: "Fixed-rate Lua / GLSL rendering. Live bundles need scene.lua; images and videos use libmpv.",
+    "gpu-paced":
+      "Lua / GLSL waits for each visible display before drawing another shared frame. The slowest visible display paces a group; HDR uses the native pipeline.",
+    "gpu-independent":
+      "Lua / GLSL animates at the requested budget while video keeps its own playback clock. Live bundles need scene.lua; HDR uses the native pipeline.",
+    "gpu-independent-drop":
+      "Independent video clock with permission to skip video frames when decoding falls behind. Scene FPS is not video FPS; live bundles need scene.lua and HDR uses the native pipeline.",
   }[experiment];
+  $("fps-note").textContent =
+    experiment === "chromium" && Number($("fps").value) > 240
+      ? "360 requested · Chromium SDR copy is capped at 240 fps"
+      : experiment === "gpu-paced"
+        ? "Maximum budget; compositor callbacks determine the delivered rate"
+        : "Requested budget; diagnostics show the delivered frame rate";
   $("apply").disabled = !item || !outputs.size || busy;
   $("apply-target").textContent = outputs.size
     ? `Apply to ${[...outputs].join(" + ")}${span && outputs.size > 1 ? " · spanning" : ""}`
@@ -75,7 +87,9 @@ function detail() {
     `<span>${labels[item.kind]}</span><span>On this device</span>`;
   $("reactivity").hidden = item.kind !== "live";
   $("audio").disabled = item.kind !== "live";
-  $("fps").disabled = item.kind !== "live";
+  $("fps").disabled =
+    item.kind === "image" ||
+    (item.kind !== "live" && experiment === "baseline");
   $("pause").disabled = !state.groups.some((g) =>
     g.outputs.some((o) => outputs.has(o)),
   );
@@ -177,12 +191,9 @@ function update(next) {
     monitors();
     detail();
   }
-  const frames = state.surfaces
-    .map((s) => s.telemetry.fps)
-    .filter(Number.isFinite);
   const running = state.surfaces.filter((s) => !s.paused).length;
   $("runtime-status").textContent = state.surfaces.length
-    ? `${state.surfaces.length} display${state.surfaces.length === 1 ? "" : "s"} connected · ${running} active${frames.some((f) => f > 0) ? ` · ${Math.max(...frames)} fps` : ""}`
+    ? `${state.surfaces.length} display${state.surfaces.length === 1 ? "" : "s"} connected · ${running} active`
     : "Ready when you are · No wallpapers applied";
   $("experiment-stats").textContent = JSON.stringify(
     state.surfaces
@@ -233,6 +244,7 @@ $("apply").onclick = () =>
     "A new atmosphere. Wallpaper applied.",
   );
 $("experiment").onchange = detail;
+$("fps").onchange = detail;
 $("import").onclick = () => action({ op: "choose" });
 $("import-bundle").onclick = () => action({ op: "choose", folder: true });
 $("refresh").onclick = () =>

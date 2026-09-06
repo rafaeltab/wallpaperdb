@@ -16,10 +16,81 @@ Select **Prism laboratory**, choose a **Renderer experiment** in the inspector, 
 | --- | --- | --- | --- |
 | `baseline` | Original GTK images, mpvpaper video, WebKitGTK HTML/JS | All original bundles; Prism WebGL | These presentation paths are SDR |
 | `gpu` | LuaJIT + GLSL, libmpv, native Wayland/EGL presenter | Prism, Rose hour, Afterglow, HDR reference; ordinary image/video files | Verified for live, image, and video reference content |
+| `gpu-paced` | Same native renderer with one outstanding compositor frame callback per visible output | The same native scenes; a shared group waits for its slowest visible output | Verified for the same four HDR references |
+| `gpu-independent` | Native fixed-rate scene timer with an independent mpv video clock and retained FP16 media texture | The same native scenes, including live scenes containing video | Six HDR checks passed, including retained live video at 120/360 scene targets |
+| `gpu-independent-drop` | The independent media clock with optional decoder/output frame skipping under overload | Same native live scenes, images and videos; may omit video frames to catch up | The same six HDR checks passed separately for this option |
 | `chromium` | Electron HTML/JS with two bounded bitmap transfer slots | The same HTML bundles, images, videos | SDR only; HDR requests are rejected |
 | `chromium-dmabuf` | Electron accelerated shared textures imported by the native presenter | A deliberately exposed interoperability experiment | Failed on this Electron/NVIDIA setup; no silent fallback |
 
 The two Chromium switches make the transfer cost explicit. The working bitmap path copies pixels through CPU memory. The DMA-BUF path keeps at most two producer leases and releases each after the consumer's GPU fence. Receiving a buffer is not treated as proof of correct pixels: diagnostics flag sampled black content, and HDR checks compare actual scene values.
+
+Frame budgets now extend through **120, 240 and 360 fps**. They are requested limits,
+not guaranteed throughput. Electron's bitmap path caps a 360 request at 240 and reports
+both values. The native callback experiment also waits for every visible member of
+a span; pausing or hiding a member cancels its outstanding callback so reveal can
+make progress. Fullscreen-covered members are excluded from that wait even with
+**Keep playing** enabled. A fully covered group uses its frame timer; manual pause
+still stops it. These visibility hints come from Hyprland fullscreen/power state,
+not a general analysis of overlapping windows. See the [4K stress laboratory](STRESS.md) for the heavy shared scenes,
+bounded matrix runner and comparison evidence.
+
+`gpu-independent` keeps the `gpu` scene timer and output submission policy. It
+changes only media scheduling: mpv queues video when due (`video-sync=audio`,
+using the system clock because audio playback is disabled, and
+`video-timing-offset=0`); the render call does not wait for its target time.
+Scene ticks without a queued media frame reuse the previous FP16 video texture.
+A 60 fps clip can therefore remain at normal playback speed inside a scene
+requesting 120 or 360 fps. Those scene rates remain budgets to measure, not
+promised throughput. The existing `gpu` and `gpu-paced` paths keep their original
+behavior. Combining independent media with compositor callbacks is a possible
+later experiment, not an additional switch here.
+
+`gpu-independent-drop` is a separate, opt-in overload experiment. It keeps the
+independent scene/media scheduling and color pipeline, but sets mpv
+`framedrop=decoder+vo`. The helper reads back the applied policy at initialization
+and fails if it differs; telemetry records the requested/applied policy and its
+verification scope. Profiling rejects missing or incorrect policy evidence.
+Scenes without a media source report no applied mpv policy. Existing
+`gpu-independent` options and all default runner recipes remain unchanged.
+
+This can trade video frames for playback-clock progress when decoding falls
+behind. It cannot turn the observed ~206 decoded-frame/s capacity under the preserved
+background workload into 360 unique video frames/s.
+The actual effect depends on decoder skipping support and source dependencies;
+compare playback positions, both reset-aware drop counters, media updates and
+scene presentations separately. The option is available in the CLI, UI,
+`--engines` overrides and native HDR verification, including the live media case.
+In the measured 4K360-source overload, enabling the option did not recover normal
+playback speed: both variants remained near 0.56× speed and 17 media render
+updates/s. The policy readback succeeded, while sampled decoder-drop counters
+remained zero. The option is retained as a negative experiment. Its separate
+HDR checks passed; see [the final results](FINAL-REPORT.md).
+
+The new diagnostics distinguish media render calls, queued new-frame/redraw
+requests, retained-texture scene frames, and group submission acknowledgements.
+`media_properties` samples supported mpv playback position, duration, FPS
+estimates and drop counters asynchronously at approximately one-second intervals,
+with at most one request outstanding per property. Values carry reply times and
+ages; unavailable data stays null. These counters do not independently measure
+decoded video FPS. Raw `media_target` trace rows pair mpv's next-frame timestamp
+with its nanosecond clock for timing verification; they do not control scheduling.
+
+The zero-offset timing choice avoids an mpv 0.41 discrepancy: its render header
+documents microseconds for `target_time`, while its implementation forwards an
+internal nanosecond timestamp. Advanced control remains disabled because the
+current helper still uses synchronous core calls on the render thread.
+`report_swap` follows a successful group buffer submission containing a media
+update; it is not Wayland presentation feedback or proof of physical scanout.
+See [mpv timing documentation](https://mpv.io/manual/stable/#options-video-timing-offset),
+the [render API contract](https://github.com/mpv-player/mpv/blob/v0.41.0/include/mpv/render.h),
+and [its implementation](https://github.com/mpv-player/mpv/blob/v0.41.0/video/out/vo_libmpv.c).
+
+The [HDR live-media fixture](scripts/fixtures/hdr-media-live/README.md) composes the
+unchanged HDR reference video through an identity live shader. The HDR verifier
+adds this case at 120 and 360 fps for `gpu-independent` and
+`gpu-independent-drop`, including explicit pixel
+readbacks from reused media textures before pause and after resume. Those
+diagnostic readbacks are separate from sustained profiling.
 
 ```sh
 make native ARGS='set apps/native-prototype/examples/prism --outputs DP-2 --experiment gpu --audio'
@@ -101,7 +172,7 @@ Raw CSV/JSON and a standalone interactive HTML report go under `verification/pro
 
 Refresh sequences count display refreshes between presentations. Gaps greater than one indicate missed opportunities for the 144-fps contender on a 144-Hz display; they are normal for a wallpaper deliberately capped at 30 fps. Summed process RSS includes shared pages and is not unique memory usage. The recorder does not attribute GPU VRAM or AMD compositor work to individual applications.
 
-CPU clocks include exited threads; membership is discovered after warmup and checked afterward. Failed, restarted or stopped animated renderers invalidate a run. `--sample-hz 0` removes CPU/NVML/status sampling during measurement while retaining buffered frame records. It measures collector overhead, not the overhead of frame recording itself. NVML integrates a coarser native window than the polling interval and cannot assign a millisecond hitch to a particular process. Presenter GPU timing also excludes Chromium production/import and asynchronous media decoding. [NVML averaging contract](https://docs.nvidia.com/deploy/nvml-api/structnvmlUtilization__t.html).
+CPU clocks include exited threads; membership is discovered after warmup and checked afterward. Failed, restarted or stopped animated renderers invalidate a run. `--sample-hz 0` removes the CPU sampler while retaining buffered frame records and the independent 4 Hz temperature/memory guard. It measures part of the collector overhead, not the overhead of all instrumentation. NVML integrates a coarser native window than the polling interval and cannot assign a millisecond hitch to a particular process. Presenter GPU timing also excludes Chromium production/import and asynchronous media decoding; elapsed GPU queries can include interference from other queued work. [NVML averaging contract](https://docs.nvidia.com/deploy/nvml-api/structnvmlUtilization__t.html).
 
 ## Dependencies and checks
 

@@ -332,7 +332,14 @@ mod tests {
         let mut disabled = monitors.clone();
         disabled[1].disabled = true;
 
-        for experiment in ["gpu", "chromium", "chromium-dmabuf"] {
+        for experiment in [
+            "gpu",
+            "gpu-paced",
+            "gpu-independent",
+            "gpu-independent-drop",
+            "chromium",
+            "chromium-dmabuf",
+        ] {
             group.experiment = experiment.into();
             for member in &remaining {
                 assert_eq!(
@@ -361,7 +368,14 @@ mod tests {
         let mut rotated = monitors.clone();
         rotated[1].transform = 2;
 
-        for experiment in ["gpu", "chromium", "chromium-dmabuf"] {
+        for experiment in [
+            "gpu",
+            "gpu-paced",
+            "gpu-independent",
+            "gpu-independent-drop",
+            "chromium",
+            "chromium-dmabuf",
+        ] {
             group.experiment = experiment.into();
             for (change, updated) in [
                 ("position", &moved),
@@ -418,6 +432,9 @@ mod tests {
             ("baseline", true),
             ("baseline", false),
             ("gpu", false),
+            ("gpu-paced", false),
+            ("gpu-independent", false),
+            ("gpu-independent-drop", false),
             ("chromium", false),
             ("chromium-dmabuf", false),
         ] {

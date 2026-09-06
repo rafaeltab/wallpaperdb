@@ -1,0 +1,6 @@
+{
+  "title": "Stress studio · fixed heavy benchmark control",
+  "entry": "index.html",
+  "description": "Benchmark only: the shared heavy shader redraws one fixed frame at the requested rate. Fixed phase, centered pointer, silent audio, no signals or media. This is an intentional static image with continuing GPU work.",
+  "tags": ["experiment", "benchmark-only", "fixed-workload", "WebGL2", "Lua"]
+}

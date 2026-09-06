@@ -1,0 +1,7 @@
+{
+  "title": "Stress studio · shader heavy",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "description": "Seeded kinetic sculpture, layered field, spectrum and clock. 40 ray steps, 4 octaves, 12 lights; no video decoder.",
+  "tags": ["experiment", "stress", "WebGL2", "Lua"]
+}

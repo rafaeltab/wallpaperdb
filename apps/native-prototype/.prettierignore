@@ -1,2 +1,5 @@
 lab/build/
 verification/
+results/stress/
+examples/stress-studio/fixture.json
+examples/stress-studio/*.fixture.json

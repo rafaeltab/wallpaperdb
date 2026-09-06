@@ -253,10 +253,19 @@ impl Library {
         if group.outputs.is_empty() {
             bail!("Select at least one monitor");
         }
-        if !(1..=60).contains(&group.fps) {
-            bail!("Frame rate must be between 1 and 60");
+        if !(1..=360).contains(&group.fps) {
+            bail!("Frame rate must be between 1 and 360");
         }
-        if !["baseline", "chromium", "chromium-dmabuf", "gpu"].contains(&group.experiment.as_str())
+        if ![
+            "baseline",
+            "chromium",
+            "chromium-dmabuf",
+            "gpu",
+            "gpu-paced",
+            "gpu-independent",
+            "gpu-independent-drop",
+        ]
+        .contains(&group.experiment.as_str())
         {
             bail!("Unknown experiment: {}", group.experiment);
         }
@@ -420,6 +429,42 @@ mod tests {
         invalid.hdr = true;
         assert!(library.assign(invalid, &[monitor("A", 0, 0)]).is_err());
         assert_eq!(before, serde_json::to_string(&library).unwrap());
+    }
+
+    #[test]
+    fn native_experiments_accept_high_frame_budgets_and_hdr_without_clamping_request() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/Blue hour.svg");
+        let mut library = Library::default();
+        let item = library.import(&path).unwrap();
+        for experiment in [
+            "gpu",
+            "gpu-paced",
+            "gpu-independent",
+            "gpu-independent-drop",
+        ] {
+            for fps in [1, 60, 120, 240, 360] {
+                let mut requested = group(&["A"]);
+                requested.item = item.clone();
+                requested.experiment = experiment.into();
+                requested.hdr = true;
+                requested.fps = fps;
+                library.assign(requested, &[monitor("A", 0, 0)]).unwrap();
+                assert_eq!(library.groups[0].fps, fps);
+                assert_eq!(library.groups[0].experiment, experiment);
+                assert!(library.groups[0].hdr);
+            }
+        }
+        for fps in [0, 361] {
+            let mut invalid = library.groups[0].clone();
+            invalid.fps = fps;
+            assert!(library.assign(invalid, &[monitor("A", 0, 0)]).is_err());
+            assert_eq!(library.groups[0].fps, 360);
+        }
+        let mut chromium = library.groups[0].clone();
+        chromium.experiment = "chromium".into();
+        chromium.hdr = false;
+        library.assign(chromium, &[monitor("A", 0, 0)]).unwrap();
+        assert_eq!(library.groups[0].fps, 360);
     }
 
     #[test]

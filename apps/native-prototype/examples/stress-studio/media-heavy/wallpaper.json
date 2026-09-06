@@ -1,0 +1,7 @@
+{
+  "title": "Stress studio · 4K media heavy",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "description": "Seeded kinetic sculpture, layered field, spectrum and clock. 40 ray steps, 4 octaves, 12 lights; one shared 3840×2160 / 60 fps video decoder. Generate the fixture before use.",
+  "tags": ["experiment", "stress", "WebGL2", "Lua", "video", "4K"]
+}

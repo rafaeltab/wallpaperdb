@@ -22,21 +22,34 @@
       }
     }
   }
+  let reportSequence = 0;
   function report() {
-    const videos = [...document.querySelectorAll("video")].map((v) => ({
-      time: v.currentTime,
-      duration: Number.isFinite(v.duration) ? v.duration : null,
-      width: v.videoWidth,
-      height: v.videoHeight,
-      paused: v.paused,
-      ready: v.readyState,
-      error: v.error?.message || null,
-    }));
+    const videos = [...document.querySelectorAll("video")].map((v) => {
+      // These count displayed plus dropped video frames, not decoded frames:
+      // https://w3c.github.io/media-playback-quality/
+      let quality;
+      try {
+        quality = v.getVideoPlaybackQuality?.();
+      } catch {}
+      return {
+        time: v.currentTime,
+        duration: Number.isFinite(v.duration) ? v.duration : null,
+        width: v.videoWidth,
+        height: v.videoHeight,
+        paused: v.paused,
+        ready: v.readyState,
+        error: v.error?.message || null,
+        total_video_frames: quality?.totalVideoFrames ?? null,
+        dropped_video_frames: quality?.droppedVideoFrames ?? null,
+      };
+    });
     window.webkit?.messageHandlers?.telemetry?.postMessage(
       JSON.stringify({
         ...state,
+        report_sequence: ++reportSequence,
         date: new Date().toISOString(),
         videos,
+        scene: window.__wallpaperSceneDiagnostics || null,
         canvas: config.canvas,
         viewport: config.viewport,
       }),
@@ -44,9 +57,20 @@
     state.intervals_ms = [];
   }
   let timer,
+    pausedReportTimer,
     last = performance.now(),
     measuredAt = last,
     frameCount = 0;
+  function schedulePausedReport() {
+    // This heartbeat observes state without emitting scene frame events. Its
+    // paused-only 1 Hz cost remains part of the paused workload measurement.
+    pausedReportTimer = setTimeout(() => {
+      pausedReportTimer = undefined;
+      if (!state.paused) return;
+      report();
+      schedulePausedReport();
+    }, 1000);
+  }
   function schedule() {
     timer = setTimeout(
       () => requestAnimationFrame(frame),
@@ -115,6 +139,10 @@
         state.paused = input.paused;
         if (state.paused) state.fps = 0;
         clearTimeout(timer);
+        if (pausedReportTimer !== undefined) {
+          clearTimeout(pausedReportTimer);
+          pausedReportTimer = undefined;
+        }
         for (const video of document.querySelectorAll("video")) {
           if (state.paused) video.pause();
           else
@@ -123,7 +151,8 @@
             });
         }
         emit("pause", state.paused);
-        if (!state.paused) {
+        if (state.paused) schedulePausedReport();
+        else {
           last = performance.now();
           measuredAt = last;
           frameCount = 0;

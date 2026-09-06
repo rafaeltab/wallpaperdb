@@ -8,6 +8,10 @@ const { pathToFileURL } = require("node:url");
 const transport = require("./build/dmabuf.node");
 const configPath = process.argv.at(-1);
 const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+// Electron 42.7: the 240 FPS ceiling applies only to bitmap offscreen mode.
+// https://github.com/electron/electron/blob/v42.7.0/docs/api/web-contents.md#contentssetframeratefps
+const producerFpsCap = config.experiment === "chromium" ? 240 : null;
+let producerTargetFps = null;
 app.setPath(
   "userData",
   path.join(path.dirname(configPath), `chromium-${process.pid}`),
@@ -107,6 +111,17 @@ app
         telemetry.producer_drops = frameDrops;
         telemetry.electron = process.versions.electron;
         telemetry.chromium = process.versions.chrome;
+        telemetry.producer_target_fps = producerTargetFps;
+        telemetry.producer_fps_cap = producerFpsCap;
+        telemetry.fps_limit_reason =
+          producerFpsCap === null
+            ? "360 FPS application limit; Electron shared textures have no 240 FPS cap"
+            : "Electron bitmap offscreen rendering is capped at 240 FPS";
+        if (producerTargetFps !== null)
+          telemetry.target_fps = Math.min(
+            telemetry.target_fps,
+            producerTargetFps,
+          );
         process.stdout.write(JSON.stringify(telemetry) + "\n");
       } catch {}
     });
@@ -141,7 +156,10 @@ app
       },
     });
     win.webContents.setAudioMuted(true);
-    win.webContents.setFrameRate(config.fps);
+    win.webContents.setFrameRate(
+      Math.min(config.fps, producerFpsCap ?? config.fps),
+    );
+    producerTargetFps = win.webContents.getFrameRate();
     win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     win.webContents.session.setPermissionRequestHandler((_w, _p, callback) =>
       callback(false),
@@ -253,7 +271,7 @@ app
       path.join(__dirname, "../runtime/wallpaper.js"),
       "utf8",
     );
-    const injection = `window.__WALLPAPER_CONFIG__=${JSON.stringify({ canvas: { width: config.width, height: config.height }, viewport: { x: 0, y: 0, width: config.width, height: config.height }, epoch: config.epoch, fps: config.fps, synchronize: false, hdr: config.hdr })};window.webkit={messageHandlers:{telemetry:{postMessage:(v)=>console.debug('WALLPAPER_STATS '+v)}}};${runtime}`;
+    const injection = `window.__WALLPAPER_CONFIG__=${JSON.stringify({ canvas: { width: config.width, height: config.height }, viewport: { x: 0, y: 0, width: config.width, height: config.height }, epoch: config.epoch, fps: producerTargetFps, synchronize: false, hdr: config.hdr })};window.webkit={messageHandlers:{telemetry:{postMessage:(v)=>console.debug('WALLPAPER_STATS '+v)}}};${runtime}`;
     let body;
     if (config.kind === "live") body = fs.readFileSync(config.source, "utf8");
     else {

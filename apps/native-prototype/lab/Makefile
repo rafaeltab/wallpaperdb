@@ -5,7 +5,7 @@ PKGS := wayland-client wayland-egl egl epoxy mpv luajit json-c
 CFLAGS := -O2 -g -std=gnu11 -Wall -Wextra -Wno-unused-parameter $(shell pkg-config --cflags $(PKGS)) -I$(BUILD)
 LDLIBS := $(shell pkg-config --libs $(PKGS)) -lm
 GENERATED := $(BUILD)/layer.c $(BUILD)/color.c $(BUILD)/presentation.c $(BUILD)/xdg.c
-.PHONY: all clean
+.PHONY: all clean test
 all: $(BUILD)/presenter $(BUILD)/dmabuf.node
 $(BUILD):
 	@mkdir -p $@
@@ -20,9 +20,16 @@ $(BUILD)/presentation.h $(BUILD)/presentation.c &: $(PROTOCOLS)/stable/presentat
 	wayland-scanner private-code $< $(BUILD)/presentation.c
 $(BUILD)/xdg.c: $(PROTOCOLS)/stable/xdg-shell/xdg-shell.xml | $(BUILD)
 	wayland-scanner private-code $< $@
-$(BUILD)/presenter: presenter.c $(GENERATED) $(BUILD)/layer.h $(BUILD)/color.h $(BUILD)/presentation.h
+$(BUILD)/presenter: presenter.c pacing.h media_texture.h $(GENERATED) $(BUILD)/layer.h $(BUILD)/color.h $(BUILD)/presentation.h
 	$(CC) $(CFLAGS) presenter.c $(GENERATED) $(LDLIBS) -o $@
 $(BUILD)/dmabuf.node: dmabuf.c | $(BUILD)
 	$(CC) -shared -fPIC -O2 -Wall -Wextra -I/usr/include/node $< -o $@
+$(BUILD)/pacing-test: pacing_test.c pacing.h | $(BUILD)
+	$(CC) -std=c11 -O2 -Wall -Wextra -Werror $< -lm -o $@
+$(BUILD)/media-texture-test: media_texture_test.c media_texture.h | $(BUILD)
+	$(CC) -std=c11 -O2 -Wall -Wextra -Werror $< -o $@
+test: $(BUILD)/pacing-test $(BUILD)/media-texture-test
+	./$(BUILD)/pacing-test
+	./$(BUILD)/media-texture-test
 clean:
 	rm -f $(BUILD)/presenter $(BUILD)/dmabuf.node $(GENERATED) $(BUILD)/*.h

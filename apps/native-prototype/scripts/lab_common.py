@@ -7,10 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
 CONTROL = RUNTIME / "wallpaperdb-native-prototype/control.sock"
 ENV = os.environ.copy()
-ENV["HYPRLAND_INSTANCE_SIGNATURE"] = next((RUNTIME / "hypr").glob("*/.socket.sock")).parent.name
-ENV["WAYLAND_DISPLAY"] = next(
-    p.name for p in RUNTIME.glob("wayland-*") if p.is_socket() and "swww" not in p.name
+_hypr_socket = next((RUNTIME / "hypr").glob("*/.socket.sock"), None)
+if _hypr_socket:
+    ENV["HYPRLAND_INSTANCE_SIGNATURE"] = _hypr_socket.parent.name
+_wayland_socket = next(
+    (p for p in RUNTIME.glob("wayland-*") if p.is_socket() and "swww" not in p.name), None
 )
+if _wayland_socket:
+    ENV["WAYLAND_DISPLAY"] = _wayland_socket.name
 
 
 def api(op, **kwargs):

@@ -143,6 +143,15 @@
               Chromium · DMA-BUF experiment
             </option>
             <option value="gpu">Native · Lua / GLSL + libmpv</option>
+            <option value="gpu-paced">
+              Native · Compositor-paced Lua / GLSL
+            </option>
+            <option value="gpu-independent">
+              Native GPU · independent media clock
+            </option>
+            <option value="gpu-independent-drop">
+              Native GPU · independent video with frame dropping
+            </option>
           </select>
           <p id="experiment-note">
             The original image, video, and HTML runtime.
@@ -187,12 +196,15 @@ Apply an experiment to see its actual renderer.</pre
         <div class="setting">
           <div>
             <strong>Animation budget</strong>
-            <p>Balance motion and energy</p>
+            <p id="fps-note">Requested frame budget</p>
           </div>
           <select id="fps" aria-label="Animation frame rate">
             <option value="15">15 fps</option>
             <option value="30" selected>30 fps</option>
             <option value="60">60 fps</option>
+            <option value="120">120 fps</option>
+            <option value="240">240 fps</option>
+            <option value="360">360 fps</option>
           </select>
         </div>
         <div class="apply-area">

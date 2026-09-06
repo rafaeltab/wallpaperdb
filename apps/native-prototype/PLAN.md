@@ -26,3 +26,15 @@ These are disposable experiments. Keep the original baseline runnable.
 - [x] Sustained profiling: frame intervals, GPU time, CPU scheduling, competing workload
 - [x] Real DP-2 checks and scoped DP-5 HDR checks; preserve existing desktop processes
 - [x] Comparison report, reproducible commands, and documented negative results
+
+## High refresh stress laboratory
+
+Question: how do the execution paths behave with a busy, full 4K scene at
+120–360 fps targets, including contention and long frame-time tails?
+
+- [x] Shared heavy GLSL scenes and a genuine 4K layered video fixture
+- [x] Compositor-paced native alternative and explicit renderer FPS limits
+- [x] Bounded matrix runner, thermal/memory guards, and honest delivered-frame metrics
+- [x] Verify visuals, high refresh scheduling, and pause/reveal lifecycle
+- [x] Repeated 4K runs, complexity sweep, media loops, and competing GPU work
+- [x] Durable comparison, raw evidence, reproducible commands, and restored desktop

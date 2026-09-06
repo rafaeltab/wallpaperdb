@@ -48,11 +48,12 @@ enum Commands {
         outputs: Vec<String>,
         #[arg(long)]
         span: bool,
+        /// Requested frame budget, 1–360. Chromium SDR copy caps at 240.
         #[arg(long, default_value_t = 30)]
         fps: u32,
         #[arg(long)]
         audio: bool,
-        /// baseline, chromium, chromium-dmabuf, or gpu (Lua/GLSL + libmpv).
+        /// baseline, chromium, chromium-dmabuf, gpu, gpu-paced, gpu-independent, or gpu-independent-drop.
         #[arg(long, default_value = "baseline")]
         experiment: String,
         /// Request real floating-point HDR presentation (experimental renderers only).
@@ -523,6 +524,11 @@ impl Desktop {
                     let pointer = json!({"x":(px-(surface.monitor.x-surface.crop.x) as f64)/surface.canvas.width as f64,"y":(py-(surface.monitor.y-surface.crop.y) as f64)/surface.canvas.height as f64,"inside":inside});
                     let mut input =
                         json!({"paused":manual||all_hidden,"pointer":pointer,"hidden":hidden});
+                    // Covered outputs cannot promise compositor frame callbacks,
+                    // even when the producer is allowed to keep playing behind them.
+                    if surface.group.experiment == "gpu-paced" {
+                        input["covered"] = json!(self.suspended);
+                    }
                     if surface.group.audio {
                         input["audio"] = json!(audio);
                     }

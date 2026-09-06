@@ -50,7 +50,7 @@ make native ARGS='status'
 make native ARGS='stop'
 ```
 
-Pause/resume acts on the entire group containing the selected output, preserving a spanning group's timing. Automatic fullscreen / DPMS suspension is per output. Spanning videos rejoin their common timeline on resume. Video is always muted and looped. Live scene frame budgets range from 1–60 fps; videos retain their source frame rate. The UI's animation selector applies to live scenes.
+Pause/resume acts on the entire group containing the selected output, preserving a spanning group's timing. Automatic fullscreen / DPMS suspension is per output. Spanning videos rejoin their common timeline on resume. Video is always muted and looped. Live scene frame budgets range from 1–360 fps; these are requested limits, and the baseline browser may deliver fewer frames. Baseline videos retain their source frame rate. The UI's animation selector applies to live scenes.
 
 `clear` removes only surfaces owned by this application, revealing the underlying background. `stop` stops the daemon and its own video/audio children; it keeps the saved library and groups for the next launch. Existing swww or mpvpaper processes are never killed.
 

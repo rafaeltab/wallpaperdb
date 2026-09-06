@@ -4,6 +4,8 @@
 #define _GNU_SOURCE
 #include "color.h"
 #include "layer.h"
+#include "media_texture.h"
+#include "pacing.h"
 #include "presentation.h"
 #include <epoxy/egl.h>
 #include <epoxy/gl.h>
@@ -49,12 +51,16 @@ typedef struct {
   struct zwlr_layer_surface_v1 *layer;
   struct wp_color_management_surface_v1 *color;
   struct wl_egl_window *window;
+  struct wl_callback *frame_callback;
   EGLSurface egl;
   Output *output;
   char name[128];
-  int w, h, pw, ph, ready, hidden;
+  int w, h, pw, ph, ready, hidden, covered;
   float crop[4];
   uint64_t presented, discarded;
+  uint64_t callback_frame, callbacks_requested, callbacks_completed,
+      callbacks_cancelled;
+  double callback_requested_at;
   double last_present, max_interval;
 } View;
 static struct wl_display *display;
@@ -72,8 +78,9 @@ static EGLConfig egl_config;
 static int egl_red, egl_component, can_scrgb, presentation_clock = -1;
 static volatile sig_atomic_t running = 1;
 static json_object *config;
-static int hdr, chromium, paused, fps, cw, ch, has_media,
-    media_dirty = 1, scene_dirty = 0, stress;
+static int hdr, chromium, paced, independent, decoder_drop, paused,
+    requested_fps, fps, cw, ch, has_media, media_dirty = 1, scene_dirty = 0,
+                                           stress, black_output;
 static double start_time, last_frame, last_report, play_time, signal_energy,
     pointer_x = .5, pointer_y = .5, audio_rms;
 static float bands[16];
@@ -92,6 +99,31 @@ static int listener = -1, peer = -1;
 static char last_error[512], source_format[64] = "none",
                              source_color[512] = "none";
 static int media_loaded, media_rendered;
+static char media_framedrop[32];
+static MediaTexture media_texture;
+static uint64_t media_render_calls, media_new_frame_renders,
+    media_redraw_renders, media_repeat_renders, media_file_loaded_events,
+    media_end_file_events, media_position_resets;
+static double media_render_ms, media_render_total_ms;
+static int64_t media_target_time_raw, media_target_clock_ns;
+static unsigned media_target_flags;
+typedef struct {
+  const char *name;
+  mpv_format format;
+  int pending, available, error;
+  double number, requested_at, sample_requested_at, replied_at;
+  int64_t integer;
+} MediaProperty;
+static MediaProperty media_properties[] = {
+    {.name = "time-pos", .format = MPV_FORMAT_DOUBLE},
+    {.name = "duration", .format = MPV_FORMAT_DOUBLE},
+    {.name = "container-fps", .format = MPV_FORMAT_DOUBLE},
+    {.name = "estimated-vf-fps", .format = MPV_FORMAT_DOUBLE},
+    {.name = "decoder-frame-drop-count", .format = MPV_FORMAT_INT64},
+    {.name = "frame-drop-count", .format = MPV_FORMAT_INT64},
+};
+#define MEDIA_PROPERTY_COUNT                                                   \
+  (sizeof media_properties / sizeof media_properties[0])
 static GLuint imported_tex;
 static EGLImageKHR imported_image = EGL_NO_IMAGE_KHR;
 static GLsync import_fence;
@@ -99,6 +131,12 @@ static int imported_id;
 static int pending_ack;
 static double probe_max = -1;
 static int probe_done;
+static int probe_reuse_requested, probe_reused_media;
+static uint64_t probe_frame;
+static FramePacer pacer;
+static uint64_t callback_wait_deadlines, callbacks_requested,
+    callbacks_completed, callbacks_cancelled, last_report_frame;
+static double callback_wait_started, callback_wait_total, last_fps_sample;
 
 static double now(void) {
   struct timespec t;
@@ -132,6 +170,67 @@ static void log_event(const char *kind, uint64_t id, const char *out, double a,
             (unsigned long long)id, out ? out : "", a, b,
             (unsigned long long)seq, flags);
 }
+static void update_callback_wait(void) {
+  if (pacer.waiting && !callback_wait_started)
+    callback_wait_started = now();
+  else if (!pacer.waiting && callback_wait_started) {
+    callback_wait_total += now() - callback_wait_started;
+    callback_wait_started = 0;
+  }
+}
+static void account_callback_wait_deadlines(void) {
+  if (!paced || paused)
+    return;
+  uint64_t elapsed = frame_pacer_wait_deadlines(&pacer, now());
+  if (!elapsed)
+    return;
+  callback_wait_deadlines += elapsed;
+  log_event("callback_wait_deadline", frame_id, NULL, elapsed, pacer.pending, 0,
+            0);
+}
+static void cancel_frame_callback(View *v) {
+  if (!v->frame_callback)
+    return;
+  account_callback_wait_deadlines();
+  wl_callback_destroy(v->frame_callback);
+  v->frame_callback = NULL;
+  frame_pacer_done(&pacer, v - views);
+  v->callbacks_cancelled++;
+  callbacks_cancelled++;
+  log_event("callback_cancel", v->callback_frame, v->name,
+            (now() - v->callback_requested_at) * 1000, 0, 0, 0);
+  update_callback_wait();
+}
+static void sync_pacer_visibility(void) {
+  if (!paced)
+    return;
+  uint32_t active = 0, callback_outputs = 0;
+  for (int i = 0; i < view_count; i++) {
+    if (!paused && !views[i].hidden)
+      active |= UINT32_C(1) << i;
+    if ((active & (UINT32_C(1) << i)) && !views[i].covered)
+      callback_outputs |= UINT32_C(1) << i;
+    else
+      cancel_frame_callback(&views[i]);
+  }
+  frame_pacer_set_outputs(&pacer, active, callback_outputs);
+  update_callback_wait();
+}
+static void frame_callback_done(void *data, struct wl_callback *callback,
+                                uint32_t callback_time) {
+  View *v = data;
+  account_callback_wait_deadlines();
+  wl_callback_destroy(callback);
+  v->frame_callback = NULL;
+  frame_pacer_done(&pacer, v - views);
+  v->callbacks_completed++;
+  callbacks_completed++;
+  log_event("callback", v->callback_frame, v->name,
+            (now() - v->callback_requested_at) * 1000, callback_time, 0, 0);
+  update_callback_wait();
+}
+static const struct wl_callback_listener frame_callback_listener = {
+    frame_callback_done};
 static void output_geometry(void *d, struct wl_output *o, int32_t x, int32_t y,
                             int32_t pw, int32_t ph, int32_t sub,
                             const char *make, const char *model, int32_t tr) {}
@@ -261,14 +360,24 @@ static void feedback_discarded(void *d, struct wp_presentation_feedback *f) {
 static const struct wp_presentation_feedback_listener feedback_listener = {
     feedback_output, feedback_presented, feedback_discarded};
 
+static int startup_roundtrip(void) {
+  if (!running)
+    return 0;
+  int result = wl_display_roundtrip(display);
+  if (!running)
+    return 0;
+  if (result < 0)
+    fatal("Wayland startup roundtrip failed");
+  return 1;
+}
 static void init_wayland(void) {
   display = wl_display_connect(NULL);
   if (!display)
     fatal("Cannot connect Wayland");
   struct wl_registry *r = wl_display_get_registry(display);
   wl_registry_add_listener(r, &registry_listener, NULL);
-  wl_display_roundtrip(display);
-  wl_display_roundtrip(display);
+  if (!startup_roundtrip() || !startup_roundtrip())
+    return;
   if (!compositor || !shell)
     fatal("Layer shell unavailable");
   if (hdr) {
@@ -276,7 +385,8 @@ static void init_wayland(void) {
       fatal("scRGB surface descriptions unavailable; HDR was not enabled");
     description = wp_color_manager_v1_create_windows_scrgb(color_manager);
     wp_image_description_v1_add_listener(description, &desc_listener, NULL);
-    wl_display_roundtrip(display);
+    if (!startup_roundtrip())
+      return;
     if (!color_ready || color_failed)
       fatal("HDR image description not ready");
   }
@@ -284,7 +394,7 @@ static void init_wayland(void) {
   view_count = json_object_array_length(list);
   if (view_count < 1 || view_count > MAX_OUTPUTS)
     fatal("Invalid output count");
-  for (int i = 0; i < view_count; i++) {
+  for (int i = 0; i < view_count && running; i++) {
     View *v = &views[i];
     json_object *o = json_object_array_get_idx(list, i);
     snprintf(v->name, sizeof v->name, "%s", str(o, "name", ""));
@@ -306,11 +416,12 @@ static void init_wayland(void) {
     snprintf(name, sizeof name, "wallpaperdb-lab-%s", v->name);
     v->layer = zwlr_layer_shell_v1_get_layer_surface(
         shell, v->surface, v->output->object,
-        stress ? ZWLR_LAYER_SHELL_V1_LAYER_TOP
-               : ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
+        black_output ? ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY
+        : stress     ? ZWLR_LAYER_SHELL_V1_LAYER_TOP
+                     : ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND,
         name);
     zwlr_layer_surface_v1_add_listener(v->layer, &layer_listener, v);
-    if (stress) {
+    if (stress && !black_output) {
       zwlr_layer_surface_v1_set_size(v->layer, v->w < 1280 ? v->w : 1280,
                                      v->h < 720 ? v->h : 720);
       v->pw = v->w = 1280;
@@ -331,19 +442,22 @@ static void init_wayland(void) {
     }
     wl_surface_commit(v->surface);
   }
-  for (int n = 0; n < 20; n++) {
+  for (int n = 0; n < 20 && running; n++) {
     int ready = 1;
     for (int i = 0; i < view_count; i++)
       ready &= views[i].ready;
     if (ready)
       break;
-    wl_display_roundtrip(display);
+    if (!startup_roundtrip())
+      return;
   }
 }
 static void init_egl(void) {
   ed = eglGetDisplay((EGLNativeDisplayType)display);
   if (!eglInitialize(ed, NULL, NULL))
     fatal("eglInitialize");
+  if (!running)
+    return;
   eglBindAPI(EGL_OPENGL_API);
   EGLint a[] = {EGL_SURFACE_TYPE,
                 EGL_WINDOW_BIT,
@@ -383,7 +497,7 @@ static void init_egl(void) {
   ec = eglCreateContext(ed, egl_config, EGL_NO_CONTEXT, ca);
   if (ec == EGL_NO_CONTEXT)
     fatal("eglCreateContext");
-  for (int i = 0; i < view_count; i++) {
+  for (int i = 0; i < view_count && running; i++) {
     View *v = &views[i];
     if (!v->ready)
       fatal("Layer configure timed out");
@@ -400,10 +514,22 @@ static void init_egl(void) {
                                     (EGLNativeWindowType)v->window, sa);
     if (v->egl == EGL_NO_SURFACE)
       fatal("eglCreateWindowSurface");
+    if (!running)
+      return;
+    // Swap interval belongs to the current draw surface, not the GL context.
+    if (!eglMakeCurrent(ed, v->egl, v->egl, ec))
+      fatal("eglMakeCurrent");
+    if (!running)
+      return;
+    if (!eglSwapInterval(ed, 0))
+      fatal("eglSwapInterval");
   }
+  if (!running)
+    return;
   if (!eglMakeCurrent(ed, views[0].egl, views[0].egl, ec))
     fatal("eglMakeCurrent");
-  eglSwapInterval(ed, 0);
+  if (!running)
+    return;
   fprintf(stderr, "renderer=%s EGL=%s float=%d bits=%d HDR=%d\n",
           glGetString(GL_RENDERER), eglQueryString(ed, EGL_VENDOR),
           egl_component == EGL_COLOR_COMPONENT_TYPE_FLOAT_EXT, egl_red, hdr);
@@ -506,8 +632,28 @@ static void init_media(const char *path) {
   for (unsigned i = 0; i < sizeof options / sizeof options[0]; i++)
     if (mpv_set_option_string(mpv, options[i][0], options[i][1]) < 0)
       fatal(options[i][0]);
+  if (independent) {
+    // With audio disabled, mpv's audio-sync mode uses the system clock.
+    // Queue video only when due instead of rendering it early and blocking
+    // this scene/EGL thread until the target time. Keep legacy experiments
+    // on their existing default 50 ms render-ahead path.
+    if (mpv_set_option_string(mpv, "video-sync", "audio") < 0 ||
+        mpv_set_option_string(mpv, "video-timing-offset", "0") < 0)
+      fatal("Independent media clock options unavailable");
+  }
+  // This opt-in variant permits skipping source frames to recover playback
+  // time under decoder overload. All existing experiments keep their options.
+  if (decoder_drop && mpv_set_option_string(mpv, "framedrop", "decoder+vo") < 0)
+    fatal("Decoder frame-drop option unavailable");
   if (mpv_initialize(mpv) < 0)
     fatal("mpv_initialize");
+  if (decoder_drop) {
+    char *applied = mpv_get_property_string(mpv, "framedrop");
+    if (!applied || strcmp(applied, "decoder+vo"))
+      fatal("Decoder frame-drop policy was not applied");
+    snprintf(media_framedrop, sizeof media_framedrop, "%s", applied);
+    mpv_free(applied);
+  }
   mpv_opengl_init_params gl = {get_proc, NULL};
   mpv_render_param p[] = {
       {MPV_RENDER_PARAM_API_TYPE, MPV_RENDER_API_TYPE_OPENGL},
@@ -536,6 +682,12 @@ static void init_scene(void) {
   copy_program = program(copy_fragment);
   texture(&scene_tex, &scene_fbo, cw, ch);
   texture(&media_tex, &media_fbo, cw, ch);
+  if (independent) {
+    // A scene may sample mediaTexture directly before its first video frame.
+    // Initialize that retained FP16 texture without changing shader content.
+    const GLfloat empty_media[] = {0, 0, 0, 1};
+    glClearBufferfv(GL_COLOR, 0, empty_media);
+  }
   if (chromium)
     return;
   const char *lua_path = str(config, "script", "");
@@ -627,8 +779,11 @@ static void commands(void) {
     running = 0;
     return;
   }
-  if (n < 0)
+  if (n < 0) {
+    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+      running = 0;
     return;
+  }
   used += n;
   buf[used] = 0;
   char *line = buf, *end;
@@ -644,6 +799,8 @@ static void commands(void) {
             mpv_set_property(mpv, "pause", MPV_FORMAT_FLAG, &paused);
           log_event(paused ? "pause" : "resume", frame_id, NULL, 0, 0, 0, 0);
           last_frame = now();
+          if (paced && !paused)
+            scene_dirty = 1;
         }
       }
       json_object *p = get(o, "pointer");
@@ -659,8 +816,17 @@ static void commands(void) {
           bands[i] = json_object_get_double(json_object_array_get_idx(b, i));
       }
       if (get(o, "signal")) {
-        signal_energy += 1;
-        log_event("signal", frame_id, NULL, signal_energy, 0, 0, 0);
+        json_object *event = get(o, "signal");
+        if (independent && !strcmp(str(event, "name", ""), "lab-probe")) {
+          // Explicit diagnostic readback, never requested by the profiler.
+          probe_done = 0;
+          probe_reuse_requested =
+              has_media && !strcmp(str(event, "value", ""), "media-reuse");
+          scene_dirty = 1;
+        } else {
+          signal_energy += 1;
+          log_event("signal", frame_id, NULL, signal_energy, 0, 0, 0);
+        }
       }
       json_object *h = get(o, "hidden");
       if (h)
@@ -674,6 +840,20 @@ static void commands(void) {
           if (was_hidden && !views[i].hidden)
             scene_dirty = 1;
         }
+      json_object *covered = get(o, "covered");
+      if (covered)
+        for (int i = 0; i < view_count; i++) {
+          int was_covered = views[i].covered;
+          views[i].covered = 0;
+          for (size_t j = 0; j < json_object_array_length(covered); j++)
+            if (!strcmp(views[i].name,
+                        json_object_get_string(
+                            json_object_array_get_idx(covered, j))))
+              views[i].covered = 1;
+          if (paced && was_covered && !views[i].covered)
+            scene_dirty = 1;
+        }
+      sync_pacer_visibility();
       json_object_put(o);
     }
     line = end + 1;
@@ -857,8 +1037,163 @@ static void query_results(void) {
       }
     }
 }
+static void drain_independent_media_events(void) {
+  if (!independent || !mpv)
+    return;
+  mpv_event *event;
+  while ((event = mpv_wait_event(mpv, 0))->event_id != MPV_EVENT_NONE) {
+    if (event->event_id == MPV_EVENT_FILE_LOADED) {
+      media_loaded = 1;
+      media_file_loaded_events++;
+    }
+    if (event->event_id == MPV_EVENT_END_FILE) {
+      mpv_event_end_file *end = event->data;
+      media_end_file_events++;
+      if (end->error < 0)
+        snprintf(last_error, sizeof last_error, "Media load: %s",
+                 mpv_error_string(end->error));
+    }
+    if (event->event_id == MPV_EVENT_GET_PROPERTY_REPLY &&
+        event->reply_userdata >= 1 &&
+        event->reply_userdata <= MEDIA_PROPERTY_COUNT) {
+      MediaProperty *property = &media_properties[event->reply_userdata - 1];
+      mpv_event_property *reply = event->data;
+      int was_available = property->available;
+      double previous = property->number;
+      property->pending = 0;
+      property->sample_requested_at = property->requested_at;
+      property->replied_at = now();
+      property->error = event->error;
+      property->available = event->error >= 0 && reply && reply->data &&
+                            reply->format == property->format;
+      if (!property->available)
+        continue;
+      if (property->format == MPV_FORMAT_INT64) {
+        property->integer = *(int64_t *)reply->data;
+      } else {
+        property->number = *(double *)reply->data;
+        if (!isfinite(property->number))
+          property->available = 0;
+        if (property->available && was_available &&
+            !strcmp(property->name, "time-pos") &&
+            property->number < previous - .1)
+          media_position_resets++;
+      }
+    }
+  }
+  // A static image may have rendered before FILE_LOADED reached this client.
+  if (media_loaded && media_texture.ready)
+    media_rendered = 1;
+}
+static void report_independent_media_properties(json_object *report) {
+  json_object *properties = json_object_new_object();
+  for (size_t i = 0; i < MEDIA_PROPERTY_COUNT; i++) {
+    MediaProperty *property = &media_properties[i];
+    // One request per property at most. A paused/blocked core cannot build up
+    // an unbounded backlog of diagnostics requests.
+    if (mpv && !property->pending) {
+      int result =
+          mpv_get_property_async(mpv, i + 1, property->name, property->format);
+      if (result >= 0) {
+        property->pending = 1;
+        property->requested_at = now();
+      } else {
+        property->available = 0;
+        property->error = result;
+      }
+    }
+    json_object *entry = json_object_new_object();
+    json_object *value = NULL;
+    if (property->available)
+      value = property->format == MPV_FORMAT_INT64
+                  ? json_object_new_int64(property->integer)
+                  : json_object_new_double(property->number);
+    json_object_object_add(entry, "value", value);
+    json_object_object_add(entry, "pending",
+                           json_object_new_boolean(property->pending));
+    json_object_object_add(entry, "request_pending_since_monotonic",
+                           property->pending
+                               ? json_object_new_double(property->requested_at)
+                               : NULL);
+    json_object_object_add(
+        entry, "sample_requested_at_monotonic",
+        property->sample_requested_at
+            ? json_object_new_double(property->sample_requested_at)
+            : NULL);
+    json_object_object_add(entry, "replied_at_monotonic",
+                           property->replied_at
+                               ? json_object_new_double(property->replied_at)
+                               : NULL);
+    json_object_object_add(
+        entry, "age_ms",
+        property->replied_at
+            ? json_object_new_double((now() - property->replied_at) * 1000)
+            : NULL);
+    if (property->error < 0)
+      json_object_object_add(
+          entry, "error",
+          json_object_new_string(mpv_error_string(property->error)));
+    json_object_object_add(properties, property->name, entry);
+  }
+  json_object_object_add(report, "media_properties", properties);
+}
+static void render_independent_media(uint64_t update_flags) {
+  // A wakeup is not a video frame. update() is authoritative, and the mpv
+  // zero-offset system clock has already made queued frames eligible.
+  if (!media_texture_begin_frame(&media_texture,
+                                 (update_flags & MPV_RENDER_UPDATE_FRAME) != 0))
+    return;
+  mpv_render_frame_info info = {0};
+  if (mpv_render_context_get_info(
+          mpv_render,
+          (mpv_render_param){MPV_RENDER_PARAM_NEXT_FRAME_INFO, &info}) < 0)
+    fatal("Cannot inspect queued media frame");
+  if (!(info.flags & MPV_RENDER_FRAME_INFO_PRESENT)) {
+    // The core can discard a late queued frame between update and get_info.
+    media_texture_begin_frame(&media_texture, false);
+    return;
+  }
+  if (info.flags & MPV_RENDER_FRAME_INFO_BLOCK_VSYNC)
+    fatal("Independent media requires system-clock video synchronization");
+  // Do not schedule using info.target_time: mpv 0.41 documents microseconds,
+  // while its implementation forwards an internal nanosecond timestamp.
+  // video-timing-offset=0 leaves due-time scheduling in mpv instead.
+  mpv_opengl_fbo fbo = {(int)media_fbo, cw, ch, GL_RGBA16F};
+  int flip = 1, block = 0;
+  mpv_render_param p[] = {{MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
+                          {MPV_RENDER_PARAM_FLIP_Y, &flip},
+                          {MPV_RENDER_PARAM_BLOCK_FOR_TARGET_TIME, &block},
+                          {0, NULL}};
+  media_target_time_raw = info.target_time;
+  media_target_clock_ns = mpv_get_time_ns(mpv);
+  media_target_flags = (unsigned)info.flags;
+  log_event("media_target", frame_id, NULL, media_target_time_raw,
+            media_target_clock_ns, 0, media_target_flags);
+  double began = now();
+  int result = mpv_render_context_render(mpv_render, p);
+  media_render_ms = (now() - began) * 1000;
+  media_render_total_ms += media_render_ms;
+  media_render_calls++;
+  if (result < 0) {
+    snprintf(last_error, sizeof last_error, "Media render: %s",
+             mpv_error_string(result));
+    fatal(last_error);
+  }
+  media_texture_rendered(&media_texture);
+  if (info.flags & MPV_RENDER_FRAME_INFO_REDRAW)
+    media_redraw_renders++;
+  else if (info.flags & MPV_RENDER_FRAME_INFO_REPEAT)
+    media_repeat_renders++;
+  else if (info.flags & MPV_RENDER_FRAME_INFO_PRESENT)
+    media_new_frame_renders++;
+  // value is render-call wall time; flags describe the queued request. This
+  // counts media renders, not independently observed decoder completions.
+  log_event("media", frame_id, NULL, media_render_ms, 0, 0,
+            (unsigned)info.flags);
+}
 static void render_frame(void) {
   double began = now();
+  uint64_t media_updates_before = media_texture.updates;
   double dt = fmin(began - last_frame, .1);
   last_frame = began;
   play_time += dt;
@@ -872,7 +1207,8 @@ static void render_frame(void) {
   if (!chromium) {
     if (mpv_render) {
       mpv_event *event;
-      while ((event = mpv_wait_event(mpv, 0))->event_id != MPV_EVENT_NONE) {
+      while (!independent &&
+             (event = mpv_wait_event(mpv, 0))->event_id != MPV_EVENT_NONE) {
         if (event->event_id == MPV_EVENT_FILE_LOADED)
           media_loaded = 1;
         if (event->event_id == MPV_EVENT_END_FILE) {
@@ -882,9 +1218,19 @@ static void render_frame(void) {
                      mpv_error_string(e->error));
         }
       }
+      // Consume before update(): a callback racing with update remains set
+      // for the next scene tick. The legacy short-circuit expression below
+      // intentionally keeps its original behavior for the comparison.
+      if (independent)
+        __atomic_exchange_n(&media_dirty, 0, __ATOMIC_RELAXED);
       uint64_t flags = mpv_render_context_update(mpv_render);
-      if ((flags & MPV_RENDER_UPDATE_FRAME) ||
-          __atomic_exchange_n(&media_dirty, 0, __ATOMIC_RELAXED)) {
+      if (independent) {
+        render_independent_media(flags);
+        // FILE_LOADED can be received after the first retained image frame.
+        if (media_loaded && media_texture.ready)
+          media_rendered = 1;
+      } else if ((flags & MPV_RENDER_UPDATE_FRAME) ||
+                 __atomic_exchange_n(&media_dirty, 0, __ATOMIC_RELAXED)) {
         mpv_opengl_fbo fbo = {(int)media_fbo, cw, ch, GL_RGBA16F};
         int flip = 1;
         mpv_render_param p[] = {{MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
@@ -902,7 +1248,8 @@ static void render_frame(void) {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, media_tex);
     glUniform1i(glGetUniformLocation(scene_program, "mediaTexture"), 0);
-    glUniform1i(glGetUniformLocation(scene_program, "hasMedia"), has_media);
+    glUniform1i(glGetUniformLocation(scene_program, "hasMedia"),
+                has_media && (!independent || media_texture.ready));
     glUniform1i(glGetUniformLocation(scene_program, "hdr"), hdr);
     uniform1(scene_program, "time", play_time);
     uniform1(scene_program, "audio", audio_rms);
@@ -925,6 +1272,9 @@ static void render_frame(void) {
   // One diagnostic readback, outside sustained profiling warmup. Samples real
   // renderer content.
   if (!probe_done && frame_id > 30 && (!has_media || media_rendered) &&
+      (!probe_reuse_requested ||
+       (media_texture.ready &&
+        media_texture.updates == media_updates_before)) &&
       (!chromium || received_frames > 5 ||
        (!strcmp(str(config, "kind", ""), "image") && received_frames > 0))) {
     glBindFramebuffer(GL_FRAMEBUFFER, scene_fbo);
@@ -942,15 +1292,31 @@ static void render_frame(void) {
       json_object_array_add(patches, a);
     }
     json_object_object_add(config, "probe_patches_scrgb", patches);
+    probe_frame = frame_id;
+    probe_reused_media = independent && has_media && media_texture.ready &&
+                         media_texture.updates == media_updates_before;
+    probe_reuse_requested = 0;
     probe_done = 1;
     log_event("probe", frame_id, NULL, probe_max, 0, 0, 0);
   }
+  int any_output_submitted = 0;
   for (int i = 0; i < view_count; i++) {
     View *v = &views[i];
     if (v->hidden)
       continue;
     eglMakeCurrent(ed, v->egl, v->egl, ec);
-    copy(scene_tex, 0, v->pw, v->ph, v->crop, hdr ? 0 : 1);
+    if (black_output) {
+      // Keep the offscreen stress passes and their timing above. Only the
+      // actual output buffer is black; no scene pixels reach the display.
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glViewport(0, 0, v->pw, v->ph);
+      glDisable(GL_SCISSOR_TEST);
+      glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+      glClearColor(0, 0, 0, 1);
+      glClear(GL_COLOR_BUFFER_BIT);
+    } else {
+      copy(scene_tex, 0, v->pw, v->ph, v->crop, hdr ? 0 : 1);
+    }
     if (presentation) {
       Feedback *b = calloc(1, sizeof *b);
       b->view = v;
@@ -962,15 +1328,30 @@ static void render_frame(void) {
       wp_presentation_feedback_add_listener(f, &feedback_listener, b);
     }
     log_event("submit", frame_id, v->name, now(), 0, 0, 0);
+    if (paced && (pacer.callback_outputs & (UINT32_C(1) << i))) {
+      if (v->frame_callback)
+        fatal("A compositor frame callback is already outstanding");
+      v->frame_callback = wl_surface_frame(v->surface);
+      if (!v->frame_callback)
+        fatal("Cannot allocate compositor frame callback");
+      v->callback_frame = frame_id;
+      v->callback_requested_at = now();
+      v->callbacks_requested++;
+      callbacks_requested++;
+      wl_callback_add_listener(v->frame_callback, &frame_callback_listener, v);
+      log_event("callback_request", frame_id, v->name, 0, 0, 0, 0);
+    }
     if (!eglSwapBuffers(ed, v->egl))
       fatal("eglSwapBuffers");
+    any_output_submitted = 1;
   }
   if (timing) {
     glEndQuery(GL_TIME_ELAPSED);
     query_pending[q] = 1;
     query_frame[q] = frame_id;
   }
-  if (mpv_render)
+  if (mpv_render && (!independent || media_texture_submitted(
+                                         &media_texture, any_output_submitted)))
     mpv_render_context_report_swap(mpv_render);
   scene_dirty = 0;
   last_cpu_ms = (now() - began) * 1000;
@@ -991,11 +1372,80 @@ static void report(void) {
           chromium ? (!strcmp(str(config, "experiment", ""), "chromium")
                           ? "Chromium SDR copy"
                           : "Chromium DMA-BUF")
-                   : "Lua / OpenGL"));
+          : paced  ? "Lua / OpenGL compositor-paced"
+          : decoder_drop
+              ? "Lua / OpenGL independent media clock + decoder dropping"
+          : independent ? "Lua / OpenGL independent media clock"
+                        : "Lua / OpenGL"));
   json_object_object_add(o, "pid", json_object_new_int(getpid()));
   json_object_object_add(
       o, "adapter", json_object_new_string((char *)glGetString(GL_RENDERER)));
   json_object_object_add(o, "frames", json_object_new_int64(frame_id));
+  double measured_at = now();
+  double report_elapsed = measured_at - last_fps_sample;
+  json_object_object_add(
+      o, "fps",
+      json_object_new_double(
+          report_elapsed > 0 ? (frame_id - last_report_frame) / report_elapsed
+                             : 0));
+  last_report_frame = frame_id;
+  last_fps_sample = measured_at;
+  json_object_object_add(o, "requested_fps",
+                         json_object_new_int(requested_fps));
+  json_object_object_add(o, "target_fps", json_object_new_int(fps));
+  json_object_object_add(
+      o, "fps_cap",
+      json_object_new_int(
+          chromium && !strcmp(str(config, "experiment", ""), "chromium")
+              ? 240
+              : 360));
+  json_object_object_add(
+      o, "fps_limit_reason",
+      json_object_new_string(paced ? "360 FPS application limit; every visible "
+                                     "output must release its callback"
+                             : independent
+                                 ? "360 FPS application limit; scene "
+                                   "submission budget is independent "
+                                   "of video cadence, not guaranteed "
+                                   "throughput"
+                                 : "Application frame budget; this value is "
+                                   "not measured throughput"));
+  json_object_object_add(
+      o, "pacing",
+      json_object_new_string(
+          paced ? "Uncovered outputs: one compositor callback "
+                  "each, then FPS deadline; timer when all covered"
+                : "Fixed-rate submission"));
+  json_object_object_add(o, "pacing_mode",
+                         json_object_new_string(!paced          ? "fixed-rate"
+                                                : !pacer.active ? "inactive"
+                                                : pacer.callback_outputs
+                                                    ? "compositor-callback"
+                                                    : "covered-timer"));
+  json_object_object_add(o, "callback_wait_deadlines",
+                         json_object_new_int64(callback_wait_deadlines));
+  json_object_object_add(
+      o, "callback_wait_scope",
+      json_object_new_string(
+          "After render returns until callbacks are handled; "
+          "includes client scheduling/dispatch delay, not compositor "
+          "attribution"));
+  json_object_object_add(o, "frame_callbacks_requested",
+                         json_object_new_int64(callbacks_requested));
+  json_object_object_add(o, "frame_callbacks_completed",
+                         json_object_new_int64(callbacks_completed));
+  json_object_object_add(o, "frame_callbacks_cancelled",
+                         json_object_new_int64(callbacks_cancelled));
+  json_object_object_add(
+      o, "callback_wait_ms",
+      json_object_new_double(
+          (callback_wait_total +
+           (callback_wait_started ? now() - callback_wait_started : 0)) *
+          1000));
+  json_object *canvas = json_object_new_object();
+  json_object_object_add(canvas, "width", json_object_new_int(cw));
+  json_object_object_add(canvas, "height", json_object_new_int(ch));
+  json_object_object_add(o, "canvas", canvas);
   json_object_object_add(o, "received", json_object_new_int64(received_frames));
   json_object_object_add(o, "paused", json_object_new_boolean(paused));
   json_object_object_add(o, "cpu_frame_ms",
@@ -1003,6 +1453,8 @@ static void report(void) {
   json_object_object_add(o, "gpu_frame_ms",
                          json_object_new_double(last_gpu_ms));
   json_object_object_add(o, "hdr", json_object_new_boolean(hdr));
+  json_object_object_add(o, "black_output",
+                         json_object_new_boolean(black_output));
   json_object_object_add(o, "egl_bits", json_object_new_int(egl_red));
   json_object_object_add(
       o, "egl_float",
@@ -1043,6 +1495,87 @@ static void report(void) {
   json_object_object_add(o, "pointer_y", json_object_new_double(pointer_y));
   json_object_object_add(o, "audio_rms", json_object_new_double(audio_rms));
   json_object_object_add(o, "signals", json_object_new_double(signal_energy));
+  if (decoder_drop) {
+    json_object_object_add(o, "media_decoder_drop_enabled",
+                           json_object_new_boolean(1));
+    json_object_object_add(o, "media_framedrop_requested",
+                           json_object_new_string("decoder+vo"));
+    json_object_object_add(o, "media_framedrop",
+                           mpv ? json_object_new_string(media_framedrop)
+                               : NULL);
+    json_object_object_add(
+        o, "media_framedrop_verified_at_init",
+        json_object_new_boolean(mpv && !strcmp(media_framedrop, "decoder+vo")));
+    json_object_object_add(
+        o, "media_framedrop_scope",
+        json_object_new_string(
+            "Read back once at mpv initialization; no runtime "
+            "policy changes. May skip source frames to catch "
+            "up; scene FPS does not count unique video frames."));
+  }
+  if (independent) {
+    json_object_object_add(o, "media_active",
+                           json_object_new_boolean(has_media));
+    json_object_object_add(o, "media_texture_ready",
+                           json_object_new_boolean(media_texture.ready));
+    json_object_object_add(o, "probe_frame",
+                           json_object_new_int64(probe_frame));
+    json_object_object_add(o, "probe_reused_media",
+                           json_object_new_boolean(probe_reused_media));
+    json_object_object_add(o, "probe_reuse_pending",
+                           json_object_new_boolean(probe_reuse_requested));
+    json_object_object_add(
+        o, "media_clock",
+        json_object_new_string("mpv system clock; video-timing-offset=0; "
+                               "reuse latest due texture between scene ticks"));
+    json_object_object_add(o, "media_timing_offset_ms", json_object_new_int(0));
+    json_object_object_add(o, "media_block_for_target_time",
+                           json_object_new_boolean(0));
+    json_object_object_add(o, "media_advanced_control",
+                           json_object_new_boolean(0));
+    json_object_object_add(o, "media_render_calls",
+                           json_object_new_int64(media_render_calls));
+    json_object_object_add(o, "media_texture_updates",
+                           json_object_new_int64(media_texture.updates));
+    json_object_object_add(o, "media_texture_reuse_frames",
+                           json_object_new_int64(media_texture.reuses));
+    json_object_object_add(o, "media_new_frame_renders",
+                           json_object_new_int64(media_new_frame_renders));
+    json_object_object_add(o, "media_redraw_renders",
+                           json_object_new_int64(media_redraw_renders));
+    json_object_object_add(o, "media_repeat_renders",
+                           json_object_new_int64(media_repeat_renders));
+    json_object_object_add(o, "media_render_ms",
+                           json_object_new_double(media_render_ms));
+    json_object_object_add(o, "media_render_total_ms",
+                           json_object_new_double(media_render_total_ms));
+    json_object_object_add(o, "media_target_time_raw",
+                           json_object_new_int64(media_target_time_raw));
+    json_object_object_add(o, "media_target_clock_ns",
+                           json_object_new_int64(media_target_clock_ns));
+    json_object_object_add(o, "media_target_flags",
+                           json_object_new_int(media_target_flags));
+    json_object_object_add(
+        o, "media_target_time_units",
+        json_object_new_string("Raw target from mpv; v0.41 source uses ns "
+                               "despite header documentation. Diagnostic "
+                               "only, never used for scheduling."));
+    json_object_object_add(o, "media_file_loaded_events",
+                           json_object_new_int64(media_file_loaded_events));
+    json_object_object_add(o, "media_end_file_events",
+                           json_object_new_int64(media_end_file_events));
+    json_object_object_add(o, "media_position_resets",
+                           json_object_new_int64(media_position_resets));
+    json_object_object_add(o, "media_submission_reports",
+                           json_object_new_int64(media_texture.submissions));
+    json_object_object_add(
+        o, "media_timing_scope",
+        json_object_new_string("Render-call wall time includes backend work; "
+                               "media counts are render requests, not decoder "
+                               "FPS. report_swap follows group EGL submission, "
+                               "not physical presentation."));
+    report_independent_media_properties(o);
+  }
   if (mpv) {
     char *hw = mpv_get_property_string(mpv, "hwdec-current");
     json_object_object_add(o, "hwdec",
@@ -1050,9 +1583,36 @@ static void report(void) {
     mpv_free(hw);
   }
   json_object *a = json_object_new_array();
+  int pending_outputs = 0;
   for (int i = 0; i < view_count; i++) {
     json_object *v = json_object_new_object();
     json_object_object_add(v, "output", json_object_new_string(views[i].name));
+    json_object_object_add(v, "logical_width", json_object_new_int(views[i].w));
+    json_object_object_add(v, "logical_height",
+                           json_object_new_int(views[i].h));
+    json_object_object_add(v, "buffer_width", json_object_new_int(views[i].pw));
+    json_object_object_add(v, "buffer_height",
+                           json_object_new_int(views[i].ph));
+    json_object_object_add(v, "buffer_scale",
+                           json_object_new_int(views[i].output->scale));
+    json_object_object_add(v, "hidden",
+                           json_object_new_boolean(views[i].hidden));
+    json_object_object_add(v, "covered",
+                           json_object_new_boolean(views[i].covered));
+    json_object_object_add(
+        v, "callback_eligible",
+        json_object_new_boolean(paced &&
+                                (pacer.callback_outputs & (UINT32_C(1) << i))));
+    json_object_object_add(
+        v, "callback_pending",
+        json_object_new_boolean(views[i].frame_callback != NULL));
+    json_object_object_add(v, "callbacks_requested",
+                           json_object_new_int64(views[i].callbacks_requested));
+    json_object_object_add(v, "callbacks_completed",
+                           json_object_new_int64(views[i].callbacks_completed));
+    json_object_object_add(v, "callbacks_cancelled",
+                           json_object_new_int64(views[i].callbacks_cancelled));
+    pending_outputs += views[i].frame_callback != NULL;
     json_object_object_add(v, "presented",
                            json_object_new_int64(views[i].presented));
     json_object_object_add(v, "discarded",
@@ -1061,6 +1621,8 @@ static void report(void) {
                            json_object_new_double(views[i].max_interval));
     json_object_array_add(a, v);
   }
+  json_object_object_add(o, "callback_pending_outputs",
+                         json_object_new_int(pending_outputs));
   json_object_object_add(o, "outputs", a);
   puts(json_object_to_json_string_ext(o, JSON_C_TO_STRING_PLAIN));
   fflush(stdout);
@@ -1071,7 +1633,16 @@ int main(int argc, char **argv) {
     fprintf(stderr, "usage: presenter CONFIG.json\n");
     return 2;
   }
-  prctl(PR_SET_PDEATHSIG, SIGTERM);
+  // A blocked Wayland/EGL call cannot act on the graceful signal handler.
+  // Keep this helper tied to its creator even during startup or teardown.
+  pid_t parent = getppid();
+  if (prctl(PR_SET_PDEATHSIG, SIGKILL, 0L, 0L, 0L) < 0) {
+    perror("presenter: PR_SET_PDEATHSIG");
+    return 1;
+  }
+  // Parent death before prctl() is not signalled retroactively.
+  if (getppid() != parent)
+    return 0;
   signal(SIGTERM, stop);
   signal(SIGINT, stop);
   signal(SIGPIPE, SIG_IGN);
@@ -1080,12 +1651,27 @@ int main(int argc, char **argv) {
     fatal("Invalid config");
   hdr = val(config, "hdr", 0);
   chromium = !strncmp(str(config, "experiment", "gpu"), "chromium", 8);
-  fps = val(config, "fps", 30);
+  paced = !strcmp(str(config, "experiment", "gpu"), "gpu-paced");
+  decoder_drop =
+      !strcmp(str(config, "experiment", "gpu"), "gpu-independent-drop");
+  independent = decoder_drop ||
+                !strcmp(str(config, "experiment", "gpu"), "gpu-independent");
+  requested_fps = fps = val(config, "fps", 30);
   cw = val(config, "width", 1920);
   ch = val(config, "height", 1080);
   stress = val(config, "stress", 0);
+  json_object *black = NULL;
+  int has_black = json_object_object_get_ex(config, "black_output", &black);
+  if (has_black && !json_object_is_type(black, json_type_boolean))
+    fatal("black_output must be a boolean");
+  black_output = black ? json_object_get_boolean(black) : 0;
+  if (black_output && stress <= 0)
+    fatal("black_output is only available for a stress contender");
   if (cw < 1 || ch < 1 || cw > 16384 || ch > 16384 || fps < 1 || fps > 360)
     fatal("Invalid canvas/fps");
+  if (chromium && !strcmp(str(config, "experiment", ""), "chromium") &&
+      fps > 240)
+    fps = 240;
   const char *log = str(config, "frames", "");
   if (*log) {
     frames = fopen(log, "w");
@@ -1095,32 +1681,63 @@ int main(int argc, char **argv) {
     fprintf(frames,
             "monotonic,event,frame,output,value,value2,sequence,flags\n");
   }
+  if (!running)
+    return 0;
   init_wayland();
+  if (!running)
+    return 0;
   init_egl();
+  if (!running)
+    return 0;
   init_scene();
+  if (!running)
+    return 0;
   setup_socket();
-  fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
+  int input_flags = fcntl(STDIN_FILENO, F_GETFL);
+  if (input_flags < 0 ||
+      fcntl(STDIN_FILENO, F_SETFL, input_flags | O_NONBLOCK) < 0)
+    fatal("Cannot configure host input pipe");
   start_time = last_frame = last_report = now();
+  last_fps_sample = start_time;
   last_frame -= 1. / fps;
   double next_frame = now();
+  frame_pacer_init(&pacer, fps, next_frame);
+  sync_pacer_visibility();
   while (running) {
     if (wl_display_dispatch_pending(display) < 0 || !running)
       break;
+    drain_independent_media_events();
+    sync_pacer_visibility();
+    account_callback_wait_deadlines();
     release_import();
     query_results();
     double t = now();
-    int due = !paused && t >= next_frame;
+    int due = !paused && t >= (paced ? pacer.next_frame : next_frame);
     int static_image = !lua && !strcmp(str(config, "kind", ""), "image");
     if (due) {
       if ((!chromium || received_frames > 0) &&
           (!chromium || scene_dirty ||
            (static_image && received_frames > 0 && frame_id < 40)) &&
           (!static_image || scene_dirty || frame_id < 40 ||
-           __atomic_load_n(&media_dirty, __ATOMIC_RELAXED)))
+           (independent && probe_reuse_requested) ||
+           __atomic_load_n(&media_dirty, __ATOMIC_RELAXED)) &&
+          (!paced || frame_pacer_ready(&pacer, t))) {
+        if (paced)
+          frame_pacer_submit(&pacer, t);
         render_frame();
-      next_frame += 1. / fps;
-      if (next_frame < now())
-        next_frame = now() + 1. / fps;
+        if (paced) {
+          frame_pacer_rendered(&pacer, now());
+          update_callback_wait();
+        }
+      }
+      if (paced) {
+        if (!pacer.pending && pacer.next_frame < now())
+          pacer.next_frame = now() + pacer.period;
+      } else {
+        next_frame += 1. / fps;
+        if (next_frame < now())
+          next_frame = now() + 1. / fps;
+      }
     }
     if (chromium && !received_frames && t - start_time > 12 && !paused)
       snprintf(
@@ -1135,10 +1752,6 @@ int main(int argc, char **argv) {
         {STDIN_FILENO, POLLIN, 0},
         {listener, POLLIN, 0},
         {peer, import_fence || pending_ack ? 0 : POLLIN, 0}};
-    double delay = paused ? .05 : fmax(.00005, fmin(.05, next_frame - now()));
-    if (import_fence || pending_ack)
-      delay = fmin(delay, .001);
-    struct timespec wait = {0, (long)(delay * 1e9)};
     // EGL also reads this connection. Reserve the read before polling, then
     // read or cancel before any EGL work; dispatch() after poll can block if
     // EGL consumed the readable events on its own queue in the meantime.
@@ -1154,6 +1767,16 @@ int main(int argc, char **argv) {
         wl_display_cancel_read(display);
       break;
     }
+    // Preparing may dispatch a just-arrived callback. Compute the timeout from
+    // the updated barrier so a ready group never inherits a stale 50 ms wait.
+    double delay = paused ? .05 : fmax(.00005, fmin(.05, next_frame - now()));
+    if (paced)
+      delay = paused || !pacer.active || pacer.pending
+                  ? .05
+                  : fmax(.00005, fmin(.05, pacer.next_frame - now()));
+    if (import_fence || pending_ack)
+      delay = fmin(delay, .001);
+    struct timespec wait = {0, (long)(delay * 1e9)};
     if (wl_display_flush(display) < 0) {
       if (errno == EAGAIN)
         fds[0].events |= POLLOUT;
@@ -1178,7 +1801,13 @@ int main(int argc, char **argv) {
         errno != EAGAIN)
       break;
     if (count > 0) {
-      if (fds[1].revents & (POLLIN | POLLHUP))
+      // A closed host pipe ends ownership even if buffered updates remain.
+      // Do not render another frame merely to consume those stale updates.
+      if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL)) {
+        running = 0;
+        break;
+      }
+      if (fds[1].revents & POLLIN)
         commands();
       if (!running)
         break;
@@ -1193,6 +1822,8 @@ int main(int argc, char **argv) {
         receive_frame();
     }
   }
+  for (int i = 0; i < view_count; i++)
+    cancel_frame_callback(&views[i]);
   glFinish();
   release_import();
   if (frames)

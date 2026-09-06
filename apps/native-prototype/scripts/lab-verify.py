@@ -1,7 +1,19 @@
 """Exercise the real alternative renderers on DP-2 and temporary virtual outputs."""
 
-import argparse, hashlib, json, math, os, socket, struct, subprocess, time, wave
-from lab_common import ROOT, RUNTIME, ENV, api, assign, ready, hypr, capture, saved_assignments
+import argparse, hashlib, json, math, os, select, signal, socket, struct, subprocess, time, wave
+from pathlib import Path
+from stress import termination_cleanup
+from lab_common import (
+    ROOT,
+    RUNTIME,
+    ENV,
+    api,
+    assign as lab_assign,
+    ready,
+    hypr,
+    capture,
+    saved_assignments,
+)
 
 OUT = ROOT / "verification" / f"lab-{int(time.time())}"
 OUT.mkdir(parents=True)
@@ -9,7 +21,18 @@ checks = []
 parser = argparse.ArgumentParser()
 parser.add_argument("--lifecycle-only", action="store_true")
 parser.add_argument("--debug-stacks", action="store_true")
+parser.add_argument("--engines", default="gpu,chromium,gpu-paced")
+parser.add_argument("--fps", type=int, default=30, choices=range(1, 361))
+parser.add_argument("--stress-scenes", action="store_true")
 args = parser.parse_args()
+engines = args.engines.split(",")
+if not set(engines) <= {"gpu", "gpu-paced", "gpu-independent", "gpu-independent-drop", "chromium"}:
+    parser.error("Only visible, working experimental renderers can be verified")
+
+
+def assign(*positional, **kwargs):
+    kwargs.setdefault("fps", args.fps)
+    return lab_assign(*positional, **kwargs)
 
 
 def stats(output="DP-2"):
@@ -161,22 +184,209 @@ def producer_disconnect():
             path.unlink(missing_ok=True)
 
 
+def host_disconnect():
+    """A stopped host must not leave a native helper or frozen layer behind."""
+    config = OUT / "host-disconnect.json"
+    config.write_text(
+        json.dumps(
+            {
+                "experiment": "gpu-paced",
+                "width": 64,
+                "height": 64,
+                "fps": 60,
+                "script": str(ROOT / "examples/prism/scene.lua"),
+                "outputs": [{"name": "DP-2", "width": 1920, "height": 1080}],
+            }
+        )
+    )
+    helper = str(ROOT / "lab/build/presenter")
+    log_path = OUT / "host-eof.log"
+    with log_path.open("w") as log:
+        child = subprocess.Popen(
+            [helper, str(config)], env=ENV, stdin=subprocess.PIPE, stdout=log, stderr=log
+        )
+        try:
+            wait(lambda: '"frames":' in log_path.read_text(), 10)
+            assert child.poll() is None
+            child.stdin.close()
+            assert child.wait(timeout=3) == 0
+            passed("gpu-paced: closing the host input pipe exits the helper promptly")
+        finally:
+            if child.poll() is None:
+                child.kill()
+            child.wait(timeout=3)
+            child.stdin.close()
+
+    log_path = OUT / "host-death.log"
+    program = """
+import subprocess, sys
+with open(sys.argv[3], 'w') as log:
+    child = subprocess.Popen(sys.argv[1:3], stdin=int(sys.argv[4]), stdout=log, stderr=log)
+    print(child.pid, flush=True)
+    sys.stdin.buffer.read(1)
+"""
+    input_reader, input_writer = os.pipe()
+    parent = subprocess.Popen(
+        ["python3", "-c", program, helper, str(config), str(log_path), str(input_reader)],
+        env=ENV,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        pass_fds=(input_reader,),
+    )
+    os.close(input_reader)
+    child_fd = None
+    try:
+        assert select.select([parent.stdout], [], [], 5)[0], "Test host did not start"
+        child_pid = int(parent.stdout.readline())
+        child_fd = os.pidfd_open(child_pid)
+        wait(lambda: log_path.exists() and '"frames":' in log_path.read_text(), 10)
+        poller = select.poll()
+        poller.register(child_fd, select.POLLIN)
+        assert not poller.poll(0), "Helper exited before its parent"
+        # Keep a writer alive and stop the helper: EOF or a cooperative signal
+        # handler cannot make this pass in place of the parent-death SIGKILL.
+        signal.pidfd_send_signal(child_fd, signal.SIGSTOP)
+        wait(
+            lambda: (
+                Path(f"/proc/{child_pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "T"
+            )
+        )
+        parent.kill()
+        parent.wait(timeout=3)
+        assert poller.poll(3000), "Helper survived abrupt creator death"
+        passed("gpu-paced: abrupt creator death cannot orphan the presenter")
+    finally:
+        os.close(input_writer)
+        if parent.poll() is None:
+            parent.kill()
+        parent.wait(timeout=3)
+        parent.stdin.close()
+        parent.stdout.close()
+        if child_fd is not None:
+            try:
+                signal.pidfd_send_signal(child_fd, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            os.close(child_fd)
+
+
+def paced_coverage_checks(output):
+    """Exercise real fullscreen coverage independently from keep-playing policy."""
+    if "gpu-paced" not in engines:
+        return
+    assign("prism", "gpu-paced", ["DP-2", output], span=True, keep_playing=True)
+    ready()
+    api("ui", fullscreen=True)
+
+    def view(name):
+        return next(v for v in stats()["outputs"] if v["output"] == name)
+
+    wait(lambda: view("DP-2").get("covered") and not view("DP-2").get("callback_eligible"))
+    assert not view("DP-2")["hidden"]
+    before = view(output)["presented"]
+    wait(lambda: view(output)["presented"] > before + 10)
+    passed("gpu-paced: a fullscreen-covered keep-playing member cannot stall its visible span")
+
+    app_id = f"org.wallpaperdb.CoverageProbe.p{os.getpid()}"
+    coverage_rule = f"wallpaperdb-coverage-{os.getpid()}"
+    monitor = next(m for m in hypr("-j", "monitors") if m["name"] == output)
+    child = None
+    try:
+        for key, value in [
+            ("match:class", "^" + app_id.replace(".", "\\.") + "$"),
+            ("monitor", output),
+            ("workspace", f"{monitor['activeWorkspace']['id']} silent"),
+            ("no_initial_focus", "on"),
+            ("suppress_event", "activate activatefocus"),
+        ]:
+            hypr("keyword", f"windowrule[{coverage_rule}]:{key}", value)
+        program = """
+import gi, signal, sys
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk, GLib
+GLib.set_prgname(sys.argv[1])
+app = Gtk.Application(application_id=sys.argv[1])
+def activate(application):
+    window = Gtk.ApplicationWindow(application=application)
+    window.set_title('Temporary wallpaper coverage check')
+    window.show_all()
+app.connect('activate', activate)
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: (app.quit(), False)[1])
+GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, lambda: (app.get_windows()[0].fullscreen(), True)[1])
+app.run([])
+"""
+        with (OUT / "coverage-window.log").open("w") as log:
+            child = subprocess.Popen(
+                ["python3", "-c", program, app_id],
+                env=ENV | {"GDK_BACKEND": "wayland"},
+                stdout=log,
+                stderr=log,
+            )
+
+        def probe_window():
+            return next((w for w in hypr("-j", "clients") if w["pid"] == child.pid), None)
+
+        wait(lambda: probe_window() is not None)
+        window = probe_window()
+        hypr(
+            "dispatch",
+            "movetoworkspacesilent",
+            f"{monitor['activeWorkspace']['id']},address:{window['address']}",
+        )
+        wait(lambda: probe_window()["monitor"] == monitor["id"])
+        child.send_signal(signal.SIGUSR1)
+        api("ui", fullscreen=True)
+        wait(lambda: stats().get("pacing_mode") == "covered-timer")
+        assert all(v["covered"] and not v["callback_eligible"] for v in stats()["outputs"])
+        before = stats()["frames"]
+        wait(lambda: stats()["frames"] > before + 10)
+        api("pause", outputs=["DP-2", output], paused=True)
+        wait(lambda: stats()["paused"])
+        before = stats()["frames"]
+        time.sleep(1.4)
+        assert stats()["frames"] == before
+        api("pause", outputs=["DP-2", output], paused=False)
+        wait(lambda: not stats()["paused"] and stats()["frames"] > before)
+        passed("gpu-paced: fully covered keep-playing uses its timer and still honors manual pause")
+    finally:
+        if child:
+            child.terminate()
+            try:
+                child.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=3)
+        hypr("keyword", f"windowrule[{coverage_rule}]:enable", "false")
+        api("ui", fullscreen=False)
+    wait(lambda: all(v.get("callback_eligible") for v in stats()["outputs"]))
+    before = {v["output"]: v["callbacks_completed"] for v in stats()["outputs"]}
+    wait(lambda: all(v["callbacks_completed"] > before[v["output"]] for v in stats()["outputs"]))
+    passed("gpu-paced: revealing both span members restores fresh compositor callbacks")
+
+
 virtual = []
 rule = f"wallpaperdb-lab-verify-{os.getpid()}"
-with saved_assignments():
+with termination_cleanup(), saved_assignments():
     try:
         producer_disconnect()
+        host_disconnect()
         for window in hypr("-j", "clients"):
             if window["class"] == "wallpaperdb-native":
                 hypr("dispatch", "closewindow", "address:" + window["address"])
-        for engine in [] if args.lifecycle_only else ["gpu", "chromium"]:
+        for engine in [] if args.lifecycle_only else engines:
             for asset in [
                 "rose-clock/background.png",
                 "Drifting dusk.mp4",
                 "prism",
                 "rose-clock",
                 "tide",
-            ]:
+            ] + (
+                ["stress-studio", "stress-studio/shader-heavy", "stress-studio/media-heavy"]
+                if args.stress_scenes
+                else []
+            ):
                 assign(asset, engine, keep_playing=True)
                 info = ready()
                 assert info["state"] == "ready" and info["probe_max_scrgb"] > 0, info
@@ -243,7 +453,7 @@ with saved_assignments():
             virtual.append(name)
             hypr("keyword", "monitor", f"{name},1920x1080@60,{x}x-1080,1")
         wait(lambda: len([m for m in api("status")["monitors"] if m["name"] in virtual]) == 2)
-        for engine in ["gpu", "chromium"]:
+        for engine in engines:
             assign("tide", engine, ["DP-2", virtual[0]], span=True, keep_playing=True)
             ready()
             ready(virtual[0])
@@ -275,7 +485,8 @@ with saved_assignments():
             hypr("dispatch", "closewindow", "address:" + existing["address"])
         api("ui")
         time.sleep(2)
-        for engine in ["gpu", "chromium"]:
+        paced_coverage_checks(virtual[0])
+        for engine in engines:
             assign("prism", engine, ["DP-2", virtual[0]], span=False)
             ready()
             ready(virtual[0])

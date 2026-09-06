@@ -1,0 +1,7 @@
+{
+  "title": "Stress studio · shader standard",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "description": "A seeded kinetic sculpture, layered light field, spectrum and clock. Shared WebGL2 / native GLSL: 24 ray steps, 3 octaves, 8 lights; no video decoder.",
+  "tags": ["experiment", "stress", "WebGL2", "Lua", "audio", "clock"]
+}

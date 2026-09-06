@@ -5,7 +5,9 @@ import vm from "node:vm";
 
 function runtime() {
   const events = new Map(),
-    reports = [];
+    reports = [],
+    timers = new Map(),
+    animationFrames = [];
   let scheduled = 0,
     cleared = 0;
   const video = {
@@ -44,14 +46,18 @@ function runtime() {
       createElement: () => ({}),
       head: { append() {} },
     },
-    setTimeout() {
+    setTimeout(callback, delay) {
       scheduled++;
+      timers.set(scheduled, { callback, delay });
       return scheduled;
     },
-    clearTimeout() {
+    clearTimeout(id) {
       cleared++;
+      timers.delete(id);
     },
-    requestAnimationFrame() {},
+    requestAnimationFrame(callback) {
+      animationFrames.push(callback);
+    },
     addEventListener(name, fn) {
       events.set(name, fn);
     },
@@ -71,6 +77,13 @@ function runtime() {
     events,
     reports,
     video,
+    timers,
+    animationFrames,
+    runTimer(id) {
+      const timer = timers.get(id);
+      timers.delete(id);
+      timer.callback();
+    },
     get scheduled() {
       return scheduled;
     },
@@ -85,10 +98,48 @@ test("host pause stops scheduling and video, resume restarts both", () => {
   assert.equal(r.scheduled, 1);
   r.context.__wallpaperHost.update({ paused: true });
   assert.equal(r.video.paused, true);
-  assert.equal(r.cleared, 1);
+  assert.equal(r.timers.size, 1);
+  assert.equal([...r.timers.values()][0].delay, 1000);
   r.context.__wallpaperHost.update({ paused: false });
   assert.equal(r.video.paused, false);
-  assert.equal(r.scheduled, 2);
+  assert.equal(r.timers.size, 1);
+  assert.ok([...r.timers.values()][0].delay < 1000);
+});
+test("paused heartbeat refreshes telemetry without scene events or animation callbacks", () => {
+  const r = runtime();
+  let sceneEvents = 0;
+  r.context.wallpaper.on("frame", () => sceneEvents++);
+  r.events.get("DOMContentLoaded")();
+  r.context.__wallpaperHost.update({ paused: true });
+  const pausedReport = r.reports.at(-1);
+  const timerId = [...r.timers.keys()][0];
+  r.context.__wallpaperHost.update({ paused: true });
+  assert.deepEqual([...r.timers.keys()], [timerId]);
+  r.video.currentTime = 2.5;
+  r.runTimer(timerId);
+  const heartbeat = r.reports.at(-1);
+  assert.equal(heartbeat.report_sequence, pausedReport.report_sequence + 1);
+  assert.equal(heartbeat.paused, true);
+  assert.equal(heartbeat.videos[0].time, 2.5);
+  assert.equal(heartbeat.frames, pausedReport.frames);
+  assert.equal(sceneEvents, 0);
+  assert.equal(r.animationFrames.length, 0);
+  assert.equal(r.timers.size, 1);
+  assert.equal([...r.timers.values()][0].delay, 1000);
+});
+test("resume cancels the paused heartbeat and a stale callback cannot restart it", () => {
+  const r = runtime();
+  r.events.get("DOMContentLoaded")();
+  r.context.__wallpaperHost.update({ paused: true });
+  const heartbeatId = [...r.timers.keys()][0];
+  const staleCallback = r.timers.get(heartbeatId).callback;
+  r.context.__wallpaperHost.update({ paused: false });
+  const reports = r.reports.length;
+  assert.equal(r.timers.has(heartbeatId), false);
+  staleCallback();
+  assert.equal(r.reports.length, reports);
+  assert.equal(r.timers.size, 1);
+  assert.ok([...r.timers.values()][0].delay < 1000);
 });
 test("audio, pointer and keyboard reach executable scene callbacks", () => {
   const r = runtime();

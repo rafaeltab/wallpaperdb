@@ -2,6 +2,11 @@
 
 Captured on Manjaro/Hyprland, September 5–6, 2026. These are results from this workstation and these workloads, not a guarantee about game FPS or other drivers.
 
+The later 4K/120–360 FPS experiments are recorded separately in
+[FINAL-REPORT.md](FINAL-REPORT.md), [STRESS.md](STRESS.md), and the
+[interactive comparison](results/stress/index.html). The measurements below
+remain the earlier, lower-rate evidence.
+
 ## What works
 
 The original prototype remains selectable. The laboratory adds native Lua/GLSL and Chromium HTML/JavaScript, with independent assignments and a single simulation/producer/decoder for each spanning group. Twenty-three real desktop checks passed on DP-2 and two temporary virtual outputs: visible stationary images, changing video/live content, keyboard signals, pause/resume, system-output audio, pointer data, shared spans plus independent groups, fullscreen suspension, retained-image reveal, reconnects, and producer disconnects. Both working alternatives ran the original image/video compositions as well as Prism. [Final desktop check](verification/lab-1788650065/report.json).

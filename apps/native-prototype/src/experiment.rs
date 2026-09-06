@@ -51,7 +51,12 @@ impl Player {
         let base = platform::runtime_dir().join(id);
         let path = base.with_extension("json");
         let script = item.path.parent().unwrap().join("scene.lua");
-        if group.experiment == "gpu" && item.kind == Kind::Live && !script.is_file() {
+        if matches!(
+            group.experiment.as_str(),
+            "gpu" | "gpu-paced" | "gpu-independent" | "gpu-independent-drop"
+        ) && item.kind == Kind::Live
+            && !script.is_file()
+        {
             bail!("This live bundle has no scene.lua. Try Prism laboratory or an HDR reference scene with Lua / GPU.");
         }
         let outputs: Vec<_> = members

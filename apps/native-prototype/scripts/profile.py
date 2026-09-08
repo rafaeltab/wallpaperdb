@@ -192,16 +192,21 @@ class SafetyGuard:
         min_vram_free_mib=1024,
         min_ram_free_mib=8192,
         cpu_grace=3,
+        cpu_temperature_check=True,
     ):
         self.max_gpu_temp = max_gpu_temp
         self.max_cpu_temp = max_cpu_temp
         self.min_vram_free_mib = min_vram_free_mib
         self.min_ram_free_mib = min_ram_free_mib
         self.cpu_grace = cpu_grace
+        self.cpu_temperature_check = cpu_temperature_check
         self.cpu_hot_since = None
 
     def check(self, values, now):
-        for key in ["temperature_c", "cpu_temperature_c", "vram_free_mib", "ram_available_mib"]:
+        required = ["temperature_c", "vram_free_mib", "ram_available_mib"]
+        if self.cpu_temperature_check:
+            required.append("cpu_temperature_c")
+        for key in required:
             value = values.get(key)
             if value is None or not math.isfinite(value):
                 raise GuardViolation(f"Required guard counter unavailable: {key}")
@@ -211,7 +216,7 @@ class SafetyGuard:
             raise GuardViolation(f"Free VRAM fell below {self.min_vram_free_mib:g} MiB")
         if values["ram_available_mib"] < self.min_ram_free_mib:
             raise GuardViolation(f"Available RAM fell below {self.min_ram_free_mib:g} MiB")
-        if values["cpu_temperature_c"] >= self.max_cpu_temp:
+        if self.cpu_temperature_check and values["cpu_temperature_c"] >= self.max_cpu_temp:
             if self.cpu_hot_since is None:
                 self.cpu_hot_since = now
             if now - self.cpu_hot_since >= self.cpu_grace:

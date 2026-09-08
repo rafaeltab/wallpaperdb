@@ -59,7 +59,7 @@ def validate_request(request, connected):
     demo = request.get("demo", "")
     if not isinstance(demo, str) or any(c in demo for c in '\r\n";'):
         raise ValueError("Demo path contains unsupported console characters")
-    for key in ["span", "audio", "hdr"]:
+    for key in ["span", "audio", "hdr", "cpu_temperature_check"]:
         if key in request and type(request[key]) is not bool:
             raise ValueError(f"{key} must be a boolean")
 

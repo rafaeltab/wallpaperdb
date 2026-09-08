@@ -64,6 +64,29 @@ class GuardTests(unittest.TestCase):
         with self.assertRaises(profile.GuardViolation):
             guard.check(metrics(cpu_temperature_c=96.2), 6.0)
 
+    def test_disabled_cpu_check_allows_sustained_high_and_unavailable_cpu_readings(self):
+        guard = profile.SafetyGuard(cpu_temperature_check=False)
+        for now in [0.0, 3.0, 30.0]:
+            guard.check(metrics(cpu_temperature_c=99.0), now)
+        unavailable = metrics()
+        del unavailable["cpu_temperature_c"]
+        guard.check(unavailable, 31.0)
+        guard.check(metrics(cpu_temperature_c=float("nan")), 32.0)
+
+    def test_disabled_cpu_check_still_enforces_gpu_memory_and_required_counters(self):
+        for changes, message in [
+            ({"temperature_c": 82.0}, "GPU"),
+            ({"vram_free_mib": 1023}, "VRAM"),
+            ({"ram_available_mib": 8191}, "RAM"),
+            ({"temperature_c": None}, "unavailable"),
+            ({"vram_free_mib": None}, "unavailable"),
+            ({"ram_available_mib": None}, "unavailable"),
+        ]:
+            with self.subTest(changes=changes), self.assertRaisesRegex(
+                profile.GuardViolation, message
+            ):
+                profile.SafetyGuard(cpu_temperature_check=False).check(metrics(**changes), 0)
+
     def test_gpu_and_actual_memory_limits_fail_immediately(self):
         for values, message in [
             (metrics(temperature_c=82.0), "GPU"),

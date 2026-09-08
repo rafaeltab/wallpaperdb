@@ -21,6 +21,11 @@ Choose **Bench** in the inspector, then the game display, graphics preset, game 
 limit, replay interval and number of pairs. **Start comparison** owns the temporary
 setup until it finishes or you choose **Cancel and restore**.
 
+Uncheck **CPU temperature check** in the Bench panel to disable its 96°C / three-second
+cutoff for that comparison. The checkbox starts enabled. Your choice is included
+in the result and exported JSON; CPU temperature readings are still collected.
+GPU temperature, free RAM/VRAM, resource freshness and time-limit checks stay active.
+
 The game display can differ from the wallpaper displays. **Keep playing** measures
 active wallpaper interference. **Normal policy** measures the existing fullscreen
 pause behavior; a shared spanning producer continues if another selected display
@@ -108,6 +113,7 @@ reported as successful comparisons.
     make native-game-bench ARGS='--discover'
     make native-game-bench-test
     make native-game-bench-ui-test
+    make native-game-bench-ui-test ARGS='--temperature-option'
 
 The UI harness connects to the actual running local library. To exercise the game:
 

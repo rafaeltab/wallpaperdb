@@ -60,6 +60,7 @@
           game_output: $("bench-output").value,
           cap: Number($("bench-cap").value),
           preset: $("bench-preset").value,
+          cpu_temperature_check: $("bench-cpu-temperature-check").checked,
           seconds: Number($("bench-seconds").value),
           repeats: Number($("bench-repeats").value),
           policy: $("bench-policy").value,
@@ -163,6 +164,8 @@
         ? result.request.cap + " fps limit requested"
         : "uncapped requested",
       result.runs.length / 2 + " paired comparison(s)",
+      "CPU temperature check " +
+        (result.request.cpu_temperature_check === false ? "off" : "on"),
     ].join(" · ");
     const body = $("bench-table").querySelector("tbody");
     body.replaceChildren(

@@ -53,6 +53,8 @@ class HostTests(unittest.TestCase):
             policy="active",
         )
         validate_request(request, {"DP-2", "DP-5"})
+        for enabled in (True, False):
+            validate_request(request | dict(cpu_temperature_check=enabled), {"DP-2", "DP-5"})
         for change in [
             dict(repeats=100),
             dict(outputs=["missing"]),
@@ -63,6 +65,9 @@ class HostTests(unittest.TestCase):
             dict(outputs=["DP-2", "DP-2"]),
             dict(fps=True),
             dict(demo="a.dem\nquit"),
+            dict(cpu_temperature_check="false"),
+            dict(cpu_temperature_check=0),
+            dict(cpu_temperature_check=None),
         ]:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate_request(request | change, {"DP-2", "DP-5"})

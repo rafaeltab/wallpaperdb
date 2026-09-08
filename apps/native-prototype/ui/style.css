@@ -99,6 +99,25 @@
 .bench-policy {
   margin: 18px 0;
 }
+#bench-form .bench-temperature {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0;
+}
+#bench-dialog input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--pink);
+}
+.bench-temperature small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
 .bench-advanced {
   padding: 12px 0;
   border-top: 1px solid var(--border);

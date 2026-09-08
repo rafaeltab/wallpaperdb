@@ -227,6 +227,47 @@ try {
       `document.querySelector('#bench-output').value=${JSON.stringify(settings.output || "DP-5")};document.querySelector('#bench-cap').value=${JSON.stringify(settings.cap || "120")};document.querySelector('#bench-seconds').value=${JSON.stringify(settings.seconds || "20")};document.querySelector('#bench-repeats').value=${JSON.stringify(settings.repeats || "1")};document.querySelector('#bench-resolution').value=${JSON.stringify(settings.resolution || "current")};document.querySelector('#bench-preset').value=${JSON.stringify(settings.preset || "current")};document.querySelector('#bench-policy').value=${JSON.stringify(settings.policy || "active")};document.querySelector('#bench-demo').value=${JSON.stringify(settings.demo || "")}`,
     );
     const before = await js("JSON.stringify(state.groups)");
+    assert.equal(
+      await js(
+        "document.querySelector('#bench-cpu-temperature-check').checked",
+      ),
+      true,
+      "CPU temperature check should default to enabled",
+    );
+    if (process.argv.includes("--temperature-option")) {
+      // Exercise form submission without launching a game or changing the desktop.
+      await js(
+        "window.__benchOriginalApi=api;window.__benchTemperatureRequests=[];api=async request=>{if(request.op==='bench_start'){window.__benchTemperatureRequests.push(request);throw new Error('UI-only temperature-option check');}return window.__benchOriginalApi(request);}",
+      );
+      try {
+        for (const [index, enabled] of [true, false, true].entries()) {
+          await js(
+            "if(document.querySelector('#bench-cpu-temperature-check').checked!==" +
+              enabled +
+              ")document.querySelector('#bench-cpu-temperature-check').click();document.querySelector('#bench-start').click()",
+          );
+          await until(
+            "window.__benchTemperatureRequests.length===" + (index + 1),
+          );
+          assert.equal(
+            await js(
+              "window.__benchTemperatureRequests.at(-1).cpu_temperature_check",
+            ),
+            enabled,
+          );
+        }
+      } finally {
+        await js("api=window.__benchOriginalApi;updateBench(state)");
+      }
+      assert.equal(await js("JSON.stringify(state.groups)"), before);
+      console.log(
+        "CPU temperature option: default, disabled and re-enabled submissions verified",
+      );
+    }
+    if (settings["cpu-temperature-check"] === "false")
+      await js(
+        "document.querySelector('#bench-cpu-temperature-check').click()",
+      );
     if (runGame) {
       await js("document.querySelector('#bench-start').click()");
       await until("state.benchmark?.active");
@@ -253,6 +294,12 @@ try {
         await pause(1000);
       }
       const job = await js("state.benchmark");
+      assert.equal(
+        JSON.parse(readFileSync(join(job.directory, "job.json"), "utf8"))
+          .cpu_temperature_check,
+        settings["cpu-temperature-check"] !== "false",
+        "Worker job did not retain the selected CPU temperature policy",
+      );
       assert.equal(job.active, false, "Job exceeded deadline");
       assert.equal(
         job.state,

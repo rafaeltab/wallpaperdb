@@ -679,7 +679,9 @@ class Job:
             )
             if self.item is None:
                 raise RuntimeError("Selected wallpaper is no longer installed")
-            self.guard = SafetyMonitor(SafetyGuard())
+            self.guard = SafetyMonitor(
+                SafetyGuard(cpu_temperature_check=self.request.get("cpu_temperature_check", True))
+            )
             actions.append(("resource sampler", self.guard.stop))
             self.check()
             # Finite inhibitor owns its own process group, and is verified before pausing media.

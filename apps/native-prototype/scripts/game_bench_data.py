@@ -5,45 +5,87 @@ import math
 import statistics
 
 
+SOURCE2_FIELDS = {
+    "demo tick",
+    "frame start time",
+    "frame start delta",
+    "frame swap time",
+    "frame swap delta",
+}
+
+
+def source2_row(raw, previous):
+    row = {
+        "tick": int(raw["demo tick"]),
+        "engine_start_s": float(raw["frame start time"]),
+        "engine_swap_s": float(raw["frame swap time"]),
+        "start_ms": float(raw["frame start delta"]) * 1000,
+        "frame_ms": float(raw["frame swap delta"]) * 1000,
+    }
+    if not all(math.isfinite(v) for v in row.values()):
+        raise ValueError("Non-finite Source 2 frame")
+    if previous is None:
+        if row["frame_ms"] != 0 or row["start_ms"] != 0:
+            raise ValueError("Missing first-frame clock anchor")
+    else:
+        if row["tick"] < previous["tick"] or row["frame_ms"] <= 0 or row["start_ms"] <= 0:
+            raise ValueError("Invalid Source 2 frame/tick order")
+        for absolute, delta in [("engine_swap_s", "frame_ms"), ("engine_start_s", "start_ms")]:
+            difference = (row[absolute] - previous[absolute]) * 1000
+            if difference <= 0 or abs(difference - row[delta]) > 0.003:
+                raise ValueError("Frame timestamps disagree with durations; incomplete capture")
+        row["time_s"] = row["engine_swap_s"]
+    return row
+
+
 def parse_source2(source):
     reader = csv.DictReader(line for line in source if line.strip())
-    required = {
-        "demo tick",
-        "frame start time",
-        "frame start delta",
-        "frame swap time",
-        "frame swap delta",
-    }
-    if not required.issubset(reader.fieldnames or []):
+    if not SOURCE2_FIELDS.issubset(reader.fieldnames or []):
         raise ValueError("Not an individual-frame Source 2 capture")
-    rows = []
-    previous = None
+    rows, previous = [], None
     for raw in reader:
-        row = {
-            "tick": int(raw["demo tick"]),
-            "engine_start_s": float(raw["frame start time"]),
-            "engine_swap_s": float(raw["frame swap time"]),
-            "start_ms": float(raw["frame start delta"]) * 1000,
-            "frame_ms": float(raw["frame swap delta"]) * 1000,
-        }
-        if not all(math.isfinite(v) for v in row.values()):
-            raise ValueError("Non-finite Source 2 frame")
-        if previous is None:
-            if row["frame_ms"] != 0 or row["start_ms"] != 0:
-                raise ValueError("Missing first-frame clock anchor")
-        else:
-            if row["tick"] < previous["tick"] or row["frame_ms"] <= 0 or row["start_ms"] <= 0:
-                raise ValueError("Invalid Source 2 frame/tick order")
-            for absolute, delta in [("engine_swap_s", "frame_ms"), ("engine_start_s", "start_ms")]:
-                difference = (row[absolute] - previous[absolute]) * 1000
-                if difference <= 0 or abs(difference - row[delta]) > 0.003:
-                    raise ValueError("Frame timestamps disagree with durations; incomplete capture")
-            row["time_s"] = row["engine_swap_s"]
+        row = source2_row(raw, previous)
+        if previous is not None:
             rows.append(row)
         previous = row
     if not rows:
         raise ValueError("No game frames captured")
     return rows
+
+
+class Source2Stream:
+    """Only complete appended CSV rows become provisional live frame evidence."""
+
+    def __init__(self):
+        self.pending = ""
+        self.header = None
+        self.previous = None
+        self.rows = []
+        self.last_tick = 0
+
+    def feed(self, text):
+        lines = (self.pending + text).split("\n")
+        self.pending = lines.pop()
+        for line in lines:
+            if not line.strip():
+                continue
+            if self.header is None:
+                self.header = next(csv.reader([line]))
+                if not SOURCE2_FIELDS.issubset(self.header):
+                    raise ValueError("Not an individual-frame Source 2 capture")
+                continue
+            raw = dict(zip(self.header, next(csv.reader([line]))))
+            row = source2_row(raw, self.previous)
+            if self.previous is not None:
+                self.rows.append(row)
+            self.previous = row
+            self.last_tick = row["tick"]
+
+    def partial(self, start_tick, end_tick):
+        end_tick = min(end_tick, self.last_tick)
+        if end_tick <= start_tick:
+            return []
+        return segment(self.rows, start_tick, end_tick)
 
 
 def segment(frames, start_tick, end_tick):
@@ -189,3 +231,12 @@ def paired_comparison(runs):
         "median_p99_change_ms": statistics.median(pair["p99_change_ms"] for pair in pairs),
         "note": "Paired scene observations; application present timing, not scanout or input latency.",
     }
+
+
+def completed_comparison(runs):
+    complete = []
+    for repeat in sorted({run["repeat"] for run in runs}):
+        pair = [run for run in runs if run["repeat"] == repeat]
+        if len(pair) == 2 and all(run.get("valid") for run in pair):
+            complete.extend(pair)
+    return paired_comparison(complete) if complete else None

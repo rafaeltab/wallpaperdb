@@ -14,7 +14,16 @@ import subprocess
 import time
 import traceback
 
-from game_bench_data import parse_source2, segment, summarize, envelope, paired_comparison
+from game_bench_data import (
+    parse_source2,
+    segment,
+    summarize,
+    envelope,
+    completed_comparison,
+    Source2Stream,
+)
+from game_bench_live import WakeLease
+from game_bench_graphics import GraphicsWatch, GraphicsFault, check_session
 from game_bench_host import (
     atomic_json,
     cleanup_all,
@@ -31,16 +40,28 @@ class Cancelled(RuntimeError):
     pass
 
 
+class Finished(RuntimeError):
+    pass
+
+
 class Job:
     def __init__(self, path):
         self.request = json.loads(path.read_text())
         self.directory = path.parent
         self.marker = self.request["id"]
         self.parent = os.getppid()
-        self.deadline = time.monotonic() + 900
+        self.manual = self.request.get("mode") == "manual"
+        self.deadline = None if self.manual else time.monotonic() + 900
+        self.allow_finish = False
+        self.stopped = False
+        self.runs = []
+        self.result = None
+        self.live_sequence = 0
+        self.wake = None
+        self.graphics = None
         self.cancelled = False
         self.completed = 0
-        self.total = 1 + 2 * self.request["repeats"]
+        self.total = 2 if self.manual else 1 + 2 * self.request["repeats"]
         self.guard = None
         self.child = None
         self.client = None
@@ -52,6 +73,7 @@ class Job:
         self.cancelled = True
 
     def status(self, state, phase, **extra):
+        self.latest_status = {"state": state, "phase": phase, **extra}
         atomic_json(
             self.directory / "status.json",
             {
@@ -70,10 +92,45 @@ class Job:
             raise Cancelled("Cancelled by you")
         if os.getppid() != self.parent:
             raise Cancelled("The wallpaper host exited")
-        if time.monotonic() >= self.deadline:
+        if self.deadline and time.monotonic() >= self.deadline:
             raise RuntimeError("The 15-minute benchmark deadline expired")
+        if self.wake:
+            self.wake.check()
         if self.guard:
             self.guard.snapshot()
+        if self.graphics:
+            self.graphics.check()
+        if not self.allow_finish and self.finish_requested():
+            raise Finished("Stopped and saved by you")
+
+    def finish_requested(self):
+        return (self.directory / "finish").exists()
+
+    def next_requested(self):
+        path = self.directory / "next-phase"
+        if path.exists():
+            phase = path.read_text().strip()
+            path.unlink()
+            return phase
+        return None
+
+    def publish(self, current=None):
+        if self.result is None:
+            return
+        self.live_sequence += 1
+        runs = self.runs + ([current] if current else [])
+        atomic_json(
+            self.directory / "live.json",
+            {
+                **self.result,
+                "runs": runs,
+                "comparison": completed_comparison(self.runs),
+                "sequence": self.live_sequence,
+                "sampled_at": time.time(),
+                "live": True,
+                "status": self.latest_status,
+            },
+        )
 
     def wait(self, seconds):
         deadline = time.monotonic() + seconds
@@ -123,6 +180,7 @@ class Job:
         )
         env.pop("GDK_BACKEND", None)
         env.pop("MANGOHUD_CONFIG", None)
+        env.pop("MANGOHUD_CONFIGFILE", None)
         # Individual frame collection is owned by Source 2, with no overlay injection.
         if "VK_INSTANCE_LAYERS" in env:
             env["VK_INSTANCE_LAYERS"] = ":".join(
@@ -130,6 +188,10 @@ class Job:
                 for layer in env["VK_INSTANCE_LAYERS"].split(":")
                 if "MANGOHUD" not in layer.upper()
             )
+        if self.manual:
+            env["MANGOHUD"] = "1"
+            env.pop("DISABLE_MANGOHUD", None)
+            env["MANGOHUD_CONFIGFILE"] = str(self.directory / "mangohud.conf")
         command = [
             info["binary"],
             "-steam",
@@ -148,8 +210,7 @@ class Job:
             "120",
             "+engine_no_focus_sleep",
             "0",
-            "+volume",
-            "0",
+            *([] if self.manual else ["+volume", "0"]),
             "+con_enable",
             "1",
             "+demo_ui_mode",
@@ -367,7 +428,7 @@ class Job:
         self.wallpaper(condition)
         self.status(
             "running",
-            "Warming up CS2" if warmup else f"Pair {repeat} · {condition}",
+            "Warming up CS2" if warmup else f"Loading {condition} trial · pair {repeat}",
             message="Loading and setup frames are excluded. Keep the game visible and avoid other heavy work; Cancel stays available in the library.",
         )
         video_settings = configure_video(
@@ -392,6 +453,9 @@ class Job:
         renderer = []
         clock_offsets = []
         previous_size = 0
+        stream = Source2Stream()
+        next_live = started
+        recording = False
         last_tick = 0
         screenshot = False
         ended = False
@@ -482,14 +546,48 @@ class Job:
                         )
                 if trace.exists() and trace.stat().st_size != previous_size:
                     previous_size = trace.stat().st_size
-                    # The C stdio buffer can end mid-row. Only use complete rows here.
-                    lines = trace.read_text(errors="replace").split("\n")
-                    for line in reversed(lines[:-1]):
-                        values = line.strip().split(",")
-                        if len(values) == 6 and values[0].isdigit():
-                            last_tick = int(values[0])
-                            clock_offsets.append(time.monotonic() - float(values[3]))
-                            break
+                    with trace.open() as reader:
+                        reader.seek(getattr(stream, "offset", 0))
+                        stream.feed(reader.read())
+                        stream.offset = reader.tell()
+                    last_tick = stream.last_tick or 0
+                    if stream.previous:
+                        clock_offsets.append(time.monotonic() - stream.previous["engine_swap_s"])
+                if not warmup and last_tick >= start_tick and not recording:
+                    recording = True
+                    self.status(
+                        "running",
+                        f"Recording {condition} benchmark",
+                        recording=condition,
+                        message=f"Pair {repeat} · live data updates as the game flushes frames.",
+                    )
+                if now >= next_live and not warmup:
+                    next_live = now + 1
+                    selected_live = stream.partial(start_tick, end_tick)
+                    if selected_live:
+                        origin_live = (
+                            selected_live[0]["engine_swap_s"] - selected_live[0]["frame_ms"] / 1000
+                        )
+                        bridge_live = min(clock_offsets)
+                        live_resources = [
+                            row | {"time_s": row["monotonic"] - bridge_live - origin_live}
+                            for row in resources
+                            if 0
+                            <= row["monotonic"] - bridge_live - origin_live
+                            <= selected_live[-1]["time_s"]
+                        ]
+                        self.publish(
+                            {
+                                "repeat": repeat,
+                                "condition": condition,
+                                "valid": False,
+                                "provisional": True,
+                                "summary": summarize(selected_live),
+                                "plot": envelope(selected_live),
+                                "resources": live_resources,
+                                "wall_seconds": selected_live[-1]["time_s"],
+                            }
+                        )
                 if warmup and not screenshot and last_tick >= start_tick + 128:
                     capture(folder / "scene.png", self.request["game_output"])
                     screenshot = True
@@ -659,6 +757,7 @@ class Job:
         failure = None
         self.owned_files = []
         try:
+            check_session(ENV)
             info = discover()
             if game_processes():
                 raise RuntimeError(
@@ -679,45 +778,16 @@ class Job:
             )
             if self.item is None:
                 raise RuntimeError("Selected wallpaper is no longer installed")
+            self.graphics = GraphicsWatch(self.directory, ENV)
+            actions.append(("graphics fault monitor", self.graphics.close))
             self.guard = SafetyMonitor(
-                SafetyGuard(cpu_temperature_check=self.request.get("cpu_temperature_check", True))
+                SafetyGuard(cpu_temperature_check=self.request.get("cpu_temperature_check", True)),
+                max_rows=1200 if self.manual else None,
             )
             actions.append(("resource sampler", self.guard.stop))
             self.check()
-            # Finite inhibitor owns its own process group, and is verified before pausing media.
-            inhibitor_log = (self.directory / "inhibitor.log").open("w")
-            inhibitor = subprocess.Popen(
-                [
-                    "systemd-inhibit",
-                    "--what=sleep:idle",
-                    "--mode=block",
-                    "--who=WallpaperDB Bench",
-                    f"--why={self.marker}",
-                    "sleep",
-                    "900",
-                ],
-                env=ENV,
-                stdout=inhibitor_log,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-            inhibitor_log.close()
-
-            def release_inhibitor():
-                if inhibitor.poll() is None:
-                    os.killpg(inhibitor.pid, signal.SIGTERM)
-                    inhibitor.wait(timeout=3)
-
-            actions.insert(0, ("wake inhibitor", release_inhibitor))
-            self.wait(0.3)
-            listed = subprocess.run(
-                ["systemd-inhibit", "--list", "--no-pager"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if inhibitor.poll() is not None or self.marker not in listed.stdout:
-                raise RuntimeError("Could not verify the temporary wake inhibitor")
+            self.wake = WakeLease(self.directory, self.marker, ENV)
+            actions.insert(0, ("wake inhibitor", self.wake.close))
             backgrounds = FrozenBackgrounds(self.directory)
             actions.insert(0, ("external wallpapers", backgrounds.restore))
             external = backgrounds.freeze()
@@ -753,28 +823,8 @@ class Job:
                 if self.request["resolution"] == "display"
                 else current_resolution(info)
             )
-            self.desktop.enter()
-            self.wallpaper("control")
-            demo = self.prepare_demo(info)
-            warmup = self.run_scene(info, demo, 0, "control", warmup=True)
-            if not self.request.get("demo"):
-                metadata_path = demo.parent / "scene.json"
-                metadata = json.loads(metadata_path.read_text())
-                metadata["validated"] = True
-                metadata["warmup_evidence"] = str(self.directory / "warmup")
-                atomic_json(metadata_path, metadata)
-            self.completed += 1
-            runs = []
-            for repeat in range(1, self.request["repeats"] + 1):
-                order = ["control", "wallpaper"] if repeat % 2 else ["wallpaper", "control"]
-                for condition in order:
-                    self.check()
-                    runs.append(self.run_scene(info, demo, repeat, condition))
-                    self.completed += 1
-                    atomic_json(self.directory / "partial.json", {"runs": runs})
-            self.check()
-            result = {
-                "schema": 1,
+            self.result = result = {
+                "schema": 2,
                 "id": self.marker,
                 "request": {
                     k: v
@@ -783,33 +833,81 @@ class Job:
                 },
                 "game": {k: info[k] for k in ("platform", "proton_name", "build_id", "version")},
                 "wallpaper": self.item,
-                "actual_resolution": warmup["actual_resolution"],
-                "comparison": paired_comparison(runs),
-                "runs": runs,
-                "demo": {
-                    "path": str(demo),
-                    "sha256": hashlib.sha256(demo.read_bytes()).hexdigest(),
-                },
+                "actual_resolution": None,
+                "requested_resolution": self.resolution,
+                "comparison": None,
+                "runs": self.runs,
                 "external_backgrounds": external,
                 "outputs": monitors,
                 "scope": {
-                    "game_frames": "Source 2 application swap intervals; not physical scanout or input latency",
+                    "game_frames": "Application frame intervals; not physical scanout or input latency",
                     "gpu": "Whole NVIDIA device via NVML at 4 Hz, with the driver averaging window",
                     "cpu": "CS2 process CPU, expressed as percent of one core",
                     "control": "Prototype surfaces removed; existing mpvpaper stopped, its retained textures remain",
-                    "timedemo": "One rendered frame per demo tick; world playback accelerates at higher FPS",
-                    "warmup": "One full replay excluded, then first 1024 ticks excluded in each measured run",
-                    "clock": "Coarse clock bridge from buffered CSV flushes; not suitable for attributing an individual hitch",
-                    "focus": "CS2 replay keeps rendering when unfocused (engine_no_focus_sleep=0); focus state is retained in raw observations.",
+                    "focus": "engine_no_focus_sleep=0; focus and visibility retained in raw observations",
                 },
                 "limitations": [
-                    "A local fixed-camera replay is not a live multiplayer match.",
+                    "A local bot game is not a live multiplayer match.",
                     "Short runs and small low-percentile sample counts need repeated observations.",
                     "External applications and compositor workload can still vary.",
                     "GPU-only bottleneck or a renderer winner cannot be inferred from average utilization.",
-                    "Video config, FPS cap and VSync are submitted settings; only dimensions and the subset in engine_settings are independently reported by Source 2.",
                 ],
             }
+            self.publish()
+            self.desktop.enter()
+            self.wallpaper("control")
+            if self.manual:
+                from game_bench_manual import record_gameplay
+
+                record_gameplay(self, info)
+            else:
+                result["scope"].update(
+                    {
+                        "collector": "Source 2 application swap intervals",
+                        "timedemo": "One rendered frame per demo tick; world playback accelerates at higher FPS",
+                        "warmup": "One full replay excluded, then first 1024 ticks excluded in each measured run",
+                        "clock": "Coarse clock bridge from buffered CSV flushes; not suitable for attributing an individual hitch",
+                    }
+                )
+                demo = self.prepare_demo(info)
+                result["demo"] = {
+                    "path": str(demo),
+                    "sha256": hashlib.sha256(demo.read_bytes()).hexdigest(),
+                }
+                warmup = self.run_scene(info, demo, 0, "control", warmup=True)
+                result["actual_resolution"] = warmup["actual_resolution"]
+                if not self.request.get("demo"):
+                    metadata_path = demo.parent / "scene.json"
+                    metadata = json.loads(metadata_path.read_text())
+                    metadata["validated"] = True
+                    metadata["warmup_evidence"] = str(self.directory / "warmup")
+                    atomic_json(metadata_path, metadata)
+                self.completed += 1
+                for repeat in range(1, self.request["repeats"] + 1):
+                    order = ["control", "wallpaper"] if repeat % 2 else ["wallpaper", "control"]
+                    for condition in order:
+                        self.check()
+                        self.runs.append(self.run_scene(info, demo, repeat, condition))
+                        self.completed += 1
+                        atomic_json(self.directory / "partial.json", {"runs": self.runs})
+                        self.publish()
+                self.check()
+        except Finished:
+            self.stopped = True
+            if result is None:
+                self.result = result = {
+                    "schema": 2,
+                    "id": self.marker,
+                    "runs": self.runs,
+                    "request": {
+                        k: v
+                        for k, v in self.request.items()
+                        if k not in ("bench_token", "control", "directory", "op")
+                    },
+                    "wallpaper": {"title": self.request.get("source", "Wallpaper")},
+                    "game": {},
+                    "comparison": None,
+                }
         except Exception as error:
             failure = error
             traceback.print_exc()
@@ -818,21 +916,34 @@ class Job:
         except OSError:
             traceback.print_exc()
         cleanup_errors = cleanup_all(actions)
+        if self.graphics and self.graphics.failure and failure is None:
+            failure = GraphicsFault(self.graphics.failure)
         if self.guard and self.guard.failure and failure is None:
             failure = RuntimeError(self.guard.failure)
         if cleanup_errors:
             failure = RuntimeError(f'{failure or ""}; Restoration: ' + "; ".join(cleanup_errors))
         if result is not None and failure is None:
+            result["comparison"] = completed_comparison(self.runs)
+            result["stopped"] = self.stopped
             result["restoration"] = {
                 "worker": "complete",
                 "desktop_wallpapers": "restored by the Rust host after worker exit",
             }
             atomic_json(self.directory / "result.json", result)
-            self.status("complete", "Comparison complete")
+            self.status(
+                "complete",
+                "Recording saved" if self.stopped else "Comparison complete",
+                stopped=self.stopped,
+            )
+            self.publish()
             return 0
         state = "cancelled" if isinstance(failure, Cancelled) else "failed"
         self.status(
-            state, "Cancelled" if state == "cancelled" else "Comparison failed", error=str(failure)
+            state,
+            "Cancelled" if state == "cancelled" else "Benchmark failed",
+            error=str(failure),
+            graphics_fault=isinstance(failure, GraphicsFault)
+            or bool(self.graphics and self.graphics.failure),
         )
         return 1
 

@@ -226,7 +226,26 @@ try {
     await js(
       `document.querySelector('#bench-output').value=${JSON.stringify(settings.output || "DP-5")};document.querySelector('#bench-cap').value=${JSON.stringify(settings.cap || "120")};document.querySelector('#bench-seconds').value=${JSON.stringify(settings.seconds || "20")};document.querySelector('#bench-repeats').value=${JSON.stringify(settings.repeats || "1")};document.querySelector('#bench-resolution').value=${JSON.stringify(settings.resolution || "current")};document.querySelector('#bench-preset').value=${JSON.stringify(settings.preset || "current")};document.querySelector('#bench-policy').value=${JSON.stringify(settings.policy || "active")};document.querySelector('#bench-demo').value=${JSON.stringify(settings.demo || "")}`,
     );
+    await js(
+      "document.querySelector('#bench-mode').value=" +
+        JSON.stringify(settings.mode || "comparison") +
+        ";document.querySelector('#bench-mode').dispatchEvent(new Event('change'));document.querySelector('#bench-output').dispatchEvent(new Event('change'))",
+    );
+    assert.equal(
+      await js("document.querySelector('#bench-display-warning').hidden"),
+      await js(
+        "state.ui_output !== document.querySelector('#bench-output').value",
+      ),
+    );
+    if (settings.mode === "manual")
+      assert.equal(
+        await js(
+          "document.querySelector('#bench-seconds').disabled && document.querySelector('#bench-repeats').closest('label').hidden",
+        ),
+        true,
+      );
     const before = await js("JSON.stringify(state.groups)");
+    const uiOutput = await js("state.ui_output");
     assert.equal(
       await js(
         "document.querySelector('#bench-cpu-temperature-check').checked",
@@ -282,13 +301,81 @@ try {
         await pause(5000);
         await js("document.querySelector('#bench-cancel').click()");
       }
-      let previous = "";
+      assert.equal(
+        await js(
+          "!document.querySelector('#bench-dialog').open && document.querySelector('#bench-browser').open && !document.querySelector('#bench-detail').hidden",
+        ),
+        true,
+      );
+      let previous = "",
+        phaseStarted = 0,
+        controlRequested = false,
+        wallpaperRequested = false,
+        stopRequested = false;
+      const liveSeen = { control: new Set(), wallpaper: new Set() };
       for (let i = 0; i < 950; i++) {
         const job = await js("state.benchmark");
         const phase = job.state + ": " + job.phase;
         if (phase !== previous) {
           console.log(JSON.stringify(job));
           previous = phase;
+          phaseStarted = Date.now();
+        }
+        if (job.active && job.recording) {
+          const evidence = await js(
+            "({label:document.querySelector('#bench-phase').textContent,rows:document.querySelector('#bench-table tbody').textContent,canvas:document.querySelector('#bench-frames').width})",
+          );
+          if (
+            evidence.label === `Recording ${job.recording} benchmark` &&
+            evidence.rows &&
+            evidence.canvas > 0
+          )
+            liveSeen[job.recording].add(evidence.rows);
+        }
+        if (
+          settings.mode === "manual" &&
+          job.active &&
+          !process.argv.includes("--cancel")
+        ) {
+          if (job.can_next && !job.recording && !controlRequested) {
+            controlRequested = true;
+            await until(
+              "!document.querySelector('#bench-next').hidden && !document.querySelector('#bench-next').disabled",
+            );
+            await js("document.querySelector('#bench-next').click()");
+          }
+          if (
+            job.recording === "control" &&
+            !wallpaperRequested &&
+            Date.now() - phaseStarted >
+              1000 * Number(settings["control-seconds"] || 25)
+          ) {
+            wallpaperRequested = true;
+            const shot = await call("Page.captureScreenshot", {
+              format: "png",
+            });
+            writeFileSync(
+              join(evidence, "game-bench-live-control.png"),
+              Buffer.from(shot.data, "base64"),
+            );
+            await js("document.querySelector('#bench-next').click()");
+          }
+          if (
+            job.recording === "wallpaper" &&
+            !stopRequested &&
+            Date.now() - phaseStarted >
+              1000 * Number(settings["wallpaper-seconds"] || 40)
+          ) {
+            stopRequested = true;
+            const shot = await call("Page.captureScreenshot", {
+              format: "png",
+            });
+            writeFileSync(
+              join(evidence, "game-bench-live-wallpaper.png"),
+              Buffer.from(shot.data, "base64"),
+            );
+            await js("document.querySelector('#bench-stop').click()");
+          }
         }
         if (!job.active) break;
         await pause(1000);
@@ -305,7 +392,8 @@ try {
         job.state,
         process.argv.includes("--cancel")
           ? "cancelled"
-          : settings.expect || "complete",
+          : settings.expect ||
+              (settings.mode === "manual" ? "stopped" : "complete"),
         job.error,
       );
       assert.equal(
@@ -313,17 +401,41 @@ try {
         before,
         "Wallpaper assignments were not restored exactly",
       );
-      if (job.state === "complete") {
+      assert.equal(
+        await js("state.ui_output"),
+        uiOutput,
+        "Library changed displays during the benchmark",
+      );
+      if (["complete", "stopped"].includes(job.state)) {
+        await until("!document.querySelector('#bench-export').disabled");
+        assert.ok(
+          liveSeen.control.size >= 2,
+          "Control graph did not update with live frames",
+        );
+        assert.ok(
+          liveSeen.wallpaper.size >= 2,
+          "Wallpaper graph did not update with live frames",
+        );
+        console.log(
+          "Distinct live graph updates",
+          JSON.stringify(
+            Object.fromEntries(
+              Object.entries(liveSeen).map(([k, v]) => [k, v.size]),
+            ),
+          ),
+        );
         await until("!document.querySelector('#bench-results').hidden");
         assert.equal(
           await js("document.querySelectorAll('#bench-table tbody tr').length"),
-          Number(settings.repeats || 1) * 2,
+          settings.mode === "manual" ? 2 : Number(settings.repeats || 1) * 2,
         );
         assert.equal(
           await js("document.querySelector('#bench-frames').width > 0"),
           true,
         );
-        for (const axis of ["time_s", "scene_s"]) {
+        for (const axis of settings.mode === "manual"
+          ? ["time_s"]
+          : ["time_s", "scene_s"]) {
           for (const metric of [
             "gpu_percent",
             "game_cpu_one_core_percent",
@@ -363,9 +475,42 @@ try {
         false,
       );
     }
-    if (settings.history) {
-      await until("!document.querySelector('#bench-results').hidden");
-      assert.equal(await js("state.benchmark.id"), settings.history);
+    if (settings.history || runGame) {
+      const id = settings.history || (await js("state.benchmark.id"));
+      await js(
+        "document.querySelector('#bench-dialog').close();document.querySelector('#bench-nav').click()",
+      );
+      await until(
+        "document.querySelectorAll('.bench-history-card').length > 0",
+      );
+      assert.equal(
+        await js(
+          "document.querySelector('#bench-detail').hidden && !document.querySelector('#bench-history').hidden",
+        ),
+        true,
+      );
+      await js(
+        "document.querySelector('.bench-history-card[data-id=" +
+          JSON.stringify(id) +
+          "]').click()",
+      );
+      await until(
+        "!document.querySelector('#bench-detail').hidden && document.querySelector('#bench-browser-title').textContent !== 'Benchmarks'",
+      );
+      await js("document.querySelector('#bench-parameters-toggle').click()");
+      assert.equal(
+        await js(
+          "document.querySelector('#bench-parameter-list').textContent.includes(" +
+            JSON.stringify(id) +
+            ")",
+        ),
+        true,
+      );
+      assert.equal(
+        await js("document.querySelector('#bench-parameters').hidden"),
+        false,
+      );
+      await js("document.querySelector('#bench-parameters-toggle').click()");
     }
   }
   const shot = await call("Page.captureScreenshot", { format: "png" });

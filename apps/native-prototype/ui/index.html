@@ -38,7 +38,7 @@
         <button class="nav" id="displays-nav">
           <span>▱</span> Display layout
         </button>
-        <button class="nav" id="bench-nav"><span>◴</span> Game bench</button>
+        <button class="nav" id="bench-nav"><span>◴</span> Benchmarks</button>
         <div class="sidebar-bottom">
           <div class="local-icon">↙</div>
           <strong>Made for your desktop.</strong>
@@ -240,12 +240,16 @@ Apply an experiment to see its actual renderer.</pre
     </div>
     <div id="toast" role="status" aria-live="polite" hidden></div>
     <div id="error" role="alert" hidden></div>
-    <dialog id="bench-dialog" aria-labelledby="bench-title">
+    <dialog
+      class="bench-dialog"
+      id="bench-dialog"
+      aria-labelledby="bench-title"
+    >
       <div class="bench-heading">
         <div>
           <p class="eyebrow accent">REAL GAMES · PROTOTYPE</p>
           <h2 id="bench-title">A wallpaper that plays nicely.</h2>
-          <p>Compare the same game scene with and without your wallpaper.</p>
+          <p>Choose a replay comparison or record your own gameplay.</p>
         </div>
         <button
           id="bench-close"
@@ -257,6 +261,13 @@ Apply an experiment to see its actual renderer.</pre
       </div>
       <div class="bench-selection" id="bench-selection"></div>
       <form id="bench-form">
+        <label class="bench-mode"
+          >Recording mode<select id="bench-mode">
+            <option value="comparison">Automatic replay comparison</option>
+            <option value="manual">Continuous gameplay · stop manually</option>
+          </select></label
+        >
+        <p id="bench-mode-description" class="bench-explanation"></p>
         <div class="bench-fields">
           <label
             >Game<select id="bench-game">
@@ -292,6 +303,7 @@ Apply an experiment to see its actual renderer.</pre
             </select></label
           >
         </div>
+        <p id="bench-display-warning" class="bench-warning" hidden></p>
         <label class="bench-policy"
           >Wallpaper during fullscreen<select id="bench-policy">
             <option value="active">
@@ -326,7 +338,7 @@ Apply an experiment to see its actual renderer.</pre
             must contain the full selected scene interval.
           </p>
         </details>
-        <p class="bench-explanation">
+        <p id="bench-replay-explanation" class="bench-explanation">
           The first run prepares and warms the replay. Bench temporarily
           controls the game and wallpapers, then restores your setup. Keep the
           game visible during capture and avoid other heavy work. Existing
@@ -337,108 +349,164 @@ Apply an experiment to see its actual renderer.</pre
         <div class="bench-actions">
           <button id="bench-start" class="primary" type="submit">
             Start comparison <span>↗</span></button
-          ><button id="bench-cancel" class="quiet" type="button" hidden>
-            Cancel and restore</button
           ><span id="bench-estimate"
             >A few minutes · results stay on this device</span
           >
         </div>
+        <p id="bench-setup-error" role="alert"></p>
       </form>
-      <section
-        id="bench-progress"
-        class="bench-progress"
-        aria-live="polite"
-        hidden
-      >
+    </dialog>
+    <dialog
+      class="bench-dialog"
+      id="bench-browser"
+      aria-labelledby="bench-browser-title"
+    >
+      <div class="bench-heading">
         <div>
-          <strong id="bench-phase"></strong><span id="bench-step"></span>
+          <p class="eyebrow accent">ON THIS DEVICE</p>
+          <h2 id="bench-browser-title">Benchmarks</h2>
         </div>
-        <progress id="bench-bar" max="1" value="0"></progress>
-        <p id="bench-message"></p>
+        <button
+          id="bench-browser-close"
+          class="icon-button"
+          aria-label="Close benchmarks"
+        >
+          ×
+        </button>
+      </div>
+      <section id="bench-history">
+        <p>
+          Your recordings, settings, and results. Choose a wallpaper in the
+          library to start a new benchmark.
+        </p>
+        <div id="bench-history-list"></div>
+        <p id="bench-history-empty" hidden>
+          No benchmarks yet. Select a wallpaper and choose Bench this wallpaper.
+        </p>
       </section>
-      <section id="bench-results" hidden>
-        <div class="bench-result-heading">
-          <div>
-            <p class="eyebrow accent">YOUR COMPARISON</p>
-            <h3 id="bench-verdict"></h3>
-          </div>
-          <button id="bench-export" class="quiet">
-            Save comparison JSON ↗
+      <section id="bench-detail" hidden>
+        <div class="bench-actions bench-detail-actions">
+          <button id="bench-back" class="quiet">← All benchmarks</button>
+          <button
+            id="bench-parameters-toggle"
+            class="quiet"
+            aria-expanded="false"
+          >
+            View parameters
           </button>
         </div>
-        <p id="bench-result-context"></p>
-        <div class="bench-table-wrap">
-          <table id="bench-table">
-            <thead>
-              <tr>
-                <th>Run</th>
-                <th>Average FPS</th>
-                <th>1% low</th>
-                <th>p99 frame</th>
-                <th>Worst frame</th>
-                <th>&gt;50 ms</th>
-                <th>Capture</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <div id="bench-parameters" class="bench-parameters" hidden>
+          <h3>Parameters used for this run</h3>
+          <dl id="bench-parameter-list"></dl>
         </div>
-        <div class="bench-chart-heading">
-          <h3>Every spike matters.</h3>
-          <label
-            >Align by<select id="bench-axis">
-              <option value="scene_s">Replay position</option>
-              <option value="time_s">Capture time</option>
-            </select></label
-          >
-          <label
-            >Pair
-            <select id="bench-pair"></select
-          ></label>
-        </div>
-        <p class="bench-legend">
-          <span class="control-dot">●</span> Control
-          <span class="wallpaper-dot">●</span> Selected wallpaper
-          <span>· frame time in ms, lower is better</span>
-        </p>
-        <canvas
-          id="bench-frames"
-          class="bench-chart"
-          aria-label="Game frame times with preserved minimum and maximum values"
-        ></canvas>
-        <p id="bench-hover" class="bench-chart-readout">
-          Move over the chart to inspect a time bucket.
-        </p>
-        <div class="bench-chart-heading">
-          <h3>Resources during the scene</h3>
-          <label
-            >Metric<select id="bench-metric">
-              <option value="gpu_percent">Whole GPU · %</option>
-              <option value="game_cpu_one_core_percent">
-                CS2 CPU · % of one core
-              </option>
-              <option value="watts">Whole GPU · watts</option>
-              <option value="vram_used_mib">Whole GPU · VRAM MiB</option>
-            </select></label
-          >
-        </div>
-        <canvas
-          id="bench-resources"
-          class="bench-chart compact"
-          aria-label="Whole NVIDIA device utilization alongside the game scene"
-        ></canvas>
-        <p class="bench-explanation">
-          Game frame timing describes application rendering/presentation, not
-          physical scanout or input latency. The 1% low uses the mean of the
-          slowest 1% of frames. Short runs can reveal problems; small
-          differences need repeated comparisons. Resource readings use a coarse
-          clock estimate; they show trends and cannot identify the cause of one
-          frame-time spike.
-        </p>
-        <details>
-          <summary>Evidence and run metadata</summary>
-          <pre id="bench-evidence"></pre>
-        </details>
+        <section
+          id="bench-progress"
+          class="bench-progress"
+          aria-live="polite"
+          hidden
+        >
+          <div>
+            <strong id="bench-phase"></strong><span id="bench-step"></span>
+          </div>
+          <progress id="bench-bar" max="1" value="0"></progress>
+          <p id="bench-message"></p>
+          <div class="bench-actions">
+            <button id="bench-next" class="primary" hidden>
+              Start control recording
+            </button>
+            <button id="bench-stop" class="quiet" hidden>Stop and save</button>
+            <button id="bench-cancel" class="quiet" hidden>
+              Cancel and restore
+            </button>
+          </div>
+        </section>
+        <section id="bench-results" hidden>
+          <div class="bench-result-heading">
+            <div>
+              <p class="eyebrow accent" id="bench-result-label">
+                YOUR RECORDING
+              </p>
+              <h3 id="bench-verdict"></h3>
+            </div>
+            <button id="bench-export" class="quiet">
+              Export result JSON ↗
+            </button>
+          </div>
+          <p id="bench-result-context"></p>
+          <p id="bench-live-note" class="bench-explanation"></p>
+          <div class="bench-table-wrap">
+            <table id="bench-table">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>Average FPS</th>
+                  <th>1% low</th>
+                  <th>p99 frame</th>
+                  <th>Worst frame</th>
+                  <th>&gt;50 ms</th>
+                  <th>Capture</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="bench-chart-heading">
+            <h3>Every spike matters.</h3>
+            <label
+              >Align by<select id="bench-axis">
+                <option value="scene_s">Replay position</option>
+                <option value="time_s">Capture time</option>
+              </select></label
+            >
+            <label
+              >Pair
+              <select id="bench-pair"></select
+            ></label>
+          </div>
+          <p class="bench-legend">
+            <span class="control-dot">●</span> Control
+            <span class="wallpaper-dot">●</span> Selected wallpaper
+            <span>· frame time in ms, lower is better</span>
+          </p>
+          <canvas
+            id="bench-frames"
+            class="bench-chart"
+            aria-label="Game frame times with preserved minimum and maximum values"
+          ></canvas>
+          <p id="bench-hover" class="bench-chart-readout">
+            Move over the chart to inspect a time bucket.
+          </p>
+          <div class="bench-chart-heading">
+            <h3>Resources during the scene</h3>
+            <label
+              >Metric<select id="bench-metric">
+                <option value="gpu_percent">Whole GPU · %</option>
+                <option value="game_cpu_one_core_percent">
+                  CS2 CPU · % of one core
+                </option>
+                <option value="watts">Whole GPU · watts</option>
+                <option value="vram_used_mib">Whole GPU · VRAM MiB</option>
+              </select></label
+            >
+          </div>
+          <canvas
+            id="bench-resources"
+            class="bench-chart compact"
+            aria-label="Whole NVIDIA device utilization alongside the game scene"
+          ></canvas>
+          <p class="bench-explanation">
+            Game frame timing describes application rendering/presentation, not
+            physical scanout or input latency. The 1% low uses the mean of the
+            slowest 1% of frames. Short runs can reveal problems; small
+            differences need repeated comparisons. Resource readings use a
+            coarse clock estimate; they show trends and cannot identify the
+            cause of one frame-time spike.
+          </p>
+          <details>
+            <summary>Evidence and run metadata</summary>
+            <pre id="bench-evidence"></pre>
+          </details>
+        </section>
       </section>
     </dialog>
   </body>

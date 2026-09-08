@@ -26,6 +26,8 @@ def cleanup_all(actions):
 
 
 def validate_request(request, connected):
+    if request.get("mode", "comparison") not in ("comparison", "manual"):
+        raise ValueError("Unsupported benchmark mode")
     for key, allowed in {
         "experiment": {
             "baseline",

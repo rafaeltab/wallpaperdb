@@ -220,11 +220,23 @@ struct Desktop {
 }
 
 impl Desktop {
+    fn ui_output(&self) -> Option<String> {
+        let window = self.ui.as_ref()?.window()?;
+        let geometry = window.display().monitor_at_window(&window)?.geometry();
+        self.monitors
+            .iter()
+            .find(|monitor| monitor.x == geometry.x() && monitor.y == geometry.y())
+            .map(|monitor| monitor.name.clone())
+    }
+
     fn snapshot(&self) -> Value {
-        json!({"items":self.library.items,"groups":self.library.groups,"monitors":self.monitors,"surfaces":self.surfaces.iter().map(|s|s.snapshot()).collect::<Vec<_>>(),"fullscreen_outputs":self.suspended,"audio":*self.audio.levels.lock().unwrap(),"url":self.url,"warning":self.error,"prototype":true,"benchmark":self.benchmark.snapshot()})
+        json!({"items":self.library.items,"groups":self.library.groups,"monitors":self.monitors,"surfaces":self.surfaces.iter().map(|s|s.snapshot()).collect::<Vec<_>>(),"fullscreen_outputs":self.suspended,"audio":*self.audio.levels.lock().unwrap(),"url":self.url,"warning":self.error,"prototype":true,"benchmark":self.benchmark.snapshot(),"ui_output":self.ui_output(),"graphics_fault":benchmark::graphics_fault()})
     }
 
     fn apply(&mut self, next: Library, persist: bool) -> Result<()> {
+        if !next.groups.is_empty() && benchmark::graphics_fault().is_some() {
+            bail!("Prototype rendering is paused for this graphics session after a kernel GPU fault. Saved assignments are retained.");
+        }
         let mut additions = Vec::new();
         let mut desired = Vec::new();
         for group in &next.groups {
@@ -286,7 +298,16 @@ impl Desktop {
         if self.benchmark.active()
             && !matches!(
                 op,
-                "status" | "ui" | "bench_cancel" | "bench_result" | "stop"
+                "status"
+                    | "ui"
+                    | "bench_cancel"
+                    | "bench_stop"
+                    | "bench_next"
+                    | "bench_result"
+                    | "bench_history"
+                    | "bench_record"
+                    | "bench_live"
+                    | "stop"
             )
             && !(benchmark_owned && matches!(op, "set" | "clear"))
         {
@@ -301,7 +322,12 @@ impl Desktop {
             "status" => {}
             "bench_start" => self.benchmark.start(&request, &self.library)?,
             "bench_cancel" => self.benchmark.cancel()?,
+            "bench_stop" => self.benchmark.finish()?,
+            "bench_next" => self.benchmark.next_phase()?,
             "bench_result" => return self.benchmark.result(),
+            "bench_history" => return self.benchmark.history(),
+            "bench_record" => return self.benchmark.record(request["id"].as_str()),
+            "bench_live" => return self.benchmark.live(request["id"].as_str()),
             "set" => {
                 let source = request["source"].as_str().context("Choose a wallpaper")?;
                 let mut next = self.library.clone();
@@ -446,10 +472,15 @@ impl Desktop {
                     let owner = Rc::downgrade(owner);
                     let ui_web = web.clone();
                     window.connect_delete_event(move |_, _| {
-                        ui_web.terminate_web_process();
                         if let Some(owner) = owner.upgrade() {
-                            owner.borrow_mut().ui = None;
+                            let mut desktop = owner.borrow_mut();
+                            if desktop.benchmark.active() {
+                                desktop.error = Some("A benchmark is running. Use Stop and save or Cancel before closing the library.".into());
+                                return glib::Propagation::Stop;
+                            }
+                            desktop.ui = None;
                         }
+                        ui_web.terminate_web_process();
                         glib::Propagation::Proceed
                     });
                     window.show_all();
@@ -664,8 +695,14 @@ fn daemon(port: u16) -> Result<()> {
     let owner = desktop.clone();
     glib::timeout_add_local(Duration::from_millis(500), move || {
         let mut desktop = owner.borrow_mut();
-        if let Some(library) = desktop.benchmark.poll() {
-            let error = desktop.apply(library, false).err().map(|e| e.to_string());
+        if let Some(mut library) = desktop.benchmark.poll() {
+            let graphics_fault = desktop.benchmark.state["graphics_fault"] == true
+                || benchmark::graphics_fault().is_some();
+            if graphics_fault {
+                library.groups.clear();
+            }
+            let error = desktop.apply(library, false).err().map(|e| e.to_string())
+                .or_else(|| graphics_fault.then(|| "GPU fault: prototype wallpapers remain stopped; the original assignments are in library-before.json".into()));
             desktop.benchmark.restored(error);
             if desktop.stop_requested {
                 gtk::main_quit();

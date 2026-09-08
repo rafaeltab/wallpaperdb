@@ -251,11 +251,12 @@ def wait_for_cooldown(
 class SafetyMonitor:
     """Always active, including recorder-off controls; never kills unrelated processes."""
 
-    def __init__(self, guard, reader=None, clock=time.monotonic):
+    def __init__(self, guard, reader=None, clock=time.monotonic, max_rows=None):
         self.guard = guard
         self.reader = reader or ResourceReader()
         self.clock = clock
         self.rows = []
+        self.max_rows = max_rows
         self.failure = None
         self.child = None
         self.done = threading.Event()
@@ -288,6 +289,8 @@ class SafetyMonitor:
             try:
                 values = self.reader.read()
                 self.rows.append(values)
+                if self.max_rows and len(self.rows) > self.max_rows:
+                    del self.rows[: len(self.rows) // 2]
                 self.check_freshness(values)
                 self.guard.check(values, values["monotonic"])
             except Exception as error:

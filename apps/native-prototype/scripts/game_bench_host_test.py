@@ -53,6 +53,7 @@ class HostTests(unittest.TestCase):
             policy="active",
         )
         validate_request(request, {"DP-2", "DP-5"})
+        validate_request(request | dict(mode="manual"), {"DP-2", "DP-5"})
         for enabled in (True, False):
             validate_request(request | dict(cpu_temperature_check=enabled), {"DP-2", "DP-5"})
         for change in [
@@ -68,6 +69,7 @@ class HostTests(unittest.TestCase):
             dict(cpu_temperature_check="false"),
             dict(cpu_temperature_check=0),
             dict(cpu_temperature_check=None),
+            dict(mode="unknown"),
         ]:
             with self.subTest(change=change), self.assertRaises(ValueError):
                 validate_request(request | change, {"DP-2", "DP-5"})

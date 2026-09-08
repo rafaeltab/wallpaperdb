@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WallpaperDB · CS2 Bench results</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font: 15px/1.55 system-ui;
+      color: #ece7ec;
+      background: #100e12;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      max-width: 1200px;
+      margin: auto;
+      padding: 36px 24px;
+    }
+    h1 {
+      font-size: 36px;
+      letter-spacing: -1px;
+      margin: 8px 0;
+    }
+    h2 {
+      font-size: 20px;
+      margin: 0;
+    }
+    p {
+      color: #b5aab6;
+      max-width: 86ch;
+    }
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: #ef8aa8;
+    }
+    section {
+      padding: 24px;
+      margin: 24px 0;
+      background: #19151c;
+      border: 1px solid #352b38;
+      border-radius: 18px;
+    }
+    select {
+      background: #28202b;
+      border: 1px solid #544255;
+      border-radius: 9px;
+      padding: 10px;
+      color: inherit;
+      max-width: 100%;
+    }
+    label {
+      display: inline-flex;
+      gap: 12px;
+      align-items: center;
+      margin: 8px 18px 8px 0;
+      color: #cbbcca;
+    }
+    .scroll {
+      overflow: auto;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #352b38;
+    }
+    th {
+      color: #a99aaa;
+      font-weight: 500;
+    }
+    button {
+      color: #ef8aa8;
+      background: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+    button:hover {
+      text-decoration: underline;
+    }
+    canvas {
+      width: 100%;
+      height: 270px;
+      display: block;
+      background: #120f16;
+      border-radius: 12px;
+    }
+    #resources {
+      height: 200px;
+    }
+    .legend {
+      font-size: 13px;
+      margin: 12px 0;
+      color: #b5aab6;
+    }
+    .control {
+      color: #8aadd0;
+    }
+    .wallpaper {
+      color: #ef8aa8;
+    }
+    #hover {
+      min-height: 24px;
+      font-size: 13px;
+    }
+    a {
+      color: #ef8aa8;
+    }
+    code {
+      word-break: break-all;
+    }
+    .note {
+      font-size: 13px;
+    }
+    @media (max-width: 700px) {
+      body {
+        padding: 18px 12px;
+      }
+      section {
+        padding: 15px;
+      }
+      h1 {
+        font-size: 29px;
+      }
+    }
+  </style>
+  <header>
+    <div class="eyebrow">WALLPAPERDB · DISPOSABLE DESKTOP LAB</div>
+    <h1>Real game. Individual frames.</h1>
+    <p>
+      Saved CS2 comparisons from 8 September 2026. Explore the raw frame-time
+      peaks and resource trends for each completed experiment. No server or
+      internet connection is needed to view this file.
+    </p>
+    <p>
+      <a href="../../GAME-BENCH-REPORT.md"
+        >Read the methods, findings and limitations</a
+      >
+    </p>
+  </header>
+  <section>
+    <h2>Experiments</h2>
+    <p class="note">
+      Click a row to inspect it. Each percentage compares that wallpaper with
+      its own matched controls. Different settings, output layouts and delivered
+      wallpaper rates are different workloads.
+    </p>
+    <div class="scroll">
+      <table id="overview">
+        <thead>
+          <tr>
+            <th>Wallpaper / renderer</th>
+            <th>Game limit</th>
+            <th>Policy</th>
+            <th>Pairs</th>
+            <th>Median FPS change</th>
+            <th>Median p99 change</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+  <section>
+    <h2 id="title"></h2>
+    <p id="context"></p>
+    <div class="scroll">
+      <table id="runs">
+        <thead>
+          <tr>
+            <th>Run</th>
+            <th>Average FPS</th>
+            <th>1% low</th>
+            <th>p99 ms</th>
+            <th>Worst ms</th>
+            <th>&gt;50 ms</th>
+            <th>Capture seconds</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <label
+      >Pair
+      <select id="pair"></select
+    ></label>
+    <label
+      >Align by
+      <select id="axis">
+        <option value="scene_s">Replay position</option>
+        <option value="time_s">Capture time</option>
+      </select></label
+    >
+    <div class="legend">
+      <span class="control">● Control</span> ·
+      <span class="wallpaper">● Wallpaper</span> · Frame milliseconds, lower is
+      better
+    </div>
+    <canvas
+      id="frames"
+      aria-label="Game frame times, preserving bucket peaks"
+    ></canvas>
+    <p id="hover">
+      Move over the frame chart to inspect the underlying buckets.
+    </p>
+    <label
+      >Resources
+      <select id="metric">
+        <option value="gpu_percent">Whole GPU · %</option>
+        <option value="game_cpu_one_core_percent">
+          CS2 CPU · % of one core
+        </option>
+        <option value="watts">Whole GPU · watts</option>
+        <option value="vram_used_mib">Whole GPU · VRAM MiB</option>
+      </select></label
+    >
+    <canvas id="resources" aria-label="Resource trends"></canvas>
+    <p class="note">
+      These are application swap intervals, not scanout or input latency.
+      Timedemo accelerates replay time at higher FPS. The GPU clock bridge comes
+      from buffered file observations; resource plots cannot attribute an
+      individual hitch. The native collector's overhead was not isolated.
+    </p>
+    <p id="download"></p>
+  </section>
+  <script src="data.js"></script>
+  <script>
+    "use strict";
+    const $ = (id) => document.getElementById(id);
+    const cases = window.GAME_BENCH_RESULTS || [];
+    const fmt = (n, digits = 2) =>
+      Number.isFinite(n) ? n.toFixed(digits) : "—";
+    const signed = (n, digits = 2) => (n >= 0 ? "+" : "") + fmt(n, digits);
+    const colors = { control: "#8aadd0", wallpaper: "#ef8aa8" };
+    let selected = null;
+    function tableRow(values) {
+      const row = document.createElement("tr");
+      for (const value of values) {
+        const cell = document.createElement("td");
+        if (value instanceof Node) cell.append(value);
+        else cell.textContent = value;
+        row.append(cell);
+      }
+      return row;
+    }
+    for (const item of cases) {
+      const button = document.createElement("button");
+      button.textContent =
+        (item.wallpaper.title || item.request.source) +
+        " · " +
+        item.request.experiment;
+      button.onclick = () => {
+        choose(item);
+        $("title").scrollIntoView({ block: "start" });
+      };
+      $("overview")
+        .querySelector("tbody")
+        .append(
+          tableRow([
+            button,
+            item.request.cap || "uncapped",
+            item.request.policy,
+            item.request.repeats,
+            signed(item.comparison.median_fps_change_percent, 1) + "%",
+            signed(item.comparison.median_p99_change_ms) + " ms",
+          ]),
+        );
+    }
+    function choose(item) {
+      selected = item;
+      $("title").textContent =
+        (item.wallpaper.title || item.request.source) +
+        " · " +
+        item.request.experiment;
+      $("context").textContent =
+        item.actual_resolution.join(" × ") +
+        " · " +
+        item.request.preset +
+        " settings · " +
+        item.request.outputs.join(" + ") +
+        (item.request.span ? " spanning" : " independent") +
+        " · " +
+        item.request.fps +
+        " wallpaper FPS requested · " +
+        item.request.policy +
+        " policy";
+      $("runs")
+        .querySelector("tbody")
+        .replaceChildren(
+          ...item.runs.map((run) => {
+            const frames = document.createElement("a");
+            frames.href = item.id + "/" + run.raw_frames;
+            frames.textContent = run.repeat + " · " + run.condition;
+            return tableRow([
+              frames,
+              fmt(run.summary.average_fps, 1),
+              fmt(run.summary.low_1_percent_fps, 1),
+              fmt(run.summary.p99_ms),
+              fmt(run.summary.worst_ms),
+              run.summary.over_50ms,
+              fmt(run.wall_seconds, 1),
+            ]);
+          }),
+        );
+      $("pair").replaceChildren(
+        ...[...new Set(item.runs.map((run) => run.repeat))].map(
+          (value) => new Option(value, value),
+        ),
+      );
+      const link = document.createElement("a");
+      link.href = item.id + "/comparison.json";
+      link.textContent = "Comparison JSON";
+      $("download").replaceChildren(
+        link,
+        " · Run labels link to the original frame CSVs.",
+      );
+      draw();
+    }
+    function chart(id, datasets, key, cpu = false) {
+      const canvas = $(id),
+        ctx = canvas.getContext("2d"),
+        ratio = devicePixelRatio || 1;
+      const width = canvas.clientWidth,
+        height = canvas.clientHeight;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      ctx.scale(ratio, ratio);
+      const axis = $("axis").value,
+        xValue = (row) => (cpu ? row["cpu_" + axis] : row[axis]) ?? row[axis];
+      const points = datasets.flatMap((set) => set.rows);
+      const maxX = Math.max(1, ...points.map(xValue));
+      const maxY =
+        (key === "gpu_percent"
+          ? 100
+          : Math.max(
+              key === "max_ms" ? 8 : 1,
+              ...points.map((row) => row[key]),
+            )) * 1.05;
+      const left = 46,
+        top = 12,
+        w = width - left - 14,
+        h = height - top - 30;
+      ctx.font = "11px system-ui";
+      for (let i = 0; i <= 4; i++) {
+        const y = top + (h * i) / 4;
+        ctx.strokeStyle = "#ffffff13";
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(width - 14, y);
+        ctx.stroke();
+        ctx.fillStyle = "#a99aaa";
+        ctx.fillText(fmt(maxY * (1 - i / 4), 0), 5, y + 4);
+      }
+      for (const set of datasets) {
+        ctx.strokeStyle = colors[set.condition];
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        set.rows.forEach((row, i) => {
+          const x = left + (w * xValue(row)) / maxX,
+            y = top + h * (1 - row[key] / maxY);
+          if (i) ctx.lineTo(x, y);
+          else ctx.moveTo(x, y);
+        });
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#a99aaa";
+      ctx.fillText(
+        axis === "scene_s" ? "Replay seconds" : "Capture seconds",
+        left,
+        height - 6,
+      );
+      ctx.fillText(fmt(maxX, 1) + " s", width - 58, height - 6);
+      if (id === "frames")
+        canvas.onmousemove = (event) => {
+          const t = Math.max(
+            0,
+            Math.min(maxX, ((event.offsetX - left) * maxX) / w),
+          );
+          $("hover").textContent =
+            fmt(t) +
+            " s · " +
+            datasets
+              .map((set) => {
+                const row = set.rows.reduce(
+                  (best, row) =>
+                    !best ||
+                    Math.abs(xValue(row) - t) < Math.abs(xValue(best) - t)
+                      ? row
+                      : best,
+                  null,
+                );
+                return (
+                  set.condition +
+                  ": " +
+                  fmt(row.min_ms) +
+                  "–" +
+                  fmt(row.max_ms) +
+                  " ms / " +
+                  row.count +
+                  " frames"
+                );
+              })
+              .join(" · ");
+        };
+    }
+    function draw() {
+      if (!selected) return;
+      const runs = selected.runs.filter(
+          (run) => run.repeat === Number($("pair").value),
+        ),
+        metric = $("metric").value;
+      chart(
+        "frames",
+        runs.map((run) => ({ condition: run.condition, rows: run.plot })),
+        "max_ms",
+      );
+      chart(
+        "resources",
+        runs.map((run) => ({
+          condition: run.condition,
+          rows: run.resources.filter((row) => Number.isFinite(row[metric])),
+        })),
+        metric,
+        metric === "game_cpu_one_core_percent",
+      );
+    }
+    for (const id of ["pair", "axis", "metric"]) $(id).onchange = draw;
+    window.addEventListener("resize", draw);
+    if (cases.length) choose(cases[0]);
+  </script>
+</html>

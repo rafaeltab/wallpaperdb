@@ -73,6 +73,11 @@ help:
 	@echo "  make native-stress-results - Assemble saved stress captures into an interactive report"
 	@echo "  make native-lab-test  - Test frame pacing and profiler evidence/guards"
 	@echo "  make native-benchmark-cover - Temporarily cover DP-5 black and inhibit idle/sleep"
+	@echo "  make native-game-bench - Discover the installed CS2 adapter (ARGS='--discover')"
+	@echo "  make native-game-bench-test - Test frame evidence, settings, and restoration"
+	@echo "  make native-game-bench-format - Format the game benchmark Python sources"
+	@echo "  make native-game-bench-ui-test - Check the Bench UI (ARGS='--run' launches CS2)"
+	@echo "  make native-game-bench-export - Revalidate and export selected completed job directories"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
 	@echo ""
@@ -838,7 +843,7 @@ native-format:
 	@cargo fmt --manifest-path $(NATIVE_MANIFEST)
 
 native-format-web:
-	@npx --yes prettier@3.6.2 --write 'apps/native-prototype/{ui,runtime,tests,scripts,examples,lab}/**/*.{js,mjs,cjs,css,html,json}' --ignore-path apps/native-prototype/.prettierignore
+	@npx --yes prettier@3.6.2 --write 'apps/native-prototype/{ui,runtime,tests,scripts,examples,lab}/**/*.{js,mjs,cjs,css,html,json}' apps/native-prototype/results/game-bench/index.html --ignore-path apps/native-prototype/.prettierignore
 
 native-assets:
 	@python3 apps/native-prototype/scripts/generate-assets.py
@@ -920,6 +925,25 @@ native-chromium-diagnostic-analyze:
 .PHONY: native-benchmark-cover
 native-benchmark-cover:
 	@systemd-inhibit --what=idle:sleep --mode=block --who='WallpaperDB stress lab' --why='Bounded unattended renderer measurements' python3 apps/native-prototype/scripts/benchmark-cover.py $(ARGS)
+
+.PHONY: native-game-bench native-game-bench-test native-game-bench-export
+native-game-bench:
+	@python3 apps/native-prototype/scripts/game_bench.py $(ARGS)
+
+native-game-bench-export:
+	@python3 apps/native-prototype/scripts/game_bench_export.py $(ARGS)
+
+native-game-bench-test:
+	@python3 -m unittest discover -s apps/native-prototype/scripts -p 'game_bench*_test.py'
+
+.PHONY: native-game-bench-ui-test
+native-game-bench-ui-test:
+	@node apps/native-prototype/scripts/game-bench-ui-test.mjs $(ARGS)
+
+.PHONY: native-game-bench-format
+native-game-bench-format:
+	@test -x apps/native-prototype/lab/build/format-env/bin/black || (python3 -m venv apps/native-prototype/lab/build/format-env && apps/native-prototype/lab/build/format-env/bin/pip -q install black==25.1.0)
+	@apps/native-prototype/lab/build/format-env/bin/black apps/native-prototype/scripts/game_bench*.py --line-length 100
 
 native-lab-test:
 	@$(MAKE) -C apps/native-prototype/lab test

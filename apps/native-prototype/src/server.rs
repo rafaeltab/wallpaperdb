@@ -134,6 +134,8 @@ pub fn start(sender: Sender, port: u16) -> Result<Servers> {
                     (include_str!("../ui/style.css").into(), "text/css")
                 } else if req.method() == &Method::Get && path == "/ui.js" {
                     (include_str!("../ui/app.js").into(), "text/javascript")
+                } else if req.method() == &Method::Get && path == "/bench.js" {
+                    (include_str!("../ui/bench.js").into(), "text/javascript")
                 } else if path == "/api" && req.method() == &Method::Post {
                     if get_header("X-WallpaperDB-Token") != Some(token.as_str()) {
                         let _ =

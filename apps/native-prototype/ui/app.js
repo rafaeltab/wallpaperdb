@@ -75,7 +75,8 @@ function detail() {
       : experiment === "gpu-paced"
         ? "Maximum budget; compositor callbacks determine the delivered rate"
         : "Requested budget; diagnostics show the delivered frame rate";
-  $("apply").disabled = !item || !outputs.size || busy;
+  $("apply").disabled =
+    !item || !outputs.size || busy || state.benchmark?.active;
   $("apply-target").textContent = outputs.size
     ? `Apply to ${[...outputs].join(" + ")}${span && outputs.size > 1 ? " · spanning" : ""}`
     : "Select a display above";
@@ -90,10 +91,12 @@ function detail() {
   $("fps").disabled =
     item.kind === "image" ||
     (item.kind !== "live" && experiment === "baseline");
-  $("pause").disabled = !state.groups.some((g) =>
-    g.outputs.some((o) => outputs.has(o)),
-  );
-  $("pulse").disabled = !state.surfaces.some((s) => outputs.has(s.output));
+  $("pause").disabled =
+    state.benchmark?.active ||
+    !state.groups.some((g) => g.outputs.some((o) => outputs.has(o)));
+  $("pulse").disabled =
+    state.benchmark?.active ||
+    !state.surfaces.some((s) => outputs.has(s.output));
   $("pause").textContent = state.groups.some(
     (g) => g.paused && g.outputs.some((o) => outputs.has(o)),
   )
@@ -173,6 +176,7 @@ let gallerySignature = "",
   monitorSignature = "";
 function update(next) {
   state = next;
+  window.updateBench?.(next);
   if (!selected || !state.items.some((i) => i.id === selected)) {
     selected = (state.items.find((i) => i.kind === "live") || state.items[0])
       ?.id;

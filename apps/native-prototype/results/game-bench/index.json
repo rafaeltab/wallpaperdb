@@ -1,0 +1,232 @@
+[
+  {
+    "id": "game-1788843279100873085",
+    "wallpaper": "Prism laboratory",
+    "experiment": "gpu",
+    "policy": "active",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.05696359306497367,
+          "p99_change_ms": 0.22406999999999577
+        }
+      ],
+      "median_fps_change_percent": 0.05696359306497367,
+      "median_p99_change_ms": 0.22406999999999577,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788843279100873085/comparison.json"
+  },
+  {
+    "id": "game-1788843638192773398",
+    "wallpaper": "Stress studio \u00b7 fixed heavy benchmark control",
+    "experiment": "gpu",
+    "policy": "active",
+    "pairs": 3,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": -5.150463550377338,
+          "p99_change_ms": 0.4351800000000008
+        },
+        {
+          "repeat": 2,
+          "fps_change_percent": -4.132074630635807,
+          "p99_change_ms": 0.3165599999999973
+        },
+        {
+          "repeat": 3,
+          "fps_change_percent": -6.997665215053949,
+          "p99_change_ms": 0.4759699999999967
+        }
+      ],
+      "median_fps_change_percent": -5.150463550377338,
+      "median_p99_change_ms": 0.4351800000000008,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788843638192773398/comparison.json"
+  },
+  {
+    "id": "game-1788843887837261472",
+    "wallpaper": "Stress studio \u00b7 fixed heavy benchmark control",
+    "experiment": "chromium",
+    "policy": "active",
+    "pairs": 3,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": -20.066398118639295,
+          "p99_change_ms": 1.8492199999999936
+        },
+        {
+          "repeat": 2,
+          "fps_change_percent": -18.378945777014742,
+          "p99_change_ms": 1.6270199999999972
+        },
+        {
+          "repeat": 3,
+          "fps_change_percent": -20.430872026541856,
+          "p99_change_ms": 1.6246899999999984
+        }
+      ],
+      "median_fps_change_percent": -20.066398118639295,
+      "median_p99_change_ms": 1.6270199999999972,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788843887837261472/comparison.json"
+  },
+  {
+    "id": "game-1788844139482249281",
+    "wallpaper": "Stress studio \u00b7 fixed heavy benchmark control",
+    "experiment": "baseline",
+    "policy": "active",
+    "pairs": 3,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": -17.509237575076398,
+          "p99_change_ms": 1.4399599999999912
+        },
+        {
+          "repeat": 2,
+          "fps_change_percent": -18.604130791370377,
+          "p99_change_ms": 1.3040500000000002
+        },
+        {
+          "repeat": 3,
+          "fps_change_percent": -16.663942140198152,
+          "p99_change_ms": 1.1071499999999972
+        }
+      ],
+      "median_fps_change_percent": -17.509237575076398,
+      "median_p99_change_ms": 1.3040500000000002,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788844139482249281/comparison.json"
+  },
+  {
+    "id": "game-1788844540904074009",
+    "wallpaper": "background 4k",
+    "experiment": "gpu",
+    "policy": "active",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": -0.002771433885384589,
+          "p99_change_ms": -0.0237899999999982
+        }
+      ],
+      "median_fps_change_percent": -0.002771433885384589,
+      "median_p99_change_ms": -0.0237899999999982,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788844540904074009/comparison.json"
+  },
+  {
+    "id": "game-1788844696421850088",
+    "wallpaper": "background 4k",
+    "experiment": "baseline",
+    "policy": "active",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.0043927285668932115,
+          "p99_change_ms": 0.016820000000000945
+        }
+      ],
+      "median_fps_change_percent": 0.0043927285668932115,
+      "median_p99_change_ms": 0.016820000000000945,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788844696421850088/comparison.json"
+  },
+  {
+    "id": "game-1788845303702721147",
+    "wallpaper": "background 4k",
+    "experiment": "baseline",
+    "policy": "normal",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.0026692603367628465,
+          "p99_change_ms": 0.10941000000000045
+        }
+      ],
+      "median_fps_change_percent": 0.0026692603367628465,
+      "median_p99_change_ms": 0.10941000000000045,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788845303702721147/comparison.json"
+  },
+  {
+    "id": "game-1788845465336526041",
+    "wallpaper": "Prism laboratory",
+    "experiment": "gpu-paced",
+    "policy": "normal",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.007304891496051624,
+          "p99_change_ms": -0.006230000000000402
+        }
+      ],
+      "median_fps_change_percent": 0.007304891496051624,
+      "median_p99_change_ms": -0.006230000000000402,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788845465336526041/comparison.json"
+  },
+  {
+    "id": "game-1788845620927309800",
+    "wallpaper": "background 4k",
+    "experiment": "gpu-independent",
+    "policy": "active",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.043679874473379066,
+          "p99_change_ms": 0.4129999999999985
+        }
+      ],
+      "median_fps_change_percent": 0.043679874473379066,
+      "median_p99_change_ms": 0.4129999999999985,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788845620927309800/comparison.json"
+  },
+  {
+    "id": "game-1788845776599816072",
+    "wallpaper": "background 4k",
+    "experiment": "gpu-independent-drop",
+    "policy": "active",
+    "pairs": 1,
+    "comparison": {
+      "pairs": [
+        {
+          "repeat": 1,
+          "fps_change_percent": 0.0258306891510518,
+          "p99_change_ms": 0.2453999999999965
+        }
+      ],
+      "median_fps_change_percent": 0.0258306891510518,
+      "median_p99_change_ms": 0.2453999999999965,
+      "note": "Paired scene observations; application present timing, not scanout or input latency."
+    },
+    "file": "game-1788845776599816072/comparison.json"
+  }
+]

@@ -1,4 +1,5 @@
 mod audio;
+mod benchmark;
 mod experiment;
 mod model;
 mod platform;
@@ -214,11 +215,13 @@ struct Desktop {
     error: Option<String>,
     suspended: Vec<String>,
     reconcile_pending: bool,
+    benchmark: benchmark::Benchmark,
+    stop_requested: bool,
 }
 
 impl Desktop {
     fn snapshot(&self) -> Value {
-        json!({"items":self.library.items,"groups":self.library.groups,"monitors":self.monitors,"surfaces":self.surfaces.iter().map(|s|s.snapshot()).collect::<Vec<_>>(),"audio":*self.audio.levels.lock().unwrap(),"url":self.url,"warning":self.error,"prototype":true})
+        json!({"items":self.library.items,"groups":self.library.groups,"monitors":self.monitors,"surfaces":self.surfaces.iter().map(|s|s.snapshot()).collect::<Vec<_>>(),"fullscreen_outputs":self.suspended,"audio":*self.audio.levels.lock().unwrap(),"url":self.url,"warning":self.error,"prototype":true,"benchmark":self.benchmark.snapshot()})
     }
 
     fn apply(&mut self, next: Library, persist: bool) -> Result<()> {
@@ -279,6 +282,16 @@ impl Desktop {
 
     fn execute(&mut self, request: Value, owner: &Rc<RefCell<Desktop>>) -> Result<Value> {
         let op = request["op"].as_str().context("Missing operation")?;
+        let benchmark_owned = self.benchmark.owns(&request);
+        if self.benchmark.active()
+            && !matches!(
+                op,
+                "status" | "ui" | "bench_cancel" | "bench_result" | "stop"
+            )
+            && !(benchmark_owned && matches!(op, "set" | "clear"))
+        {
+            bail!("A benchmark owns the temporary wallpaper setup. Cancel it before changing the library.");
+        }
         let outputs: Vec<String> = request
             .get("outputs")
             .map(|v| serde_json::from_value(v.clone()))
@@ -286,6 +299,9 @@ impl Desktop {
             .unwrap_or_default();
         match op {
             "status" => {}
+            "bench_start" => self.benchmark.start(&request, &self.library)?,
+            "bench_cancel" => self.benchmark.cancel()?,
+            "bench_result" => return self.benchmark.result(),
             "set" => {
                 let source = request["source"].as_str().context("Choose a wallpaper")?;
                 let mut next = self.library.clone();
@@ -308,7 +324,7 @@ impl Desktop {
                     trace: request["trace"].as_bool().unwrap_or(false),
                 };
                 next.assign(group, &self.monitors)?;
-                self.apply(next, true)?;
+                self.apply(next, !benchmark_owned)?;
             }
             "import" => {
                 let mut next = self.library.clone();
@@ -343,6 +359,13 @@ impl Desktop {
                     if response == gtk::ResponseType::Accept {
                         if let Some(owner) = owner.upgrade() {
                             let mut desktop = owner.borrow_mut();
+                            if desktop.benchmark.active() {
+                                desktop.error = Some(
+                                    "Import deferred: cancel the active benchmark first".into(),
+                                );
+                                dialog.close();
+                                return;
+                            }
                             for path in dialog.filenames() {
                                 let mut next = desktop.library.clone();
                                 match next
@@ -362,7 +385,7 @@ impl Desktop {
             "clear" => {
                 let mut next = self.library.clone();
                 next.clear(&outputs);
-                self.apply(next, true)?;
+                self.apply(next, !benchmark_owned)?;
             }
             "pause" => {
                 let paused = request["paused"].as_bool().context("Missing pause state")?;
@@ -443,7 +466,12 @@ impl Desktop {
                 }
             }
             "stop" => {
-                gtk::main_quit();
+                if self.benchmark.active() {
+                    self.stop_requested = true;
+                    self.benchmark.cancel()?;
+                } else {
+                    gtk::main_quit();
+                }
             }
             _ => bail!("Unknown operation: {op}"),
         }
@@ -626,11 +654,25 @@ fn daemon(port: u16) -> Result<()> {
         error: None,
         suspended: vec![],
         reconcile_pending: false,
+        benchmark: benchmark::Benchmark::new(),
+        stop_requested: false,
     }));
     let initial = desktop.borrow_mut().apply(library, false);
     if let Err(error) = initial {
         desktop.borrow_mut().error = Some(error.to_string());
     }
+    let owner = desktop.clone();
+    glib::timeout_add_local(Duration::from_millis(500), move || {
+        let mut desktop = owner.borrow_mut();
+        if let Some(library) = desktop.benchmark.poll() {
+            let error = desktop.apply(library, false).err().map(|e| e.to_string());
+            desktop.benchmark.restored(error);
+            if desktop.stop_requested {
+                gtk::main_quit();
+            }
+        }
+        glib::ControlFlow::Continue
+    });
     let owner = desktop.clone();
     glib::timeout_add_local(Duration::from_millis(25), move || {
         // Bounded queue drain; a burst of clients cannot starve GTK rendering.
@@ -667,14 +709,21 @@ fn daemon(port: u16) -> Result<()> {
         }
         glib::ControlFlow::Continue
     });
-    glib::source::unix_signal_add_local(libc::SIGTERM, || {
-        gtk::main_quit();
-        glib::ControlFlow::Break
-    });
-    glib::source::unix_signal_add_local(libc::SIGINT, || {
-        gtk::main_quit();
-        glib::ControlFlow::Break
-    });
+    for signal in [libc::SIGTERM, libc::SIGINT] {
+        let owner = desktop.clone();
+        glib::source::unix_signal_add_local(signal, move || {
+            let mut desktop = owner.borrow_mut();
+            if desktop.benchmark.active() {
+                desktop.stop_requested = true;
+                if let Err(error) = desktop.benchmark.cancel() {
+                    desktop.error = Some(error.to_string());
+                }
+            } else {
+                gtk::main_quit();
+            }
+            glib::ControlFlow::Continue
+        });
+    }
     gtk::main();
     desktop.borrow_mut().surfaces.clear();
     desktop.borrow_mut().audio.set_active(false);

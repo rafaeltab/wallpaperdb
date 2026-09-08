@@ -7,6 +7,7 @@
     <title>WallpaperDB · Desktop</title>
     <link rel="stylesheet" href="/ui.css" />
     <script defer src="/ui.js"></script>
+    <script defer src="/bench.js"></script>
   </head>
   <body>
     <header>
@@ -37,6 +38,7 @@
         <button class="nav" id="displays-nav">
           <span>▱</span> Display layout
         </button>
+        <button class="nav" id="bench-nav"><span>◴</span> Game bench</button>
         <div class="sidebar-bottom">
           <div class="local-icon">↙</div>
           <strong>Made for your desktop.</strong>
@@ -212,6 +214,9 @@ Apply an experiment to see its actual renderer.</pre
           <button id="apply" class="primary">
             Apply wallpaper <span>↗</span>
           </button>
+          <button id="bench" class="bench-button">
+            ◴ Bench this wallpaper
+          </button>
           <div class="playback">
             <button id="pause" class="quiet">Ⅱ Pause</button
             ><button id="pulse" class="quiet">✧ Send a pulse</button>
@@ -235,5 +240,199 @@ Apply an experiment to see its actual renderer.</pre
     </div>
     <div id="toast" role="status" aria-live="polite" hidden></div>
     <div id="error" role="alert" hidden></div>
+    <dialog id="bench-dialog" aria-labelledby="bench-title">
+      <div class="bench-heading">
+        <div>
+          <p class="eyebrow accent">REAL GAMES · PROTOTYPE</p>
+          <h2 id="bench-title">A wallpaper that plays nicely.</h2>
+          <p>Compare the same game scene with and without your wallpaper.</p>
+        </div>
+        <button
+          id="bench-close"
+          class="icon-button"
+          aria-label="Close benchmark panel"
+        >
+          ×
+        </button>
+      </div>
+      <div class="bench-selection" id="bench-selection"></div>
+      <form id="bench-form">
+        <div class="bench-fields">
+          <label
+            >Game<select id="bench-game">
+              <option value="cs2">Counter-Strike 2</option>
+            </select></label
+          >
+          <label>Game display<select id="bench-output"></select></label>
+          <label
+            >Graphics<select id="bench-preset">
+              <option value="current">Your current settings</option>
+              <option value="low">Low</option>
+              <option value="high">High</option>
+            </select></label
+          >
+          <label
+            >Game frame limit<select id="bench-cap">
+              <option value="240">240 fps</option>
+              <option value="120">120 fps</option>
+              <option value="360">360 fps</option>
+              <option value="0">Uncapped</option>
+            </select></label
+          >
+          <label
+            >Measured scene<select id="bench-seconds">
+              <option value="20">20 replay seconds</option>
+              <option value="40" selected>40 replay seconds</option>
+            </select></label
+          >
+          <label
+            >Comparisons<select id="bench-repeats">
+              <option value="1">1 pair · quick experiment</option>
+              <option value="3">3 pairs · alternate order</option>
+            </select></label
+          >
+        </div>
+        <label class="bench-policy"
+          >Wallpaper during fullscreen<select id="bench-policy">
+            <option value="active">
+              Keep playing · measure active interference
+            </option>
+            <option value="normal">
+              Normal policy · pause behind fullscreen
+            </option>
+          </select></label
+        >
+        <details class="bench-advanced">
+          <summary>Replay and resolution</summary>
+          <label
+            >Local CS2 demo path<input
+              id="bench-demo"
+              placeholder="Automatic · create a replay with your game build" /></label
+          ><label
+            >Resolution<select id="bench-resolution">
+              <option value="current">Use the saved game resolution</option>
+              <option value="display">Match the game display</option>
+            </select></label
+          >
+          <p>
+            The game adapter records actual rendering dimensions. Custom demos
+            must contain the full selected scene interval.
+          </p>
+        </details>
+        <p class="bench-explanation">
+          The first run prepares and warms the replay. Bench temporarily
+          controls the game and wallpapers, then restores your setup. Keep the
+          game visible during capture and avoid other heavy work. Existing
+          mpvpaper video backgrounds are frozen for both conditions. The
+          timedemo runs faster than real time at high frame rates; the results
+          show the actual capture duration.
+        </p>
+        <div class="bench-actions">
+          <button id="bench-start" class="primary" type="submit">
+            Start comparison <span>↗</span></button
+          ><button id="bench-cancel" class="quiet" type="button" hidden>
+            Cancel and restore</button
+          ><span id="bench-estimate"
+            >A few minutes · results stay on this device</span
+          >
+        </div>
+      </form>
+      <section
+        id="bench-progress"
+        class="bench-progress"
+        aria-live="polite"
+        hidden
+      >
+        <div>
+          <strong id="bench-phase"></strong><span id="bench-step"></span>
+        </div>
+        <progress id="bench-bar" max="1" value="0"></progress>
+        <p id="bench-message"></p>
+      </section>
+      <section id="bench-results" hidden>
+        <div class="bench-result-heading">
+          <div>
+            <p class="eyebrow accent">YOUR COMPARISON</p>
+            <h3 id="bench-verdict"></h3>
+          </div>
+          <button id="bench-export" class="quiet">
+            Save comparison JSON ↗
+          </button>
+        </div>
+        <p id="bench-result-context"></p>
+        <div class="bench-table-wrap">
+          <table id="bench-table">
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Average FPS</th>
+                <th>1% low</th>
+                <th>p99 frame</th>
+                <th>Worst frame</th>
+                <th>&gt;50 ms</th>
+                <th>Capture</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="bench-chart-heading">
+          <h3>Every spike matters.</h3>
+          <label
+            >Align by<select id="bench-axis">
+              <option value="scene_s">Replay position</option>
+              <option value="time_s">Capture time</option>
+            </select></label
+          >
+          <label
+            >Pair
+            <select id="bench-pair"></select
+          ></label>
+        </div>
+        <p class="bench-legend">
+          <span class="control-dot">●</span> Control
+          <span class="wallpaper-dot">●</span> Selected wallpaper
+          <span>· frame time in ms, lower is better</span>
+        </p>
+        <canvas
+          id="bench-frames"
+          class="bench-chart"
+          aria-label="Game frame times with preserved minimum and maximum values"
+        ></canvas>
+        <p id="bench-hover" class="bench-chart-readout">
+          Move over the chart to inspect a time bucket.
+        </p>
+        <div class="bench-chart-heading">
+          <h3>Resources during the scene</h3>
+          <label
+            >Metric<select id="bench-metric">
+              <option value="gpu_percent">Whole GPU · %</option>
+              <option value="game_cpu_one_core_percent">
+                CS2 CPU · % of one core
+              </option>
+              <option value="watts">Whole GPU · watts</option>
+              <option value="vram_used_mib">Whole GPU · VRAM MiB</option>
+            </select></label
+          >
+        </div>
+        <canvas
+          id="bench-resources"
+          class="bench-chart compact"
+          aria-label="Whole NVIDIA device utilization alongside the game scene"
+        ></canvas>
+        <p class="bench-explanation">
+          Game frame timing describes application rendering/presentation, not
+          physical scanout or input latency. The 1% low uses the mean of the
+          slowest 1% of frames. Short runs can reveal problems; small
+          differences need repeated comparisons. Resource readings use a coarse
+          clock estimate; they show trends and cannot identify the cause of one
+          frame-time spike.
+        </p>
+        <details>
+          <summary>Evidence and run metadata</summary>
+          <pre id="bench-evidence"></pre>
+        </details>
+      </section>
+    </dialog>
   </body>
 </html>

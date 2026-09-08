@@ -15,3 +15,9 @@ comparison report. It records delivered frames and long frame-time tails alongsi
 CPU/GPU resources; requested frame rates are not treated as measured throughput.
 Read [the final stress report](FINAL-REPORT.md) for the conclusions and validation
 status of this extended session.
+
+The [real-game Bench experiment](GAME-BENCH.md) adds a **Bench** button to the
+library. It records a compatible local CS2 replay, runs matched controls and
+wallpaper trials, plots individual game frame intervals and resource samples, and
+restores the desktop afterward. See [the Bench report](GAME-BENCH-REPORT.md) for
+validation, measurements, and limits.

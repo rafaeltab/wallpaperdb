@@ -307,6 +307,8 @@ impl Desktop {
                     | "bench_history"
                     | "bench_record"
                     | "bench_live"
+                    | "bench_rename"
+                    | "bench_delete"
                     | "stop"
             )
             && !(benchmark_owned && matches!(op, "set" | "clear"))
@@ -328,6 +330,15 @@ impl Desktop {
             "bench_history" => return self.benchmark.history(),
             "bench_record" => return self.benchmark.record(request["id"].as_str()),
             "bench_live" => return self.benchmark.live(request["id"].as_str()),
+            "bench_rename" => {
+                return self.benchmark.rename(
+                    request["id"].as_str().context("Choose a benchmark")?,
+                    request["name"].as_str().context("Enter a benchmark name")?,
+                )
+            }
+            "bench_delete" => self
+                .benchmark
+                .delete(request["id"].as_str().context("Choose a benchmark")?)?,
             "set" => {
                 let source = request["source"].as_str().context("Choose a wallpaper")?;
                 let mut next = self.library.clone();

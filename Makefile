@@ -77,6 +77,7 @@ help:
 	@echo "  make native-game-bench-test - Test frame evidence, settings, and restoration"
 	@echo "  make native-game-bench-format - Format the game benchmark Python sources"
 	@echo "  make native-game-bench-ui-test - Check the Bench UI (ARGS='--run' launches CS2)"
+	@echo "    ARGS='--history-actions' checks rename/delete with isolated data and no game"
 	@echo "  make native-game-bench-export - Revalidate and export selected completed job directories"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"

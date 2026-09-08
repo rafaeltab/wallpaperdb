@@ -9,7 +9,12 @@
     lastSequence = null,
     lastHistory = 0;
   let actionPending = null;
+  let managementPending = false,
+    editId = null,
+    recordVersion = 0;
   const active = () => Boolean(state.benchmark?.active);
+  const recordName = (entry) =>
+    entry.name || entry.wallpaper?.title || "Benchmark";
   const number = (n, digits = 1) =>
     Number.isFinite(n) ? n.toFixed(digits) : "—";
   const manual = (request) => request?.mode === "manual";
@@ -145,9 +150,110 @@
   $("bench-cancel").onclick = () => action("bench_cancel");
   $("bench-stop").onclick = () => action("bench_stop");
   $("bench-next").onclick = () => action("bench_next");
+  function managementButtons() {
+    $("bench-rename").disabled = !record || managementPending;
+    $("bench-delete").disabled =
+      !record || record.status.active || managementPending;
+    $("bench-delete").title = record?.status.active
+      ? "Stop or cancel this benchmark and wait for desktop restoration before deleting it."
+      : "Delete this benchmark and its saved files";
+    $("bench-back").disabled = managementPending;
+    for (const id of [
+      "bench-name",
+      "bench-name-save",
+      "bench-name-cancel",
+      "bench-delete-cancel",
+    ])
+      $(id).disabled = managementPending;
+    $("bench-delete-confirm").disabled =
+      managementPending || Boolean(record?.status.active);
+  }
+  function closeManagement() {
+    $("bench-manage").hidden = true;
+    $("bench-manage-error").textContent = "";
+    editId = null;
+  }
+  function manage(kind) {
+    if (
+      !record ||
+      managementPending ||
+      (kind === "delete" && record.status.active)
+    )
+      return;
+    editId = viewedId;
+    $("bench-manage").hidden = false;
+    $("bench-manage-error").textContent = "";
+    $("bench-rename-form").hidden = kind !== "rename";
+    $("bench-delete-confirmation").hidden = kind !== "delete";
+    if (kind === "rename") {
+      $("bench-name").value = recordName(record);
+      $("bench-name").focus();
+      $("bench-name").select();
+    } else {
+      $("bench-delete-name").textContent = recordName(record);
+      $("bench-delete-cancel").focus();
+    }
+    managementButtons();
+  }
+  $("bench-rename").onclick = () => manage("rename");
+  $("bench-delete").onclick = () => manage("delete");
+  $("bench-name-cancel").onclick = () => {
+    closeManagement();
+    $("bench-rename").focus();
+  };
+  $("bench-delete-cancel").onclick = () => {
+    closeManagement();
+    $("bench-delete").focus();
+  };
+  async function saveManagement(op, extra = {}) {
+    if (managementPending || !editId || editId !== viewedId) return;
+    const id = editId;
+    managementPending = true;
+    recordVersion++;
+    managementButtons();
+    $("bench-manage-error").textContent = "";
+    try {
+      const next = await api({ op, id, ...extra });
+      if (viewedId !== id) return;
+      closeManagement();
+      if (op === "bench_delete") {
+        update(next);
+        await showHistory();
+        toast("Benchmark deleted");
+      } else {
+        record.name = next.name;
+        showStatus();
+        toast("Benchmark renamed");
+      }
+    } catch (failure) {
+      if (viewedId === id)
+        $("bench-manage-error").textContent = failure.message;
+    } finally {
+      managementPending = false;
+      managementButtons();
+      if (op === "bench_rename" && viewedId === id && $("bench-manage").hidden)
+        $("bench-rename").focus();
+    }
+  }
+  $("bench-rename-form").onsubmit = (event) => {
+    event.preventDefault();
+    const name = $("bench-name").value.trim();
+    if (
+      !name ||
+      [...name].length > 120 ||
+      /[\u0000-\u001f\u007f-\u009f]/.test(name)
+    ) {
+      $("bench-manage-error").textContent =
+        "Choose a name with 1–120 characters on one line.";
+      return;
+    }
+    return saveManagement("bench_rename", { name });
+  };
+  $("bench-delete-confirm").onclick = () => saveManagement("bench_delete");
   function summaryText(entry) {
     const r = entry.request;
     return [
+      `Wallpaper: ${entry.wallpaper?.title || r.source}`,
       "Counter-Strike 2",
       manual(r)
         ? "Continuous gameplay"
@@ -162,6 +268,7 @@
     ].join(" · ");
   }
   async function showHistory() {
+    closeManagement();
     viewedId = null;
     result = record = null;
     loadedFinal = null;
@@ -173,9 +280,10 @@
     await loadHistory();
   }
   async function loadHistory() {
+    const version = recordVersion;
     try {
       const { benchmarks } = await api({ op: "bench_history" });
-      if (viewedId) return;
+      if (viewedId || version !== recordVersion) return;
       lastHistory = Date.now();
       $("bench-history-empty").hidden = benchmarks.length > 0;
       $("bench-history-list").replaceChildren(
@@ -186,7 +294,7 @@
           const title = document.createElement("strong"),
             summary = document.createElement("span"),
             status = document.createElement("span");
-          title.textContent = entry.wallpaper?.title || entry.request.source;
+          title.textContent = recordName(entry);
           summary.textContent = summaryText(entry);
           status.className = "bench-history-state";
           status.textContent = `${new Date(entry.created_ms).toLocaleString()} · ${stateLabel(entry.status)}`;
@@ -200,11 +308,13 @@
     }
   }
   async function openRecord(id) {
+    closeManagement();
     viewedId = id;
     loadedFinal = null;
     lastSequence = null;
     actionPending = null;
     result = record = null;
+    managementButtons();
     $("bench-history").hidden = true;
     $("bench-detail").hidden = false;
     $("bench-results").hidden = true;
@@ -268,8 +378,8 @@
     const running = job.active === true;
     if (actionPending && (!running || job.phase !== actionPending))
       actionPending = null;
-    $("bench-browser-title").textContent =
-      record.wallpaper?.title || "Benchmark results";
+    $("bench-browser-title").textContent = recordName(record);
+    managementButtons();
     $("bench-phase").textContent = stateLabel(job);
     if (running && job.recording && job.state === "running")
       $("bench-progress").dataset.recording = job.recording;
@@ -303,8 +413,10 @@
         ["restoring", "cancelling", "stopping"].includes(job.state);
   }
   async function poll(force = false) {
-    if (polling || !viewedId || !$("bench-browser").open) return;
+    if (polling || managementPending || !viewedId || !$("bench-browser").open)
+      return;
     const id = viewedId;
+    const version = recordVersion;
     const running = state.benchmark?.id === id && active();
     if (!force && !running && loadedFinal === id) return;
     polling = true;
@@ -313,7 +425,7 @@
         op: running && !force ? "bench_live" : "bench_record",
         id,
       });
-      if (id !== viewedId) return;
+      if (id !== viewedId || version !== recordVersion) return;
       record = next;
       const value = next.result || next.live;
       if (!next.status.active && (!running || next.result)) loadedFinal = id;

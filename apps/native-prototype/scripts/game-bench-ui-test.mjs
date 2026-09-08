@@ -12,14 +12,27 @@ import { tmpdir, homedir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
+import { createHistoryFixture } from "./game-bench-history-fixture.mjs";
+
+const historyActions = process.argv.includes("--history-actions");
+if (
+  historyActions &&
+  process.argv.some((value) => ["--run", "--cancel"].includes(value))
+)
+  throw new Error(
+    "History action tests use isolated data and cannot launch a game",
+  );
+const fixture = historyActions ? await createHistoryFixture() : null;
 
 const runtime = process.env.XDG_RUNTIME_DIR || `/run/user/${process.getuid()}`;
 const reportArgument = process.argv
   .find((value) => value.startsWith("--report="))
   ?.slice(9);
-const url = reportArgument
-  ? pathToFileURL(resolve(reportArgument)).href
-  : readFileSync(join(runtime, "wallpaperdb-native-prototype/url"), "utf8");
+const url =
+  fixture?.url ||
+  (reportArgument
+    ? pathToFileURL(resolve(reportArgument)).href
+    : readFileSync(join(runtime, "wallpaperdb-native-prototype/url"), "utf8"));
 const cache = join(homedir(), ".cache/ms-playwright");
 const chrome =
   process.env.CHROME ||
@@ -135,7 +148,17 @@ try {
     mobile: false,
   });
   await call("Page.navigate", { url });
-  if (settings.report) {
+  if (fixture) {
+    await fixture.verify({
+      js,
+      until,
+      call,
+      screenshot: async (name) => {
+        const shot = await call("Page.captureScreenshot", { format: "png" });
+        writeFileSync(join(evidence, name), Buffer.from(shot.data, "base64"));
+      },
+    });
+  } else if (settings.report) {
     await until(
       "window.GAME_BENCH_RESULTS?.length > 0 && document.querySelectorAll('#overview tbody tr').length === window.GAME_BENCH_RESULTS.length",
     );
@@ -544,4 +567,5 @@ try {
   child.kill("SIGTERM");
   await pause(500);
   rmSync(profile, { recursive: true, force: true });
+  if (fixture) await fixture.close();
 }

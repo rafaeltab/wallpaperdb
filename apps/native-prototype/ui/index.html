@@ -394,7 +394,55 @@ Apply an experiment to see its actual renderer.</pre
           >
             View parameters
           </button>
+          <div class="bench-record-actions">
+            <button id="bench-rename" class="quiet" disabled>Rename</button>
+            <button id="bench-delete" class="quiet danger" disabled>
+              Delete
+            </button>
+          </div>
         </div>
+        <section id="bench-manage" class="bench-parameters bench-manage" hidden>
+          <form id="bench-rename-form" hidden>
+            <label for="bench-name">Benchmark name</label>
+            <input
+              id="bench-name"
+              type="text"
+              required
+              maxlength="120"
+              autocomplete="off"
+              aria-describedby="bench-name-hint bench-manage-error"
+            />
+            <p id="bench-name-hint">
+              Give this run a name you’ll recognize. Its wallpaper and recorded
+              parameters stay the same.
+            </p>
+            <div class="bench-actions">
+              <button id="bench-name-save" class="primary" type="submit">
+                Save name
+              </button>
+              <button id="bench-name-cancel" class="quiet" type="button">
+                Cancel
+              </button>
+            </div>
+          </form>
+          <div id="bench-delete-confirmation" hidden>
+            <h3>Delete <span id="bench-delete-name"></span>?</h3>
+            <p>
+              This permanently removes this benchmark’s results, raw recordings,
+              logs, and recovery backups from this device. Your installed
+              wallpaper and other benchmarks are kept.
+            </p>
+            <div class="bench-actions">
+              <button id="bench-delete-cancel" class="quiet">
+                Keep benchmark
+              </button>
+              <button id="bench-delete-confirm" class="danger">
+                Delete permanently
+              </button>
+            </div>
+          </div>
+          <p id="bench-manage-error" role="alert"></p>
+        </section>
         <div id="bench-parameters" class="bench-parameters" hidden>
           <h3>Parameters used for this run</h3>
           <dl id="bench-parameter-list"></dl>

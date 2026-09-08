@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 use std::{
     fs,
-    io::Read,
+    io::{Read, Write},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
@@ -12,6 +12,7 @@ use std::{
 };
 
 pub struct Benchmark {
+    base: PathBuf,
     child: Option<Child>,
     saved: Option<Library>,
     directory: Option<PathBuf>,
@@ -35,6 +36,15 @@ fn job_path(base: &Path, id: &str) -> Result<PathBuf> {
 
 fn read_json(path: impl AsRef<Path>) -> Option<Value> {
     serde_json::from_slice(&fs::read(path).ok()?).ok()
+}
+
+fn existing_job_path(base: &Path, id: &str) -> Result<PathBuf> {
+    let directory = job_path(base, id)?;
+    let metadata = fs::symlink_metadata(&directory).context("Benchmark is missing")?;
+    if !metadata.file_type().is_dir() {
+        bail!("Benchmark must be a directory inside the benchmark library");
+    }
+    Ok(directory)
 }
 
 pub fn graphics_fault() -> Option<Value> {
@@ -78,6 +88,19 @@ fn history_entry(directory: &Path, active: Option<Value>) -> Option<Value> {
         .unwrap_or_else(
             || json!({"id":request["source"],"title":"Wallpaper no longer in library"}),
         );
+    let name = read_json(directory.join("name.json"))
+        .and_then(|value| {
+            value
+                .as_str()
+                .filter(|name| !name.trim().is_empty())
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| {
+            wallpaper["title"]
+                .as_str()
+                .unwrap_or("Benchmark")
+                .to_owned()
+        });
     let is_active = active.is_some();
     let mut status = active
         .or_else(|| read_json(directory.join("desktop-status.json")))
@@ -97,7 +120,7 @@ fn history_entry(directory: &Path, active: Option<Value>) -> Option<Value> {
     // Process/control paths belong in private receipts, not in the history cards.
     status.as_object_mut()?.remove("directory");
     Some(json!({
-        "id":id,
+        "id":id,"name":name,
         "created_ms":id.strip_prefix("game-")?.parse::<u128>().ok()? / 1_000_000,
         "request":request,"wallpaper":wallpaper,"status":status,
         "has_result":directory.join("result.json").is_file(),
@@ -106,7 +129,12 @@ fn history_entry(directory: &Path, active: Option<Value>) -> Option<Value> {
 
 impl Benchmark {
     pub fn new() -> Self {
+        Self::load(base_directory())
+    }
+
+    fn load(base: PathBuf) -> Self {
         let mut benchmark = Self {
+            base,
             child: None,
             saved: None,
             directory: None,
@@ -115,12 +143,15 @@ impl Benchmark {
             exit_ok: false,
         };
         // Keep the latest successful comparison inspectable after a prototype restart.
-        let base = base_directory();
-        if let Ok(entries) = fs::read_dir(base) {
+        if let Ok(entries) = fs::read_dir(&benchmark.base) {
             let latest = entries
                 .flatten()
                 .filter_map(|entry| {
+                    if !entry.file_type().ok()?.is_dir() {
+                        return None;
+                    }
                     let directory = entry.path();
+                    job_path(&benchmark.base, directory.file_name()?.to_str()?).ok()?;
                     let state: Value = serde_json::from_slice(
                         &fs::read(directory.join("desktop-status.json")).ok()?,
                     )
@@ -174,11 +205,7 @@ impl Benchmark {
             "game-{}",
             SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
         );
-        let directory = platform::data_file()
-            .parent()
-            .unwrap()
-            .join("benchmarks")
-            .join(&id);
+        let directory = self.base.join(&id);
         fs::create_dir_all(&directory)?;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
         let mut random = [0_u8; 24];
@@ -336,7 +363,7 @@ impl Benchmark {
 
     fn directory_for(&self, id: Option<&str>) -> Result<PathBuf> {
         match id {
-            Some(id) => job_path(&base_directory(), id),
+            Some(id) => existing_job_path(&self.base, id),
             None => self.directory.clone().context("No benchmark selected"),
         }
     }
@@ -349,14 +376,58 @@ impl Benchmark {
     }
 
     pub fn history(&self) -> Result<Value> {
-        let base = base_directory();
-        fs::create_dir_all(&base)?;
-        let mut entries: Vec<Value> = fs::read_dir(base)?
+        fs::create_dir_all(&self.base)?;
+        let mut entries: Vec<Value> = fs::read_dir(&self.base)?
             .flatten()
+            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
             .filter_map(|entry| self.entry(&entry.path()).ok())
             .collect();
         entries.sort_by(|a, b| b["id"].as_str().cmp(&a["id"].as_str()));
         Ok(json!({"benchmarks":entries}))
+    }
+
+    pub fn rename(&self, id: &str, name: &str) -> Result<Value> {
+        let name = name.trim();
+        if name.is_empty() || name.chars().count() > 120 || name.chars().any(char::is_control) {
+            bail!("Choose a name with 1–120 characters on one line");
+        }
+        let directory = existing_job_path(&self.base, id)?;
+        self.entry(&directory)?;
+        // Keep original run metadata and worker-owned results untouched, even while recording.
+        let temporary = directory.join(format!(
+            ".name-{}.tmp",
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
+        ));
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)?;
+        let write_result = file
+            .write_all(&serde_json::to_vec(&name)?)
+            .and_then(|_| fs::rename(&temporary, directory.join("name.json")));
+        if write_result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        write_result.context("Could not save the benchmark name")?;
+        self.entry(&directory)
+    }
+
+    pub fn delete(&mut self, id: &str) -> Result<()> {
+        let directory = existing_job_path(&self.base, id)?;
+        let current = self.directory.as_deref() == Some(directory.as_path());
+        if current && self.active() {
+            bail!(
+                "Stop or cancel this benchmark and wait for desktop restoration before deleting it"
+            );
+        }
+        fs::remove_dir_all(&directory).context("Could not delete all benchmark files")?;
+        if current {
+            self.directory = None;
+            self.state = json!({"state":"idle"});
+            self.token.clear();
+            self.exit_ok = false;
+        }
+        Ok(())
     }
 
     pub fn record(&self, id: Option<&str>) -> Result<Value> {
@@ -378,6 +449,160 @@ impl Benchmark {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct Jobs(PathBuf);
+
+    impl Jobs {
+        fn new() -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "wallpaperdb-job-actions-{}-{}",
+                std::process::id(),
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            fs::create_dir_all(&root).unwrap();
+            Self(root)
+        }
+
+        fn add(&self, id: &str) -> PathBuf {
+            let directory = self.0.join(id);
+            fs::create_dir_all(directory.join("gameplay/frames")).unwrap();
+            fs::write(
+                directory.join("job.json"),
+                r#"{"source":"image","game":"cs2","cap":120}"#,
+            )
+            .unwrap();
+            fs::write(
+                directory.join("library-before.json"),
+                r#"{"items":[{"id":"image","title":"Original wallpaper","kind":"image"}]}"#,
+            )
+            .unwrap();
+            fs::write(
+                directory.join("desktop-status.json"),
+                json!({"id":id,"state":"complete"}).to_string(),
+            )
+            .unwrap();
+            fs::write(
+                directory.join("result.json"),
+                r#"{"runs":[],"comparison":null}"#,
+            )
+            .unwrap();
+            fs::write(
+                directory.join("gameplay/frames/control.csv"),
+                "raw evidence",
+            )
+            .unwrap();
+            directory
+        }
+    }
+
+    impl Drop for Jobs {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn rename_survives_reload_without_rewriting_measurements_or_wallpaper() {
+        let jobs = Jobs::new();
+        let directory = jobs.add("game-123");
+        let original_result = fs::read(directory.join("result.json")).unwrap();
+        let original_request = fs::read(directory.join("job.json")).unwrap();
+        let benchmark = Benchmark::load(jobs.0.clone());
+        assert_eq!(
+            benchmark.record(Some("game-123")).unwrap()["name"],
+            "Original wallpaper"
+        );
+        benchmark
+            .rename("game-123", "  Evening run 🌙 <high>  ")
+            .unwrap();
+        let reloaded = Benchmark::load(jobs.0.clone());
+        assert_eq!(
+            reloaded.history().unwrap()["benchmarks"][0]["name"],
+            "Evening run 🌙 <high>"
+        );
+        let row = reloaded.record(Some("game-123")).unwrap();
+        assert_eq!(row["name"], "Evening run 🌙 <high>");
+        assert_eq!(row["wallpaper"]["title"], "Original wallpaper");
+        assert_eq!(
+            fs::read(directory.join("result.json")).unwrap(),
+            original_result
+        );
+        assert_eq!(
+            fs::read(directory.join("job.json")).unwrap(),
+            original_request
+        );
+        for name in ["", "   ", "two\nlines", "bad\u{0000}name", &"x".repeat(121)] {
+            assert!(benchmark.rename("game-123", name).is_err(), "{name:?}");
+        }
+        assert_eq!(
+            benchmark.record(Some("game-123")).unwrap()["name"],
+            "Evening run 🌙 <high>"
+        );
+    }
+
+    #[test]
+    fn delete_removes_only_the_selected_job_and_clears_its_cached_status() {
+        let jobs = Jobs::new();
+        let other = jobs.add("game-100");
+        let target = jobs.add("game-200");
+        let outside = Jobs::new();
+        fs::write(outside.0.join("keep.txt"), "unrelated data").unwrap();
+        std::os::unix::fs::symlink(&outside.0, target.join("linked-directory")).unwrap();
+        let mut benchmark = Benchmark::load(jobs.0.clone());
+        assert_eq!(benchmark.snapshot()["id"], "game-200");
+        benchmark.delete("game-200").unwrap();
+        assert!(!target.exists());
+        assert!(other.join("gameplay/frames/control.csv").exists());
+        assert_eq!(
+            fs::read_to_string(outside.0.join("keep.txt")).unwrap(),
+            "unrelated data"
+        );
+        assert_eq!(benchmark.snapshot()["state"], "idle");
+        assert!(benchmark.result().is_err());
+        assert!(benchmark.record(Some("game-200")).is_err());
+        assert_eq!(
+            Benchmark::load(jobs.0.clone()).history().unwrap()["benchmarks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn active_job_can_be_renamed_but_not_deleted_even_during_restoration() {
+        let jobs = Jobs::new();
+        let other = jobs.add("game-100");
+        let target = jobs.add("game-200");
+        let mut benchmark = Benchmark::load(jobs.0.clone());
+        benchmark.saved = Some(Library::default());
+        benchmark.state["state"] = json!("restoring");
+        benchmark.rename("game-200", "Active session").unwrap();
+        assert!(benchmark.delete("game-200").is_err());
+        assert!(target.join("library-before.json").exists());
+        benchmark.delete("game-100").unwrap();
+        assert!(!other.exists());
+        assert_eq!(benchmark.snapshot()["id"], "game-200");
+        assert!(benchmark.active());
+    }
+
+    #[test]
+    fn history_mutations_reject_paths_and_symlinked_job_directories() {
+        let jobs = Jobs::new();
+        let external = Jobs::new();
+        let target = external.add("game-300");
+        std::os::unix::fs::symlink(&target, jobs.0.join("game-300")).unwrap();
+        let mut benchmark = Benchmark::load(jobs.0.clone());
+        for id in ["../game-300", "game-", "game-999", "game-300"] {
+            assert!(benchmark.rename(id, "Should fail").is_err(), "{id}");
+            assert!(benchmark.delete(id).is_err(), "{id}");
+        }
+        assert!(target.join("result.json").exists());
+        assert!(!target.join("name.json").exists());
+    }
 
     #[test]
     fn history_ids_cannot_escape_the_job_directory() {

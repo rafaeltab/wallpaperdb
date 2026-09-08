@@ -1237,6 +1237,65 @@ select {
   justify-content: space-between;
   margin-bottom: 18px;
 }
+.bench-record-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+.bench-detail-actions > .quiet,
+.bench-record-actions button,
+.bench-manage button {
+  padding: 9px 14px;
+  min-height: 36px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.bench-detail-actions .quiet,
+.bench-manage .quiet {
+  border: 1px solid #ffffff18;
+  background: #ffffff04;
+}
+.bench-manage .primary {
+  width: auto;
+  min-width: 128px;
+  justify-content: center;
+}
+.bench-manage {
+  background: #ef8aa806;
+}
+.bench-manage label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+.bench-manage input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.bench-manage p {
+  color: #aaa0a9;
+  line-height: 1.65;
+}
+.bench-manage h3,
+.bench-history-card strong,
+#bench-browser-title {
+  overflow-wrap: anywhere;
+}
+#bench-manage-error {
+  color: #ff9baf;
+}
+#bench-manage-error:empty {
+  display: none;
+}
+.bench-dialog button.danger {
+  color: #ffa4b5;
+  border: 1px solid #ff9baf50;
+  background: #ff9baf0a;
+}
+.bench-dialog button.danger:hover:not(:disabled) {
+  background: #ff9baf1a;
+  border-color: #ff9baf90;
+}
 .bench-parameters {
   border: 1px solid #ffffff16;
   border-radius: 12px;

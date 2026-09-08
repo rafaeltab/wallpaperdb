@@ -25,6 +25,13 @@ choose **View parameters** to inspect its settings. The native library window st
 on its existing display and workspace. Choosing that same game display shows a
 warning that the game may hide the library.
 
+Open a run in **Benchmarks** and choose **Rename** to give it a recognizable name.
+Names persist across restarts; the original wallpaper and recording parameters
+remain available. **Delete** asks for confirmation before permanently removing that
+run's results, raw recordings, logs and recovery backups. Installed wallpapers and
+other benchmarks are kept. A running or restoring benchmark can be renamed, but
+must finish stopping or cancelling before it can be deleted.
+
 **Automatic replay comparison** runs the configured replay interval and pair count.
 **Continuous gameplay · stop manually** opens one offline Dust II bot game. Choose
 **Start control recording** when ready, then **Record wallpaper benchmark →** to
@@ -160,6 +167,13 @@ subsequently marked invalid after visual inspection.
     make native-game-bench-test
     make native-game-bench-ui-test
     make native-game-bench-ui-test ARGS='--temperature-option'
+
+Rename/delete checks use temporary filesystem jobs and an isolated UI fixture;
+they do not connect to the real desktop library, change existing recordings, or
+launch a game. The UI test uses headless Chromium with the GPU disabled:
+
+    make native-test
+    make native-game-bench-ui-test ARGS='--history-actions'
 
 The UI harness connects to the actual running local library. To exercise the game:
 

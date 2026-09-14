@@ -309,6 +309,28 @@ describe('Profile commands', () => {
     expect(accepted.json()).toMatchObject({ version: 2, aliases: [{ handle: before.handle, claimGeneration: expect.any(Number) }] });
   });
 
+  it('serializes competing Handle edits and returns coherent owner snapshots', async () => {
+    const before = (await request('user_1')).json();
+    const [first, second, ...reads] = await Promise.all([
+      changeHandle('user_1', 'first-handle', before.version),
+      changeHandle('user_1', 'second-handle', before.version),
+      ...Array.from({ length: 8 }, () => request('user_1')),
+    ]);
+    expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
+    const stale = first.statusCode === 409 ? first : second;
+    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    for (const response of reads) {
+      expect(response.statusCode).toBe(200);
+      const profile = response.json();
+      if (profile.version === 1) expect(profile).toEqual(before);
+      else expect(profile).toMatchObject({
+        version: 2, handle: expect.stringMatching(/^(first|second)-handle$/),
+        aliases: [{ handle: before.handle, claimGeneration: expect.any(Number) }],
+      });
+    }
+    expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(1);
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

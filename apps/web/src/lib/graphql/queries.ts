@@ -84,15 +84,20 @@ export const GET_PROFILE = gql`
 export const GET_PROFILE_BY_HANDLE = gql`
   query GetProfileByHandle($handle: String!) {
     profileByHandle(handle: $handle) {
-      id
-      handle
-      displayName
-      biographyMarkdown
-      picture {
+      requestedHandle
+      isAlias
+      canonicalHandle
+      profile {
         id
-        url
+        handle
+        displayName
+        biographyMarkdown
+        picture {
+          id
+          url
+        }
+        canonicalPath
       }
-      canonicalPath
     }
   }
 `;

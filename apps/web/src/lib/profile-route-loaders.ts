@@ -7,23 +7,23 @@ export async function loadCanonicalProfile(
   queryClient: QueryClient,
   handle: string
 ): Promise<Profile> {
-  const profile = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
-  if (!profile) throw notFound();
+  const resolution = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
+  if (!resolution) throw notFound();
 
-  if (profile.handle !== handle) {
-    throw redirectToCanonicalProfile(profile.handle);
+  if (resolution.canonicalHandle !== handle) {
+    throw redirectToCanonicalProfile(resolution.canonicalHandle);
   }
 
-  return profile;
+  return resolution.profile;
 }
 
 export async function redirectHandleToCanonical(
   queryClient: QueryClient,
   handle: string
 ): Promise<never> {
-  const profile = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
-  if (!profile) throw notFound();
-  throw redirectToCanonicalProfile(profile.handle);
+  const resolution = await queryClient.fetchQuery(profileByHandleQueryOptions(handle));
+  if (!resolution) throw notFound();
+  throw redirectToCanonicalProfile(resolution.canonicalHandle);
 }
 
 export async function redirectProfileIdToCanonical(

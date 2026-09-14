@@ -74,3 +74,10 @@ export interface Profile {
   picture: ProfilePicture | null;
   canonicalPath: string;
 }
+
+export interface HandleResolution {
+  profile: Profile;
+  requestedHandle: string;
+  isAlias: boolean;
+  canonicalHandle: string;
+}

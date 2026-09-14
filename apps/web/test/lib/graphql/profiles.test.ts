@@ -28,12 +28,14 @@ describe('Profile GraphQL client', () => {
       picture: null,
       canonicalPath: '/profiles/@ada-lovelace',
     };
-    mockFetch.mockResolvedValue(createGraphQLResponse({ profileByHandle: profile }));
+    const resolution = { profile, requestedHandle: 'Ada-Lovelace', isAlias: false, canonicalHandle: profile.handle };
+    mockFetch.mockResolvedValue(createGraphQLResponse({ profileByHandle: resolution }));
 
-    await expect(fetchProfileByHandle('Ada-Lovelace')).resolves.toEqual(profile);
+    await expect(fetchProfileByHandle('Ada-Lovelace')).resolves.toEqual(resolution);
     const [, init] = mockFetch.mock.calls[0] as [URL, RequestInit];
     expect(JSON.parse(init.body as string)).toMatchObject({
       operationName: 'GetProfileByHandle',
+      query: expect.stringContaining('canonicalHandle'),
       variables: { handle: 'Ada-Lovelace' },
     });
   });

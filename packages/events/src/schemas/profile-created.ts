@@ -8,6 +8,11 @@ export const PublicProfileSnapshotSchema = z
     displayName: z.string().min(1),
     handle: z.string().min(1),
     claimGeneration: z.number().int().positive(),
+    // Older retained events predate Handle changes and contain no aliases.
+    aliases: z.array(z.object({
+      handle: z.string().min(1),
+      claimGeneration: z.number().int().positive(),
+    }).strict()).optional(),
     biographyMarkdown: z.string(),
     pictureAssetId: z.string().min(1).nullable(),
     version: z.number().int().positive(),

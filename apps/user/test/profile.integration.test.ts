@@ -127,6 +127,41 @@ describe('Profile commands', () => {
     });
   }
 
+  async function changeHandle(userId: string, handle: string, expectedVersion: number) {
+    const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+    return app.inject({
+      method: 'PUT',
+      url: '/profile/me/handle',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { handle, expectedVersion },
+    });
+  }
+
+  it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    const before = (await request('user_1')).json();
+    const response = await changeHandle('user_1', '  New__Hándle -- ', before.version);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: 'user_1', handle: 'new-handle', displayName: 'Before', version: 2,
+      aliases: [{ handle: 'before', claimGeneration: expect.any(Number) }],
+    });
+    const events = await sql`select payload from outbox_events where subject = 'profile.updated'`;
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toMatchObject({
+      eventType: 'profile.updated',
+      change: { type: 'handle-changed', before: 'before', after: 'new-handle' },
+      profile: {
+        id: 'user_1', handle: 'new-handle', displayName: 'Before', version: 2,
+        biographyMarkdown: '', pictureAssetId: null,
+        aliases: response.json().aliases,
+      },
+    });
+    expect(events[0].payload.profile.claimGeneration).toBeGreaterThan(response.json().aliases[0].claimGeneration);
+    expect((await request('user_1')).json()).toMatchObject(response.json());
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

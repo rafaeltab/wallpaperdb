@@ -50,6 +50,11 @@ const RESERVED_HANDLES = new Set([
 const FALLBACK_ADJECTIVES = ['quiet', 'bright', 'silver', 'wild'];
 const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
 
+type ProfileReader = Pick<ReturnType<DatabaseConnection['getClient']>['db'], 'query'>;
+export interface OwnerProfile extends Profile {
+  aliases: Array<{ handle: string; claimGeneration: number }>;
+}
+
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
 export class ProfileVersionConflictError extends Error {}
@@ -91,11 +96,11 @@ export class ProfileService {
     @inject('config') private readonly config: Config
   ) {}
 
-  async ensure(userId: string): Promise<Profile> {
+  async ensure(userId: string): Promise<OwnerProfile> {
     const existing = await this.database.getClient().db.query.profiles.findFirst({
       where: eq(profiles.id, userId),
     });
-    if (existing) return existing;
+    if (existing) return this.ownerProfile(existing);
 
     let identity: ExternalIdentity;
     try {
@@ -130,7 +135,7 @@ export class ProfileService {
       try {
         return await this.database.getClient().db.transaction(async (tx) => {
           const raced = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
-          if (raced) return raced;
+          if (raced) return this.ownerProfile(raced);
 
           const now = new Date();
           const [profile] = await tx
@@ -152,6 +157,7 @@ export class ProfileService {
               displayName: profile.displayName,
               handle: profile.handle,
               claimGeneration: claim.claimGeneration,
+              aliases: [],
               biographyMarkdown: profile.biographyMarkdown,
               pictureAssetId: profile.pictureAssetId,
               version: profile.version,
@@ -166,17 +172,57 @@ export class ProfileService {
             aggregateId: userId,
             payload: event,
           });
-          return profile;
+          return { ...profile, aliases: [] };
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
         const raced = await this.database.getClient().db.query.profiles.findFirst({
           where: eq(profiles.id, userId),
         });
-        if (raced) return raced;
+        if (raced) return this.ownerProfile(raced);
       }
     }
     throw new Error('Unable to claim a unique profile handle');
+  }
+
+  async changeHandle(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
+    const handle = slugify(requestedHandle);
+    return this.database.getClient().db.transaction(async (tx) => {
+      const current = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
+      if (!current || current.version !== expectedVersion) {
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      }
+      const now = new Date();
+      const [updated] = await tx.update(profiles).set({
+        handle, version: sql`${profiles.version} + 1`, updatedAt: now,
+      }).where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion))).returning();
+      if (!updated) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      const [claim] = await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' }).returning();
+      await tx.update(handleClaims).set({ kind: 'alias', createdAt: now }).where(eq(handleClaims.handle, current.handle));
+      const owner = await this.ownerProfile(updated, tx);
+      const event: ProfileUpdatedEvent = {
+        eventId: `evt_${ulid()}`, eventType: PROFILE_UPDATED_SUBJECT, timestamp: now.toISOString(),
+        change: { type: 'handle-changed', before: current.handle, after: handle },
+        profile: {
+          id: updated.id, displayName: updated.displayName, handle: updated.handle,
+          claimGeneration: claim.claimGeneration, aliases: owner.aliases,
+          biographyMarkdown: updated.biographyMarkdown, pictureAssetId: updated.pictureAssetId,
+          version: updated.version, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(),
+        },
+      };
+      ProfileUpdatedEventSchema.parse(event);
+      await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event });
+      return owner;
+    });
+  }
+
+  private async ownerProfile(profile: Profile, reader: ProfileReader = this.database.getClient().db): Promise<OwnerProfile> {
+    const aliases = await reader.query.handleClaims.findMany({
+      where: and(eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'alias')),
+      columns: { handle: true, claimGeneration: true },
+      orderBy: [handleClaims.createdAt, handleClaims.handle],
+    });
+    return { ...profile, aliases };
   }
 
   async updateDisplayName(

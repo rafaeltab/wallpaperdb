@@ -10,7 +10,7 @@ export const ProfileUpdatedEventSchema = z
     timestamp: z.string().datetime(),
     change: z
       .object({
-        type: z.literal("display-name-changed"),
+        type: z.enum(["display-name-changed", "handle-changed"]),
         before: z.string().min(1),
         after: z.string().min(1),
       })

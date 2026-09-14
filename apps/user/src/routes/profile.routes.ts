@@ -40,6 +40,12 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
     }
   });
 
+  fastify.put<{ Body: { handle: string; expectedVersion: number } }>('/profile/me/handle', async (request, reply) => {
+    const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
+    const profile = await container.resolve(ProfileService).changeHandle(user.id, request.body.handle, request.body.expectedVersion);
+    return reply.code(200).send(profile);
+  });
+
   fastify.patch('/profile/me', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
     if (!isProfileUpdateBody(request.body)) {

@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { buildSchema, parse } from 'graphql';
 import { container } from 'tsyringe';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
 import { QueryComplexityService } from '../src/services/query-complexity.service.js';
 import { tester } from './setup.js';
@@ -247,6 +247,34 @@ describe('GraphQL Security', () => {
   });
 
   describe('Query Complexity Analysis', () => {
+    it('rejects fragment-based contributor query amplification before searching wallpapers', async () => {
+      const search = vi.spyOn(container.resolve(WallpaperRepository), 'search');
+
+      try {
+        const response = await tester.getApp().inject({
+          method: 'POST',
+          url: '/graphql',
+          payload: {
+            query: `
+              query {
+                searchWallpapers(first: 40) {
+                  edges { node { profile { ...Contributions } } }
+                }
+              }
+              fragment Contributions on Profile {
+                wallpapers(first: 40) { edges { node { wallpaperId } } }
+              }
+            `,
+          },
+        });
+
+        expect(response.json().errors?.[0].extensions?.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+        expect(search).not.toHaveBeenCalled();
+      } finally {
+        search.mockRestore();
+      }
+    });
+
     it('does not apply Profile.wallpapers cost to an unrelated field with the same name', () => {
       const collisionSchema = buildSchema(`
         type Query { wallpapers(first: Int): WallpaperConnection! }

@@ -1,6 +1,6 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import type { DocumentNode, FieldNode, GraphQLSchema, ValueNode } from 'graphql';
-import { TypeInfo, visit, visitWithTypeInfo } from 'graphql';
+import type { DocumentNode, FieldNode, FragmentDefinitionNode, GraphQLSchema, ValueNode } from 'graphql';
+import { BREAK, Kind, TypeInfo, visit, visitWithTypeInfo } from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { BreadthLimitError, ComplexityLimitError } from '../errors/graphql-errors.js';
@@ -45,26 +45,67 @@ export class QueryComplexityService {
     variables: Record<string, unknown>
   ): number {
     let totalCost = 0;
-    const typeInfo = new TypeInfo(schema);
+    const fragments = new Map<string, FragmentDefinitionNode>();
+    for (const definition of document.definitions) {
+      if (definition.kind === Kind.FRAGMENT_DEFINITION) {
+        fragments.set(definition.name.value, definition);
+      }
+    }
 
-    visit(
-      document,
-      visitWithTypeInfo(typeInfo, {
-        Field: (node) => {
-          const parentType = typeInfo.getParentType();
-          const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
-          const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
+    for (const operation of document.definitions) {
+      if (operation.kind !== Kind.OPERATION_DEFINITION) continue;
+      const typeInfo = new TypeInfo(schema);
+      let multiplier = 1;
+      let pageSize = 1;
+      const ancestors: Array<{ multiplier: number; pageSize: number }> = [];
+      const activeFragments = new Set<string>();
 
-          // Calculate list multiplier from arguments (first, last)
-          const listMultiplier = this.getListMultiplier(node, variables);
+      const visitor = visitWithTypeInfo(typeInfo, {
+        Field: {
+          enter: (node) => {
+            ancestors.push({ multiplier, pageSize });
+            const parentType = typeInfo.getParentType();
+            const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
+            const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
 
-          // Calculate nested multiplier for nested lists
-          const nestedMultiplier = this.getNestedMultiplier(fieldName);
+            // Only connection edges repeat per result; pageInfo is resolved once.
+            if (fieldName === 'WallpaperConnection.edges') multiplier *= pageSize;
+            const listMultiplier = this.getListMultiplier(node, variables);
+            totalCost += fieldCost * multiplier * listMultiplier * this.getNestedMultiplier(fieldName);
 
-          totalCost += fieldCost * listMultiplier * nestedMultiplier;
+            if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
+            if (fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers') {
+              pageSize = listMultiplier;
+            }
+            return undefined;
+          },
+          leave: () => {
+            const ancestor = ancestors.pop();
+            if (ancestor) ({ multiplier, pageSize } = ancestor);
+          },
         },
-      })
-    );
+        FragmentSpread: (node) => {
+          const name = node.name.value;
+          const fragment = fragments.get(name);
+          if (!fragment) return undefined;
+          if (activeFragments.has(name)) {
+            totalCost = this.config.graphqlMaxComplexity + 1;
+            return BREAK;
+          }
+          activeFragments.add(name);
+          visit(fragment, visitor);
+          activeFragments.delete(name);
+          if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
+          return undefined;
+        },
+      });
+      visit(operation, visitor);
+
+      // Stop expanding fragments as soon as rejection is certain.
+      if (totalCost > this.config.graphqlMaxComplexity) {
+        return this.config.graphqlMaxComplexity + 1;
+      }
+    }
 
     return totalCost;
   }

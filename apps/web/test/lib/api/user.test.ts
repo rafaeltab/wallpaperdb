@@ -81,6 +81,34 @@ describe('User API client', () => {
     ).rejects.toMatchObject({ status: 409 });
   });
 
+  it('changes the Handle with a fresh token and last-seen Profile version', async () => {
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const updated = {
+      ...profile,
+      handle: 'new-handle',
+      version: 2,
+      lastHandleChangedAt: '2026-09-14T12:00:00.000Z',
+      aliases: [{ handle: profile.handle, claimGeneration: 1 }],
+    };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated)));
+    vi.stubGlobal('fetch', fetch);
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
+
+    await expect(
+      client.updateHandle({ handle: 'New Handle', expectedVersion: 1, expectedProfileId: profile.id })
+    ).resolves.toEqual(updated);
+    expect(tokenProvider).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me/handle', {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer fresh-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ handle: 'New Handle', expectedVersion: 1 }),
+    });
+  });
+
   it('does not send an ensure request without an auth token', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);

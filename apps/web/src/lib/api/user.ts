@@ -9,6 +9,8 @@ export interface Profile {
   version: number;
   createdAt: string;
   updatedAt: string;
+  lastHandleChangedAt?: string | null;
+  aliases?: Array<{ handle: string; claimGeneration: number }>;
 }
 
 export class UserApiError extends Error {
@@ -39,6 +41,13 @@ interface UpdateProfileOptions {
   tokenProvider?: () => Promise<string | null>;
 }
 
+interface UpdateHandleOptions {
+  handle: string;
+  expectedVersion: number;
+  expectedProfileId?: string;
+  tokenProvider?: () => Promise<string | null>;
+}
+
 export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOptions) {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
@@ -59,6 +68,31 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
       if (!response.ok) {
         throw await userApiError(response);
       }
+
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) {
+        throw new UserApiError('User API returned a malformed Profile', 502);
+      }
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
+    async updateHandle(options: UpdateHandleOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+
+      const response = await fetch(`${normalizedBaseUrl}/profile/me/handle`, {
+        method: 'PUT',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ handle: options.handle, expectedVersion: options.expectedVersion }),
+      });
+      if (!response.ok) throw await userApiError(response);
 
       const profile: unknown = await response.json();
       if (!isProfile(profile)) {

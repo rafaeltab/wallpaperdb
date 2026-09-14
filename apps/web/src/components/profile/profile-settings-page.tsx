@@ -195,7 +195,15 @@ function HandleSettings({
   const [handle, setHandle] = useState(profile.handle);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
+  const [serverNextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
+  const nextChangeTime = serverNextHandleChangeAt
+    ? Date.parse(serverNextHandleChangeAt)
+    : profile.lastHandleChangedAt
+      ? Date.parse(profile.lastHandleChangedAt) + 7 * 24 * 60 * 60 * 1000
+      : Number.NaN;
+  const nextHandleChangeAt = nextChangeTime > Date.now()
+    ? new Date(nextChangeTime).toISOString()
+    : null;
   const mutation = useMutation({
     mutationFn: () => userApi.updateHandle({
       handle,
@@ -207,6 +215,7 @@ function HandleSettings({
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
       setSaved(true);
       setError(null);
+      setNextHandleChangeAt(null);
     },
     onError: (cause) => {
       if (cause instanceof UserApiError && cause.type?.endsWith('/profile-version-conflict')) {

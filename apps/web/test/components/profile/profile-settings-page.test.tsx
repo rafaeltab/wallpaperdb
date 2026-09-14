@@ -32,11 +32,11 @@ const profile: Profile = {
   updatedAt: '2026-07-12T12:00:00.000Z',
 };
 
-function renderPage() {
+function renderPage(initialProfile: Profile = profile) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  queryClient.setQueryData(profileQueryKey(profile.id), profile);
+  queryClient.setQueryData(profileQueryKey(initialProfile.id), initialProfile);
   return {
     queryClient,
     ...render(
@@ -181,5 +181,15 @@ describe('ProfileSettingsPage', () => {
       new Date(nextHandleChangeAt).toLocaleString()
     );
     expect(input).toHaveValue('another-handle');
+  });
+
+  it('shows the seven-day cooldown from the authoritative Profile before another edit', async () => {
+    const lastHandleChangedAt = '2099-09-14T12:00:00.000Z';
+    renderPage({ ...profile, lastHandleChangedAt });
+
+    expect(screen.getByText(/next handle change available/i)).toHaveTextContent(
+      new Date('2099-09-21T12:00:00.000Z').toLocaleString()
+    );
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
 });

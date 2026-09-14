@@ -21,6 +21,13 @@ function isProfileUpdateBody(body: unknown): body is ProfileUpdateBody {
   return typeof update.displayName === 'string' && typeof update.expectedVersion === 'number';
 }
 
+function isHandleChangeBody(body: unknown): body is { handle: string; expectedVersion: number } {
+  if (!body || typeof body !== 'object') return false;
+  const change = body as Record<string, unknown>;
+  return typeof change.handle === 'string' && typeof change.expectedVersion === 'number' &&
+    Number.isInteger(change.expectedVersion) && change.expectedVersion > 0;
+}
+
 export default async function profileRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post('/profile/me/ensure', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
@@ -41,12 +48,25 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
     }
   });
 
-  fastify.put<{ Body: { handle: string; expectedVersion: number } }>('/profile/me/handle', async (request, reply) => {
+  fastify.put('/profile/me/handle', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
+    if (!isHandleChangeBody(request.body)) {
+      return reply.code(400).type('application/problem+json').send({
+        type: 'https://wallpaperdb.example/problems/invalid-handle',
+        title: 'Invalid Handle command', status: 400,
+        detail: 'Handle and a positive integer expected Profile version are required', instance: request.url,
+      });
+    }
     try {
       const profile = await container.resolve(ProfileService).changeHandle(user.id, request.body.handle, request.body.expectedVersion);
       return reply.code(200).send(profile);
     } catch (error) {
+      if (error instanceof ProfileVersionConflictError) {
+        return reply.code(409).type('application/problem+json').send({
+          type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+          title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
+        });
+      }
       if (error instanceof InvalidHandleError) {
         return reply.code(400).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/invalid-handle',

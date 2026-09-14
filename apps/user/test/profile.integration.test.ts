@@ -183,6 +183,21 @@ describe('Profile commands', () => {
     }
   });
 
+  it('requires authentication and a positive expected version for Handle commands', async () => {
+    const before = (await request('user_1')).json();
+    const unauthenticated = await app.inject({ method: 'PUT', url: '/profile/me/handle', payload: { handle: 'new', expectedVersion: 1 } });
+    expect(unauthenticated.statusCode).toBe(401);
+    const token = Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64');
+    for (const payload of [{}, { handle: 2, expectedVersion: 1 }, { handle: 'new' }, { handle: 'new', expectedVersion: 0 }, { handle: 'new', expectedVersion: 1.5 }]) {
+      const response = await app.inject({ method: 'PUT', url: '/profile/me/handle', headers: { authorization: `Bearer ${token}` }, payload });
+      expect(response.statusCode).toBe(400);
+    }
+    const stale = await changeHandle('user_1', 'new', before.version + 1);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    expect((await request('user_1')).json()).toEqual(before);
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

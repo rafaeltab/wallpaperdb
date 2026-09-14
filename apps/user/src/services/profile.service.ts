@@ -187,6 +187,9 @@ export class ProfileService {
   }
 
   async changeHandle(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new InvalidHandleError('Expected Profile version must be a positive integer');
+    }
     const handle = slugify(requestedHandle);
     if (handle.length < this.config.profileHandleMinLength || handle.length > this.config.profileHandleMaxLength) {
       throw new InvalidHandleError(`Handle must contain ${this.config.profileHandleMinLength}–${this.config.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`);

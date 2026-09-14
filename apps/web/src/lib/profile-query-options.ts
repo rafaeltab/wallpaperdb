@@ -5,6 +5,7 @@ export function profileByHandleQueryOptions(handle: string) {
   return queryOptions({
     queryKey: ['public-profile', 'handle', handle] as const,
     queryFn: () => fetchProfileByHandle(handle),
+    staleTime: 0,
   });
 }
 

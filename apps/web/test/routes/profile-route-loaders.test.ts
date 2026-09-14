@@ -66,6 +66,25 @@ describe('Profile route loaders', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('rechecks a cached current Handle when it becomes an alias after projection', async () => {
+    const original = { ...profile, handle: 'ada-original', canonicalPath: '/profiles/@ada-original' };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
+    });
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(createGraphQLResponse({ profileByHandle: {
+        profile: original, requestedHandle: 'ada-original', isAlias: false, canonicalHandle: 'ada-original',
+      } }))
+      .mockResolvedValueOnce(createGraphQLResponse({ profileByHandle: {
+        ...resolution, requestedHandle: 'ada-original', isAlias: true,
+      } }));
+    vi.stubGlobal('fetch', mockFetch);
+
+    await expect(loadCanonicalProfile(queryClient, 'ada-original')).resolves.toEqual(original);
+    await expectCanonicalRedirect(loadCanonicalProfile(queryClient, 'ada-original'));
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('throws route not-found when a canonical Handle lookup has no result', async () => {
     await expect(loadCanonicalProfile(queryClientReturning(null), 'unknown')).rejects.toMatchObject({
       isNotFound: true,

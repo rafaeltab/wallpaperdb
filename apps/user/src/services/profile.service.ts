@@ -139,7 +139,11 @@ export class ProfileService {
 
       try {
         return await this.database.getClient().db.transaction(async (tx) => {
-          const [raced] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('share');
+          const [raced] = await tx
+            .select()
+            .from(profiles)
+            .where(eq(profiles.id, userId))
+            .for('share');
           if (raced) return this.ownerProfile(raced, tx);
 
           const now = new Date();
@@ -188,62 +192,120 @@ export class ProfileService {
     throw new Error('Unable to claim a unique profile handle');
   }
 
-  async changeHandle(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
+  async changeHandle(
+    userId: string,
+    requestedHandle: string,
+    expectedVersion: number
+  ): Promise<OwnerProfile> {
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
       throw new InvalidHandleError('Expected Profile version must be a positive integer');
     }
     const handle = slugify(requestedHandle);
-    if (handle.length < this.config.profileHandleMinLength || handle.length > this.config.profileHandleMaxLength) {
-      throw new InvalidHandleError(`Handle must contain ${this.config.profileHandleMinLength}–${this.config.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`);
+    if (
+      handle.length < this.config.profileHandleMinLength ||
+      handle.length > this.config.profileHandleMaxLength
+    ) {
+      throw new InvalidHandleError(
+        `Handle must contain ${this.config.profileHandleMinLength}–${this.config.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`
+      );
     }
-    if (RESERVED_HANDLES.has(handle)) throw new InvalidHandleError('This Handle is reserved; choose another name');
-    return this.database.getClient().db.transaction(async (tx) => {
-      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
-      if (!current || current.version !== expectedVersion) {
-        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      }
-      if (current.handle === handle) return this.ownerProfile(current, tx);
-      const now = new Date();
-      if (current.lastHandleChangedAt) {
-        const deadline = new Date(current.lastHandleChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
-        if (now < deadline) throw new HandleCooldownError(deadline);
-      }
-      const [updated] = await tx.update(profiles).set({
-        handle, version: sql`${profiles.version} + 1`, updatedAt: now, lastHandleChangedAt: now,
-      }).where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion))).returning();
-      if (!updated) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      const [claim] = await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' })
-        .onConflictDoUpdate({
-          target: handleClaims.handle,
-          set: { kind: 'profile', claimGeneration: sql`excluded.claim_generation`, createdAt: now },
-          setWhere: and(eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
-        }).returning();
-      if (!claim) throw new HandleUnavailableError('This Handle is already in use; choose another name');
-      await tx.update(handleClaims).set({ kind: 'alias', createdAt: now }).where(eq(handleClaims.handle, current.handle));
-      const owner = await this.ownerProfile(updated, tx);
-      const event: ProfileUpdatedEvent = {
-        eventId: `evt_${ulid()}`, eventType: PROFILE_UPDATED_SUBJECT, timestamp: now.toISOString(),
-        change: { type: 'handle-changed', before: current.handle, after: handle },
-        profile: {
-          id: updated.id, displayName: updated.displayName, handle: updated.handle,
-          claimGeneration: claim.claimGeneration, aliases: owner.aliases,
-          biographyMarkdown: updated.biographyMarkdown, pictureAssetId: updated.pictureAssetId,
-          version: updated.version, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(),
-        },
-      };
-      ProfileUpdatedEventSchema.parse(event);
-      await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event });
-      return owner;
-    }).catch((error: unknown) => {
-      if (isUniqueViolation(error)) throw new HandleUnavailableError('This Handle is already in use; choose another name');
-      throw error;
-    });
+    if (RESERVED_HANDLES.has(handle))
+      throw new InvalidHandleError('This Handle is reserved; choose another name');
+    return this.database
+      .getClient()
+      .db.transaction(async (tx) => {
+        const [current] = await tx
+          .select()
+          .from(profiles)
+          .where(eq(profiles.id, userId))
+          .for('update');
+        if (!current || current.version !== expectedVersion) {
+          throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+        }
+        if (current.handle === handle) return this.ownerProfile(current, tx);
+        const now = new Date();
+        if (current.lastHandleChangedAt) {
+          const deadline = new Date(
+            current.lastHandleChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000
+          );
+          if (now < deadline) throw new HandleCooldownError(deadline);
+        }
+        const [updated] = await tx
+          .update(profiles)
+          .set({
+            handle,
+            version: sql`${profiles.version} + 1`,
+            updatedAt: now,
+            lastHandleChangedAt: now,
+          })
+          .where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion)))
+          .returning();
+        if (!updated)
+          throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+        const [claim] = await tx
+          .insert(handleClaims)
+          .values({ handle, profileId: userId, kind: 'profile' })
+          .onConflictDoUpdate({
+            target: handleClaims.handle,
+            set: {
+              kind: 'profile',
+              claimGeneration: sql`excluded.claim_generation`,
+              createdAt: now,
+            },
+            setWhere: and(eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
+          })
+          .returning();
+        if (!claim)
+          throw new HandleUnavailableError('This Handle is already in use; choose another name');
+        await tx
+          .update(handleClaims)
+          .set({ kind: 'alias', createdAt: now })
+          .where(eq(handleClaims.handle, current.handle));
+        const owner = await this.ownerProfile(updated, tx);
+        const event: ProfileUpdatedEvent = {
+          eventId: `evt_${ulid()}`,
+          eventType: PROFILE_UPDATED_SUBJECT,
+          timestamp: now.toISOString(),
+          change: { type: 'handle-changed', before: current.handle, after: handle },
+          profile: {
+            id: updated.id,
+            displayName: updated.displayName,
+            handle: updated.handle,
+            claimGeneration: claim.claimGeneration,
+            aliases: owner.aliases,
+            biographyMarkdown: updated.biographyMarkdown,
+            pictureAssetId: updated.pictureAssetId,
+            version: updated.version,
+            createdAt: updated.createdAt.toISOString(),
+            updatedAt: updated.updatedAt.toISOString(),
+          },
+        };
+        ProfileUpdatedEventSchema.parse(event);
+        await tx
+          .insert(outboxEvents)
+          .values({
+            id: event.eventId,
+            subject: event.eventType,
+            aggregateId: userId,
+            payload: event,
+          });
+        return owner;
+      })
+      .catch((error: unknown) => {
+        if (isUniqueViolation(error))
+          throw new HandleUnavailableError('This Handle is already in use; choose another name');
+        throw error;
+      });
   }
 
   private async findOwnerProfile(userId: string): Promise<OwnerProfile | undefined> {
     return this.database.getClient().db.transaction(async (tx) => {
       // Keep the Profile and its claims at one version while assembling owner state.
-      const [profile] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('share');
+      const [profile] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('share');
       return profile ? this.ownerProfile(profile, tx) : undefined;
     });
   }
@@ -274,7 +336,11 @@ export class ProfileService {
     }
 
     return this.database.getClient().db.transaction(async (tx) => {
-      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
+      const [current] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('update');
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }

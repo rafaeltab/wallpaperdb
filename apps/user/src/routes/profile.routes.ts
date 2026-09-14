@@ -26,8 +26,12 @@ function isProfileUpdateBody(body: unknown): body is ProfileUpdateBody {
 function isHandleChangeBody(body: unknown): body is { handle: string; expectedVersion: number } {
   if (!body || typeof body !== 'object') return false;
   const change = body as Record<string, unknown>;
-  return typeof change.handle === 'string' && typeof change.expectedVersion === 'number' &&
-    Number.isInteger(change.expectedVersion) && change.expectedVersion > 0;
+  return (
+    typeof change.handle === 'string' &&
+    typeof change.expectedVersion === 'number' &&
+    Number.isInteger(change.expectedVersion) &&
+    change.expectedVersion > 0
+  );
 }
 
 export default async function profileRoutes(fastify: FastifyInstance): Promise<void> {
@@ -55,37 +59,53 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
     if (!isHandleChangeBody(request.body)) {
       return reply.code(400).type('application/problem+json').send({
         type: 'https://wallpaperdb.example/problems/invalid-handle',
-        title: 'Invalid Handle command', status: 400,
-        detail: 'Handle and a positive integer expected Profile version are required', instance: request.url,
+        title: 'Invalid Handle command',
+        status: 400,
+        detail: 'Handle and a positive integer expected Profile version are required',
+        instance: request.url,
       });
     }
     try {
-      const profile = await container.resolve(ProfileService).changeHandle(user.id, request.body.handle, request.body.expectedVersion);
+      const profile = await container
+        .resolve(ProfileService)
+        .changeHandle(user.id, request.body.handle, request.body.expectedVersion);
       return reply.code(200).send(profile);
     } catch (error) {
       if (error instanceof ProfileVersionConflictError) {
         return reply.code(409).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/profile-version-conflict',
-          title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
+          title: 'Profile version conflict',
+          status: 409,
+          detail: error.message,
+          instance: request.url,
         });
       }
       if (error instanceof HandleUnavailableError) {
         return reply.code(409).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/handle-unavailable',
-          title: 'Handle unavailable', status: 409, detail: error.message, instance: request.url,
+          title: 'Handle unavailable',
+          status: 409,
+          detail: error.message,
+          instance: request.url,
         });
       }
       if (error instanceof HandleCooldownError) {
         return reply.code(429).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/handle-cooldown',
-          title: 'Handle change cooldown', status: 429, detail: error.message, instance: request.url,
+          title: 'Handle change cooldown',
+          status: 429,
+          detail: error.message,
+          instance: request.url,
           nextHandleChangeAt: error.nextHandleChangeAt.toISOString(),
         });
       }
       if (error instanceof InvalidHandleError) {
         return reply.code(400).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/invalid-handle',
-          title: 'Invalid Handle', status: 400, detail: error.message, instance: request.url,
+          title: 'Invalid Handle',
+          status: 400,
+          detail: error.message,
+          instance: request.url,
         });
       }
       throw error;

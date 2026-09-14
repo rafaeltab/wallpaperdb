@@ -105,7 +105,11 @@ export class ProfileRepository {
     const aliasGeneration = alias?.aliases?.find(
       (claim) => claim.handle === normalizedHandle
     )?.claimGeneration;
-    if (alias && aliasGeneration !== undefined && (!current || aliasGeneration > current.claimGeneration)) {
+    if (
+      alias &&
+      aliasGeneration !== undefined &&
+      (!current || aliasGeneration > current.claimGeneration)
+    ) {
       return alias;
     }
     return current ?? null;

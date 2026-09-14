@@ -272,6 +272,26 @@ describe('Profile commands', () => {
     expect((await request('user_1')).json()).toEqual(edited.json());
   });
 
+  it('can promote its own retained alias with a new generation after cooldown', async () => {
+    const before = (await request('user_1')).json();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const now = new Date('2030-01-01T12:00:00.000Z');
+    vi.setSystemTime(now);
+    try {
+      const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+      vi.setSystemTime(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000));
+      const reverted = await changeHandle('user_1', before.handle, changed.version);
+      expect(reverted.statusCode).toBe(200);
+      expect(reverted.json()).toMatchObject({ handle: before.handle, version: 3, aliases: [{ handle: 'new-handle', claimGeneration: expect.any(Number) }] });
+      const events = await sql`select payload from outbox_events where subject = 'profile.updated' order by created_at, id`;
+      expect(events[1].payload.profile.claimGeneration).toBeGreaterThan(events[0].payload.profile.claimGeneration);
+      expect(events[1].payload.change).toEqual({ type: 'handle-changed', before: 'new-handle', after: before.handle });
+      expect((await request('user_1')).json()).toEqual(reverted.json());
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

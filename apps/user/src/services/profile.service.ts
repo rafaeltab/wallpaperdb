@@ -212,7 +212,13 @@ export class ProfileService {
         handle, version: sql`${profiles.version} + 1`, updatedAt: now, lastHandleChangedAt: now,
       }).where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion))).returning();
       if (!updated) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      const [claim] = await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' }).returning();
+      const [claim] = await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' })
+        .onConflictDoUpdate({
+          target: handleClaims.handle,
+          set: { kind: 'profile', claimGeneration: sql`excluded.claim_generation`, createdAt: now },
+          setWhere: and(eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
+        }).returning();
+      if (!claim) throw new HandleUnavailableError('This Handle is already in use; choose another name');
       await tx.update(handleClaims).set({ kind: 'alias', createdAt: now }).where(eq(handleClaims.handle, current.handle));
       const owner = await this.ownerProfile(updated, tx);
       const event: ProfileUpdatedEvent = {

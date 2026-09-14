@@ -247,6 +247,38 @@ describe('GraphQL Security', () => {
   });
 
   describe('Query Complexity Analysis', () => {
+    it.each([
+      ['omitted page sizes', `query {
+        searchWallpapers { edges { node { profile { ...Contributions } } } }
+      }
+      fragment Contributions on Profile {
+        wallpapers { edges { node { wallpaperId } } }
+      }`],
+      ['null first with backward pagination', `query {
+        searchWallpapers(first: null, last: 90) { edges { node { wallpaperId } } }
+      }`],
+      ['operation variable defaults', `query($page: Int = 90) {
+        searchWallpapers(first: $page) { edges { node { wallpaperId } } }
+      }`],
+      ['negative sizes before an expensive alias', `query {
+        cheap: searchWallpapers(first: -100000) { edges { node { wallpaperId } } }
+        expensive: searchWallpapers(first: 100) { edges { node { wallpaperId } } }
+      }`],
+    ])('rejects excessive work using %s before searching wallpapers', async (_name, query) => {
+      const search = vi.spyOn(container.resolve(WallpaperRepository), 'search');
+      try {
+        const response = await tester.getApp().inject({
+          method: 'POST',
+          url: '/graphql',
+          payload: { query },
+        });
+        expect(response.json().errors?.[0].extensions?.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+        expect(search).not.toHaveBeenCalled();
+      } finally {
+        search.mockRestore();
+      }
+    });
+
     it('rejects fragment-based contributor query amplification before searching wallpapers', async () => {
       const search = vi.spyOn(container.resolve(WallpaperRepository), 'search');
 

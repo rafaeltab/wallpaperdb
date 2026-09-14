@@ -1,6 +1,6 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import type { DocumentNode, FieldNode, FragmentDefinitionNode, GraphQLSchema, ValueNode } from 'graphql';
-import { BREAK, Kind, TypeInfo, visit, visitWithTypeInfo } from 'graphql';
+import { BREAK, getVariableValues, Kind, TypeInfo, visit, visitWithTypeInfo } from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { BreadthLimitError, ComplexityLimitError } from '../errors/graphql-errors.js';
@@ -54,6 +54,8 @@ export class QueryComplexityService {
 
     for (const operation of document.definitions) {
       if (operation.kind !== Kind.OPERATION_DEFINITION) continue;
+      const resolvedVariables = getVariableValues(schema, operation.variableDefinitions ?? [], variables);
+      if (resolvedVariables.errors) return this.config.graphqlMaxComplexity + 1;
       const typeInfo = new TypeInfo(schema);
       let multiplier = 1;
       let pageSize = 1;
@@ -67,14 +69,15 @@ export class QueryComplexityService {
             const parentType = typeInfo.getParentType();
             const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
             const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
+            const isConnection = fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers';
 
             // Only connection edges repeat per result; pageInfo is resolved once.
             if (fieldName === 'WallpaperConnection.edges') multiplier *= pageSize;
-            const listMultiplier = this.getListMultiplier(node, variables);
+            const listMultiplier = this.getListMultiplier(node, resolvedVariables.coerced, isConnection ? 10 : 1);
             totalCost += fieldCost * multiplier * listMultiplier * this.getNestedMultiplier(fieldName);
 
             if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
-            if (fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers') {
+            if (isConnection) {
               pageSize = listMultiplier;
             }
             return undefined;
@@ -173,23 +176,21 @@ export class QueryComplexityService {
   /**
    * Get list multiplier from pagination arguments
    */
-  private getListMultiplier(node: FieldNode, variables: Record<string, unknown>): number {
-    // Check for 'first' argument
+  private getListMultiplier(
+    node: FieldNode,
+    variables: Record<string, unknown>,
+    defaultSize: number
+  ): number {
     const firstArg = node.arguments?.find((arg) => arg.name.value === 'first');
-    if (firstArg) {
-      const value = this.getArgumentValue(firstArg.value, variables);
-      // Cap at 100 to prevent overflow in cost calculation
-      return Math.min(value ?? 10, 100);
-    }
-
-    // Check for 'last' argument
     const lastArg = node.arguments?.find((arg) => arg.name.value === 'last');
-    if (lastArg) {
-      const value = this.getArgumentValue(lastArg.value, variables);
-      return Math.min(value ?? 10, 100);
-    }
+    const first = firstArg && this.getArgumentValue(firstArg.value, variables);
+    const last = lastArg && this.getArgumentValue(lastArg.value, variables);
+    // Match resolver precedence, including nullable arguments and its default page.
+    const size = first ?? last ?? defaultSize;
 
-    return 1; // No list multiplier
+    // Invalid sizes must never subtract cost; saturation must always imply rejection.
+    if (!Number.isFinite(size)) return this.config.graphqlMaxComplexity + 1;
+    return Math.min(Math.max(size, 1), this.config.graphqlMaxComplexity + 1);
   }
 
   /**

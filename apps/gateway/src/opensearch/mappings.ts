@@ -56,6 +56,13 @@ export const profilesIndexMapping = {
     displayName: { type: 'text' },
     handle: { type: 'keyword' },
     claimGeneration: { type: 'long' },
+    aliases: {
+      type: 'nested',
+      properties: {
+        handle: { type: 'keyword' },
+        claimGeneration: { type: 'long' },
+      },
+    },
     biographyMarkdown: { type: 'text', index: false },
     pictureAssetId: { type: 'keyword' },
     version: { type: 'long' },

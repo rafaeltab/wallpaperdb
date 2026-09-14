@@ -11,6 +11,7 @@ interface ProfileSnapshot {
     displayName: string;
     handle: string;
     claimGeneration: number;
+    aliases?: Array<{ handle: string; claimGeneration: number }>;
     biographyMarkdown: string;
     pictureAssetId: string | null;
     version: number;
@@ -70,6 +71,79 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("resolves former Handle aliases after projecting a Handle change", async () => {
+        const timestamp = "2026-01-01T00:00:00.000Z";
+        const original = {
+            id: "user_handle_change",
+            displayName: "Profile Owner",
+            handle: "original-handle",
+            claimGeneration: 1,
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        await tester.nats.publishEvent(
+            PROFILE_CREATED_SUBJECT,
+            profileCreated(original, "evt_handle_created"),
+        );
+        const updated = {
+            ...original,
+            handle: "current-handle",
+            claimGeneration: 2,
+            aliases: [{ handle: original.handle, claimGeneration: original.claimGeneration }],
+            version: 2,
+            updatedAt: "2026-01-08T00:00:00.000Z",
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            eventId: "evt_handle_changed",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp: updated.updatedAt,
+            change: { type: "handle-changed", before: original.handle, after: updated.handle },
+            profile: updated,
+        });
+        await eventually(
+            () => query(`query { profile(id: "${original.id}") { version } }`),
+            (result) => result.data.profile?.version === 2,
+        );
+
+        const result = await query(`query {
+            current: profileByHandle(handle: "current-handle") {
+                requestedHandle isAlias canonicalHandle profile { id canonicalPath }
+            }
+            previous: profileByHandle(handle: "Original-Handle") {
+                requestedHandle isAlias canonicalHandle profile { id canonicalPath }
+            }
+            partial: profileByHandle(handle: "original") { profile { id } }
+        }`);
+
+        expect(result.errors).toBeUndefined();
+        expect(result.data).toEqual({
+            current: {
+                requestedHandle: "current-handle",
+                isAlias: false,
+                canonicalHandle: "current-handle",
+                profile: { id: original.id, canonicalPath: "/profiles/@current-handle" },
+            },
+            previous: {
+                requestedHandle: "Original-Handle",
+                isAlias: true,
+                canonicalHandle: "current-handle",
+                profile: { id: original.id, canonicalPath: "/profiles/@current-handle" },
+            },
+            partial: null,
+        });
+        const aliasEnumeration = await tester.getApp().inject({
+            method: "POST",
+            url: "/graphql",
+            payload: { query: `query { profile(id: "${original.id}") { aliases } }` },
+        });
+        expect(aliasEnumeration.json().errors[0].message).toContain(
+            'Cannot query field "aliases" on type "Profile"',
+        );
+    });
+
     it("projects an updated Display name through the public GraphQL Profile", async () => {
         const createdAt = "2026-01-01T00:00:00.000Z";
         const original = {

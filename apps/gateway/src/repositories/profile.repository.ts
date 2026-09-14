@@ -65,10 +65,24 @@ export class ProfileRepository {
   }
 
   async findByHandle(handle: string): Promise<ProfileDocument | null> {
+    const normalizedHandle = handle.toLowerCase();
     const result = await this.openSearchConnection.getClient().search({
       index: this.indexManager.getIndexName(profileIndexDefinition.key),
       body: {
-        query: { term: { handle: handle.toLowerCase() } },
+        query: {
+          bool: {
+            should: [
+              { term: { handle: normalizedHandle } },
+              {
+                nested: {
+                  path: 'aliases',
+                  query: { term: { 'aliases.handle': normalizedHandle } },
+                },
+              },
+            ],
+            minimum_should_match: 1,
+          },
+        },
         sort: [{ claimGeneration: 'desc' }],
         size: 1,
       },

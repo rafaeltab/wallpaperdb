@@ -246,18 +246,20 @@ describe("Profile projection integration", () => {
                             picture { id url }
                         }
                         byHandle: profileByHandle(handle: "profile-reader") {
-                            id
-                            handle
-                            canonicalPath
+                            requestedHandle
+                            isAlias
+                            canonicalHandle
+                            profile { id handle canonicalPath }
                         }
                         mixedCaseHandle: profileByHandle(handle: "Profile-Reader") {
-                            id
-                            handle
-                            canonicalPath
+                            requestedHandle
+                            isAlias
+                            canonicalHandle
+                            profile { id handle canonicalPath }
                         }
-                        partialHandle: profileByHandle(handle: "profile-read") { id }
+                        partialHandle: profileByHandle(handle: "profile-read") { profile { id } }
                         missingId: profile(id: "user_profile_missing") { id }
-                        noPicture: profileByHandle(handle: "no-picture") { picture { id } }
+                        noPicture: profileByHandle(handle: "no-picture") { profile { picture { id } } }
                     }
                 `);
 
@@ -275,18 +277,28 @@ describe("Profile projection integration", () => {
                 },
             },
             byHandle: {
-                id: "user_profile_reads",
-                handle: "profile-reader",
-                canonicalPath: "/profiles/@profile-reader",
+                requestedHandle: "profile-reader",
+                isAlias: false,
+                canonicalHandle: "profile-reader",
+                profile: {
+                    id: "user_profile_reads",
+                    handle: "profile-reader",
+                    canonicalPath: "/profiles/@profile-reader",
+                },
             },
             mixedCaseHandle: {
-                id: "user_profile_reads",
-                handle: "profile-reader",
-                canonicalPath: "/profiles/@profile-reader",
+                requestedHandle: "Profile-Reader",
+                isAlias: false,
+                canonicalHandle: "profile-reader",
+                profile: {
+                    id: "user_profile_reads",
+                    handle: "profile-reader",
+                    canonicalPath: "/profiles/@profile-reader",
+                },
             },
             partialHandle: null,
             missingId: null,
-            noPicture: { picture: null },
+            noPicture: { profile: { picture: null } },
         });
     });
 

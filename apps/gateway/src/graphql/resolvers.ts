@@ -117,7 +117,14 @@ export class Resolvers {
           return await this.profileRepository.findById(args.id);
         },
         profileByHandle: async (_parent: unknown, args: ProfileByHandleArgs) => {
-          return await this.profileRepository.findByHandle(args.handle);
+          const profile = await this.profileRepository.findByHandle(args.handle);
+          if (!profile) return null;
+          return {
+            profile,
+            requestedHandle: args.handle,
+            isAlias: profile.handle !== args.handle.toLowerCase(),
+            canonicalHandle: profile.handle,
+          };
         },
       },
       Profile: {

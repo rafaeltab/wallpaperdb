@@ -235,6 +235,13 @@ export const schema = `#graphql
 		url: String!
 	}
 
+	type HandleResolution {
+		profile: Profile!
+		requestedHandle: String!
+		isAlias: Boolean!
+		canonicalHandle: String!
+	}
+
 	type Query {
 		"""
 		Get a Profile by its immutable Profile ID
@@ -242,9 +249,9 @@ export const schema = `#graphql
 		profile(id: ID!): Profile
 
 		"""
-		Get a Profile by its exact current Handle
+		Resolve an exact Handle to its canonical Profile
 		"""
-		profileByHandle(handle: String!): Profile
+		profileByHandle(handle: String!): HandleResolution
 
 		"""
 		Search for wallpapers with optional filters and pagination

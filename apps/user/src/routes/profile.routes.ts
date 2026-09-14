@@ -4,6 +4,7 @@ import { container } from 'tsyringe';
 import {
   IdentityUnavailableError,
   HandleCooldownError,
+  HandleUnavailableError,
   InvalidDisplayNameError,
   InvalidHandleError,
   ProfileService,
@@ -66,6 +67,12 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
         return reply.code(409).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/profile-version-conflict',
           title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
+        });
+      }
+      if (error instanceof HandleUnavailableError) {
+        return reply.code(409).type('application/problem+json').send({
+          type: 'https://wallpaperdb.example/problems/handle-unavailable',
+          title: 'Handle unavailable', status: 409, detail: error.message, instance: request.url,
         });
       }
       if (error instanceof HandleCooldownError) {

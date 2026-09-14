@@ -230,6 +230,33 @@ describe('Profile commands', () => {
     expect((await changeHandle('user_1', 'new-handle', before.version)).statusCode).toBe(409);
   });
 
+  it('permits one concurrent claimant and reserves current Handles and aliases together', async () => {
+    identities.identities.set('one', { displayName: 'First', firstName: null, lastName: null });
+    identities.identities.set('two', { displayName: 'Second', firstName: null, lastName: null });
+    const before = await Promise.all(['one', 'two'].map(async (id) => (await request(id)).json()));
+    const responses = await Promise.all([
+      changeHandle('one', 'same-handle', 1),
+      changeHandle('two', ' SAME_HANDLE ', 1),
+    ]);
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([200, 409]);
+    const winnerIndex = responses.findIndex((response) => response.statusCode === 200);
+    const loserIndex = 1 - winnerIndex;
+    const winner = responses[winnerIndex].json();
+    const loser = before[loserIndex];
+    expect(responses[loserIndex].json().type).toMatch(/handle-unavailable$/);
+    expect((await request(loser.id)).json()).toEqual(loser);
+    const aliasCollision = await changeHandle(loser.id, before[winnerIndex].handle.toUpperCase(), 1);
+    expect(aliasCollision.statusCode).toBe(409);
+    expect(aliasCollision.json().type).toMatch(/handle-unavailable$/);
+    expect((await request(winner.id)).json()).toEqual(winner);
+    const events = await sql`select payload from outbox_events where subject = 'profile.updated'`;
+    expect(events).toHaveLength(1);
+    expect(events[0].payload.profile.claimGeneration).toBeGreaterThan(winner.aliases[0].claimGeneration);
+    identities.identities.set('three', { displayName: before[winnerIndex].handle, firstName: null, lastName: null });
+    const allocated = (await request('three')).json();
+    expect(allocated.handle).not.toBe(before[winnerIndex].handle);
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

@@ -58,6 +58,7 @@ export interface OwnerProfile extends Profile {
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
 export class InvalidHandleError extends Error {}
+export class HandleUnavailableError extends Error {}
 export class HandleCooldownError extends Error {
   constructor(readonly nextHandleChangeAt: Date) {
     super('You can change your Handle once every seven days');
@@ -231,6 +232,9 @@ export class ProfileService {
       ProfileUpdatedEventSchema.parse(event);
       await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event });
       return owner;
+    }).catch((error: unknown) => {
+      if (isUniqueViolation(error)) throw new HandleUnavailableError('This Handle is already in use; choose another name');
+      throw error;
     });
   }
 

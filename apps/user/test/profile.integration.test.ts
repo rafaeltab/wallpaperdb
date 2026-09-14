@@ -257,6 +257,21 @@ describe('Profile commands', () => {
     expect(allocated.handle).not.toBe(before[winnerIndex].handle);
   });
 
+  it('preserves aliases in owner responses and complete snapshots after Display-name edits', async () => {
+    const before = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+    const edited = await patch('user_1', 'New Display', changed.version);
+    expect(edited.statusCode).toBe(200);
+    expect(edited.json()).toMatchObject({
+      aliases: changed.aliases, lastHandleChangedAt: changed.lastHandleChangedAt,
+      displayName: 'New Display', version: 3,
+    });
+    const events = await sql`select payload from outbox_events where subject = 'profile.updated' order by created_at, id`;
+    expect(events[1].payload.profile).toMatchObject({ aliases: changed.aliases, handle: changed.handle, displayName: 'New Display', version: 3 });
+    expect((await patch('user_1', 'New Display', 3)).json()).toEqual(edited.json());
+    expect((await request('user_1')).json()).toEqual(edited.json());
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

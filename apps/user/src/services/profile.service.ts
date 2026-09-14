@@ -104,10 +104,8 @@ export class ProfileService {
   ) {}
 
   async ensure(userId: string): Promise<OwnerProfile> {
-    const existing = await this.database.getClient().db.query.profiles.findFirst({
-      where: eq(profiles.id, userId),
-    });
-    if (existing) return this.ownerProfile(existing);
+    const existing = await this.findOwnerProfile(userId);
+    if (existing) return existing;
 
     let identity: ExternalIdentity;
     try {
@@ -141,8 +139,8 @@ export class ProfileService {
 
       try {
         return await this.database.getClient().db.transaction(async (tx) => {
-          const raced = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
-          if (raced) return this.ownerProfile(raced);
+          const [raced] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('share');
+          if (raced) return this.ownerProfile(raced, tx);
 
           const now = new Date();
           const [profile] = await tx
@@ -183,10 +181,8 @@ export class ProfileService {
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
-        const raced = await this.database.getClient().db.query.profiles.findFirst({
-          where: eq(profiles.id, userId),
-        });
-        if (raced) return this.ownerProfile(raced);
+        const raced = await this.findOwnerProfile(userId);
+        if (raced) return raced;
       }
     }
     throw new Error('Unable to claim a unique profile handle');
@@ -202,7 +198,7 @@ export class ProfileService {
     }
     if (RESERVED_HANDLES.has(handle)) throw new InvalidHandleError('This Handle is reserved; choose another name');
     return this.database.getClient().db.transaction(async (tx) => {
-      const current = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
+      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
@@ -238,7 +234,15 @@ export class ProfileService {
     });
   }
 
-  private async ownerProfile(profile: Profile, reader: ProfileReader = this.database.getClient().db): Promise<OwnerProfile> {
+  private async findOwnerProfile(userId: string): Promise<OwnerProfile | undefined> {
+    return this.database.getClient().db.transaction(async (tx) => {
+      // Keep the Profile and its claims at one version while assembling owner state.
+      const [profile] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('share');
+      return profile ? this.ownerProfile(profile, tx) : undefined;
+    });
+  }
+
+  private async ownerProfile(profile: Profile, reader: ProfileReader): Promise<OwnerProfile> {
     const aliases = await reader.query.handleClaims.findMany({
       where: and(eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'alias')),
       columns: { handle: true, claimGeneration: true },
@@ -251,7 +255,7 @@ export class ProfileService {
     userId: string,
     requestedDisplayName: string,
     expectedVersion: number
-  ): Promise<Profile> {
+  ): Promise<OwnerProfile> {
     const displayName = normalizeDisplayName(requestedDisplayName);
     if (!displayName) throw new InvalidDisplayNameError('Display name must not be blank');
     if ([...displayName].length > this.config.profileDisplayNameMaxLength) {
@@ -264,11 +268,11 @@ export class ProfileService {
     }
 
     return this.database.getClient().db.transaction(async (tx) => {
-      const current = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
+      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
-      if (current.displayName === displayName) return current;
+      if (current.displayName === displayName) return this.ownerProfile(current, tx);
 
       const now = new Date();
       const [updated] = await tx
@@ -289,6 +293,7 @@ export class ProfileService {
       });
       if (!claim) throw new Error('Current Profile Handle claim is missing');
 
+      const owner = await this.ownerProfile(updated, tx);
       const event: ProfileUpdatedEvent = {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
@@ -303,6 +308,7 @@ export class ProfileService {
           displayName: updated.displayName,
           handle: updated.handle,
           claimGeneration: claim.claimGeneration,
+          aliases: owner.aliases,
           biographyMarkdown: updated.biographyMarkdown,
           pictureAssetId: updated.pictureAssetId,
           version: updated.version,
@@ -317,7 +323,7 @@ export class ProfileService {
         aggregateId: userId,
         payload: event,
       });
-      return updated;
+      return owner;
     });
   }
 

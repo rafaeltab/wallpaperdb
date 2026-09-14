@@ -292,6 +292,23 @@ describe('Profile commands', () => {
     }
   });
 
+  it('rolls back the Handle, cooldown, and claims when recording the transition fails', async () => {
+    const before = (await request('user_1')).json();
+    await sql.unsafe(`create function reject_handle_event() returns trigger language plpgsql as $$ begin if new.subject = 'profile.updated' then raise exception 'handle event rejected'; end if; return new; end $$`);
+    await sql.unsafe('create trigger reject_handle_event before insert on outbox_events for each row execute function reject_handle_event()');
+    try {
+      const failed = await changeHandle('user_1', 'new-handle', before.version);
+      expect(failed.statusCode).toBe(500);
+      expect((await request('user_1')).json()).toEqual(before);
+      expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(0);
+    } finally {
+      await sql.unsafe('drop trigger reject_handle_event on outbox_events; drop function reject_handle_event()');
+    }
+    const accepted = await changeHandle('user_1', 'new-handle', before.version);
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toMatchObject({ version: 2, aliases: [{ handle: before.handle, claimGeneration: expect.any(Number) }] });
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

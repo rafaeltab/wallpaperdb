@@ -201,16 +201,16 @@ function HandleSettings({
     : profile.lastHandleChangedAt
       ? Date.parse(profile.lastHandleChangedAt) + 7 * 24 * 60 * 60 * 1000
       : Number.NaN;
-  const nextHandleChangeAt = nextChangeTime > Date.now()
-    ? new Date(nextChangeTime).toISOString()
-    : null;
+  const nextHandleChangeAt =
+    nextChangeTime > Date.now() ? new Date(nextChangeTime).toISOString() : null;
   const mutation = useMutation({
-    mutationFn: () => userApi.updateHandle({
-      handle,
-      expectedVersion: profile.version,
-      expectedProfileId: profile.id,
-      tokenProvider,
-    }),
+    mutationFn: () =>
+      userApi.updateHandle({
+        handle,
+        expectedVersion: profile.version,
+        expectedProfileId: profile.id,
+        tokenProvider,
+      }),
     onSuccess: (updated) => {
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
       setHandle(updated.handle);
@@ -242,18 +242,24 @@ function HandleSettings({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form className="space-y-5" onSubmit={(event) => {
-          event.preventDefault();
-          setSaved(null);
-          setError(null);
-          mutation.mutate();
-        }}>
+        <form
+          className="space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSaved(null);
+            setError(null);
+            mutation.mutate();
+          }}
+        >
           <Field data-invalid={Boolean(error)}>
             <FieldLabel htmlFor="profile-handle">Handle</FieldLabel>
             <Input
               id="profile-handle"
               value={handle}
-              onChange={(event) => { setHandle(event.target.value); setSaved(null); }}
+              onChange={(event) => {
+                setHandle(event.target.value);
+                setSaved(null);
+              }}
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
@@ -268,7 +274,8 @@ function HandleSettings({
           </Field>
           {nextHandleChangeAt && (
             <p className="text-sm text-muted-foreground">
-              Next Handle change available: <time dateTime={nextHandleChangeAt}>
+              Next Handle change available:{' '}
+              <time dateTime={nextHandleChangeAt}>
                 {new Date(nextHandleChangeAt).toLocaleString()}
               </time>
             </p>
@@ -276,9 +283,13 @@ function HandleSettings({
           {saved && (
             <Alert role="status">
               <AlertDescription>
-                {saved === 'unchanged' ? 'Handle unchanged.' : (
-                  <>Handle changed to @{profile.handle}. Your previous Profile address will redirect to
-                  your new one. Public links may take a moment to update.</>
+                {saved === 'unchanged' ? (
+                  'Handle unchanged.'
+                ) : (
+                  <>
+                    Handle changed to @{profile.handle}. Your previous Profile address will redirect
+                    to your new one. Public links may take a moment to update.
+                  </>
                 )}
               </AlertDescription>
             </Alert>

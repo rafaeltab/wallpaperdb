@@ -95,7 +95,11 @@ describe('User API client', () => {
     const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
 
     await expect(
-      client.updateHandle({ handle: 'New Handle', expectedVersion: 1, expectedProfileId: profile.id })
+      client.updateHandle({
+        handle: 'New Handle',
+        expectedVersion: 1,
+        expectedProfileId: profile.id,
+      })
     ).resolves.toEqual(updated);
     expect(tokenProvider).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledWith('/user/profile/me/handle', {
@@ -126,22 +130,26 @@ describe('User API client', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({
-          type: 'https://wallpaperdb.local/problems/handle-cooldown',
-          detail: 'You can change your Handle once every seven days.',
-          nextHandleChangeAt: '2026-09-21T12:00:00.000Z',
-        }), { status: 429 })
+        new Response(
+          JSON.stringify({
+            type: 'https://wallpaperdb.local/problems/handle-cooldown',
+            detail: 'You can change your Handle once every seven days.',
+            nextHandleChangeAt: '2026-09-21T12:00:00.000Z',
+          }),
+          { status: 429 }
+        )
       )
     );
     const client = createUserApiClient({ baseUrl: '/user', tokenProvider: async () => 'token' });
 
-    await expect(client.updateHandle({ handle: 'another-handle', expectedVersion: 2 }))
-      .rejects.toMatchObject({
-        status: 429,
-        type: 'https://wallpaperdb.local/problems/handle-cooldown',
-        message: 'You can change your Handle once every seven days.',
-        nextHandleChangeAt: '2026-09-21T12:00:00.000Z',
-      });
+    await expect(
+      client.updateHandle({ handle: 'another-handle', expectedVersion: 2 })
+    ).rejects.toMatchObject({
+      status: 429,
+      type: 'https://wallpaperdb.local/problems/handle-cooldown',
+      message: 'You can change your Handle once every seven days.',
+      nextHandleChangeAt: '2026-09-21T12:00:00.000Z',
+    });
   });
 
   it('exposes the response status and service error detail', async () => {

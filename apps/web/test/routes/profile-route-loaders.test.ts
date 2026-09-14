@@ -15,16 +15,18 @@ const profile = {
   canonicalPath: '/profiles/@ada-lovelace',
 };
 
-const resolution = { profile, requestedHandle: profile.handle, isAlias: false, canonicalHandle: profile.handle };
+const resolution = {
+  profile,
+  requestedHandle: profile.handle,
+  isAlias: false,
+  canonicalHandle: profile.handle,
+};
 
 function queryClientReturning(
   value: unknown,
   field: 'profileByHandle' | 'profile' = 'profileByHandle'
 ): QueryClient {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue(createGraphQLResponse({ [field]: value }))
-  );
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(createGraphQLResponse({ [field]: value })));
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
@@ -41,12 +43,17 @@ async function expectCanonicalRedirect(promise: Promise<unknown>) {
 
 describe('Profile route loaders', () => {
   it('redirects an active Handle alias to the canonical Handle in its resolution', async () => {
-    await expectCanonicalRedirect(loadCanonicalProfile(queryClientReturning({
-      profile,
-      requestedHandle: 'ada-original',
-      isAlias: true,
-      canonicalHandle: 'ada-lovelace',
-    }), 'ada-original'));
+    await expectCanonicalRedirect(
+      loadCanonicalProfile(
+        queryClientReturning({
+          profile,
+          requestedHandle: 'ada-original',
+          isAlias: true,
+          canonicalHandle: 'ada-lovelace',
+        }),
+        'ada-original'
+      )
+    );
   });
 
   it('rechecks an eventually consistent Handle after a cached miss', async () => {
@@ -67,17 +74,35 @@ describe('Profile route loaders', () => {
   });
 
   it('rechecks a cached current Handle when it becomes an alias after projection', async () => {
-    const original = { ...profile, handle: 'ada-original', canonicalPath: '/profiles/@ada-original' };
+    const original = {
+      ...profile,
+      handle: 'ada-original',
+      canonicalPath: '/profiles/@ada-original',
+    };
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
     });
-    const mockFetch = vi.fn()
-      .mockResolvedValueOnce(createGraphQLResponse({ profileByHandle: {
-        profile: original, requestedHandle: 'ada-original', isAlias: false, canonicalHandle: 'ada-original',
-      } }))
-      .mockResolvedValueOnce(createGraphQLResponse({ profileByHandle: {
-        ...resolution, requestedHandle: 'ada-original', isAlias: true,
-      } }));
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createGraphQLResponse({
+          profileByHandle: {
+            profile: original,
+            requestedHandle: 'ada-original',
+            isAlias: false,
+            canonicalHandle: 'ada-original',
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        createGraphQLResponse({
+          profileByHandle: {
+            ...resolution,
+            requestedHandle: 'ada-original',
+            isAlias: true,
+          },
+        })
+      );
     vi.stubGlobal('fetch', mockFetch);
 
     await expect(loadCanonicalProfile(queryClient, 'ada-original')).resolves.toEqual(original);
@@ -86,14 +111,16 @@ describe('Profile route loaders', () => {
   });
 
   it('throws route not-found when a canonical Handle lookup has no result', async () => {
-    await expect(loadCanonicalProfile(queryClientReturning(null), 'unknown')).rejects.toMatchObject({
-      isNotFound: true,
-    });
+    await expect(loadCanonicalProfile(queryClientReturning(null), 'unknown')).rejects.toMatchObject(
+      {
+        isNotFound: true,
+      }
+    );
   });
 
   it('returns a current Profile from its canonical Handle', async () => {
     await expect(
-      loadCanonicalProfile(queryClientReturning(resolution), 'ada-lovelace'),
+      loadCanonicalProfile(queryClientReturning(resolution), 'ada-lovelace')
     ).resolves.toEqual(profile);
   });
 
@@ -103,13 +130,13 @@ describe('Profile route loaders', () => {
 
   it('redirects a bare Handle to the canonical route', async () => {
     await expectCanonicalRedirect(
-      redirectHandleToCanonical(queryClientReturning(resolution), 'ada-lovelace'),
+      redirectHandleToCanonical(queryClientReturning(resolution), 'ada-lovelace')
     );
   });
 
   it('redirects a Profile ID to the canonical route', async () => {
     await expectCanonicalRedirect(
-      redirectProfileIdToCanonical(queryClientReturning(profile, 'profile'), 'user_ada'),
+      redirectProfileIdToCanonical(queryClientReturning(profile, 'profile'), 'user_ada')
     );
   });
 

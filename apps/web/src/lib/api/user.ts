@@ -18,7 +18,11 @@ export class UserApiError extends Error {
   readonly type?: string;
   readonly nextHandleChangeAt?: string;
 
-  constructor(message: string, status: number, details: { type?: string; nextHandleChangeAt?: string } = {}) {
+  constructor(
+    message: string,
+    status: number,
+    details: { type?: string; nextHandleChangeAt?: string } = {}
+  ) {
     super(message);
     this.name = 'UserApiError';
     this.status = status;
@@ -154,7 +158,8 @@ async function userApiError(response: Response): Promise<UserApiError> {
     if (typeof body.detail === 'string') message = body.detail;
     else if (typeof body.message === 'string') message = body.message;
     if (typeof body.type === 'string') details.type = body.type;
-    if (typeof body.nextHandleChangeAt === 'string') details.nextHandleChangeAt = body.nextHandleChangeAt;
+    if (typeof body.nextHandleChangeAt === 'string')
+      details.nextHandleChangeAt = body.nextHandleChangeAt;
   } catch {
     // Preserve the status-based message for non-JSON responses.
   }

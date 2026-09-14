@@ -28,7 +28,12 @@ describe('Profile GraphQL client', () => {
       picture: null,
       canonicalPath: '/profiles/@ada-lovelace',
     };
-    const resolution = { profile, requestedHandle: 'Ada-Lovelace', isAlias: false, canonicalHandle: profile.handle };
+    const resolution = {
+      profile,
+      requestedHandle: 'Ada-Lovelace',
+      isAlias: false,
+      canonicalHandle: profile.handle,
+    };
     mockFetch.mockResolvedValue(createGraphQLResponse({ profileByHandle: resolution }));
 
     await expect(fetchProfileByHandle('Ada-Lovelace')).resolves.toEqual(resolution);

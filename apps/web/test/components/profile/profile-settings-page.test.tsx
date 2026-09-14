@@ -16,9 +16,15 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
   };
 });
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, params }: { children: React.ReactNode; to: string; params?: { handle: string } }) => (
-    <a href={params ? `/profiles/@${params.handle}` : to}>{children}</a>
-  ),
+  Link: ({
+    children,
+    to,
+    params,
+  }: {
+    children: React.ReactNode;
+    to: string;
+    params?: { handle: string };
+  }) => <a href={params ? `/profiles/@${params.handle}` : to}>{children}</a>,
 }));
 
 const profile: Profile = {
@@ -123,8 +129,13 @@ describe('ProfileSettingsPage', () => {
     });
     expect(screen.getByText('@new-handle')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Handle changed to @new-handle.');
-    expect(screen.getByRole('status')).toHaveTextContent('Your previous Profile address will redirect to your new one.');
-    expect(screen.getByRole('link', { name: /view your profile/i })).toHaveAttribute('href', '/profiles/@new-handle');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Your previous Profile address will redirect to your new one.'
+    );
+    expect(screen.getByRole('link', { name: /view your profile/i })).toHaveAttribute(
+      'href',
+      '/profiles/@new-handle'
+    );
   });
 
   it('validates the 80-character limit before sending', async () => {
@@ -141,13 +152,25 @@ describe('ProfileSettingsPage', () => {
   });
 
   it.each([
-    ['invalid-handle', 400, 'Handle must contain between 1 and 30 characters.', 'Handle must contain between 1 and 30 characters.'],
+    [
+      'invalid-handle',
+      400,
+      'Handle must contain between 1 and 30 characters.',
+      'Handle must contain between 1 and 30 characters.',
+    ],
     ['handle-unavailable', 409, 'That Handle is already in use.', 'That Handle is already in use.'],
-    ['profile-version-conflict', 409, 'Profile has changed.', 'Your Profile changed elsewhere. Reload before saving again.'],
+    [
+      'profile-version-conflict',
+      409,
+      'Profile has changed.',
+      'Your Profile changed elsewhere. Reload before saving again.',
+    ],
   ])('preserves the Handle draft and explains %s', async (type, status, detail, expected) => {
-    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError(detail, status, {
-      type: `https://wallpaperdb.example/problems/${type}`,
-    }));
+    vi.mocked(userApi.updateHandle).mockRejectedValue(
+      new UserApiError(detail, status, {
+        type: `https://wallpaperdb.example/problems/${type}`,
+      })
+    );
     renderPage();
     const user = userEvent.setup();
     const input = screen.getByRole('textbox', { name: /^handle$/i });
@@ -164,11 +187,12 @@ describe('ProfileSettingsPage', () => {
 
   it('shows the next permitted change time returned by a cooldown rejection', async () => {
     const nextHandleChangeAt = '2099-09-21T12:00:00.000Z';
-    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError(
-      'You can change your Handle once every seven days.',
-      429,
-      { type: 'https://wallpaperdb.example/problems/handle-cooldown', nextHandleChangeAt }
-    ));
+    vi.mocked(userApi.updateHandle).mockRejectedValue(
+      new UserApiError('You can change your Handle once every seven days.', 429, {
+        type: 'https://wallpaperdb.example/problems/handle-cooldown',
+        nextHandleChangeAt,
+      })
+    );
     renderPage();
     const user = userEvent.setup();
     const input = screen.getByRole('textbox', { name: /^handle$/i });

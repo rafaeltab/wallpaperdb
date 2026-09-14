@@ -15,11 +15,15 @@ export interface Profile {
 
 export class UserApiError extends Error {
   readonly status: number;
+  readonly type?: string;
+  readonly nextHandleChangeAt?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, details: { type?: string; nextHandleChangeAt?: string } = {}) {
     super(message);
     this.name = 'UserApiError';
     this.status = status;
+    this.type = details.type;
+    this.nextHandleChangeAt = details.nextHandleChangeAt;
   }
 }
 
@@ -139,14 +143,22 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
 
 async function userApiError(response: Response): Promise<UserApiError> {
   let message = `User API request failed with status ${response.status}`;
+  const details: { type?: string; nextHandleChangeAt?: string } = {};
   try {
-    const body = (await response.json()) as { detail?: unknown; message?: unknown };
+    const body = (await response.json()) as {
+      detail?: unknown;
+      message?: unknown;
+      type?: unknown;
+      nextHandleChangeAt?: unknown;
+    };
     if (typeof body.detail === 'string') message = body.detail;
     else if (typeof body.message === 'string') message = body.message;
+    if (typeof body.type === 'string') details.type = body.type;
+    if (typeof body.nextHandleChangeAt === 'string') details.nextHandleChangeAt = body.nextHandleChangeAt;
   } catch {
     // Preserve the status-based message for non-JSON responses.
   }
-  return new UserApiError(message, response.status);
+  return new UserApiError(message, response.status, details);
 }
 
 function isProfile(value: unknown): value is Profile {

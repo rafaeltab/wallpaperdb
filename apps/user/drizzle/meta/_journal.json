@@ -15,6 +15,13 @@
       "when": 1788037371210,
       "tag": "0001_wild_carnage",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789429388142,
+      "tag": "0002_fancy_firebrand",
+      "breakpoints": true
     }
   ]
 }

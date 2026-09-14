@@ -20,6 +20,7 @@ export const profiles = pgTable(
     biographyMarkdown: text('biography_markdown').notNull().default(''),
     pictureAssetId: text('picture_asset_id'),
     version: integer('version').notNull().default(1),
+    lastHandleChangedAt: timestamp('last_handle_changed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

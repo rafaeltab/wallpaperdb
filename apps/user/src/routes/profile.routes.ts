@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import {
   IdentityUnavailableError,
+  HandleCooldownError,
   InvalidDisplayNameError,
   InvalidHandleError,
   ProfileService,
@@ -65,6 +66,13 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
         return reply.code(409).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/profile-version-conflict',
           title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
+        });
+      }
+      if (error instanceof HandleCooldownError) {
+        return reply.code(429).type('application/problem+json').send({
+          type: 'https://wallpaperdb.example/problems/handle-cooldown',
+          title: 'Handle change cooldown', status: 429, detail: error.message, instance: request.url,
+          nextHandleChangeAt: error.nextHandleChangeAt.toISOString(),
         });
       }
       if (error instanceof InvalidHandleError) {

@@ -58,6 +58,11 @@ export interface OwnerProfile extends Profile {
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
 export class InvalidHandleError extends Error {}
+export class HandleCooldownError extends Error {
+  constructor(readonly nextHandleChangeAt: Date) {
+    super('You can change your Handle once every seven days');
+  }
+}
 export class ProfileVersionConflictError extends Error {}
 
 function slugify(value: string): string {
@@ -201,8 +206,12 @@ export class ProfileService {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
       const now = new Date();
+      if (current.lastHandleChangedAt) {
+        const deadline = new Date(current.lastHandleChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+        if (now < deadline) throw new HandleCooldownError(deadline);
+      }
       const [updated] = await tx.update(profiles).set({
-        handle, version: sql`${profiles.version} + 1`, updatedAt: now,
+        handle, version: sql`${profiles.version} + 1`, updatedAt: now, lastHandleChangedAt: now,
       }).where(and(eq(profiles.id, userId), eq(profiles.version, expectedVersion))).returning();
       if (!updated) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       const [claim] = await tx.insert(handleClaims).values({ handle, profileId: userId, kind: 'profile' }).returning();

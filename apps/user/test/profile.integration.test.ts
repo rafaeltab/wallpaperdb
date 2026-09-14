@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
@@ -8,7 +8,7 @@ import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/even
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { container } from 'tsyringe';
 import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
@@ -26,10 +26,7 @@ import {
 } from '../src/services/profile-outbox-publisher.service.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
-const migrationPaths = [
-  join(migrationDirectory, '0000_parallel_shocker.sql'),
-  join(migrationDirectory, '0001_wild_carnage.sql'),
-];
+const migrationPaths = readdirSync(migrationDirectory).filter((path) => path.endsWith('.sql')).sort().map((path) => join(migrationDirectory, path));
 
 class FakeIdentityProvider implements IdentityProvider {
   readonly identities = new Map<string, ExternalIdentity>();
@@ -196,6 +193,31 @@ describe('Profile commands', () => {
     expect(stale.statusCode).toBe(409);
     expect(stale.json().type).toMatch(/profile-version-conflict$/);
     expect((await request('user_1')).json()).toEqual(before);
+  });
+
+  it('enforces seven days between Handle changes and allows the exact cooldown boundary', async () => {
+    const before = (await request('user_1')).json();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const now = new Date('2030-01-01T12:00:00.000Z');
+    vi.setSystemTime(now);
+    try {
+      const first = await changeHandle('user_1', 'first-handle', before.version);
+      expect(first.statusCode).toBe(200);
+      const deadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      vi.setSystemTime(new Date(deadline.getTime() - 1));
+      const early = await changeHandle('user_1', 'second-handle', first.json().version);
+      expect(early.statusCode).toBe(429);
+      expect(early.json()).toMatchObject({ type: expect.stringMatching(/handle-cooldown$/), nextHandleChangeAt: deadline.toISOString() });
+      expect((await request('user_1')).json()).toEqual(first.json());
+      expect(first.json().lastHandleChangedAt).toBe(now.toISOString());
+      vi.setSystemTime(deadline);
+      const next = await changeHandle('user_1', 'second-handle', first.json().version);
+      expect(next.statusCode).toBe(200);
+      expect(next.json()).toMatchObject({ handle: 'second-handle', version: 3, lastHandleChangedAt: deadline.toISOString() });
+      expect(next.json().aliases).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('creates a profile and typed outbox event from the authenticated ID', async () => {

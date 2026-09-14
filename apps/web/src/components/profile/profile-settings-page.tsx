@@ -195,6 +195,7 @@ function HandleSettings({
   const [handle, setHandle] = useState(profile.handle);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
   const mutation = useMutation({
     mutationFn: () => userApi.updateHandle({
       handle,
@@ -212,6 +213,9 @@ function HandleSettings({
         setError('Your Profile changed elsewhere. Reload before saving again.');
       } else {
         setError(cause instanceof Error ? cause.message : 'Unable to change the Handle.');
+      }
+      if (cause instanceof UserApiError && cause.nextHandleChangeAt) {
+        setNextHandleChangeAt(cause.nextHandleChangeAt);
       }
     },
   });
@@ -252,6 +256,13 @@ function HandleSettings({
             </FieldDescription>
             {error && <FieldError id="handle-error">{error}</FieldError>}
           </Field>
+          {nextHandleChangeAt && (
+            <p className="text-sm text-muted-foreground">
+              Next Handle change available: <time dateTime={nextHandleChangeAt}>
+                {new Date(nextHandleChangeAt).toLocaleString()}
+              </time>
+            </p>
+          )}
           {saved && (
             <Alert role="status">
               <AlertDescription>

@@ -161,4 +161,25 @@ describe('ProfileSettingsPage', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
+
+  it('shows the next permitted change time returned by a cooldown rejection', async () => {
+    const nextHandleChangeAt = '2099-09-21T12:00:00.000Z';
+    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError(
+      'You can change your Handle once every seven days.',
+      429,
+      { type: 'https://wallpaperdb.example/problems/handle-cooldown', nextHandleChangeAt }
+    ));
+    renderPage();
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.clear(input);
+    await user.type(input, 'another-handle');
+    await user.click(screen.getByRole('button', { name: /change handle/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('once every seven days');
+    expect(screen.getByText(/next handle change available/i)).toHaveTextContent(
+      new Date(nextHandleChangeAt).toLocaleString()
+    );
+    expect(input).toHaveValue('another-handle');
+  });
 });

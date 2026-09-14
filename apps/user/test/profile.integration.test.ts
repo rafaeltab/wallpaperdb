@@ -162,6 +162,27 @@ describe('Profile commands', () => {
     expect((await request('user_1')).json()).toMatchObject(response.json());
   });
 
+  it('rejects reserved and out-of-range normalized Handles without changing the Profile', async () => {
+    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
+    const before = (await request('user_1')).json();
+    const previousMinimum = config.profileHandleMinLength;
+    const previousMaximum = config.profileHandleMaxLength;
+    config.profileHandleMinLength = 3;
+    config.profileHandleMaxLength = 10;
+    try {
+      for (const handle of [' ADMÍN ', 'sUpPoRt', 'GraphQL', 'settings', '--!!!', ' A ', 'abcdefghijkl']) {
+        const response = await changeHandle('user_1', handle, before.version);
+        expect(response.statusCode, handle).toBe(400);
+        expect(response.json().type).toMatch(/invalid-handle$/);
+      }
+      expect((await request('user_1')).json()).toEqual(before);
+      expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(0);
+    } finally {
+      config.profileHandleMinLength = previousMinimum;
+      config.profileHandleMaxLength = previousMaximum;
+    }
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

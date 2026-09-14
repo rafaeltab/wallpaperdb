@@ -57,6 +57,7 @@ export interface OwnerProfile extends Profile {
 
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
+export class InvalidHandleError extends Error {}
 export class ProfileVersionConflictError extends Error {}
 
 function slugify(value: string): string {
@@ -187,6 +188,10 @@ export class ProfileService {
 
   async changeHandle(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
     const handle = slugify(requestedHandle);
+    if (handle.length < this.config.profileHandleMinLength || handle.length > this.config.profileHandleMaxLength) {
+      throw new InvalidHandleError(`Handle must contain ${this.config.profileHandleMinLength}–${this.config.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`);
+    }
+    if (RESERVED_HANDLES.has(handle)) throw new InvalidHandleError('This Handle is reserved; choose another name');
     return this.database.getClient().db.transaction(async (tx) => {
       const current = await tx.query.profiles.findFirst({ where: eq(profiles.id, userId) });
       if (!current || current.version !== expectedVersion) {

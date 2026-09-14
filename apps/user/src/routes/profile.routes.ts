@@ -4,6 +4,7 @@ import { container } from 'tsyringe';
 import {
   IdentityUnavailableError,
   InvalidDisplayNameError,
+  InvalidHandleError,
   ProfileService,
   ProfileVersionConflictError,
 } from '../services/profile.service.js';
@@ -42,8 +43,18 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
 
   fastify.put<{ Body: { handle: string; expectedVersion: number } }>('/profile/me/handle', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
-    const profile = await container.resolve(ProfileService).changeHandle(user.id, request.body.handle, request.body.expectedVersion);
-    return reply.code(200).send(profile);
+    try {
+      const profile = await container.resolve(ProfileService).changeHandle(user.id, request.body.handle, request.body.expectedVersion);
+      return reply.code(200).send(profile);
+    } catch (error) {
+      if (error instanceof InvalidHandleError) {
+        return reply.code(400).type('application/problem+json').send({
+          type: 'https://wallpaperdb.example/problems/invalid-handle',
+          title: 'Invalid Handle', status: 400, detail: error.message, instance: request.url,
+        });
+      }
+      throw error;
+    }
   });
 
   fastify.patch('/profile/me', async (request, reply) => {

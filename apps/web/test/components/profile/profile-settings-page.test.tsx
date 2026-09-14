@@ -139,4 +139,26 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('at most 80 characters');
     expect(userApi.updateProfile).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['invalid-handle', 400, 'Handle must contain between 1 and 30 characters.', 'Handle must contain between 1 and 30 characters.'],
+    ['handle-unavailable', 409, 'That Handle is already in use.', 'That Handle is already in use.'],
+    ['profile-version-conflict', 409, 'Profile has changed.', 'Your Profile changed elsewhere. Reload before saving again.'],
+  ])('preserves the Handle draft and explains %s', async (type, status, detail, expected) => {
+    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError(detail, status, {
+      type: `https://wallpaperdb.example/problems/${type}`,
+    }));
+    renderPage();
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+
+    await user.clear(input);
+    await user.type(input, 'My draft handle');
+    await user.click(screen.getByRole('button', { name: /change handle/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(expected);
+    expect(input).toHaveValue('My draft handle');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
 });

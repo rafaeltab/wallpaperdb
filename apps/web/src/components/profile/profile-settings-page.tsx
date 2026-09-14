@@ -194,6 +194,7 @@ function HandleSettings({
   const queryClient = useQueryClient();
   const [handle, setHandle] = useState(profile.handle);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const mutation = useMutation({
     mutationFn: () => userApi.updateHandle({
       handle,
@@ -204,6 +205,14 @@ function HandleSettings({
     onSuccess: (updated) => {
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
       setSaved(true);
+      setError(null);
+    },
+    onError: (cause) => {
+      if (cause instanceof UserApiError && cause.type?.endsWith('/profile-version-conflict')) {
+        setError('Your Profile changed elsewhere. Reload before saving again.');
+      } else {
+        setError(cause instanceof Error ? cause.message : 'Unable to change the Handle.');
+      }
     },
   });
 
@@ -222,9 +231,10 @@ function HandleSettings({
         <form className="space-y-5" onSubmit={(event) => {
           event.preventDefault();
           setSaved(false);
+          setError(null);
           mutation.mutate();
         }}>
-          <Field>
+          <Field data-invalid={Boolean(error)}>
             <FieldLabel htmlFor="profile-handle">Handle</FieldLabel>
             <Input
               id="profile-handle"
@@ -233,12 +243,14 @@ function HandleSettings({
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
-              aria-describedby="handle-rules"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? 'handle-rules handle-error' : 'handle-rules'}
             />
             <FieldDescription id="handle-rules">
               Use lowercase ASCII letters, numbers, and single hyphens. Spaces and punctuation
               become hyphens. Technical names are reserved.
             </FieldDescription>
+            {error && <FieldError id="handle-error">{error}</FieldError>}
           </Field>
           {saved && (
             <Alert role="status">

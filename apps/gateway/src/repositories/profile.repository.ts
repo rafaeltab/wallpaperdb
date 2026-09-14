@@ -66,28 +66,48 @@ export class ProfileRepository {
 
   async findByHandle(handle: string): Promise<ProfileDocument | null> {
     const normalizedHandle = handle.toLowerCase();
-    const result = await this.openSearchConnection.getClient().search({
-      index: this.indexManager.getIndexName(profileIndexDefinition.key),
-      body: {
-        query: {
-          bool: {
-            should: [
-              { term: { handle: normalizedHandle } },
-              {
+    const index = this.indexManager.getIndexName(profileIndexDefinition.key);
+    const client = this.openSearchConnection.getClient();
+    const aliasFilter = { term: { 'aliases.handle': normalizedHandle } };
+    // Compare each kind of claim by the requested Handle's generation. A newer
+    // current Handle or unrelated alias must not make an older claim win.
+    const [currentResult, aliasResult] = await Promise.all([
+      client.search({
+        index,
+        body: {
+          query: { term: { handle: normalizedHandle } },
+          sort: [{ claimGeneration: 'desc' }],
+          size: 1,
+        },
+      }),
+      client.search({
+        index,
+        body: {
+          query: { nested: { path: 'aliases', query: aliasFilter } },
+          sort: [
+            {
+              'aliases.claimGeneration': {
+                order: 'desc',
+                mode: 'max',
                 nested: {
                   path: 'aliases',
-                  query: { term: { 'aliases.handle': normalizedHandle } },
+                  filter: aliasFilter,
                 },
               },
-            ],
-            minimum_should_match: 1,
-          },
+            },
+          ],
+          size: 1,
         },
-        sort: [{ claimGeneration: 'desc' }],
-        size: 1,
-      },
-    });
-    const hit = result.body.hits.hits[0] as { _source?: ProfileDocument } | undefined;
-    return hit?._source ?? null;
+      }),
+    ]);
+    const current = currentResult.body.hits.hits[0]?._source as ProfileDocument | undefined;
+    const alias = aliasResult.body.hits.hits[0]?._source as ProfileDocument | undefined;
+    const aliasGeneration = alias?.aliases?.find(
+      (claim) => claim.handle === normalizedHandle
+    )?.claimGeneration;
+    if (alias && aliasGeneration !== undefined && (!current || aliasGeneration > current.claimGeneration)) {
+      return alias;
+    }
+    return current ?? null;
   }
 }

@@ -71,6 +71,72 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("selects the highest matching claim generation during projection lag", async () => {
+        const timestamp = "2026-01-01T00:00:00.000Z";
+        const base = {
+            displayName: "Profile Owner",
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const repository = container.resolve(ProfileRepository);
+        await repository.project({
+            ...base,
+            id: "user_stale_aliases",
+            handle: "unrelated-current",
+            claimGeneration: 100,
+            aliases: [
+                { handle: "reclaimed-current", claimGeneration: 10 },
+                { handle: "reclaimed-alias", claimGeneration: 20 },
+                { handle: "unrelated-alias", claimGeneration: 99 },
+            ],
+        });
+        await repository.project({
+            ...base,
+            id: "user_current_winner",
+            handle: "reclaimed-current",
+            claimGeneration: 11,
+        });
+        await repository.project({
+            ...base,
+            id: "user_stale_current",
+            handle: "reclaimed-current",
+            claimGeneration: 9,
+        });
+        await repository.project({
+            ...base,
+            id: "user_alias_winner",
+            handle: "canonical-alias-owner",
+            claimGeneration: 40,
+            aliases: [{ handle: "reclaimed-alias", claimGeneration: 21 }],
+        });
+
+        const result = await query(`query {
+            current: profileByHandle(handle: "reclaimed-current") {
+                isAlias canonicalHandle profile { id }
+            }
+            alias: profileByHandle(handle: "reclaimed-alias") {
+                isAlias canonicalHandle profile { id }
+            }
+        }`);
+
+        expect(result.errors).toBeUndefined();
+        expect(result.data).toEqual({
+            current: {
+                isAlias: false,
+                canonicalHandle: "reclaimed-current",
+                profile: { id: "user_current_winner" },
+            },
+            alias: {
+                isAlias: true,
+                canonicalHandle: "canonical-alias-owner",
+                profile: { id: "user_alias_winner" },
+            },
+        });
+    });
+
     it("resolves former Handle aliases after projecting a Handle change", async () => {
         const timestamp = "2026-01-01T00:00:00.000Z";
         const original = {

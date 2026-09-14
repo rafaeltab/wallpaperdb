@@ -220,6 +220,16 @@ describe('Profile commands', () => {
     }
   });
 
+  it('returns unchanged owner state for the same normalized Handle during cooldown', async () => {
+    const before = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+    const same = await changeHandle('user_1', ' NEW__HANDLE ', changed.version);
+    expect(same.statusCode).toBe(200);
+    expect(same.json()).toEqual(changed);
+    expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(1);
+    expect((await changeHandle('user_1', 'new-handle', before.version)).statusCode).toBe(409);
+  });
+
   it('creates a profile and typed outbox event from the authenticated ID', async () => {
     identities.identities.set('user_1', {
       displayName: 'Ada Display',

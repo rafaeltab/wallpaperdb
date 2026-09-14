@@ -205,6 +205,7 @@ export class ProfileService {
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
+      if (current.handle === handle) return this.ownerProfile(current, tx);
       const now = new Date();
       if (current.lastHandleChangedAt) {
         const deadline = new Date(current.lastHandleChangedAt.getTime() + 7 * 24 * 60 * 60 * 1000);

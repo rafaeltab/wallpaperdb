@@ -48,7 +48,7 @@ endif
 FILTER = $(if $(PACKAGE),--filter=@wallpaperdb/$(PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
-.PHONY: help install dev build test test-unit test-integration test-e2e \
+.PHONY: help install dev build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
@@ -79,6 +79,11 @@ build: ## Build workspaces (optional PACKAGE)
 
 test: ## Run workspace test scripts (optional PACKAGE)
 	@$(TURBO) run test $(TURBO_FLAGS)
+
+test-focused: ## Build dependencies and run selected tests serially (requires PACKAGE; optional ARGS)
+	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
+	@$(TURBO) run build --filter="@wallpaperdb/$(PACKAGE)^..." --concurrency=1
+	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)

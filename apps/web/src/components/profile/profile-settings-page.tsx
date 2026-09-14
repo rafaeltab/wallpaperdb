@@ -179,6 +179,88 @@ function DisplayNameSettings({
           </form>
         </CardContent>
       </Card>
+      <HandleSettings profile={profile} tokenProvider={tokenProvider} />
     </div>
+  );
+}
+
+function HandleSettings({
+  profile,
+  tokenProvider,
+}: {
+  profile: Profile;
+  tokenProvider: () => Promise<string | null>;
+}) {
+  const queryClient = useQueryClient();
+  const [handle, setHandle] = useState(profile.handle);
+  const [saved, setSaved] = useState(false);
+  const mutation = useMutation({
+    mutationFn: () => userApi.updateHandle({
+      handle,
+      expectedVersion: profile.version,
+      expectedProfileId: profile.id,
+      tokenProvider,
+    }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(profileQueryKey(profile.id), updated);
+      setSaved(true);
+    },
+  });
+
+  useEffect(() => setHandle(profile.handle), [profile.handle]);
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Profile address</CardTitle>
+        <CardDescription>
+          You can change your Handle once every seven days. Your previous Profile address will
+          redirect to your new one.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form className="space-y-5" onSubmit={(event) => {
+          event.preventDefault();
+          setSaved(false);
+          mutation.mutate();
+        }}>
+          <Field>
+            <FieldLabel htmlFor="profile-handle">Handle</FieldLabel>
+            <Input
+              id="profile-handle"
+              value={handle}
+              onChange={(event) => { setHandle(event.target.value); setSaved(false); }}
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              aria-describedby="handle-rules"
+            />
+            <FieldDescription id="handle-rules">
+              Use lowercase ASCII letters, numbers, and single hyphens. Spaces and punctuation
+              become hyphens. Technical names are reserved.
+            </FieldDescription>
+          </Field>
+          {saved && (
+            <Alert role="status">
+              <AlertDescription>
+                Handle changed to @{profile.handle}. Your previous Profile address will redirect to
+                your new one.
+              </AlertDescription>
+            </Alert>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending && <Loader2 className="animate-spin" />}
+              Change Handle
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/profiles/@{$handle}" params={{ handle: profile.handle }}>
+                View your Profile
+              </Link>
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

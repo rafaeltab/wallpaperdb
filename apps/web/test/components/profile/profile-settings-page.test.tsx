@@ -12,12 +12,12 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
     ...original,
-    userApi: { ensureProfile: vi.fn(), updateProfile: vi.fn() },
+    userApi: { ensureProfile: vi.fn(), updateProfile: vi.fn(), updateHandle: vi.fn() },
   };
 });
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
+  Link: ({ children, to, params }: { children: React.ReactNode; to: string; params?: { handle: string } }) => (
+    <a href={params ? `/profiles/@${params.handle}` : to}>{children}</a>
   ),
 }));
 
@@ -57,6 +57,7 @@ describe('ProfileSettingsPage', () => {
     } as ReturnType<typeof useAuth>);
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+    vi.mocked(userApi.updateHandle).mockReset();
   });
 
   it('shows the current Display name and immediately adopts the REST response', async () => {
@@ -98,6 +99,32 @@ describe('ProfileSettingsPage', () => {
       'Your Profile changed elsewhere. Reload before saving again.'
     );
     expect(input).toHaveValue('My unsaved name');
+  });
+
+  it('changes the Handle and immediately links to the authoritative Profile', async () => {
+    const updated = { ...profile, handle: 'new-handle', version: 2 };
+    vi.mocked(userApi.updateHandle).mockResolvedValue(updated);
+    const { queryClient } = renderPage();
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+
+    expect(input).toHaveValue(profile.handle);
+    await user.clear(input);
+    await user.type(input, 'New Handle');
+    await user.click(screen.getByRole('button', { name: /change handle/i }));
+
+    await waitFor(() => expect(input).toHaveValue('new-handle'));
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(userApi.updateHandle).toHaveBeenCalledWith({
+      handle: 'New Handle',
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(screen.getByText('@new-handle')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Handle changed to @new-handle.');
+    expect(screen.getByRole('status')).toHaveTextContent('Your previous Profile address will redirect to your new one.');
+    expect(screen.getByRole('link', { name: /view your profile/i })).toHaveAttribute('href', '/profiles/@new-handle');
   });
 
   it('validates the 80-character limit before sending', async () => {

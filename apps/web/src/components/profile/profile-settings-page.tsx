@@ -193,7 +193,7 @@ function HandleSettings({
 }) {
   const queryClient = useQueryClient();
   const [handle, setHandle] = useState(profile.handle);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<'changed' | 'unchanged' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [serverNextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
   const nextChangeTime = serverNextHandleChangeAt
@@ -213,7 +213,8 @@ function HandleSettings({
     }),
     onSuccess: (updated) => {
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
-      setSaved(true);
+      setHandle(updated.handle);
+      setSaved(updated.handle === profile.handle ? 'unchanged' : 'changed');
       setError(null);
       setNextHandleChangeAt(null);
     },
@@ -243,7 +244,7 @@ function HandleSettings({
       <CardContent>
         <form className="space-y-5" onSubmit={(event) => {
           event.preventDefault();
-          setSaved(false);
+          setSaved(null);
           setError(null);
           mutation.mutate();
         }}>
@@ -252,7 +253,7 @@ function HandleSettings({
             <Input
               id="profile-handle"
               value={handle}
-              onChange={(event) => { setHandle(event.target.value); setSaved(false); }}
+              onChange={(event) => { setHandle(event.target.value); setSaved(null); }}
               autoCapitalize="none"
               autoComplete="off"
               spellCheck={false}
@@ -275,8 +276,10 @@ function HandleSettings({
           {saved && (
             <Alert role="status">
               <AlertDescription>
-                Handle changed to @{profile.handle}. Your previous Profile address will redirect to
-                your new one.
+                {saved === 'unchanged' ? 'Handle unchanged.' : (
+                  <>Handle changed to @{profile.handle}. Your previous Profile address will redirect to
+                  your new one. Public links may take a moment to update.</>
+                )}
               </AlertDescription>
             </Alert>
           )}

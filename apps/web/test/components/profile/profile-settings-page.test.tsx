@@ -192,4 +192,18 @@ describe('ProfileSettingsPage', () => {
     );
     expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
+
+  it('reports an unchanged normalized Handle without claiming the address changed', async () => {
+    vi.mocked(userApi.updateHandle).mockResolvedValue(profile);
+    renderPage();
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.clear(input);
+    await user.type(input, 'Wallpaper Fan');
+    await user.click(screen.getByRole('button', { name: /change handle/i }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Handle unchanged.');
+    expect(input).toHaveValue(profile.handle);
+    expect(screen.getByRole('status')).not.toHaveTextContent('Handle changed');
+  });
 });

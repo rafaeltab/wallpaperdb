@@ -5,6 +5,7 @@ Owns WallpaperDB Profiles. It verifies Clerk-authenticated Users, persists publi
 ## Key Capabilities
 
 - Idempotently creates or returns the signed-in User's Profile through `POST /profile/me/ensure`
+- Changes Handles through `PUT /profile/me/handle`, preserving former addresses as aliases and enforcing a seven-day cooldown
 - Safely edits Display names through `PATCH /profile/me` with optimistic concurrency
 - Derives unique, configurable Handles with monotonic claim generations from Clerk identity data or a generated fallback
 - Atomically persists Profile state, Handle claims, and typed outbox events for creation and updates

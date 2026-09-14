@@ -24,6 +24,7 @@ make dev PACKAGE=user
 ### Core Functionality
 - **Authenticated Profile creation** through an idempotent ensure command
 - **Optimistic Profile editing** with authoritative command responses and conflict detection
+- **Handle changes** with a seven-day cooldown and atomic alias retention for existing Profile links
 - **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
 - **Health checks** for database and message queue connectivity
@@ -53,6 +54,7 @@ profiles {
   biographyMarkdown: text
   pictureAssetId: text | null
   version: integer
+  lastHandleChangedAt: timestamp | null
   createdAt: timestamp
   updatedAt: timestamp
 }
@@ -75,6 +77,12 @@ Verifies the Clerk bearer token and idempotently creates or returns the signed-i
 ### PATCH /profile/me
 
 Updates the signed-in User's Display name. The request supplies `displayName` and the last-seen `expectedVersion`. Display names preserve casing and Unicode while trimming and collapsing whitespace, and default to an 80-Unicode-character limit. Stale versions return `409 Conflict` without changing Profile state or recording an event. A successful command returns the authoritative updated Profile immediately and records a versioned `profile.updated` event in the same transaction.
+
+### PUT /profile/me/handle
+
+Changes the signed-in User's Handle using `{ "handle": "new-name", "expectedVersion": 2 }`. Normalization produces lowercase ASCII letters, digits, and single hyphens; configured length bounds apply afterward and technical names are reserved. A successful transaction claims the new Handle, retains the former Handle as an alias, increments the Profile version, and records the complete public snapshot. Owners may promote their own retained aliases back to the current Handle after cooldown.
+
+The command returns `400` for invalid Handles, `409` for collisions or stale versions, and `429` with `nextHandleChangeAt` during the seven-day cooldown. Repeating the unchanged normalized Handle at the current version returns unchanged state. Authenticated Profile responses include `aliases` and `lastHandleChangedAt`; GraphQL resolves aliases without enumerating them publicly. Former addresses redirect to the current canonical Handle after projection catches up.
 
 ### GET /health
 
@@ -175,7 +183,7 @@ apps/user/
 │   │   └── profile.routes.ts    # Authenticated Profile commands
 │   └── services/                 # Business logic
 │       ├── health.service.ts    # Health checks
-│       └── profile.service.ts   # Profile ensure and Handle allocation
+│       └── profile.service.ts   # Profile commands and Handle claims
 ├── test/                         # Tests
 ├── drizzle/                      # Database migrations
 ├── package.json

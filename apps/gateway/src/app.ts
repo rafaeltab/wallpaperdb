@@ -189,26 +189,33 @@ export async function createApp(
     const complexityService = container.resolve(QueryComplexityService);
 
     // preExecution hook for complexity and breadth analysis
-    fastify.graphql.addHook(
-      'preExecution',
-      async (graphqlSchema, document, _context, variables) => {
-        return await withSpan('graphql.security_check', {}, async (span) => {
-          // Check breadth (unique fields and aliases)
-          complexityService.checkBreadth(document);
+    fastify.graphql.addHook('preExecution', async (graphqlSchema, document, context, variables) => {
+      return await withSpan('graphql.security_check', {}, async (span) => {
+        // Check breadth (unique fields and aliases)
+        complexityService.checkBreadth(document);
 
-          // Calculate and validate complexity
-          const complexity = complexityService.calculateComplexity(
-            graphqlSchema,
-            document,
-            variables ?? {}
-          );
-          span.setAttribute('graphql.complexity', complexity);
-          recordHistogram('graphql.query.complexity', complexity);
+        // Calculate and validate complexity
+        const request = context.reply?.request;
+        const parameters = request?.method === 'GET' ? request.query : request?.body;
+        const operationName =
+          parameters &&
+          typeof parameters === 'object' &&
+          'operationName' in parameters &&
+          typeof parameters.operationName === 'string'
+            ? parameters.operationName
+            : undefined;
+        const complexity = complexityService.calculateComplexity(
+          graphqlSchema,
+          document,
+          variables ?? {},
+          operationName
+        );
+        span.setAttribute('graphql.complexity', complexity);
+        recordHistogram('graphql.query.complexity', complexity);
 
-          complexityService.validateComplexity(complexity);
-        });
-      }
-    );
+        complexityService.validateComplexity(complexity);
+      });
+    });
   });
 
   // Initialize connections

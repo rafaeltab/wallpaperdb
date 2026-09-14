@@ -247,6 +247,26 @@ describe('GraphQL Security', () => {
   });
 
   describe('Query Complexity Analysis', () => {
+    it.each(['POST', 'GET'] as const)('analyzes only the selected operation for %s requests', async (method) => {
+      const parameters = {
+        operationName: 'Chosen',
+        query: `
+          query Chosen { searchWallpapers(first: 1) { edges { node { wallpaperId } } } }
+          query Other($page: Int!) {
+            searchWallpapers(first: $page) { edges { node { wallpaperId } } }
+          }
+        `,
+      };
+      const response = await tester.getApp().inject({
+        method,
+        url: '/graphql',
+        ...(method === 'GET' ? { query: parameters } : { payload: parameters }),
+      });
+
+      expect(response.json().errors).toBeUndefined();
+      expect(response.json().data.searchWallpapers.edges).toEqual([]);
+    });
+
     it.each([
       ['omitted page sizes', `query {
         searchWallpapers { edges { node { profile { ...Contributions } } } }

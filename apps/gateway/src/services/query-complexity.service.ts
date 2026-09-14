@@ -1,6 +1,20 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import type { DocumentNode, FieldNode, FragmentDefinitionNode, GraphQLSchema, ValueNode } from 'graphql';
-import { BREAK, getVariableValues, Kind, TypeInfo, visit, visitWithTypeInfo } from 'graphql';
+import type {
+  DocumentNode,
+  FieldNode,
+  FragmentDefinitionNode,
+  GraphQLSchema,
+  ValueNode,
+} from 'graphql';
+import {
+  BREAK,
+  getOperationAST,
+  getVariableValues,
+  Kind,
+  TypeInfo,
+  visit,
+  visitWithTypeInfo,
+} from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { BreadthLimitError, ComplexityLimitError } from '../errors/graphql-errors.js';
@@ -42,7 +56,8 @@ export class QueryComplexityService {
   calculateComplexity(
     schema: GraphQLSchema,
     document: DocumentNode,
-    variables: Record<string, unknown>
+    variables: Record<string, unknown>,
+    operationName?: string
   ): number {
     let totalCost = 0;
     const fragments = new Map<string, FragmentDefinitionNode>();
@@ -52,62 +67,71 @@ export class QueryComplexityService {
       }
     }
 
-    for (const operation of document.definitions) {
-      if (operation.kind !== Kind.OPERATION_DEFINITION) continue;
-      const resolvedVariables = getVariableValues(schema, operation.variableDefinitions ?? [], variables);
-      if (resolvedVariables.errors) return this.config.graphqlMaxComplexity + 1;
-      const typeInfo = new TypeInfo(schema);
-      let multiplier = 1;
-      let pageSize = 1;
-      const ancestors: Array<{ multiplier: number; pageSize: number }> = [];
-      const activeFragments = new Set<string>();
+    const operation = getOperationAST(document, operationName);
+    if (!operation) return this.config.graphqlMaxComplexity + 1;
+    const resolvedVariables = getVariableValues(
+      schema,
+      operation.variableDefinitions ?? [],
+      variables
+    );
+    if (resolvedVariables.errors) return this.config.graphqlMaxComplexity + 1;
+    const typeInfo = new TypeInfo(schema);
+    let multiplier = 1;
+    let pageSize = 1;
+    const ancestors: Array<{ multiplier: number; pageSize: number }> = [];
+    const activeFragments = new Set<string>();
 
-      const visitor = visitWithTypeInfo(typeInfo, {
-        Field: {
-          enter: (node) => {
-            ancestors.push({ multiplier, pageSize });
-            const parentType = typeInfo.getParentType();
-            const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
-            const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
-            const isConnection = fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers';
+    const visitor = visitWithTypeInfo(typeInfo, {
+      Field: {
+        enter: (node) => {
+          ancestors.push({ multiplier, pageSize });
+          const parentType = typeInfo.getParentType();
+          const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
+          const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
+          const isConnection =
+            fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers';
 
-            // Only connection edges repeat per result; pageInfo is resolved once.
-            if (fieldName === 'WallpaperConnection.edges') multiplier *= pageSize;
-            const listMultiplier = this.getListMultiplier(node, resolvedVariables.coerced, isConnection ? 10 : 1);
-            totalCost += fieldCost * multiplier * listMultiplier * this.getNestedMultiplier(fieldName);
+          // Only connection edges repeat per result; pageInfo is resolved once.
+          if (fieldName === 'WallpaperConnection.edges') multiplier *= pageSize;
+          const listMultiplier = this.getListMultiplier(
+            node,
+            resolvedVariables.coerced,
+            isConnection ? 10 : 1
+          );
+          totalCost +=
+            fieldCost * multiplier * listMultiplier * this.getNestedMultiplier(fieldName);
 
-            if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
-            if (isConnection) {
-              pageSize = listMultiplier;
-            }
-            return undefined;
-          },
-          leave: () => {
-            const ancestor = ancestors.pop();
-            if (ancestor) ({ multiplier, pageSize } = ancestor);
-          },
-        },
-        FragmentSpread: (node) => {
-          const name = node.name.value;
-          const fragment = fragments.get(name);
-          if (!fragment) return undefined;
-          if (activeFragments.has(name)) {
-            totalCost = this.config.graphqlMaxComplexity + 1;
-            return BREAK;
-          }
-          activeFragments.add(name);
-          visit(fragment, visitor);
-          activeFragments.delete(name);
           if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
+          if (isConnection) {
+            pageSize = listMultiplier;
+          }
           return undefined;
         },
-      });
-      visit(operation, visitor);
+        leave: () => {
+          const ancestor = ancestors.pop();
+          if (ancestor) ({ multiplier, pageSize } = ancestor);
+        },
+      },
+      FragmentSpread: (node) => {
+        const name = node.name.value;
+        const fragment = fragments.get(name);
+        if (!fragment) return undefined;
+        if (activeFragments.has(name)) {
+          totalCost = this.config.graphqlMaxComplexity + 1;
+          return BREAK;
+        }
+        activeFragments.add(name);
+        visit(fragment, visitor);
+        activeFragments.delete(name);
+        if (totalCost > this.config.graphqlMaxComplexity) return BREAK;
+        return undefined;
+      },
+    });
+    visit(operation, visitor);
 
-      // Stop expanding fragments as soon as rejection is certain.
-      if (totalCost > this.config.graphqlMaxComplexity) {
-        return this.config.graphqlMaxComplexity + 1;
-      }
+    // Stop expanding fragments as soon as rejection is certain.
+    if (totalCost > this.config.graphqlMaxComplexity) {
+      return this.config.graphqlMaxComplexity + 1;
     }
 
     return totalCost;

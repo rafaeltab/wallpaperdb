@@ -155,7 +155,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - OpenSearch integration for fast wallpaper search
 - Variant-based filtering (resolution, aspect ratio, format)
 - Event-driven metadata synchronization
-- Eventually consistent public Profile reads by ID and Handle
+- Eventually consistent public Profile reads by ID, current Handle, and Handle alias
 - Batched nullable contributor resolution and Profile-owned wallpaper galleries
 - Cursor-based pagination
 
@@ -177,7 +177,14 @@ type Query {
   searchWallpapers(filter: WallpaperFilter, first: Int, after: String): WallpaperConnection!
   getWallpaper(wallpaperId: ID!): Wallpaper
   profile(id: ID!): Profile
-  profileByHandle(handle: String!): Profile
+  profileByHandle(handle: String!): HandleResolution
+}
+
+type HandleResolution {
+  profile: Profile!
+  requestedHandle: String!
+  isAlias: Boolean!
+  canonicalHandle: String!
 }
 
 type Profile {

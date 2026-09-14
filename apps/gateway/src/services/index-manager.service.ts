@@ -69,6 +69,10 @@ export class IndexManagerService {
         });
 
         if (exists.body) {
+          await client.indices.putMapping({
+            index: definition.name,
+            body: { properties: definition.mapping.properties },
+          });
           span.setAttribute('index.already_exists', true);
           return;
         }

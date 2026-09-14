@@ -2,8 +2,11 @@ import "reflect-metadata";
 import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT } from "@wallpaperdb/events";
 import { container } from "tsyringe";
 import { describe, expect, it, vi } from "vitest";
+import { OpenSearchConnection } from "../src/connections/opensearch.js";
+import { profilesIndexMapping } from "../src/opensearch/mappings.js";
 import { ProfileRepository } from "../src/repositories/profile.repository.js";
 import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
+import { IndexManagerService } from "../src/services/index-manager.service.js";
 import { tester } from "./setup.js";
 
 interface ProfileSnapshot {
@@ -71,6 +74,67 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("adds alias routing to an existing Profile index without losing Profiles", async () => {
+        const indexManager = container.resolve(IndexManagerService);
+        const client = container.resolve(OpenSearchConnection).getClient();
+        await indexManager.deleteIndex("profiles");
+        await client.indices.create({
+            index: indexManager.getIndexName("profiles"),
+            body: {
+                mappings: {
+                    properties: Object.fromEntries(
+                        Object.entries(profilesIndexMapping.properties).filter(([name]) => name !== "aliases"),
+                    ),
+                },
+            },
+        });
+        const timestamp = "2026-01-01T00:00:00.000Z";
+        const existing = {
+            id: "user_existing_index",
+            displayName: "Existing Profile",
+            handle: "existing-profile",
+            claimGeneration: 1,
+            biographyMarkdown: "Preserved biography",
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const repository = container.resolve(ProfileRepository);
+        await repository.project(existing);
+
+        // This is the normal startup path, before Profile consumers start.
+        await indexManager.createIndex();
+        const preserved = await query(`query {
+            profile(id: "${existing.id}") { id displayName biographyMarkdown version }
+        }`);
+        expect(preserved.data.profile).toEqual({
+            id: existing.id,
+            displayName: existing.displayName,
+            biographyMarkdown: existing.biographyMarkdown,
+            version: 1,
+        });
+
+        await repository.project({
+            ...existing,
+            handle: "updated-profile",
+            claimGeneration: 2,
+            aliases: [{ handle: existing.handle, claimGeneration: existing.claimGeneration }],
+            version: 2,
+        });
+        const result = await query(`query {
+            profileByHandle(handle: "existing-profile") {
+                isAlias canonicalHandle profile { id }
+            }
+        }`);
+        expect(result.errors).toBeUndefined();
+        expect(result.data.profileByHandle).toEqual({
+            isAlias: true,
+            canonicalHandle: "updated-profile",
+            profile: { id: existing.id },
+        });
+    });
+
     it("selects the highest matching claim generation during projection lag", async () => {
         const timestamp = "2026-01-01T00:00:00.000Z";
         const base = {

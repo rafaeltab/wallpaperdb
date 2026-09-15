@@ -82,11 +82,14 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
       {query && (query !== debouncedQuery || results.isLoading) ? (
         <p role="status" className="text-xs text-muted-foreground">Searching Profiles…</p>
       ) : null}
-      {query && query === debouncedQuery && results.isError ? (
+      {query && query === debouncedQuery && results.isError && !results.isFetchNextPageError ? (
         <div className="flex flex-wrap items-center gap-2">
           <p role="alert" className="text-xs text-destructive">Could not search Profiles. Try again.</p>
           <Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()} aria-label="Retry Profile search">Try again</Button>
         </div>
+      ) : null}
+      {query && query === debouncedQuery && results.isFetchNextPageError ? (
+        <p role="alert" className="text-xs text-destructive">Could not load more Profiles.</p>
       ) : null}
       {query && query === debouncedQuery && results.data?.pages[0].edges.length === 0 ? (
         <p role="status" className="text-xs text-muted-foreground">No Profiles found. Try another Handle or Display name.</p>
@@ -117,7 +120,7 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
       ) : null}
       {query && query === debouncedQuery && results.hasNextPage ? (
         <Button type="button" variant="outline" size="sm" disabled={results.isFetchingNextPage} onClick={() => void results.fetchNextPage()}>
-          {results.isFetchingNextPage ? 'Loading more Profiles…' : 'Load more Profiles'}
+          {results.isFetchingNextPage ? 'Loading more Profiles…' : results.isFetchNextPageError ? 'Retry loading more Profiles' : 'Load more Profiles'}
         </Button>
       ) : null}
       </> : null}

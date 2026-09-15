@@ -140,4 +140,25 @@ describe('Profile wallpaper filter', () => {
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(init.body as string).variables.query).toBe('ada');
   });
+
+  it('keeps existing results and retries a failed next page with the same cursor', async () => {
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [{ node: ada }], pageInfo: { hasNextPage: true, hasPreviousPage: false, endCursor: 'cursor_ada' },
+    } }));
+    const user = userEvent.setup();
+    renderFilter();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), 'ada');
+    mockFetch.mockRejectedValueOnce(new Error('offline'));
+    await user.click(await screen.findByRole('button', { name: 'Load more Profiles' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load more Profiles.');
+    expect(screen.getByRole('button', { name: 'Select Ada Lovelace (@ada-lovelace)' })).toBeInTheDocument();
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [], pageInfo: { hasNextPage: false, hasPreviousPage: true },
+    } }));
+    await user.click(screen.getByRole('button', { name: 'Retry loading more Profiles' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    const [, init] = mockFetch.mock.calls[2] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).variables.after).toBe('cursor_ada');
+  });
 });

@@ -233,6 +233,20 @@ describe('HomePage browse filters', () => {
     expect(mockNavigate.mock.calls[0][0].search({ profileId: 'user_Ada' }).profileId).toBeUndefined();
   });
 
+  it('explains empty filtered results without asking the reader to upload for another Profile', () => {
+    mockUseSearch.mockReturnValue({ profileId: 'user_Ada' });
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ data: { profile: null } }), {
+      headers: { 'content-type': 'application/json' },
+    }));
+    (useWallpaperInfiniteQuery as Mock).mockReturnValue({
+      data: { pages: [] }, isLoading: false, error: null, fetchNextPage: vi.fn(),
+    });
+    render(<HomePage />);
+    expect(screen.getByText('No wallpapers match these filters.')).toBeInTheDocument();
+    expect(screen.getByText('Try another Profile or clear a filter to see more wallpapers.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Upload wallpaper' })).not.toBeInTheDocument();
+  });
+
   it('shows the resolved device aspect ratio as a neutral badge when the panel is collapsed', () => {
     mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: 'device' });
 

@@ -188,7 +188,7 @@ export function HomePage() {
       ) : error ? (
         <ErrorState error={error} />
       ) : wallpapers.length === 0 ? (
-        <EmptyState hasCursor={!!after} />
+        <EmptyState hasCursor={!!after} hasFilters={Boolean(profileId || format || aspectRatio)} />
       ) : (
         <>
           <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
@@ -419,7 +419,7 @@ function ErrorState({ error }: { error: Error }) {
   );
 }
 
-function EmptyState({ hasCursor }: { hasCursor: boolean }) {
+function EmptyState({ hasCursor, hasFilters }: { hasCursor: boolean; hasFilters: boolean }) {
   return (
     <div className="max-w-md mx-auto px-4 py-12">
       <Card>
@@ -434,6 +434,11 @@ function EmptyState({ hasCursor }: { hasCursor: boolean }) {
                   Go to beginning
                 </Link>
               </Button>
+            </>
+          ) : hasFilters ? (
+            <>
+              <p className="mb-2 font-medium">No wallpapers match these filters.</p>
+              <p className="text-sm text-muted-foreground">Try another Profile or clear a filter to see more wallpapers.</p>
             </>
           ) : (
             <>

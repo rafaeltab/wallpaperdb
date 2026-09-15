@@ -182,6 +182,25 @@ describe('Profile commands', () => {
     await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
 
+  it('rolls back both Profile details when the combined Biography event cannot commit', async () => {
+    const original = (await request('user_1')).json();
+    await sql.unsafe(`create function reject_biography_event() returns trigger language plpgsql as $$ begin if NEW.payload->'change'->>'type' = 'profile-details-changed' then raise exception 'Biography event rejected'; end if; return NEW; end $$`);
+    await sql.unsafe(`create trigger reject_biography_event before insert on outbox_events for each row execute function reject_biography_event()`);
+    const save = () => app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: original.id })).toString('base64')}` }, payload: { displayName: 'New Name', biographyMarkdown: 'New **Biography**', expectedVersion: original.version } });
+    try {
+      expect((await save()).statusCode).toBe(500);
+      expect((await request('user_1')).json()).toEqual(original);
+      expect((await sql`select id from outbox_events where subject = 'profile.updated'`)).toHaveLength(0);
+      await sql.unsafe('drop trigger reject_biography_event on outbox_events');
+      const saved = await save();
+      expect(saved.statusCode).toBe(200);
+      expect(saved.json()).toMatchObject({ displayName: 'New Name', biographyMarkdown: 'New **Biography**', version: original.version + 1 });
+    } finally {
+      await sql.unsafe('drop trigger if exists reject_biography_event on outbox_events');
+      await sql.unsafe('drop function reject_biography_event()');
+    }
+  });
+
   it('clears Biography with version checks while preserving aliases and treating identical drafts as no-ops', async () => {
     const initial = (await request('user_1')).json();
     const original = (await changeHandle('user_1', 'biography-writer', initial.version)).json();

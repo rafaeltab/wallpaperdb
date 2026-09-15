@@ -41,4 +41,29 @@ describe('Profile evidence retention worker', () => {
     expect(pictures).toHaveBeenCalledTimes(2);
     await worker.stop();
   });
+
+  it('coalesces overlapping cycles and drains shutdown without starting another cleanup batch', async () => {
+    let finish!: () => void;
+    let isStopping!: () => boolean;
+    const events = vi.fn(async (_now: Date, stop: () => boolean) => {
+      isStopping = stop;
+      await new Promise<void>((resolve) => { finish = resolve; });
+      return { deleted: 1, failed: 0 };
+    });
+    const pictures = vi.fn(async () => ({ deleted: 0, failed: 0 }));
+    const timer = new FakeTimerService();
+    const worker = new ProfileEvidenceRetentionWorker(events, pictures, { info: vi.fn(), error: vi.fn() }, timer);
+    worker.start();
+    expect(worker.cleanupPending()).toBe(worker.cleanupPending());
+    expect(events).toHaveBeenCalledTimes(1);
+    const closed = vi.fn();
+    const stopping = worker.stop().then(closed);
+    expect(isStopping()).toBe(true);
+    expect(closed).not.toHaveBeenCalled();
+    finish();
+    await stopping;
+    expect(pictures).not.toHaveBeenCalled();
+    await timer.tickAsync(1000);
+    expect(events).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { isRedirect } from '@tanstack/react-router';
 import { describe, expect, it, vi } from 'vitest';
 import {
   loadCanonicalProfile,
@@ -37,7 +38,12 @@ async function expectCanonicalRedirect(promise: Promise<unknown>) {
   } catch (error) {
     expect(error).toBeInstanceOf(Response);
     expect((error as Response).status).toBe(307);
-    expect((error as Response).headers.get('location')).toBe('/profiles/@ada-lovelace');
+    if (!isRedirect(error)) throw error;
+    expect(error.options).toMatchObject({
+      to: '/profiles/@{$handle}',
+      params: { handle: 'ada-lovelace' },
+      replace: true,
+    });
   }
 }
 

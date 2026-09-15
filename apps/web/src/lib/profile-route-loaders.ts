@@ -37,7 +37,8 @@ export async function redirectProfileIdToCanonical(
 
 function redirectToCanonicalProfile(handle: string): Response {
   return redirect({
-    href: `/profiles/@${handle}`,
+    to: '/profiles/@{$handle}',
+    params: { handle },
     replace: true,
   });
 }

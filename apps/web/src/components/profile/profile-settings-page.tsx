@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { Loader2, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
+import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -180,6 +181,7 @@ function DisplayNameSettings({
         </CardContent>
       </Card>
       <HandleSettings profile={profile} tokenProvider={tokenProvider} />
+      <ProfileAliasSettings profile={profile} />
     </div>
   );
 }

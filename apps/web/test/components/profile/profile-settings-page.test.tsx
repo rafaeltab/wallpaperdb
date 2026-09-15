@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
@@ -87,6 +87,26 @@ describe('ProfileSettingsPage', () => {
       tokenProvider: expect.any(Function),
     });
     expect(screen.getByText('Display name saved.')).toBeInTheDocument();
+  });
+
+  it('separates retained and expiring aliases, counting only retained aliases against the configured limit', () => {
+    const expiresAt = '2026-09-16T12:34:56.789Z';
+    renderPage({
+      ...profile,
+      retainedAliasLimit: 2,
+      aliases: [
+        { handle: 'retained-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
+        { handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt },
+      ],
+    });
+
+    const retained = screen.getByRole('list', { name: /retained aliases/i });
+    const expiring = screen.getByRole('list', { name: /expiring aliases/i });
+    expect(within(retained).getByText('@retained-name')).toBeInTheDocument();
+    expect(within(retained).queryByText('@expiring-name')).not.toBeInTheDocument();
+    expect(within(expiring).getByText('@expiring-name')).toBeInTheDocument();
+    expect(screen.getByText('1 of 2 retained aliases')).toBeInTheDocument();
+    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString(), { exact: false }).closest('time')).toHaveAttribute('dateTime', expiresAt);
   });
 
   it('retains unsaved input and explains a stale edit', async () => {

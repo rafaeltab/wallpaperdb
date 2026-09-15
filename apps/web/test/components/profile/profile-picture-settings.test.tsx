@@ -64,6 +64,39 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('confirms picture removal with the version seen when the dialog opened and keeps cancellation local', async () => {
+    const initial = { ...profile, pictureAssetId: 'picture_old' };
+    const updated = { ...profile, version: 3 };
+    vi.mocked(userApi.removePicture).mockResolvedValue(updated);
+    const { client } = renderPage(initial);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    let dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent(/generated avatar/i);
+    expect(dialog).toHaveTextContent(/pending picture import/i);
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(userApi.removePicture).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Remove picture' }));
+    dialog = screen.getByRole('alertdialog');
+    act(() =>
+      client.setQueryData(profileQueryKey(profile.id), {
+        ...initial,
+        version: 2,
+        pictureAssetId: 'newer_unseen',
+      })
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Use generated avatar' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+    expect(userApi.removePicture).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveTextContent(
+      'AL'
+    );
+  });
+
   it('uploads the selected file with its captured version and immediately adopts the authoritative picture', async () => {
     const updated = { ...profile, pictureAssetId: 'picture_new', version: 3 };
     vi.mocked(userApi.uploadPicture).mockResolvedValue(updated);

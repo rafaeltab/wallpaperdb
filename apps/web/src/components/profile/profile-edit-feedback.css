@@ -1,0 +1,38 @@
+/* Brief save feedback; reduced motion keeps a static result. */
+.profile-save-feedback[data-save-phase="success"] {
+  --save-bright: #16a34a;
+  --save-dark: #14532d;
+}
+
+.profile-save-feedback[data-save-phase="error"] {
+  --save-bright: #dc2626;
+  --save-dark: #7f1d1d;
+}
+
+.dark .profile-save-feedback[data-save-phase="success"] {
+  --save-bright: #4ade80;
+  --save-dark: #15803d;
+}
+
+.dark .profile-save-feedback[data-save-phase="error"] {
+  --save-bright: #f87171;
+  --save-dark: #b91c1c;
+}
+
+.profile-save-feedback[data-save-phase="success"],
+.profile-save-feedback[data-save-phase="error"] {
+  color: var(--save-bright);
+  animation: profile-save-result 1600ms ease-in-out both;
+}
+
+@keyframes profile-save-result {
+  0%, 40%, 80% { color: var(--save-bright); opacity: 1; }
+  20%, 60% { color: var(--save-dark); opacity: 1; }
+  100% { color: var(--save-bright); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-save-feedback[data-save-phase] {
+    animation: none;
+  }
+}

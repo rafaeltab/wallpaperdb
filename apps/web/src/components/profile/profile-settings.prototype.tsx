@@ -1,7 +1,724 @@
 // THROWAWAY: three minimal Profile settings layouts on /settings/profile?variant=A|B|C.
 // All edits stay in React state. Delete after the design decision; do not promote as-is.
+import { useNavigate } from '@tanstack/react-router';
+import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
+import { Dialog } from 'radix-ui';
+import { type ReactNode, useRef, useState } from 'react';
+import { BiographyMarkdown } from '@/components/profile/profile-biography';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { PrototypeSwitcher } from '@/components/ui/prototype-switcher';
+import { Textarea } from '@/components/ui/textarea';
 import type { Profile } from '@/lib/api/user';
 
-export default function ProfileSettingsPrototype({ profile, variant }: { profile: Profile; variant: 'A' | 'B' | 'C' }) {
-  return <div className="mx-auto max-w-3xl p-8"><h1 className="text-2xl font-semibold">Your profile</h1><p>{profile.displayName} · Prototype {variant}</p></div>;
+type Variant = 'A' | 'B' | 'C';
+type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
+type PreviousHandle = { handle: string; status: 'retained' | 'expiring' | 'historical' };
+type DraftProfile = {
+  name: string;
+  handle: string;
+  biography: string;
+  picture: string | null;
+  aliases: PreviousHandle[];
+};
+
+function initialProfile(profile: Profile): DraftProfile {
+  return {
+    name: profile.displayName,
+    handle: profile.handle,
+    biography: profile.biographyMarkdown,
+    picture: profile.pictureAssetId
+      ? `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(profile.pictureAssetId)}`
+      : null,
+    aliases: [
+      ...(profile.aliases ?? []).map((alias) => ({
+        handle: alias.handle,
+        status: alias.expiresAt ? ('expiring' as const) : ('retained' as const),
+      })),
+      ...(profile.historicalHandles ?? []).map((alias) => ({
+        handle: alias.handle,
+        status: 'historical' as const,
+      })),
+    ],
+  };
+}
+
+export default function ProfileSettingsPrototype({
+  profile,
+  variant,
+}: {
+  profile: Profile;
+  variant: Variant;
+}) {
+  const navigate = useNavigate({ from: '/settings/profile' });
+  const [value, setValue] = useState(() => initialProfile(profile));
+  const [handle, setHandle] = useState(value.handle);
+  const [editor, setEditor] = useState<Editor>(null);
+  const [notice, setNotice] = useState('');
+  const opener = useRef<HTMLElement | null>(null);
+  function openEditor(next: Editor) {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setEditor(next);
+    setNotice('');
+  }
+  function update(patch: Partial<DraftProfile>, message: string) {
+    setValue((current) => ({ ...current, ...patch }));
+    setNotice(message);
+    setEditor(null);
+  }
+  const retained = value.aliases.filter((alias) => alias.status === 'retained').length;
+  const expiring = value.aliases.filter((alias) => alias.status === 'expiring').length;
+  const historical = value.aliases.filter((alias) => alias.status === 'historical').length;
+  const aliasSummary =
+    retained || expiring
+      ? `${retained} retained${expiring ? ` · ${expiring} expiring` : ''}`
+      : historical
+        ? `${historical} previous ${historical === 1 ? 'handle' : 'handles'}`
+        : 'No previous handles';
+  const dirtyHandle = handle !== value.handle;
+  const validHandle = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(handle);
+
+  const avatar = (
+    <div className="relative w-fit shrink-0">
+      <Avatar value={value} />
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute -right-2 -bottom-2 rounded-full border-4 border-card bg-background shadow-sm"
+        aria-label="Edit profile picture"
+        onClick={() => openEditor('picture')}
+      >
+        <Pencil className="size-4" />
+      </Button>
+    </div>
+  );
+  const name = (
+    <div className="flex min-w-0 items-center gap-2">
+      <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+        {value.name}
+      </h2>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Edit display name"
+        className="shrink-0 text-muted-foreground"
+        onClick={() => openEditor('name')}
+      >
+        <Pencil className="size-4" />
+      </Button>
+    </div>
+  );
+  const aliases = (
+    <button
+      type="button"
+      className="flex max-w-full items-center gap-1.5 rounded text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      onClick={() => openEditor('aliases')}
+    >
+      <Link2 className="size-3.5 shrink-0" />
+      <span>
+        Previous handles <span aria-hidden="true">·</span> {aliasSummary}
+      </span>
+      <ChevronRight className="size-3.5 shrink-0" />
+    </button>
+  );
+  const handleField = (
+    <div className="min-w-0 space-y-2.5">
+      <label htmlFor="prototype-handle" className="block text-sm font-medium">
+        Profile handle
+      </label>
+      <div className="relative max-w-md">
+        <span className="pointer-events-none absolute top-2.5 left-3 text-sm text-muted-foreground">
+          @
+        </span>
+        <Input
+          id="prototype-handle"
+          value={handle}
+          onChange={(event) => setHandle(event.target.value)}
+          className="h-10 pl-8"
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby={dirtyHandle ? 'prototype-handle-help' : undefined}
+        />
+      </div>
+      {dirtyHandle && (
+        <div className="max-w-md space-y-3">
+          <p id="prototype-handle-help" className="text-xs leading-5 text-muted-foreground">
+            You can change your handle once every seven days. @{value.handle} will redirect to your
+            new handle.
+          </p>
+          {!validHandle && (
+            <p role="alert" className="text-xs text-destructive">
+              Use lowercase letters, numbers, and single hyphens.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              disabled={!validHandle}
+              onClick={() =>
+                update(
+                  {
+                    handle,
+                    aliases: [
+                      { handle: value.handle, status: 'retained' },
+                      ...value.aliases.filter((alias) => alias.handle !== handle),
+                    ],
+                  },
+                  'Profile handle updated'
+                )
+              }
+            >
+              Save handle
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setHandle(value.handle)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+      {aliases}
+    </div>
+  );
+  const biography = (
+    <section className="min-w-0 space-y-3">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-sm font-medium">Biography</h3>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          onClick={() => openEditor('biography')}
+        >
+          <Pencil className="size-3.5" />
+          Edit<span className="sr-only"> biography</span>
+        </Button>
+      </div>
+      {value.biography.trim() ? (
+        <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
+      ) : (
+        <button
+          className="w-full rounded-lg border border-dashed p-5 text-left text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          type="button"
+          onClick={() => openEditor('biography')}
+        >
+          A little about you, and the wallpapers you love.
+          <span className="mt-2 block font-medium text-foreground">
+            Add a biography <span aria-hidden="true">→</span>
+          </span>
+        </button>
+      )}
+    </section>
+  );
+  const parts = { avatar, name, handleField, biography, aliases };
+  return (
+    <>
+      <div
+        className={`mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' ? 'max-w-4xl' : 'max-w-3xl'}`}
+      >
+        <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Your profile</h1>
+            <p className="mt-1 text-sm text-muted-foreground">How you appear on WallpaperDB.</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => openEditor('public')}>
+            View profile
+            <ArrowUpRight className="size-4" />
+          </Button>
+        </header>
+        {variant === 'A' ? (
+          <VariantA {...parts} />
+        ) : variant === 'B' ? (
+          <VariantB {...parts} />
+        ) : (
+          <VariantC {...parts} />
+        )}
+        <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
+          {notice && (
+            <>
+              <Check className="size-4" />
+              {notice}
+            </>
+          )}
+        </output>
+      </div>
+      <PrototypeModal editor={editor} close={() => setEditor(null)} opener={opener.current}>
+        {editor === 'picture' && (
+          <PictureEditor value={value} update={update} cancel={() => setEditor(null)} />
+        )}
+        {editor === 'biography' && (
+          <BiographyEditor
+            value={value}
+            profile={profile}
+            update={update}
+            cancel={() => setEditor(null)}
+          />
+        )}
+        {editor === 'name' && (
+          <NameEditor value={value} update={update} cancel={() => setEditor(null)} />
+        )}
+        {editor === 'aliases' && (
+          <AliasesEditor
+            value={value}
+            onChange={(aliases) => setValue((current) => ({ ...current, aliases }))}
+          />
+        )}
+        {editor === 'public' && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center gap-5">
+              <Avatar value={value} />
+              <div>
+                <h3 className="text-2xl font-semibold">{value.name}</h3>
+                <p className="text-muted-foreground">@{value.handle}</p>
+              </div>
+            </div>
+            <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
+          </div>
+        )}
+      </PrototypeModal>
+      <PrototypeSwitcher
+        variant={variant}
+        modalOpen={editor !== null}
+        onChange={(next) =>
+          void navigate({ search: { variant: next }, replace: true, resetScroll: false })
+        }
+        onReset={() => {
+          const fresh = initialProfile(profile);
+          setValue(fresh);
+          setHandle(fresh.handle);
+          setNotice('');
+        }}
+        onExample={() => {
+          setValue((current) => ({
+            ...current,
+            biography:
+              'Collecting quiet landscapes, thoughtful architecture, and the occasional splash of colour.\n\nMostly here for **the details**.',
+            aliases: [
+              { handle: 'rafael-bieze', status: 'retained' },
+              { handle: 'rafael-archive', status: 'expiring' },
+              { handle: 'rafael-design', status: 'historical' },
+            ],
+          }));
+          setNotice('Example biography and previous handles loaded');
+        }}
+        state={{
+          ...value,
+          picture: value.picture ? 'Picture set' : 'Generated initials',
+          handleDraft: handle,
+          editor,
+        }}
+      />
+    </>
+  );
+}
+
+type Parts = {
+  avatar: ReactNode;
+  name: ReactNode;
+  handleField: ReactNode;
+  biography: ReactNode;
+  aliases: ReactNode;
+};
+export function VariantA({ avatar, name, handleField, biography }: Parts) {
+  return (
+    <div className="rounded-2xl border bg-card p-5 sm:p-8">
+      <div className="flex flex-col gap-6 sm:flex-row sm:gap-7">
+        <div className="pt-1">{avatar}</div>
+        <div className="min-w-0 flex-1 space-y-5">
+          {name}
+          {handleField}
+        </div>
+      </div>
+      <div className="mt-7 border-t pt-5">{biography}</div>
+    </div>
+  );
+}
+export function VariantB({ avatar, name, handleField, biography }: Parts) {
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card">
+      <div className="h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36" />
+      <div className="px-5 pb-7 sm:px-9 sm:pb-9">
+        <div className="relative -mt-12 mb-6 w-fit rounded-3xl border-4 border-card bg-card">
+          {avatar}
+        </div>
+        <div className="grid gap-7 sm:grid-cols-[1fr_1fr]">
+          <div className="space-y-2">
+            {name}
+            <p className="text-sm text-muted-foreground">Wallpaper collector</p>
+          </div>
+          {handleField}
+        </div>
+        <div className="mt-8 border-t pt-5">{biography}</div>
+      </div>
+    </div>
+  );
+}
+export function VariantC({ avatar, name, handleField, biography }: Parts) {
+  return (
+    <div className="divide-y rounded-xl border bg-card px-5 sm:px-7">
+      <div className="grid items-center gap-5 py-6 sm:grid-cols-[130px_1fr]">
+        <span className="text-sm text-muted-foreground">Profile picture</span>
+        {avatar}
+      </div>
+      <div className="grid items-center gap-3 py-5 sm:grid-cols-[130px_1fr]">
+        <span className="text-sm text-muted-foreground">Display name</span>
+        {name}
+      </div>
+      <div className="grid gap-3 py-5 sm:grid-cols-[130px_1fr]">
+        <span className="text-sm text-muted-foreground sm:pt-2">Profile handle</span>
+        <div className="[&>div>label]:sr-only">{handleField}</div>
+      </div>
+      <div className="py-5">{biography}</div>
+    </div>
+  );
+}
+
+function Avatar({ value, large = false }: { value: DraftProfile; large?: boolean }) {
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 font-semibold text-primary ${large ? 'size-36 text-4xl' : 'size-24 text-3xl'}`}
+    >
+      {value.picture ? (
+        <img className="size-full object-cover" src={value.picture} alt={value.name} />
+      ) : (
+        <span role="img" aria-label="Generated profile picture">
+          {value.name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((word) => word[0])
+            .join('')
+            .toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PrototypeModal({
+  editor,
+  close,
+  opener,
+  children,
+}: {
+  editor: Editor;
+  close: () => void;
+  opener: HTMLElement | null;
+  children: ReactNode;
+}) {
+  const titles = {
+    picture: 'Profile picture',
+    biography: 'Edit biography',
+    name: 'Display name',
+    aliases: 'Previous handles',
+    public: 'Profile preview',
+  };
+  const descriptions = {
+    picture: 'Choose the picture people see on your profile and contributions.',
+    biography: 'Tell people a little about yourself and your collection.',
+    name: 'The name people see alongside your contributions.',
+    aliases: 'Previous handles help people find you after a change.',
+    public: 'A preview of your profile with your local edits.',
+  };
+  return (
+    <Dialog.Root
+      open={editor !== null}
+      onOpenChange={(open) => {
+        if (!open) close();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-sm" />
+        <Dialog.Content
+          className="fixed top-1/2 left-1/2 z-[90] max-h-[88dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            opener?.focus();
+          }}
+        >
+          <Dialog.Title className="pr-9 text-lg font-semibold">
+            {editor && titles[editor]}
+          </Dialog.Title>
+          <Dialog.Description className="mt-1 mb-6 pr-6 text-sm leading-6 text-muted-foreground">
+            {editor && descriptions[editor]}
+          </Dialog.Description>
+          <Dialog.Close asChild>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="absolute top-4 right-4"
+              aria-label="Close dialog"
+            >
+              <X />
+            </Button>
+          </Dialog.Close>
+          {children}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+type EditorProps = {
+  value: DraftProfile;
+  update: (patch: Partial<DraftProfile>, message: string) => void;
+  cancel: () => void;
+};
+function PictureEditor({ value, update, cancel }: EditorProps) {
+  const [picture, setPicture] = useState(value.picture);
+  const [filename, setFilename] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div className="space-y-5">
+      <div className="flex justify-center py-3">
+        <Avatar value={{ ...value, picture }} large />
+      </div>
+      <input
+        ref={input}
+        id="prototype-picture-file"
+        className="sr-only"
+        tabIndex={-1}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        aria-label="Choose profile picture file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            setPicture(String(reader.result));
+            setFilename(file.name);
+          };
+          reader.readAsDataURL(file);
+        }}
+      />
+      <Button variant="outline" className="w-full" onClick={() => input.current?.click()}>
+        <Upload className="size-4" />
+        {filename ? 'Choose another picture' : 'Choose picture'}
+      </Button>
+      <p className="break-all text-center text-sm text-muted-foreground">
+        {filename || 'JPEG, PNG or WebP · up to 5 MB'}
+      </p>
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          disabled={!filename}
+          onClick={() => update({ picture }, 'Profile picture updated')}
+        >
+          Replace picture
+        </Button>
+        <Button
+          className="flex-1"
+          variant="outline"
+          disabled={!value.picture}
+          onClick={() => update({ picture: null }, 'Profile picture removed')}
+        >
+          Remove picture
+        </Button>
+      </div>
+      <Button variant="ghost" className="w-full" onClick={cancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
+function BiographyEditor({ value, profile, update, cancel }: EditorProps & { profile: Profile }) {
+  const [draft, setDraft] = useState(value.biography);
+  const [preview, setPreview] = useState(false);
+  const count = [...draft].length;
+  const limit = profile.biographyMaxLength ?? 5000;
+  return (
+    <div className="space-y-4">
+      <fieldset className="flex gap-1 rounded-lg bg-muted/60 p-1">
+        <legend className="sr-only">Biography editor view</legend>
+        <Button
+          className="flex-1"
+          variant={preview ? 'ghost' : 'secondary'}
+          aria-pressed={!preview}
+          onClick={() => setPreview(false)}
+        >
+          Write
+        </Button>
+        <Button
+          className="flex-1"
+          variant={preview ? 'secondary' : 'ghost'}
+          aria-pressed={preview}
+          onClick={() => setPreview(true)}
+        >
+          Preview
+        </Button>
+      </fieldset>
+      {preview ? (
+        <div className="min-h-48 rounded-lg border p-4">
+          <BiographyMarkdown markdown={draft} profileId={profile.id} />
+        </div>
+      ) : (
+        <>
+          <label className="sr-only" htmlFor="prototype-biography">
+            Biography
+          </label>
+          <Textarea
+            id="prototype-biography"
+            className="min-h-48 resize-y text-sm leading-6"
+            placeholder="A little about you…"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </>
+      )}
+      <p
+        className={`text-right text-xs ${count > limit ? 'text-destructive' : 'text-muted-foreground'}`}
+      >
+        {count.toLocaleString()} / {limit.toLocaleString()} characters
+      </p>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Formatting help</summary>
+        <p className="mt-2 leading-6">
+          Use **bold**, *italic*, headings, lists, and HTTPS links. Embed your published wallpapers
+          with <code className="break-all">![Description](wallpaper:wallpaper-id)</code>.
+        </p>
+      </details>
+      <div className="flex justify-end gap-2 border-t pt-4">
+        <Button variant="outline" onClick={cancel}>
+          Cancel
+        </Button>
+        <Button
+          disabled={count > limit || draft === value.biography}
+          onClick={() => update({ biography: draft }, 'Biography saved')}
+        >
+          Save biography
+        </Button>
+      </div>
+    </div>
+  );
+}
+function NameEditor({ value, update, cancel }: EditorProps) {
+  const [draft, setDraft] = useState(value.name);
+  return (
+    <form
+      className="space-y-5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        update({ name: draft.trim() }, 'Display name updated');
+      }}
+    >
+      <label htmlFor="prototype-name" className="block space-y-2 text-sm font-medium">
+        <span>Display name</span>
+        <Input value={draft} maxLength={80} onChange={(event) => setDraft(event.target.value)} />
+      </label>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" type="button" onClick={cancel}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!draft.trim() || draft === value.name}>
+          Save name
+        </Button>
+      </div>
+    </form>
+  );
+}
+function AliasesEditor({
+  value,
+  onChange,
+}: {
+  value: DraftProfile;
+  onChange: (aliases: PreviousHandle[]) => void;
+}) {
+  const [feedback, setFeedback] = useState('');
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg bg-muted/60 px-4 py-3 text-sm">
+        Current profile handle <strong className="mt-1 block break-all">@{value.handle}</strong>
+      </div>
+      {(['retained', 'expiring', 'historical'] as const).map((status) => {
+        const items = value.aliases.filter((alias) => alias.status === status);
+        return (
+          <section key={status} className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {status === 'historical'
+                  ? 'Recently used'
+                  : status === 'expiring'
+                    ? 'Expiring'
+                    : 'Retained'}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {items.length}
+                {status === 'retained' ? ' of 3' : ''}
+              </span>
+            </div>
+            {items.length ? (
+              <ul className="space-y-2">
+                {items.map((alias) => (
+                  <li key={alias.handle} className="rounded-xl border bg-background/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="break-all text-sm font-semibold">@{alias.handle}</span>
+                      <span
+                        className={`rounded-full px-2 py-1 text-[11px] ${status === 'expiring' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}
+                      >
+                        {status === 'retained'
+                          ? 'Redirect active'
+                          : status === 'expiring'
+                            ? 'Removal scheduled'
+                            : 'Available to restore'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {status === 'retained'
+                        ? `Redirects to @${value.handle}.`
+                        : status === 'expiring'
+                          ? 'Redirect stays active until the removal takes effect.'
+                          : 'Restore this handle to redirect people to your profile.'}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      onClick={() => {
+                        const nextStatus =
+                          status === 'retained'
+                            ? 'expiring'
+                            : status === 'expiring'
+                              ? 'historical'
+                              : 'retained';
+                        onChange(
+                          value.aliases.map((item) =>
+                            item.handle === alias.handle ? { ...item, status: nextStatus } : item
+                          )
+                        );
+                        setFeedback(
+                          status === 'retained'
+                            ? `Removal scheduled for @${alias.handle}. It will redirect for another 24 hours.`
+                            : status === 'expiring'
+                              ? `@${alias.handle} no longer redirects to your profile.`
+                              : `@${alias.handle} now redirects to your profile.`
+                        );
+                      }}
+                    >
+                      {status === 'retained' ? (
+                        <>
+                          <Clock3 className="size-3.5" />
+                          Schedule removal
+                        </>
+                      ) : status === 'expiring' ? (
+                        'Remove now'
+                      ) : (
+                        'Restore redirect'
+                      )}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="rounded-lg border border-dashed px-4 py-3 text-xs text-muted-foreground">
+                {status === 'historical'
+                  ? 'No recently used handles to restore.'
+                  : `No ${status} handles.`}
+              </p>
+            )}
+          </section>
+        );
+      })}
+      <output className="block text-sm text-muted-foreground">{feedback}</output>
+    </div>
+  );
 }

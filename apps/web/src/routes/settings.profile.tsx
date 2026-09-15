@@ -4,9 +4,15 @@ import { ProfileSettingsPage } from '@/components/profile/profile-settings-page'
 export const Route = createFileRoute('/settings/profile')({
   validateSearch: (search: Record<string, unknown>): { variant?: 'A' | 'B' | 'C' } => ({
     variant:
-      import.meta.env.DEV && ['A', 'B', 'C'].includes(String(search.variant))
-        ? (search.variant as 'A' | 'B' | 'C')
+      import.meta.env.DEV &&
+      (search.variant === 'A' || search.variant === 'B' || search.variant === 'C')
+        ? search.variant
         : undefined,
   }),
-  component: ProfileSettingsPage,
+  component: ProfileSettingsRoute,
 });
+
+function ProfileSettingsRoute() {
+  const { variant } = Route.useSearch();
+  return <ProfileSettingsPage variant={variant} />;
+}

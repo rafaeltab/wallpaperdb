@@ -74,6 +74,76 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("restores a released alias from reactivation and ignores an older expiry event", async () => {
+        const timestamp = "2030-01-01T12:00:00.000Z";
+        const released = {
+            id: "user_reactivated_release",
+            displayName: "Alias Owner",
+            handle: "reactivation-current",
+            claimGeneration: 3,
+            aliases: [],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 4,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const expiry = {
+            eventId: "evt_release_before_reactivation",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: {
+                type: "alias-expired", handle: "released-alias", claimGeneration: 1,
+                before: "2030-01-02T12:00:00.000Z", after: null, reason: "immediate",
+            },
+            profile: released,
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, expiry);
+        await eventually(
+            () => query(`query { profile(id: "${released.id}") { version } }`),
+            (result) => result.data.profile?.version === 4,
+        );
+        const read = () => query(`query {
+            profileByHandle(handle: "Released-Alias") { isAlias canonicalHandle profile { id version } }
+        }`);
+        expect((await read()).data.profileByHandle).toBeNull();
+
+        const reactivated = {
+            ...released, version: 5,
+            aliases: [{ handle: "released-alias", claimGeneration: 4, createdAt: timestamp, expiresAt: null }],
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            eventId: "evt_reactivate_released_alias",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "alias-reactivated", handle: "released-alias", claimGeneration: 4, before: null, after: null },
+            profile: reactivated,
+        });
+        await eventually(
+            () => query(`query { profile(id: "${released.id}") { version } }`),
+            (result) => result.data.profile?.version === 5,
+        );
+        const expected = {
+            isAlias: true, canonicalHandle: released.handle, profile: { id: released.id, version: 5 },
+        };
+        expect((await read()).data.profileByHandle).toEqual(expected);
+
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            ...expiry, eventId: "evt_delayed_expiry_after_reactivation",
+        });
+        const marker = { ...released, id: "user_reactivation_marker", handle: "reactivation-marker" };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_reactivation_marker", "Before"));
+        // This consumer reaches the marker after processing the delayed expiry.
+        await eventually(
+            () => query(`query { profile(id: "${marker.id}") { version } }`),
+            (result) => result.data.profile?.version === marker.version,
+        );
+        const result = await read();
+        expect(result.errors).toBeUndefined();
+        expect(result.data.profileByHandle).toEqual(expected);
+        expect((await container.resolve(ProfileRepository).findById(released.id))?.aliases).toEqual(reactivated.aliases);
+    });
+
     it("routes a reclaimed Handle to its newer generation while the old alias snapshot still appears active", async () => {
         const timestamp = "2030-01-01T12:00:00.000Z";
         const original = {

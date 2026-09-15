@@ -8,6 +8,7 @@ import { ProfileSettingsPage } from '@/components/profile/profile-settings-page'
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
+vi.mock('@/lib/graphql/client', () => ({ request: vi.fn().mockResolvedValue({ getWallpaper: null }) }));
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
@@ -55,6 +56,24 @@ describe('Biography settings', () => {
     });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+  });
+
+  it('preserves a wallpaper Biography draft while the server ownership projection catches up', async () => {
+    const biographyMarkdown = '![New wallpaper](wallpaper:wlpr_new)';
+    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(new UserApiError('Wallpaper is not available yet. Newly published wallpapers may take a moment; try again.', 400, { type: 'https://wallpaperdb.test/problems/unavailable-wallpaper' }));
+    const updated = { ...profile, biographyMarkdown, version: 2 };
+    vi.mocked(userApi.updateProfile).mockResolvedValueOnce(updated);
+    const { client } = renderPage();
+    const user = userEvent.setup();
+    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.clear(editor);
+    await user.paste(biographyMarkdown);
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Newly published wallpapers may take a moment; try again.');
+    expect(editor).toHaveValue(biographyMarkdown);
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
   });
 
   it('previews the draft through the shared safe renderer and shows an empty Biography state', async () => {

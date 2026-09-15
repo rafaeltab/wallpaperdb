@@ -258,6 +258,33 @@ describe('Profile commands', () => {
     }
   });
 
+  it('immediately excludes expiring aliases from a configured retained limit of one', async () => {
+    const previousLimit = config.profileRetainedAliasLimit;
+    config.profileRetainedAliasLimit = 1;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const before = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'first', before.version)).json();
+      // After cooldown, schedule and immediately use the freed retained slot.
+      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
+      const scheduled = (await scheduleAlias('user_1', before.handle, changed.version)).json();
+      const response = await changeHandle('user_1', 'second', scheduled.version);
+      expect(response.statusCode).toBe(200);
+      const updated = response.json();
+      expect(updated.retainedAliasLimit).toBe(1);
+      expect(updated.aliases).toEqual([
+        scheduled.aliases[0],
+        { handle: 'first', claimGeneration: expect.any(Number), createdAt: updated.lastHandleChangedAt, expiresAt: null },
+      ]);
+      const [event] = await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
+      expect(event.payload.change.scheduledAliases).toEqual([]);
+    } finally {
+      config.profileRetainedAliasLimit = previousLimit;
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

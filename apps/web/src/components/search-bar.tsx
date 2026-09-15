@@ -47,7 +47,7 @@ export function SearchBar({
         <Search />
       </InputGroupAddon>
       <InputGroupInput ref={inputRef} type="search" placeholder="Search wallpapers..." />
-      <InputGroupAddon align="inline-end" className="hidden sm:flex">
+      <InputGroupAddon align="inline-end">
         {showFilterToggle && onToggleFilters ? (
           <Button
             type="button"
@@ -62,8 +62,10 @@ export function SearchBar({
             <span className="hidden md:inline">Filters</span>
           </Button>
         ) : null}
-        {isMac ? <Kbd>⌘</Kbd> : <Kbd>Ctrl</Kbd>}
-        <Kbd>K</Kbd>
+        <span className="hidden items-center gap-1 sm:flex">
+          {isMac ? <Kbd>⌘</Kbd> : <Kbd>Ctrl</Kbd>}
+          <Kbd>K</Kbd>
+        </span>
       </InputGroupAddon>
     </InputGroup>
   );

@@ -18,7 +18,6 @@
 #   /user/*                   → user:3009              (prefix stripped)
 #   /web/*                    → web:3005               (prefix kept — Vite base=/web)
 #   /grafana/*                → lgtm:3000              (prefix kept — GF_SERVER_SERVE_FROM_SUB_PATH)
-#   /minio/*                  → minio:9001             (prefix kept — MinIO console)
 #   /pgadmin/*                → pgadmin:80             (prefix kept — SCRIPT_NAME=/pgadmin)
 #   /opensearch-dashboards/*  → opensearch-dashboards:5601 (prefix kept — SERVER_BASEPATH)
 #   /nats/*                   → nats:8222              (prefix stripped — plain HTTP API)
@@ -81,12 +80,6 @@
     # Grafana LGTM — GF_SERVER_SERVE_FROM_SUB_PATH=true
     handle /grafana/* {
         reverse_proxy lgtm:3000
-    }
-
-    # MinIO Console — MINIO_BROWSER_REDIRECT_URL=.../minio
-    # Note: MinIO console sub-path support is a known risk (see plan known risks #1).
-    handle /minio/* {
-        reverse_proxy minio:9001
     }
 
     # pgAdmin — SCRIPT_NAME=/pgadmin

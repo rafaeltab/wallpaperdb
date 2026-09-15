@@ -34,7 +34,7 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
     │              │              │             │
 ┌───▼────┐   ┌────▼─────┐   ┌───▼────┐   ┌───▼──────┐
 │        │   │          │   │        │   │          │
-│PostGres│   │  MinIO   │   │  NATS  │   │OpenSearch│
+│PostGres│   │ SeaweedFS │   │  NATS  │   │OpenSearch│
 │        │   │          │   │        │   │          │
 └────────┘   └──────────┘   └────────┘   └──────────┘
 ```
@@ -46,7 +46,7 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 **1. Ingestor** (✅ Production)
 - Port: 3001
 - Purpose: Wallpaper upload and validation
-- Dependencies: PostgreSQL, MinIO, NATS, Redis
+- Dependencies: PostgreSQL, SeaweedFS, NATS, Redis
 - Events Published: `wallpaper.uploaded`
 - Database: `wallpaperdb_ingestor`
 - Status: Complete
@@ -54,7 +54,7 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 **2. Media** (✅ Production)
 - Port: 3002
 - Purpose: Wallpaper retrieval and resizing
-- Dependencies: PostgreSQL, MinIO, Redis
+- Dependencies: PostgreSQL, SeaweedFS, Redis
 - Events Consumed: `wallpaper.uploaded`, `wallpaper.variant.uploaded`
 - Events Published: `wallpaper.variant.available`
 - Database: `wallpaperdb_media`
@@ -63,7 +63,7 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 **3. Variant Generator** (✅ Production)
 - Port: 3004
 - Purpose: Pre-generate common resolution variants
-- Dependencies: MinIO, NATS
+- Dependencies: SeaweedFS, NATS
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `wallpaper.variant.uploaded`
 - Status: Production-ready
@@ -86,19 +86,19 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 
 **6. Thumbnail Extractor** (📋 Planned)
 - Purpose: Video thumbnail generation
-- Dependencies: MinIO, NATS, FFmpeg
+- Dependencies: SeaweedFS, NATS, FFmpeg
 - Events Consumed: `wallpaper.uploaded` (video only)
 - Events Published: `thumbnail.generated`
 
 **7. Quality Enrichment** (📋 Planned)
 - Purpose: Image quality analysis
-- Dependencies: MinIO, NATS, PostgreSQL
+- Dependencies: SeaweedFS, NATS, PostgreSQL
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `quality.analyzed`
 
 **8. Color Enrichment** (📋 Planned)
 - Purpose: Color extraction and palette generation
-- Dependencies: MinIO, NATS, PostgreSQL
+- Dependencies: SeaweedFS, NATS, PostgreSQL
 - Events Consumed: `wallpaper.uploaded`
 - Events Published: `colors.extracted`
 
@@ -144,7 +144,7 @@ WallpaperDB uses a microservices architecture with event-driven communication, s
 - Connection pooling
 - OpenTelemetry instrumentation
 
-**Object Storage:** MinIO (S3-compatible)
+**Object Storage:** SeaweedFS (S3-compatible)
 - Self-hosted
 - AWS SDK v3 compatible
 - Bucket-per-service pattern
@@ -202,7 +202,7 @@ packages/
 **Purpose:** Shared infrastructure patterns for all services
 
 **Exports:**
-- Connection managers (Database, MinIO, NATS, Redis, OTEL)
+- Connection managers (Database, SeaweedFS, NATS, Redis, OTEL)
 - Configuration schemas (DatabaseConfig, S3Config, NatsConfig, etc.)
 - Error classes (ProblemDetailsError, ApplicationError)
 - Telemetry helpers (withSpan, recordCounter, recordHistogram)
@@ -241,7 +241,7 @@ packages/
 
 **Exports:**
 - TesterBuilder (composable builders)
-- Infrastructure builders (Postgres, MinIO, NATS, Redis, Docker)
+- Infrastructure builders (Postgres, SeaweedFS, NATS, Redis, Docker)
 - Fixture generators
 - Test helpers
 
@@ -271,7 +271,7 @@ apps/<service-name>/
 │   │   └── <feature>.service.ts
 │   ├── connections/
 │   │   ├── database.ts     # Service-specific connection
-│   │   ├── minio.ts
+│   │   ├── s3.ts
 │   │   └── nats.ts
 │   ├── db/
 │   │   └── schema.ts       # Drizzle schema
@@ -324,12 +324,12 @@ export const config: Config = MyServiceConfigSchema.parse(process.env);
 **Use shared connection managers:**
 
 ```typescript
-import { DatabaseConnection, MinioConnection, NatsConnectionManager } from '@wallpaperdb/core/connections';
+import { DatabaseConnection, S3Connection, NatsConnectionManager } from '@wallpaperdb/core/connections';
 import { container } from 'tsyringe';
 
 // Register connections
 container.registerSingleton(DatabaseConnection);
-container.registerSingleton(MinioConnection);
+container.registerSingleton(S3Connection);
 container.registerSingleton(NatsConnectionManager);
 container.register('config', { useValue: config });
 
@@ -337,8 +337,8 @@ container.register('config', { useValue: config });
 const db = container.resolve(DatabaseConnection);
 await db.initialize();
 
-const minio = container.resolve(MinioConnection);
-await minio.initialize();
+const s3 = container.resolve(S3Connection);
+await s3.initialize();
 
 const nats = container.resolve(NatsConnectionManager);
 await nats.initialize();
@@ -532,7 +532,7 @@ describe('My Service', () => {
   it('should process feature', async () => {
     const { app, db, cleanup } = await new TesterBuilder()
       .withPostgres()
-      .withMinIO()
+      .withS3()
       .withNATS()
       .withRedis()
       .withMyServiceApp()
@@ -604,10 +604,10 @@ CMD ["node", "dist/index.mjs"]
 ```
 Upload Request (Ingestor)
 ├── Validate File (Ingestor)
-├── Upload to MinIO (Ingestor)
+├── Upload to SeaweedFS (Ingestor)
 ├── Publish Event (Ingestor → NATS)
 └── Process Upload (Media)
-    ├── Fetch from MinIO
+    ├── Fetch from SeaweedFS
     ├── Generate Variant
     └── Update Database
 ```

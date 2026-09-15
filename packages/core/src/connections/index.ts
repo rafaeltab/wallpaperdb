@@ -6,8 +6,8 @@ export {
   type DatabaseConnectionOptions,
   type DatabaseClient,
 } from "./database-connection.js";
-export { createS3Client, checkS3Health, type S3ClientOptions } from "./minio.js";
-export { MinioConnection, type MinioConnectionOptions } from "./minio-connection.js";
+export { createS3Client, checkS3Health, type S3ClientOptions } from "./s3.js";
+export { S3Connection, type S3ConnectionOptions } from "./s3-connection.js";
 export { createNatsConnection, checkNatsHealth } from "./nats.js";
 export {
   NatsConnectionManager,

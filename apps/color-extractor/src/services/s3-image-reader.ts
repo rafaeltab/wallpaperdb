@@ -1,15 +1,15 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import type { Readable } from 'node:stream';
 import { inject, injectable } from 'tsyringe';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import type { ImageReader } from './ports.js';
 
 @injectable()
-export class MinioImageReader implements ImageReader {
-  constructor(@inject(MinioConnection) private readonly minio: MinioConnection) {}
+export class S3ImageReader implements ImageReader {
+  constructor(@inject(S3Connection) private readonly s3: S3Connection) {}
 
   async read(bucket: string, key: string): Promise<Buffer> {
-    const response = await this.minio
+    const response = await this.s3
       .getClient()
       .send(new GetObjectCommand({ Bucket: bucket, Key: key }));
 

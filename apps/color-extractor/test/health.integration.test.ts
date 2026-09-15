@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import type { FastifyInstance } from 'fastify';
@@ -11,7 +11,7 @@ import { InProcessColorExtractorTesterBuilder } from './builders/index.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
   .with(InProcessColorExtractorTesterBuilder)
   .build();
@@ -23,8 +23,8 @@ describe('Health Endpoints', () => {
   beforeAll(async () => {
     tester = new TesterClass();
     tester
-      .withMinio()
-      .withMinioBucket('wallpapers')
+      .withS3()
+      .withS3Bucket('wallpapers')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withInProcessApp();
@@ -48,7 +48,7 @@ describe('Health Endpoints', () => {
       const body = JSON.parse(response.body);
       expect(body.status).toBe('healthy');
       expect(body.checks).toBeDefined();
-      expect(body.checks.minio).toBe(true);
+      expect(body.checks.s3).toBe(true);
       expect(body.checks.nats).toBe(true);
       expect(body.checks.otel).toBe(true);
     });

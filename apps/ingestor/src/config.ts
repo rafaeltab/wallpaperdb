@@ -21,7 +21,7 @@ const configSchema = z.object({
   ...ServerConfigSchema.shape,
   // Database config
   ...DatabaseConfigSchema.shape,
-  // S3/MinIO config
+  // S3 config
   ...S3ConfigSchema.shape,
   // NATS config
   ...NatsConfigSchema.shape,
@@ -38,7 +38,7 @@ const configSchema = z.object({
     .int()
     .positive()
     .default(5 * 60 * 1000), // 5 minutes
-  minioCleanupIntervalMs: z
+  s3CleanupIntervalMs: z
     .number()
     .int()
     .positive()
@@ -64,7 +64,7 @@ export function loadConfig(): Config {
     // Database
     databaseUrl: process.env.DATABASE_URL,
 
-    // S3/MinIO
+    // S3
     s3Endpoint: process.env.S3_ENDPOINT,
     s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
@@ -94,9 +94,9 @@ export function loadConfig(): Config {
       process.env.RECONCILIATION_INTERVAL_MS,
       5 * 60 * 1000 // 5 minutes (production default — tests use FakeTimerService)
     ),
-    minioCleanupIntervalMs: parseIntEnv(
-      process.env.MINIO_CLEANUP_INTERVAL_MS,
-      24 * 60 * 60 * 1000 // 24 hours (production default — tests use runMinioCleanupNow())
+    s3CleanupIntervalMs: parseIntEnv(
+      process.env.S3_CLEANUP_INTERVAL_MS,
+      24 * 60 * 60 * 1000 // 24 hours (production default — tests use runS3CleanupNow())
     ),
     rateLimitMax: parseIntEnv(process.env.RATE_LIMIT_MAX, 100),
     rateLimitWindowMs: parseIntEnv(process.env.RATE_LIMIT_WINDOW_MS, 60 * 60 * 1000),

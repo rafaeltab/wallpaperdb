@@ -3,9 +3,9 @@ import { S3Client, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/cl
 import type { Config } from '../src/config.js';
 
 /**
- * Clean up MinIO test bucket
+ * Clean up S3 test bucket
  */
-export async function cleanupMinio(config: Config) {
+export async function cleanupS3(config: Config) {
   const s3Client = new S3Client({
     endpoint: config.s3Endpoint,
     region: config.s3Region,
@@ -38,7 +38,7 @@ export async function cleanupMinio(config: Config) {
       }
     }
   } catch (error) {
-    console.error('Failed to cleanup MinIO:', error);
+    console.error('Failed to cleanup S3:', error);
     // Don't throw - cleanup is best effort
   }
 }

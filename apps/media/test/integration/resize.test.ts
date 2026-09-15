@@ -2,7 +2,7 @@ import "reflect-metadata";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
 } from "@wallpaperdb/test-utils";
@@ -20,7 +20,7 @@ import {
 const TesterClass = createDefaultTesterBuilder()
     .with(DockerTesterBuilder)
     .with(PostgresTesterBuilder)
-    .with(MinioTesterBuilder)
+    .with(S3TesterBuilder)
     .with(NatsTesterBuilder)
     .with(MediaMigrationsTesterBuilder)
     .with(InProcessMediaTesterBuilder)
@@ -37,8 +37,8 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_media_resize_${Date.now()}`),
             )
-            .withMinio()
-            .withMinioBucket("wallpapers")
+            .withS3()
+            .withS3Bucket("wallpapers")
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withMigrations()
@@ -177,8 +177,8 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_resize_001";
 
-            // Upload to MinIO
-            await tester.minio.uploadObject(
+            // Upload to S3
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -215,8 +215,8 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1080, 1920, "jpeg");
             const wallpaperId = "wlpr_test_resize_002";
 
-            // Upload to MinIO
-            await tester.minio.uploadObject(
+            // Upload to S3
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -253,7 +253,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_resize_003";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -284,7 +284,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1920, 1080, "jpeg");
             const wallpaperId = "wlpr_test_resize_004";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -315,7 +315,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1920, 1080, "jpeg");
             const wallpaperId = "wlpr_test_resize_005";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -379,7 +379,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_resize_h_001";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -415,7 +415,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1080, 1920, "jpeg");
             const wallpaperId = "wlpr_test_resize_h_002";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -472,7 +472,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_fit_contain_001";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -508,7 +508,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(2000, 2000, "jpeg");
             const wallpaperId = "wlpr_test_fit_contain_002";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -541,7 +541,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_fit_cover_001";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -575,7 +575,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1080, 1920, "jpeg");
             const wallpaperId = "wlpr_test_fit_cover_002";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -609,7 +609,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(3840, 2160, "jpeg");
             const wallpaperId = "wlpr_test_fit_fill_001";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -643,7 +643,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const image = await createTestImage(1080, 1920, "jpeg");
             const wallpaperId = "wlpr_test_fit_fill_002";
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 image,
@@ -703,18 +703,18 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const variant1920 = await createTestImage(1920, 1080, "jpeg");
             const variant1280 = await createTestImage(1280, 720, "jpeg");
 
-            // Upload to MinIO
-            await tester.minio.uploadObject(
+            // Upload to S3
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1920x1080.jpg`,
                 variant1920,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1280x720.jpg`,
                 variant1280,
@@ -774,22 +774,22 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const variant1920 = await createTestImage(1920, 1080, "jpeg");
             const variant1280 = await createTestImage(1280, 720, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/2560x1440.jpg`,
                 variant2560,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1920x1080.jpg`,
                 variant1920,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1280x720.jpg`,
                 variant1280,
@@ -854,17 +854,17 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const variant1920 = await createTestImage(1920, 1080, "jpeg");
             const variant1280 = await createTestImage(1280, 720, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1920x1080.jpg`,
                 variant1920,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1280x720.jpg`,
                 variant1280,
@@ -919,7 +919,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
 
             const original = await createTestImage(3840, 2160, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -958,17 +958,17 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             const variant3840 = await createTestImage(3840, 2160, "jpeg");
             const variant1920 = await createTestImage(1920, 1080, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/3840x2160.jpg`,
                 variant3840,
             );
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/1920x1080.jpg`,
                 variant1920,
@@ -1018,13 +1018,13 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             expect(metadata.height).toBe(1080);
         });
 
-        it("should fallback to original when variant file is missing from MinIO", async () => {
+        it("should fallback to original when variant file is missing from S3", async () => {
             const wallpaperId = "wlpr_missing_variant_001";
 
             const original = await createTestImage(3840, 2160, "jpeg");
 
             // Upload only original (not the variant file)
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1041,7 +1041,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
                 createdAt: new Date(),
             });
 
-            // Insert variant in DB but file doesn't exist in MinIO
+            // Insert variant in DB but file doesn't exist in S3
             await db.insert(variants).values({
                 id: "var_missing",
                 wallpaperId,
@@ -1092,7 +1092,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
 
             const original = await createTestImage(1920, 1080, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1128,7 +1128,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
 
             const original = await createTestImage(1280, 720, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1164,7 +1164,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
 
             const original = await createTestImage(1920, 1080, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1200,7 +1200,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
 
             const original = await createTestImage(1920, 1080, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1259,7 +1259,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create 8K image (7680x4320)
             const original = await createTestImage(7680, 4320, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1295,7 +1295,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create very small image
             const original = await createTestImage(320, 180, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1331,7 +1331,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create 21:9 ultrawide image (3440x1440)
             const original = await createTestImage(3440, 1440, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1367,7 +1367,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create portrait image (9:16)
             const original = await createTestImage(1080, 1920, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1403,7 +1403,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create square image
             const original = await createTestImage(2048, 2048, "jpeg");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.jpg`,
                 original,
@@ -1439,7 +1439,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create PNG image
             const original = await createTestImage(1920, 1080, "png");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.png`,
                 original,
@@ -1476,7 +1476,7 @@ describe("Phase 4: Resizing & Variant Selection", () => {
             // Create WebP image
             const original = await createTestImage(1920, 1080, "webp");
 
-            await tester.minio.uploadObject(
+            await tester.s3.uploadObject(
                 "wallpapers",
                 `${wallpaperId}/original.webp`,
                 original,

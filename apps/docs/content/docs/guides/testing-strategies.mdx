@@ -92,7 +92,7 @@ describe('DatabaseConfigSchema', () => {
 **When to use:**
 - Testing HTTP routes
 - Testing database operations (Drizzle ORM)
-- Testing MinIO uploads
+- Testing SeaweedFS uploads
 - Testing NATS event publishing
 - Testing Redis caching
 - Testing service interactions
@@ -115,7 +115,7 @@ describe('POST /upload', () => {
   it('should upload wallpaper successfully', async () => {
     const { app, db, cleanup } = await new TesterBuilder()
       .withPostgres()
-      .withMinIO()
+      .withS3()
       .withNATS()
       .withRedis()
       .withIngestorApp()
@@ -150,7 +150,7 @@ describe('POST /upload', () => {
 ```
 
 **Advantages:**
-- Tests real infrastructure (PostgreSQL, MinIO, NATS, Redis)
+- Tests real infrastructure (PostgreSQL, SeaweedFS, NATS, Redis)
 - Catches integration bugs (serialization, connection pooling)
 - Fast enough for TDD workflow
 - Container reuse across test files (< 5s startup)
@@ -197,7 +197,7 @@ describe('Ingestor E2E - Health endpoints', () => {
     const { client, cleanup } = await new TesterBuilder()
       .withDocker()
       .withPostgres()
-      .withMinIO()
+      .withS3()
       .withNATS()
       .withRedis()
       .withIngestorDocker()
@@ -301,7 +301,7 @@ import { TesterBuilder } from '@wallpaperdb/test-utils';
 
 const { app, db, cleanup } = await new TesterBuilder()
   .withPostgres()         // PostgreSQL container + migrations
-  .withMinIO()            // MinIO container + bucket setup
+  .withS3()            // SeaweedFS container + bucket setup
   .withNATS()             // NATS container + stream setup
   .withRedis()            // Redis container
   .withIngestorApp()      // In-process Fastify app (integration)
@@ -311,7 +311,7 @@ const { app, db, cleanup } = await new TesterBuilder()
 const { client, cleanup } = await new TesterBuilder()
   .withDocker()           // Docker client
   .withPostgres()
-  .withMinIO()
+  .withS3()
   .withNATS()
   .withRedis()
   .withIngestorDocker()   // Containerized app (E2E)
@@ -424,7 +424,7 @@ describe('Upload flow', () => {
   beforeEach(async () => {
     const builder = await new TesterBuilder()
       .withPostgres()
-      .withMinIO()
+      .withS3()
       .build();
     cleanup = builder.cleanup;
   });
@@ -511,7 +511,7 @@ let sharedContainers: Awaited<ReturnType<typeof TesterBuilder.prototype.build>>;
 export async function setup() {
   sharedContainers = await new TesterBuilder()
     .withPostgres()
-    .withMinIO()
+    .withS3()
     .withNATS()
     .withRedis()
     .build();
@@ -645,8 +645,8 @@ docker exec -it wallpaperdb-postgres psql -U wallpaperdb
 
 ❌ **Bad:**
 ```typescript
-it('should call uploadToMinIO with correct params', async () => {
-  const spy = vi.spyOn(storage, 'uploadToMinIO');
+it('should call uploadToS3 with correct params', async () => {
+  const spy = vi.spyOn(storage, 'uploadToS3');
   await handler(request);
   expect(spy).toHaveBeenCalledWith('bucket', 'key', buffer);
 });
@@ -654,7 +654,7 @@ it('should call uploadToMinIO with correct params', async () => {
 
 ✅ **Good:**
 ```typescript
-it('should upload file to MinIO', async () => {
+it('should upload file to SeaweedFS', async () => {
   await handler(request);
   const exists = await storage.fileExists('bucket', 'key');
   expect(exists).toBe(true);

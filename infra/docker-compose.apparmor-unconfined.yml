@@ -2,10 +2,7 @@ services:
   postgres:
     security_opt:
       - apparmor=unconfined
-  minio:
-    security_opt:
-      - apparmor=unconfined
-  minio-init:
+  seaweedfs:
     security_opt:
       - apparmor=unconfined
   opensearch:

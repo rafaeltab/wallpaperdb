@@ -2,7 +2,7 @@ import "reflect-metadata";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -18,7 +18,7 @@ describe("Health Endpoint (Builder-Based)", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
@@ -33,8 +33,8 @@ describe("Health Endpoint (Builder-Based)", () => {
                 builder.withDatabase(`test_health_${Date.now()}`),
             )
             .withRedis()
-            .withMinio()
-            .withMinioBucket("wallpapers")
+            .withS3()
+            .withS3Bucket("wallpapers")
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withInProcessApp();
@@ -70,7 +70,7 @@ describe("Health Endpoint (Builder-Based)", () => {
         expect(body.status).toBe("healthy");
         expect(body.checks).toBeDefined();
         expect(body.checks.database).toBe(true);
-        expect(body.checks.minio).toBe(true);
+        expect(body.checks.s3).toBe(true);
         expect(body.checks.nats).toBe(true);
         expect(body.checks.otel).toBe(true);
         expect(body.timestamp).toBeDefined();

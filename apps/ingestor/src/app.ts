@@ -7,7 +7,7 @@ import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { RedisConnection } from './connections/redis.js';
 import { DatabaseConnection } from './connections/database.js';
-import { MinioConnection } from './connections/minio.js';
+import { S3Connection } from './connections/s3.js';
 import { registerRoutes } from './routes/index.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import {
@@ -53,7 +53,7 @@ export async function createApp(
   container.register('TimerService', { useValue: new SystemTimerService() });
   // Register scalar interval values from config so SchedulerService can inject them
   container.register('reconciliationIntervalMs', { useValue: config.reconciliationIntervalMs });
-  container.register('minioCleanupIntervalMs', { useValue: config.minioCleanupIntervalMs });
+  container.register('s3CleanupIntervalMs', { useValue: config.s3CleanupIntervalMs });
 
   // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
   // This allows the SDK to be accessed via DI if needed
@@ -160,9 +160,9 @@ export async function createApp(
     await container.resolve(DatabaseConnection).initialize();
     fastify.log.info('Database connection pool created');
 
-    // Initialize MinIO connection
-    await container.resolve(MinioConnection).initialize();
-    fastify.log.info('MinIO connection created');
+    // Initialize S3 connection
+    await container.resolve(S3Connection).initialize();
+    fastify.log.info('S3 connection created');
 
     // Initialize NATS connection
     await container.resolve(NatsConnectionManager).initialize();
@@ -186,7 +186,7 @@ export async function createApp(
     fastify.connectionsState.isShuttingDown = true;
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
-    await container.resolve(MinioConnection).close();
+    await container.resolve(S3Connection).close();
     await container.resolve(RedisConnection).close();
     await shutdownOtel();
   });

@@ -54,6 +54,6 @@ export class Semaphore {
  * Limits concurrent container starts to prevent daemon overload.
  *
  * With 32 CPU cores and 80GB RAM, we can safely start ~32 containers concurrently.
- * MinIO containers are lightweight and start quickly.
+ * SeaweedFS containers are lightweight and start quickly.
  */
 export const dockerStartSemaphore = new Semaphore(32);

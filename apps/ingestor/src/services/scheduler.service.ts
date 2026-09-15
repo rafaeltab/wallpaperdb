@@ -3,14 +3,14 @@ import type { TimerService } from '@wallpaperdb/core/timer';
 import { StuckUploadsReconciliation } from './reconciliation/stuck-uploads-reconciliation.service.js';
 import { MissingEventsReconciliation } from './reconciliation/missing-events-reconciliation.service.js';
 import { OrphanedIntentsReconciliation } from './reconciliation/orphaned-intents-reconciliation.service.js';
-import { OrphanedMinioReconciliation } from './reconciliation/orphaned-minio-reconciliation.service.js';
+import { OrphanedS3Reconciliation } from './reconciliation/orphaned-s3-reconciliation.service.js';
 
 /**
  * Scheduler service for running background reconciliation tasks.
  *
  * Manages two intervals:
  * - Reconciliation cycle: Runs stuck uploads, missing events, and orphaned intents reconciliation
- * - MinIO cleanup cycle: Removes orphaned objects from MinIO storage
+ * - S3 cleanup cycle: Removes orphaned objects from S3 storage
  *
  * Timer calls are delegated to an injected TimerService so that tests can
  * substitute FakeTimerService and advance time deterministically without
@@ -19,28 +19,28 @@ import { OrphanedMinioReconciliation } from './reconciliation/orphaned-minio-rec
 @singleton()
 export class SchedulerService {
   private reconciliationInterval: NodeJS.Timeout | null = null;
-  private minioCleanupInterval: NodeJS.Timeout | null = null;
+  private s3CleanupInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
   private isReconciling = false;
 
   constructor(
     @inject('TimerService') private readonly timerService: TimerService,
     @inject('reconciliationIntervalMs') private readonly reconciliationIntervalMs: number,
-    @inject('minioCleanupIntervalMs') private readonly minioCleanupIntervalMs: number,
+    @inject('s3CleanupIntervalMs') private readonly s3CleanupIntervalMs: number,
     @inject(StuckUploadsReconciliation)
     private readonly stuckUploadsReconciliation: StuckUploadsReconciliation,
     @inject(MissingEventsReconciliation)
     private readonly missingEventsReconciliation: MissingEventsReconciliation,
     @inject(OrphanedIntentsReconciliation)
     private readonly orphanedIntentsReconciliation: OrphanedIntentsReconciliation,
-    @inject(OrphanedMinioReconciliation)
-    private readonly orphanedMinioReconciliation: OrphanedMinioReconciliation
+    @inject(OrphanedS3Reconciliation)
+    private readonly orphanedS3Reconciliation: OrphanedS3Reconciliation
   ) {}
 
   /**
    * Start the reconciliation scheduler.
    * Runs reconciliation every reconciliationIntervalMs milliseconds.
-   * Runs MinIO cleanup every minioCleanupIntervalMs milliseconds.
+   * Runs S3 cleanup every s3CleanupIntervalMs milliseconds.
    */
   start(): void {
     if (this.isRunning) {
@@ -57,16 +57,16 @@ export class SchedulerService {
       });
     }, this.reconciliationIntervalMs);
 
-    // Run MinIO cleanup on separate interval
-    this.minioCleanupInterval = this.timerService.setInterval(() => {
-      return this.runMinioCleanupCycle().catch((error) => {
-        console.error('Fatal error in MinIO cleanup interval:', error);
+    // Run S3 cleanup on separate interval
+    this.s3CleanupInterval = this.timerService.setInterval(() => {
+      return this.runS3CleanupCycle().catch((error) => {
+        console.error('Fatal error in S3 cleanup interval:', error);
       });
-    }, this.minioCleanupIntervalMs);
+    }, this.s3CleanupIntervalMs);
 
     this.isRunning = true;
     console.log(
-      `Scheduler started (reconciliation: ${this.reconciliationIntervalMs}ms, MinIO cleanup: ${this.minioCleanupIntervalMs}ms)`
+      `Scheduler started (reconciliation: ${this.reconciliationIntervalMs}ms, S3 cleanup: ${this.s3CleanupIntervalMs}ms)`
     );
   }
 
@@ -87,9 +87,9 @@ export class SchedulerService {
       this.reconciliationInterval = null;
     }
 
-    if (this.minioCleanupInterval) {
-      this.timerService.clearInterval(this.minioCleanupInterval);
-      this.minioCleanupInterval = null;
+    if (this.s3CleanupInterval) {
+      this.timerService.clearInterval(this.s3CleanupInterval);
+      this.s3CleanupInterval = null;
     }
 
     this.isRunning = false;
@@ -122,13 +122,13 @@ export class SchedulerService {
   }
 
   /**
-   * Run MinIO cleanup immediately (for testing or admin trigger)
+   * Run S3 cleanup immediately (for testing or admin trigger)
    * This can be called independently of the scheduler
    */
-  async runMinioCleanupNow(): Promise<void> {
-    console.log('Running manual MinIO cleanup...');
-    await this.runMinioCleanupCycle();
-    console.log('Manual MinIO cleanup complete');
+  async runS3CleanupNow(): Promise<void> {
+    console.log('Running manual S3 cleanup...');
+    await this.runS3CleanupCycle();
+    console.log('Manual S3 cleanup complete');
   }
 
   /**
@@ -177,16 +177,16 @@ export class SchedulerService {
   }
 
   /**
-   * Execute MinIO cleanup cycle
-   * Removes orphaned objects from MinIO storage
+   * Execute S3 cleanup cycle
+   * Removes orphaned objects from S3 storage
    */
-  private async runMinioCleanupCycle(): Promise<void> {
+  private async runS3CleanupCycle(): Promise<void> {
     try {
-      console.log('Starting MinIO orphaned object cleanup...');
-      await this.orphanedMinioReconciliation.reconcile();
-      console.log('MinIO cleanup complete');
+      console.log('Starting S3 orphaned object cleanup...');
+      await this.orphanedS3Reconciliation.reconcile();
+      console.log('S3 cleanup complete');
     } catch (error) {
-      console.error('Error in MinIO cleanup cycle:', error);
+      console.error('Error in S3 cleanup cycle:', error);
     }
   }
 }

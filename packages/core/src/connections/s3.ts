@@ -1,13 +1,13 @@
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
-import type { MinioConfig } from "./types.js";
+import type { S3Config } from "./types.js";
 
 export interface S3ClientOptions {
-  /** Force path-style URLs (required for MinIO, default: true) */
+  /** Force path-style URLs (required for local S3-compatible storage, default: true) */
   forcePathStyle?: boolean;
 }
 
 /**
- * Creates an S3 client configured for MinIO.
+ * Creates an S3 client for the configured object store (locally SeaweedFS).
  *
  * @example
  * ```typescript
@@ -22,7 +22,7 @@ export interface S3ClientOptions {
  * });
  * ```
  */
-export function createS3Client(config: MinioConfig, options: S3ClientOptions = {}): S3Client {
+export function createS3Client(config: S3Config, options: S3ClientOptions = {}): S3Client {
   return new S3Client({
     endpoint: config.s3Endpoint,
     region: config.s3Region,
@@ -35,7 +35,7 @@ export function createS3Client(config: MinioConfig, options: S3ClientOptions = {
 }
 
 /**
- * Checks if an S3/MinIO client can access the specified bucket.
+ * Checks if an S3 client can access the specified bucket.
  */
 export async function checkS3Health(client: S3Client, bucket: string): Promise<boolean> {
   try {

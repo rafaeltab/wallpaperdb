@@ -8,8 +8,7 @@ import {
   type PutObjectCommandInput,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
-import { Wait } from 'testcontainers';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import { dockerStartSemaphore } from '../utils/semaphore.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
@@ -18,20 +17,20 @@ import type { DockerTesterBuilder } from './DockerTesterBuilder.js';
 import type { SetupTesterBuilder } from './SetupTesterBuilder.js';
 import { createTestLogger } from '@wallpaperdb/test-logger';
 
-const logger = createTestLogger('MinioTesterBuilder');
+const logger = createTestLogger('S3TesterBuilder');
 
-export interface MinioOptions {
+export interface S3Options {
   image: string;
   accessKey: string;
   secretKey: string;
   networkAlias: string;
 }
 
-class MinioBuilder {
-  image = 'minio/minio:latest';
-  accessKey = 'minioadmin';
-  secretKey = 'minioadmin';
-  networkAlias = 'minio';
+class S3Builder {
+  image = 'chrislusf/seaweedfs:4.47';
+  accessKey = 'storageadmin';
+  secretKey = 'storageadmin';
+  networkAlias = 's3';
 
   withImage(image: string) {
     this.image = image;
@@ -53,7 +52,7 @@ class MinioBuilder {
     return this;
   }
 
-  build(): MinioOptions {
+  build(): S3Options {
     return {
       image: this.image,
       accessKey: this.accessKey,
@@ -63,38 +62,38 @@ class MinioBuilder {
   }
 }
 
-export interface MinioConfig {
-  container: StartedMinioContainer;
+export interface S3Config {
+  container: StartedTestContainer;
   endpoints: {
     networked: string;
     fromHost: string;
     fromHostDockerInternal: string;
     directIp: string;
   };
-  options: MinioOptions;
+  options: S3Options;
   buckets: string[];
 }
 
 /**
- * Helper class providing namespaced MinIO/S3 operations.
+ * Helper class providing namespaced S3 operations against SeaweedFS.
  * Manages a cached S3Client and provides object storage helpers.
  */
-class MinioHelpers {
+class S3Helpers {
   s3Client: S3Client | undefined;
-  tester: TesterInstance<MinioTesterBuilder>;
+  tester: TesterInstance<S3TesterBuilder>;
 
-  constructor(tester: TesterInstance<MinioTesterBuilder>) {
+  constructor(tester: TesterInstance<S3TesterBuilder>) {
     this.tester = tester;
   }
 
   /**
-   * Get the MinIO configuration.
-   * @throws Error if MinIO not initialized
+   * Get the S3 configuration.
+   * @throws Error if S3 not initialized
    */
-  get config(): MinioConfig {
-    const config = this.tester._minioConfig;
+  get config(): S3Config {
+    const config = this.tester._s3Config;
     if (!config) {
-      throw new Error('MinIO not initialized. Call withMinio() and setup() first.');
+      throw new Error('S3 not initialized. Call withS3() and setup() first.');
     }
     return config;
   }
@@ -110,7 +109,7 @@ class MinioHelpers {
    *
    * @example
    * ```typescript
-   * const client = tester.minio.getS3Client();
+   * const client = tester.s3.getS3Client();
    * await client.send(new GetObjectCommand({ Bucket: 'test', Key: 'file.jpg' }));
    * ```
    */
@@ -130,7 +129,7 @@ class MinioHelpers {
   }
 
   /**
-   * Upload an object to S3/MinIO.
+   * Upload an object to S3.
    *
    * @param bucket - Bucket name
    * @param key - Object key
@@ -139,7 +138,7 @@ class MinioHelpers {
    * @example
    * ```typescript
    * const image = await tester.fixtures.images.validJpeg();
-   * await tester.minio.uploadObject('test-bucket', 'test.jpg', image);
+   * await tester.s3.uploadObject('test-bucket', 'test.jpg', image);
    * ```
    */
   async uploadObject(
@@ -159,14 +158,14 @@ class MinioHelpers {
   }
 
   /**
-   * Delete a single object from S3/MinIO.
+   * Delete a single object from S3.
    *
    * @param bucket - Bucket name
    * @param key - Object key
    *
    * @example
    * ```typescript
-   * await tester.minio.deleteObject('test-bucket', 'test.jpg');
+   * await tester.s3.deleteObject('test-bucket', 'test.jpg');
    * ```
    */
   async deleteObject(bucket: string, key: string): Promise<void> {
@@ -174,7 +173,7 @@ class MinioHelpers {
   }
 
   /**
-   * Check if an object exists in S3/MinIO.
+   * Check if an object exists in S3.
    *
    * @param bucket - Bucket name
    * @param key - Object key
@@ -182,7 +181,7 @@ class MinioHelpers {
    *
    * @example
    * ```typescript
-   * const exists = await tester.minio.objectExists('test-bucket', 'test.jpg');
+   * const exists = await tester.s3.objectExists('test-bucket', 'test.jpg');
    * expect(exists).toBe(true);
    * ```
    */
@@ -212,8 +211,8 @@ class MinioHelpers {
    *
    * @example
    * ```typescript
-   * const keys = await tester.minio.listObjects('test-bucket');
-   * const images = await tester.minio.listObjects('test-bucket', 'images/');
+   * const keys = await tester.s3.listObjects('test-bucket');
+   * const images = await tester.s3.listObjects('test-bucket', 'images/');
    * ```
    */
   async listObjects(bucket: string, prefix?: string): Promise<string[]> {
@@ -230,7 +229,7 @@ class MinioHelpers {
    *
    * @example
    * ```typescript
-   * await tester.minio.cleanupBuckets();
+   * await tester.s3.cleanupBuckets();
    * ```
    */
   async cleanupBuckets(): Promise<void> {
@@ -248,11 +247,11 @@ class MinioHelpers {
   }
 }
 
-export class MinioTesterBuilder extends BaseTesterBuilder<
-  'minio',
+export class S3TesterBuilder extends BaseTesterBuilder<
+  's3',
   [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
 > {
-  name = 'minio' as const;
+  name = 's3' as const;
 
   addMethods<
     TBase extends AddMethodsType<
@@ -261,12 +260,12 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
   >(Base: TBase) {
     const desiredBuckets: string[] = [];
 
-    return class Minio extends Base {
+    return class S3 extends Base {
       // Private: internal config storage
-      _minioConfig: MinioConfig | undefined;
+      _s3Config: S3Config | undefined;
 
       // Public: helper instance
-      readonly minio = new MinioHelpers(this);
+      readonly s3 = new S3Helpers(this);
       /**
        * Add a bucket to be created during setup.
        * Can be called multiple times to create multiple buckets.
@@ -276,49 +275,69 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
        *
        * @example
        * ```typescript
-       * tester.withMinio()
-       *       .withMinioBucket('uploads')
-       *       .withMinioBucket('backups');
+       * tester.withS3()
+       *       .withS3Bucket('uploads')
+       *       .withS3Bucket('backups');
        * ```
        */
-      withMinioBucket(name: string) {
+      withS3Bucket(name: string) {
         desiredBuckets.push(name);
         return this;
       }
 
       /**
-       * Configure and start a MinIO container.
+       * Configure and start a SeaweedFS S3 container.
+       * Custom images must support the SeaweedFS mini command.
        *
        * @param configure - Optional configuration callback
        * @returns this for chaining
        *
        * @example
        * ```typescript
-       * tester.withMinio(b =>
+       * tester.withS3(b =>
        *   b.withAccessKey('custom_key')
        *    .withSecretKey('custom_secret')
        * );
        * ```
        */
-      withMinio(configure: (minio: MinioBuilder) => MinioBuilder = (a) => a) {
-        const options = configure(new MinioBuilder()).build();
+      withS3(configure: (s3: S3Builder) => S3Builder = (a) => a) {
+        const options = configure(new S3Builder()).build();
         const { image, accessKey, secretKey, networkAlias } = options;
 
         this.addSetupHook(async () => {
           // Use semaphore to limit concurrent container starts
           await dockerStartSemaphore.run(async () => {
-            logger.debug('Starting MinIO container...');
+            logger.debug('Starting SeaweedFS S3 container...');
 
-            let container = new MinioContainer(image);
-
-            container.withPassword(secretKey);
-            container.withUsername(accessKey);
-
-            // Longer timeout when using Docker networks - health check may be slower
-            container.withStartupTimeout(90000);
-            // @testcontainers/minio waits for the live endpoint, which can respond before
-            // MinIO is ready to serve S3 requests such as CreateBucket.
-            container.withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000));
+            let container = new GenericContainer(image)
+              .withEnvironment({
+                AWS_ACCESS_KEY_ID: accessKey,
+                AWS_SECRET_ACCESS_KEY: secretKey,
+              })
+              .withCommand([
+                'mini',
+                '-dir=/data',
+                '-ip=127.0.0.1',
+                '-ip.bind=0.0.0.0',
+                '-s3.port=9000',
+                '-s3.autoCreateBucket=false',
+                '-s3.allowDeleteBucketNotEmpty=false',
+                '-s3.port.iceberg=0',
+                '-s3.port.lance=0',
+                '-admin.ui=false',
+                '-webdav=false',
+                '-master.telemetry=false',
+              ])
+              .withExposedPorts(9000)
+              .withStartupTimeout(90000)
+              // The HTTP endpoint alone does not ensure that the filer and volumes
+              // are ready for S3 writes. Mini logs this after all components start.
+              .withWaitStrategy(
+                Wait.forAll([
+                  Wait.forLogMessage('All enabled components are running and ready to use:'),
+                  Wait.forHttp('/healthz', 9000),
+                ])
+              );
 
             const dockerNetwork = this.docker.network;
             if (dockerNetwork) {
@@ -327,15 +346,16 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
 
             const started = await container.start();
 
-            const ip = started.getIpAddress('bridge');
+            const ip = started.getIpAddress(dockerNetwork?.getName() ?? 'bridge');
+            const port = started.getMappedPort(9000);
             const endpoints = {
               networked: `http://${networkAlias}:9000`,
-              fromHost: `http://${started.getHost()}:${started.getPort()}`,
-              fromHostDockerInternal: `http://host.docker.internal:${started.getPort()}`,
+              fromHost: `http://${started.getHost()}:${port}`,
+              fromHostDockerInternal: `http://host.docker.internal:${port}`,
               directIp: `http://${ip}:9000`,
             };
 
-            this._minioConfig = {
+            this._s3Config = {
               container: started,
               endpoints: endpoints,
               options: options,
@@ -349,18 +369,18 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
                 fromHostDockerInternal: endpoints.fromHostDockerInternal,
                 directIp: endpoints.directIp,
               },
-              'MinIO started'
+              'SeaweedFS S3 started'
             );
           });
 
           // Create buckets outside semaphore - these don't strain Docker daemon
-          if (desiredBuckets.length > 0 && this._minioConfig) {
+          if (desiredBuckets.length > 0 && this._s3Config) {
             // Create buckets using the helper's S3 client
             for (const bucket of desiredBuckets) {
               try {
-                await this.minio.getS3Client().send(new CreateBucketCommand({ Bucket: bucket }));
+                await this.s3.getS3Client().send(new CreateBucketCommand({ Bucket: bucket }));
                 logger.debug({ bucket }, 'Created S3 bucket');
-                this._minioConfig.buckets.push(bucket);
+                this._s3Config.buckets.push(bucket);
               } catch (error) {
                 if ((error as Error).name !== 'BucketAlreadyOwnedByYou') {
                   throw error;
@@ -371,9 +391,9 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
         });
 
         this.addDestroyHook(async () => {
-          if (this._minioConfig) {
-            logger.debug('Stopping MinIO container...');
-            await this._minioConfig.container.stop();
+          if (this._s3Config) {
+            logger.debug('Stopping SeaweedFS S3 container...');
+            await this._s3Config.container.stop();
           }
         });
 
@@ -388,36 +408,36 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
        *
        * @example
        * ```typescript
-       * tester.withMinio()
-       *       .withMinioBucket('test-bucket')
-       *       .withAutoCleanup();
+       * tester.withS3()
+       *       .withS3Bucket('test-bucket')
+       *       .withS3AutoCleanup();
        *
        * // In beforeEach:
        * await tester.cleanup(); // Deletes all objects from all buckets
        * ```
        */
-      withMinioAutoCleanup() {
+      withS3AutoCleanup() {
         this.addCleanupHook(async () => {
-          await this.minio.cleanupBuckets();
+          await this.s3.cleanupBuckets();
         });
         return this;
       }
 
       /**
-       * Get MinIO configuration.
-       * Backward compatibility method - prefer using tester.minio.config
+       * Get S3 configuration.
+       * Also available through tester.s3.config.
        *
-       * @returns MinIO configuration object
-       * @throws Error if MinIO not initialized
+       * @returns S3 configuration object
+       * @throws Error if S3 not initialized
        *
        * @example
        * ```typescript
-       * const config = tester.getMinio();
-       * console.log(config.endpoint);
+       * const config = tester.getS3();
+       * console.log(config.endpoints.fromHost);
        * ```
        */
-      getMinio(): MinioConfig {
-        return this.minio.config;
+      getS3(): S3Config {
+        return this.s3.config;
       }
     };
   }

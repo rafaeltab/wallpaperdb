@@ -3,7 +3,7 @@ title: Color Extractor Service
 description: Dominant color palette extraction service for wallpapers
 ---
 
-The Color Extractor Service extracts dominant color palettes from stored wallpaper images. It connects to MinIO to read wallpaper files and NATS JetStream for event-driven processing.
+The Color Extractor Service extracts dominant color palettes from stored wallpaper images. It connects to SeaweedFS to read wallpaper files and NATS JetStream for event-driven processing.
 
 **Status:** 🚧 Under Development
 
@@ -21,13 +21,13 @@ make color-extractor-dev
 
 ## Architecture
 
-The Color Extractor is a stateless service with no database dependency. It reads wallpaper images from MinIO object storage and extracts dominant color palettes using image processing algorithms.
+The Color Extractor is a stateless service with no database dependency. It reads wallpaper images from SeaweedFS object storage and extracts dominant color palettes using image processing algorithms.
 
 ### Connections
 
 | Connection | Purpose |
 |---|---|
-| MinIO (S3) | Read wallpaper image files |
+| SeaweedFS (S3) | Read wallpaper image files |
 | NATS JetStream | Event consumption (future) |
 | OpenTelemetry | Traces and metrics |
 
@@ -35,7 +35,7 @@ The Color Extractor is a stateless service with no database dependency. It reads
 
 The service exposes two health endpoints:
 
-- **`GET /health`** — Returns the health status of the service and its dependencies (MinIO, NATS, OTel)
+- **`GET /health`** — Returns the health status of the service and its dependencies (SeaweedFS, NATS, OTel)
 - **`GET /ready`** — Returns whether the service is ready to accept traffic
 
 ## Configuration
@@ -47,10 +47,10 @@ Environment variables (Zod-validated):
 PORT=3007
 NODE_ENV=development
 
-# MinIO/S3
-S3_ENDPOINT=http://localhost:9000
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+# SeaweedFS/S3
+S3_ENDPOINT=http://localhost:8002
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -81,7 +81,7 @@ Health check with dependency status.
 {
   "status": "healthy",
   "checks": {
-    "minio": true,
+    "s3": true,
     "nats": true,
     "otel": true
   }

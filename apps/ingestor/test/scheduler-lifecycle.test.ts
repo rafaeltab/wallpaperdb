@@ -3,7 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -50,7 +50,7 @@ describe("Scheduler Lifecycle Tests", () => {
             .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
             .build();
@@ -63,9 +63,9 @@ describe("Scheduler Lifecycle Tests", () => {
             )
             .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
@@ -94,8 +94,8 @@ describe("Scheduler Lifecycle Tests", () => {
         // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
 
-        // Clean up MinIO bucket
-        await tester.minio.cleanupBuckets();
+        // Clean up S3 bucket
+        await tester.s3.cleanupBuckets();
 
         // Clean up NATS stream before each test
         try {
@@ -127,10 +127,10 @@ describe("Scheduler Lifecycle Tests", () => {
         const storageKey = `${wallpaperId}/original.jpg`;
         const contentHash = generateContentHash(testImage);
 
-        // Upload file to MinIO
-        await tester.minio.getS3Client().send(
+        // Upload file to S3
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: storageKey,
                 Body: testImage,
                 ContentType: "image/jpeg",
@@ -195,9 +195,9 @@ describe("Scheduler Lifecycle Tests", () => {
             const wallpaperId = `wlpr_shutdown_${i}_${ulid()}`;
             const storageKey = `${wallpaperId}/original.jpg`;
 
-            await tester.minio.getS3Client().send(
+            await tester.s3.getS3Client().send(
                 new PutObjectCommand({
-                    Bucket: tester.minio.config.buckets[0],
+                    Bucket: tester.s3.config.buckets[0],
                     Key: storageKey,
                     Body: testImage,
                     ContentType: "image/jpeg",
@@ -264,9 +264,9 @@ describe("Scheduler Lifecycle Tests", () => {
         const storageKey = `${wallpaperId}/original.jpg`;
         const contentHash = generateContentHash(testImage);
 
-        await tester.minio.getS3Client().send(
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: storageKey,
                 Body: testImage,
                 ContentType: "image/jpeg",
@@ -325,9 +325,9 @@ describe("Scheduler Lifecycle Tests", () => {
             const storageKey = `${wallpaperId}/original.jpg`;
             const contentHash = generateContentHash(testImage);
 
-            await tester.minio.getS3Client().send(
+            await tester.s3.getS3Client().send(
                 new PutObjectCommand({
-                    Bucket: tester.minio.config.buckets[0],
+                    Bucket: tester.s3.config.buckets[0],
                     Key: storageKey,
                     Body: testImage,
                     ContentType: "image/jpeg",
@@ -398,9 +398,9 @@ describe("Scheduler Lifecycle Tests", () => {
             Buffer.concat([testImage, Buffer.from("_first")]),
         );
 
-        await tester.minio.getS3Client().send(
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: storageKey,
                 Body: testImage,
                 ContentType: "image/jpeg",
@@ -446,9 +446,9 @@ describe("Scheduler Lifecycle Tests", () => {
             Buffer.concat([testImage2, Buffer.from("_second")]),
         );
 
-        await tester.minio.getS3Client().send(
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: storageKey2,
                 Body: testImage2,
                 ContentType: "image/jpeg",
@@ -515,7 +515,7 @@ describe("Scheduler Lifecycle Tests", () => {
                     height: 1080,
                     aspectRatio: "1.7778",
                     storageKey,
-                    storageBucket: tester.minio.config.buckets[0],
+                    storageBucket: tester.s3.config.buckets[0],
                     originalFilename: `test_${i}.jpg`,
                 });
         }

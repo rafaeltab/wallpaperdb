@@ -39,7 +39,9 @@ make dev
 - Variant Generator: http://localhost:3004
 - Web Frontend: http://localhost:3005
 - Grafana: http://localhost:3000 (admin/admin)
-- MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+- SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `storageadmin`)
+
+The S3 host port is `8002 + 10 × slot` for other worktrees. See [SeaweedFS](/docs/infrastructure/seaweedfs) for S3 client operations and migration of existing S3 data.
 
 ## Test the Upload Flow
 

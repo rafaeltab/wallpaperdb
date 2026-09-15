@@ -2,7 +2,7 @@ import "reflect-metadata";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -40,7 +40,7 @@ describe("Multi-Instance Rate Limiting", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
@@ -54,9 +54,9 @@ describe("Multi-Instance Rate Limiting", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_ratelimit_distributed_${Date.now()}`),
             )
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()

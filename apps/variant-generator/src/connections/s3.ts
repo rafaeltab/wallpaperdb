@@ -1,17 +1,17 @@
-import { MinioConnection as CoreMinioConnection } from '@wallpaperdb/core/connections';
+import { S3Connection as CoreS3Connection } from '@wallpaperdb/core/connections';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 
 /**
- * Variant-generator service-specific MinIO connection.
- * Extends the core MinioConnection with service-specific configuration.
+ * Variant-generator service-specific S3 connection.
+ * Extends the core S3Connection with service-specific configuration.
  *
  * Used for:
  * - Reading original wallpaper files
  * - Uploading generated variant files
  */
 @singleton()
-export class MinioConnection extends CoreMinioConnection {
+export class S3Connection extends CoreS3Connection {
   constructor(@inject('config') config: Config) {
     super(config);
   }

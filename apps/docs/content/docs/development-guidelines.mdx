@@ -43,14 +43,14 @@ export class StorageService {
 
 // DO: Write test first
 describe('StorageService', () => {
-  it('should upload file to MinIO and return storage key', async () => {
-    const service = new StorageService(mockMinioClient);
+  it('should upload file to SeaweedFS and return storage key', async () => {
+    const service = new StorageService(mockS3Client);
     const file = Buffer.from('test');
 
     const key = await service.upload(file);
 
     expect(key).toMatch(/^wlpr_.*\/original\.jpg$/);
-    expect(mockMinioClient.send).toHaveBeenCalledWith(
+    expect(mockS3Client.send).toHaveBeenCalledWith(
       expect.objectContaining({
         input: expect.objectContaining({
           Bucket: 'wallpapers',
@@ -99,7 +99,7 @@ describe('StorageService', () => {
 //   - Verify all tests still pass
 //   - Commit
 
-// Step 3: Repeat for next connection (MinioConnection)
+// Step 3: Repeat for next connection (S3Connection)
 //   - Same process
 //   - Commit
 
@@ -148,7 +148,7 @@ When migrating code to shared packages or refactoring:
 
 2. **Integration Tests** - Test service integration with infrastructure
    - Use Testcontainers for real infrastructure
-   - Test database operations, MinIO uploads, NATS publishing
+   - Test database operations, SeaweedFS uploads, NATS publishing
    - Slower but more realistic
 
 3. **E2E Tests** - Test entire service in Docker
@@ -236,7 +236,7 @@ Follow Conventional Commits:
 
 ```
 feat: add thumbnail extraction service
-fix: handle MinIO timeout errors
+fix: handle SeaweedFS timeout errors
 refactor: extract BaseConnection to @wallpaperdb/core
 docs: add observability implementation guide
 test: add coverage for state machine transitions

@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import sharp from 'sharp';
@@ -11,7 +11,7 @@ import { InProcessColorExtractorTesterBuilder } from './builders/index.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
   .with(InProcessColorExtractorTesterBuilder)
   .build();
@@ -64,8 +64,8 @@ describe('Color Extraction Pipeline', () => {
   beforeAll(async () => {
     tester = new TesterClass();
     tester
-      .withMinio()
-      .withMinioBucket('wallpapers')
+      .withS3()
+      .withS3Bucket('wallpapers')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withInProcessApp();
@@ -81,7 +81,7 @@ describe('Color Extraction Pipeline', () => {
     const wallpaperId = `wlpr_pipe_${Date.now()}`;
     const storageKey = `${wallpaperId}/original.png`;
     const imageBuffer = await createTestImage(100, 100, { r: 255, g: 0, b: 0 });
-    await tester.minio.uploadObject('wallpapers', storageKey, imageBuffer);
+    await tester.s3.uploadObject('wallpapers', storageKey, imageBuffer);
 
     const event = createWallpaperUploadedEvent({
       wallpaperId,

@@ -20,7 +20,7 @@ function createDefaultTesterBuilder(): TesterBuilder<[DockerTesterBuilder]>
 ```typescript
 const builder = createDefaultTesterBuilder()
   .with(PostgresTesterBuilder)  // DockerTesterBuilder already included!
-  .with(MinioTesterBuilder);
+  .with(S3TesterBuilder);
 ```
 
 ### createTesterBuilder()
@@ -82,12 +82,12 @@ Automatically truncate tables after each test.
 withPostgresAutoCleanup(tables: string[]): this
 ```
 
-### withMinioAutoCleanup()
+### withS3AutoCleanup()
 
 Automatically empty all buckets after each test.
 
 ```typescript
-withMinioAutoCleanup(): this
+withS3AutoCleanup(): this
 ```
 
 ### withNatsAutoCleanup()
@@ -123,7 +123,7 @@ Execute SQL queries directly.
 async query<T>(sql: string, params?: any[]): Promise<T[]>
 ```
 
-### tester.minio.listObjects()
+### tester.s3.listObjects()
 
 List objects in a bucket.
 
@@ -131,7 +131,7 @@ List objects in a bucket.
 async listObjects(bucket: string): Promise<string[]>
 ```
 
-### tester.minio.getS3Client()
+### tester.s3.getS3Client()
 
 Get the underlying S3 client for advanced operations.
 
@@ -190,34 +190,44 @@ class PostgresTesterBuilder extends BaseTesterBuilder<
 }
 ```
 
-### MinioTesterBuilder
+### S3TesterBuilder
 
-Manages MinIO (S3-compatible) containers.
+Manages SeaweedFS containers through `.withS3()`. The `tester.s3` namespace exposes object helpers and the AWS SDK S3 client through `getS3Client()`.
 
 ```typescript
-class MinioTesterBuilder extends BaseTesterBuilder<
-  'minio',
-  [DockerTesterBuilder]
+class S3TesterBuilder extends BaseTesterBuilder<
+  's3',
+  [DockerTesterBuilder, SetupTesterBuilder, DestroyTesterBuilder, CleanupTesterBuilder]
 >
 ```
 
 **Configuration Methods:**
-- `withImage(image: string)`: Docker image (default: `minio/minio:latest`)
-- `withAccessKey(key: string)`: Access key (default: `minioadmin`)
-- `withSecretKey(key: string)`: Secret key (default: `minioadmin`)
+- `withImage(image: string)`: Compatible SeaweedFS Docker image (default: `chrislusf/seaweedfs:4.47`)
+- `withAccessKey(key: string)`: Access key (default: `storageadmin`)
+- `withSecretKey(key: string)`: Secret key (default: `storageadmin`)
 
 **Methods:**
-- `withMinioBucket(name)`: Create bucket (can call multiple times)
+- `withS3(configure?)`: Configure and start the container during `setup()`
+- `withS3AutoCleanup()`: Remove objects between tests
+- `getS3()`: Read the `S3Config` container configuration
+- `withS3Bucket(name)`: Create bucket (can call multiple times)
 
-**Returns:**
+**Configuration (`tester.s3.config` or `tester.getS3()`):**
 ```typescript
 {
-  container: StartedMinioContainer,
-  endpoint: string,
-  options: MinioOptions,
+  container: StartedTestContainer,
+  endpoints: {
+    networked: string,
+    fromHost: string,
+    fromHostDockerInternal: string,
+    directIp: string
+  },
+  options: S3Options,
   buckets: string[]
 }
 ```
+
+Use `container.getMappedPort(9000)` for the published S3 port; the container is a generic `StartedTestContainer`. Prefer the supplied `endpoints` for connections from hosts or Docker networks.
 
 ### NatsTesterBuilder
 

@@ -98,8 +98,8 @@ make infra-start
 **What happens:**
 1. Creates `.env` from `.env.example` (if needed)
 2. Pulls Docker images (~2 minutes first time)
-3. Starts 9 services (PostgreSQL, MinIO, NATS, Redis, Grafana, OpenSearch, etc.)
-4. Initializes MinIO buckets
+3. Starts infrastructure services (PostgreSQL, SeaweedFS, NATS, Redis, Grafana, OpenSearch, etc.)
+4. Creates the `wallpapers` and `example-bucket` buckets in SeaweedFS
 5. Waits for health checks
 
 **Verify infrastructure:**
@@ -140,7 +140,9 @@ This starts all services in development mode with hot-reload.
 - Docs Site: http://localhost:3002
 - Media API: http://localhost:3003
 - Grafana: http://localhost:3000
-- MinIO Console: http://localhost:9001
+- SeaweedFS S3 API: http://localhost:8002 (slot 0)
+
+The S3 endpoint uses `8002 + 10 × slot` for other worktrees; inspect `S3_API_HOST_PORT` in `infra/.env`. Apps in Docker use `http://seaweedfs:9000`. For an existing environment, follow the [S3 data migration procedure](/docs/infrastructure/seaweedfs#existing-minio-data) before relying on stored wallpapers.
 
 ## Verifying Setup
 
@@ -156,7 +158,7 @@ curl http://localhost:3001/health
   "status": "healthy",
   "checks": {
     "database": { "status": "healthy" },
-    "minio": { "status": "healthy" },
+    "s3": { "status": "healthy" },
     "nats": { "status": "healthy" },
     "redis": { "status": "healthy" }
   }
@@ -247,6 +249,9 @@ make media-test
 # Watch mode
 make ingestor-test-watch
 
+# Storage compatibility (real SeaweedFS container)
+make storage-test
+
 # By intensity
 make test-unit         # Fast (no containers)
 make test-integration  # Medium (with Testcontainers)
@@ -263,7 +268,7 @@ make test-e2e          # Slow (full Docker builds)
 ```bash
 # Check what's using ports
 lsof -i :5432  # PostgreSQL
-lsof -i :9000  # MinIO
+lsof -i :8002  # SeaweedFS S3 API (slot 0)
 lsof -i :4222  # NATS
 
 # Kill conflicting processes or change ports

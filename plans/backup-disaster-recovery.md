@@ -12,7 +12,7 @@ Implement automated backups for all stateful services.
 
 **No backups configured for:**
 - PostgreSQL (volatile Docker volumes)
-- MinIO (no replication)
+- S3 (no replication)
 - NATS JetStream
 - Redis
 - OpenSearch
@@ -33,15 +33,13 @@ docker exec wallpaperdb-postgres pg_dump \
 aws s3 cp backup.sql.gz s3://wallpaperdb-backups/
 ```
 
-### MinIO Backup
+### S3 Object Storage Backup
 
-```bash
-# Enable versioning
-mc version enable myminio/wallpapers
+Back up SeaweedFS objects to an independent S3 endpoint with a tool that supports separate source and destination endpoints and preserves object content, content types, and user metadata. Configure credentials independently for each endpoint.
 
-# Replicate to backup bucket
-mc mirror myminio/wallpapers s3://wallpaperdb-backups/minio/
-```
+- Retain previous versions or dated snapshots so deletion or corruption is recoverable.
+- Verify copied objects and metadata, and rehearse restoring them alongside the database.
+- Measure achievable backup frequency and recovery time before committing to the targets below.
 
 ### NATS Backup
 
@@ -55,7 +53,7 @@ nats stream backup WALLPAPER /backups/nats/
 | Service | RPO (Data Loss) | RTO (Recovery) | Frequency |
 |---------|----------------|----------------|-----------|
 | PostgreSQL | 24 hours | 1 hour | Daily |
-| MinIO | Near-zero | 2 hours | Continuous |
+| S3 | Near-zero | 2 hours | Continuous |
 | NATS | 24 hours | 30 min | Daily |
 
 ## Acceptance Criteria

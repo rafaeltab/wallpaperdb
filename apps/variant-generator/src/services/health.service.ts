@@ -6,7 +6,7 @@ import {
 import { NatsConnectionManager } from '../connections/nats.js';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import { getOtelSdk } from '../otel-init.js';
 
 // Re-export types for backwards compatibility
@@ -15,7 +15,7 @@ export type ReadyResponse = CoreReadyResponse;
 
 /**
  * Health service for the variant-generator.
- * Checks connectivity to MinIO and NATS.
+ * Checks connectivity to S3 and NATS.
  * Note: No database connection since this service is stateless.
  */
 @injectable()
@@ -24,13 +24,13 @@ export class HealthService {
 
   constructor(
     @inject('config') private readonly config: Config,
-    @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+    @inject(S3Connection) private readonly s3Connection: S3Connection,
     @inject(NatsConnectionManager) private readonly natsConnection: NatsConnectionManager
   ) {
     this.aggregator = new HealthAggregator({ checkTimeoutMs: 5000 });
 
     // Register health checks (no database for stateless service)
-    this.aggregator.register('minio', async () => this.minioConnection.checkHealth());
+    this.aggregator.register('s3', async () => this.s3Connection.checkHealth());
     this.aggregator.register('nats', async () => this.natsConnection.checkHealth());
 
     // OTEL health check logic:

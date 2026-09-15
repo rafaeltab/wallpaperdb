@@ -17,7 +17,7 @@ description: Testing strategy for WallpaperDB: three test tiers (unit, integrati
 ### Integration Tests
 
 - **Where:** `apps/` (e.g. `ingestor`, `media`, `gateway`)
-- **Characteristics:** Uses Testcontainers for real PostgreSQL, MinIO, and NATS; the application runs in-process in the same Node.js process as the tests
+- **Characteristics:** Uses Testcontainers for real PostgreSQL, SeaweedFS, and NATS; the application runs in-process in the same Node.js process as the tests
 - **Run:** `make test-integration`
 - **Use for:** Full workflows involving the database, object storage, or messaging — anything that requires real infrastructure
 - **Speed:** ~2–5 seconds per suite (fast because the app is in-process)
@@ -65,3 +65,7 @@ Test infrastructure is set up using the **TesterBuilder** pattern from `@wallpap
 
 Full documentation: `apps/docs/content/docs/packages/test-utils.mdx`  
 Testing strategy guide: `apps/docs/content/docs/guides/testing-strategies.mdx`
+
+## S3 Storage
+
+`S3TesterBuilder` starts SeaweedFS through `.withS3()`. Use `tester.s3` for object helpers and `tester.s3.getS3Client()` for the AWS SDK S3 client. Run `make storage-test` to verify the storage contract against a real container.

@@ -3,7 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -40,7 +40,7 @@ describe("Multi-Instance Safety Tests", () => {
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
             .with(RedisTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
@@ -55,9 +55,9 @@ describe("Multi-Instance Safety Tests", () => {
             )
             .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
@@ -87,15 +87,15 @@ describe("Multi-Instance Safety Tests", () => {
             height: 1080,
             format: "jpeg",
         });
-        const bucket = tester.minio.config.buckets[0];
+        const bucket = tester.s3.config.buckets[0];
         const db = tester.getDrizzle();
-        const s3Client = tester.minio.getS3Client();
+        const s3Client = tester.s3.getS3Client();
 
         for (let i = 0; i < 20; i++) {
             const id = `wlpr_test_stuck_${i}_${ulid()}`;
             const storageKey = `${id}/original.jpg`;
 
-            // Upload file to MinIO first
+            // Upload file to S3 first
             await s3Client.send(
                 new PutObjectCommand({
                     Bucket: bucket,
@@ -154,7 +154,7 @@ describe("Multi-Instance Safety Tests", () => {
     //
     //     // Create 30 records in 'stored' state (awaiting NATS publish)
     //     const storedRecords: string[] = [];
-    //     const bucket = tester.minio.config.buckets[0];
+    //     const bucket = tester.s3.config.buckets[0];
     //     const db = tester.getDrizzle();
     //
     //     for (let i = 0; i < 30; i++) {
@@ -275,9 +275,9 @@ describe("Multi-Instance Safety Tests", () => {
     //         height: 1080,
     //         format: "jpeg",
     //     });
-    //     const bucket = tester.minio.config.buckets[0];
+    //     const bucket = tester.s3.config.buckets[0];
     //     const db = tester.getDrizzle();
-    //     const s3Client = tester.minio.getS3Client();
+    //     const s3Client = tester.s3.getS3Client();
     //
     //     // Create 50 stuck uploads (in 'uploading' state)
     //     const uploadingIds: string[] = [];
@@ -285,8 +285,8 @@ describe("Multi-Instance Safety Tests", () => {
     //         const id = `wlpr_stress_uploading_${i}_${ulid()}`;
     //         const storageKey = `${id}/original.jpg`;
     //
-    //         // Upload file to MinIO
-    //         tester.minio.uploadObject(bucket, storageKey, testImage, {
+    //         // Upload file to S3
+    //         tester.s3.uploadObject(bucket, storageKey, testImage, {
     //             ContentType: "image/jpeg",
     //         });
     //
@@ -426,9 +426,9 @@ describe("Multi-Instance Safety Tests", () => {
     //         height: 1080,
     //         format: "jpeg",
     //     });
-    //     const bucket = tester.minio.config.buckets[0];
+    //     const bucket = tester.s3.config.buckets[0];
     //     const db = tester.getDrizzle();
-    //     const s3Client = tester.minio.getS3Client();
+    //     const s3Client = tester.s3.getS3Client();
     //
     //     // Create 10 stuck uploads
     //     for (let i = 0; i < 10; i++) {
@@ -487,9 +487,9 @@ describe("Multi-Instance Safety Tests", () => {
     //         height: 1080,
     //         format: "jpeg",
     //     });
-    //     const bucket = tester.minio.config.buckets[0];
+    //     const bucket = tester.s3.config.buckets[0];
     //     const db = tester.getDrizzle();
-    //     const s3Client = tester.minio.getS3Client();
+    //     const s3Client = tester.s3.getS3Client();
     //
     //     for (const { state, count, stateAge } of states) {
     //         for (let i = 0; i < count; i++) {
@@ -497,7 +497,7 @@ describe("Multi-Instance Safety Tests", () => {
     //             const storageKey = `${id}/original.jpg`;
     //
     //             if (state === "uploading") {
-    //                 // Upload to MinIO for stuck uploads
+    //                 // Upload to S3 for stuck uploads
     //                 await s3Client.send(
     //                     new PutObjectCommand({
     //                         Bucket: bucket,

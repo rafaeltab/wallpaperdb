@@ -2,23 +2,23 @@ import 'reflect-metadata';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
 } from '@wallpaperdb/test-utils';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { MinioConnection } from '../src/connections/minio.js';
-import { MinioImageReader } from '../src/services/minio-image-reader.js';
+import type { S3Connection } from '../src/connections/s3.js';
+import { S3ImageReader } from '../src/services/s3-image-reader.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .build();
 
-describe('MinioImageReader integration', () => {
+describe('S3ImageReader integration', () => {
   let tester: InstanceType<typeof TesterClass>;
 
   beforeAll(async () => {
     tester = new TesterClass();
-    tester.withMinio().withMinioBucket('wallpapers');
+    tester.withS3().withS3Bucket('wallpapers');
     await tester.setup();
   });
 
@@ -28,12 +28,12 @@ describe('MinioImageReader integration', () => {
 
   it('downloads the complete object as a buffer', async () => {
     const expected = Buffer.from('streamed image bytes');
-    await tester.minio.uploadObject('wallpapers', 'test/image.bin', expected);
+    await tester.s3.uploadObject('wallpapers', 'test/image.bin', expected);
     const connection = {
-      getClient: () => tester.minio.getS3Client(),
-    } as unknown as MinioConnection;
+      getClient: () => tester.s3.getS3Client(),
+    } as unknown as S3Connection;
 
-    const result = await new MinioImageReader(connection).read('wallpapers', 'test/image.bin');
+    const result = await new S3ImageReader(connection).read('wallpapers', 'test/image.bin');
 
     expect(result).toEqual(expected);
   });

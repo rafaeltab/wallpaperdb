@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import type { FastifyInstance } from 'fastify';
@@ -15,7 +15,7 @@ import { InProcessVariantGeneratorTesterBuilder } from '../builders/index.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
   .with(InProcessVariantGeneratorTesterBuilder)
   .build();
@@ -27,8 +27,8 @@ describe('Variant Generator Service', () => {
   beforeAll(async () => {
     tester = new TesterClass();
     tester
-      .withMinio()
-      .withMinioBucket('wallpapers')
+      .withS3()
+      .withS3Bucket('wallpapers')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withInProcessApp();
@@ -189,7 +189,7 @@ describe('Variant Generator Service', () => {
 
       // Create and upload original image
       const original = await createTestImage(3840, 2160, 'jpeg');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
 
       // Generate variants
       const wallpaperData = {
@@ -220,8 +220,8 @@ describe('Variant Generator Service', () => {
         expect(variant.storageKey).toContain(wallpaperId);
         expect(variant.storageBucket).toBe('wallpapers');
 
-        // Verify file exists in MinIO
-        const exists = await tester.minio.objectExists('wallpapers', variant.storageKey);
+        // Verify file exists in S3
+        const exists = await tester.s3.objectExists('wallpapers', variant.storageKey);
         expect(exists).toBe(true);
       }
     });
@@ -232,7 +232,7 @@ describe('Variant Generator Service', () => {
 
       // Create and upload PNG original
       const original = await createTestImage(1920, 1080, 'png');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.png`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.png`, original);
 
       const wallpaperData = {
         id: wallpaperId,
@@ -267,7 +267,7 @@ describe('Variant Generator Service', () => {
 
       // Create and upload WebP original
       const original = await createTestImage(1920, 1080, 'webp');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.webp`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.webp`, original);
 
       const wallpaperData = {
         id: wallpaperId,
@@ -321,7 +321,7 @@ describe('Variant Generator Service', () => {
 
       // Create square image (1:1 aspect ratio - no matching category)
       const original = await createTestImage(2000, 2000, 'jpeg');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
 
       const wallpaperData = {
         id: wallpaperId,
@@ -348,7 +348,7 @@ describe('Variant Generator Service', () => {
 
       // Create 4K image
       const original = await createTestImage(3840, 2160, 'jpeg');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
 
       const wallpaperData = {
         id: wallpaperId,
@@ -390,7 +390,7 @@ describe('Variant Generator Service', () => {
 
       // Create UWQHD image (3440x1440)
       const original = await createTestImage(3440, 1440, 'jpeg');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
 
       const wallpaperData = {
         id: wallpaperId,
@@ -421,7 +421,7 @@ describe('Variant Generator Service', () => {
 
       // Create FHD+ phone image (1080x2400)
       const original = await createTestImage(1080, 2400, 'jpeg');
-      await tester.minio.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
+      await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
 
       const wallpaperData = {
         id: wallpaperId,

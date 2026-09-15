@@ -22,16 +22,16 @@ This is a workspace package. Add it to your app's `package.json`:
 The TesterBuilder pattern uses composable mixins to build test infrastructure. Instead of manually setting up containers and connections, you declare what you need:
 
 ```typescript
-import { PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder } from "@wallpaperdb/test-utils";
+import { PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder } from "@wallpaperdb/test-utils";
 
 const tester = await new PostgresTesterBuilder()
-  .withMinio()
+  .withS3()
   .withNats()
   .build();
 
 // Now you have:
 // - tester.pool (PostgreSQL connection pool)
-// - tester.minio (MinIO S3 client)
+// - tester.s3 (SeaweedFS S3 client)
 // - tester.nats (NATS connection)
 ```
 
@@ -51,7 +51,7 @@ const tester = await new PostgresTesterBuilder()
 |---------|---------|----------|
 | `DockerTesterBuilder` | Docker engine access | Docker environment, network |
 | `PostgresTesterBuilder` | PostgreSQL database | Connection pool, migrations |
-| `MinioTesterBuilder` | S3/MinIO storage | S3 client, bucket management |
+| `S3TesterBuilder` | S3/SeaweedFS storage | S3 client, bucket management |
 | `NatsTesterBuilder` | NATS messaging | NATS connection, JetStream |
 | `RedisTesterBuilder` | Redis cache | Redis client |
 | `OpenSearchTesterBuilder` | OpenSearch search engine | OpenSearch client, configuration |
@@ -130,37 +130,57 @@ const result = await tester.pool.query('SELECT NOW()');
 - `postgres.container` - Container instance
 - `postgres.connectionString` - Connection URL
 
-### MinioTesterBuilder
+### S3TesterBuilder
 
-MinIO/S3 storage with bucket management.
+S3 storage with bucket management. Tests start `chrislusf/seaweedfs:4.47` and use the AWS SDK S3 client through the `tester.s3` namespace.
 
 ```typescript
-import { MinioTesterBuilder } from "@wallpaperdb/test-utils";
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  S3TesterBuilder,
+} from "@wallpaperdb/test-utils";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 
-const tester = await new MinioTesterBuilder()
-  .withMinio({
-    buckets: ['wallpapers', 'thumbnails']
-  })
+const Tester = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(S3TesterBuilder)
   .build();
 
-// Use S3 client
-await tester.minio.send(new PutObjectCommand({
-  Bucket: 'wallpapers',
-  Key: 'test.jpg',
-  Body: buffer
-}));
+const tester = await new Tester()
+  .withS3()
+  .withS3Bucket("wallpapers")
+  .withS3Bucket("thumbnails")
+  .withS3AutoCleanup()
+  .setup();
+
+try {
+  await tester.s3.getS3Client().send(new PutObjectCommand({
+    Bucket: "wallpapers",
+    Key: "test.jpg",
+    Body: buffer,
+  }));
+} finally {
+  await tester.destroy();
+}
 ```
 
 **Methods:**
-- `withMinio(options?)` - Start MinIO container
+- `withS3(configure?)` - Configure a SeaweedFS container to start during `setup()`
+- `withS3Bucket(name)` - Add a bucket to create; call once per bucket
+- `withS3AutoCleanup()` - Remove bucket contents when `cleanup()` runs
+- `getS3()` - Read the container configuration, also available as `tester.s3.config`
 
-**Options:**
-- `buckets` - Array of bucket names to create
+**Configuration callback:**
+- `withImage(image)` - Choose a compatible SeaweedFS image
+- `withAccessKey(key)` / `withSecretKey(key)` - Set credentials; both default to `storageadmin`
+- `withNetworkAlias(alias)` - Set the Docker network alias; defaults to `s3`
 
 **Provides:**
-- `minio` - AWS SDK v3 S3 client
-- `minioContainer` - Container instance
-- `minioEndpoint` - S3 endpoint URL
+- `s3.getS3Client()` - Cached AWS SDK v3 S3 client
+- `s3.uploadObject()`, `s3.deleteObject()`, `s3.objectExists()`, `s3.listObjects()` - Object helpers
+- `s3.config.container` - Container instance
+- `s3.config.endpoints` - Endpoints for host and Docker clients
 
 ### NatsTesterBuilder
 
@@ -371,7 +391,8 @@ import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
 const tester = await new PostgresTesterBuilder()
   .withDocker()
   .withPostgres()
-  .withMinio({ buckets: ['wallpapers'] })
+  .withS3()
+      .withS3Bucket("wallpapers")
   .withNats()
   .withRedis()
   .withMigrations("./drizzle")
@@ -384,7 +405,7 @@ const tester = await new PostgresTesterBuilder()
   .build();
 
 // Everything is typed and available:
-// tester.pool, tester.minio, tester.nats, tester.redis
+// tester.pool, tester.s3, tester.nats, tester.redis
 ```
 
 ### Type Safety
@@ -394,12 +415,12 @@ The builder pattern provides full type inference:
 ```typescript
 const tester = await new PostgresTesterBuilder()
   .withPostgres()
-  .withMinio()
+  .withS3()
   .build();
 
-// TypeScript knows tester has both pool and minio
+// TypeScript knows tester has both pool and s3
 tester.pool;  // ✓ Type: Pool
-tester.minio; // ✓ Type: S3Client
+tester.s3.getS3Client(); // ✓ Type: S3Client
 
 // @ts-expect-error - TypeScript catches this
 tester.nats;  // ✗ Error: Property 'nats' does not exist
@@ -428,14 +449,14 @@ Builders automatically set environment variables:
 ```typescript
 const tester = await new PostgresTesterBuilder()
   .withPostgres()
-  .withMinio()
+  .withS3()
   .build();
 
 // Environment variables are set:
 // DATABASE_URL=postgresql://...
-// MINIO_ENDPOINT=http://127.0.0.1:...
-// MINIO_ACCESS_KEY=...
-// MINIO_SECRET_KEY=...
+// S3_ENDPOINT=http://127.0.0.1:...
+// S3_ACCESS_KEY_ID=...
+// S3_SECRET_ACCESS_KEY=...
 ```
 
 ## Default Builder
@@ -447,7 +468,7 @@ import { createDefaultTesterBuilder } from "@wallpaperdb/test-utils";
 
 const tester = await createDefaultTesterBuilder()
   .withPostgres()
-  .withMinio()
+  .withS3()
   .withNats()
   .build();
 ```
@@ -467,7 +488,8 @@ describe("Upload Flow Integration", () => {
     return await new PostgresTesterBuilder()
       .withDocker()
       .withPostgres()
-      .withMinio({ buckets: ['wallpapers'] })
+      .withS3()
+      .withS3Bucket("wallpapers")
       .withNats()
       .withMigrations("./drizzle")
       .withSetup(async (ctx) => {
@@ -498,7 +520,7 @@ describe("Upload Flow Integration", () => {
 
   it("should upload wallpaper end-to-end", async () => {
     // Upload to S3
-    await tester.minio.send(new PutObjectCommand({
+    await tester.s3.getS3Client().send(new PutObjectCommand({
       Bucket: 'wallpapers',
       Key: 'wlpr_123/original.jpg',
       Body: Buffer.from('fake image data')
@@ -544,7 +566,7 @@ const tester = await new PostgresTesterBuilder()
 // Bad - unnecessary infrastructure
 const tester = await new PostgresTesterBuilder()
   .withPostgres()
-  .withMinio()
+  .withS3()
   .withNats()
   .withRedis()
   .build();

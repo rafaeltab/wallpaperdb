@@ -20,7 +20,7 @@ Connection managers for all infrastructure dependencies:
 ```typescript
 import {
   DatabaseConnection,
-  MinioConnection,
+  S3Connection,
   NatsConnectionManager,
   RedisConnection,
   OtelConnection,
@@ -37,7 +37,7 @@ export class DatabaseConnection extends BaseConnection {
 
 **Available connections:**
 - `DatabaseConnection` - PostgreSQL with Drizzle ORM
-- `MinioConnection` - S3-compatible object storage
+- `S3Connection` - S3-compatible object storage
 - `NatsConnectionManager` - NATS with JetStream
 - `RedisConnection` - Redis with connection pooling
 - `OtelConnection` - OpenTelemetry SDK initialization
@@ -237,7 +237,7 @@ Composable test infrastructure using the TesterBuilder pattern.
 
 **See full documentation:** [Package: Testcontainers](/docs/packages/testcontainers)
 
-Custom Testcontainers implementations for NATS, PostgreSQL, MinIO, and Redis.
+Custom Testcontainers implementations for NATS, PostgreSQL, SeaweedFS, and Redis.
 
 ### @wallpaperdb/url-ipv4-resolver
 

@@ -3,7 +3,7 @@ title: Ingestor Service
 description: Wallpaper upload and validation service with state machine workflow
 ---
 
-The Ingestor Service is the entry point for wallpapers into WallpaperDB. It handles file uploads, validation, storage in MinIO, metadata recording in PostgreSQL, and event publishing for downstream processing.
+The Ingestor Service is the entry point for wallpapers into WallpaperDB. It handles file uploads, validation, storage in SeaweedFS, metadata recording in PostgreSQL, and event publishing for downstream processing.
 
 **Status:** ✅ Production-ready
 
@@ -61,13 +61,13 @@ initiated → uploading → stored → processing → completed
    - Content hash not yet calculated
    - No file uploaded
 
-2. **uploading** - File being uploaded to MinIO
+2. **uploading** - File being uploaded to SeaweedFS
    - Content hash calculated (SHA256)
-   - File streamed to MinIO
+   - File streamed to SeaweedFS
    - Metadata extracted (dimensions, MIME type, file size)
 
-3. **stored** - File in MinIO, metadata in DB, awaiting NATS publish
-   - File successfully stored in MinIO
+3. **stored** - File in SeaweedFS, metadata in DB, awaiting NATS publish
+   - File successfully stored in SeaweedFS
    - All metadata recorded in database
    - Ready to publish event
 
@@ -131,7 +131,7 @@ This conditional unique index prevents duplicate uploads while allowing failed u
 3. SHA256 hash calculated
 4. Duplicate check against DB (per user)
 5. State: initiated → Insert DB record
-6. State: uploading → Upload to MinIO
+6. State: uploading → Upload to SeaweedFS
 7. State: stored → Record all metadata
 8. Publish NATS event to "wallpaper.uploaded"
 9. State: processing (if NATS succeeds)
@@ -147,7 +147,7 @@ Recovers uploads stuck in `uploading` state.
 
 **Logic:**
 - Find records in `uploading` state for >5 minutes
-- Check if file exists in MinIO
+- Check if file exists in SeaweedFS
 - If exists: transition to `stored` state
 - If missing: increment retry count
 - After 3 retries: mark as `failed`
@@ -174,8 +174,8 @@ Deletes abandoned `initiated` records.
 
 **Runs:** Every 5 minutes
 
-#### 4. Orphaned MinIO Reconciliation
-Deletes MinIO objects without DB records.
+#### 4. Orphaned SeaweedFS Reconciliation
+Deletes SeaweedFS objects without DB records.
 
 **Logic:**
 - List all objects in wallpapers bucket
@@ -305,7 +305,7 @@ Health check with dependency status.
   "status": "healthy",
   "checks": {
     "database": { "status": "healthy" },
-    "minio": { "status": "healthy" },
+    "s3": { "status": "healthy" },
     "nats": { "status": "healthy" },
     "redis": { "status": "healthy" }
   }
@@ -352,10 +352,10 @@ NODE_ENV=development
 # Database
 DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
 
-# MinIO/S3
-MINIO_ENDPOINT=http://localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+# SeaweedFS/S3
+S3_ENDPOINT=http://localhost:8002
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -400,7 +400,8 @@ describe("Upload Flow", () => {
   it("should upload JPEG successfully", async () => {
     const tester = await new PostgresTesterBuilder()
       .withPostgres()
-      .withMinio({ buckets: ['wallpapers'] })
+      .withS3()
+      .withS3Bucket("wallpapers")
       .withNats()
       .withRedis()
       .withMigrations("./drizzle")
@@ -440,7 +441,7 @@ Distributed tracing with OpenTelemetry:
 - `upload.process` - Full upload workflow
 - `upload.validate` - File validation
 - `upload.hash` - SHA256 calculation
-- `upload.minio` - MinIO upload
+- `upload.s3` - SeaweedFS upload
 - `upload.nats` - NATS publish
 - `reconciliation.*` - Reconciliation jobs
 
@@ -484,7 +485,7 @@ apps/ingestor/
 │   ├── config.ts                 # Zod-validated config
 │   ├── connections/              # Singleton connection managers
 │   │   ├── database.ts          # PostgreSQL pool
-│   │   ├── minio.ts             # S3 client
+│   │   ├── s3.ts             # S3 client
 │   │   ├── nats.ts              # NATS client
 │   │   ├── redis.ts             # Redis client
 │   │   └── otel.ts              # OpenTelemetry SDK
@@ -495,7 +496,7 @@ apps/ingestor/
 │   ├── services/                 # Business logic
 │   │   ├── upload-orchestrator.service.ts  # Upload workflow
 │   │   ├── file-processor.service.ts       # Validation, metadata
-│   │   ├── storage.service.ts              # MinIO operations
+│   │   ├── storage.service.ts              # SeaweedFS operations
 │   │   ├── events.service.ts               # NATS publishing
 │   │   ├── validation-limits.service.ts    # Per-user limits
 │   │   ├── rate-limit.service.ts           # Redis rate limiting
@@ -505,7 +506,7 @@ apps/ingestor/
 │   │       ├── stuck-uploads.service.ts
 │   │       ├── missing-events.service.ts
 │   │       ├── orphaned-intents.service.ts
-│   │       └── orphaned-minio.service.ts
+│   │       └── orphaned-s3.service.ts
 │   └── errors/problem-details.ts           # RFC 7807 errors
 ├── test/                         # Integration tests
 ├── drizzle/                      # Database migrations

@@ -2,7 +2,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { inject, injectable } from 'tsyringe';
 import { withSpan, Attributes, recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import type { Readable } from 'node:stream';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
 import { ResizeService } from './resize.service.js';
 import { VariantSelectorService } from './variant-selector.service.js';
@@ -14,7 +14,7 @@ import { VariantSelectorService } from './variant-selector.service.js';
 export class MediaService {
   constructor(
     @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
-    @inject(MinioConnection) private readonly minio: MinioConnection,
+    @inject(S3Connection) private readonly s3: S3Connection,
     @inject(ResizeService) private readonly resizeService: ResizeService,
     @inject(VariantSelectorService)
     private readonly variantSelector: VariantSelectorService
@@ -52,13 +52,13 @@ export class MediaService {
         try {
           const s3StartTime = Date.now();
 
-          // Get file from MinIO
+          // Get file from S3
           const command = new GetObjectCommand({
             Bucket: wallpaper.storageBucket,
             Key: wallpaper.storageKey,
           });
 
-          const response = await this.minio.getClient().send(command);
+          const response = await this.s3.getClient().send(command);
 
           const s3DurationMs = Date.now() - s3StartTime;
 
@@ -72,7 +72,7 @@ export class MediaService {
           });
 
           if (!response.Body) {
-            throw new Error('MinIO returned no body');
+            throw new Error('S3 returned no body');
           }
 
           return {
@@ -88,8 +88,8 @@ export class MediaService {
               error instanceof Error ? error.constructor.name : 'UnknownError',
           });
 
-          // File not found in MinIO (or other S3 error)
-          console.error(`Failed to retrieve file from MinIO for wallpaper ${id}:`, error);
+          // File not found in S3 (or other S3 error)
+          console.error(`Failed to retrieve file from S3 for wallpaper ${id}:`, error);
           return null;
         }
       }
@@ -146,13 +146,13 @@ export class MediaService {
         try {
           const s3StartTime = Date.now();
 
-          // Get file from MinIO using selected source
+          // Get file from S3 using selected source
           const command = new GetObjectCommand({
             Bucket: selection.storageBucket,
             Key: selection.storageKey,
           });
 
-          const response = await this.minio.getClient().send(command);
+          const response = await this.s3.getClient().send(command);
 
           const s3DurationMs = Date.now() - s3StartTime;
 
@@ -168,7 +168,7 @@ export class MediaService {
           });
 
           if (!response.Body) {
-            throw new Error('MinIO returned no body');
+            throw new Error('S3 returned no body');
           }
 
           const inputStream = response.Body as Readable;
@@ -200,7 +200,7 @@ export class MediaService {
             fileSizeBytes: wallpaper.fileSizeBytes,
           };
         } catch (error) {
-          // FALLBACK LOGIC: Variant file might be missing from MinIO
+          // FALLBACK LOGIC: Variant file might be missing from S3
           if (selection.source === 'variant' && selection.variantId) {
             span.setAttribute(Attributes.VARIANT_FALLBACK, true);
 
@@ -218,7 +218,7 @@ export class MediaService {
             });
 
             console.warn(
-              `Variant ${selection.variantId} file missing from MinIO, falling back to original`
+              `Variant ${selection.variantId} file missing from S3, falling back to original`
             );
 
             // Retry with original
@@ -230,7 +230,7 @@ export class MediaService {
                 Key: wallpaper.storageKey,
               });
 
-              const response = await this.minio.getClient().send(command);
+              const response = await this.s3.getClient().send(command);
 
               const s3DurationMs = Date.now() - s3StartTime;
 
@@ -247,7 +247,7 @@ export class MediaService {
               });
 
               if (!response.Body) {
-                throw new Error('MinIO returned no body');
+                throw new Error('S3 returned no body');
               }
 
               const inputStream = response.Body as Readable;
@@ -283,14 +283,14 @@ export class MediaService {
               });
 
               console.error(
-                `Failed to retrieve original file from MinIO for wallpaper ${id}:`,
+                `Failed to retrieve original file from S3 for wallpaper ${id}:`,
                 fallbackError
               );
               return null;
             }
           }
 
-          // Original file not found in MinIO (or other S3 error)
+          // Original file not found in S3 (or other S3 error)
           recordCounter('media.s3.operations.total', 1, {
             [Attributes.OPERATION_NAME]: 'get_object',
             [Attributes.OPERATION_SUCCESS]: 'false',
@@ -299,7 +299,7 @@ export class MediaService {
               error instanceof Error ? error.constructor.name : 'UnknownError',
           });
 
-          console.error(`Failed to retrieve file from MinIO for wallpaper ${id}:`, error);
+          console.error(`Failed to retrieve file from S3 for wallpaper ${id}:`, error);
           return null;
         }
       }

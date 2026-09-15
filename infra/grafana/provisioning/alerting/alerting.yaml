@@ -164,7 +164,7 @@ groups:
         execErrState: Error
         for: 2m
         annotations:
-          summary: Storage (MinIO) operations are failing
+          summary: Object storage (S3) operations are failing
           description: "Storage operations have failed {{ $values.A }} times in the last 5 minutes"
         labels:
           severity: critical

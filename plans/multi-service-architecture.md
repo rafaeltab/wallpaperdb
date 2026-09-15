@@ -48,7 +48,7 @@ WallpaperDB is transitioning from a single-service (ingestor) to a multi-service
     │                                                       │
 ┌───▼────┐   ┌────▼─────┐                   ┌───▼────┐   ┌───▼──────┐
 │        │   │          │                   │        │   │          │
-│PostGres│   │  MinIO   │                   │  NATS  │   │OpenSearch│
+│PostGres│   │    S3    │                   │  NATS  │   │OpenSearch│
 │        │   │          │                   │        │   │          │
 └────────┘   └──────────┘                   └────────┘   └──────────┘
 ```
@@ -487,7 +487,7 @@ apps/<service-name>/
 
 All services share:
 - PostgreSQL (separate schemas per service)
-- MinIO (shared buckets, namespaced keys)
+- S3 (shared buckets, namespaced keys)
 - NATS (event bus)
 - Redis (caching, rate limiting)
 - OpenSearch (search index)

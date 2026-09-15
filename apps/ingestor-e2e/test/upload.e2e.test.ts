@@ -2,7 +2,7 @@ import { randomInt } from "node:crypto";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -87,7 +87,7 @@ describe("Upload E2E", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
@@ -102,9 +102,9 @@ describe("Upload E2E", () => {
                 builder.withDatabase(`test_e2e_upload_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup() // Enable automatic MinIO cleanup
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup() // Enable automatic S3 cleanup
             .withNats()
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
@@ -160,8 +160,8 @@ describe("Upload E2E", () => {
         const wallpaperId = (body as { id: string }).id;
 
         // Verify: Side effect in S3 - object was created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBeGreaterThan(0);
         expect(s3Objects[0]).toContain(wallpaperId);
@@ -211,8 +211,8 @@ describe("Upload E2E", () => {
         expect(response.statusCode).toBe(400);
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 
@@ -278,8 +278,8 @@ describe("Upload E2E", () => {
         expect(response2.statusCode).toBe(200);
 
         // Verify: Only one S3 object exists
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(1);
         expect(s3Objects[0]).toContain(wallpaperId);
@@ -325,8 +325,8 @@ describe("Upload E2E", () => {
         const wallpaperId = (body as { id: string }).id;
 
         // Verify: S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBeGreaterThan(0);
         expect(s3Objects[0]).toContain(wallpaperId);
@@ -384,8 +384,8 @@ describe("Upload E2E", () => {
         const wallpaperId = (body as { id: string }).id;
 
         // Verify: S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBeGreaterThan(0);
         expect(s3Objects[0]).toContain(wallpaperId);
@@ -436,8 +436,8 @@ describe("Upload E2E", () => {
         expect(response.statusCode).toBe(400);
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 
@@ -474,8 +474,8 @@ describe("Upload E2E", () => {
         expect((body as { type: unknown }).type).toMatch(/unauthorized/);
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 
@@ -506,8 +506,8 @@ describe("Upload E2E", () => {
         expect(response.statusCode).toBe(400);
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 
@@ -537,8 +537,8 @@ describe("Upload E2E", () => {
         expect(response.statusCode).toBe(400);
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 
@@ -579,8 +579,8 @@ describe("Upload E2E", () => {
         // Should fail format validation since video/mp4 is not in allowedFormats
 
         // Verify: No S3 object created
-        const s3Objects = await tester.minio.listObjects(
-            tester.minio.config.buckets[0],
+        const s3Objects = await tester.s3.listObjects(
+            tester.s3.config.buckets[0],
         );
         expect(s3Objects.length).toBe(0);
 

@@ -24,7 +24,7 @@ apps/my-service/
 │   ├── config.ts                 # Zod-validated configuration
 │   ├── connections/              # Connection managers
 │   │   ├── database.ts
-│   │   ├── minio.ts
+│   │   ├── s3.ts
 │   │   ├── nats.ts
 │   │   └── otel.ts
 │   ├── db/
@@ -155,9 +155,9 @@ export function loadConfig(): MyServiceConfig {
     port: parseIntEnv(process.env.PORT, 3003),
     nodeEnv: getEnv("NODE_ENV", "development"),
     databaseUrl: process.env.DATABASE_URL,
-    s3Endpoint: process.env.MINIO_ENDPOINT,
-    s3AccessKeyId: process.env.MINIO_ACCESS_KEY,
-    s3SecretAccessKey: process.env.MINIO_SECRET_KEY,
+    s3Endpoint: process.env.S3_ENDPOINT,
+    s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+    s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     s3Bucket: getEnv("S3_BUCKET", "wallpapers"),
     s3Region: getEnv("S3_REGION", "us-east-1"),
     natsUrl: process.env.NATS_URL,
@@ -207,7 +207,7 @@ export class DatabaseConnection extends BaseConnection {
 }
 ```
 
-Repeat for `minio.ts`, `nats.ts` following the same pattern.
+Repeat for `s3.ts`, `nats.ts` following the same pattern.
 
 ## Step 6: Database Schema
 
@@ -369,7 +369,8 @@ export async function setupTester() {
   return await new PostgresTesterBuilder()
     .withDocker()
     .withPostgres()
-    .withMinio({ buckets: ["wallpapers"] })
+    .withS3()
+    .withS3Bucket("wallpapers")
     .withNats()
     .withMigrations("./drizzle")
     .build();
@@ -484,7 +485,7 @@ make my-service-test
 
 ```typescript
 // Connections
-import { DatabaseConnection, MinioConnection } from "@wallpaperdb/core/connections";
+import { DatabaseConnection, S3Connection } from "@wallpaperdb/core/connections";
 
 // Config
 import { ServerConfigSchema, parseIntEnv } from "@wallpaperdb/core/config";
@@ -560,7 +561,7 @@ class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
 export class MyService {
   constructor(
     private db: DatabaseConnection,
-    private s3: MinioConnection,
+    private s3: S3Connection,
     private nats: NatsConnectionManager
   ) {}
 }
@@ -620,7 +621,7 @@ Register all dependencies in health aggregator:
 
 ```typescript
 aggregator.register("database", () => db.checkHealth());
-aggregator.register("minio", () => s3.checkHealth());
+aggregator.register("s3", () => s3.checkHealth());
 aggregator.register("nats", () => nats.checkHealth());
 ```
 

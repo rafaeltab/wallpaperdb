@@ -1,0 +1,12 @@
+---
+title: Profile picture delivery
+description: Private picture storage, immediate origin retirement, and immutable caching.
+---
+
+User owns Profile picture ingestion and lifecycle state. It stores immutable objects in a private bucket and publishes asset metadata through the transactional Profile outbox. Media projects this metadata and serves `/media/profile-pictures/:pictureId`.
+
+Before each origin response, Media asks User whether the asset is still the current public picture. This internal request uses a shared service token, is never cached, and fails closed. The synchronous check prevents a delayed or replayed event from exposing a replaced or removed picture.
+
+Successful image responses use immutable caching. Removal prevents subsequent origin delivery; it cannot recall copies already downloaded or cached by browsers or a CDN. A User outage makes picture delivery unavailable. Missing assets and other errors are not cached, so a newly accepted image can become available after its projection arrives.
+
+User retains replaced and removed objects privately for 30 days. Public responses and GraphQL expose only the immutable asset ID and Media URL, never object-store credentials or the captured Clerk import URL.

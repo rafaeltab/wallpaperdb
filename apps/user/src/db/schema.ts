@@ -120,3 +120,12 @@ export const profilePictureImports = pgTable(
 );
 export type ProfilePictureImport = typeof profilePictureImports.$inferSelect;
 export type NewProfilePictureImport = typeof profilePictureImports.$inferInsert;
+
+// A successfully uploaded Wallpaper is published. Ownership is immutable in the
+// current event contract; no Profile FK because upload may precede lazy creation.
+export const wallpaperOwnership = pgTable('wallpaper_ownership', {
+  wallpaperId: text('wallpaper_id').primaryKey(),
+  profileId: text('profile_id').notNull(),
+});
+export type WallpaperOwnership = typeof wallpaperOwnership.$inferSelect;
+export type NewWallpaperOwnership = typeof wallpaperOwnership.$inferInsert;

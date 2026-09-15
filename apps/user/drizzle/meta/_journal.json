@@ -57,6 +57,13 @@
       "when": 1789437547100,
       "tag": "0007_complete_dakota_north",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789439517198,
+      "tag": "0008_reflective_harpoon",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import {
   HandleUnavailableError,
   InvalidDisplayNameError,
   InvalidBiographyError,
+  UnavailableBiographyWallpaperError,
   InvalidHandleError,
   InvalidAliasCommandError,
   IneligibleHandleError,
@@ -287,6 +288,9 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
         .updateDetails(user.id, request.body, request.body.expectedVersion);
       return reply.code(200).send(profile);
     } catch (error) {
+      if (error instanceof UnavailableBiographyWallpaperError) return reply.code(400).type('application/problem+json').send({
+        type: 'https://wallpaperdb.example/problems/unavailable-wallpaper', title: 'Wallpaper unavailable', status: 400, detail: error.message, retryable: error.retryable, instance: request.url,
+      });
       if (error instanceof InvalidBiographyError) return reply.code(400).type('application/problem+json').send({
         type: 'https://wallpaperdb.example/problems/invalid-biography', title: 'Invalid Biography', status: 400, detail: error.message, instance: request.url,
       });

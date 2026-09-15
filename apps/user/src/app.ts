@@ -15,6 +15,7 @@ import { ProfileService } from './services/profile.service.js';
 import { ProfilePictureStorage } from './services/profile-picture-storage.js';
 import { ProfilePictureImportService } from './services/profile-picture-import.service.js';
 import { ProfilePictureImportWorker } from './services/profile-picture-import-worker.js';
+import { WallpaperOwnershipConsumer } from './services/consumers/wallpaper-ownership.consumer.js';
 import {
   NatsProfileEventPublisher,
   ProfileOutboxPublisherWorker,
@@ -109,6 +110,7 @@ export async function createApp(
 
     await container.resolve(NatsConnectionManager).initialize();
     fastify.log.info('NATS connection created');
+    await container.resolve(WallpaperOwnershipConsumer).start();
 
     outboxPublisher = new ProfileOutboxPublisherWorker(
       container.resolve(DatabaseConnection),
@@ -136,6 +138,7 @@ export async function createApp(
 
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
+    await container.resolve(WallpaperOwnershipConsumer).stop();
     await aliasExpiryWorker?.stop();
     await pictureImportWorker?.stop();
     container.resolve(ProfilePictureStorage).close();

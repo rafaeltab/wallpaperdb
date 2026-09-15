@@ -4,10 +4,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { FakeTimerService } from '@wallpaperdb/core/timer';
-import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/events';
+import type { ProfileCreatedEvent, ProfileUpdatedEvent, WallpaperUploadedEvent } from '@wallpaperdb/events';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
+import { connect } from 'nats';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { container } from 'tsyringe';
 import { createApp } from '../src/app.js';
@@ -69,6 +70,9 @@ describe('Profile commands', () => {
       new PostgreSqlContainer('postgres:16-alpine').start(),
       createNatsContainer(),
     ]);
+    const streamConnection = await connect({ servers: natsContainer.getConnectionUrl() });
+    await (await streamConnection.jetstreamManager()).streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
+    await streamConnection.close();
     const databaseUrl = postgresContainer.getConnectionUri();
     sql = postgres(databaseUrl, { max: 10 });
     for (const migrationPath of migrationPaths) {
@@ -97,7 +101,7 @@ describe('Profile commands', () => {
   });
 
   beforeEach(async () => {
-    await sql`truncate table outbox_events, handle_claims, profiles cascade`;
+    await sql`truncate table outbox_events, handle_claims, wallpaper_ownership, profiles cascade`;
     identities.identities.clear();
     identities.error = null;
   });
@@ -166,6 +170,31 @@ describe('Profile commands', () => {
       headers: { authorization: `Bearer ${token}` }, payload: { expectedVersion },
     });
   }
+
+  it('allows an owned published Wallpaper embed after the ownership event catches up', async () => {
+    const original = (await request('user_1')).json();
+    const biographyMarkdown = '![Sunset](wallpaper:wlpr_owned)';
+    const save = () => app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { biographyMarkdown, expectedVersion: original.version } });
+    const waiting = await save();
+    expect(waiting.statusCode).toBe(400);
+    expect(waiting.json()).toMatchObject({ type: 'https://wallpaperdb.example/problems/unavailable-wallpaper', retryable: true });
+    expect((await request('user_1')).json()).toEqual(original);
+    const now = new Date().toISOString();
+    const event: WallpaperUploadedEvent = {
+      eventId: 'evt_owned_wallpaper', eventType: 'wallpaper.uploaded', timestamp: now,
+      wallpaper: { id: 'wlpr_owned', userId: original.id, fileType: 'image', mimeType: 'image/png', fileSizeBytes: 100,
+        width: 10, height: 10, aspectRatio: 1, storageKey: 'wlpr_owned.png', storageBucket: 'wallpapers', originalFilename: 'owned.png', uploadedAt: now },
+    };
+    await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
+    const saved = await vi.waitFor(async () => {
+      const response = await save();
+      expect(response.statusCode).toBe(200);
+      return response.json();
+    }, { timeout: 5000, interval: 25 });
+    expect(saved).toMatchObject({ biographyMarkdown, version: original.version + 1 });
+    const [changed] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'biography-changed'`;
+    expect(changed.payload.profile.biographyMarkdown).toBe(biographyMarkdown);
+  });
 
   it('audits a combined Display-name and Biography edit in one atomic Profile version', async () => {
     const original = (await request('user_1')).json();

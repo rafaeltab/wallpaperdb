@@ -9,6 +9,7 @@ import { FakeTimerService } from '@wallpaperdb/core/timer';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
+import { connect } from 'nats';
 import sharp from 'sharp';
 import { Wait } from 'testcontainers';
 import { container } from 'tsyringe';
@@ -36,6 +37,9 @@ describe('Profile picture commands', () => {
       new PostgreSqlContainer('postgres:16-alpine').start(), createNatsContainer(),
       new MinioContainer('minio/minio:latest').withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000)).start(),
     ]);
+    const streamConnection = await connect({ servers: natsContainer.getConnectionUrl() });
+    await (await streamConnection.jetstreamManager()).streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
+    await streamConnection.close();
     sql = postgres(postgresContainer.getConnectionUri(), { max: 10 });
     for (const path of readdirSync(migrations).filter((path) => path.endsWith('.sql')).sort()) {
       await sql.unsafe(readFileSync(join(migrations, path), 'utf8'));

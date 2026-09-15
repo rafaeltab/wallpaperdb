@@ -19,6 +19,7 @@ import {
   profiles,
   profilePictureAssets,
   profilePictureImports,
+  wallpaperOwnership,
 } from '../db/schema.js';
 import {
   type ExternalIdentity,
@@ -91,6 +92,11 @@ export interface OwnerProfile extends Profile {
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
 export class InvalidBiographyError extends Error {}
+export class UnavailableBiographyWallpaperError extends Error {
+  constructor(readonly retryable: boolean) {
+    super(retryable ? 'A referenced wallpaper is not available yet. Check the ID or wait for publication and try again.' : 'Biography images must be published wallpapers owned by this Profile.');
+  }
+}
 export class InvalidHandleError extends Error {}
 export class InvalidAliasCommandError extends Error {}
 export class IneligibleHandleError extends Error {}
@@ -894,9 +900,11 @@ export class ProfileService {
       if ([...displayName].length > this.config.profileDisplayNameMaxLength) throw new InvalidDisplayNameError(`Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`);
     }
     const biographyMarkdown = changes.biographyMarkdown;
+    let wallpaperIds: string[] = [];
     if (biographyMarkdown !== undefined) {
       const validation = validateProfileMarkdown(biographyMarkdown, { maxCharacters: this.config.profileBiographyMaxLength });
       if (!validation.valid) throw new InvalidBiographyError(validation.errors[0]?.message ?? 'Biography Markdown is invalid');
+      wallpaperIds = validation.wallpaperIds;
     }
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
       throw new InvalidDisplayNameError('Expected Profile version must be a positive integer');
@@ -912,6 +920,12 @@ export class ProfileService {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
       if ((displayName === undefined || current.displayName === displayName) && (biographyMarkdown === undefined || current.biographyMarkdown === biographyMarkdown)) return this.ownerProfile(current, tx);
+      if (biographyMarkdown !== current.biographyMarkdown && wallpaperIds.length > 0) {
+        const published = await tx.query.wallpaperOwnership.findMany({ where: inArray(wallpaperOwnership.wallpaperId, wallpaperIds) });
+        if (published.some((wallpaper) => wallpaper.profileId !== userId)) throw new UnavailableBiographyWallpaperError(false);
+        if (published.length !== wallpaperIds.length) throw new UnavailableBiographyWallpaperError(true);
+      }
+
 
       const now = new Date();
       const [updated] = await tx

@@ -93,4 +93,24 @@ describe('production inline profile fields', () => {
     expect(userApi.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ displayName: 'My draft', expectedVersion: 3 }));
   });
 
+  it('confirms aliases at capacity and submits the captured raw handle and version', async () => {
+    const initial = { ...profile, retainedAliasLimit: 1, aliases: [{ handle: 'old', claimGeneration: 1 }] };
+    vi.mocked(userApi.updateHandle).mockResolvedValue({ ...initial, handle: 'ada-byron', version: 2, lastHandleChangedAt: new Date().toISOString() });
+    const { client } = renderField('handle', initial);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: 'Profile handle' });
+    fireEvent.change(input, { target: { value: 'Áda Byron!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile handle' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('@old');
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+    act(() => { client.setQueryData(profileQueryKey(profile.id), { ...initial, version: 8 }); });
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm handle change' }));
+    await flush();
+    expect(userApi.updateHandle).toHaveBeenCalledWith({ handle: 'Áda Byron!', expectedVersion: 1, expectedProfileId: profile.id, tokenProvider });
+    await act(async () => vi.advanceTimersByTimeAsync(1600));
+    expect(screen.getByRole('button', { name: 'Edit profile handle' })).toBeDisabled();
+    expect(screen.getByText('7 days')).toBeInTheDocument();
+  });
+
 });

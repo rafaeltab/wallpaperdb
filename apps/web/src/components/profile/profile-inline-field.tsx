@@ -591,7 +591,15 @@ function InlineField({ field, profile, tokenProvider }: Props) {
           if (!open) setConfirmation(null);
         }}
       >
-        <AlertDialogContent ref={confirmationDialog}>
+        <AlertDialogContent
+          ref={confirmationDialog}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            // Accepted changes retain their existing save-feedback focus lifecycle.
+            if (!pending.current && input.current?.isConnected && !input.current.disabled)
+              input.current.focus();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Change profile handle and schedule alias removal?</AlertDialogTitle>
             <AlertDialogDescription>

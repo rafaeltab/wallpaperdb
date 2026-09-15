@@ -273,4 +273,20 @@ describe('production inline profile fields', () => {
     else expect(input).toHaveFocus();
   });
 
+  it('returns to the unchanged handle draft when an alias-capacity confirmation is canceled', async () => {
+    renderField('handle', { ...profile, retainedAliasLimit: 0 });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: 'Profile handle' });
+    fireEvent.change(input, { target: { value: 'new-ada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile handle' }));
+    await flush();
+    const cancel = screen.getByRole('button', { name: 'Cancel' });
+    expect(cancel).toHaveFocus();
+    fireEvent.click(cancel);
+    await flush();
+    expect(input).toHaveValue('new-ada');
+    expect(input).toHaveFocus();
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+  });
+
 });

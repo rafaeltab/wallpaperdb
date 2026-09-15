@@ -1,7 +1,8 @@
 import type { Definition, Nodes, Root } from "mdast";
+import { defaultSchema, type Options as SanitizeSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
-import { unified } from "unified";
+import { type Plugin, unified } from "unified";
 
 export interface ProfileMarkdownIssue {
   code: "unsupported-syntax" | "too-long" | "invalid-link" | "invalid-image";
@@ -117,3 +118,46 @@ export function normalizeProfileLink(target: string): ProfileLinkDestination | n
     return null;
   }
 }
+
+
+export class ProfileMarkdownError extends Error {
+  constructor(readonly issues: ProfileMarkdownIssue[]) {
+    super(issues.map((issue) => issue.message).join(" "));
+    this.name = "ProfileMarkdownError";
+  }
+}
+
+/** Defense in depth after the shared remark policy; no arbitrary image source is admitted. */
+export const profileMarkdownSanitizeSchema: SanitizeSchema = {
+  ...defaultSchema,
+  tagNames: defaultSchema.tagNames?.filter((name) => name !== "img"),
+  attributes: {
+    ...defaultSchema.attributes,
+    span: [...(defaultSchema.attributes?.span ?? []), ["dataWallpaperId", wallpaperIdPattern]],
+  },
+  protocols: { ...defaultSchema.protocols, href: ["https"] },
+};
+
+/** Apply after remark-gfm. Public rendering validates syntax without an authoring length limit. */
+export const remarkProfileMarkdown: Plugin<[], Root> = () => (tree) => {
+  const result = validateTree(tree);
+  if (!result.valid) throw new ProfileMarkdownError(result.errors);
+  const nodes = flatten(tree);
+  const definitions = definitionsIn(nodes);
+  for (const node of nodes) {
+    if (node.type === "link" || node.type === "definition") {
+      const destination = normalizeProfileLink(node.url);
+      if (destination) node.url = destination.href;
+    }
+    if (node.type === "image" || node.type === "imageReference") {
+      const target = node.type === "image" ? node.url : definitions.get(node.identifier.toUpperCase())?.url;
+      const id = target ? wallpaperTarget(target) : null;
+      if (!id) continue; // validateTree has already rejected invalid image targets.
+      node.data = {
+        hName: "span",
+        hProperties: { dataWallpaperId: id },
+        hChildren: [{type: "text", value: node.alt ?? ""}],
+      };
+    }
+  }
+};

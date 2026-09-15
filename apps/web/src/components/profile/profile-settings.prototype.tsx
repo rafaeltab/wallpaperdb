@@ -314,7 +314,8 @@ export default function ProfileSettingsPrototype({
       {handleLocked && value.nextHandleChangeAt && (
         <p
           id="prototype-handle-cooldown"
-          className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"
+          tabIndex={-1}
+          className="flex items-start gap-2 text-xs leading-5 text-muted-foreground focus:outline-none"
         >
           <Clock3 className="mt-0.5 size-3.5 shrink-0" />
           <span>
@@ -612,9 +613,12 @@ function InlineProfileText({
   const wasEditing = useRef(false);
   useEffect(() => {
     if (editing) input.current?.focus();
-    else if (wasEditing.current) button.current?.focus();
+    else if (wasEditing.current) {
+      if (disabled && disabledHintId) document.getElementById(disabledHintId)?.focus();
+      else button.current?.focus();
+    }
     wasEditing.current = editing;
-  }, [editing]);
+  }, [editing, disabled, disabledHintId]);
   const valid =
     draft !== null &&
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));

@@ -10,6 +10,7 @@ import { z } from 'zod';
 // Gateway-specific OpenSearch config (extends shared schema with index field)
 const GatewayOpenSearchConfigSchema = OpenSearchConfigSchema.extend({
   opensearchIndex: z.string().min(1),
+  opensearchProfileIndex: z.string().min(1).optional(),
 });
 
 // Compose full config from shared schemas + gateway-specific fields
@@ -77,6 +78,7 @@ export function loadConfig(
     // OpenSearch
     opensearchUrl: environment.OPENSEARCH_URL,
     opensearchIndex: getEnv('OPENSEARCH_INDEX', 'wallpapers'),
+    opensearchProfileIndex: environment.OPENSEARCH_PROFILE_INDEX,
     opensearchPassword: getEnv('OPENSEARCH_PASSWORD'),
     opensearchUsername: getEnv('OPENSEARCH_USERNAME'),
 

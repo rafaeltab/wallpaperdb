@@ -21,6 +21,16 @@ export const ProfileUpdatedEventSchema = z
           type: z.literal("handle-changed"),
           before: z.string().min(1),
           after: z.string().min(1),
+          scheduledAliases: z
+            .array(
+              z
+                .object({
+                  handle: z.string().min(1),
+                  expiresAt: z.string().datetime(),
+                })
+                .strict()
+            )
+            .optional(),
         })
         .strict(),
       z

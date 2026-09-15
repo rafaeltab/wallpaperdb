@@ -151,6 +151,43 @@ describe("Event Schemas", () => {
       ).toBe(false);
     });
 
+    it("preserves Handle-change scheduling metadata and accepts retained changes", () => {
+      const expiresAt = "2026-10-01T00:00:00.000Z";
+      const retained = {
+        ...event,
+        change: { type: "handle-changed", before: "ada", after: "ada-lovelace" },
+        profile: {
+          ...event.profile,
+          aliases: [{ handle: "ada", claimGeneration: 1 }],
+        },
+      };
+      const scheduled = {
+        ...retained,
+        change: {
+          ...retained.change,
+          scheduledAliases: [{ handle: "ada", expiresAt }],
+        },
+        profile: {
+          ...retained.profile,
+          aliases: [
+            { handle: "ada", claimGeneration: 1, createdAt: timestamp, expiresAt },
+          ],
+        },
+      };
+
+      expect(ProfileUpdatedEventSchema.parse(scheduled)).toEqual(scheduled);
+      expect(ProfileUpdatedEventSchema.parse(retained)).toEqual(retained);
+      expect(
+        ProfileUpdatedEventSchema.safeParse({
+          ...scheduled,
+          change: {
+            ...scheduled.change,
+            scheduledAliases: [{ handle: "ada", expiresAt: "tomorrow" }],
+          },
+        }).success
+      ).toBe(false);
+    });
+
     it("rejects private or incomplete changes", () => {
       expect(
         ProfileUpdatedEventSchema.safeParse({

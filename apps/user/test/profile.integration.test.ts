@@ -167,6 +167,24 @@ describe('Profile commands', () => {
     });
   }
 
+  it('enforces the configured Biography limit in Unicode code points without truncating authored text', async () => {
+    const previousLimit = config.profileBiographyMaxLength;
+    config.profileBiographyMaxLength = 4;
+    try {
+      const original = (await request('user_1')).json();
+      expect(original.biographyMaxLength).toBe(4);
+      const headers = { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` };
+      const accepted = await app.inject({ method: 'PATCH', url: '/profile/me', headers, payload: { biographyMarkdown: '👋abc', expectedVersion: original.version } });
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json().biographyMarkdown).toBe('👋abc');
+      const rejected = await app.inject({ method: 'PATCH', url: '/profile/me', headers, payload: { biographyMarkdown: '👋abcd', expectedVersion: accepted.json().version } });
+      expect(rejected.statusCode).toBe(400);
+      expect(rejected.json().type).toContain('invalid-biography');
+      expect((await request('user_1')).json()).toEqual(accepted.json());
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'biography-changed'`)).toHaveLength(1);
+    } finally { config.profileBiographyMaxLength = previousLimit; }
+  });
+
   it('stores authored Biography Markdown and returns a complete authoritative versioned snapshot', async () => {
     const original = (await request('user_1')).json();
     const authored = '  # Hello 👋\n\nA **Biography** with `<literal>` code.\n';

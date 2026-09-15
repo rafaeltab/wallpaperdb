@@ -895,7 +895,7 @@ export class ProfileService {
     }
     const biographyMarkdown = changes.biographyMarkdown;
     if (biographyMarkdown !== undefined) {
-      const validation = validateProfileMarkdown(biographyMarkdown);
+      const validation = validateProfileMarkdown(biographyMarkdown, { maxCharacters: this.config.profileBiographyMaxLength });
       if (!validation.valid) throw new InvalidBiographyError(validation.errors[0]?.message ?? 'Biography Markdown is invalid');
     }
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {

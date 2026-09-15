@@ -279,6 +279,19 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.reactivateAlias).not.toHaveBeenCalled();
   });
 
+  it('disables stale history entries whose reactivation deadline has passed', () => {
+    renderPage({
+      ...profile,
+      aliases: [{ handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
+      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({ handle, eligibleUntil: '2000-01-01T12:00:00.000Z', unavailableReason: null })),
+    });
+
+    expect(screen.getByRole('button', { name: 'Keep alias @expiring-name' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reactivate @released-name' })).toBeDisabled();
+    expect(screen.getAllByText('This Handle is no longer in your 30-day history. Refresh aliases.')).toHaveLength(2);
+    expect(userApi.reactivateAlias).not.toHaveBeenCalled();
+  });
+
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {
     const alias = {
       handle: 'old-handle',

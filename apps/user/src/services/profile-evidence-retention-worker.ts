@@ -48,6 +48,7 @@ export class ProfileEvidenceRetentionWorker {
   }
 
   private async runCleanup(cleanup: CleanupBatch, category: string, now: Date): Promise<{ deleted: number; failed: number }> {
+    if (this.stopping) return { deleted: 0, failed: 0 };
     try {
       return await cleanup(now, () => this.stopping);
     } catch {

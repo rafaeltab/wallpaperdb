@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from '@wallpaperdb/events';
 import {
   createDefaultTesterBuilder,
@@ -169,5 +170,32 @@ describe('Profile picture delivery', () => {
     expect((await getPicture('pic_late_metadata')).statusCode).toBe(200);
     expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
       .toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
+  });
+
+  it('rejects new GET and HEAD requests immediately after retirement despite stale projection and retains private bytes', async () => {
+    const { event, bytes } = await pictureEvent('user_picture_retired', 'pic_retired');
+    availability.set('pic_retired', 204);
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
+    await vi.waitFor(async () => expect((await getPicture('pic_retired')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+
+    // The User command has committed, but no retirement event has reached Media.
+    availability.set('pic_retired', 404);
+    const requestsBefore = authorityRequests.length;
+    for (const method of ['GET', 'HEAD'] as const) {
+      const response = await tester.getApp().inject({ method, url: '/profile-pictures/pic_retired', headers: { 'if-none-match': '*' } });
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers.location).toBeUndefined();
+      expect(response.body).not.toContain('user_picture_retired/pic_retired.webp');
+      expect(response.rawPayload).not.toEqual(bytes);
+    }
+    expect(authorityRequests).toHaveLength(requestsBefore + 2);
+    const stored = await tester.minio.getS3Client().send(new GetObjectCommand({
+      Bucket: 'profile-pictures', Key: 'user_picture_retired/pic_retired.webp',
+    }));
+    expect(Buffer.from(await stored.Body?.transformToByteArray() ?? [])).toEqual(bytes);
+    const anonymous = await fetch(`${tester.minio.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`);
+    expect(anonymous.status).toBe(403);
+    await anonymous.body?.cancel();
   });
 });

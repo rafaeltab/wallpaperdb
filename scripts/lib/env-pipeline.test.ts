@@ -10,6 +10,13 @@ import {
 } from './env-pipeline.mjs';
 
 describe('Profile picture service credentials', () => {
+  it('adds the service token without changing an existing secret lacking a final newline', () => {
+    const previous = 'CLERK_SECRET_KEY=test-existing-clerk-secret';
+    const updated = parseEnvValues(syncKnownSecretsToContent(previous, knownUserSecrets));
+    expect(updated.CLERK_SECRET_KEY).toBe('test-existing-clerk-secret');
+    expect(updated.USER_MEDIA_SERVICE_TOKEN).toMatch(/^[a-f0-9]{64}$/);
+  });
+
   it('generates one persistent token shared by User and Media only', () => {
     const content = syncKnownSecretsToContent('', knownUserSecrets);
     const secrets = parseEnvValues(content);

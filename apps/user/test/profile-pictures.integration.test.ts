@@ -80,6 +80,40 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('lets one worker reclaim an expired import lease without accepting the stale attempt', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    initialImageUrl = 'https://img.clerk.com/slow-initial-picture';
+    const pending = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    let release!: (response: Response) => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((resolve) => { started = resolve; });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => { started(); return new Promise<Response>((resolve) => { release = resolve; }); }).mockImplementation(async () => new Response(new Uint8Array(image)));
+    const importer = container.resolve(ProfilePictureImportService);
+    const first = importer.importPending();
+    try {
+      await waiting;
+      await importer.importPending();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const [lease] = await sql`select lease_until from profile_picture_imports where profile_id = ${pending.id}`;
+      vi.setSystemTime(lease.lease_until);
+      await importer.importPending();
+      const winner = (await ensure()).json();
+      expect(winner).toMatchObject({ version: pending.version + 1, pictureImportStatus: 'complete', pictureAssetId: expect.stringMatching(/^pic_/) });
+      release(new Response(new Uint8Array(image)));
+      await first;
+      expect((await ensure()).json()).toEqual(winner);
+      expect((await sql`select id from outbox_events where payload->'change'->>'source' = 'clerk-import'`)).toHaveLength(1);
+      expect((await sql`select status, attempts, source_url from profile_picture_imports where profile_id = ${pending.id}`)[0]).toEqual({ status: 'complete', attempts: 2, source_url: null });
+      expect((await sql`select id from profile_picture_assets where state = 'active'`)).toEqual([{ id: winner.pictureAssetId }]);
+    } finally {
+      release?.(new Response(new Uint8Array(image)));
+      await first;
+      fetcher.mockRestore(); vi.useRealTimers();
+    }
+  });
+
   it.each(['upload', 'remove'])('prevents a late initial import from overwriting manual %s', async (command) => {
     initialImageUrl = 'https://img.clerk.com/slow-initial-picture';
     const pending = (await ensure()).json();

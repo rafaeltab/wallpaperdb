@@ -432,6 +432,37 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
 
+  it('resets identity drafts when another signed-in User opens their cached Profile', async () => {
+    const otherProfile = {
+      ...profile,
+      id: 'user_456',
+      displayName: 'Another User',
+      handle: 'another-user',
+    };
+    const { queryClient, rerender } = renderPage();
+    const user = userEvent.setup();
+    await user.clear(screen.getByRole('textbox', { name: 'Display name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Display name' }), 'First User draft');
+    await user.clear(screen.getByRole('textbox', { name: 'Handle' }));
+    await user.type(screen.getByRole('textbox', { name: 'Handle' }), 'first-user-draft');
+    const auth = vi.mocked(useAuth)();
+    if (!auth.isLoaded || !auth.isSignedIn) throw new Error('Expected a signed-in test User');
+    vi.mocked(useAuth).mockReturnValue({ ...auth, userId: otherProfile.id });
+    queryClient.setQueryData(profileQueryKey(otherProfile.id), otherProfile);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ProfileSettingsPage />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
+      otherProfile.displayName
+    );
+    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(otherProfile.handle);
+    expect(userApi.updateProfile).not.toHaveBeenCalled();
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+  });
+
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
       new UserApiError('Profile has changed since it was last loaded', 409)

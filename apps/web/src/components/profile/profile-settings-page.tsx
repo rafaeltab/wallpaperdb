@@ -85,7 +85,13 @@ export function ProfileSettingsPage() {
     );
   }
 
-  return <DisplayNameSettings profile={profileQuery.data} tokenProvider={getToken} />;
+  return (
+    <DisplayNameSettings
+      key={profileQuery.data.id}
+      profile={profileQuery.data}
+      tokenProvider={getToken}
+    />
+  );
 }
 
 function DisplayNameSettings({

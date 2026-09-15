@@ -127,12 +127,12 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
   }
   const maxCharacters = profile.biographyMaxLength ?? 5000;
-  const validationError = edit && field === 'biographyMarkdown' ? validateProfileMarkdown(edit.value, { maxCharacters }).errors[0]?.message : undefined;
+  const validationError = edit && field === 'biographyMarkdown' ? validateProfileMarkdown(edit.value, { maxCharacters }).errors?.[0]?.message : undefined;
   const locked = phase === 'saving' || phase === 'success';
   const actionLabel = phase === 'saving' ? `Saving ${label}` : phase === 'success' ? `${title} saved` : phase === 'error' ? `${title} save failed` : `Save ${label}`;
   const typography = field === 'displayName' ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl' : 'text-base font-normal text-muted-foreground sm:text-lg';
   const iconSize = field === 'displayName' ? 'size-[1ex]' : 'size-3.5';
-  const actions = <><ProfileActionButton label={actionLabel} type="submit" textBaseline={field !== 'biographyMarkdown'} buttonClassName="size-6" disabled={Boolean(validationError) || phase !== 'idle' || coolingDown || refreshing || writing || edit.value === edit.baseValue}>
+  const actions = <><ProfileActionButton label={actionLabel} type="submit" textBaseline={field !== 'biographyMarkdown'} buttonClassName="size-6" disabled={Boolean(validationError) || phase !== 'idle' || coolingDown || refreshing || writing || !edit || edit.value === edit.baseValue}>
           {phase === 'saving' ? <Loader2 className={`${iconSize} animate-spin motion-reduce:animate-none`} /> : phase === 'error' ? <X className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} /> : <Check className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} />}
         </ProfileActionButton>
         <ProfileActionButton label="Cancel" textBaseline={field !== 'biographyMarkdown'} buttonClassName="size-6" disabled={locked} onClick={finish}><X className={iconSize} /></ProfileActionButton></>;

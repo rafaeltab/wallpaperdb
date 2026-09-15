@@ -1,5 +1,12 @@
 import { getAuthToken } from '@/lib/auth/token-provider';
 
+export interface ProfileAlias {
+  handle: string;
+  claimGeneration: number;
+  createdAt?: string;
+  expiresAt?: string | null;
+}
+
 export interface Profile {
   id: string;
   handle: string;
@@ -10,7 +17,8 @@ export interface Profile {
   createdAt: string;
   updatedAt: string;
   lastHandleChangedAt?: string | null;
-  aliases?: Array<{ handle: string; claimGeneration: number }>;
+  aliases?: ProfileAlias[];
+  retainedAliasLimit?: number;
 }
 
 export class UserApiError extends Error {
@@ -56,10 +64,45 @@ interface UpdateHandleOptions {
   tokenProvider?: () => Promise<string | null>;
 }
 
+interface ScheduleAliasRemovalOptions {
+  handle: string;
+  expectedVersion: number;
+  expectedProfileId?: string;
+  tokenProvider?: () => Promise<string | null>;
+}
+
 export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOptions) {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   return {
+    async scheduleAliasRemoval(options: ScheduleAliasRemovalOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+
+      const response = await fetch(
+        `${normalizedBaseUrl}/profile/me/aliases/${encodeURIComponent(options.handle)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ expectedVersion: options.expectedVersion }),
+        }
+      );
+      if (!response.ok) throw await userApiError(response);
+
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) {
+        throw new UserApiError('User API returned a malformed Profile', 502);
+      }
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
     async ensureProfile(options: EnsureProfileOptions = {}): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);

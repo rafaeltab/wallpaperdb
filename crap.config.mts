@@ -1,3 +1,16 @@
+import type { AnalyzeProjectOptions } from '@barney-media/crap-typescript-core';
+
+interface CrapConfig {
+  workspaceRoots: string[];
+  excludedWorkspaces: string[];
+  sourceDirectory: string;
+  coverageTasks: Record<string, string>;
+  sourceExclusions: Pick<
+    AnalyzeProjectOptions,
+    'useDefaultExclusions' | 'excludePathRegexes' | 'excludeGeneratedMarkers'
+  >;
+}
+
 // Repository policy. Keep generated-code and source exclusions here, independent
 // of the analyzer's defaults. No permanent threshold is chosen during calibration.
 export default {
@@ -27,4 +40,4 @@ export default {
       'DO NOT EDIT',
     ],
   },
-};
+} satisfies CrapConfig;

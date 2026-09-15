@@ -43,6 +43,18 @@ has empty stdout and a concise summary on stderr. Both commands fail if a test,
 build, expected coverage report, coverage combination, source parsing, or analysis
 fails. They never fall back to an old report after a failed task.
 
+## Type checking the tooling
+
+```bash
+make crap-check-types
+```
+
+This runs strict TypeScript checking for `scripts/crap.mts` and `crap.config.mts`
+using `scripts/tsconfig.crap.json`. It also runs as part of `make check`,
+`make check-types`, `make check-types-force`, `make ci`, and `make ci-force`.
+The reporting and threshold commands execute the TypeScript script with the
+repository's existing `tsx` dependency.
+
 ## How scores are calculated
 
 ```text
@@ -58,7 +70,7 @@ their workspace has no unit or integration coverage task.
 For example, complexity 4 with 100% statement coverage and 50% branch coverage
 uses 50% effective coverage and scores 6. With no coverage it scores 20.
 
-`scripts/crap.mjs` owns orchestration, merging, missing-coverage policy, sorting,
+`scripts/crap.mts` owns orchestration, merging, missing-coverage policy, sorting,
 and exit behavior. The exact-pinned `@barney-media/crap-typescript-core` 0.5.2
 provides TypeScript/TSX parsing, cyclomatic complexity, Istanbul attribution, and
 the formula. Its Vitest adapter is not used. Re-evaluate the pin when migrating
@@ -88,7 +100,7 @@ whole-file function/branch spans are not function measurements and can contain
 invalid remapped columns. These records contribute missing coverage (0%); a real
 measurement from the other tier takes precedence.
 
-`crap.config.mjs` centralizes the scope and generated-code exclusions:
+`crap.config.mts` centralizes the scope and generated-code exclusions:
 
 - Maintained `apps/*/src` and `packages/*/src` TypeScript and TSX functions are
   included, including reusable `test-utils`, `testcontainers`, `test-logger`, and

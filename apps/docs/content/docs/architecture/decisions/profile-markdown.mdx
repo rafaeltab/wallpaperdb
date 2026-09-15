@@ -1,0 +1,12 @@
+---
+title: Shared Biography Markdown policy
+description: One parsing policy for authored Biographies, ownership-checked wallpaper embeds, and safe React rendering.
+---
+
+User and Web share `@wallpaperdb/profile-markdown` for Biography parsing, supported syntax, URL validation, and wallpaper image recognition. User stores authored Markdown and publishes it in Profile snapshots. It never persists generated HTML.
+
+The shared policy rejects raw HTML, unsafe or credential-bearing destinations, and ordinary image URLs. External destinations require HTTPS, display their normalized hostname, and pass through a warning dialog before navigation. Web renders with `react-markdown`, `remark-gfm`, the shared remark plugin, and `rehype-sanitize`.
+
+Images use `![Alt text](wallpaper:<wallpaper-id>)`. User validates these references against its local ownership projection, populated from the same `wallpaper.uploaded` events that publish wallpapers to the catalog. Only an author's own published wallpapers are accepted. Projection lag can briefly reject a newly uploaded wallpaper; the author can retry once its event arrives.
+
+Web renders accepted references through a dedicated Wallpaper component and handles unavailable wallpaper reads. Future deletion or unpublication events must update the ownership projection and public embed availability together.

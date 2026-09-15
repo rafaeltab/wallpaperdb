@@ -118,6 +118,14 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("records authored Biography changes including clearing without generating HTML", () => {
+      for (const after of ["  # Hello 👋\n\n`<literal>`\n", ""]) {
+        const changed = { ...event, change: { type: "biography-changed", before: "Previous **Biography**", after }, profile: { ...event.profile, biographyMarkdown: after } };
+        expect(ProfileUpdatedEventSchema.parse(changed)).toEqual(changed);
+        expect(ProfileUpdatedEventSchema.safeParse({ ...changed, change: { ...changed.change, before: 123 } }).success).toBe(false);
+      }
+    });
+
     it("records uploaded, imported, and removed Profile pictures with delivery metadata", () => {
       const asset = {
         id: "pic_new", storageBucket: "profile-pictures", storageKey: "user_123/pic_new.webp",

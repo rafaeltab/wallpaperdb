@@ -9,6 +9,7 @@ export const ProfileUpdatedEventSchema = z
     eventType: z.literal(PROFILE_UPDATED_SUBJECT),
     timestamp: z.string().datetime(),
     change: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("biography-changed"), before: z.string(), after: z.string() }).strict(),
       z
         .object({
           type: z.literal("picture-changed"),

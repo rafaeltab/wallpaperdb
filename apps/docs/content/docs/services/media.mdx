@@ -206,7 +206,7 @@ Health check with dependency status.
   "status": "healthy",
   "checks": {
     "database": { "status": "healthy" },
-    "minio": { "status": "healthy" },
+    "s3": { "status": "healthy" },
     "nats": { "status": "healthy" }
   }
 }
@@ -241,8 +241,8 @@ DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
 
 # SeaweedFS/S3
 S3_ENDPOINT=http://localhost:8002
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -279,7 +279,8 @@ describe("Media Service", () => {
   it("should retrieve and resize wallpaper", async () => {
     const tester = await new PostgresTesterBuilder()
       .withPostgres()
-      .withMinio({ buckets: ['wallpapers'] })
+      .withS3()
+      .withS3Bucket("wallpapers")
       .withMigrations("./drizzle")
       .build();
 
@@ -291,7 +292,7 @@ describe("Media Service", () => {
     );
 
     // Upload test image to SeaweedFS
-    await tester.minio.send(new PutObjectCommand({
+    await tester.s3.getS3Client().send(new PutObjectCommand({
       Bucket: 'wallpapers',
       Key: 'wlpr_123/original.jpg',
       Body: jpegBuffer
@@ -351,7 +352,7 @@ const resizeStream = sharp()
   .jpeg({ quality: 85 });
 
 // SeaweedFS download stream → Sharp transform → HTTP response
-minioStream.pipe(resizeStream).pipe(reply.raw);
+s3Stream.pipe(resizeStream).pipe(reply.raw);
 ```
 
 ### Caching Strategy
@@ -387,7 +388,7 @@ apps/media/
 │   ├── config.ts                 # Zod-validated config
 │   ├── connections/              # Connection managers
 │   │   ├── database.ts
-│   │   ├── minio.ts
+│   │   ├── s3.ts
 │   │   ├── nats.ts
 │   │   └── otel.ts
 │   ├── db/schema.ts              # Drizzle schema

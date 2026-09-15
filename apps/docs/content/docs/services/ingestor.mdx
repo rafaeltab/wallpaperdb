@@ -305,7 +305,7 @@ Health check with dependency status.
   "status": "healthy",
   "checks": {
     "database": { "status": "healthy" },
-    "minio": { "status": "healthy" },
+    "s3": { "status": "healthy" },
     "nats": { "status": "healthy" },
     "redis": { "status": "healthy" }
   }
@@ -354,8 +354,8 @@ DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
 
 # SeaweedFS/S3
 S3_ENDPOINT=http://localhost:8002
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -400,7 +400,8 @@ describe("Upload Flow", () => {
   it("should upload JPEG successfully", async () => {
     const tester = await new PostgresTesterBuilder()
       .withPostgres()
-      .withMinio({ buckets: ['wallpapers'] })
+      .withS3()
+      .withS3Bucket("wallpapers")
       .withNats()
       .withRedis()
       .withMigrations("./drizzle")
@@ -440,7 +441,7 @@ Distributed tracing with OpenTelemetry:
 - `upload.process` - Full upload workflow
 - `upload.validate` - File validation
 - `upload.hash` - SHA256 calculation
-- `upload.minio` - SeaweedFS upload
+- `upload.s3` - SeaweedFS upload
 - `upload.nats` - NATS publish
 - `reconciliation.*` - Reconciliation jobs
 
@@ -484,7 +485,7 @@ apps/ingestor/
 │   ├── config.ts                 # Zod-validated config
 │   ├── connections/              # Singleton connection managers
 │   │   ├── database.ts          # PostgreSQL pool
-│   │   ├── minio.ts             # S3 client
+│   │   ├── s3.ts             # S3 client
 │   │   ├── nats.ts              # NATS client
 │   │   ├── redis.ts             # Redis client
 │   │   └── otel.ts              # OpenTelemetry SDK
@@ -505,7 +506,7 @@ apps/ingestor/
 │   │       ├── stuck-uploads.service.ts
 │   │       ├── missing-events.service.ts
 │   │       ├── orphaned-intents.service.ts
-│   │       └── orphaned-minio.service.ts
+│   │       └── orphaned-s3.service.ts
 │   └── errors/problem-details.ts           # RFC 7807 errors
 ├── test/                         # Integration tests
 ├── drizzle/                      # Database migrations

@@ -3,7 +3,7 @@ import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -36,7 +36,7 @@ describe("Scheduler Service Tests", () => {
             .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
             .build();
@@ -49,9 +49,9 @@ describe("Scheduler Service Tests", () => {
             )
             .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
@@ -76,8 +76,8 @@ describe("Scheduler Service Tests", () => {
         // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
 
-        // Clean up MinIO bucket before each test
-        await tester.minio.cleanupBuckets();
+        // Clean up S3 bucket before each test
+        await tester.s3.cleanupBuckets();
 
         // Clean up NATS stream before each test
         try {
@@ -111,7 +111,7 @@ describe("Scheduler Service Tests", () => {
         minutesAgo: number,
         options: {
             userId?: string;
-            hasMinioFile?: boolean;
+            hasS3File?: boolean;
             uploadAttempts?: number;
         } = {},
     ) {
@@ -141,17 +141,17 @@ describe("Scheduler Service Tests", () => {
                         width: 1920,
                         height: 1080,
                         storageKey: `${id}/original.jpg`,
-                        storageBucket: tester.minio.config.buckets[0],
+                        storageBucket: tester.s3.config.buckets[0],
                         originalFilename: "test.jpg",
                     }
                     : {}),
             });
 
-        // Optionally create MinIO file
-        if (options.hasMinioFile) {
-            await tester.minio.getS3Client().send(
+        // Optionally create S3 file
+        if (options.hasS3File) {
+            await tester.s3.getS3Client().send(
                 new PutObjectCommand({
-                    Bucket: tester.minio.config.buckets[0],
+                    Bucket: tester.s3.config.buckets[0],
                     Key: `${id}/original.jpg`,
                     Body: Buffer.from("test image data"),
                     ContentType: "image/jpeg",
@@ -163,14 +163,14 @@ describe("Scheduler Service Tests", () => {
     }
 
     /**
-     * Test Helper: Create an orphaned MinIO object (no DB record)
+     * Test Helper: Create an orphaned S3 object (no DB record)
      */
-    async function createOrphanedMinioObject(id?: string) {
+    async function createOrphanedS3Object(id?: string) {
         const wallpaperId = id || `wlpr_${ulid()}`;
 
-        await tester.minio.getS3Client().send(
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: `${wallpaperId}/original.jpg`,
                 Body: Buffer.from("orphaned file data"),
                 ContentType: "image/jpeg",
@@ -244,7 +244,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create stuck upload to verify reconciliation runs
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Start scheduler
@@ -262,7 +262,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create another stuck upload
             const id2 = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Advance more time — scheduler is stopped, nothing should fire
@@ -281,7 +281,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create stuck upload in 'uploading' state
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Verify initial state
@@ -345,7 +345,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create test data for all three scenarios
             const uploadingId = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
             const storedId = await createStuckUpload("stored", 10);
             const initiatedId = await createStuckUpload("initiated", 90);
@@ -371,7 +371,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create first batch of stuck uploads
             const id1 = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Advance first interval
@@ -382,7 +382,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create second batch
             const id2 = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Advance second interval
@@ -409,46 +409,46 @@ describe("Scheduler Service Tests", () => {
         });
     });
 
-    describe("MinIO Cleanup Cycles", () => {
-        it("should run MinIO cleanup on separate schedule", async () => {
+    describe("S3 Cleanup Cycles", () => {
+        it("should run S3 cleanup on separate schedule", async () => {
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
-            // Create orphaned MinIO object
-            const orphanedId = await createOrphanedMinioObject();
+            // Create orphaned S3 object
+            const orphanedId = await createOrphanedS3Object();
 
             // Verify object exists
             const headCommand = new HeadObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: `${orphanedId}/original.jpg`,
             });
             await expect(
-                tester.minio.getS3Client().send(headCommand),
+                tester.s3.getS3Client().send(headCommand),
             ).resolves.toBeDefined();
 
-            // Start scheduler, but trigger MinIO cleanup directly
+            // Start scheduler, but trigger S3 cleanup directly
             // (its interval is 24 h — no need to tick that far)
             schedulerService.start();
-            await schedulerService.runMinioCleanupNow();
+            await schedulerService.runS3CleanupNow();
 
             // Verify orphaned object was deleted
             await expect(
-                tester.minio.getS3Client().send(headCommand),
+                tester.s3.getS3Client().send(headCommand),
             ).rejects.toThrow();
         });
 
-        it("should not run MinIO cleanup on regular reconciliation cycles", async () => {
+        it("should not run S3 cleanup on regular reconciliation cycles", async () => {
             const fakeTimer = tester.getFakeTimer();
             const schedulerService = tester.getApp().container.resolve(SchedulerService);
 
             // Create regular stuck upload (should be reconciled quickly)
             const regularId = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
-            // Create orphaned MinIO object (should NOT be cleaned up in regular cycle)
-            const orphanedId = await createOrphanedMinioObject();
+            // Create orphaned S3 object (should NOT be cleaned up in regular cycle)
+            const orphanedId = await createOrphanedS3Object();
 
-            // Start scheduler and advance one reconciliation interval (not MinIO cleanup)
+            // Start scheduler and advance one reconciliation interval (not S3 cleanup)
             schedulerService.start();
             await fakeTimer.tickAsync(5 * 60 * 1000);
 
@@ -457,11 +457,11 @@ describe("Scheduler Service Tests", () => {
 
             // Verify orphaned object still exists (not cleaned up yet)
             const headCommand = new HeadObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: `${orphanedId}/original.jpg`,
             });
             await expect(
-                tester.minio.getS3Client().send(headCommand),
+                tester.s3.getS3Client().send(headCommand),
             ).resolves.toBeDefined();
         });
     });
@@ -472,7 +472,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create stuck uploads
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Trigger immediate reconciliation (without starting scheduler)
@@ -507,7 +507,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create test data
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Manual trigger should work independently
@@ -548,7 +548,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create valid data
             const validId = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Advance another interval — scheduler must still be running
@@ -600,7 +600,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create data that will cause reconciliation errors
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: false,
+                hasS3File: false,
                 uploadAttempts: 3, // Max retries - will be marked as failed
             });
 
@@ -624,7 +624,7 @@ describe("Scheduler Service Tests", () => {
 
             // Create test data for multiple reconciliation types
             const uploadingId = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
             const initiatedId = await createStuckUpload("initiated", 90);
 
@@ -653,12 +653,12 @@ describe("Scheduler Service Tests", () => {
             // Create comprehensive test scenario with multiple stuck states
             await Promise.all([
                 // Stuck uploads that can be recovered
-                createStuckUpload("uploading", 15, { hasMinioFile: true }),
-                createStuckUpload("uploading", 15, { hasMinioFile: true }),
+                createStuckUpload("uploading", 15, { hasS3File: true }),
+                createStuckUpload("uploading", 15, { hasS3File: true }),
 
                 // Stuck uploads that should fail
                 createStuckUpload("uploading", 15, {
-                    hasMinioFile: false,
+                    hasS3File: false,
                     uploadAttempts: 3,
                 }),
 
@@ -703,7 +703,7 @@ describe("Scheduler Service Tests", () => {
             // Create 50 stuck uploads
             await Promise.all(
                 Array.from({ length: 50 }, () =>
-                    createStuckUpload("uploading", 15, { hasMinioFile: true }),
+                    createStuckUpload("uploading", 15, { hasS3File: true }),
                 ),
             );
 
@@ -728,7 +728,7 @@ describe("Scheduler Service Tests", () => {
             // Create 30 stuck uploads
             await Promise.all(
                 Array.from({ length: 30 }, () =>
-                    createStuckUpload("uploading", 15, { hasMinioFile: true }),
+                    createStuckUpload("uploading", 15, { hasS3File: true }),
                 ),
             );
 
@@ -756,12 +756,12 @@ describe("Scheduler Service Tests", () => {
 
             // Create upload that is 9 minutes old (should NOT be reconciled)
             const recentId = await createStuckUpload("uploading", 9, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Create upload that is 11 minutes old (should be reconciled)
             const oldId = await createStuckUpload("uploading", 11, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Start scheduler

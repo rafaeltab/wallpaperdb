@@ -13,7 +13,7 @@ Replace hardcoded Docker Compose secrets with proper secrets management.
 ```yaml
 # These are DEVELOPMENT defaults only
 POSTGRES_PASSWORD: wallpaperdb
-MINIO_ROOT_PASSWORD: minioadmin
+S3_SECRET_ACCESS_KEY: storageadmin
 GRAFANA_ADMIN_PASSWORD: admin
 DISABLE_SECURITY_PLUGIN: "true"
 ```
@@ -26,7 +26,7 @@ DISABLE_SECURITY_PLUGIN: "true"
 # infra/scripts/setup-local-secrets.sh
 cat > .env.local <<EOF
 POSTGRES_PASSWORD=$(openssl rand -base64 32)
-MINIO_ROOT_PASSWORD=$(openssl rand -base64 32)
+S3_SECRET_ACCESS_KEY=$(openssl rand -base64 32)
 CURSOR_SECRET=$(openssl rand -hex 32)
 EOF
 ```

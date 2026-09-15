@@ -7,7 +7,7 @@ import {
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
 import { inject, injectable } from 'tsyringe';
 import type { Config } from '../config.js';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import { StorageUploadFailedError } from '../errors/problem-details.js';
 
 export interface UploadResult {
@@ -20,14 +20,14 @@ export class StorageService {
   private readonly s3Client: S3Client;
 
   constructor(
-    @inject(MinioConnection) minioConnection: MinioConnection,
+    @inject(S3Connection) s3Connection: S3Connection,
     @inject('config') private readonly config: Config
   ) {
-    this.s3Client = minioConnection.getClient();
+    this.s3Client = s3Connection.getClient();
   }
 
   /**
-   * Upload file to MinIO storage
+   * Upload file to S3 storage
    */
   async upload(
     wallpaperId: string,
@@ -75,7 +75,7 @@ export class StorageService {
           };
         } catch (error) {
           this.recordStorageMetrics('put_object', false, startTime);
-          console.error('MinIO upload failed:', error);
+          console.error('S3 upload failed:', error);
           throw new StorageUploadFailedError();
         }
       }
@@ -139,7 +139,7 @@ export class StorageService {
           this.recordStorageMetrics('delete_object', true, startTime);
         } catch (error) {
           this.recordStorageMetrics('delete_object', false, startTime);
-          console.error('Failed to delete from MinIO:', error);
+          console.error('Failed to delete from S3:', error);
           // Don't throw - this is a cleanup operation
         }
       }

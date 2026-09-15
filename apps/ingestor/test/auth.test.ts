@@ -3,7 +3,7 @@ import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     FixturesTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -26,7 +26,7 @@ describe("Auth Integration", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(FixturesTesterBuilder)
@@ -38,9 +38,9 @@ describe("Auth Integration", () => {
 
         tester
             .withPostgres((b) => b.withDatabase(`test_auth_${Date.now()}`))
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((b) => b.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()

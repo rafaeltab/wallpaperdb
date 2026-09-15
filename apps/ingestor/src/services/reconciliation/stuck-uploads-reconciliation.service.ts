@@ -13,7 +13,7 @@ type WallpaperRecord = typeof wallpapers.$inferSelect;
  * Reconciles uploads stuck in 'uploading' state for longer than threshold.
  *
  * Recovery logic:
- * - If file exists in MinIO: recover to 'stored' state
+ * - If file exists in S3: recover to 'stored' state
  * - If file missing and retries < MAX: increment retry count
  * - If file missing and retries >= MAX: mark as 'failed'
  */
@@ -51,7 +51,7 @@ export class StuckUploadsReconciliation extends BaseReconciliation<WallpaperReco
     // For reconciliation, we try with .jpg as default since extension may not be stored yet
     const storageKey = `${record.id}/original.jpg`;
 
-    // Check if file exists in MinIO
+    // Check if file exists in S3
     const fileExists = await this.storageService.objectExists(this.config.s3Bucket, storageKey);
 
     if (fileExists) {

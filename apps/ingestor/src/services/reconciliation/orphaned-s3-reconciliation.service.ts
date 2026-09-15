@@ -3,30 +3,30 @@ import { eq } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../../config.js';
 import { DatabaseConnection } from '../../connections/database.js';
-import { MinioConnection } from '../../connections/minio.js';
+import { S3Connection } from '../../connections/s3.js';
 import { ReconciliationConstants } from '../../constants/reconciliation.constants.js';
 import { wallpapers } from '../../db/schema.js';
 import { StorageService } from '../storage.service.js';
 
 /**
- * Reconciles orphaned MinIO objects - files that exist in storage but not in the database.
+ * Reconciles orphaned S3 objects - files that exist in storage but not in the database.
  *
- * This reconciliation is different from others - it iterates through MinIO objects
+ * This reconciliation is different from others - it iterates through S3 objects
  * rather than database records, so it doesn't use the BaseReconciliation pattern.
  *
  * Recovery logic:
- * - Delete MinIO object if no DB record exists
- * - Delete MinIO object if DB record has uploadState = 'failed'
+ * - Delete S3 object if no DB record exists
+ * - Delete S3 object if DB record has uploadState = 'failed'
  *
  * NOTE: This implementation does not currently support pagination.
  * TODO: Add pagination support for buckets with large numbers of objects.
  */
 @singleton()
-export class OrphanedMinioReconciliation {
+export class OrphanedS3Reconciliation {
   constructor(
     @inject(StorageService) private readonly storageService: StorageService,
     @inject(DatabaseConnection) private readonly databaseConnection: DatabaseConnection,
-    @inject(MinioConnection) private readonly minioConnection: MinioConnection,
+    @inject(S3Connection) private readonly s3Connection: S3Connection,
     @inject('config') private readonly config: Config
   ) {}
 
@@ -45,14 +45,14 @@ export class OrphanedMinioReconciliation {
       const listCommand = new ListObjectsV2Command({
         Bucket: this.config.s3Bucket,
       });
-      const listResponse = await this.minioConnection.getClient().send(listCommand);
+      const listResponse = await this.s3Connection.getClient().send(listCommand);
 
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
         return;
       }
 
       // Process in batches to avoid overwhelming the database
-      const batchSize = ReconciliationConstants.MINIO_CLEANUP_BATCH_SIZE;
+      const batchSize = ReconciliationConstants.S3_CLEANUP_BATCH_SIZE;
       for (let i = 0; i < listResponse.Contents.length; i += batchSize) {
         const batch = listResponse.Contents.slice(i, i + batchSize);
 
@@ -62,19 +62,19 @@ export class OrphanedMinioReconciliation {
           try {
             await this.processObject(object.Key);
           } catch (error) {
-            console.error(`Error processing MinIO object ${object.Key}:`, error);
+            console.error(`Error processing S3 object ${object.Key}:`, error);
             // Continue processing other objects
           }
         }
       }
     } catch (error) {
-      console.error('Error listing MinIO objects:', error);
+      console.error('Error listing S3 objects:', error);
       throw error;
     }
   }
 
   /**
-   * Process a single MinIO object.
+   * Process a single S3 object.
    * Deletes the object if it's orphaned (no DB record or failed upload).
    *
    * @param objectKey - The S3 object key (format: {wallpaperId}/original.{ext})
@@ -91,7 +91,7 @@ export class OrphanedMinioReconciliation {
     // Delete if no DB record OR DB record has uploadState = 'failed'
     if (!dbRecord || dbRecord.uploadState === 'failed') {
       await this.storageService.delete(this.config.s3Bucket, objectKey);
-      console.log(`Deleted orphaned MinIO object: ${objectKey}`);
+      console.log(`Deleted orphaned S3 object: ${objectKey}`);
     }
   }
 }

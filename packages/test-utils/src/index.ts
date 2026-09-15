@@ -22,8 +22,8 @@ export type { DockerConfig } from './builders/DockerTesterBuilder.js';
 export { PostgresTesterBuilder } from './builders/PostgresTesterBuilder.js';
 export type { PostgresOptions, PostgresConfig } from './builders/PostgresTesterBuilder.js';
 
-export { MinioTesterBuilder } from './builders/MinioTesterBuilder.js';
-export type { MinioOptions, MinioConfig } from './builders/MinioTesterBuilder.js';
+export { S3TesterBuilder } from './builders/S3TesterBuilder.js';
+export type { S3Options, S3Config } from './builders/S3TesterBuilder.js';
 
 export { NatsTesterBuilder } from './builders/NatsTesterBuilder.js';
 export type { NatsOptions, NatsConfig } from './builders/NatsTesterBuilder.js';

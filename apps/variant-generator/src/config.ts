@@ -77,7 +77,7 @@ const QualityConfigSchema = z.object({
 const configSchema = z.object({
   // Server config
   ...ServerConfigSchema.shape,
-  // S3/MinIO config (for reading originals and uploading variants)
+  // S3 config (for reading originals and uploading variants)
   ...S3ConfigSchema.shape,
   // NATS config (event consumer and publisher)
   ...NatsConfigSchema.shape,
@@ -97,7 +97,7 @@ export function loadConfig(): Config {
     port: parseIntEnv(process.env.PORT, 3006), // Different port from other services
     nodeEnv,
 
-    // S3/MinIO
+    // S3
     s3Endpoint: process.env.S3_ENDPOINT,
     s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,

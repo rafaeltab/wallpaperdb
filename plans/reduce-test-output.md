@@ -223,7 +223,7 @@ const logger = createTestLogger("FileName");
 |---|---|
 | `packages/test-utils/src/builders/DockerTesterBuilder.ts` | 3 |
 | `packages/test-utils/src/builders/PostgresTesterBuilder.ts` | 3 |
-| `packages/test-utils/src/builders/MinioTesterBuilder.ts` | 4 |
+| `packages/test-utils/src/builders/S3TesterBuilder.ts` | 4 |
 | `packages/test-utils/src/builders/NatsTesterBuilder.ts` | 4 |
 | `packages/test-utils/src/builders/RedisTesterBuilder.ts` | 3 |
 | `packages/test-utils/src/builders/OpenSearchTesterBuilder.ts` | 3 |

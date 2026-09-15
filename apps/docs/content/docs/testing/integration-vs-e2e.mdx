@@ -157,7 +157,7 @@ export default {
 // Use auto-cleanup for test isolation
 tester
   .withPostgresAutoCleanup(["wallpapers"])
-  .withMinioAutoCleanup()
+  .withS3AutoCleanup()
   .withNatsAutoCleanup();
 
 afterEach(async () => {

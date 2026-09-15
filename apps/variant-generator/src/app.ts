@@ -4,7 +4,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import type { Config } from './config.js';
 import { NatsConnectionManager } from './connections/nats.js';
-import { MinioConnection } from './connections/minio.js';
+import { S3Connection } from './connections/s3.js';
 import { registerRoutes } from './routes/index.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
@@ -95,9 +95,9 @@ export async function createApp(
   fastify.log.info('Initializing connections...');
 
   try {
-    // Initialize MinIO connection (for reading originals and uploading variants)
-    await container.resolve(MinioConnection).initialize();
-    fastify.log.info('MinIO connection created');
+    // Initialize S3 connection (for reading originals and uploading variants)
+    await container.resolve(S3Connection).initialize();
+    fastify.log.info('S3 connection created');
 
     // Initialize NATS connection (for event consumption and publishing)
     await container.resolve(NatsConnectionManager).initialize();
@@ -137,7 +137,7 @@ export async function createApp(
     }
 
     await container.resolve(NatsConnectionManager).close();
-    await container.resolve(MinioConnection).close();
+    await container.resolve(S3Connection).close();
     await shutdownOtel();
   });
 

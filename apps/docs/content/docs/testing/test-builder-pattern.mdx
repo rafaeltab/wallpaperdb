@@ -14,7 +14,11 @@ Instead of writing imperative setup code, you **declare** what infrastructure yo
 ```typescript
 // Old Way: Manual setup
 const postgres = await new PostgreSqlContainer().start();
-const minio = await new MinioContainer().start();
+const s3 = await new GenericContainer("chrislusf/seaweedfs:4.47")
+  .withCommand(["mini", "-s3.port=9000"])
+  .withExposedPorts(9000)
+  .start();
+// Configure credentials, wait for storage readiness, and create buckets.
 const nats = await createNatsContainer().start();
 // ... manual cleanup in afterAll
 
@@ -22,7 +26,7 @@ const nats = await createNatsContainer().start();
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(PostgresTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
   .build();
 
@@ -59,7 +63,7 @@ Builders manage setup and cleanup automatically:
 createTesterBuilder()
   .with(DockerTesterBuilder)      // 1. Create network
   .with(PostgresTesterBuilder)    // 2. Start Postgres
-  .with(MinioTesterBuilder)       // 3. Start SeaweedFS
+  .with(S3TesterBuilder)       // 3. Start SeaweedFS
   .build();
 
 // Setup order:    Docker → Postgres → SeaweedFS
@@ -78,7 +82,7 @@ import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
   PostgresTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
   RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
@@ -92,7 +96,7 @@ describe("Health Endpoint", () => {
     const TesterClass = createDefaultTesterBuilder()
       .with(DockerTesterBuilder)
       .with(PostgresTesterBuilder)
-      .with(MinioTesterBuilder)
+      .with(S3TesterBuilder)
       .with(NatsTesterBuilder)
       .with(RedisTesterBuilder)
       .with(IngestorMigrationsTesterBuilder)
@@ -103,8 +107,8 @@ describe("Health Endpoint", () => {
 
     tester
       .withPostgres((b) => b.withDatabase(`test_health_${Date.now()}`))
-      .withMinio()
-      .withMinioBucket("wallpapers")
+      .withS3()
+      .withS3Bucket("wallpapers")
       .withNats((b) => b.withJetstream())
       .withMigrations()
       .withInProcessApp();
@@ -145,7 +149,7 @@ import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
   PostgresTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
   RedisTesterBuilder,
 } from "@wallpaperdb/test-utils";
@@ -159,7 +163,7 @@ describe("Health Endpoint E2E", () => {
     const TesterClass = createDefaultTesterBuilder()
       .with(DockerTesterBuilder)
       .with(PostgresTesterBuilder)
-      .with(MinioTesterBuilder)
+      .with(S3TesterBuilder)
       .with(NatsTesterBuilder)
       .with(RedisTesterBuilder)
       .with(IngestorMigrationsTesterBuilder)
@@ -171,9 +175,9 @@ describe("Health Endpoint E2E", () => {
     tester
       .withPostgres((b) => b.withDatabase(`test_e2e_health_${Date.now()}`))
       .withPostgresAutoCleanup(["wallpapers"])
-      .withMinio()
-      .withMinioBucket("wallpapers")
-      .withMinioAutoCleanup()
+      .withS3()
+      .withS3Bucket("wallpapers")
+      .withS3AutoCleanup()
       .withNats()
       .withStream("WALLPAPER")
       .withNatsAutoCleanup()
@@ -229,7 +233,7 @@ tester
   .withPostgresAutoCleanup(["wallpapers", "users"]);
 ```
 
-### MinioTesterBuilder
+### S3TesterBuilder
 
 Manages SeaweedFS (S3-compatible storage) containers.
 
@@ -237,10 +241,10 @@ Manages SeaweedFS (S3-compatible storage) containers.
 
 ```typescript
 tester
-  .withMinio()
-  .withMinioBucket("wallpapers")
-  .withMinioBucket("thumbnails")
-  .withMinioAutoCleanup();
+  .withS3()
+  .withS3Bucket("wallpapers")
+  .withS3Bucket("thumbnails")
+  .withS3AutoCleanup();
 ```
 
 ### NatsTesterBuilder

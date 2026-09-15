@@ -18,4 +18,4 @@ Composable, type-safe test infrastructure for WallpaperDB integration and E2E te
 
 ## S3 Storage Compatibility
 
-`MinioTesterBuilder`, `.withMinio()`, and `tester.minio` retain their public names. The builder starts the pinned `chrislusf/seaweedfs:4.47` image and exposes an AWS SDK S3 client and the existing bucket/object helpers. A custom `.withImage()` must provide a compatible SeaweedFS image. Run `make storage-test` from the repository root to verify the S3 storage contract against a real container.
+Use `S3TesterBuilder`, `.withS3()`, and `tester.s3` to test object storage. The builder starts the pinned `chrislusf/seaweedfs:4.47` image and exposes an AWS SDK S3 client and bucket/object helpers. A custom `.withImage()` must provide a compatible SeaweedFS image. Run `make storage-test` from the repository root to verify the S3 storage contract against a real container.

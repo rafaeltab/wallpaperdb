@@ -1,7 +1,7 @@
 import {
     type AddMethodsType,
     BaseTesterBuilder,
-    type MinioTesterBuilder,
+    type S3TesterBuilder,
     type NatsTesterBuilder,
     type PostgresTesterBuilder,
     type RedisConfig,
@@ -37,7 +37,7 @@ export interface InProcessIngestorOptions {
  * const tester = await createTesterBuilder()
  *   .with(DockerTesterBuilder)
  *   .with(PostgresTesterBuilder)
- *   .with(MinioTesterBuilder)
+ *   .with(S3TesterBuilder)
  *   .with(NatsTesterBuilder)
  *   .with(IngestorMigrationsTesterBuilder)
  *   .with(InProcessIngestorTesterBuilder)
@@ -51,7 +51,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
     "InProcessIngestor",
     [
         PostgresTesterBuilder,
-        MinioTesterBuilder,
+        S3TesterBuilder,
         NatsTesterBuilder,
         RedisTesterBuilder,
     ]
@@ -68,7 +68,7 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
         TBase extends AddMethodsType<
             [
                 PostgresTesterBuilder,
-                MinioTesterBuilder,
+                S3TesterBuilder,
                 NatsTesterBuilder,
                 RedisTesterBuilder,
             ]
@@ -86,13 +86,13 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                 this.addSetupHook(async () => {
                     logger.debug("[InProcessIngestor] Setting up environment variables");
                     const postgres = this.getPostgres();
-                    const minio = this.getMinio();
+                    const s3 = this.getS3();
                     const nats = this.getNats();
                     const redis: RedisConfig | undefined = this.redis.tryGetConfig();
 
-                    if (!postgres || !minio || !nats) {
+                    if (!postgres || !s3 || !nats) {
                         throw new Error(
-                            "InProcessIngestorTesterBuilder requires PostgresTesterBuilder, MinioTesterBuilder, and NatsTesterBuilder",
+                            "InProcessIngestorTesterBuilder requires PostgresTesterBuilder, S3TesterBuilder, and NatsTesterBuilder",
                         );
                     }
 
@@ -101,11 +101,11 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
                     // Set environment variables for loadConfig()
                     process.env.NODE_ENV = "test";
                     process.env.DATABASE_URL = postgres.connectionStrings.fromHost;
-                    process.env.S3_ENDPOINT = minio.endpoints.fromHost;
-                    process.env.S3_ACCESS_KEY_ID = minio.options.accessKey;
-                    process.env.S3_SECRET_ACCESS_KEY = minio.options.secretKey;
+                    process.env.S3_ENDPOINT = s3.endpoints.fromHost;
+                    process.env.S3_ACCESS_KEY_ID = s3.options.accessKey;
+                    process.env.S3_SECRET_ACCESS_KEY = s3.options.secretKey;
                     process.env.S3_BUCKET =
-                        minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers";
+                        s3.buckets.length > 0 ? s3.buckets[0] : "wallpapers";
                     process.env.NATS_URL = nats.endpoints.fromHost;
                     process.env.NATS_STREAM =
                         nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";

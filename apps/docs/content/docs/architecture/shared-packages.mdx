@@ -20,7 +20,7 @@ Connection managers for all infrastructure dependencies:
 ```typescript
 import {
   DatabaseConnection,
-  MinioConnection,
+  S3Connection,
   NatsConnectionManager,
   RedisConnection,
   OtelConnection,
@@ -37,7 +37,7 @@ export class DatabaseConnection extends BaseConnection {
 
 **Available connections:**
 - `DatabaseConnection` - PostgreSQL with Drizzle ORM
-- `MinioConnection` - S3-compatible object storage
+- `S3Connection` - S3-compatible object storage
 - `NatsConnectionManager` - NATS with JetStream
 - `RedisConnection` - Redis with connection pooling
 - `OtelConnection` - OpenTelemetry SDK initialization

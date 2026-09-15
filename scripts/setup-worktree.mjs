@@ -31,7 +31,6 @@ import {
 	applyOverrides,
 	extractKeys,
 	filterApplicableSecrets,
-	normalizeStorageEnvironment,
 	syncKnownSecretsToContent,
 	resolveGenerateMarker,
 } from "./lib/env-pipeline.mjs";
@@ -598,8 +597,8 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
 
 	ensureSecretEnv(secretEnvPath);
 	syncKnownSecrets(secretEnvPath);
-	const secrets = normalizeStorageEnvironment(loadSecrets(secretEnvPath));
-	const environment = normalizeStorageEnvironment(process.env);
+	const secrets = loadSecrets(secretEnvPath);
+	const environment = process.env;
 
 	const exampleFiles = findEnvExamples(repoRoot);
 

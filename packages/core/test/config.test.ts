@@ -65,8 +65,8 @@ describe("Config Schemas", () => {
     it("should validate valid config", () => {
       const config = S3ConfigSchema.parse({
         s3Endpoint: "http://localhost:9000",
-        s3AccessKeyId: "minioadmin",
-        s3SecretAccessKey: "minioadmin",
+        s3AccessKeyId: "storageadmin",
+        s3SecretAccessKey: "storageadmin",
       });
 
       expect(config.s3Endpoint).toBe("http://localhost:9000");

@@ -68,4 +68,4 @@ Testing strategy guide: `apps/docs/content/docs/guides/testing-strategies.mdx`
 
 ## S3 Storage
 
-`MinioTesterBuilder`, `.withMinio()`, and `tester.minio` retain their public names for compatibility. They start SeaweedFS and use the AWS SDK S3 client. Run `make storage-test` to verify the storage contract against a real container.
+`S3TesterBuilder` starts SeaweedFS through `.withS3()`. Use `tester.s3` for object helpers and `tester.s3.getS3Client()` for the AWS SDK S3 client. Run `make storage-test` to verify the storage contract against a real container.

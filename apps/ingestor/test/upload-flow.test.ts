@@ -4,7 +4,7 @@ import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     FixturesTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -23,7 +23,7 @@ describe("Upload Flow Integration Tests", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(FixturesTesterBuilder)
@@ -37,9 +37,9 @@ describe("Upload Flow Integration Tests", () => {
         tester
             .withPostgres((b) => b.withDatabase(`test_upload_flow_${Date.now()}`))
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((b) => b.withJetstream())
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()
@@ -67,8 +67,8 @@ describe("Upload Flow Integration Tests", () => {
     });
 
     beforeEach(async () => {
-        // Clean up MinIO before each test
-        await tester.minio.cleanupBuckets();
+        // Clean up S3 before each test
+        await tester.s3.cleanupBuckets();
     });
 
     describe("Happy Path - Upload Valid Image", () => {
@@ -98,13 +98,13 @@ describe("Upload Flow Integration Tests", () => {
             expect(body.height).toBe(1080);
             expect(body.fileSizeBytes).toBeGreaterThan(0);
 
-            // Verify file is stored in MinIO
+            // Verify file is stored in S3
             const storageKey = `${body.id}/original.jpg`;
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const headResponse = await s3Client.send(
                 new HeadObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: storageKey,
                 }),
             );
@@ -134,11 +134,11 @@ describe("Upload Flow Integration Tests", () => {
 
             // Verify storage
             const storageKey = `${body.id}/original.png`;
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const headResponse = await s3Client.send(
                 new HeadObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: storageKey,
                 }),
             );
@@ -165,11 +165,11 @@ describe("Upload Flow Integration Tests", () => {
 
             // Verify storage
             const storageKey = `${body.id}/original.webp`;
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const headResponse = await s3Client.send(
                 new HeadObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: storageKey,
                 }),
             );
@@ -373,7 +373,7 @@ describe("Upload Flow Integration Tests", () => {
     });
 
     describe("Storage Organization", () => {
-        it("should store file in correct MinIO path structure", async () => {
+        it("should store file in correct S3 path structure", async () => {
             const userId = tester.fixtures.generateTestUserId();
             const filename = tester.fixtures.generateTestFilename("jpg");
             const imageBuffer = await tester.fixtures.images.validJpeg();
@@ -391,11 +391,11 @@ describe("Upload Flow Integration Tests", () => {
             // Should be stored as: wlpr_<ulid>/original.jpg
             const expectedKey = `${body.id}/original.jpg`;
 
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const headResponse = await s3Client.send(
                 new HeadObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: expectedKey,
                 }),
             );
@@ -403,7 +403,7 @@ describe("Upload Flow Integration Tests", () => {
             expect(headResponse).toBeDefined();
         });
 
-        it("should set correct content type in MinIO", async () => {
+        it("should set correct content type in S3", async () => {
             const userId = tester.fixtures.generateTestUserId();
             const filename = tester.fixtures.generateTestFilename("png");
             const imageBuffer = await tester.fixtures.images.validPng();
@@ -419,11 +419,11 @@ describe("Upload Flow Integration Tests", () => {
             const body = JSON.parse(response.body);
 
             const storageKey = `${body.id}/original.png`;
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const headResponse = await s3Client.send(
                 new HeadObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: storageKey,
                 }),
             );
@@ -431,7 +431,7 @@ describe("Upload Flow Integration Tests", () => {
             expect(headResponse.ContentType).toBe("image/png");
         });
 
-        it("should store file content correctly in MinIO", async () => {
+        it("should store file content correctly in S3", async () => {
             const userId = tester.fixtures.generateTestUserId();
             const filename = tester.fixtures.generateTestFilename("jpg");
             const imageBuffer = await tester.fixtures.images.validJpeg();
@@ -446,13 +446,13 @@ describe("Upload Flow Integration Tests", () => {
             expect(response.statusCode).toBe(200);
             const body = JSON.parse(response.body);
 
-            // Retrieve the file from MinIO
+            // Retrieve the file from S3
             const storageKey = `${body.id}/original.jpg`;
-            const s3Client = tester.minio.getS3Client();
-            const minioConfig = tester.getMinio();
+            const s3Client = tester.s3.getS3Client();
+            const s3Config = tester.getS3();
             const getResponse = await s3Client.send(
                 new GetObjectCommand({
-                    Bucket: minioConfig.buckets[0],
+                    Bucket: s3Config.buckets[0],
                     Key: storageKey,
                 }),
             );

@@ -7,7 +7,7 @@ export interface DatabaseConfig {
   databaseUrl: string;
 }
 
-export interface MinioConfig {
+export interface S3Config {
   s3Endpoint: string;
   s3Region: string;
   s3AccessKeyId: string;

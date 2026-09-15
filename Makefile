@@ -30,7 +30,7 @@
 COMPOSE_PROJECT_NAME ?= wallpaperdb
 INGRESS_PORT         ?= 8000
 POSTGRES_HOST_PORT   ?= 8001
-S3_API_HOST_PORT     ?= $(or $(MINIO_API_HOST_PORT),8002)
+S3_API_HOST_PORT     ?= 8002
 NATS_HOST_PORT       ?= 8003
 REDIS_HOST_PORT      ?= 8004
 OPENSEARCH_HOST_PORT ?= 8005
@@ -500,8 +500,8 @@ color-extractor-docker-run:
 		-e NODE_ENV=production \
 		-e PORT=3007 \
 		-e S3_ENDPOINT=http://host.docker.internal:$(S3_API_HOST_PORT) \
-		-e S3_ACCESS_KEY_ID=$${S3_ACCESS_KEY_ID:-$$MINIO_ROOT_USER} \
-		-e S3_SECRET_ACCESS_KEY=$${S3_SECRET_ACCESS_KEY:-$$MINIO_ROOT_PASSWORD} \
+		-e S3_ACCESS_KEY_ID=$${S3_ACCESS_KEY_ID:-storageadmin} \
+		-e S3_SECRET_ACCESS_KEY=$${S3_SECRET_ACCESS_KEY:-storageadmin} \
 		-e S3_BUCKET=wallpapers \
 		-e NATS_URL=nats://host.docker.internal:$(NATS_HOST_PORT) \
 		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:$(OTEL_HTTP_HOST_PORT) \
@@ -612,8 +612,8 @@ ingestor-docker-run:
 		-e PORT=3001 \
 		-e DATABASE_URL=postgresql://$$POSTGRES_USER:$$POSTGRES_PASSWORD@host.docker.internal:$(POSTGRES_HOST_PORT)/$$POSTGRES_DB \
 		-e S3_ENDPOINT=http://host.docker.internal:$(S3_API_HOST_PORT) \
-		-e S3_ACCESS_KEY_ID=$${S3_ACCESS_KEY_ID:-$$MINIO_ROOT_USER} \
-		-e S3_SECRET_ACCESS_KEY=$${S3_SECRET_ACCESS_KEY:-$$MINIO_ROOT_PASSWORD} \
+		-e S3_ACCESS_KEY_ID=$${S3_ACCESS_KEY_ID:-storageadmin} \
+		-e S3_SECRET_ACCESS_KEY=$${S3_SECRET_ACCESS_KEY:-storageadmin} \
 		-e S3_BUCKET=wallpapers \
 		-e NATS_URL=nats://host.docker.internal:$(NATS_HOST_PORT) \
 		-e OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:$(OTEL_HTTP_HOST_PORT) \
@@ -828,7 +828,7 @@ test-ui:
 
 storage-test:
 	@$(TURBO) run build --filter='@wallpaperdb/test-utils^...'
-	@pnpm --filter @wallpaperdb/test-utils test tests/minio.test.ts
+	@pnpm --filter @wallpaperdb/test-utils test tests/s3.test.ts
 
 storage-infra-test:
 	@node --test scripts/lib/env-pipeline.test.mjs

@@ -102,7 +102,7 @@ make infra-logs
 
 3. **Access services:**
    - Grafana: http://localhost:3000 (admin/admin)
-   - SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `minioadmin`)
+   - SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `storageadmin`)
    - NATS Monitoring: http://localhost:8222
 
 ## Data Persistence
@@ -144,8 +144,8 @@ POSTGRES_USER=wallpaperdb
 POSTGRES_PASSWORD=wallpaperdb
 
 # SeaweedFS S3 API
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_API_HOST_PORT=8002
 
 # pgAdmin
@@ -153,7 +153,7 @@ PGADMIN_DEFAULT_EMAIL=admin@example.com
 PGADMIN_DEFAULT_PASSWORD=admin
 ```
 
-Default values work out of the box for local development. Worktree setup assigns the S3 host port as `8002 + 10 × slot`. Existing `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_API_HOST_PORT` remain fallback settings; see [storage configuration](/docs/infrastructure/seaweedfs#configuration).
+Default values work out of the box for local development. Worktree setup assigns the S3 host port as `8002 + 10 × slot`. Existing environments must update storage variables and regenerate application environments; see [storage migration](/docs/infrastructure/seaweedfs#existing-minio-data).
 
 ## Health Checks
 
@@ -188,7 +188,7 @@ infra/
 - `wallpapers` - Main wallpaper storage
 - `example-bucket` - Example/test bucket
 
-Both allow anonymous object downloads for local development. Listing and writes require credentials. See [SeaweedFS](/docs/infrastructure/seaweedfs) for configuration and the migration procedure for existing MinIO data.
+Both allow anonymous object downloads for local development. Listing and writes require credentials. See [SeaweedFS](/docs/infrastructure/seaweedfs) for configuration and the migration procedure for existing S3 data.
 
 ## Resource Usage
 

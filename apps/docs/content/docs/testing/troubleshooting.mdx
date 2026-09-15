@@ -88,13 +88,13 @@ Error: bind: address already in use
 ```typescript
 // Missing PostgresTesterBuilder
 createTesterBuilder()
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .build();
 
 // Add PostgresTesterBuilder
 createTesterBuilder()
   .with(PostgresTesterBuilder)  // Add this
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .build();
 ```
 

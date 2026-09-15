@@ -30,7 +30,7 @@ Production observability with dashboards and alerts is operational. Minor enhanc
 - PostgreSQL pool usage and connection metrics
 - NATS consumer lag and pending messages
 - Redis memory usage and hit rates
-- MinIO bandwidth and storage metrics
+- S3 bandwidth and storage metrics
 - OpenSearch index health
 
 **Variant Generator Dashboard** (not yet created)

@@ -72,10 +72,10 @@ await dbConnection.close();
 
 #### S3 Connection
 
-`MinioConnection` retains its public name and uses the AWS SDK S3 client. Configure it for SeaweedFS locally or another S3-compatible service:
+`S3Connection` uses the AWS SDK S3 client. Configure it for SeaweedFS locally or another S3-compatible service:
 
 ```typescript
-import { MinioConnection } from "@wallpaperdb/core/connections";
+import { S3Connection } from "@wallpaperdb/core/connections";
 import type { S3Config } from "@wallpaperdb/core/connections/types";
 
 const config: S3Config = {
@@ -86,7 +86,7 @@ const config: S3Config = {
   s3Region: 'us-east-1'
 };
 
-const s3Connection = new MinioConnection(config);
+const s3Connection = new S3Connection(config);
 await s3Connection.initialize();
 
 const s3Client = s3Connection.getClient();
@@ -455,7 +455,7 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import {
   DatabaseConnection,
-  MinioConnection,
+  S3Connection,
   NatsConnectionManager,
   RedisConnection,
   OtelConnection
@@ -475,8 +475,8 @@ const config = loadConfig();
 container.register("DatabaseConnection", {
   useFactory: () => new DatabaseConnection(config)
 });
-container.register("MinioConnection", {
-  useFactory: () => new MinioConnection(config)
+container.register("S3Connection", {
+  useFactory: () => new S3Connection(config)
 });
 container.register("NatsConnection", {
   useFactory: () => new NatsConnectionManager(config)

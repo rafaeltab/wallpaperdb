@@ -10,28 +10,30 @@ SeaweedFS provides S3-compatible object storage for storing wallpaper files (ori
 - **Image**: `chrislusf/seaweedfs:4.47`
 - **Host S3 API**: http://localhost:8002 for worktree slot 0; other slots use `8002 + 10 × slot`
 - **Docker S3 API**: `http://seaweedfs:9000`
-- **Access key / secret key**: `minioadmin` / `minioadmin` (local development defaults)
+- **Access key / secret key**: `storageadmin` / `storageadmin` (local development defaults)
 - **Buckets**: `wallpapers`, `example-bucket`
 
-The Compose service runs SeaweedFS `mini`, which starts its storage components together and creates both buckets through `S3_BUCKET`. The S3 API is the published interface; administer objects through an S3 client such as the AWS CLI. The old MinIO console route at `/minio` has been removed.
+The Compose service runs SeaweedFS `mini`, which starts its storage components together and creates both buckets through `S3_BUCKET`. The S3 API is the published interface; administer objects through an S3 client such as the AWS CLI.
 
 ## Configuration
 
-`infra/.env` uses `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_API_HOST_PORT`. Existing `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_API_HOST_PORT` settings remain fallback values when the corresponding S3 variable is absent. App configuration uses `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`.
+`infra/.env` uses `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_API_HOST_PORT`. App configuration uses `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`. Local credentials default to `storageadmin` for both keys. Apps in Docker connect to `http://seaweedfs:9000`; tests on a shared Docker network use the builder's `s3` alias.
 
-The default credentials are retained so existing generated app environments continue to work. Inside Docker, `minio` remains a network alias for the SeaweedFS service during migration; new configuration uses `seaweedfs`.
+Ingestor reconciliation uses `S3_CLEANUP_INTERVAL_MS` to configure the orphaned-object cleanup interval. Service health responses identify storage as `s3`.
+
+Existing environments must migrate their settings and regenerate `.env` files before restarting applications; see [Existing MinIO Data](#existing-minio-data).
 
 ## Connection
 
-`MinioConnection` is the existing public class name. It uses the AWS SDK S3 client and connects to SeaweedFS without a provider-specific client. Tests similarly retain `MinioTesterBuilder`, `.withMinio()`, and `tester.minio` while starting SeaweedFS containers.
+`S3Connection` uses the AWS SDK S3 client and connects to SeaweedFS without a provider-specific client. Tests compose `S3TesterBuilder`, configure `.withS3()`, and access object helpers through `tester.s3`. Use `tester.s3.getS3Client()` for direct AWS SDK commands.
 
 ```typescript
-import { MinioConnection } from "@wallpaperdb/core/connections";
+import { S3Connection } from "@wallpaperdb/core/connections";
 
-const s3 = new MinioConnection({
+const s3 = new S3Connection({
   s3Endpoint: 'http://localhost:8002',
-  s3AccessKeyId: 'minioadmin',
-  s3SecretAccessKey: 'minioadmin',
+  s3AccessKeyId: 'storageadmin',
+  s3SecretAccessKey: 'storageadmin',
   s3Bucket: 'wallpapers',
   s3Region: 'us-east-1'
 });
@@ -103,8 +105,8 @@ const response = await client.send(new ListObjectsV2Command({
 With the AWS CLI installed, configure the local credentials and use your worktree's host endpoint:
 
 ```bash
-export AWS_ACCESS_KEY_ID=minioadmin
-export AWS_SECRET_ACCESS_KEY=minioadmin
+export AWS_ACCESS_KEY_ID=storageadmin
+export AWS_SECRET_ACCESS_KEY=storageadmin
 export AWS_DEFAULT_REGION=us-east-1
 
 aws --endpoint-url http://localhost:8002 s3 ls s3://wallpapers/
@@ -116,7 +118,7 @@ aws --endpoint-url http://localhost:8002 s3api head-object --bucket wallpapers -
 
 SeaweedFS uses a new `seaweedfs-data` Docker volume. Its storage format differs from MinIO's, so do not mount the old `minio-data` volume into SeaweedFS. The migration does not copy or delete existing objects; an existing database may therefore reference wallpapers that still need copying.
 
-Before starting the replacement service, stop the old MinIO containers so they release the S3 host port and `minio` network alias. In the old checkout, stop application writes and run `make infra-stop` before switching branches. This preserves the Docker volumes.
+Before starting the replacement service, stop the old MinIO containers so they release the S3 host port. In the old checkout, stop application writes and run `make infra-stop` before switching branches. This preserves the Docker volumes.
 
 If you have already switched to the migrated checkout, stop application writes and remove the old containers with the following command from the repository root. Replace `wallpaperdb` with `COMPOSE_PROJECT_NAME` from your worktree's `.worktree` file:
 
@@ -124,12 +126,31 @@ If you have already switched to the migrated checkout, stop application writes a
 docker compose -p wallpaperdb -f infra/docker-compose.yml down --remove-orphans
 ```
 
-Do not add `--volumes` or `-v`; the old `minio-data` volume must remain intact. This also stops the other infrastructure containers for that project. Then run `make infra-start` to start the new stack.
+Do not add `--volumes` or `-v`; the old `minio-data` volume must remain intact. This also stops the other infrastructure containers for that project. Update configuration as described below before running `make infra-start` to start the new stack.
+
+### Update Existing Configuration
+
+Before regenerating environment files, copy any customized values from your existing `.env` files or override sources into the new settings:
+
+| Previous setting | Current setting |
+| --- | --- |
+| `MINIO_ROOT_USER` | `S3_ACCESS_KEY_ID` |
+| `MINIO_ROOT_PASSWORD` | `S3_SECRET_ACCESS_KEY` |
+| `MINIO_API_HOST_PORT` | `S3_API_HOST_PORT` |
+| `MINIO_CLEANUP_INTERVAL_MS` | `S3_CLEANUP_INTERVAL_MS` |
+
+Update your shared secrets file (`$XDG_CONFIG_HOME/wallpaperdb/secrets.env`, or `~/.config/wallpaperdb/secrets.env` by default), CI settings, and exported shell variables as applicable. Remove old entries after copying their values. These old variable names have no runtime fallback. If you keep existing credentials, use the same values for the replacement server and all app clients; the new defaults are `storageadmin`.
+
+Run `make install` to regenerate `infra/.env` and per-app `.env` files. This replaces generated files, so save any custom values in the override sources first. Remove or update an overridden `S3_ENDPOINT=http://minio:9000`: Compose clients now use `http://seaweedfs:9000`, and the old network alias is removed. Host clients use their assigned `S3_API_HOST_PORT`.
+
+Update any external health checks that read the old `minio` response field to read `s3`. Code using shared packages must use `S3Connection`, `S3TesterBuilder`, `.withS3()`, `.withS3Bucket()`, `.withS3AutoCleanup()`, `.getS3()`, and `tester.s3`; the old names are removed.
+
+### Copy and Verify Objects
 
 For data you want to retain:
 
 1. While application writes are stopped, take backups of the database and old object storage. Keep the old MinIO volume and a usable source server or backup until migration is verified.
-2. Stop/remove the old service containers as described above, then start SeaweedFS with its new volume. If a running source is needed, restore or run the old MinIO server under a separate Compose project with a different host port and network, so it cannot claim SeaweedFS's port or `minio` alias. Preserve the source's original data.
+2. Stop/remove the old service containers as described above, then start SeaweedFS with its new volume. If a running source is needed, restore or run the old MinIO server under a separate Compose project with a different host port and network, so it cannot claim SeaweedFS's port. Preserve the source's original data.
 3. Copy every required bucket and object through the S3 API. An S3 migration tool must support distinct source and destination endpoints and preserve content types, user metadata, and other headers your application relies on. An ordinary download/upload through a local directory does not preserve all object metadata automatically.
 4. Compare bucket inventories, object counts, sizes, contents or checksums, and metadata. Exercise uploads and media retrieval against the destination while writes remain paused.
 5. Resume applications against SeaweedFS after verification. Keep the source and backups until you explicitly decide to retire them.

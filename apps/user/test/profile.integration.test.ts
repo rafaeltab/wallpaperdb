@@ -231,6 +231,30 @@ describe('Profile commands', () => {
     }
   });
 
+  it('only permits authenticated owners to immediately expire scheduled aliases at the last-seen version', async () => {
+    const original = (await request('user_1')).json();
+    const other = (await request('user_2')).json();
+    const retained = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const unauthenticated = await app.inject({ method: 'POST', url: `/profile/me/aliases/${original.handle}/expire`, payload: { expectedVersion: retained.version } });
+    expect(unauthenticated.statusCode).toBe(401);
+    expect((await expireAlias('user_1', original.handle, 0)).statusCode).toBe(400);
+    const notScheduled = await expireAlias('user_1', original.handle, retained.version);
+    expect(notScheduled.statusCode).toBe(409);
+    expect(notScheduled.json().type).toMatch(/alias-not-scheduled$/);
+    expect((await expireAlias('user_2', original.handle, other.version)).statusCode).toBe(404);
+    expect((await expireAlias('user_1', retained.handle, retained.version)).statusCode).toBe(404);
+    expect((await request('user_1')).json()).toEqual(retained);
+    const scheduled = (await scheduleAlias('user_1', original.handle, retained.version)).json();
+    const stale = await expireAlias('user_1', original.handle, retained.version);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    const expired = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+    expect((await expireAlias('user_1', original.handle, scheduled.version)).statusCode).toBe(409);
+    expect((await expireAlias('user_1', original.handle, expired.version)).statusCode).toBe(404);
+    expect((await request('user_1')).json()).toEqual(expired);
+    expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(1);
+  });
+
   it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
     const before = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();

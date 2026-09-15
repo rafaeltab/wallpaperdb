@@ -66,10 +66,30 @@ export class ProfileRepository {
   }
 
   async search(params: { query: string; size: number; searchAfter?: CursorValue[] }) {
+    const aliasMatch = (query: Record<string, unknown>) => ({
+      nested: { path: 'aliases', score_mode: 'none', query },
+    });
+    const tiers = [
+      { term: { handle: params.query } },
+      { prefix: { handle: params.query } },
+      aliasMatch({ term: { 'aliases.handle': params.query } }),
+      aliasMatch({ prefix: { 'aliases.handle': params.query } }),
+      { match_phrase_prefix: { displayName: params.query } },
+      { match: { displayName: { query: params.query, fuzziness: 'AUTO', operator: 'and' } } },
+    ];
     const result = await this.openSearchConnection.getClient().search({
       index: this.indexManager.getIndexName(profileIndexDefinition.key),
       body: {
-        query: { constant_score: { filter: { term: { handle: params.query } }, boost: 6 } },
+        // Only the best tier contributes. Extra alias/name matches cannot push a
+        // lower tier above a current Handle, and scores do not drift with index statistics.
+        query: {
+          dis_max: {
+            tie_breaker: 0,
+            queries: tiers.map((filter, index) => ({
+              constant_score: { filter, boost: tiers.length - index },
+            })),
+          },
+        },
         sort: [{ _score: 'desc' }, { id: 'asc' }],
         size: params.size,
         search_after: params.searchAfter,

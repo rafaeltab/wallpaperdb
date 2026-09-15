@@ -39,6 +39,33 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('ranks current Handles, active aliases, and Display names in strict tiers', async () => {
+    await project({ id: 'user_rank_7', handle: 'aurora', displayName: 'Aurora' });
+    await project({ id: 'user_rank_6', handle: 'aurora-ridge' });
+    await project({
+      id: 'user_rank_5', handle: 'renamed-exact', displayName: 'Aurora Aurora Aurora',
+      aliases: [
+        { handle: 'aurora', claimGeneration: 2 },
+        { handle: 'aurora-one', claimGeneration: 3 },
+        { handle: 'aurora-two', claimGeneration: 4 },
+        { handle: 'aurora-three', claimGeneration: 5 },
+      ],
+    });
+    await project({
+      id: 'user_rank_4', handle: 'renamed-prefix', displayName: 'Aurora',
+      aliases: [{ handle: 'aurora-hill', claimGeneration: 2 }],
+    });
+    await project({ id: 'user_rank_3', handle: 'phrase-artist', displayName: 'The Aurora Artist' });
+    await project({ id: 'user_rank_2', handle: 'prefix-artist', displayName: 'Auroral Painter' });
+    await project({ id: 'user_rank_1', handle: 'fuzzy-artist', displayName: 'Aurorra' });
+
+    const result = await search('aurora');
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_rank_7', 'user_rank_6', 'user_rank_5', 'user_rank_4', 'user_rank_2', 'user_rank_3', 'user_rank_1']);
+  });
+
   it('finds an exact current Handle as a public Profile connection', async () => {
     await project({ id: 'user_aurora', handle: 'aurora', displayName: 'Aurora Artist' });
     await project({ id: 'user_other', handle: 'other' });

@@ -9,15 +9,15 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 
 | Service | Port | Status | Database | Dependencies | Events Published | Events Consumed |
 |---------|------|--------|----------|--------------|------------------|-----------------|
-| **Ingestor** | 3001 | ✅ Production | wallpaperdb_ingestor | PostgreSQL, MinIO, NATS, Redis | `wallpaper.uploaded` | - |
-| **Media** | 3002 | ✅ Production | wallpaperdb_media | PostgreSQL, MinIO, Redis | `wallpaper.variant.available` | `wallpaper.uploaded`, `wallpaper.variant.uploaded` |
-| **Variant Generator** | 3004 | ✅ Production | - | MinIO, NATS | `wallpaper.variant.uploaded` | `wallpaper.uploaded` |
+| **Ingestor** | 3001 | ✅ Production | wallpaperdb_ingestor | PostgreSQL, SeaweedFS, NATS, Redis | `wallpaper.uploaded` | - |
+| **Media** | 3002 | ✅ Production | wallpaperdb_media | PostgreSQL, SeaweedFS, Redis | `wallpaper.variant.available` | `wallpaper.uploaded`, `wallpaper.variant.uploaded` |
+| **Variant Generator** | 3004 | ✅ Production | - | SeaweedFS, NATS | `wallpaper.variant.uploaded` | `wallpaper.uploaded` |
 | **Gateway** | 3000 | ✅ Production | wallpaperdb_gateway | PostgreSQL, OpenSearch, NATS, Redis | - | `wallpaper.uploaded`, `wallpaper.variant.available`, `profile.created` |
 | **User** | 3009 | ✅ Production | wallpaperdb_user | PostgreSQL, NATS, Clerk | `profile.created` | - |
 | **Web Frontend** | 3005 | ✅ Production | - | Gateway (GraphQL) | - | - |
-| **Thumbnail Extractor** | 3003 | 📋 Planned | - | MinIO, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
-| **Quality Enrichment** | 3006 | 📋 Planned | wallpaperdb_quality | PostgreSQL, MinIO, NATS | `quality.analyzed` | `wallpaper.uploaded` |
-| **Color Enrichment** | 3007 | 📋 Planned | wallpaperdb_colors | PostgreSQL, MinIO, NATS | `colors.extracted` | `wallpaper.uploaded` |
+| **Thumbnail Extractor** | 3003 | 📋 Planned | - | SeaweedFS, NATS, FFmpeg | `thumbnail.generated` | `wallpaper.uploaded` |
+| **Quality Enrichment** | 3006 | 📋 Planned | wallpaperdb_quality | PostgreSQL, SeaweedFS, NATS | `quality.analyzed` | `wallpaper.uploaded` |
+| **Color Enrichment** | 3007 | 📋 Planned | wallpaperdb_colors | PostgreSQL, SeaweedFS, NATS | `colors.extracted` | `wallpaper.uploaded` |
 | **Tagging** | 3008 | 🚧 In Development | wallpaperdb_tags | PostgreSQL, NATS | - | - |
 
 ## Service Details
@@ -37,7 +37,7 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 
 **Dependencies:**
 - PostgreSQL (wallpaperdb_ingestor)
-- MinIO (wallpapers bucket)
+- SeaweedFS (wallpapers bucket)
 - NATS (wallpaper.* subjects)
 - Redis (rate limiting, caching)
 
@@ -54,7 +54,7 @@ Central registry of all services in the WallpaperDB microservices architecture, 
 ```bash
 PORT=3001
 DATABASE_URL=postgresql://...
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 S3_BUCKET=wallpapers
 NATS_URL=nats://localhost:4222
 REDIS_URL=redis://localhost:6379
@@ -80,7 +80,7 @@ RATE_LIMIT_WINDOW_MS=300000
 
 **Dependencies:**
 - PostgreSQL (wallpaperdb_media)
-- MinIO (wallpapers bucket)
+- SeaweedFS (wallpapers bucket)
 - Redis (metadata caching)
 
 **Events Consumed:**
@@ -105,7 +105,7 @@ RATE_LIMIT_WINDOW_MS=300000
 ```bash
 PORT=3002
 DATABASE_URL=postgresql://...
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 S3_BUCKET=wallpapers
 REDIS_URL=redis://localhost:6379
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -126,7 +126,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - Event-driven processing
 
 **Dependencies:**
-- MinIO (wallpapers bucket)
+- SeaweedFS (wallpapers bucket)
 - NATS (event consumption/publishing)
 
 **Events Consumed:**
@@ -138,7 +138,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 **Configuration:**
 ```bash
 PORT=3004
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 S3_BUCKET=wallpapers
 NATS_URL=nats://localhost:4222
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -289,10 +289,10 @@ VITE_GATEWAY_URL=http://localhost:3000/graphql
 - Extract thumbnails from video wallpapers (MP4, WebM)
 - Multiple thumbnail variants (start, middle, end)
 - FFmpeg integration
-- Thumbnail upload to MinIO
+- Thumbnail upload to SeaweedFS
 
 **Dependencies:**
-- MinIO (wallpapers bucket, thumbnails bucket)
+- SeaweedFS (wallpapers bucket, thumbnails bucket)
 - NATS (event consumption/publishing)
 - FFmpeg (external binary)
 
@@ -305,7 +305,7 @@ VITE_GATEWAY_URL=http://localhost:3000/graphql
 **Configuration:**
 ```bash
 PORT=3003
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 S3_BUCKET_WALLPAPERS=wallpapers
 S3_BUCKET_THUMBNAILS=thumbnails
 NATS_URL=nats://localhost:4222
@@ -327,7 +327,7 @@ FFMPEG_PATH=/usr/bin/ffmpeg
 
 **Dependencies:**
 - PostgreSQL (wallpaperdb_quality)
-- MinIO (wallpapers bucket)
+- SeaweedFS (wallpapers bucket)
 - NATS (event consumption/publishing)
 
 **Events Consumed:**
@@ -352,7 +352,7 @@ FFMPEG_PATH=/usr/bin/ffmpeg
 ```bash
 PORT=3004
 DATABASE_URL=postgresql://...
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 NATS_URL=nats://localhost:4222
 ML_MODEL_PATH=/models/quality.onnx
 ```
@@ -371,7 +371,7 @@ ML_MODEL_PATH=/models/quality.onnx
 
 **Dependencies:**
 - PostgreSQL (wallpaperdb_colors)
-- MinIO (wallpapers bucket)
+- SeaweedFS (wallpapers bucket)
 - NATS (event consumption/publishing)
 - OpenSearch (color search index)
 
@@ -396,7 +396,7 @@ ML_MODEL_PATH=/models/quality.onnx
 ```bash
 PORT=3005
 DATABASE_URL=postgresql://...
-S3_ENDPOINT=http://localhost:9000
+S3_ENDPOINT=http://localhost:8002
 NATS_URL=nats://localhost:4222
 OPENSEARCH_URL=http://localhost:9200
 ```
@@ -511,8 +511,7 @@ NATS_URL=nats://localhost:4222
 
 **Infrastructure ports:**
 - 5432: PostgreSQL
-- 9000: MinIO API
-- 9001: MinIO Console
+- 9000: SeaweedFS S3 API inside Docker; host port 8002 for worktree slot 0
 - 4222: NATS
 - 8222: NATS Monitoring
 - 6379: Redis
@@ -525,7 +524,7 @@ NATS_URL=nats://localhost:4222
 ## Service Startup Order
 
 **Recommended order:**
-1. Infrastructure (PostgreSQL, MinIO, NATS, Redis, OpenSearch)
+1. Infrastructure (PostgreSQL, SeaweedFS, NATS, Redis, OpenSearch)
 2. Core services (Ingestor, Media, Variant Generator)
 3. Gateway (depends on Media)
 4. Web Frontend (depends on Gateway)
@@ -566,7 +565,7 @@ All services implement standard health endpoints:
 
 **GET /ready**
 - Returns 200 OK if service is ready to accept traffic
-- Checks all dependencies (database, MinIO, NATS, Redis)
+- Checks all dependencies (database, SeaweedFS, NATS, Redis)
 - Returns 503 Service Unavailable if any dependency is down
 
 **Example health response:**

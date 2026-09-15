@@ -2,12 +2,12 @@ import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import type { MinioConfig } from "./types.js";
 
 export interface S3ClientOptions {
-  /** Force path-style URLs (required for MinIO, default: true) */
+  /** Force path-style URLs (required for local S3-compatible storage, default: true) */
   forcePathStyle?: boolean;
 }
 
 /**
- * Creates an S3 client configured for MinIO.
+ * Creates an S3 client for the configured object store (locally SeaweedFS).
  *
  * @example
  * ```typescript

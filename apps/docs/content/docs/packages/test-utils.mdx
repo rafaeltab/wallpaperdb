@@ -31,7 +31,7 @@ const tester = await new PostgresTesterBuilder()
 
 // Now you have:
 // - tester.pool (PostgreSQL connection pool)
-// - tester.minio (MinIO S3 client)
+// - tester.minio (SeaweedFS S3 client)
 // - tester.nats (NATS connection)
 ```
 
@@ -51,7 +51,7 @@ const tester = await new PostgresTesterBuilder()
 |---------|---------|----------|
 | `DockerTesterBuilder` | Docker engine access | Docker environment, network |
 | `PostgresTesterBuilder` | PostgreSQL database | Connection pool, migrations |
-| `MinioTesterBuilder` | S3/MinIO storage | S3 client, bucket management |
+| `MinioTesterBuilder` | S3/SeaweedFS storage | S3 client, bucket management |
 | `NatsTesterBuilder` | NATS messaging | NATS connection, JetStream |
 | `RedisTesterBuilder` | Redis cache | Redis client |
 | `OpenSearchTesterBuilder` | OpenSearch search engine | OpenSearch client, configuration |
@@ -132,7 +132,7 @@ const result = await tester.pool.query('SELECT NOW()');
 
 ### MinioTesterBuilder
 
-MinIO/S3 storage with bucket management.
+SeaweedFS/S3 storage with bucket management. The public `MinioTesterBuilder`, `.withMinio()`, and `tester.minio` names remain for compatibility. Tests start `chrislusf/seaweedfs:4.47` and use the AWS SDK S3 client.
 
 ```typescript
 import { MinioTesterBuilder } from "@wallpaperdb/test-utils";
@@ -152,7 +152,7 @@ await tester.minio.send(new PutObjectCommand({
 ```
 
 **Methods:**
-- `withMinio(options?)` - Start MinIO container
+- `withMinio(options?)` - Start SeaweedFS container
 
 **Options:**
 - `buckets` - Array of bucket names to create
@@ -433,9 +433,9 @@ const tester = await new PostgresTesterBuilder()
 
 // Environment variables are set:
 // DATABASE_URL=postgresql://...
-// MINIO_ENDPOINT=http://127.0.0.1:...
-// MINIO_ACCESS_KEY=...
-// MINIO_SECRET_KEY=...
+// S3_ENDPOINT=http://127.0.0.1:...
+// S3_ACCESS_KEY_ID=...
+// S3_SECRET_ACCESS_KEY=...
 ```
 
 ## Default Builder

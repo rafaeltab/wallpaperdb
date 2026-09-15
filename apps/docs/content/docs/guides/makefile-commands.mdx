@@ -25,7 +25,7 @@ make ci               # Run full CI pipeline locally
 ### Starting & Stopping
 
 **make infra-start**
-- Starts all infrastructure services (PostgreSQL, MinIO, NATS, Redis, OpenSearch, Grafana)
+- Starts all infrastructure services (PostgreSQL, SeaweedFS, NATS, Redis, OpenSearch, Grafana)
 - Uses Docker Compose in `infra/` directory
 - First-time startup takes ~2 minutes (downloads images)
 - Subsequent startups take ~10 seconds
@@ -730,7 +730,7 @@ help:
 
 ❌ **Don't:**
 ```bash
-make dev  # Will fail - no database, MinIO, etc.
+make dev  # Will fail - no database, SeaweedFS, etc.
 ```
 
 ✅ **Do:**

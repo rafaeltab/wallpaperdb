@@ -70,18 +70,18 @@ const isHealthy = await dbConnection.checkHealth();
 await dbConnection.close();
 ```
 
-#### MinIO/S3 Connection
+#### S3 Connection
 
-S3 client configuration for MinIO or AWS S3:
+`MinioConnection` retains its public name and uses the AWS SDK S3 client. Configure it for SeaweedFS locally or another S3-compatible service:
 
 ```typescript
 import { MinioConnection } from "@wallpaperdb/core/connections";
 import type { S3Config } from "@wallpaperdb/core/connections/types";
 
 const config: S3Config = {
-  s3Endpoint: process.env.MINIO_ENDPOINT!,
-  s3AccessKeyId: process.env.MINIO_ACCESS_KEY!,
-  s3SecretAccessKey: process.env.MINIO_SECRET_KEY!,
+  s3Endpoint: process.env.S3_ENDPOINT!,
+  s3AccessKeyId: process.env.S3_ACCESS_KEY_ID!,
+  s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
   s3Bucket: 'wallpapers',
   s3Region: 'us-east-1'
 };
@@ -94,10 +94,10 @@ const s3Client = s3Connection.getClient();
 ```
 
 **Features:**
-- Path-style URLs for MinIO compatibility
+- Path-style URLs for SeaweedFS compatibility
 - AWS SDK v3 support
 - Bucket validation
-- Health check via ListBuckets
+- Health check via HeadBucket
 
 #### NATS Connection
 

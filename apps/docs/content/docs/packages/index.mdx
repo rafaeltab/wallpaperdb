@@ -29,7 +29,7 @@ Event schemas (Zod-based) and abstract base classes for publishing and consuming
 ### [@wallpaperdb/testcontainers](/docs/packages/testcontainers)
 **Shared test infrastructure**
 
-Reusable Testcontainers setups for integration testing. Provides custom NATS container configuration and will expand to include PostgreSQL, MinIO, and other infrastructure containers.
+Reusable Testcontainers setups for integration testing. Provides custom NATS container configuration. S3 storage setup runs SeaweedFS through `MinioTesterBuilder` in `@wallpaperdb/test-utils`.
 
 - Custom NATS container with JetStream support
 - Proper wait strategies for container readiness
@@ -38,7 +38,7 @@ Reusable Testcontainers setups for integration testing. Provides custom NATS con
 ### [@wallpaperdb/test-utils](/docs/packages/test-utils)
 **TesterBuilder pattern framework**
 
-Composable test infrastructure builders using the TesterBuilder pattern. Provides 9 infrastructure builders (Docker, Postgres, MinIO, NATS, Redis, Fixtures, Cleanup, Setup, Destroy) with type-safe composition.
+Composable test infrastructure builders using the TesterBuilder pattern. Provides 9 infrastructure builders (Docker, Postgres, SeaweedFS, NATS, Redis, Fixtures, Cleanup, Setup, Destroy) with type-safe composition.
 
 - Infrastructure builders for all services
 - Composable mixin pattern

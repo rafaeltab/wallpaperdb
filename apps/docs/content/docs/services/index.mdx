@@ -10,7 +10,7 @@ WallpaperDB uses a microservices architecture with specialized services for diff
 ### Ingestor Service
 **Status:** ✅ Complete (Production-ready)
 
-The entry point for wallpapers into the system. Handles file uploads, validation, storage in MinIO, and event publishing for downstream processing.
+The entry point for wallpapers into the system. Handles file uploads, validation, storage in SeaweedFS, and event publishing for downstream processing.
 
 **Key Features:**
 - Multi-part file upload with streaming
@@ -33,7 +33,7 @@ The entry point for wallpapers into the system. Handles file uploads, validation
 Retrieval and serving of wallpapers with on-demand resizing and format conversion.
 
 **Key Features:**
-- Wallpaper retrieval from MinIO
+- Wallpaper retrieval from SeaweedFS
 - On-demand image resizing (Sharp)
 - Multiple resize modes (contain, cover, fill)
 - CDN-ready caching headers
@@ -216,7 +216,7 @@ Ingestor → wallpaper.uploaded → {
 
 ### Service Registry
 
-| Service | Port | Database | S3/MinIO | NATS | Redis | Status |
+| Service | Port | Database | S3/SeaweedFS | NATS | Redis | Status |
 |---------|------|----------|----------|------|-------|--------|
 | Ingestor | 3001 | ✓ | ✓ | ✓ (publish) | ✓ | ✅ Complete |
 | Media | 3002 | ✓ | ✓ | ✓ (consume) | - | ✅ Complete |
@@ -233,7 +233,7 @@ Ingestor → wallpaper.uploaded → {
 
 All services use:
 - **PostgreSQL** - Primary data store
-- **MinIO** - S3-compatible object storage
+- **SeaweedFS** - S3-compatible object storage
 - **NATS JetStream** - Event bus with durability
 - **Grafana LGTM** - Observability (traces, metrics, logs)
 
@@ -257,7 +257,7 @@ See [Packages](/docs/packages) for complete package documentation.
 
 ### Database & Storage
 - **Drizzle ORM** - Type-safe PostgreSQL queries
-- **AWS SDK v3** - S3/MinIO client
+- **AWS SDK v3** - S3/SeaweedFS client
 - **IORedis** - Redis client
 
 ### Observability

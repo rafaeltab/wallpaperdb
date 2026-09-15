@@ -19,5 +19,5 @@ What purpose does this new service serve?
 - [ ] NATS.io
 - [ ] GraphQL
 - [ ] Postgres
-- [ ] S3 / Minio
+- [ ] S3 / SeaweedFS
 - [ ] OpenSearch

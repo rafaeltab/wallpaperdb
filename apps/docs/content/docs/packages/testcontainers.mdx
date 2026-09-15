@@ -200,20 +200,9 @@ const postgresContainer = await createPostgresContainer({
 const connectionUrl = postgresContainer.getConnectionUrl();
 ```
 
-#### MinIO Container (Planned)
+#### S3 Storage Container
 
-```typescript
-import { createMinioContainer } from '@wallpaperdb/testcontainers/containers';
-
-const minioContainer = await createMinioContainer({
-  accessKey: 'minioadmin',
-  secretKey: 'minioadmin',
-  buckets: ['wallpapers', 'thumbnails'] // Create buckets on startup
-});
-
-const endpoint = minioContainer.getEndpoint();
-const credentials = minioContainer.getCredentials();
-```
+S3 test storage is provided by `MinioTesterBuilder` in [`@wallpaperdb/test-utils`](/docs/packages/test-utils#miniotesterbuilder). It starts SeaweedFS and exposes bucket management and an AWS SDK S3 client. The historical builder name remains compatible with existing tests.
 
 #### Redis Container (Planned)
 

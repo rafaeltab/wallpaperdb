@@ -92,7 +92,7 @@ describe('DatabaseConfigSchema', () => {
 **When to use:**
 - Testing HTTP routes
 - Testing database operations (Drizzle ORM)
-- Testing MinIO uploads
+- Testing SeaweedFS uploads
 - Testing NATS event publishing
 - Testing Redis caching
 - Testing service interactions
@@ -150,7 +150,7 @@ describe('POST /upload', () => {
 ```
 
 **Advantages:**
-- Tests real infrastructure (PostgreSQL, MinIO, NATS, Redis)
+- Tests real infrastructure (PostgreSQL, SeaweedFS, NATS, Redis)
 - Catches integration bugs (serialization, connection pooling)
 - Fast enough for TDD workflow
 - Container reuse across test files (< 5s startup)
@@ -301,7 +301,7 @@ import { TesterBuilder } from '@wallpaperdb/test-utils';
 
 const { app, db, cleanup } = await new TesterBuilder()
   .withPostgres()         // PostgreSQL container + migrations
-  .withMinIO()            // MinIO container + bucket setup
+  .withMinIO()            // SeaweedFS container + bucket setup
   .withNATS()             // NATS container + stream setup
   .withRedis()            // Redis container
   .withIngestorApp()      // In-process Fastify app (integration)
@@ -654,7 +654,7 @@ it('should call uploadToMinIO with correct params', async () => {
 
 ✅ **Good:**
 ```typescript
-it('should upload file to MinIO', async () => {
+it('should upload file to SeaweedFS', async () => {
   await handler(request);
   const exists = await storage.fileExists('bucket', 'key');
   expect(exists).toBe(true);

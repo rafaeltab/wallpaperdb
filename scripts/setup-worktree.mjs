@@ -31,6 +31,7 @@ import {
 	applyOverrides,
 	extractKeys,
 	filterApplicableSecrets,
+	normalizeStorageEnvironment,
 	syncKnownSecretsToContent,
 	resolveGenerateMarker,
 } from "./lib/env-pipeline.mjs";
@@ -169,7 +170,7 @@ function getProjectName(isWorktree, branch) {
  * Port offsets (relative to base = 8000 + slot * 10):
  *   +0  INGRESS_PORT          (Caddy)
  *   +1  POSTGRES_HOST_PORT
- *   +2  MINIO_API_HOST_PORT
+ *   +2  S3_API_HOST_PORT
  *   +3  NATS_HOST_PORT
  *   +4  REDIS_HOST_PORT
  *   +5  OPENSEARCH_HOST_PORT
@@ -181,7 +182,7 @@ function computePorts(slot) {
 	return {
 		INGRESS_PORT: base + 0,
 		POSTGRES_HOST_PORT: base + 1,
-		MINIO_API_HOST_PORT: base + 2,
+		S3_API_HOST_PORT: base + 2,
 		NATS_HOST_PORT: base + 3,
 		REDIS_HOST_PORT: base + 4,
 		OPENSEARCH_HOST_PORT: base + 5,
@@ -366,7 +367,7 @@ function buildWorktreeFileContent(slot, projectName, ports) {
 		`COMPOSE_PROJECT_NAME=${projectName}`,
 		`INGRESS_PORT=${ports.INGRESS_PORT}`,
 		`POSTGRES_HOST_PORT=${ports.POSTGRES_HOST_PORT}`,
-		`MINIO_API_HOST_PORT=${ports.MINIO_API_HOST_PORT}`,
+		`S3_API_HOST_PORT=${ports.S3_API_HOST_PORT}`,
 		`NATS_HOST_PORT=${ports.NATS_HOST_PORT}`,
 		`REDIS_HOST_PORT=${ports.REDIS_HOST_PORT}`,
 		`OPENSEARCH_HOST_PORT=${ports.OPENSEARCH_HOST_PORT}`,
@@ -455,7 +456,7 @@ function findEnvExamples(dir) {
 // ─── Override Maps ──────────────────────────────────────────────────────────
 
 const globalOverrides = {
-	S3_ENDPOINT: "http://minio:9000",
+	S3_ENDPOINT: "http://seaweedfs:9000",
 	NATS_URL: "nats://nats:4222",
 	OTEL_EXPORTER_OTLP_ENDPOINT: "http://lgtm:4318",
 	REDIS_HOST: "redis",
@@ -469,7 +470,7 @@ function buildServiceOverrides() {
 			COMPOSE_PROJECT_NAME: (ctx) => ctx.projectName,
 			INGRESS_PORT: (ctx) => String(ctx.ports.INGRESS_PORT),
 			POSTGRES_HOST_PORT: (ctx) => String(ctx.ports.POSTGRES_HOST_PORT),
-			MINIO_API_HOST_PORT: (ctx) => String(ctx.ports.MINIO_API_HOST_PORT),
+			S3_API_HOST_PORT: (ctx) => String(ctx.ports.S3_API_HOST_PORT),
 			NATS_HOST_PORT: (ctx) => String(ctx.ports.NATS_HOST_PORT),
 			REDIS_HOST_PORT: (ctx) => String(ctx.ports.REDIS_HOST_PORT),
 			OPENSEARCH_HOST_PORT: (ctx) => String(ctx.ports.OPENSEARCH_HOST_PORT),
@@ -597,7 +598,8 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
 
 	ensureSecretEnv(secretEnvPath);
 	syncKnownSecrets(secretEnvPath);
-	const secrets = loadSecrets(secretEnvPath);
+	const secrets = normalizeStorageEnvironment(loadSecrets(secretEnvPath));
+	const environment = normalizeStorageEnvironment(process.env);
 
 	const exampleFiles = findEnvExamples(repoRoot);
 
@@ -638,8 +640,8 @@ function generateAllEnvFiles(repoRoot, projectName, ports) {
 
 		const envOverrides = {};
 		for (const key of exampleKeys) {
-			if (key in process.env) {
-				envOverrides[key] = process.env[key];
+			if (key in environment) {
+				envOverrides[key] = environment[key];
 			}
 		}
 		if (Object.keys(envOverrides).length > 0) {
@@ -787,7 +789,7 @@ function main() {
 			`  Project name : ${projectName}\n` +
 			`  Ingress      : http://localhost:${ports.INGRESS_PORT}\n` +
 			`  Postgres     : localhost:${ports.POSTGRES_HOST_PORT}\n` +
-			`  MinIO API    : localhost:${ports.MINIO_API_HOST_PORT}\n` +
+			`  S3 API       : localhost:${ports.S3_API_HOST_PORT}\n` +
 			`  NATS         : localhost:${ports.NATS_HOST_PORT}\n` +
 			`  Redis        : localhost:${ports.REDIS_HOST_PORT}\n` +
 			`  OpenSearch   : localhost:${ports.OPENSEARCH_HOST_PORT}\n` +

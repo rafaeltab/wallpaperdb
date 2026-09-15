@@ -50,7 +50,7 @@ You should see output like:
 make infra-start
 ```
 
-This starts PostgreSQL, MinIO, NATS, Redis, OpenSearch, and Grafana in Docker. First run takes about 2 minutes as images are pulled.
+This starts PostgreSQL, SeaweedFS, NATS, Redis, OpenSearch, and Grafana in Docker. First run takes about 2 minutes as images are pulled.
 
 ### 2. Start all services
 
@@ -74,10 +74,11 @@ Everything runs behind a single ingress at **http://localhost:8000**.
 | http://localhost:8000/gateway | GraphQL gateway |
 | http://localhost:8000/variant-generator | Variant generator API |
 | http://localhost:8000/grafana | Grafana (observability) |
-| http://localhost:8000/minio | MinIO console |
 | http://localhost:8000/pgadmin | pgAdmin |
 | http://localhost:8000/opensearch-dashboards | OpenSearch Dashboards |
 | http://localhost:8000/nats | NATS monitoring |
+
+SeaweedFS exposes its S3 API at **http://localhost:8002** for slot 0 (`8002 + 10 × slot` for other worktrees). The default access key and secret key are both `minioadmin`. Use the AWS CLI or another S3 client to administer objects. Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout to release the old storage port and network alias. See [storage setup and migration](apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data) for instructions if you have already switched and for copying existing data without deleting its volumes.
 
 Individual service health checks:
 ```bash
@@ -93,6 +94,7 @@ curl http://localhost:8000/gateway/health
 Tests do not require `make dev` to be running. They spin up their own containers via Testcontainers.
 
 ```bash
+make storage-test      # S3 storage contract against a real SeaweedFS container
 make test-unit         # Fast, no Docker needed (~5s)
 make test-integration  # Integration tests with real infra containers (~30s)
 make test-e2e          # Full E2E tests, sequential (~2min)

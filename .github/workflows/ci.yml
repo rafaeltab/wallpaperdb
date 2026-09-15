@@ -45,6 +45,9 @@ jobs:
       - name: Run unit and integration tests
         run: turbo run test:unit test:integration
 
+      - name: Verify object storage configuration
+        run: make storage-infra-test
+
       - name: Merge coverage reports
         run: pnpm coverage:merge
 

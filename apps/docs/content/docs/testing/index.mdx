@@ -25,7 +25,7 @@ Are you new to this testing approach?
 ├─ Yes → Start with test-builder-pattern
 └─ No
    ├─ Writing a new test?
-   │  ├─ Standard infrastructure (Postgres/MinIO/NATS)?
+   │  ├─ Standard infrastructure (Postgres/SeaweedFS/NATS)?
    │  │  └─ → test-builder-pattern (Quick Start section)
    │  └─ Custom application setup needed?
    │     └─ → creating-custom-builders
@@ -41,7 +41,7 @@ Are you new to this testing approach?
 
 WallpaperDB uses **real infrastructure** for all tests:
 
-- Testcontainers for Postgres, MinIO, NATS, Redis
+- Testcontainers for Postgres, SeaweedFS, NATS, Redis
 - Actual Docker containers, not mocks
 - Production-like behavior
 - No in-memory databases

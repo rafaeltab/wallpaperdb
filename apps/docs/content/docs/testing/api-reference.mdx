@@ -192,7 +192,7 @@ class PostgresTesterBuilder extends BaseTesterBuilder<
 
 ### MinioTesterBuilder
 
-Manages MinIO (S3-compatible) containers.
+Manages SeaweedFS (S3-compatible) containers. The `MinioTesterBuilder` name is retained for compatibility; `.withMinio()` and `tester.minio` use the same S3 API as before.
 
 ```typescript
 class MinioTesterBuilder extends BaseTesterBuilder<
@@ -202,7 +202,7 @@ class MinioTesterBuilder extends BaseTesterBuilder<
 ```
 
 **Configuration Methods:**
-- `withImage(image: string)`: Docker image (default: `minio/minio:latest`)
+- `withImage(image: string)`: Compatible SeaweedFS Docker image (default: `chrislusf/seaweedfs:4.47`)
 - `withAccessKey(key: string)`: Access key (default: `minioadmin`)
 - `withSecretKey(key: string)`: Secret key (default: `minioadmin`)
 
@@ -212,12 +212,19 @@ class MinioTesterBuilder extends BaseTesterBuilder<
 **Returns:**
 ```typescript
 {
-  container: StartedMinioContainer,
-  endpoint: string,
+  container: StartedTestContainer,
+  endpoints: {
+    networked: string,
+    fromHost: string,
+    fromHostDockerInternal: string,
+    directIp: string
+  },
   options: MinioOptions,
   buckets: string[]
 }
 ```
+
+Use `container.getMappedPort(9000)` for the published S3 port; the container is a generic `StartedTestContainer`. Prefer the supplied `endpoints` for connections from hosts or Docker networks.
 
 ### NatsTesterBuilder
 

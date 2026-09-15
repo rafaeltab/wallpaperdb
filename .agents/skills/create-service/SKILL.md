@@ -15,7 +15,7 @@ Copy the structure of `apps/ingestor` as your starting point. It is the canonica
 
 Every service must consume:
 
-- **`@wallpaperdb/core`** — connection managers (database, MinIO, NATS, Redis, OTEL), config schemas, telemetry helpers (`withSpan`, `recordCounter`, `recordHistogram`), health aggregator, OpenAPI plugin, RFC 7807 error classes
+- **`@wallpaperdb/core`** — connection managers (database, SeaweedFS, NATS, Redis, OTEL), config schemas, telemetry helpers (`withSpan`, `recordCounter`, `recordHistogram`), health aggregator, OpenAPI plugin, RFC 7807 error classes
 - **`@wallpaperdb/events`** — event schemas (Zod), `BaseEventPublisher`, `BaseEventConsumer`
 
 Optional (add as needed):

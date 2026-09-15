@@ -383,11 +383,24 @@ export class ProfileService {
       if (!history.some((entry) => entry.handle === handle)) {
         throw new IneligibleHandleError('This Handle is not in your recent 30-day Profile history');
       }
-      const [alias] = await tx
-        .insert(handleClaims)
-        .values({ handle, profileId: userId, kind: 'alias', createdAt: now })
-        .onConflictDoNothing()
-        .returning();
+      const existing = await tx.query.handleClaims.findFirst({
+        where: eq(handleClaims.handle, handle),
+      });
+      if (existing && (existing.profileId !== userId || existing.kind !== 'alias')) {
+        throw new HandleUnavailableError('This Handle is already claimed');
+      }
+      if (existing && !existing.expiresAt) return this.ownerProfile(current, tx);
+      const [alias] = existing
+        ? await tx
+            .update(handleClaims)
+            .set({ expiresAt: null, createdAt: now })
+            .where(eq(handleClaims.handle, handle))
+            .returning()
+        : await tx
+            .insert(handleClaims)
+            .values({ handle, profileId: userId, kind: 'alias', createdAt: now })
+            .onConflictDoNothing()
+            .returning();
       if (!alias) throw new HandleUnavailableError('This Handle is already claimed');
       const [updated] = await tx
         .update(profiles)
@@ -407,7 +420,7 @@ export class ProfileService {
           type: 'alias-reactivated',
           handle,
           claimGeneration: alias.claimGeneration,
-          before: null,
+          before: existing?.expiresAt?.toISOString() ?? null,
           after: null,
         },
         profile: {
@@ -424,15 +437,13 @@ export class ProfileService {
         },
       };
       ProfileUpdatedEventSchema.parse(event);
-      await tx
-        .insert(outboxEvents)
-        .values({
-          id: event.eventId,
-          subject: event.eventType,
-          aggregateId: userId,
-          payload: event,
-          createdAt: now,
-        });
+      await tx.insert(outboxEvents).values({
+        id: event.eventId,
+        subject: event.eventType,
+        aggregateId: userId,
+        payload: event,
+        createdAt: now,
+      });
       return this.ownerProfile(updated, tx, aliases, now);
     });
   }

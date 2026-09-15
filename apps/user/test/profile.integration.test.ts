@@ -181,6 +181,32 @@ describe('Profile commands', () => {
     expect(event.payload.profile).not.toHaveProperty('historicalHandles');
   });
 
+  it('keeps an expiring alias with the same claim and defeats its stale expiry candidate', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const alias = scheduled.aliases[0];
+      vi.setSystemTime(new Date('2030-01-01T01:00:00.000Z'));
+      const response = await reactivateAlias('user_1', original.handle, scheduled.version);
+      expect(response.statusCode).toBe(200);
+      const kept = response.json();
+      expect(kept).toMatchObject({ handle: changed.handle, lastHandleChangedAt: changed.lastHandleChangedAt, version: scheduled.version + 1, aliases: [{ ...alias, createdAt: '2030-01-01T01:00:00.000Z', expiresAt: null }], historicalHandles: [] });
+      const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`;
+      expect(event.payload).toMatchObject({ change: { type: 'alias-reactivated', handle: alias.handle, claimGeneration: alias.claimGeneration, before: alias.expiresAt, after: null }, profile: { aliases: kept.aliases, version: kept.version } });
+      expect((await reactivateAlias('user_1', original.handle, kept.version)).json()).toEqual(kept);
+      expect((await reactivateAlias('user_1', original.handle, scheduled.version)).statusCode).toBe(409);
+      vi.setSystemTime(new Date(alias.expiresAt));
+      expect(await service().expireDueAlias({ profileId: original.id, handle: alias.handle, claimGeneration: alias.claimGeneration }, new Date())).toBe(false);
+      expect((await request('user_1')).json()).toEqual(kept);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

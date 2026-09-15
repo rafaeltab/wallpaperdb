@@ -13,7 +13,6 @@
  * the worktree slot hasn't changed.
  */
 
-import { randomBytes } from "node:crypto";
 import { execSync } from "node:child_process";
 import {
 	existsSync,
@@ -33,6 +32,7 @@ import {
 	filterApplicableSecrets,
 	syncKnownSecretsToContent,
 	resolveGenerateMarker,
+	knownUserSecrets,
 } from "./lib/env-pipeline.mjs";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -483,6 +483,7 @@ function buildServiceOverrides() {
 		"apps/media": {
 			DATABASE_URL:
 				"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_media",
+			USER_SERVICE_URL: "http://user:3009",
 		},
 		"apps/gateway": {
 			OPENSEARCH_URL: "http://opensearch:9200",
@@ -506,6 +507,7 @@ function buildServiceOverrides() {
 			VITE_GATEWAY_URL: "/gateway/graphql",
 			VITE_INGESTOR_URL: "/ingestor",
 			VITE_USER_URL: "/user",
+			VITE_MEDIA_URL: "/media",
 		},
 		"apps/web-e2e": {
 			PLAYWRIGHT_BASE_URL: (ctx) =>
@@ -515,16 +517,6 @@ function buildServiceOverrides() {
 }
 
 // ─── User Secrets ───────────────────────────────────────────────────────────
-
-const knownUserSecrets = {
-	CURSOR_SECRET: () => randomBytes(32).toString("hex"),
-	VITE_CLERK_PUBLISHABLE_KEY: undefined,
-	CLERK_DOMAIN: undefined,
-	CLERK_SECRET_KEY: undefined,
-	CLERK_PUBLISHABLE_KEY: undefined,
-	E2E_BASE_TEST_EMAIL: undefined,
-	E2E_BASE_TEST_PASSWORD: undefined,
-};
 
 function getSecretEnvPaths() {
 	const configDir =

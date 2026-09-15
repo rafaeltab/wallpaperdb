@@ -77,6 +77,7 @@ export function filterApplicableSecrets(secrets, exampleKeys, dir, log) {
 
 export const knownUserSecrets = {
 	CURSOR_SECRET: () => randomBytes(32).toString("hex"),
+	USER_MEDIA_SERVICE_TOKEN: () => randomBytes(32).toString("hex"),
 	VITE_CLERK_PUBLISHABLE_KEY: undefined,
 	CLERK_DOMAIN: undefined,
 	CLERK_SECRET_KEY: undefined,

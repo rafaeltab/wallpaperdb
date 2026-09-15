@@ -104,11 +104,14 @@ describe('UploadQueueToastManager', () => {
 
   it('keeps a new upload when the previous completion toast is dismissed', async () => {
     const user = userEvent.setup();
-    vi.mocked(uploadWallpaperWithDetails).mockResolvedValueOnce(uploaded);
+    vi.mocked(uploadWallpaperWithDetails).mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(uploaded), 50))
+    );
     renderQueue();
 
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
-    await user.click(screen.getByRole('button', { name: 'Dismiss' }));
+    // Upload completion reaches the shared toast asynchronously, even for a fast API.
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
     await user.click(screen.getByRole('button', { name: 'Add upload' }));
     await act(() => new Promise((resolve) => setTimeout(resolve, 350)));
 

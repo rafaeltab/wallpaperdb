@@ -1,7 +1,17 @@
 // THROWAWAY: five Profile settings layouts on /settings/profile?variant=A|B|C|D|E.
 // All edits stay in React state. Delete after the design decision; do not promote as-is.
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  Clock3,
+  Link2,
+  LoaderCircle,
+  Pencil,
+  Upload,
+  X,
+} from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -15,6 +25,7 @@ import { PrototypeSwitcher } from '@/components/ui/prototype-switcher';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Profile } from '@/lib/api/user';
+import './profile-settings.prototype.css';
 
 type Variant = 'A' | 'B' | 'C' | 'D' | 'E';
 const HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -30,6 +41,14 @@ function relativeAvailability(remainingMs: number) {
   return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 type BiographyEdit = { draft: string; preview: boolean };
+type InlineField = 'name' | 'handle' | 'biography';
+type SavePhase = 'saving' | 'success' | 'error';
+const saveLabels: Record<InlineField, string> = {
+  name: 'Display name',
+  handle: 'Profile handle',
+  biography: 'Biography',
+};
+const SAVE_TOAST_ID = 'profile-prototype-save';
 type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
   handle: string;
@@ -98,6 +117,53 @@ export default function ProfileSettingsPrototype({
   const [editor, setEditor] = useState<Editor>(null);
   const [biographyEdit, setBiographyEdit] = useState<BiographyEdit | null>(null);
   const biographyEditButton = useRef<HTMLButtonElement>(null);
+  const [saveFeedback, setSaveFeedback] = useState<{ field: InlineField; phase: SavePhase } | null>(
+    null
+  );
+  const [failNextSave, setFailNextSave] = useState(false);
+  const saveTimer = useRef<number | null>(null);
+  const finishSave = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+      toast.dismiss(SAVE_TOAST_ID);
+    },
+    []
+  );
+  function clearSave() {
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = null;
+    finishSave.current?.();
+    finishSave.current = null;
+    setSaveFeedback(null);
+    toast.dismiss(SAVE_TOAST_ID);
+  }
+  // Deliberately simulated: these prototypes never write to the API.
+  function saveInline(field: InlineField, commit: () => void, finish: () => void) {
+    if (saveTimer.current !== null) return;
+    const shouldFail = failNextSave;
+    setFailNextSave(false);
+    setSaveFeedback({ field, phase: 'saving' });
+    saveTimer.current = window.setTimeout(() => {
+      setSaveFeedback({ field, phase: shouldFail ? 'error' : 'success' });
+      if (shouldFail) {
+        toast.error(`Couldn't save ${saveLabels[field].toLowerCase()}`, {
+          id: SAVE_TOAST_ID,
+          description: 'Your changes are still here. Please try again.',
+        });
+      } else {
+        commit();
+        finishSave.current = finish;
+        toast.success(`${saveLabels[field]} saved`, { id: SAVE_TOAST_ID, description: null });
+      }
+      saveTimer.current = window.setTimeout(() => {
+        saveTimer.current = null;
+        setSaveFeedback(null);
+        finishSave.current?.();
+        finishSave.current = null;
+      }, 1600);
+    }, 900);
+  }
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -122,8 +188,9 @@ export default function ProfileSettingsPrototype({
     } else openEditor('biography');
   }
   function finishBiographyEdit() {
+    const restoreFocus = document.activeElement?.closest('[data-prototype-biography-editor]');
     setBiographyEdit(null);
-    requestAnimationFrame(() => biographyEditButton.current?.focus());
+    if (restoreFocus) requestAnimationFrame(() => biographyEditButton.current?.focus());
   }
   const retained = value.aliases.filter((alias) => alias.status === 'retained').length;
   const expiring = value.aliases.filter((alias) => alias.status === 'expiring').length;
@@ -285,11 +352,21 @@ export default function ProfileSettingsPrototype({
               compact
               edit={biographyEdit}
               onEdit={setBiographyEdit}
-              update={(patch, message) => {
-                update(patch, message);
+              phase={saveFeedback?.field === 'biography' ? saveFeedback.phase : undefined}
+              saveBusy={saveFeedback !== null}
+              update={(patch) =>
+                saveInline(
+                  'biography',
+                  () => {
+                    setValue((current) => ({ ...current, ...patch }));
+                  },
+                  finishBiographyEdit
+                )
+              }
+              cancel={() => {
+                if (saveFeedback?.field === 'biography') clearSave();
                 finishBiographyEdit();
               }}
-              cancel={finishBiographyEdit}
             />
           ) : (
             <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
@@ -319,11 +396,21 @@ export default function ProfileSettingsPrototype({
             inline
             edit={biographyEdit}
             onEdit={setBiographyEdit}
-            update={(patch, message) => {
-              update(patch, message);
+            phase={saveFeedback?.field === 'biography' ? saveFeedback.phase : undefined}
+            saveBusy={saveFeedback !== null}
+            update={(patch) =>
+              saveInline(
+                'biography',
+                () => {
+                  setValue((current) => ({ ...current, ...patch }));
+                },
+                finishBiographyEdit
+              )
+            }
+            cancel={() => {
+              if (saveFeedback?.field === 'biography') clearSave();
               finishBiographyEdit();
             }}
-            cancel={finishBiographyEdit}
           />
         ) : value.biography.trim() ? (
           <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
@@ -348,11 +435,21 @@ export default function ProfileSettingsPrototype({
       appearance={variant === 'E' ? 'profile' : 'settings'}
       value={value.name}
       draft={inlineDrafts.name}
-      onDraft={(draft) => setInlineDrafts((current) => ({ ...current, name: draft }))}
-      onSave={(name) => {
-        update({ name }, 'Display name updated');
-        setInlineDrafts((current) => ({ ...current, name: null }));
+      phase={saveFeedback?.field === 'name' ? saveFeedback.phase : undefined}
+      saveBusy={saveFeedback !== null}
+      onDraft={(draft) => {
+        if (draft === null && saveFeedback?.field === 'name') clearSave();
+        setInlineDrafts((current) => ({ ...current, name: draft }));
       }}
+      onSave={(name) =>
+        saveInline(
+          'name',
+          () => {
+            setValue((current) => ({ ...current, name }));
+          },
+          () => setInlineDrafts((current) => ({ ...current, name: null }))
+        )
+      }
     />
   );
   const inlineHandle = (
@@ -404,24 +501,32 @@ export default function ProfileSettingsPrototype({
         }
         value={value.handle}
         draft={inlineDrafts.handle}
-        onDraft={(draft) => setInlineDrafts((current) => ({ ...current, handle: draft }))}
-        onSave={(handle) => {
-          const changedAt = Date.now();
-          setNow(changedAt);
-          update(
-            {
-              handle,
-              nextHandleChangeAt: new Date(changedAt + HANDLE_COOLDOWN_MS).toISOString(),
-              aliases: [
-                { handle: value.handle, status: 'retained' },
-                ...value.aliases.filter((alias) => alias.handle !== handle),
-              ],
-            },
-            'Profile handle updated'
-          );
-          setHandle(handle);
-          setInlineDrafts((current) => ({ ...current, handle: null }));
+        phase={saveFeedback?.field === 'handle' ? saveFeedback.phase : undefined}
+        saveBusy={saveFeedback !== null}
+        onDraft={(draft) => {
+          if (draft === null && saveFeedback?.field === 'handle') clearSave();
+          setInlineDrafts((current) => ({ ...current, handle: draft }));
         }}
+        onSave={(handle) =>
+          saveInline(
+            'handle',
+            () => {
+              const changedAt = Date.now();
+              setNow(changedAt);
+              setValue((current) => ({
+                ...current,
+                handle,
+                nextHandleChangeAt: new Date(changedAt + HANDLE_COOLDOWN_MS).toISOString(),
+                aliases: [
+                  { handle: current.handle, status: 'retained' },
+                  ...current.aliases.filter((alias) => alias.handle !== handle),
+                ],
+              }));
+              setHandle(handle);
+            },
+            () => setInlineDrafts((current) => ({ ...current, handle: null }))
+          )
+        }
       />
       {variant !== 'E' && aliases}
     </div>
@@ -521,33 +626,49 @@ export default function ProfileSettingsPrototype({
         modalOpen={editor !== null}
         extraControls={
           (variant === 'D' || variant === 'E') && (
-            <Button
-              type="button"
-              variant={handleLocked ? 'secondary' : 'ghost'}
-              size="xs"
-              aria-label="Preview handle cooldown"
-              aria-pressed={handleLocked}
-              onClick={() => {
-                const previewNow = Date.now();
-                setNow(previewNow);
-                setValue((current) => ({
-                  ...current,
-                  nextHandleChangeAt: handleLocked
-                    ? null
-                    : new Date(previewNow + HANDLE_COOLDOWN_MS).toISOString(),
-                }));
-                setInlineDrafts((current) => ({ ...current, handle: null }));
-              }}
-            >
-              <Clock3 />
-              Cooldown
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant={handleLocked ? 'secondary' : 'ghost'}
+                size="xs"
+                aria-label="Preview handle cooldown"
+                aria-pressed={handleLocked}
+                onClick={() => {
+                  clearSave();
+                  const previewNow = Date.now();
+                  setNow(previewNow);
+                  setValue((current) => ({
+                    ...current,
+                    nextHandleChangeAt: handleLocked
+                      ? null
+                      : new Date(previewNow + HANDLE_COOLDOWN_MS).toISOString(),
+                  }));
+                  setInlineDrafts((current) => ({ ...current, handle: null }));
+                }}
+              >
+                <Clock3 />
+                Cooldown
+              </Button>
+              <Button
+                type="button"
+                variant={failNextSave ? 'secondary' : 'ghost'}
+                size="xs"
+                aria-pressed={failNextSave}
+                disabled={saveFeedback !== null}
+                onClick={() => setFailNextSave((current) => !current)}
+              >
+                Fail next save
+              </Button>
+            </>
           )
         }
-        onChange={(next) =>
-          void navigate({ search: { variant: next }, replace: true, resetScroll: false })
-        }
+        onChange={(next) => {
+          clearSave();
+          void navigate({ search: { variant: next }, replace: true, resetScroll: false });
+        }}
         onReset={() => {
+          clearSave();
+          setFailNextSave(false);
           const fresh = initialProfile(profile);
           setValue(fresh);
           setHandle(fresh.handle);
@@ -555,6 +676,7 @@ export default function ProfileSettingsPrototype({
           setBiographyEdit(null);
         }}
         onExample={() => {
+          clearSave();
           setValue((current) => ({
             ...current,
             biography:
@@ -581,6 +703,8 @@ export default function ProfileSettingsPrototype({
           handleDraft: handle,
           inlineDrafts,
           biographyEdit,
+          saveFeedback,
+          failNextSave,
           editor,
         }}
       />
@@ -702,6 +826,24 @@ export function VariantE({
   );
 }
 
+function saveActionLabel(label: string, phase?: SavePhase) {
+  if (phase === 'saving') return `Saving ${label.toLowerCase()}`;
+  if (phase === 'success') return `${label} saved`;
+  if (phase === 'error') return `${label} not saved`;
+  return `Save ${label.toLowerCase()}`;
+}
+
+function SaveGlyph({ phase, className }: { phase?: SavePhase; className: string }) {
+  const Icon = phase === 'saving' ? LoaderCircle : phase === 'error' ? X : Check;
+  return (
+    <Icon
+      aria-hidden="true"
+      data-save-phase={phase}
+      className={`${className} prototype-save-feedback ${phase === 'saving' ? 'animate-spin motion-reduce:animate-none' : ''}`}
+    />
+  );
+}
+
 function InlineProfileText({
   kind,
   appearance = 'settings',
@@ -709,6 +851,8 @@ function InlineProfileText({
   draft,
   onDraft,
   onSave,
+  phase,
+  saveBusy,
   disabled = false,
   disabledHintId,
   disabledNotice,
@@ -719,25 +863,43 @@ function InlineProfileText({
   draft: string | null;
   onDraft: (draft: string | null) => void;
   onSave: (value: string) => void;
+  phase?: SavePhase;
+  saveBusy: boolean;
   disabled?: boolean;
   disabledHintId?: string;
   disabledNotice?: ReactNode;
 }) {
-  const editing = draft !== null && !disabled;
+  const editing = draft !== null && (!disabled || phase === 'success');
+  const pending = phase === 'saving' || phase === 'success';
   const label = kind === 'name' ? 'Display name' : 'Profile handle';
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const profileForm = useRef<HTMLFormElement>(null);
   const readHeight = useRef<number | undefined>(undefined);
   const wasEditing = useRef(false);
+  const ownsFocus = useRef(false);
   useEffect(() => {
-    if (editing) input.current?.focus();
-    else if (wasEditing.current) {
+    const trackFocus = (event: FocusEvent) => {
+      ownsFocus.current =
+        event.target instanceof Node &&
+        Boolean(input.current?.closest('form')?.contains(event.target));
+    };
+    document.addEventListener('focusin', trackFocus);
+    return () => document.removeEventListener('focusin', trackFocus);
+  }, []);
+  useEffect(() => {
+    if (editing && !wasEditing.current) input.current?.focus();
+    else if (wasEditing.current && ownsFocus.current) {
       if (disabled && disabledHintId) document.getElementById(disabledHintId)?.focus();
       else button.current?.focus();
     }
     wasEditing.current = editing;
   }, [editing, disabled, disabledHintId]);
+  useEffect(() => {
+    if (phase === 'error' && input.current?.closest('form')?.contains(document.activeElement)) {
+      input.current.focus();
+    }
+  }, [phase]);
   const valid =
     draft !== null &&
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
@@ -754,7 +916,7 @@ function InlineProfileText({
           style={{ minHeight: editing ? readHeight.current : undefined }}
           onSubmit={(event) => {
             event.preventDefault();
-            if (editing && valid && draft.trim() !== value) onSave(draft.trim());
+            if (!saveBusy && editing && valid && draft.trim() !== value) onSave(draft.trim());
           }}
         >
           <div className="flex min-w-0 items-baseline">
@@ -766,6 +928,7 @@ function InlineProfileText({
                 aria-label={label}
                 className="h-[1lh] min-w-0 max-w-full rounded-sm border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] font-[inherit] tracking-[inherit] outline-none [field-sizing:content] focus-visible:ring-2 focus-visible:ring-ring/50"
                 value={draft}
+                readOnly={pending}
                 maxLength={kind === 'name' ? 80 : undefined}
                 autoComplete="off"
                 spellCheck={kind === 'name'}
@@ -773,7 +936,7 @@ function InlineProfileText({
                 aria-describedby={!valid ? `prototype-inline-${kind}-error` : undefined}
                 onChange={(event) => onDraft(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
+                  if (event.key === 'Escape' && !pending) {
                     event.preventDefault();
                     event.stopPropagation();
                     onDraft(null);
@@ -792,18 +955,23 @@ function InlineProfileText({
           {editing ? (
             <>
               <PrototypeIconButton
-                label={`Save ${label.toLowerCase()}`}
+                label={saveActionLabel(label, phase)}
                 type="submit"
                 textBaseline
-                buttonClassName="size-6"
-                disabled={!valid || draft.trim() === value}
+                buttonClassName={`size-6 ${phase ? 'disabled:opacity-100' : ''}`}
+                disabled={saveBusy || !valid || draft.trim() === value}
+                aria-busy={phase === 'saving'}
               >
-                <Check className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
+                <SaveGlyph
+                  phase={phase}
+                  className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'}
+                />
               </PrototypeIconButton>
               <PrototypeIconButton
                 label="Cancel"
                 textBaseline
                 buttonClassName="size-6"
+                disabled={pending}
                 onClick={() => onDraft(null)}
               >
                 <X className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
@@ -874,7 +1042,7 @@ function InlineProfileText({
       className="min-w-0 space-y-3"
       onSubmit={(event) => {
         event.preventDefault();
-        if (valid && draft.trim() !== value) onSave(draft.trim());
+        if (!saveBusy && valid && draft.trim() !== value) onSave(draft.trim());
       }}
     >
       <label htmlFor={`prototype-inline-${kind}`} className="block text-sm font-medium">
@@ -891,6 +1059,7 @@ function InlineProfileText({
           id={`prototype-inline-${kind}`}
           className={`h-10 ${kind === 'handle' ? 'pl-8' : ''}`}
           value={draft}
+          readOnly={pending}
           maxLength={kind === 'name' ? 80 : undefined}
           autoComplete="off"
           spellCheck={kind === 'name'}
@@ -898,7 +1067,7 @@ function InlineProfileText({
           aria-describedby={`prototype-inline-${kind}-help`}
           onChange={(event) => onDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') {
+            if (event.key === 'Escape' && !pending) {
               event.preventDefault();
               event.stopPropagation();
               onDraft(null);
@@ -922,9 +1091,12 @@ function InlineProfileText({
         <Button
           size="sm"
           type="submit"
-          disabled={!valid || draft.trim() === value}
-          aria-label={`Save ${label.toLowerCase()}`}
+          disabled={saveBusy || !valid || draft.trim() === value}
+          className={phase ? 'disabled:opacity-100' : undefined}
+          aria-label={saveActionLabel(label, phase)}
+          aria-busy={phase === 'saving'}
         >
+          {phase && <SaveGlyph phase={phase} className="size-3.5" />}
           Save
         </Button>
         <Button
@@ -932,6 +1104,7 @@ function InlineProfileText({
           type="button"
           variant="outline"
           aria-label={`Cancel ${label.toLowerCase()} edit`}
+          disabled={pending}
           onClick={() => onDraft(null)}
         >
           Cancel
@@ -1101,12 +1274,16 @@ function BiographyEditor({
   compact = false,
   edit,
   onEdit,
+  phase,
+  saveBusy = false,
 }: EditorProps & {
   profile: Profile;
   inline?: boolean;
   compact?: boolean;
   edit?: BiographyEdit;
   onEdit?: (edit: BiographyEdit) => void;
+  phase?: SavePhase;
+  saveBusy?: boolean;
 }) {
   const [localEdit, setLocalEdit] = useState<BiographyEdit>({
     draft: value.biography,
@@ -1115,14 +1292,21 @@ function BiographyEditor({
   const currentEdit = edit ?? localEdit;
   const setEdit = onEdit ?? setLocalEdit;
   const { draft, preview } = currentEdit;
+  const pending = phase === 'saving' || phase === 'success';
+  const container = useRef<HTMLDivElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (inline) textarea.current?.focus();
   }, [inline]);
+  useEffect(() => {
+    if (phase === 'error' && container.current?.contains(document.activeElement)) {
+      textarea.current?.focus();
+    }
+  }, [phase]);
   const count = [...draft].length;
   const limit = profile.biographyMaxLength ?? 5000;
   return (
-    <div className="relative space-y-4">
+    <div ref={container} data-prototype-biography-editor className="relative space-y-4">
       <fieldset
         className={
           compact
@@ -1167,9 +1351,10 @@ function BiographyEditor({
             }
             placeholder="A little about you…"
             value={draft}
+            readOnly={pending}
             onChange={(event) => setEdit({ ...currentEdit, draft: event.target.value })}
             onKeyDown={(event) => {
-              if (inline && event.key === 'Escape') {
+              if (inline && event.key === 'Escape' && !pending) {
                 event.preventDefault();
                 event.stopPropagation();
                 cancel();
@@ -1193,26 +1378,36 @@ function BiographyEditor({
       {compact ? (
         <div className="absolute -top-8 right-0 flex h-5 gap-1 text-base">
           <PrototypeIconButton
-            label="Save biography"
-            buttonClassName="size-5"
-            disabled={count > limit || draft === value.biography}
+            label={saveActionLabel('Biography', phase)}
+            buttonClassName={`size-5 ${phase ? 'disabled:opacity-100' : ''}`}
+            disabled={saveBusy || count > limit || draft === value.biography}
+            aria-busy={phase === 'saving'}
             onClick={() => update({ biography: draft }, 'Biography saved')}
           >
-            <Check className="size-3.5" />
+            <SaveGlyph phase={phase} className="size-3.5" />
           </PrototypeIconButton>
-          <PrototypeIconButton label="Cancel" buttonClassName="size-5" onClick={cancel}>
+          <PrototypeIconButton
+            label="Cancel"
+            buttonClassName="size-5"
+            disabled={pending}
+            onClick={cancel}
+          >
             <X className="size-3.5" />
           </PrototypeIconButton>
         </div>
       ) : (
         <div className="flex justify-end gap-2 border-t pt-4">
-          <Button variant="outline" onClick={cancel}>
+          <Button variant="outline" disabled={pending} onClick={cancel}>
             Cancel
           </Button>
           <Button
-            disabled={count > limit || draft === value.biography}
+            disabled={saveBusy || count > limit || draft === value.biography}
+            className={phase ? 'disabled:opacity-100' : undefined}
+            aria-label={saveActionLabel('Biography', phase)}
+            aria-busy={phase === 'saving'}
             onClick={() => update({ biography: draft }, 'Biography saved')}
           >
+            {phase && <SaveGlyph phase={phase} className="size-3.5" />}
             Save biography
           </Button>
         </div>

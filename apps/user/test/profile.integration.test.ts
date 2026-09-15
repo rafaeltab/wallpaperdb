@@ -64,6 +64,7 @@ describe('Profile commands', () => {
   let database: DatabaseConnection;
   const identities = new FakeIdentityProvider();
   const aliasExpiryTimer = new FakeTimerService();
+  const evidenceRetentionTimer = new FakeTimerService();
   let config: Config;
 
   beforeAll(async () => {
@@ -97,7 +98,7 @@ describe('Profile commands', () => {
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
     };
     container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer });
+    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer, evidenceRetentionTimer });
     container.register(IdentityProviderToken, { useValue: identities });
     database = container.resolve(DatabaseConnection);
   });
@@ -182,6 +183,21 @@ describe('Profile commands', () => {
     };
     await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
+
+  it('expires acknowledged Profile events from the application retention timer', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      await new ProfileOutboxPublisherWorker(database, { publish: async () => {} }, { error: vi.fn() }).publishPending();
+      vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
+      await evidenceRetentionTimer.tickAsync(1000);
+      expect(await sql`select id from outbox_events`).toEqual([]);
+      expect((await request('user_1')).json()).toEqual(original);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('rolls back both Profile details when the combined Biography event cannot commit', async () => {
     const original = (await request('user_1')).json();

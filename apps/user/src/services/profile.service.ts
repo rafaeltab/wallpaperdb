@@ -74,6 +74,7 @@ export class InvalidDisplayNameError extends Error {}
 export class InvalidHandleError extends Error {}
 export class InvalidAliasCommandError extends Error {}
 export class AliasNotFoundError extends Error {}
+export class AliasNotScheduledError extends Error {}
 export class HandleUnavailableError extends Error {}
 export class HandleCooldownError extends Error {
   constructor(readonly nextHandleChangeAt: Date) {
@@ -438,6 +439,24 @@ export class ProfileService {
       if (!alias?.expiresAt || alias.expiresAt > now) return false;
       await this.releaseAlias(tx, profile, alias, now, 'scheduled');
       return true;
+    });
+  }
+
+  async expireAliasImmediately(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new InvalidAliasCommandError('Expected Profile version must be a positive integer');
+    }
+    return this.database.getClient().db.transaction(async (tx) => {
+      const [profile] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
+      if (!profile || profile.version !== expectedVersion) {
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      }
+      const alias = await tx.query.handleClaims.findFirst({
+        where: and(eq(handleClaims.handle, requestedHandle.toLowerCase()), eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
+      });
+      if (!alias) throw new AliasNotFoundError('This Handle is not one of your aliases');
+      if (!alias.expiresAt) throw new AliasNotScheduledError('Schedule this alias for removal before expiring it immediately');
+      return this.releaseAlias(tx, profile, alias, new Date(), 'immediate');
     });
   }
 

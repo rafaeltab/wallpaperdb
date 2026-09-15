@@ -145,6 +145,33 @@ describe('Profile commands', () => {
     });
   }
 
+  async function expireAlias(userId: string, handle: string, expectedVersion: number) {
+    const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+    return app.inject({
+      method: 'POST', url: `/profile/me/aliases/${encodeURIComponent(handle)}/expire`,
+      headers: { authorization: `Bearer ${token}` }, payload: { expectedVersion },
+    });
+  }
+
+  it('immediately expires a scheduled alias through a versioned owner command', async () => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const response = await expireAlias('user_1', original.handle.toUpperCase(), scheduled.version);
+    expect(response.statusCode).toBe(200);
+    const expired = response.json();
+    expect(expired).toMatchObject({ aliases: [], handle: changed.handle, version: scheduled.version + 1 });
+    expect((await request('user_1')).json()).toEqual(expired);
+    const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
+    expect(event.payload).toMatchObject({
+      change: { type: 'alias-expired', handle: original.handle, claimGeneration: scheduled.aliases[0].claimGeneration, before: scheduled.aliases[0].expiresAt, after: null, reason: 'immediate' },
+      profile: { aliases: [], version: expired.version },
+    });
+    expect(Date.parse(event.payload.timestamp)).toBeLessThan(Date.parse(scheduled.aliases[0].expiresAt));
+    const other = (await request('user_2')).json();
+    expect((await changeHandle('user_2', original.handle, other.version)).statusCode).toBe(200);
+  });
+
   it('releases a due alias at its exact expiry and permits a newer claim generation', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));

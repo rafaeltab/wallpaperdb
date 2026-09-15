@@ -80,6 +80,29 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('bases each import lease on its actual start after earlier jobs finish', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    initialImageUrl = 'https://img.clerk.com/a-picture';
+    await ensure('a_picture');
+    initialImageUrl = 'https://img.clerk.com/b-picture';
+    await ensure('b_picture');
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const leases: number[] = [];
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('a-picture')) vi.setSystemTime(new Date('2030-01-01T00:02:00.000Z'));
+      else {
+        const [job] = await sql`select lease_until from profile_picture_imports where profile_id = 'b_picture'`;
+        leases.push(job.lease_until.getTime() - Date.now());
+      }
+      return new Response(new Uint8Array(image));
+    });
+    try {
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect(leases).toEqual([config.profilePictureImportTimeoutMs + 60_000]);
+    } finally { fetcher.mockRestore(); vi.useRealTimers(); }
+  });
+
   it('lets one worker reclaim an expired import lease without accepting the stale attempt', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

@@ -28,7 +28,7 @@ export class ProfilePictureImportService {
         const [current] = await tx.select().from(profilePictureImports).where(and(eq(profilePictureImports.profileId, candidate.profileId), due)).for('update', { skipLocked: true });
         if (!current?.sourceUrl) return undefined;
         const leaseToken = ulid();
-        await tx.update(profilePictureImports).set({ attempts: current.attempts + 1, leaseToken, leaseUntil: new Date(now.getTime() + this.config.profilePictureImportTimeoutMs + 60_000) }).where(eq(profilePictureImports.profileId, current.profileId));
+        await tx.update(profilePictureImports).set({ attempts: current.attempts + 1, leaseToken, leaseUntil: new Date(Date.now() + this.config.profilePictureImportTimeoutMs + 60_000) }).where(eq(profilePictureImports.profileId, current.profileId));
         return { ...current, leaseToken };
       });
       if (!job?.sourceUrl) continue;

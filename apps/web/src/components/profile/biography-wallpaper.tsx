@@ -19,10 +19,13 @@ export function BiographyWallpaper({
   const retryable = !wallpaper || (matches && !variant);
   useEffect(() => {
     if (query.isPending || query.isFetching || !retryable || retries >= 3) return;
-    const timeout = window.setTimeout(() => {
-      setRetries((count) => count + 1);
-      void query.refetch();
-    }, 1000 * 2 ** retries);
+    const timeout = window.setTimeout(
+      () => {
+        setRetries((count) => count + 1);
+        void query.refetch();
+      },
+      1000 * 2 ** retries
+    );
     return () => window.clearTimeout(timeout);
   }, [query.isPending, query.isFetching, query.refetch, retryable, retries]);
   if (query.isPending)
@@ -36,10 +39,20 @@ export function BiographyWallpaper({
     return (
       <span className="my-4 block rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
         Wallpaper unavailable.
-        {retryable && <button type="button" aria-label="Try wallpaper again" disabled={query.isFetching} className="ml-2 cursor-pointer text-primary underline underline-offset-4 disabled:opacity-50" onClick={() => {
-          setRetries(0);
-          void query.refetch();
-        }}>Try again</button>}
+        {retryable && (
+          <button
+            type="button"
+            aria-label="Try wallpaper again"
+            disabled={query.isFetching}
+            className="ml-2 cursor-pointer text-primary underline underline-offset-4 disabled:opacity-50"
+            onClick={() => {
+              setRetries(0);
+              void query.refetch();
+            }}
+          >
+            Try again
+          </button>
+        )}
       </span>
     );
   }

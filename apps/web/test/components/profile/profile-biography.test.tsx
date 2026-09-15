@@ -20,6 +20,55 @@ describe('Biography Markdown', () => {
   beforeEach(() => vi.mocked(request).mockReset());
   afterEach(() => vi.useRealTimers());
 
+  it('preserves an exhausted or ready embed across unrelated parent renders', async () => {
+    vi.useFakeTimers();
+    vi.mocked(request).mockResolvedValue({ getWallpaper: null });
+    const client = new QueryClient();
+    const biography = () => (
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(biography());
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    for (const delay of [1000, 2000, 4000]) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    }
+    expect(request).toHaveBeenCalledTimes(4);
+    for (let count = 0; count < 3; count += 1) {
+      rerender(biography());
+      await act(async () => vi.advanceTimersByTimeAsync(10000));
+    }
+    expect(request).toHaveBeenCalledTimes(4);
+    vi.mocked(request).mockResolvedValue({
+      getWallpaper: {
+        wallpaperId: 'wlpr_own',
+        profileId,
+        uploadedAt: '',
+        updatedAt: '',
+        variants: [
+          {
+            width: 800,
+            height: 600,
+            aspectRatio: 4 / 3,
+            format: 'image/webp',
+            fileSizeBytes: 100,
+            createdAt: '',
+            url: '/media/own.webp',
+          },
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Try wallpaper again' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('img', { name: 'Forest' })).toBeInTheDocument();
+    for (let count = 0; count < 3; count += 1) {
+      rerender(biography());
+      await act(async () => vi.advanceTimersByTimeAsync(10000));
+    }
+    expect(request).toHaveBeenCalledTimes(5);
+  });
+
   it('starts a fresh retry budget when an exhausted embed changes wallpaper and Profile identity', async () => {
     vi.useFakeTimers();
     vi.mocked(request).mockResolvedValue({ getWallpaper: null });

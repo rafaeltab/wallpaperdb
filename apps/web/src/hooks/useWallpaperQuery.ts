@@ -13,7 +13,10 @@ interface GetWallpaperResponse {
  * @param wallpaperId - Wallpaper ID (format: wlpr_<ulid>)
  * @returns Query result with wallpaper data, loading state, and error
  */
-export function useWallpaperQuery(wallpaperId: string, options: { staleTime?: number; retry?: boolean | number } = {}) {
+export function useWallpaperQuery(
+  wallpaperId: string,
+  options: { staleTime?: number; retry?: boolean | number } = {}
+) {
   return useQuery({
     queryKey: ['wallpaper', wallpaperId],
     queryFn: async () => {

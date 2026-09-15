@@ -30,6 +30,7 @@ export function ProfileBiographySettings({
   });
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshed, setRefreshed] = useState<string | null>(null);
+  const [previewRevision, setPreviewRevision] = useState(0);
   const draft = edit.value;
   useEffect(() => {
     setEdit((current) =>
@@ -50,6 +51,7 @@ export function ProfileBiographySettings({
       userApi.updateProfile({ ...command, expectedProfileId: profile.id, tokenProvider }),
     onSuccess: (updated) => {
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
+      setPreviewRevision((revision) => revision + 1);
       setEdit({
         value: updated.biographyMarkdown,
         baseValue: updated.biographyMarkdown,
@@ -76,6 +78,7 @@ export function ProfileBiographySettings({
       );
       const updated = queryClient.getQueryData<Profile>(profileQueryKey(profile.id));
       if (!updated) throw new Error('Profile unavailable');
+      setPreviewRevision((revision) => revision + 1);
       setEdit((current) => ({
         value: dirty ? current.value : updated.biographyMarkdown,
         baseValue: updated.biographyMarkdown,
@@ -184,6 +187,7 @@ export function ProfileBiographySettings({
             markdown={draft}
             profileId={profile.id}
             maxCharacters={maxCharacters}
+            refreshKey={previewRevision}
           />
         </section>
       </CardContent>

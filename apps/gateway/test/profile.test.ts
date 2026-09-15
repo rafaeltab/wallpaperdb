@@ -74,6 +74,97 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it.each(["scheduled", "immediate"])("projects %s alias expiry without letting stale events restore routing", async (reason) => {
+        const timestamp = "2030-01-01T12:00:00.000Z";
+        const expiresAt = "2030-01-02T12:00:00.000Z";
+        const profile = {
+            id: `user_expiry_${reason}`,
+            displayName: "Alias Owner",
+            handle: `expiry-current-${reason}`,
+            claimGeneration: 3,
+            aliases: [
+                { handle: `expiring-${reason}`, claimGeneration: 1, expiresAt },
+                { handle: `retained-${reason}`, claimGeneration: 2, expiresAt: null },
+            ],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 3,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const scheduled = {
+            eventId: `evt_schedule_${reason}`,
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "alias-expiry-scheduled", handle: `expiring-${reason}`, before: null, after: expiresAt },
+            profile,
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, scheduled);
+        await eventually(
+            () => query(`query { profile(id: "${profile.id}") { version } }`),
+            (result) => result.data.profile?.version === 3,
+        );
+        const read = async () => {
+            // Query during grace so date filtering cannot mask a missing projection update.
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(new Date(timestamp));
+            try {
+                return await query(`query {
+                    expired: profileByHandle(handle: "expiring-${reason}") { profile { id } }
+                    retained: profileByHandle(handle: "retained-${reason}") { profile { id } }
+                    profile(id: "${profile.id}") { version }
+                }`);
+            } finally {
+                vi.useRealTimers();
+            }
+        };
+        const before = await read();
+        expect(before.errors).toBeUndefined();
+        expect(before.data.expired).toEqual({ profile: { id: profile.id } });
+
+        const expiry = {
+            eventId: `evt_expired_${reason}`,
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp: reason === "scheduled" ? expiresAt : timestamp,
+            change: {
+                type: "alias-expired",
+                handle: `expiring-${reason}`,
+                claimGeneration: 1,
+                before: expiresAt,
+                after: null,
+                reason,
+            },
+            profile: { ...profile, version: 4, aliases: [profile.aliases[1]] },
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, expiry);
+        await eventually(
+            () => query(`query { profile(id: "${profile.id}") { version } }`),
+            (result) => result.data.profile?.version === 4,
+        );
+        expect((await read()).data).toEqual({
+            expired: null, retained: { profile: { id: profile.id } }, profile: { version: 4 },
+        });
+
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            ...scheduled, eventId: `evt_stale_schedule_${reason}`,
+        });
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            ...expiry, eventId: `evt_duplicate_expiry_${reason}`,
+        });
+        const marker = { ...expiry.profile, id: `user_expiry_marker_${reason}`, handle: `marker-${reason}`, aliases: [] };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, `evt_marker_${reason}`, "Before"));
+        // The same consumer processes the marker after both replayed events.
+        await eventually(
+            () => query(`query { profile(id: "${marker.id}") { version } }`),
+            (result) => result.data.profile?.version === 4,
+        );
+        const after = await read();
+        expect(after.errors).toBeUndefined();
+        expect(after.data).toEqual({
+            expired: null, retained: { profile: { id: profile.id } }, profile: { version: 4 },
+        });
+    });
+
     it("resolves scheduled aliases during grace and stops exactly at expiry before projection catches up", async () => {
         const expiresAt = "2030-01-02T12:00:00.000Z";
         const profile = {

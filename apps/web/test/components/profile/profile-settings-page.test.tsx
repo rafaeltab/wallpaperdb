@@ -2,12 +2,14 @@ import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
@@ -30,8 +32,20 @@ vi.mock('@tanstack/react-router', () => ({
   }: {
     children: React.ReactNode;
     to: string;
-    params?: { handle: string };
-  }) => <a href={params ? `/profiles/@${params.handle}` : to}>{children}</a>,
+    params?: { handle?: string; profileId?: string };
+  }) => (
+    <a
+      href={
+        params?.handle
+          ? `/profiles/@${params.handle}`
+          : params?.profileId
+            ? `/profiles/id/${params.profileId}`
+            : to
+      }
+    >
+      {children}
+    </a>
+  ),
 }));
 
 const profile: Profile = {
@@ -62,6 +76,7 @@ function renderPage(initialProfile: Profile = profile) {
 
 describe('ProfileSettingsPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(useAuth).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
@@ -76,11 +91,28 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.reactivateAlias).mockReset();
   });
 
+  it('keeps previous handle details in a dialog behind a compact summary', async () => {
+    renderPage({
+      ...profile,
+      aliases: [{ handle: 'old-name', claimGeneration: 1, expiresAt: null }],
+    });
+    expect(screen.queryByRole('list', { name: 'Retained aliases' })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Previous handles: 1 retained' }));
+    const dialog = screen.getByRole('dialog', { name: 'Previous handles' });
+    expect(within(dialog).getByRole('list', { name: 'Retained aliases' })).toHaveTextContent(
+      '@old-name'
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('shows the current Display name and immediately adopts the REST response', async () => {
     const updated = { ...profile, displayName: 'Éowyn 雪', version: 2 };
     vi.mocked(userApi.updateProfile).mockResolvedValue(updated);
     const { queryClient } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
 
     const input = screen.getByRole('textbox', { name: /display name/i });
     expect(input).toHaveValue('Wallpaper Fan');
@@ -96,10 +128,10 @@ describe('ProfileSettingsPage', () => {
       expectedProfileId: profile.id,
       tokenProvider: expect.any(Function),
     });
-    expect(screen.getByText('Display name saved.')).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith('Display name updated');
   });
 
-  it('separates retained and expiring aliases, counting only retained aliases against the configured limit', () => {
+  it('separates retained and expiring aliases, counting only retained aliases against the configured limit', async () => {
     const expiresAt = '2026-09-16T12:34:56.789Z';
     renderPage({
       ...profile,
@@ -114,6 +146,9 @@ describe('ProfileSettingsPage', () => {
         { handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt },
       ],
     });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     const retained = screen.getByRole('list', { name: /retained aliases/i });
     const expiring = screen.getByRole('list', { name: /expiring aliases/i });
@@ -160,6 +195,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.reactivateAlias).mockResolvedValue(updated);
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     const history = screen.getByRole('list', { name: 'Historical Handles' });
     expect(within(history).getByText(new Date(eligibleUntil).toLocaleString())).toHaveAttribute(
       'dateTime',
@@ -189,15 +225,20 @@ describe('ProfileSettingsPage', () => {
       tokenProvider: expect.any(Function),
     });
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
-    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(profile.handle);
+    expect(
+      within(screen.getByRole('dialog', { name: 'Previous handles' })).getByText(
+        `@${profile.handle}`
+      )
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole('list', { name: 'Retained aliases' })).getByText('@old-handle')
     ).toBeInTheDocument();
     expect(
       within(screen.getByRole('list', { name: 'Historical Handles' })).queryByText('@old-handle')
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Next Handle change available/)).toHaveTextContent(
-      new Date('2099-09-21T12:00:00.000Z').toLocaleString()
+    expect(screen.getByText(/Available for change in/).querySelector('time')).toHaveAttribute(
+      'datetime',
+      '2099-09-21T12:00:00.000Z'
     );
   });
 
@@ -224,6 +265,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.reactivateAlias).mockResolvedValue(updated);
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     const expiring = screen.getByRole('list', { name: 'Expiring aliases' });
     expect(within(expiring).getByText(new Date(eligibleUntil).toLocaleString())).toHaveAttribute(
       'dateTime',
@@ -257,7 +299,11 @@ describe('ProfileSettingsPage', () => {
     expect(
       within(screen.getByRole('list', { name: 'Retained aliases' })).getByText('@old-handle')
     ).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(profile.handle);
+    expect(
+      within(screen.getByRole('dialog', { name: 'Previous handles' })).getByText(
+        `@${profile.handle}`
+      )
+    ).toBeInTheDocument();
   });
 
   it('disables both alias restoration actions and explains when no retained slot is available', async () => {
@@ -279,6 +325,7 @@ describe('ProfileSettingsPage', () => {
       })),
     });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     const keep = screen.getByRole('button', { name: 'Keep alias @expiring-name' });
     const reactivate = screen.getByRole('button', { name: 'Reactivate @released-name' });
     expect(keep).toBeDisabled();
@@ -290,7 +337,7 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.reactivateAlias).not.toHaveBeenCalled();
   });
 
-  it('disables stale history entries whose reactivation deadline has passed', () => {
+  it('disables stale history entries whose reactivation deadline has passed', async () => {
     renderPage({
       ...profile,
       aliases: [
@@ -307,6 +354,9 @@ describe('ProfileSettingsPage', () => {
         unavailableReason: null,
       })),
     });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     expect(screen.getByRole('button', { name: 'Keep alias @expiring-name' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Reactivate @released-name' })).toBeDisabled();
@@ -347,6 +397,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(refreshed);
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     await user.click(screen.getByRole('button', { name: 'Reactivate @old-handle' }));
     await act(async () => {
       queryClient.setQueryData(profileQueryKey(profile.id), changed);
@@ -386,6 +437,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.scheduleAliasRemoval).mockResolvedValue(updated);
     const { queryClient } = renderPage({ ...profile, aliases: [alias] });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     await user.click(screen.getByRole('button', { name: 'Schedule removal for @old-handle' }));
     const dialog = screen.getByRole('alertdialog');
@@ -435,6 +487,7 @@ describe('ProfileSettingsPage', () => {
     );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     await user.click(screen.getByRole('button', { name: 'Schedule removal for @old-handle' }));
     await user.click(
@@ -474,6 +527,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.expireAlias).mockResolvedValue(updated);
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     expect(
       within(screen.getByRole('list', { name: 'Retained aliases' })).queryByRole('button', {
@@ -529,6 +583,7 @@ describe('ProfileSettingsPage', () => {
     );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
     await act(async () => {
       queryClient.setQueryData(profileQueryKey(profile.id), refreshed);
@@ -566,6 +621,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
 
     expect(screen.getByText('@old-handle')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
@@ -616,6 +672,11 @@ describe('ProfileSettingsPage', () => {
     );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Display name' }), ' draft');
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    await user.type(screen.getByRole('textbox', { name: 'Profile handle' }), '-draft');
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
 
     await waitFor(() => expect(userApi.ensureProfile).toHaveBeenCalledOnce());
@@ -623,12 +684,20 @@ describe('ProfileSettingsPage', () => {
     expect(
       screen.getByRole('button', { name: 'Schedule removal for @retained-name' })
     ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save Display name' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Save profile handle', hidden: true })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save display name', hidden: true })).toBeDisabled();
     await act(async () => {
       finishRefresh({ ...initial, version: 2 });
     });
 
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Save profile handle', hidden: true })
+      ).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Save display name', hidden: true })).toBeEnabled();
+    });
     await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' })
@@ -663,12 +732,15 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
     const { queryClient } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
     const nameInput = screen.getByRole('textbox', { name: 'Display name' });
-    const handleInput = screen.getByRole('textbox', { name: 'Handle' });
+    const handleInput = screen.getByRole('textbox', { name: 'Profile handle' });
     await user.clear(nameInput);
     await user.type(nameInput, 'My name draft');
     await user.clear(handleInput);
     await user.type(handleInput, 'my-handle-draft');
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
 
     await waitFor(() =>
@@ -689,10 +761,12 @@ describe('ProfileSettingsPage', () => {
     };
     const { queryClient, rerender } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
     await user.clear(screen.getByRole('textbox', { name: 'Display name' }));
     await user.type(screen.getByRole('textbox', { name: 'Display name' }), 'First User draft');
-    await user.clear(screen.getByRole('textbox', { name: 'Handle' }));
-    await user.type(screen.getByRole('textbox', { name: 'Handle' }), 'first-user-draft');
+    await user.clear(screen.getByRole('textbox', { name: 'Profile handle' }));
+    await user.type(screen.getByRole('textbox', { name: 'Profile handle' }), 'first-user-draft');
     const auth = vi.mocked(useAuth)();
     if (!auth.isLoaded || !auth.isSignedIn) throw new Error('Expected a signed-in test User');
     vi.mocked(useAuth).mockReturnValue({ ...auth, userId: otherProfile.id });
@@ -703,20 +777,29 @@ describe('ProfileSettingsPage', () => {
       </QueryClientProvider>
     );
 
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: otherProfile.displayName })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
     expect(screen.getByRole('textbox', { name: 'Display name' })).toHaveValue(
       otherProfile.displayName
     );
-    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(otherProfile.handle);
+    expect(screen.getByRole('textbox', { name: 'Profile handle' })).toHaveValue(
+      otherProfile.handle
+    );
     expect(userApi.updateProfile).not.toHaveBeenCalled();
     expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
 
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
-      new UserApiError('Profile has changed since it was last loaded', 409)
+      new UserApiError('Profile has changed since it was last loaded', 409, {
+        type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+      })
     );
     renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
     const input = screen.getByRole('textbox', { name: /display name/i });
 
     await user.clear(input);
@@ -724,22 +807,23 @@ describe('ProfileSettingsPage', () => {
     await user.click(screen.getByRole('button', { name: /save display name/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your Profile changed elsewhere. Reload before saving again.'
+      'Your profile changed elsewhere. Refresh profile to keep your draft and try again.'
     );
     expect(input).toHaveValue('My unsaved name');
   });
 
-  it('changes the Handle and immediately links to the authoritative Profile', async () => {
+  it('changes the handle and previews the authoritative profile with a public link', async () => {
     const updated = { ...profile, handle: 'new-handle', version: 2 };
     vi.mocked(userApi.updateHandle).mockResolvedValue(updated);
     const { queryClient } = renderPage();
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
 
     expect(input).toHaveValue(profile.handle);
     await user.clear(input);
     await user.type(input, 'New Handle');
-    await user.click(screen.getByRole('button', { name: /change handle/i }));
+    await user.click(screen.getByRole('button', { name: /save profile handle/i }));
 
     await waitFor(() => expect(input).toHaveValue('new-handle'));
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
@@ -749,14 +833,13 @@ describe('ProfileSettingsPage', () => {
       expectedProfileId: profile.id,
       tokenProvider: expect.any(Function),
     });
-    expect(screen.getByText('@new-handle')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Handle changed to @new-handle.');
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Your previous Profile address will redirect to your new one.'
-    );
-    expect(screen.getByRole('link', { name: /view your profile/i })).toHaveAttribute(
+    expect(toast.success).toHaveBeenCalledWith('Profile handle updated');
+    await user.click(screen.getByRole('button', { name: 'View profile' }));
+    const preview = screen.getByRole('dialog', { name: 'Profile preview' });
+    expect(within(preview).getByText('@new-handle')).toBeInTheDocument();
+    expect(within(preview).getByRole('link', { name: /open your profile/i })).toHaveAttribute(
       'href',
-      '/profiles/@new-handle'
+      `/profiles/id/${profile.id}`
     );
   });
 
@@ -788,11 +871,12 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.updateHandle).mockResolvedValue(updated);
     renderPage({ ...profile, aliases });
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
 
     await user.clear(input);
     await user.type(input, 'New Handle');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent('@oldest');
@@ -802,9 +886,9 @@ describe('ProfileSettingsPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(userApi.updateHandle).not.toHaveBeenCalled();
     expect(input).toHaveValue('New Handle');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
     await user.click(
-      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' })
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm handle change' })
     );
 
     await waitFor(() => expect(input).toHaveValue('new-handle'));
@@ -814,6 +898,7 @@ describe('ProfileSettingsPage', () => {
       expectedProfileId: profile.id,
       tokenProvider: expect.any(Function),
     });
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     const expiring = screen.getByRole('list', { name: /expiring aliases/i });
     expect(within(expiring).getByText('@oldest')).toBeInTheDocument();
     expect(within(expiring).getByText(new Date(expiresAt).toLocaleString())).toHaveAttribute(
@@ -836,11 +921,12 @@ describe('ProfileSettingsPage', () => {
     });
     renderPage({ ...profile, aliases });
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
 
     await user.clear(input);
     await user.type(input, 'Mý Alias');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
     await waitFor(() => expect(userApi.updateHandle).toHaveBeenCalledOnce());
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -850,10 +936,11 @@ describe('ProfileSettingsPage', () => {
   it('warns that the former current Handle will expire when the retained limit is zero', async () => {
     renderPage({ ...profile, retainedAliasLimit: 0, aliases: [] });
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'new-handle');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent('limit is 0');
@@ -861,6 +948,7 @@ describe('ProfileSettingsPage', () => {
     expect(dialog).toHaveTextContent('24 hours');
     expect(userApi.updateHandle).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
     expect(screen.getByText('0 of 0 retained aliases')).toBeInTheDocument();
   });
 
@@ -880,10 +968,11 @@ describe('ProfileSettingsPage', () => {
       ],
     });
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'new-handle');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
     const dialog = screen.getByRole('alertdialog');
     expect(dialog).toHaveTextContent('limit is 1');
@@ -906,12 +995,13 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.updateHandle).mockResolvedValue(initial);
     renderPage(initial);
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'Wallpaper Fan');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Handle unchanged.');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Profile handle unchanged'));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(userApi.updateHandle).toHaveBeenCalledOnce();
   });
@@ -925,19 +1015,20 @@ describe('ProfileSettingsPage', () => {
     );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'new-handle');
-    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(screen.getByRole('button', { name: 'Save profile handle' }));
 
     await act(async () => {
       queryClient.setQueryData(profileQueryKey(profile.id), { ...initial, version: 2 });
     });
     await user.click(
-      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' })
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm handle change' })
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile changed elsewhere.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your profile changed elsewhere.');
     expect(userApi.updateHandle).toHaveBeenCalledWith(
       expect.objectContaining({ expectedVersion: 1 })
     );
@@ -947,6 +1038,7 @@ describe('ProfileSettingsPage', () => {
   it('validates the 80-character limit before sending', async () => {
     renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
     const input = screen.getByRole('textbox', { name: /display name/i });
 
     await user.clear(input);
@@ -969,7 +1061,7 @@ describe('ProfileSettingsPage', () => {
       'profile-version-conflict',
       409,
       'Profile has changed.',
-      'Your Profile changed elsewhere. Reload before saving again.',
+      'Your profile changed elsewhere. Refresh profile to keep your draft and try again.',
     ],
   ])('preserves the Handle draft and explains %s', async (type, status, detail, expected) => {
     vi.mocked(userApi.updateHandle).mockRejectedValue(
@@ -979,16 +1071,21 @@ describe('ProfileSettingsPage', () => {
     );
     renderPage();
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
 
     await user.clear(input);
     await user.type(input, 'My draft handle');
-    await user.click(screen.getByRole('button', { name: /change handle/i }));
+    await user.click(screen.getByRole('button', { name: /save profile handle/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(expected);
     expect(input).toHaveValue('My draft handle');
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Profile handle save failed');
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Unable to save profile handle', {
+      description: detail,
+    });
   });
 
   it('shows the next permitted change time returned by a cooldown rejection', async () => {
@@ -1001,14 +1098,16 @@ describe('ProfileSettingsPage', () => {
     );
     renderPage();
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'another-handle');
-    await user.click(screen.getByRole('button', { name: /change handle/i }));
+    await user.click(screen.getByRole('button', { name: /save profile handle/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('once every seven days');
-    expect(screen.getByText(/next handle change available/i)).toHaveTextContent(
-      new Date(nextHandleChangeAt).toLocaleString()
+    expect(screen.getByText(/Available for change in/).querySelector('time')).toHaveAttribute(
+      'datetime',
+      nextHandleChangeAt
     );
     expect(input).toHaveValue('another-handle');
   });
@@ -1017,8 +1116,18 @@ describe('ProfileSettingsPage', () => {
     const lastHandleChangedAt = '2099-09-14T12:00:00.000Z';
     renderPage({ ...profile, lastHandleChangedAt });
 
-    expect(screen.getByText(/next handle change available/i)).toHaveTextContent(
-      new Date('2099-09-21T12:00:00.000Z').toLocaleString()
+    expect(screen.getByText(/Available for change in/).querySelector('time')).toHaveAttribute(
+      'datetime',
+      '2099-09-21T12:00:00.000Z'
+    );
+    expect(screen.getByRole('button', { name: 'Edit profile handle' })).toBeDisabled();
+    const user = userEvent.setup();
+    await user.hover(screen.getByRole('button', { name: /days$/ }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      new Date('2099-09-21T12:00:00.000Z').toLocaleString(undefined, {
+        dateStyle: 'full',
+        timeStyle: 'long',
+      })
     );
     expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
@@ -1027,13 +1136,14 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.updateHandle).mockResolvedValue(profile);
     renderPage();
     const user = userEvent.setup();
-    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: /^profile handle$/i });
     await user.clear(input);
     await user.type(input, 'Wallpaper Fan');
-    await user.click(screen.getByRole('button', { name: /change handle/i }));
+    await user.click(screen.getByRole('button', { name: /save profile handle/i }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Handle unchanged.');
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Profile handle unchanged'));
     expect(input).toHaveValue(profile.handle);
-    expect(screen.getByRole('status')).not.toHaveTextContent('Handle changed');
+    expect(toast.success).not.toHaveBeenCalledWith('Profile handle updated');
   });
 });

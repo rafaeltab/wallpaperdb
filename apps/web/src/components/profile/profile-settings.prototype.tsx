@@ -266,15 +266,16 @@ export default function ProfileSettingsPrototype({
         <div className="relative h-5">
           <h2 className="sr-only">Biography</h2>
           {!biographyEdit && (
-            <PrototypeIconButton
+            <Button
               ref={biographyEditButton}
-              className="absolute top-0 right-0 text-base"
-              buttonClassName="size-5"
-              label="Edit biography"
+              className="absolute -top-1.5 right-0"
+              variant="outline"
+              size="sm"
               onClick={startBiographyEdit}
             >
               <Pencil className="size-3.5" />
-            </PrototypeIconButton>
+              Edit biography
+            </Button>
           )}
         </div>
         <div className="mt-3 min-w-0 max-w-3xl">
@@ -304,13 +305,12 @@ export default function ProfileSettingsPrototype({
           {!(variant === 'D' && biographyEdit) && (
             <Button
               ref={biographyEditButton}
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
               onClick={startBiographyEdit}
             >
               <Pencil className="size-3.5" />
-              Edit<span className="sr-only"> biography</span>
+              Edit biography
             </Button>
           )}
         </div>

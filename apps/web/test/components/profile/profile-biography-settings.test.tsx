@@ -10,32 +10,98 @@ import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
-  return { ...original, userApi: { ...original.userApi, ensureProfile: vi.fn(), updateProfile: vi.fn() } };
+  return {
+    ...original,
+    userApi: { ...original.userApi, ensureProfile: vi.fn(), updateProfile: vi.fn() },
+  };
 });
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => <a href="/profiles/@ada">{children}</a>,
 }));
 const profile: Profile = {
-  id: 'user_123', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: 'Original Biography',
-  pictureAssetId: null, pictureImportStatus: 'complete', version: 1, biographyMaxLength: 5000,
-  createdAt: '2026-07-12T12:00:00.000Z', updatedAt: '2026-07-12T12:00:00.000Z',
+  id: 'user_123',
+  handle: 'ada',
+  displayName: 'Ada Lovelace',
+  biographyMarkdown: 'Original Biography',
+  pictureAssetId: null,
+  pictureImportStatus: 'complete',
+  version: 1,
+  biographyMaxLength: 5000,
+  createdAt: '2026-07-12T12:00:00.000Z',
+  updatedAt: '2026-07-12T12:00:00.000Z',
 };
 function renderPage(initial = profile) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   client.setQueryData(profileQueryKey(profile.id), initial);
-  return { client, ...render(<QueryClientProvider client={client}><ProfileSettingsPage /></QueryClientProvider>) };
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <ProfileSettingsPage />
+      </QueryClientProvider>
+    ),
+  };
 }
 
 describe('Biography settings', () => {
   beforeEach(() => {
-    vi.mocked(useAuth, { partial: true }).mockReturnValue({ getToken: vi.fn().mockResolvedValue('token'), isLoaded: true, isSignedIn: true, userId: profile.id });
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
+      getToken: vi.fn().mockResolvedValue('token'),
+      isLoaded: true,
+      isSignedIn: true,
+      userId: profile.id,
+    });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
   });
 
+  it('keeps an edit based on its original version until the author deliberately refreshes after a conflict', async () => {
+    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(
+      new UserApiError('Conflict', 409, {
+        type: 'https://wallpaperdb.test/problems/profile-version-conflict',
+      })
+    );
+    const remote = { ...profile, biographyMarkdown: 'Remote Biography', version: 2 };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(remote);
+    const updated = { ...remote, biographyMarkdown: 'My draft', version: 3 };
+    vi.mocked(userApi.updateProfile).mockResolvedValueOnce(updated);
+    const { client } = renderPage();
+    const user = userEvent.setup();
+    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.clear(editor);
+    await user.type(editor, 'My draft');
+    act(() => client.setQueryData(profileQueryKey(profile.id), remote));
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() =>
+      expect(userApi.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ biographyMarkdown: 'My draft', expectedVersion: 1 })
+      )
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your Profile changed elsewhere. Refresh Biography before saving again.'
+    );
+    expect(editor).toHaveValue('My draft');
+    await user.click(screen.getByRole('button', { name: 'Refresh Biography' }));
+    expect(
+      await screen.findByText('Biography refreshed. Your unsaved draft is preserved.')
+    ).toBeInTheDocument();
+    expect(editor).toHaveValue('My draft');
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+    expect(userApi.updateProfile).toHaveBeenLastCalledWith(
+      expect.objectContaining({ biographyMarkdown: 'My draft', expectedVersion: 2 })
+    );
+  });
+
   it('counts Unicode characters and enforces the owner-configured Biography limit', async () => {
     const initial = { ...profile, biographyMarkdown: '', biographyMaxLength: 2 };
-    vi.mocked(userApi.updateProfile).mockResolvedValue({ ...initial, biographyMarkdown: '🙂🙂', version: 2 });
+    vi.mocked(userApi.updateProfile).mockResolvedValue({
+      ...initial,
+      biographyMarkdown: '🙂🙂',
+      version: 2,
+    });
     renderPage(initial);
     const user = userEvent.setup();
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
@@ -47,7 +113,11 @@ describe('Biography settings', () => {
     await user.type(editor, '🙂🙂');
     expect(screen.getByText('2 / 2 characters')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save Biography' }));
-    await waitFor(() => expect(userApi.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ biographyMarkdown: '🙂🙂' })));
+    await waitFor(() =>
+      expect(userApi.updateProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ biographyMarkdown: '🙂🙂' })
+      )
+    );
   });
 
   it('saves authored Markdown with the last-seen version and adopts the authoritative owner', async () => {
@@ -61,8 +131,15 @@ describe('Biography settings', () => {
     await user.type(editor, biographyMarkdown);
     await user.click(screen.getByRole('button', { name: 'Save Biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
-    expect(userApi.updateProfile).toHaveBeenCalledWith({ biographyMarkdown, expectedVersion: 1, expectedProfileId: profile.id, tokenProvider: expect.any(Function) });
+    expect(userApi.updateProfile).toHaveBeenCalledWith({
+      biographyMarkdown,
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
     expect(editor).toHaveValue(biographyMarkdown);
-    expect(screen.getByText('Biography saved. Public views may take a moment to update.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Biography saved. Public views may take a moment to update.')
+    ).toBeInTheDocument();
   });
 });

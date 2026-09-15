@@ -72,10 +72,16 @@ describe('User API client', () => {
     vi.stubGlobal('fetch', fetch);
     const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
 
-    await expect(client.updateProfile({ biographyMarkdown, expectedVersion: 1, expectedProfileId: profile.id })).resolves.toEqual(updated);
+    await expect(
+      client.updateProfile({ biographyMarkdown, expectedVersion: 1, expectedProfileId: profile.id })
+    ).resolves.toEqual(updated);
     expect(fetch).toHaveBeenCalledWith('/user/profile/me', {
       method: 'PATCH',
-      headers: { Accept: 'application/json', Authorization: 'Bearer fresh-token', 'Content-Type': 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer fresh-token',
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ biographyMarkdown, expectedVersion: 1 }),
     });
   });

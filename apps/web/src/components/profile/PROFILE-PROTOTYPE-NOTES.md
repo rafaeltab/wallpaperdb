@@ -272,3 +272,33 @@ the prototypes. E retains its existing biography content origin. Desktop/mobile 
 checks confirmed entry, Escape/cancel, and focus return; no page errors were reported.
 Independent code review and focused formatting checks passed. Changes remain local; PR #208
 is unchanged.
+
+## Inline save feedback
+
+The handle's Edit/Save/Cancel glyphs are now 14px, with the existing click targets and
+baseline alignment. The status row below the card has been removed. Inline display name,
+handle, and biography saves share a simulated 900ms loading state: the check becomes a
+spinner, then a green check pulses between bright/dark green twice and fades over 1.6s.
+The editor closes after the feedback. Local values commit when success is announced,
+so switching prototypes during the animation keeps a confirmed save.
+
+Failures show a pulsing red cross and an error toast, preserve the draft, and keep the
+editor open. After the pulse, Save is available for retry. The prototype toolbar's
+**Fail next save** toggle makes this state reproducible; it is consumed by one inline
+save. This remains a memory-only demonstration, with no API writes. Reduced-motion
+preferences replace animation with static status icons for the same feedback interval.
+
+Toasts use the app's themed Sonner component, at the top right to clear the floating
+prototype toolbar on narrow screens. Successful retries clear the earlier error text.
+Pending saves prevent duplicate submission and cancellation; Reset cancels pending timers.
+Completion restores focus only when it would not interrupt another focused control.
+
+Agent-browser verified all three editors' failure/retry flows, spinner/green/red states,
+preserved drafts, Enter/Escape behavior, reset cancellation, confirmed saves across variant
+switches, focus retention, and biography focus return. Desktop and 320px layouts were
+checked in light/dark themes, including reduced motion and themed toast placement. The
+14px handle icon still meets the text baseline exactly (both measured at 311px on mobile).
+No browser errors were reported. Independent code review passed; 44 existing settings,
+public Profile, and account-menu tests pass. TypeScript still reports the same 71 existing
+errors, with none in the changed prototype files. Changes are committed locally; PR #208
+remains unchanged.

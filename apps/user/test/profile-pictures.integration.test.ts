@@ -78,6 +78,28 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('replaces a picture with a new immutable ID and immediately retires old public delivery for thirty days', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const first = (await upload(image, original.version)).json();
+    const secondResponse = await upload(image, first.version);
+    expect(secondResponse.statusCode).toBe(200);
+    const second = secondResponse.json();
+    expect(second.pictureAssetId).not.toBe(first.pictureAssetId);
+    expect(second.version).toBe(first.version + 1);
+    const [old] = await sql`select * from profile_picture_assets where id = ${first.pictureAssetId}`;
+    expect(old.state).toBe('retired');
+    expect(old.retired_at.toISOString()).toBe(second.updatedAt);
+    expect(old.expires_at.getTime() - old.retired_at.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
+    const check = (id: string) => app.inject({ method: 'GET', url: `/internal/profile-pictures/${id}/availability`, headers: { authorization: 'Bearer test-media-token' } });
+    expect((await check(first.pictureAssetId)).statusCode).toBe(404);
+    expect((await check(second.pictureAssetId)).statusCode).toBe(204);
+    expect((await storage.send(new GetObjectCommand({ Bucket: old.storage_bucket, Key: old.storage_key }))).ContentLength).toBeGreaterThan(0);
+    expect((await fetch(`${config.s3Endpoint}/${old.storage_bucket}/${old.storage_key}`)).status).toBe(403);
+    const [event] = await sql`select payload from outbox_events where payload->'change'->>'after' = ${second.pictureAssetId}`;
+    expect(event.payload).toMatchObject({ change: { type: 'picture-changed', before: first.pictureAssetId, after: second.pictureAssetId }, profile: { pictureAssetId: second.pictureAssetId, version: second.version } });
+  });
+
   it('authorizes public delivery only for an active current asset while storage remains private', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

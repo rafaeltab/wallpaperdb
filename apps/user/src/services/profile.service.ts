@@ -748,6 +748,9 @@ export class ProfileService {
       const asset = await tx.query.profilePictureAssets.findFirst({ where: and(eq(profilePictureAssets.id, assetId), eq(profilePictureAssets.profileId, userId), eq(profilePictureAssets.state, 'staged')) });
       if (!asset) throw new Error('Staged Profile picture is missing');
       const now = new Date();
+      if (current.pictureAssetId) {
+        await tx.update(profilePictureAssets).set({ state: 'retired', retiredAt: now, expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }).where(eq(profilePictureAssets.id, current.pictureAssetId));
+      }
       await tx.update(profilePictureAssets).set({ state: 'active', expiresAt: null }).where(eq(profilePictureAssets.id, assetId));
       const [updated] = await tx.update(profiles).set({ pictureAssetId: assetId, version: current.version + 1, updatedAt: now }).where(eq(profiles.id, userId)).returning();
       const claim = await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, updated.handle) });

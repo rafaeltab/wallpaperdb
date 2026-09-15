@@ -19,17 +19,29 @@ export class ProfilePictureService {
       throw new Error('Profile picture availability is not configured');
     }
     const origin = this.config.userServiceUrl.replace(/\/+$/, '');
-    const availability = await fetch(`${origin}/internal/profile-pictures/${encodeURIComponent(pictureId)}/availability`, {
-      headers: { Authorization: `Bearer ${this.config.userMediaServiceToken}`, 'Cache-Control': 'no-store' },
-      cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(3000),
-    });
+    const availability = await fetch(
+      `${origin}/internal/profile-pictures/${encodeURIComponent(pictureId)}/availability`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.config.userMediaServiceToken}`,
+          'Cache-Control': 'no-store',
+        },
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(3000),
+      }
+    );
     await availability.body?.cancel();
     if (availability.status === 404) return null;
-    if (availability.status !== 204) throw new Error('Profile picture availability could not be verified');
+    if (availability.status !== 204)
+      throw new Error('Profile picture availability could not be verified');
 
-    const object = await this.minio.getClient().send(new GetObjectCommand({
-      Bucket: asset.storageBucket, Key: asset.storageKey,
-    }));
+    const object = await this.minio.getClient().send(
+      new GetObjectCommand({
+        Bucket: asset.storageBucket,
+        Key: asset.storageKey,
+      })
+    );
     if (!object.Body) throw new Error('Profile picture object is unavailable');
     // Read fully before enabling immutable caching; failed reads must remain retryable.
     return Buffer.from(await object.Body.transformToByteArray());

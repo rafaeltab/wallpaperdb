@@ -77,13 +77,17 @@ export const profilePictureAssets = pgTable('profile_picture_assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const profilePictureHeads = pgTable('profile_picture_heads', {
-  profileId: text('profile_id').primaryKey(),
-  version: integer('version').notNull(),
-  // Snapshots may arrive before the event containing this asset's metadata.
-  pictureId: text('picture_id'),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index('profile_picture_heads_picture_id_idx').on(table.pictureId)]);
+export const profilePictureHeads = pgTable(
+  'profile_picture_heads',
+  {
+    profileId: text('profile_id').primaryKey(),
+    version: integer('version').notNull(),
+    // Snapshots may arrive before the event containing this asset's metadata.
+    pictureId: text('picture_id'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('profile_picture_heads_picture_id_idx').on(table.pictureId)]
+);
 
 export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
 export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;

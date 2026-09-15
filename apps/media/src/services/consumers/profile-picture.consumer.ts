@@ -1,4 +1,10 @@
-import { BaseEventConsumer, ProfileCreatedEventSchema, ProfileUpdatedEventSchema, type ProfileCreatedEvent, type ProfileUpdatedEvent } from '@wallpaperdb/events';
+import {
+  BaseEventConsumer,
+  ProfileCreatedEventSchema,
+  ProfileUpdatedEventSchema,
+  type ProfileCreatedEvent,
+  type ProfileUpdatedEvent,
+} from '@wallpaperdb/events';
 import { inject, singleton } from 'tsyringe';
 import { z } from 'zod';
 import { NatsConnectionManager } from '../../connections/nats.js';
@@ -18,8 +24,11 @@ export class ProfilePictureConsumer extends BaseEventConsumer<typeof ProfileSnap
   ) {
     super({
       natsConnectionProvider: () => connection.getClient(),
-      serviceName: 'media', streamName: 'PROFILE', durableName: 'media-profile-picture-snapshots',
-      maxRetries: 3, ackWait: 30000,
+      serviceName: 'media',
+      streamName: 'PROFILE',
+      durableName: 'media-profile-picture-snapshots',
+      maxRetries: 3,
+      ackWait: 30000,
     });
   }
 

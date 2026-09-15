@@ -29,6 +29,7 @@ describe('Profile picture commands', () => {
   let app: FastifyInstance;
   let config: Config;
   let initialImageUrl: string | undefined;
+  const pictureImportTimer = new FakeTimerService();
 
   beforeAll(async () => {
     [postgresContainer, natsContainer, minioContainer] = await Promise.all([
@@ -53,7 +54,7 @@ describe('Profile picture commands', () => {
       credentials: { accessKeyId: minioContainer.getUsername(), secretAccessKey: minioContainer.getPassword() } });
     await storage.send(new CreateBucketCommand({ Bucket: config.profilePictureBucket }));
     container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService() });
+    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService(), pictureImportTimer });
     container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } });
   });
 
@@ -79,6 +80,18 @@ describe('Profile picture commands', () => {
     ]);
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
+
+  it('runs queued picture imports from the application timer without blocking ensure', async () => {
+    initialImageUrl = 'https://img.clerk.com/scheduled-initial-picture';
+    const pending = (await ensure()).json();
+    expect(pending.pictureImportStatus).toBe('pending');
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array(image)));
+    try {
+      await pictureImportTimer.tickAsync(1000);
+      expect((await ensure()).json()).toMatchObject({ pictureImportStatus: 'complete', pictureAssetId: expect.stringMatching(/^pic_/), version: pending.version + 1 });
+    } finally { fetcher.mockRestore(); }
+  });
 
   it('bases each import lease on its actual start after earlier jobs finish', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });

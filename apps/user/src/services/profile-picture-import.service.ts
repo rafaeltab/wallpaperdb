@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull, lte, or } from 'drizzle-orm';
-import { inject, singleton } from 'tsyringe';
+import { delay, inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
@@ -13,17 +13,19 @@ import { ProfileService } from './profile.service.js';
 export class ProfilePictureImportService {
   constructor(
     @inject(DatabaseConnection) private readonly database: DatabaseConnection,
-    @inject(ProfilePictureIngestionService) private readonly ingestion: ProfilePictureIngestionService,
-    @inject(ProfileService) private readonly profiles: ProfileService,
+    @inject(delay(() => ProfilePictureIngestionService)) private readonly ingestion: ProfilePictureIngestionService,
+    @inject(delay(() => ProfileService)) private readonly profiles: ProfileService,
     @inject('config') private readonly config: Config
   ) {}
 
-  async importPending(): Promise<void> {
+  async importPending(isStopping: () => boolean = () => false): Promise<void> {
+    if (isStopping()) return;
     const now = new Date();
     const db = this.database.getClient().db;
     const due = and(inArray(profilePictureImports.status, ['pending', 'retrying']), lte(profilePictureImports.nextAttemptAt, now), or(isNull(profilePictureImports.leaseUntil), lte(profilePictureImports.leaseUntil, now)));
     const jobs = await db.query.profilePictureImports.findMany({ where: due, columns: { profileId: true }, orderBy: [profilePictureImports.nextAttemptAt, profilePictureImports.profileId], limit: 100 });
     for (const candidate of jobs) {
+      if (isStopping()) break;
       const job = await db.transaction(async (tx) => {
         const [current] = await tx.select().from(profilePictureImports).where(and(eq(profilePictureImports.profileId, candidate.profileId), due)).for('update', { skipLocked: true });
         if (!current?.sourceUrl) return undefined;

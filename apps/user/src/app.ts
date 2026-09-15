@@ -13,6 +13,8 @@ import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-i
 import { ProfileAliasExpiryWorker } from './services/profile-alias-expiry.service.js';
 import { ProfileService } from './services/profile.service.js';
 import { ProfilePictureStorage } from './services/profile-picture-storage.js';
+import { ProfilePictureImportService } from './services/profile-picture-import.service.js';
+import { ProfilePictureImportWorker } from './services/profile-picture-import-worker.js';
 import {
   NatsProfileEventPublisher,
   ProfileOutboxPublisherWorker,
@@ -36,7 +38,7 @@ declare module 'fastify' {
 
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean; aliasExpiryTimer?: TimerService }
+  options?: { logger?: boolean; enableOtel?: boolean; aliasExpiryTimer?: TimerService; pictureImportTimer?: TimerService }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
   container.register(IdentityProviderToken, { useClass: ClerkIdentityProvider });
@@ -94,6 +96,7 @@ export async function createApp(
 
   let outboxPublisher: ProfileOutboxPublisherWorker | null = null;
   let aliasExpiryWorker: ProfileAliasExpiryWorker | null = null;
+  let pictureImportWorker: ProfilePictureImportWorker | null = null;
 
   try {
     await container.resolve(DatabaseConnection).initialize();
@@ -113,6 +116,11 @@ export async function createApp(
       fastify.log,
       options?.aliasExpiryTimer
     );
+    pictureImportWorker = new ProfilePictureImportWorker(
+      async (isStopping) => container.resolve(ProfilePictureImportService).importPending(isStopping),
+      fastify.log,
+      options?.pictureImportTimer
+    );
     fastify.connectionsState.connectionsInitialized = true;
     fastify.log.info('All connections initialized successfully');
   } catch (error) {
@@ -123,6 +131,7 @@ export async function createApp(
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
     await aliasExpiryWorker?.stop();
+    await pictureImportWorker?.stop();
     container.resolve(ProfilePictureStorage).close();
     await outboxPublisher?.stop();
     await container.resolve(NatsConnectionManager).close();
@@ -136,6 +145,8 @@ export async function createApp(
   fastify.log.info('Profile outbox publisher started');
   aliasExpiryWorker?.start();
   fastify.log.info('Profile alias expiry worker started');
+  pictureImportWorker?.start();
+  fastify.log.info('Profile picture import worker started');
 
   return fastify;
 }

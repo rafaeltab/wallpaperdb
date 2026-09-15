@@ -8,13 +8,24 @@ export function PrototypeIconButton({
   label,
   className,
   buttonClassName,
+  textBaseline = false,
   children,
   ...props
-}: ComponentProps<typeof Button> & { label: string; buttonClassName?: string }) {
+}: ComponentProps<typeof Button> & {
+  label: string;
+  buttonClassName?: string;
+  textBaseline?: boolean;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={cn('inline-flex shrink-0 align-middle', className)}>
+        <span
+          className={cn(
+            'inline-flex shrink-0 align-middle',
+            textBaseline && 'inline-block overflow-visible align-baseline',
+            className
+          )}
+        >
           <Button
             type="button"
             variant="ghost"
@@ -23,7 +34,9 @@ export function PrototypeIconButton({
             {...props}
             className={cn(
               'size-7 border-0 bg-transparent p-0 text-[length:inherit] text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent',
-              buttonClassName
+              buttonClassName,
+              textBaseline &&
+                'inline-block h-[1lh] overflow-visible align-baseline text-center leading-[inherit] [font-weight:inherit] [&_svg]:inline-block [&_svg]:align-baseline'
             )}
           >
             {children}

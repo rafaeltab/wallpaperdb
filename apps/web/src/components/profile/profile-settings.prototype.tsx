@@ -164,12 +164,13 @@ export default function ProfileSettingsPrototype({
     </div>
   );
   const name = (
-    <div className="flex min-w-0 items-center gap-2">
+    <div className="flex min-w-0 items-baseline gap-2">
       <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
         {value.name}
       </h2>
       <PrototypeIconButton
         label="Edit display name"
+        textBaseline
         className="text-2xl sm:text-3xl"
         onClick={() => openEditor('name')}
       >
@@ -761,7 +762,7 @@ function InlineProfileText({
       <div className="relative flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <form
           ref={profileForm}
-          className={`flex min-w-0 max-w-full gap-1 ${editing ? 'items-start' : 'items-center'} ${typography}`}
+          className={`flex min-w-0 max-w-full items-baseline gap-1 ${typography}`}
           style={{ minHeight: editing ? readHeight.current : undefined }}
           onSubmit={(event) => {
             event.preventDefault();
@@ -805,7 +806,7 @@ function InlineProfileText({
               <PrototypeIconButton
                 label={`Save ${label.toLowerCase()}`}
                 type="submit"
-                className="mt-[calc((1lh-1.5rem)/2)]"
+                textBaseline
                 buttonClassName="size-6"
                 disabled={!valid || draft.trim() === value}
               >
@@ -813,7 +814,7 @@ function InlineProfileText({
               </PrototypeIconButton>
               <PrototypeIconButton
                 label="Cancel"
-                className="mt-[calc((1lh-1.5rem)/2)]"
+                textBaseline
                 buttonClassName="size-6"
                 onClick={() => onDraft(null)}
               >
@@ -824,6 +825,7 @@ function InlineProfileText({
             <PrototypeIconButton
               ref={button}
               label={`Edit ${label.toLowerCase()}`}
+              textBaseline
               buttonClassName="size-6"
               disabled={disabled}
               aria-describedby={disabled ? disabledHintId : undefined}
@@ -854,7 +856,7 @@ function InlineProfileText({
   if (!editing)
     return (
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-        <div className="flex min-w-0 max-w-full items-center gap-2">
+        <div className="flex min-w-0 max-w-full items-baseline gap-2">
           {kind === 'name' ? (
             <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
               {value}
@@ -867,6 +869,7 @@ function InlineProfileText({
           <PrototypeIconButton
             ref={button}
             label={`Edit ${label.toLowerCase()}`}
+            textBaseline
             className={kind === 'name' ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}
             disabled={disabled}
             aria-describedby={disabled ? disabledHintId : undefined}

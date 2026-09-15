@@ -106,6 +106,18 @@ The expiry worker processes bounded batches of due aliases. Each transaction loc
 
 Public Handle lookup excludes aliases at their expiry timestamp, even if the removal event has not reached the Gateway yet. Legacy events without an expiry timestamp remain compatible. The Gateway applies complete snapshots by Profile version; older events cannot restore a removed alias. If a newly claimed Handle overlaps a stale projected claim, its higher claim generation wins.
 
+### PUT /profile/me/aliases/:handle
+
+Reactivates an eligible historical Handle using `{ "expectedVersion": 2 }`. A released Handle receives a new claim generation and becomes a retained alias. For an owned expiring alias, reactivation cancels expiry, preserves the existing claim generation, and starts a new retention timestamp. Both transitions require a free retained-alias slot and atomically update the Profile version and append an `alias-reactivated` event with the complete public snapshot.
+
+The command returns the authoritative owner Profile. A Handle outside the User's recent history returns `400` with `ineligible-handle`. Another Profile's claim returns `409` with `handle-unavailable`; a full retained-alias limit returns `409` with `alias-limit`. Stale versions return `409` with `profile-version-conflict`. An already retained alias at the current version returns unchanged state while its Handle remains eligible in the 30-day history.
+
+### Recent Handle eligibility
+
+Authenticated owner responses include `historicalHandles`, each with `handle`, `eligibleUntil`, and nullable `unavailableReason` (`claimed` or `alias-limit`). Current Handles and owned retained aliases are excluded. Settings use this list to offer reactivation or cancellation of an owned alias's removal, and explain blocked choices. This owner history is not part of the public GraphQL model or public event snapshot.
+
+Eligibility comes from typed Handle transitions in the retained Profile event history: creation, Handle changes (including automatically scheduled aliases), scheduling, expiry, and reactivation. Unrelated edits and repeated alias values in public snapshots do not renew history. Each accepted event stores its acceptance timestamp in `outbox_events.created_at`; the latest qualifying event sets the Handle's eligibility deadline 30 days later. At that exact deadline the Handle is ineligible, even if the event has not yet been physically deleted. History lookup uses the Profile ID and timestamp index and reads only relevant transition fields.
+
 ### GET /health
 
 Health check with dependency status.

@@ -7,6 +7,12 @@ export interface ProfileAlias {
   expiresAt?: string | null;
 }
 
+export interface HistoricalHandle {
+  handle: string;
+  eligibleUntil: string;
+  unavailableReason: 'claimed' | 'alias-limit' | null;
+}
+
 export interface Profile {
   id: string;
   handle: string;
@@ -19,6 +25,7 @@ export interface Profile {
   lastHandleChangedAt?: string | null;
   aliases?: ProfileAlias[];
   retainedAliasLimit?: number;
+  historicalHandles?: HistoricalHandle[];
 }
 
 export class UserApiError extends Error {
@@ -75,6 +82,34 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   return {
+    async reactivateAlias(options: AliasCommandOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+
+      const response = await fetch(
+        `${normalizedBaseUrl}/profile/me/aliases/${encodeURIComponent(options.handle)}`,
+        {
+          method: 'PUT',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ expectedVersion: options.expectedVersion }),
+        }
+      );
+      if (!response.ok) throw await userApiError(response);
+
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) {
+        throw new UserApiError('User API returned a malformed Profile', 502);
+      }
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
     async expireAlias(options: AliasCommandOptions): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);

@@ -128,6 +128,45 @@ describe('User API client', () => {
     });
   });
 
+  it('reactivates a historical Handle with a fresh token and returns the authoritative owner state', async () => {
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const updated = {
+      ...profile,
+      version: 4,
+      retainedAliasLimit: 3,
+      aliases: [
+        {
+          handle: 'old-handle',
+          claimGeneration: 2,
+          createdAt: '2026-09-15T12:00:00.000Z',
+          expiresAt: null,
+        },
+      ],
+      historicalHandles: [],
+    };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated)));
+    vi.stubGlobal('fetch', fetch);
+    const client = createUserApiClient({ baseUrl: '/user/', tokenProvider });
+
+    await expect(
+      client.reactivateAlias({
+        handle: 'old-handle',
+        expectedVersion: 3,
+        expectedProfileId: profile.id,
+      })
+    ).resolves.toEqual(updated);
+    expect(tokenProvider).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me/aliases/old-handle', {
+      method: 'PUT',
+      headers: {
+        Accept: 'application/json',
+        Authorization: 'Bearer fresh-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expectedVersion: 3 }),
+    });
+  });
+
   it('exposes a stale Profile edit as a conflict', async () => {
     vi.stubGlobal(
       'fetch',

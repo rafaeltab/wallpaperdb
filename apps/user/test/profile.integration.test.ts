@@ -255,6 +255,43 @@ describe('Profile commands', () => {
     expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(1);
   });
 
+  it('rolls back failed expiry events and retries them without blocking later due aliases', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      identities.identities.set('user_bad', { displayName: 'A poison', firstName: null, lastName: null });
+      identities.identities.set('user_good', { displayName: 'Z healthy', firstName: null, lastName: null });
+      const owners = [];
+      for (const id of ['user_bad', 'user_good']) {
+        const original = (await request(id)).json();
+        const changed = (await changeHandle(id, `current-${id.replace('_', '-')}`, original.version)).json();
+        owners.push((await scheduleAlias(id, original.handle, changed.version)).json());
+      }
+      const [bad, good] = owners;
+      const other = (await request('user_other')).json();
+      await sql.unsafe(`create function reject_expiry_event() returns trigger language plpgsql as $$ begin if new.aggregate_id = 'user_bad' and new.payload->'change'->>'type' = 'alias-expired' then raise exception 'expiry event rejected'; end if; return new; end $$`);
+      await sql.unsafe(`create trigger reject_expiry_event before insert on outbox_events for each row execute function reject_expiry_event()`);
+      try {
+        expect((await expireAlias(bad.id, bad.aliases[0].handle, bad.version)).statusCode).toBe(500);
+        expect((await request(bad.id)).json()).toEqual(bad);
+        expect((await changeHandle(other.id, bad.aliases[0].handle, other.version)).statusCode).toBe(409);
+        vi.setSystemTime(new Date(bad.aliases[0].expiresAt));
+        await aliasExpiryTimer.tickAsync(1_000);
+        expect((await request(bad.id)).json()).toEqual(bad);
+        expect((await request(good.id)).json()).toMatchObject({ aliases: [], version: good.version + 1 });
+        const events = await sql`select aggregate_id from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
+        expect(events.map((event) => event.aggregate_id)).toEqual([good.id]);
+      } finally {
+        await sql.unsafe('drop trigger reject_expiry_event on outbox_events; drop function reject_expiry_event()');
+      }
+      await aliasExpiryTimer.tickAsync(1_000);
+      expect((await request(bad.id)).json()).toMatchObject({ aliases: [], version: bad.version + 1 });
+      expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
     const before = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();

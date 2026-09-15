@@ -52,7 +52,9 @@ const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
 const ALIAS_EXPIRY_GRACE_MS = 24 * 60 * 60 * 1000;
 
 type ProfileReader = Pick<ReturnType<DatabaseConnection['getClient']>['db'], 'query'>;
-type ProfileTransaction = Parameters<Parameters<ReturnType<DatabaseConnection['getClient']>['db']['transaction']>[0]>[0];
+type ProfileTransaction = Parameters<
+  Parameters<ReturnType<DatabaseConnection['getClient']>['db']['transaction']>[0]
+>[0];
 type AliasClaim = typeof handleClaims.$inferSelect;
 export interface AliasClaimReference {
   profileId: string;
@@ -426,7 +428,11 @@ export class ProfileService {
 
   async expireDueAlias(reference: AliasClaimReference, now: Date): Promise<boolean> {
     return this.database.getClient().db.transaction(async (tx) => {
-      const [profile] = await tx.select().from(profiles).where(eq(profiles.id, reference.profileId)).for('update');
+      const [profile] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, reference.profileId))
+        .for('update');
       if (!profile) return false;
       const alias = await tx.query.handleClaims.findFirst({
         where: and(
@@ -442,20 +448,35 @@ export class ProfileService {
     });
   }
 
-  async expireAliasImmediately(userId: string, requestedHandle: string, expectedVersion: number): Promise<OwnerProfile> {
+  async expireAliasImmediately(
+    userId: string,
+    requestedHandle: string,
+    expectedVersion: number
+  ): Promise<OwnerProfile> {
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
       throw new InvalidAliasCommandError('Expected Profile version must be a positive integer');
     }
     return this.database.getClient().db.transaction(async (tx) => {
-      const [profile] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
+      const [profile] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('update');
       if (!profile || profile.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
       const alias = await tx.query.handleClaims.findFirst({
-        where: and(eq(handleClaims.handle, requestedHandle.toLowerCase()), eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
+        where: and(
+          eq(handleClaims.handle, requestedHandle.toLowerCase()),
+          eq(handleClaims.profileId, userId),
+          eq(handleClaims.kind, 'alias')
+        ),
       });
       if (!alias) throw new AliasNotFoundError('This Handle is not one of your aliases');
-      if (!alias.expiresAt) throw new AliasNotScheduledError('Schedule this alias for removal before expiring it immediately');
+      if (!alias.expiresAt)
+        throw new AliasNotScheduledError(
+          'Schedule this alias for removal before expiring it immediately'
+        );
       return this.releaseAlias(tx, profile, alias, new Date(), 'immediate');
     });
   }
@@ -468,16 +489,27 @@ export class ProfileService {
     reason: 'scheduled' | 'immediate'
   ): Promise<OwnerProfile> {
     if (!alias.expiresAt) throw new InvalidAliasCommandError('Only a scheduled alias can expire');
-    await tx.delete(handleClaims).where(and(
-      eq(handleClaims.handle, alias.handle),
-      eq(handleClaims.profileId, profile.id),
-      eq(handleClaims.kind, 'alias'),
-      eq(handleClaims.claimGeneration, alias.claimGeneration)
-    ));
-    const [updated] = await tx.update(profiles).set({
-      version: sql`${profiles.version} + 1`, updatedAt: now,
-    }).where(eq(profiles.id, profile.id)).returning();
-    const claim = await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, profile.handle) });
+    await tx
+      .delete(handleClaims)
+      .where(
+        and(
+          eq(handleClaims.handle, alias.handle),
+          eq(handleClaims.profileId, profile.id),
+          eq(handleClaims.kind, 'alias'),
+          eq(handleClaims.claimGeneration, alias.claimGeneration)
+        )
+      );
+    const [updated] = await tx
+      .update(profiles)
+      .set({
+        version: sql`${profiles.version} + 1`,
+        updatedAt: now,
+      })
+      .where(eq(profiles.id, profile.id))
+      .returning();
+    const claim = await tx.query.handleClaims.findFirst({
+      where: eq(handleClaims.handle, profile.handle),
+    });
     if (!claim) throw new Error('Current Profile Handle claim is missing');
     const owner = await this.ownerProfile(updated, tx);
     const event: ProfileUpdatedEvent = {
@@ -485,18 +517,35 @@ export class ProfileService {
       eventType: PROFILE_UPDATED_SUBJECT,
       timestamp: now.toISOString(),
       change: {
-        type: 'alias-expired', handle: alias.handle, claimGeneration: alias.claimGeneration,
-        before: alias.expiresAt.toISOString(), after: null, reason,
+        type: 'alias-expired',
+        handle: alias.handle,
+        claimGeneration: alias.claimGeneration,
+        before: alias.expiresAt.toISOString(),
+        after: null,
+        reason,
       },
       profile: {
-        id: updated.id, displayName: updated.displayName, handle: updated.handle,
-        claimGeneration: claim.claimGeneration, aliases: owner.aliases,
-        biographyMarkdown: updated.biographyMarkdown, pictureAssetId: updated.pictureAssetId,
-        version: updated.version, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString(),
+        id: updated.id,
+        displayName: updated.displayName,
+        handle: updated.handle,
+        claimGeneration: claim.claimGeneration,
+        aliases: owner.aliases,
+        biographyMarkdown: updated.biographyMarkdown,
+        pictureAssetId: updated.pictureAssetId,
+        version: updated.version,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
       },
     };
     ProfileUpdatedEventSchema.parse(event);
-    await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: profile.id, payload: event });
+    await tx
+      .insert(outboxEvents)
+      .values({
+        id: event.eventId,
+        subject: event.eventType,
+        aggregateId: profile.id,
+        payload: event,
+      });
     return owner;
   }
 

@@ -42,7 +42,8 @@ export const handleClaims = pgTable(
   },
   (table) => [
     index('handle_claims_profile_id_idx').on(table.profileId),
-    index('handle_claims_due_expiry_idx').on(table.expiresAt, table.handle)
+    index('handle_claims_due_expiry_idx')
+      .on(table.expiresAt, table.handle)
       .where(sql`${table.kind} = 'alias' and ${table.expiresAt} is not null`),
     uniqueIndex('handle_claims_handle_lower_idx').on(sql`lower(${table.handle})`),
   ]

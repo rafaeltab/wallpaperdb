@@ -26,9 +26,10 @@ export class ProfileAliasExpiryWorker {
   start(): void {
     if (this.interval) return;
     this.stopping = false;
-    const run = () => this.expirePending().catch((error) => {
-      this.logger.error({ err: error }, 'Profile alias expiry cycle failed');
-    });
+    const run = () =>
+      this.expirePending().catch((error) => {
+        this.logger.error({ err: error }, 'Profile alias expiry cycle failed');
+      });
     void run();
     this.interval = this.timer.setInterval(run, EXPIRY_INTERVAL_MS);
   }
@@ -43,7 +44,9 @@ export class ProfileAliasExpiryWorker {
   expirePending(): Promise<void> {
     if (this.stopping) return Promise.resolve();
     if (this.inFlight) return this.inFlight;
-    this.inFlight = this.expireBatches().finally(() => { this.inFlight = null; });
+    this.inFlight = this.expireBatches().finally(() => {
+      this.inFlight = null;
+    });
     return this.inFlight;
   }
 
@@ -55,10 +58,15 @@ export class ProfileAliasExpiryWorker {
         where: and(
           eq(handleClaims.kind, 'alias'),
           lte(handleClaims.expiresAt, now),
-          cursor ? or(
-            gt(handleClaims.expiresAt, cursor.expiresAt),
-            and(eq(handleClaims.expiresAt, cursor.expiresAt), gt(handleClaims.handle, cursor.handle))
-          ) : undefined
+          cursor
+            ? or(
+                gt(handleClaims.expiresAt, cursor.expiresAt),
+                and(
+                  eq(handleClaims.expiresAt, cursor.expiresAt),
+                  gt(handleClaims.handle, cursor.handle)
+                )
+              )
+            : undefined
         ),
         columns: { handle: true, profileId: true, claimGeneration: true, expiresAt: true },
         orderBy: [handleClaims.expiresAt, handleClaims.handle],
@@ -69,7 +77,10 @@ export class ProfileAliasExpiryWorker {
         try {
           await this.expireAlias(alias, now);
         } catch (error) {
-          this.logger.error({ err: error, handle: alias.handle, profileId: alias.profileId }, 'Profile alias expiry failed; will retry');
+          this.logger.error(
+            { err: error, handle: alias.handle, profileId: alias.profileId },
+            'Profile alias expiry failed; will retry'
+          );
         }
       }
       const last = aliases.at(-1);

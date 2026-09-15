@@ -12,16 +12,16 @@ Available alternatives:
 - A — Profile card: compact identity and handle above a biography preview.
 - B — Profile preview: a public-profile composition with editing controls on the content.
 - C — Editable details: a compact list with clear labels and section boundaries.
-- D — Inline profile (prototype 4): B’s composition with matching inline text editors and a custom banner.
+- D — Inline profile (prototype 4): B’s composition with matching inline text editors and a fixed gradient.
 
 All alternatives use dialogs for pictures and previous handles. A/B/C retain biography dialogs;
-D edits biography inline. D also offers a banner dialog.
+D edits biography inline. Custom banner editing has been deferred to issue #212.
 Use “Profile handle” in user-facing copy. Show routine refresh only as contextual recovery
 in the eventual implementation. The current biography refresh reloads the profile, preserves
 unsaved text, updates its concurrency version, and retries embedded wallpaper previews.
 
 Decision: the user prefers B’s visual composition and previous-handles dialog. D explores their
-requested refinement: consistent inline display-name/handle editing and a custom banner.
+requested refinement: consistent inline display-name, handle, and biography editing.
 No production redesign or PR update is included.
 When selected, implement the chosen behavior with TDD and remove this prototype and switcher.
 
@@ -36,7 +36,7 @@ When selected, implement the chosen behavior with TDD and remove this prototype 
 - `/web/settings/profile?variant=D` — **Inline profile** (prototype 4): B’s banner/overlapping-avatar
   layout. Display name and @handle start as text with pencils; both become matching inline
   inputs with Save/Cancel, stacked display name above handle. Biography edits inline using the
-  same Write/Preview flow. The banner has its own local chooser, preview, save, and remove flow.
+  same Write/Preview flow. The gradient stays fixed; custom banner support is deferred.
 
 Use the floating arrows or left/right keys to compare. Edits carry across variants.
 Arrow keys keep their normal behavior in fields and dialogs. **Example content** adds a
@@ -67,7 +67,7 @@ Display-name editing and a local public-profile preview are also available.
   stale-version feedback, and tests. Upload previews do not normalize or store image files.
 - Every increment is committed locally. Nothing has been pushed or changed on PR #208.
 
-## Prototype 4 follow-up
+## Prototype 4 follow-up (historical; banner exploration removed below)
 
 User direction: keep prototype 2's visual composition and previous-handles modal; make
 both display name and profile handle display as text with pencils and edit inline; explore
@@ -89,7 +89,7 @@ Decision pending: user's assessment of D, then implement the selected production
 TDD and remove these throwaway alternatives. PR #208 remains unchanged.
 
 
-## Inline biography and handle availability refinement
+## Inline biography and handle availability refinement (before banner deferral)
 
 The user refined D: biography editing should expand in place, and display name should sit
 above the handle at every screen size. Implemented while retaining picture/banner dialogs
@@ -146,3 +146,34 @@ minutes near expiry, and retains a machine-readable deadline and programmatic fo
 The demo now starts at seven days, using the same clock value for the deadline and rendering.
 agent-browser confirmed the text and pencil share a row at 1440px, wrap without horizontal
 overflow at 320px, and the pencil stays disabled. Independent review passed; Biome passed.
+
+
+## Alignment, accurate preview, and navigation refinement
+
+The current D overview keeps the display name above the handle, with matching pencils
+vertically centered on each text row. Icon buttons keep their background unchanged on hover;
+only their glyph color changes. The relative cooldown follows the handle pencil and wraps
+on small screens. Hovering or keyboard-focusing the underlined duration opens the full
+weekday/date/year/time/time-zone tooltip.
+
+Banner editing and its local state have been removed. The gradient remains. Full custom
+banner support is tracked in [GitHub issue #212](https://github.com/rafaeltab/wallpaperdb/issues/212).
+The earlier banner sections above record the exploration, not the current UI.
+
+“View profile” previews local changes using the real public Profile overview, picture
+renderer (including fallback colors and initials), biography renderer, and wallpaper list.
+“Open your profile” opens the real saved Profile in another tab using the immutable Profile
+ID, so unsaved prototype handle changes cannot create broken links.
+
+The account dropdown is wide enough for “Your profile” and “Sign out” on single lines.
+“Your profile” opens the public page. That page shows “Edit profile” at the top right only
+for the authenticated owner. During local development it leads back to prototype D; in
+production it leads to normal Profile settings. The redesigned editor remains a local,
+read-only prototype and is not promoted by this navigation change.
+
+Navigation behavior was implemented test-first. Independent review corrected preview avatar
+consistency and gradient/identity layering. Desktop browser checks confirmed the tooltip on
+hover and keyboard focus, centered pencil/text rows, public preview, real profile link, and
+owner edit link. The first four focused test files passed all 48 tests. Biome passed. App
+TypeScript reports 71 pre-existing diagnostics, none in changed source files; importing the
+existing missing test helper removed one prior diagnostic.

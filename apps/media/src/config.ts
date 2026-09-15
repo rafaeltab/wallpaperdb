@@ -28,6 +28,8 @@ const configSchema = z.object({
   // Media-specific config (resize limits)
   maxResizeWidth: z.number().int().positive().default(7680), // 8K width
   maxResizeHeight: z.number().int().positive().default(4320), // 8K height
+  userServiceUrl: z.string().url().optional(),
+  userMediaServiceToken: z.string().min(1).optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -61,6 +63,8 @@ export function loadConfig(): Config {
     // Media-specific
     maxResizeWidth: parseIntEnv(process.env.MAX_RESIZE_WIDTH, 7680),
     maxResizeHeight: parseIntEnv(process.env.MAX_RESIZE_HEIGHT, 4320),
+    userServiceUrl: process.env.USER_SERVICE_URL,
+    userMediaServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
   };
 
   return configSchema.parse(raw);

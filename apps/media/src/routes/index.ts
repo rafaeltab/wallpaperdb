@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import healthRoutes from './health.routes.js';
 import { registerMediaRoutes } from './media.routes.js';
+import { registerProfilePictureRoutes } from './profile-picture.routes.js';
 
 /**
  * Register all route plugins
@@ -11,4 +12,5 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
 
   // Media routes
   await registerMediaRoutes(app);
+  await registerProfilePictureRoutes(app);
 }

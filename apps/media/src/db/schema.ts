@@ -64,3 +64,28 @@ export type Wallpaper = typeof wallpapers.$inferSelect;
 export type NewWallpaper = typeof wallpapers.$inferInsert;
 export type Variant = typeof variants.$inferSelect;
 export type NewVariant = typeof variants.$inferInsert;
+
+export const profilePictureAssets = pgTable('profile_picture_assets', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull(),
+  storageBucket: text('storage_bucket').notNull(),
+  storageKey: text('storage_key').notNull(),
+  mimeType: text('mime_type').notNull(),
+  width: integer('width').notNull(),
+  height: integer('height').notNull(),
+  fileSizeBytes: bigint('file_size_bytes', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const profilePictureHeads = pgTable('profile_picture_heads', {
+  profileId: text('profile_id').primaryKey(),
+  version: integer('version').notNull(),
+  // Snapshots may arrive before the event containing this asset's metadata.
+  pictureId: text('picture_id'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index('profile_picture_heads_picture_id_idx').on(table.pictureId)]);
+
+export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
+export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;
+export type ProfilePictureHead = typeof profilePictureHeads.$inferSelect;
+export type NewProfilePictureHead = typeof profilePictureHeads.$inferInsert;

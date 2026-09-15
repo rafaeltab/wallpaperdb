@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -47,9 +47,9 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 
 	addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(
 		Base: TBase) {
-		const migrationPath =
-			this.options.migrationPath ??
-			join(__dirname, "../../drizzle/0000_mute_the_professor.sql");
+		const migrationDirectory = join(__dirname, "../../drizzle");
+		const migrationPaths = this.options.migrationPath ? [this.options.migrationPath] :
+			readdirSync(migrationDirectory).filter((path) => path.endsWith('.sql')).sort().map((path) => join(migrationDirectory, path));
 
 		return class extends Base {
 			_migrationsApplied = false;
@@ -82,8 +82,9 @@ export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
 					);
 
 					try {
-						const migrationSql = readFileSync(migrationPath, "utf-8");
-						await sql.unsafe(migrationSql);
+						for (const migrationPath of migrationPaths) {
+							await sql.unsafe(readFileSync(migrationPath, "utf-8"));
+						}
 						logger.debug("Database migrations applied successfully");
 					} finally {
 						await sql.end();

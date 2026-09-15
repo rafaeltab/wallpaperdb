@@ -126,6 +126,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
 				}
 
 				this._appInitialized = true;
+				this.withStream('PROFILE');
 				this.withMediaEnvironment();
 
 				this.addSetupHook(async () => {

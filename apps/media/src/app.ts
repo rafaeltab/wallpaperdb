@@ -10,6 +10,7 @@ import { registerRoutes } from './routes/index.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
 import { WallpaperVariantUploadedConsumerService } from './services/consumers/wallpaper-variant-uploaded-consumer.service.js';
+import { ProfilePictureConsumer } from './services/consumers/profile-picture.consumer.js';
 
 // Connection state interface
 export interface ConnectionsState {
@@ -24,6 +25,7 @@ declare module 'fastify' {
     container: typeof container;
     wallpaperUploadedConsumer: WallpaperUploadedConsumerService;
     variantUploadedConsumer: WallpaperVariantUploadedConsumerService;
+    profilePictureConsumer: ProfilePictureConsumer;
   }
 }
 
@@ -121,15 +123,18 @@ export async function createApp(
   try {
     const wallpaperUploadedConsumer = container.resolve(WallpaperUploadedConsumerService);
     const variantUploadedConsumer = container.resolve(WallpaperVariantUploadedConsumerService);
+    const profilePictureConsumer = container.resolve(ProfilePictureConsumer);
 
     // Start consumers (non-blocking - runs in background)
     await wallpaperUploadedConsumer.start();
     await variantUploadedConsumer.start();
+    await profilePictureConsumer.start();
     fastify.log.info('Event consumers started');
 
     // Store consumer references for shutdown
     fastify.decorate('wallpaperUploadedConsumer', wallpaperUploadedConsumer);
     fastify.decorate('variantUploadedConsumer', variantUploadedConsumer);
+    fastify.decorate('profilePictureConsumer', profilePictureConsumer);
   } catch (error) {
     fastify.log.error({ err: error }, 'Failed to start event consumers');
     throw error;
@@ -146,6 +151,9 @@ export async function createApp(
     }
     if (fastify.variantUploadedConsumer) {
       await fastify.variantUploadedConsumer.stop();
+    }
+    if (fastify.profilePictureConsumer) {
+      await fastify.profilePictureConsumer.stop();
     }
 
     await container.resolve(NatsConnectionManager).close();

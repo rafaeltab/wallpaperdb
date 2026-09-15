@@ -768,12 +768,18 @@ importers:
 
   apps/user:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.709.0
+        version: 3.958.0
       '@clerk/backend':
         specifier: ^3.4.1
         version: 3.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@fastify/cors':
         specifier: ^10.0.1
         version: 10.1.0
+      '@fastify/multipart':
+        specifier: ^9.0.1
+        version: 9.3.0
       '@fastify/swagger':
         specifier: ^9.0.0
         version: 9.6.1
@@ -831,6 +837,9 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
+      sharp:
+        specifier: ^0.33.5
+        version: 0.33.5
       tsyringe:
         specifier: ^4.10.0
         version: 4.10.0
@@ -847,6 +856,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.10
+      '@testcontainers/minio':
+        specifier: ^11.9.0
+        version: 11.11.0
       '@testcontainers/postgresql':
         specifier: ^11.9.0
         version: 11.11.0

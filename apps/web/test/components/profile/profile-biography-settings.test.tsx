@@ -2,10 +2,11 @@ import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
+import { request } from '@/lib/graphql/client';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/graphql/client', () => ({
@@ -49,7 +50,9 @@ function renderPage(initial = profile) {
 }
 
 describe('Biography settings', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
+    vi.mocked(request).mockReset().mockResolvedValue({ getWallpaper: null });
     vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
@@ -58,6 +61,40 @@ describe('Biography settings', () => {
     });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+  });
+
+  it('refreshes an exhausted same-Markdown wallpaper embed when the owner deliberately refreshes Biography', async () => {
+    vi.useFakeTimers();
+    const initial = { ...profile, biographyMarkdown: '![Forest](wallpaper:wlpr_own)' };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(initial);
+    renderPage(initial);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    for (const delay of [1000, 2000, 4000])
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    expect(request).toHaveBeenCalledTimes(4);
+    vi.mocked(request).mockResolvedValue({
+      getWallpaper: {
+        wallpaperId: 'wlpr_own',
+        profileId: profile.id,
+        uploadedAt: '',
+        updatedAt: '',
+        variants: [
+          {
+            width: 800,
+            height: 600,
+            aspectRatio: 4 / 3,
+            format: 'image/webp',
+            fileSizeBytes: 100,
+            createdAt: '',
+            url: '/media/own.webp',
+          },
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Biography' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(request).toHaveBeenCalledTimes(5);
   });
 
   it('blocks owner refresh during a Biography write and keeps the accepted state when refresh fails', async () => {

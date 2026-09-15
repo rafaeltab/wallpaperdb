@@ -85,6 +85,10 @@ describe('Profile commands', () => {
       profileHandleMaxLength: 20,
       profileDisplayNameMaxLength: 80,
       profileRetainedAliasLimit: 3,
+      s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
+      profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,
+      profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,
+      profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
     };
     container.clearInstances();
     app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer });

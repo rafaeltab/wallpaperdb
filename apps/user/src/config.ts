@@ -23,6 +23,17 @@ const configSchema = z
     profileHandleMaxLength: z.number().int().min(1).max(64),
     profileDisplayNameMaxLength: z.number().int().positive(),
     profileRetainedAliasLimit: z.number().int().nonnegative(),
+    s3Endpoint: z.string().url().optional(),
+    s3AccessKeyId: z.string().min(1).optional(),
+    s3SecretAccessKey: z.string().min(1).optional(),
+    s3Region: z.string().default('us-east-1'),
+    profilePictureBucket: z.string().min(1),
+    profilePictureMaxBytes: z.number().int().positive(),
+    profilePictureMaxPixels: z.number().int().positive(),
+    profilePictureMaxDecodedBytes: z.number().int().positive(),
+    profilePictureImportTimeoutMs: z.number().int().positive(),
+    profilePictureImportHosts: z.array(z.string().min(1)).min(1),
+    userMediaServiceToken: z.string().min(1).optional(),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {
@@ -59,6 +70,29 @@ export function loadConfig(): Config {
     profileHandleMaxLength: parseIntEnv(process.env.PROFILE_HANDLE_MAX_LENGTH, 30),
     profileDisplayNameMaxLength: parseIntEnv(process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH, 80),
     profileRetainedAliasLimit: parseIntEnv(process.env.PROFILE_RETAINED_ALIAS_LIMIT, 3),
+    s3Endpoint: process.env.S3_ENDPOINT,
+    s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+    s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    s3Region: getEnv('S3_REGION', 'us-east-1'),
+    profilePictureBucket: getEnv('PROFILE_PICTURE_BUCKET', 'profile-pictures'),
+    profilePictureMaxBytes: parseIntEnv(process.env.PROFILE_PICTURE_MAX_BYTES, 5 * 1024 * 1024),
+    profilePictureMaxPixels: parseIntEnv(process.env.PROFILE_PICTURE_MAX_PIXELS, 16_000_000),
+    profilePictureMaxDecodedBytes: parseIntEnv(
+      process.env.PROFILE_PICTURE_MAX_DECODED_BYTES,
+      64 * 1024 * 1024
+    ),
+    profilePictureImportTimeoutMs: parseIntEnv(
+      process.env.PROFILE_PICTURE_IMPORT_TIMEOUT_MS,
+      10_000
+    ),
+    profilePictureImportHosts: getEnv(
+      'PROFILE_PICTURE_IMPORT_HOSTS',
+      'img.clerk.com,images.clerk.dev'
+    )
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean),
+    userMediaServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
   };
 
   return configSchema.parse(raw);

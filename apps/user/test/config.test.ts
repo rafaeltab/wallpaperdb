@@ -16,6 +16,26 @@ describe('User service configuration', () => {
     process.env = { ...originalEnv };
   });
 
+  it('configures private picture storage and bounded image/import limits', () => {
+    for (const name of ['PROFILE_PICTURE_BUCKET', 'PROFILE_PICTURE_MAX_BYTES', 'PROFILE_PICTURE_MAX_PIXELS', 'PROFILE_PICTURE_MAX_DECODED_BYTES', 'PROFILE_PICTURE_IMPORT_TIMEOUT_MS', 'PROFILE_PICTURE_IMPORT_HOSTS']) delete process.env[name];
+    expect(loadConfig()).toMatchObject({
+      profilePictureBucket: 'profile-pictures', profilePictureMaxBytes: 5 * 1024 * 1024,
+      profilePictureMaxPixels: 16_000_000, profilePictureMaxDecodedBytes: 64 * 1024 * 1024,
+      profilePictureImportTimeoutMs: 10_000, profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
+    });
+    process.env.PROFILE_PICTURE_MAX_BYTES = '1024';
+    process.env.PROFILE_PICTURE_MAX_PIXELS = '64';
+    process.env.PROFILE_PICTURE_MAX_DECODED_BYTES = '256';
+    process.env.PROFILE_PICTURE_IMPORT_TIMEOUT_MS = '1000';
+    expect(loadConfig()).toMatchObject({ profilePictureMaxBytes: 1024, profilePictureMaxPixels: 64, profilePictureMaxDecodedBytes: 256, profilePictureImportTimeoutMs: 1000 });
+    for (const name of ['PROFILE_PICTURE_MAX_BYTES', 'PROFILE_PICTURE_MAX_PIXELS', 'PROFILE_PICTURE_MAX_DECODED_BYTES', 'PROFILE_PICTURE_IMPORT_TIMEOUT_MS']) {
+      const previous = process.env[name];
+      process.env[name] = '0';
+      expect(() => loadConfig()).toThrow();
+      process.env[name] = previous;
+    }
+  });
+
   it('defaults retained aliases to three and accepts a configurable non-negative limit', () => {
     delete process.env.PROFILE_RETAINED_ALIAS_LIMIT;
     expect(loadConfig().profileRetainedAliasLimit).toBe(3);

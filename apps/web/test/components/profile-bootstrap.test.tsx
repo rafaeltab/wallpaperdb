@@ -69,16 +69,66 @@ describe('ProfileBootstrap', () => {
     vi.mocked(userApi.ensureProfile)
       .mockResolvedValueOnce({ ...profile, pictureImportStatus: 'pending' })
       .mockResolvedValueOnce({ ...profile, pictureImportStatus: 'retrying' })
-      .mockResolvedValue({ ...profile, pictureImportStatus: 'complete', pictureAssetId: 'imported_picture', version: 2 });
+      .mockResolvedValue({
+        ...profile,
+        pictureImportStatus: 'complete',
+        pictureAssetId: 'imported_picture',
+        version: 2,
+      });
     const { queryClient } = renderBootstrap();
     await act(async () => vi.advanceTimersByTimeAsync(1));
-    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'pending' });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({
+      pictureImportStatus: 'pending',
+    });
     await act(async () => vi.advanceTimersByTimeAsync(5000));
-    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'retrying' });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({
+      pictureImportStatus: 'retrying',
+    });
     await act(async () => vi.advanceTimersByTimeAsync(5000));
-    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'complete', pictureAssetId: 'imported_picture' });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({
+      pictureImportStatus: 'complete',
+      pictureAssetId: 'imported_picture',
+    });
     await act(async () => vi.advanceTimersByTimeAsync(20000));
     expect(userApi.ensureProfile).toHaveBeenCalledTimes(3);
+  });
+
+  it('pauses import polling while a Profile command is pending so an older refresh cannot overwrite it', async () => {
+    vi.useFakeTimers();
+    vi.mocked(userApi.ensureProfile).mockResolvedValue({
+      ...profile,
+      pictureImportStatus: 'pending',
+    });
+    const { queryClient } = renderBootstrap();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    let resolveCommand: ((value: Profile) => void) | undefined;
+    const command = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: profileQueryKey(profile.id),
+      mutationFn: () =>
+        new Promise<Profile>((resolve) => {
+          resolveCommand = resolve;
+        }),
+      onSuccess: (updated: Profile) => {
+        queryClient.setQueryData(profileQueryKey(profile.id), updated);
+      },
+    });
+    let completion: Promise<Profile>;
+    await act(async () => {
+      completion = command.execute(undefined);
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(15000));
+    expect(userApi.ensureProfile).toHaveBeenCalledOnce();
+    await act(async () => {
+      resolveCommand?.({ ...profile, version: 2, pictureImportStatus: 'complete' });
+      await completion;
+      await vi.advanceTimersByTimeAsync(15000);
+    });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({
+      version: 2,
+      pictureImportStatus: 'complete',
+    });
+    expect(userApi.ensureProfile).toHaveBeenCalledOnce();
   });
 
   it('retains the ensured Profile in the signed-in user query cache', async () => {
@@ -86,16 +136,23 @@ describe('ProfileBootstrap', () => {
     const { queryClient } = renderBootstrap();
 
     await waitFor(() => expect(userApi.ensureProfile).toHaveBeenCalledOnce());
-    await waitFor(() => expect(queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));
+    await waitFor(() =>
+      expect(queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile)
+    );
     expect(userApi.ensureProfile).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedProfileId: 'user_123', tokenProvider: expect.any(Function) })
+      expect.objectContaining({
+        expectedProfileId: 'user_123',
+        tokenProvider: expect.any(Function),
+      })
     );
   });
 
   it('clears Profile cache on sign-out', async () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(profile);
     const rendered = renderBootstrap();
-    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile)
+    );
 
     auth({ isSignedIn: false, userId: null });
     rendered.rerender(
@@ -104,13 +161,17 @@ describe('ProfileBootstrap', () => {
       </QueryClientProvider>
     );
 
-    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toBeUndefined());
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toBeUndefined()
+    );
   });
 
   it('isolates User changes from the previous session', async () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValue(profile);
     const rendered = renderBootstrap();
-    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile)
+    );
 
     auth({ userId: 'user_456' });
     vi.mocked(userApi.ensureProfile).mockResolvedValue({ ...profile, id: 'user_456' });
@@ -120,7 +181,9 @@ describe('ProfileBootstrap', () => {
       </QueryClientProvider>
     );
 
-    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toBeUndefined());
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toBeUndefined()
+    );
     await waitFor(() =>
       expect(rendered.queryClient.getQueryData(profileQueryKey('user_456'))).toEqual({
         ...profile,
@@ -132,7 +195,9 @@ describe('ProfileBootstrap', () => {
   it('does not cancel the new User ensure request when the signed-in User changes', async () => {
     vi.mocked(userApi.ensureProfile).mockResolvedValueOnce(profile);
     const rendered = renderBootstrap();
-    await waitFor(() => expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile));
+    await waitFor(() =>
+      expect(rendered.queryClient.getQueryData(profileQueryKey('user_123'))).toEqual(profile)
+    );
 
     let resolveEnsure: ((profile: Profile) => void) | undefined;
     vi.mocked(userApi.ensureProfile).mockImplementationOnce(

@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { userApi } from '@/lib/api/user';
 
@@ -14,6 +14,7 @@ export function ProfileBootstrap() {
   const queryClient = useQueryClient();
   const previousUserId = useRef<string | null>(null);
   const activeUserId = isLoaded && isSignedIn ? userId : null;
+  const writing = useIsMutating({ mutationKey: profileQueryKey(activeUserId ?? '') }) > 0;
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -40,6 +41,7 @@ export function ProfileBootstrap() {
     enabled: Boolean(activeUserId),
     staleTime: Infinity,
     refetchInterval: (query) => {
+      if (writing) return false;
       const status = query.state.data?.pictureImportStatus;
       return status === 'pending' || status === 'retrying' ? 5000 : false;
     },

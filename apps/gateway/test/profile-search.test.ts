@@ -41,6 +41,33 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('keeps current Handles first in discovery while exact resolution honors the newest matching claim', async () => {
+    await project({ id: 'user_old_current', handle: 'reclaimed', claimGeneration: 10 });
+    await project({
+      id: 'user_new_alias', handle: 'new-owner', claimGeneration: 20,
+      aliases: [{ handle: 'reclaimed', claimGeneration: 11 }],
+    });
+    await project({
+      id: 'user_stale_alias', handle: 'unrelated-current', claimGeneration: 100,
+      aliases: [
+        { handle: 'reclaimed', claimGeneration: 9 },
+        { handle: 'unrelated-alias', claimGeneration: 99 },
+      ],
+    });
+    const discovery = await search('reclaimed');
+    expect(discovery.errors).toBeUndefined();
+    expect(discovery.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_old_current', 'user_new_alias', 'user_stale_alias']);
+    const exact = await tester.getApp().inject({
+      method: 'POST', url: '/graphql',
+      payload: { query: '{ profileByHandle(handle: "reclaimed") { profile { id } isAlias canonicalHandle } }' },
+    });
+    expect(exact.json().errors).toBeUndefined();
+    expect(exact.json().data.profileByHandle).toEqual({
+      profile: { id: 'user_new_alias' }, isAlias: true, canonicalHandle: 'new-owner',
+    });
+  });
+
   it('searches active aliases without searching Biography or publicly enumerating aliases', async () => {
     await project({
       id: 'user_private_aliases', handle: 'current-name',

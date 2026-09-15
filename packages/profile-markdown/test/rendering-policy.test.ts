@@ -23,6 +23,17 @@ function renderTree(source: string): Root {
 }
 
 describe("Profile Markdown rendering policy", () => {
+  it.each([
+    "[![Forest](wallpaper:wlpr_own)](https://example.com)",
+    "[**![Forest][image]**][site]\n\n[image]: wallpaper:wlpr_own\n\n[site]: https://example.com",
+  ])("rejects linked Wallpaper images before producing nested interactive controls: %s", (source) => {
+    expect(validateProfileMarkdown(source)).toMatchObject({
+      valid: false,
+      errors: [{ code: "unsupported-syntax" }],
+    });
+    expect(() => renderTree(source)).toThrow(ProfileMarkdownError);
+  });
+
   it("sanitizes the dedicated component attribute without admitting arbitrary data, handlers or image sources", () => {
     const unsafeTree: Root = {
       type: "root",

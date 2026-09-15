@@ -39,7 +39,7 @@ const allowedNodes = new Set([
   "imageReference",
 ]);
 
-function flatten(root: Root): Nodes[] {
+function flatten(root: Nodes): Nodes[] {
   const nodes: Nodes[] = [];
   const pending: Nodes[] = [root];
   while (pending.length > 0) {
@@ -111,6 +111,15 @@ function validateTree(root: Root): ProfileMarkdownValidation {
         ? definitions.get(node.identifier.toUpperCase())
         : undefined;
     const target = "url" in node ? node.url : definition?.url;
+    if (
+      (node.type === "link" || node.type === "linkReference") &&
+      flatten(node).some((child) => child.type === "image" || child.type === "imageReference")
+    ) {
+      errors.push({
+        code: "unsupported-syntax",
+        message: "Wallpaper images cannot be used as link labels. Add a separate text link.",
+      });
+    }
     if (
       (node.type === "link" || node.type === "linkReference") &&
       (!target || !normalizeProfileLink(target))

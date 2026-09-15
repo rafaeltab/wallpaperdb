@@ -8,3 +8,5 @@ The shared Biography policy keeps Profile authoring and public rendering aligned
 - Prepares dedicated Wallpaper elements and a narrow sanitization policy for safe rendering.
 
 CommonMark and GitHub Flavored Markdown parsing use the unified and remark ecosystem. A shared remark plugin and rehype sanitization schema support direct React rendering without persisting generated HTML.
+
+Wallpaper images have their own navigation action and cannot be used as external link labels. Authors can add a separate text link beside an image.

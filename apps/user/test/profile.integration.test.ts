@@ -290,6 +290,30 @@ describe('Profile commands', () => {
     }
   });
 
+  it('renews an old alias only when a typed overflow schedule records that Handle', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    const previousLimit = config.profileRetainedAliasLimit;
+    config.profileRetainedAliasLimit = 1;
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'second-handle', original.version)).json();
+      vi.setSystemTime(new Date('2030-02-10T00:00:00.000Z'));
+      const renamed = (await patch('user_1', 'New Display Name', changed.version)).json();
+      expect((await reactivateAlias('user_1', original.handle, renamed.version)).statusCode).toBe(400);
+      const overflowed = (await changeHandle('user_1', 'current-handle', renamed.version)).json();
+      expect(overflowed.historicalHandles).toEqual([{ handle: original.handle, eligibleUntil: '2030-03-12T00:00:00.000Z', unavailableReason: 'alias-limit' }]);
+      expect((await request('user_1')).json()).toEqual(overflowed);
+      const freed = (await scheduleAlias('user_1', changed.handle, overflowed.version)).json();
+      const restored = await reactivateAlias('user_1', original.handle, freed.version);
+      expect(restored.statusCode).toBe(200);
+      expect(restored.json().aliases.filter((alias: {expiresAt: string | null}) => alias.expiresAt === null)).toEqual([{ ...changed.aliases[0], createdAt: '2030-02-10T00:00:00.000Z' }]);
+    } finally {
+      config.profileRetainedAliasLimit = previousLimit;
+      vi.useRealTimers();
+    }
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

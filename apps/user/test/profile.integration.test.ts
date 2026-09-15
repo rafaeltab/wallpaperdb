@@ -345,6 +345,36 @@ describe('Profile commands', () => {
     }
   });
 
+  it('ignores an old expiry scan after the owner promotes and retains a newer claim for that Handle', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'first-current', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const staleReference = { profileId: original.id, handle: original.handle, claimGeneration: scheduled.aliases[0].claimGeneration };
+      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
+      const promoted = await changeHandle('user_1', original.handle, scheduled.version);
+      expect(promoted.statusCode).toBe(200);
+      expect(await service().expireDueAlias(staleReference, new Date())).toBe(false);
+      vi.setSystemTime(new Date('2030-01-15T12:00:00.000Z'));
+      const changedAgain = (await changeHandle('user_1', 'second-current', promoted.json().version)).json();
+      const scheduledAgain = (await scheduleAlias('user_1', original.handle, changedAgain.version)).json();
+      const newer = scheduledAgain.aliases.find((alias: { handle: string }) => alias.handle === original.handle);
+      expect(newer.claimGeneration).toBeGreaterThan(staleReference.claimGeneration);
+      vi.setSystemTime(new Date(newer.expiresAt));
+      expect(await service().expireDueAlias(staleReference, new Date())).toBe(false);
+      expect((await request('user_1')).json()).toEqual(scheduledAgain);
+      expect(await service().expireDueAlias({ ...staleReference, claimGeneration: newer.claimGeneration }, new Date())).toBe(true);
+      const expired = (await request('user_1')).json();
+      expect(expired.aliases.map((alias: { handle: string }) => alias.handle)).toEqual(['first-current']);
+      const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
+      expect(event.payload.change.claimGeneration).toBe(newer.claimGeneration);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
     const before = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();

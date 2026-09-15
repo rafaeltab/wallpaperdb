@@ -78,6 +78,28 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('authorizes public delivery only for an active current asset while storage remains private', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, original.version)).json();
+    const url = `/internal/profile-pictures/${uploaded.pictureAssetId}/availability`;
+    const active = await app.inject({ method: 'GET', url, headers: { authorization: 'Bearer test-media-token' } });
+    expect(active.statusCode).toBe(204);
+    expect(active.headers['cache-control']).toBe('no-store');
+    for (const authorization of [undefined, 'Bearer wrong-token', auth().authorization]) {
+      const denied = await app.inject({ method: 'GET', url, headers: authorization ? { authorization } : {} });
+      expect(denied.statusCode).toBe(401);
+      expect(denied.headers['cache-control']).toBe('no-store');
+    }
+    const unknown = await app.inject({ method: 'GET', url: '/internal/profile-pictures/pic_unknown/availability', headers: { authorization: 'Bearer test-media-token' } });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.headers['cache-control']).toBe('no-store');
+    const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'picture-changed'`;
+    const asset = event.payload.change.asset;
+    expect((await fetch(`${config.s3Endpoint}/${asset.storageBucket}/${asset.storageKey}`)).status).toBe(403);
+    expect((await storage.send(new GetObjectCommand({ Bucket: asset.storageBucket, Key: asset.storageKey }))).ContentLength).toBeGreaterThan(0);
+  });
+
   it('uploads a normalized private picture and atomically publishes its authoritative Profile snapshot', async () => {
     const original = (await ensure()).json();
     const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#475b83' } }).jpeg().withMetadata({ orientation: 6 }).toBuffer();

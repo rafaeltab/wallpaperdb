@@ -5,9 +5,8 @@ import { DatabaseConnection } from '../connections/database.js';
 import { profilePictureAssets } from '../db/schema.js';
 import { processProfilePicture } from './profile-picture-processing.js';
 import { ProfilePictureStorage } from './profile-picture-storage.js';
+import { profileEvidenceRetentionMs } from './profile-retention-policy.js';
 import { type OwnerProfile, ProfileService } from './profile.service.js';
-
-const PRIVATE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 @singleton()
 export class ProfilePictureIngestionService {
@@ -47,7 +46,7 @@ export class ProfilePictureIngestionService {
         fileSizeBytes: picture.bytes.length,
         state: 'staged',
         createdAt: now,
-        expiresAt: new Date(now.getTime() + PRIVATE_RETENTION_MS),
+        expiresAt: new Date(now.getTime() + profileEvidenceRetentionMs(this.config)),
       })
       .returning();
     await this.storage.put(asset, picture.bytes);

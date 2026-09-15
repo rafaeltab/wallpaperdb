@@ -156,4 +156,23 @@ describe('Private Profile picture retention', () => {
     expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 100, failed: 0 });
     expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
   });
+
+  it('expires an unadopted private candidate at its configured staging deadline', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const owner = await profiles.ensure('user_picture');
+      const shorterIngestion = new ProfilePictureIngestionService(database, profiles, storage, {
+        ...config, profileEvidenceRetentionDays: 7,
+      });
+      const assetId = await shorterIngestion.stage(owner.id, picture);
+      const [asset] = await sql`select expires_at from profile_picture_assets where id = ${assetId}`;
+      expect(asset.expires_at).toEqual(new Date(Date.now() + 7 * day));
+      expect(await retention.cleanupExpired(new Date(asset.expires_at.getTime() - 1))).toEqual({ deleted: 0, failed: 0 });
+      expect((await object(assetId)).ContentType).toBe('image/webp');
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+      await expect(object(assetId)).rejects.toMatchObject({ name: 'NoSuchKey' });
+      expect(await profiles.ensure(owner.id)).toEqual(owner);
+    } finally { vi.useRealTimers(); }
+  });
 });

@@ -1,4 +1,4 @@
-import { and, eq, lte, sql } from 'drizzle-orm';
+import { and, eq, inArray, lte, sql } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../connections/database.js';
 import { type ProfilePictureAsset, profilePictureAssets, profiles } from '../db/schema.js';
@@ -23,7 +23,7 @@ export class ProfilePictureRetentionService {
       .from(profilePictureAssets)
       .where(
         and(
-          eq(profilePictureAssets.state, 'retired'),
+          inArray(profilePictureAssets.state, ['staged', 'retired']),
           lte(profilePictureAssets.expiresAt, now),
           this.cursor?.expiresAt
             ? sql`(${profilePictureAssets.expiresAt}, ${profilePictureAssets.id}) > (${this.cursor.expiresAt.toISOString()}, ${this.cursor.id})`
@@ -52,7 +52,7 @@ export class ProfilePictureRetentionService {
             .from(profilePictureAssets)
             .where(eq(profilePictureAssets.id, candidate.id))
             .for('update', { skipLocked: true });
-          if (!asset || asset.state !== 'retired' || !asset.expiresAt || asset.expiresAt > now) {
+          if (!asset || asset.state === 'active' || !asset.expiresAt || asset.expiresAt > now) {
             return false;
           }
           await this.storage.delete(asset);

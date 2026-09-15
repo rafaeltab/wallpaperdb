@@ -1,8 +1,11 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { countProfileMarkdownCharacters, validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { Check, Loader2, Pencil, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { profileQueryKey } from '@/components/profile-bootstrap';
+import { BiographyMarkdown } from './profile-biography';
+import { Textarea } from '@/components/ui/textarea';
 import { ProfileActionButton } from './profile-action-button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -25,6 +28,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const key = profileQueryKey(profile.id);
   const refreshing = useIsFetching({ queryKey: key }) > 0;
   const writing = useIsMutating({ mutationKey: key }) > 0;
+  const [preview, setPreview] = useState(false);
+  const [previewRevision, setPreviewRevision] = useState(0);
   const [edit, setEdit] = useState<Edit | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +46,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   }, [coolingDown, deadline, now]);
   const container = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
   const live = useRef(true);
   const pending = useRef(false);
@@ -58,7 +64,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     live.current = true;
     return () => { live.current = false; clearTimeout(timer.current); };
   }, []);
-  useEffect(() => { if (edit) input.current?.focus(); }, [Boolean(edit)]);
+  const editing = edit !== null;
+  useEffect(() => { if (editing) (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus(); }, [editing, field, preview]);
   useEffect(() => {
     setEdit((current) => current && current.value === current.baseValue ? { value: profile[field], baseValue: profile[field], baseVersion: profile.version, baseProfile: profile } : current);
   }, [field, profile[field], profile.version]);
@@ -90,7 +97,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     queueMicrotask(() => { if (live.current && restore) opener.current?.focus(); });
   }
   async function save(command = edit, confirmed = false) {
-    if (!command || pending.current || coolingDown || phase !== 'idle' || queryClient.isFetching({ queryKey: key }) || queryClient.isMutating({ mutationKey: key })) return;
+    if (!command || (field === 'biographyMarkdown' && !validateProfileMarkdown(command.value, { maxCharacters: profile.biographyMaxLength ?? 5000 }).valid) || pending.current || coolingDown || phase !== 'idle' || queryClient.isFetching({ queryKey: key }) || queryClient.isMutating({ mutationKey: key })) return;
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
     if (!confirmed && aliases.length) { setConfirmation({ command, aliases }); return; }
     setConfirmation(null);
@@ -119,19 +126,46 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       timer.current = setTimeout(() => setPhase('idle'), 1600);
     }
   }
+  const maxCharacters = profile.biographyMaxLength ?? 5000;
+  const validationError = edit && field === 'biographyMarkdown' ? validateProfileMarkdown(edit.value, { maxCharacters }).errors[0]?.message : undefined;
   const locked = phase === 'saving' || phase === 'success';
   const actionLabel = phase === 'saving' ? `Saving ${label}` : phase === 'success' ? `${title} saved` : phase === 'error' ? `${title} save failed` : `Save ${label}`;
   const typography = field === 'displayName' ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl' : 'text-base font-normal text-muted-foreground sm:text-lg';
   const iconSize = field === 'displayName' ? 'size-[1ex]' : 'size-3.5';
+  const actions = <><ProfileActionButton label={actionLabel} type="submit" textBaseline={field !== 'biographyMarkdown'} buttonClassName="size-6" disabled={Boolean(validationError) || phase !== 'idle' || coolingDown || refreshing || writing || edit.value === edit.baseValue}>
+          {phase === 'saving' ? <Loader2 className={`${iconSize} animate-spin motion-reduce:animate-none`} /> : phase === 'error' ? <X className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} /> : <Check className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} />}
+        </ProfileActionButton>
+        <ProfileActionButton label="Cancel" textBaseline={field !== 'biographyMarkdown'} buttonClassName="size-6" disabled={locked} onClick={finish}><X className={iconSize} /></ProfileActionButton></>;
+  const errorNotice = <>{(error || validationError) && <div role="alert" className="mt-2 text-sm text-destructive">{error ?? validationError}{conflict && <Button type="button" variant="outline" size="sm" className="ml-2" disabled={refreshing || writing || locked} onClick={() => void refresh()}>Refresh profile</Button>}</div>}</>;
+  if (field === 'biographyMarkdown') return <div ref={container} className="min-w-0 w-full">
+    <section aria-label="Biography" className="w-full min-w-0">
+      {edit ? <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="w-full space-y-3">
+        <div className="flex min-h-5 items-center justify-between gap-3">
+          <div className="flex gap-2" aria-label="Biography editor mode">
+            <Button type="button" variant={preview ? 'ghost' : 'secondary'} size="sm" aria-pressed={!preview} disabled={locked} onClick={() => setPreview(false)}>Write</Button>
+            <Button type="button" variant={preview ? 'secondary' : 'ghost'} size="sm" aria-pressed={preview} disabled={locked} onClick={() => setPreview(true)}>Preview</Button>
+          </div>
+          <div className="flex gap-1">{actions}</div>
+        </div>
+        {preview ? <section aria-label="Biography preview" className="min-h-48 w-full rounded-md border p-3">
+          <BiographyMarkdown markdown={edit.value} profileId={profile.id} maxCharacters={maxCharacters} refreshKey={previewRevision} />
+          <Button type="button" variant="ghost" size="sm" className="mt-3" disabled={locked} onClick={() => setPreviewRevision((revision) => revision + 1)}>Refresh preview</Button>
+        </section> : <Textarea ref={textarea} aria-label="Biography Markdown" value={edit.value} rows={7} className="min-h-48 w-full font-mono text-sm" disabled={locked || refreshing || writing} aria-invalid={Boolean(validationError)} onChange={(event) => setEdit({ ...edit, value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape' && !locked) finish(); }} />}
+        <p className="text-right text-xs text-muted-foreground">{countProfileMarkdownCharacters(edit.value)} / {maxCharacters} characters</p>
+        {errorNotice}
+        <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Formatting help</summary><p className="mt-2 leading-relaxed">Use headings, lists, emphasis, tables, and HTTPS links. Embed a published wallpaper you own with <code className="break-all">![Alt text](wallpaper:wallpaper-id)</code>. New uploads may take a moment to become available.</p></details>
+      </form> : <>
+        <div className="relative h-5"><h2 className="sr-only">Biography</h2><Button ref={opener} type="button" variant="outline" size="sm" className="absolute -top-1.5 right-0" disabled={refreshing || writing} onClick={() => { setPreview(false); setEdit({ value: profile[field], baseValue: profile[field], baseVersion: profile.version, baseProfile: profile }); }}><Pencil className="size-3.5" />Edit biography</Button></div>
+        <div className="mt-3"><BiographyMarkdown markdown={profile.biographyMarkdown} profileId={profile.id} maxCharacters={maxCharacters} refreshKey={profile.version} /></div>
+      </>}
+    </section>
+  </div>;
   return <div ref={container} className="min-w-0">
     <form className={`flex min-w-0 max-w-full items-baseline gap-1 ${typography}`} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       {field === 'handle' && <span aria-hidden="true">@</span>}
       {edit ? <>
         <input ref={input} aria-label={title} className="h-[1lh] min-w-0 max-w-full [field-sizing:content] rounded border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] tracking-[inherit] outline-none [font-weight:inherit] focus-visible:ring-2 focus-visible:ring-ring" value={edit.value} disabled={locked} onChange={(event) => setEdit({ ...edit, value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape' && !locked) finish(); }} />
-        <ProfileActionButton label={actionLabel} type="submit" textBaseline buttonClassName="size-6" disabled={phase !== 'idle' || coolingDown || refreshing || writing || edit.value === edit.baseValue}>
-          {phase === 'saving' ? <Loader2 className={`${iconSize} animate-spin motion-reduce:animate-none`} /> : phase === 'error' ? <X className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} /> : <Check className={`profile-save-feedback ${iconSize}`} data-save-phase={phase} />}
-        </ProfileActionButton>
-        <ProfileActionButton label="Cancel" textBaseline buttonClassName="size-6" disabled={locked} onClick={finish}><X className={iconSize} /></ProfileActionButton>
+        {actions}
       </> : <>
         {field === 'displayName' ? <h1 className="min-w-0 break-words">{profile[field]}</h1> : <p className="min-w-0 break-words"><span className="sr-only">@</span>{profile[field]}</p>}
         <ProfileActionButton ref={opener} label={`Edit ${label}`} textBaseline buttonClassName="size-6" disabled={coolingDown || refreshing || writing} onClick={() => setEdit({ value: profile[field], baseValue: profile[field], baseVersion: profile.version, baseProfile: profile })}><Pencil className={iconSize} /></ProfileActionButton>
@@ -144,7 +178,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
         <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction disabled={refreshing || writing || coolingDown} onClick={() => { if (confirmation) void save(confirmation.command, true); }}>Confirm handle change</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    {error && <div role="alert" className="mt-2 text-sm text-destructive">{error}{conflict && <Button type="button" variant="outline" size="sm" className="ml-2" disabled={refreshing || writing || locked} onClick={() => void refresh()}>Refresh profile</Button>}</div>}
+    {errorNotice}
   </div>;
 }
 

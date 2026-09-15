@@ -113,4 +113,28 @@ describe('production inline profile fields', () => {
     expect(screen.getByText('7 days')).toBeInTheDocument();
   });
 
+  it('edits biography with a safe preview, codepoint limit, and an empty valid save', async () => {
+    vi.mocked(userApi.updateProfile).mockResolvedValue({ ...profile, biographyMarkdown: '', version: 2 });
+    renderField('biographyMarkdown', { ...profile, biographyMaxLength: 10 });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit biography' }));
+    const input = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    fireEvent.change(input, { target: { value: '😀'.repeat(11) } });
+    expect(screen.getByText('11 / 10 characters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
+    fireEvent.change(input, { target: { value: '**Hello**' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByRole('region', { name: 'Biography preview' })).toHaveTextContent('Hello');
+    fireEvent.click(screen.getByRole('button', { name: 'Write' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '<script>x</script>' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(screen.getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Write' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save biography' }));
+    await flush();
+    expect(userApi.updateProfile).toHaveBeenCalledWith({ biographyMarkdown: '', expectedVersion: 1, expectedProfileId: profile.id, tokenProvider });
+    await act(async () => vi.advanceTimersByTimeAsync(1600));
+    expect(screen.getByText('No biography yet.')).toBeInTheDocument();
+  });
+
 });

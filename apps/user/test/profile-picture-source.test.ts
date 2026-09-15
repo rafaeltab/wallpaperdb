@@ -67,7 +67,9 @@ describe('Initial Profile picture download', () => {
   });
 
   it('enforces actual streamed bytes with absent or understated length headers and accepts the exact limit', async () => {
-    for (const headers of [{}, { 'Content-Length': '2' }]) {
+    for (const declaredLength of [null, '2']) {
+      const headers = new Headers();
+      if (declaredLength !== null) headers.set('Content-Length', declaredLength);
       const cancel = vi.fn();
       const body = new ReadableStream<Uint8Array>({
         start(controller) {

@@ -15,8 +15,15 @@ function trustedSource(url: string, allowedHosts: string[]): URL {
   } catch {
     throw new PermanentPictureImportError('Initial picture source is invalid');
   }
-  if (source.protocol !== 'https:' || source.username || source.password || source.port ||
-    source.hostname.startsWith('[') || isIP(source.hostname) || !allowedHosts.includes(source.hostname)) {
+  if (
+    source.protocol !== 'https:' ||
+    source.username ||
+    source.password ||
+    source.port ||
+    source.hostname.startsWith('[') ||
+    isIP(source.hostname) ||
+    !allowedHosts.includes(source.hostname)
+  ) {
     throw new PermanentPictureImportError('Initial picture source is not allowed');
   }
   return source;
@@ -67,7 +74,8 @@ async function readSource(
     }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
-      if (redirects++ >= 3) throw new PermanentPictureImportError('Initial picture has too many redirects');
+      if (redirects++ >= 3)
+        throw new PermanentPictureImportError('Initial picture has too many redirects');
       const location = response.headers.get('location');
       if (!location) throw new PermanentPictureImportError('Initial picture redirect is invalid');
       try {
@@ -79,7 +87,11 @@ async function readSource(
     }
     if (!response.ok) {
       await response.body?.cancel();
-      if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) {
+      if (
+        response.status >= 400 &&
+        response.status < 500 &&
+        ![408, 429].includes(response.status)
+      ) {
         throw new PermanentPictureImportError('Initial picture source rejected the request');
       }
       throw new Error('Initial picture source is temporarily unavailable');
@@ -92,7 +104,9 @@ async function readSource(
     let length = 0;
     const reader = response.body?.getReader();
     if (!reader) return Buffer.alloc(0);
-    const cancelBody = () => { void reader.cancel().catch(() => {}); };
+    const cancelBody = () => {
+      void reader.cancel().catch(() => {});
+    };
     signal.addEventListener('abort', cancelBody, { once: true });
     try {
       while (true) {

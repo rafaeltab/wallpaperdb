@@ -161,4 +161,33 @@ describe('Profile wallpaper filter', () => {
     const [, init] = mockFetch.mock.calls[2] as [string, RequestInit];
     expect(JSON.parse(init.body as string).variables.after).toBe('cursor_ada');
   });
+
+  it('ignores late results from an earlier query and hides results immediately when text changes', async () => {
+    let resolveEarlier: (value: Response) => void = () => {};
+    mockFetch.mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveEarlier = resolve; }));
+    const user = userEvent.setup();
+    const { onChange } = renderFilter();
+    const input = screen.getByRole('searchbox', { name: 'Profile' });
+    await user.type(input, 'ada');
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [{ node: { ...ada, id: 'user_Grace', handle: 'grace', displayName: 'Grace Hopper' } }],
+      pageInfo: { hasNextPage: false, hasPreviousPage: false },
+    } }));
+    await user.clear(input);
+    await user.type(input, 'grace');
+    await screen.findByRole('button', { name: 'Select Grace Hopper (@grace)' });
+    await act(async () => {
+      resolveEarlier(response({ searchProfiles: {
+        edges: [{ node: ada }], pageInfo: { hasNextPage: false, hasPreviousPage: false },
+      } }));
+    });
+    expect(screen.queryByRole('button', { name: 'Select Ada Lovelace (@ada-lovelace)' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select Grace Hopper (@grace)' })).toBeInTheDocument();
+    await user.type(input, 'x');
+    expect(screen.queryByRole('button', { name: 'Select Grace Hopper (@grace)' })).not.toBeInTheDocument();
+    await user.clear(input);
+    expect(screen.queryByRole('list', { name: 'Matching Profiles' })).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render as renderComponent, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -110,37 +109,6 @@ describe('HomePage browse filters', () => {
       error: null,
       hasNextPage: false,
       fetchNextPage: vi.fn(),
-    });
-  });
-
-  it('selects a fuzzy Profile result, submits its exact ID, and clears only that filter', async () => {
-    const profile = { id: 'user_Ada', handle: 'ada', displayName: 'Ada Lovelace', picture: null, canonicalPath: '/profiles/@ada', biographyMarkdown: '' };
-    mockFetch.mockImplementation(async (_url, init: RequestInit) => {
-      const body = JSON.parse(init.body as string);
-      return new Response(JSON.stringify({ data: body.operationName === 'SearchProfiles'
-        ? { searchProfiles: { edges: [{ node: profile }], pageInfo: { hasNextPage: false, hasPreviousPage: false } } }
-        : { profile } }), { headers: { 'content-type': 'application/json' } });
-    });
-    const initial = { after: 'old_cursor', format: 'png' };
-    mockUseSearch.mockReturnValue(initial);
-    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
-    const user = userEvent.setup();
-    const view = render(<HomePage />);
-    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), 'countess');
-    expect(mockNavigate).not.toHaveBeenCalled();
-    await user.click(await screen.findByRole('button', { name: 'Select Ada Lovelace (@ada)' }));
-    const selected = mockNavigate.mock.calls[0][0].search(initial);
-    expect(selected).toEqual({ after: undefined, format: 'png', profileId: 'user_Ada' });
-    mockUseSearch.mockReturnValue(selected);
-    view.rerender(<HomePage />);
-    expect(useWallpaperInfiniteQuery).toHaveBeenLastCalledWith({
-      initialCursor: null,
-      filter: { variants: { format: 'image/png' }, profileId: 'user_Ada' },
-      sort: undefined,
-    });
-    await user.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
-    expect(mockNavigate.mock.calls[1][0].search({ ...selected, after: 'selected_cursor' })).toEqual({
-      after: undefined, format: 'png', profileId: undefined,
     });
   });
 

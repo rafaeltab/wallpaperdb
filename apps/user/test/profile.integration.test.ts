@@ -90,6 +90,7 @@ describe('Profile commands', () => {
       profileHandleMaxLength: 20,
       profileDisplayNameMaxLength: 80, profileBiographyMaxLength: 5000,
       profileRetainedAliasLimit: 3,
+      profileEvidenceRetentionDays: 30,
       s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,

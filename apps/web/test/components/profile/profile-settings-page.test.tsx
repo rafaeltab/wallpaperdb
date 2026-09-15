@@ -264,23 +264,74 @@ describe('ProfileSettingsPage', () => {
   it('preserves the confirmed version and explains an expiry conflict without removing the alias locally', async () => {
     const initial = {
       ...profile,
-      aliases: [{ handle: 'old-handle', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
+      aliases: [
+        {
+          handle: 'old-handle',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2099-09-16T12:00:00.000Z',
+        },
+      ],
     };
     const refreshed = { ...initial, version: 2 };
-    vi.mocked(userApi.expireAlias).mockRejectedValue(new UserApiError('Profile changed.', 409, {
-      type: 'https://wallpaperdb.example/problems/profile-version-conflict',
-    }));
+    vi.mocked(userApi.expireAlias).mockRejectedValue(
+      new UserApiError('Profile changed.', 409, {
+        type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+      })
+    );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
-    await act(async () => { queryClient.setQueryData(profileQueryKey(profile.id), refreshed); });
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' }));
+    await act(async () => {
+      queryClient.setQueryData(profileQueryKey(profile.id), refreshed);
+    });
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' })
+    );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile changed elsewhere. Reload before expiring again.');
-    expect(userApi.expireAlias).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your Profile changed elsewhere. Reload before expiring again.'
+    );
+    expect(userApi.expireAlias).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedVersion: 1 })
+    );
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed);
-    expect(within(screen.getByRole('list', { name: 'Expiring aliases' })).getByText('@old-handle')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Expiring aliases' })).getByText('@old-handle')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('refreshes owner state to remove aliases that expired automatically', async () => {
+    const initial = {
+      ...profile,
+      aliases: [
+        {
+          handle: 'old-handle',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2026-09-01T12:00:00.000Z',
+        },
+      ],
+    };
+    const updated = { ...profile, version: 2, aliases: [] };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+
+    expect(screen.getByText('@old-handle')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('list', { name: 'Expiring aliases' })).not.toBeInTheDocument()
+    );
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(userApi.ensureProfile).toHaveBeenCalledWith({
+      signal: expect.any(AbortSignal),
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(userApi.expireAlias).not.toHaveBeenCalled();
   });
 
   it('retains unsaved input and explains a stale edit', async () => {

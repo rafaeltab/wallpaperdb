@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -30,8 +30,11 @@ export function ProfileAliasSettings({
   tokenProvider: () => Promise<string | null>;
 }) {
   const queryClient = useQueryClient();
+  const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
   const [pending, setPending] = useState<AliasCommand | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [completed, setCompleted] = useState<AliasCommand | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const mutation = useMutation({
     mutationFn: ({ action, ...command }: AliasCommand) => {
       const options = { ...command, expectedProfileId: profile.id, tokenProvider };
@@ -47,10 +50,25 @@ export function ProfileAliasSettings({
   const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
   const expiring = (profile.aliases ?? []).filter((alias) => alias.expiresAt);
   const error =
-    mutation.error instanceof UserApiError &&
+    refreshError ??
+    (mutation.error instanceof UserApiError &&
     mutation.error.type?.endsWith('/profile-version-conflict')
       ? `Your Profile changed elsewhere. Reload before ${mutation.variables?.action === 'expire' ? 'expiring' : 'scheduling'} again.`
-      : mutation.error?.message;
+      : mutation.error?.message);
+
+  async function refresh() {
+    mutation.reset();
+    setCompleted(null);
+    setRefreshError(null);
+    try {
+      await queryClient.refetchQueries(
+        { queryKey: profileQueryKey(profile.id), exact: true },
+        { throwOnError: true }
+      );
+    } catch {
+      setRefreshError('Unable to refresh aliases. Try again.');
+    }
+  }
 
   return (
     <Card className="mt-6">
@@ -62,6 +80,12 @@ export function ProfileAliasSettings({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Refresh to see the latest alias status.</p>
+          <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+            Refresh aliases
+          </Button>
+        </div>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -101,12 +125,14 @@ export function ProfileAliasSettings({
                     disabled={mutation.isPending}
                     onClick={() => {
                       mutation.reset();
+                      setRefreshError(null);
                       setCompleted(null);
                       setPending({
                         action: 'schedule',
                         handle: alias.handle,
                         expectedVersion: profile.version,
                       });
+                      setDialogOpen(true);
                     }}
                   >
                     Schedule removal
@@ -148,12 +174,14 @@ export function ProfileAliasSettings({
                     disabled={mutation.isPending}
                     onClick={() => {
                       mutation.reset();
+                      setRefreshError(null);
                       setCompleted(null);
                       setPending({
                         action: 'expire',
                         handle: alias.handle,
                         expectedVersion: profile.version,
                       });
+                      setDialogOpen(true);
                     }}
                   >
                     Expire now
@@ -165,12 +193,7 @@ export function ProfileAliasSettings({
             <p className="mt-3 text-sm text-muted-foreground">No expiring aliases.</p>
           )}
         </section>
-        <AlertDialog
-          open={Boolean(pending)}
-          onOpenChange={(open) => {
-            if (!open) setPending(null);
-          }}
-        >
+        <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { container } from 'tsyringe';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   type ProfileDocument,
   ProfileRepository,
@@ -39,6 +39,37 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('keeps scheduled aliases searchable until their exact deadline and retained aliases afterward', async () => {
+    const deadline = new Date('2030-01-01T00:00:00.000Z');
+    await project({
+      id: 'user_retained', handle: 'retained-owner',
+      aliases: [{ handle: 'aurora-retained', claimGeneration: 2 }],
+    });
+    await project({
+      id: 'user_scheduled', handle: 'scheduled-owner',
+      aliases: [
+        { handle: 'aurora', claimGeneration: 2, expiresAt: deadline.toISOString() },
+        { handle: 'unrelated-retained', claimGeneration: 3 },
+      ],
+    });
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(deadline.getTime() - 1);
+      const before = await search('aurora');
+      expect(before.errors).toBeUndefined();
+      expect(before.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+        .toEqual(['user_scheduled', 'user_retained']);
+
+      vi.setSystemTime(deadline);
+      const expired = await search('aurora');
+      expect(expired.errors).toBeUndefined();
+      expect(expired.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+        .toEqual(['user_retained']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('ranks current Handles, active aliases, and Display names in strict tiers', async () => {
     await project({ id: 'user_rank_7', handle: 'aurora', displayName: 'Aurora' });
     await project({ id: 'user_rank_6', handle: 'aurora-ridge' });

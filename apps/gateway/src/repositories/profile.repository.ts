@@ -7,6 +7,18 @@ import { IndexManagerService } from '../services/index-manager.service.js';
 
 export type ProfileDocument = PublicProfileSnapshot;
 
+function activeAliasFilter() {
+  return {
+    bool: {
+      should: [
+        { bool: { must_not: { exists: { field: 'aliases.expiresAt' } } } },
+        { range: { 'aliases.expiresAt': { gt: new Date().toISOString() } } },
+      ],
+      minimum_should_match: 1,
+    },
+  };
+}
+
 @singleton()
 export class ProfileRepository {
   constructor(
@@ -67,7 +79,11 @@ export class ProfileRepository {
 
   async search(params: { query: string; size: number; searchAfter?: CursorValue[] }) {
     const aliasMatch = (query: Record<string, unknown>) => ({
-      nested: { path: 'aliases', score_mode: 'none', query },
+      nested: {
+        path: 'aliases',
+        score_mode: 'none',
+        query: { bool: { filter: [query, activeAliasFilter()] } },
+      },
     });
     const tiers = [
       { term: { handle: params.query } },
@@ -110,15 +126,7 @@ export class ProfileRepository {
       bool: {
         filter: [
           { term: { 'aliases.handle': normalizedHandle } },
-          {
-            bool: {
-              should: [
-                { bool: { must_not: { exists: { field: 'aliases.expiresAt' } } } },
-                { range: { 'aliases.expiresAt': { gt: new Date().toISOString() } } },
-              ],
-              minimum_should_match: 1,
-            },
-          },
+          activeAliasFilter(),
         ],
       },
     };

@@ -11,6 +11,7 @@ Owns WallpaperDB Profiles. It verifies Clerk-authenticated Users, persists publi
 - Safely edits Display names through `PATCH /profile/me` with optimistic concurrency
 - Imports the initial Clerk picture asynchronously and accepts validated picture uploads and removal with optimistic concurrency
 - Keeps picture objects private and authorizes Media delivery only for the current asset
+- Validates authored Biography Markdown through the shared Profile policy and checks wallpaper embeds against an event-fed ownership projection
 - Derives unique, configurable Handles with monotonic claim generations from Clerk identity data or a generated fallback
 - Atomically persists Profile state, Handle claims, and typed outbox events for creation and updates
 - Provides health and readiness endpoints for infrastructure monitoring

@@ -79,7 +79,11 @@ Verifies the Clerk bearer token and idempotently creates or returns the signed-i
 
 ### PATCH /profile/me
 
-Updates the signed-in User's Display name. The request supplies `displayName` and the last-seen `expectedVersion`. Display names preserve casing and Unicode while trimming and collapsing whitespace, and default to an 80-Unicode-character limit. Stale versions return `409 Conflict` without changing Profile state or recording an event. A successful command returns the authoritative updated Profile immediately and records a versioned `profile.updated` event in the same transaction.
+Updates the signed-in User's Display name, Biography Markdown, or both. The request supplies `displayName` and/or `biographyMarkdown` with the last-seen `expectedVersion`. Display names preserve casing and Unicode while trimming and collapsing whitespace, and default to an 80-Unicode-character limit. Biography Markdown is preserved exactly as authored and defaults to a 5,000-Unicode-code-point limit, reported to the owner as `biographyMaxLength`.
+
+The shared Profile Markdown policy rejects raw HTML, unsafe or credential-bearing URLs, ordinary image URLs, and unsupported schemes. External destinations require HTTPS. Images use `![Alt text](wallpaper:<wallpaper-id>)` and must reference published wallpapers owned by the same Profile. User maintains a minimal local ownership projection from `wallpaper.uploaded` events; a new upload may briefly be unavailable for embedding until its event arrives.
+
+Validation errors return `400`; stale versions return `409 Conflict`. Neither changes Profile state or records an event. A successful command returns the authoritative updated Profile immediately and records a versioned `profile.updated` event in the same transaction. A Biography edit records `biography-changed`, and a combined name/Biography edit records `profile-details-changed`, each with before/after values. GraphQL exposes the authored Markdown for direct React rendering; generated HTML is never persisted.
 
 ### PUT /profile/me/handle
 
@@ -193,6 +197,7 @@ PROFILE_HANDLE_MIN_LENGTH=1
 PROFILE_HANDLE_MAX_LENGTH=30
 PROFILE_DISPLAY_NAME_MAX_LENGTH=80
 PROFILE_RETAINED_ALIAS_LIMIT=3
+PROFILE_BIOGRAPHY_MAX_LENGTH=5000
 
 # Private Profile pictures
 S3_ENDPOINT=http://localhost:9000

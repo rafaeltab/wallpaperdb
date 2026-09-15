@@ -20,6 +20,7 @@ import {
   type IdentityProvider,
 } from '../src/services/clerk-identity.service.js';
 import { ProfileService } from '../src/services/profile.service.js';
+import { ProfileAliasExpiryWorker } from '../src/services/profile-alias-expiry.service.js';
 import {
   type ProfileEventPublisher,
   ProfileOutboxPublisherWorker,
@@ -287,6 +288,41 @@ describe('Profile commands', () => {
       await aliasExpiryTimer.tickAsync(1_000);
       expect((await request(bad.id)).json()).toMatchObject({ aliases: [], version: bad.version + 1 });
       expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('safely races workers, immediate expiry, and a new Handle claimant', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const other = (await request('user_2')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const reference = { profileId: original.id, handle: original.handle, claimGeneration: scheduled.aliases[0].claimGeneration };
+      vi.setSystemTime(new Date(scheduled.aliases[0].expiresAt));
+      const worker = () => new ProfileAliasExpiryWorker(database, (alias, now) => service().expireDueAlias(alias, now), { error: () => {} });
+      const firstWorker = worker();
+      const secondWorker = worker();
+      const [,,, immediate, claim] = await Promise.all([
+        firstWorker.expirePending(), firstWorker.expirePending(), secondWorker.expirePending(),
+        expireAlias('user_1', original.handle, scheduled.version),
+        changeHandle('user_2', original.handle, other.version),
+      ]);
+      expect([200, 409]).toContain(immediate.statusCode);
+      expect([200, 409]).toContain(claim.statusCode);
+      expect((await request('user_1')).json()).toMatchObject({ aliases: [], version: scheduled.version + 1 });
+      expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(1);
+      if (claim.statusCode === 409) expect((await changeHandle('user_2', original.handle, other.version)).statusCode).toBe(200);
+      const reclaimed = (await request('user_2')).json();
+      expect(reclaimed.handle).toBe(original.handle);
+      expect(await service().expireDueAlias(reference, new Date())).toBe(false);
+      expect((await request('user_2')).json()).toEqual(reclaimed);
+      const [event] = await sql`select payload from outbox_events where aggregate_id = 'user_2' and subject = 'profile.updated'`;
+      expect(event.payload.profile.claimGeneration).toBeGreaterThan(reference.claimGeneration);
+      await Promise.all([firstWorker.stop(), secondWorker.stop()]);
     } finally {
       vi.useRealTimers();
     }

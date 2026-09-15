@@ -2,6 +2,7 @@ import type { PublicProfileSnapshot } from '@wallpaperdb/events';
 import { inject, singleton } from 'tsyringe';
 import { OpenSearchConnection } from '../connections/opensearch.js';
 import { profileIndexDefinition } from '../opensearch/index-definitions.js';
+import type { CursorValue } from '../services/cursor.service.js';
 import { IndexManagerService } from '../services/index-manager.service.js';
 
 export type ProfileDocument = PublicProfileSnapshot;
@@ -62,6 +63,23 @@ export class ProfileRepository {
       if (document.found === false) return null;
       return document._source ?? null;
     });
+  }
+
+  async search(params: { query: string; size: number; searchAfter?: CursorValue[] }) {
+    const result = await this.openSearchConnection.getClient().search({
+      index: this.indexManager.getIndexName(profileIndexDefinition.key),
+      body: {
+        query: { constant_score: { filter: { term: { handle: params.query } }, boost: 6 } },
+        sort: [{ _score: 'desc' }, { id: 'asc' }],
+        size: params.size,
+        search_after: params.searchAfter,
+      },
+    });
+    const hits = result.body.hits.hits as Array<{
+      _source: ProfileDocument;
+      sort: CursorValue[];
+    }>;
+    return hits.map((hit) => ({ profile: hit._source, cursorValues: hit.sort }));
   }
 
   async findByHandle(handle: string): Promise<ProfileDocument | null> {

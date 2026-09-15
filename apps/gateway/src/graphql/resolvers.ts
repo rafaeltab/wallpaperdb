@@ -60,6 +60,12 @@ interface ProfileByHandleArgs {
   handle: string;
 }
 
+interface SearchProfilesArgs {
+  query: string;
+  first?: number | null;
+  after?: string | null;
+}
+
 interface GraphQLContext {
   reply?: {
     request?: {
@@ -107,6 +113,9 @@ export class Resolvers {
   getResolvers() {
     return {
       Query: {
+        searchProfiles: async (_parent: unknown, args: SearchProfilesArgs) => {
+          return await this.searchProfiles(args);
+        },
         searchWallpapers: async (_parent: unknown, args: SearchArgs) => {
           return await this.searchWallpapers(args);
         },
@@ -165,6 +174,24 @@ export class Resolvers {
         profile: async (queries: Array<{ obj: Wallpaper }>) => {
           return await this.profileRepository.findByIds(queries.map(({ obj }) => obj.userId));
         },
+      },
+    };
+  }
+
+  private async searchProfiles(args: SearchProfilesArgs) {
+    const limit = args.first ?? 10;
+    const results = await this.profileRepository.search({ query: args.query, size: limit + 1 });
+    const page = results.slice(0, limit);
+    const cursors = page.map(({ cursorValues }) =>
+      this.cursorService.encode(['profiles', args.query, ...cursorValues])
+    );
+    return {
+      edges: page.map(({ profile }) => ({ node: profile })),
+      pageInfo: {
+        hasNextPage: results.length > limit,
+        hasPreviousPage: false,
+        startCursor: cursors[0] ?? null,
+        endCursor: cursors.at(-1) ?? null,
       },
     };
   }

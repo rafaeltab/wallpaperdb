@@ -242,6 +242,15 @@ export const schema = `#graphql
 		canonicalHandle: String!
 	}
 
+	type ProfileEdge {
+		node: Profile!
+	}
+
+	type ProfileConnection {
+		edges: [ProfileEdge!]!
+		pageInfo: PageInfo!
+	}
+
 	type Query {
 		"""
 		Get a Profile by its immutable Profile ID
@@ -252,6 +261,11 @@ export const schema = `#graphql
 		Resolve an exact Handle to its canonical Profile
 		"""
 		profileByHandle(handle: String!): HandleResolution
+
+		"""
+		Discover Profiles by Handle, active alias, or Display name
+		"""
+		searchProfiles(query: String!, first: Int, after: String): ProfileConnection!
 
 		"""
 		Search for wallpapers with optional filters and pagination

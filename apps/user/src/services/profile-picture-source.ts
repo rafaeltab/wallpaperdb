@@ -52,6 +52,24 @@ export async function downloadInitialPicture(
       await response.body?.cancel();
       throw new PermanentPictureImportError('Initial picture exceeds the byte limit');
     }
-    return Buffer.from(await response.arrayBuffer());
+    const chunks: Uint8Array[] = [];
+    let length = 0;
+    const reader = response.body?.getReader();
+    if (!reader) return Buffer.alloc(0);
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        length += chunk.value.byteLength;
+        if (length > options.maxBytes) {
+          await reader.cancel();
+          throw new PermanentPictureImportError('Initial picture exceeds the byte limit');
+        }
+        chunks.push(chunk.value);
+      }
+      return Buffer.concat(chunks, length);
+    } finally {
+      reader.releaseLock();
+    }
   }
 }

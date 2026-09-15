@@ -65,4 +65,23 @@ describe('Initial Profile picture download', () => {
     await expect(downloadInitialPicture('https://img.clerk.com/picture', options, fetcher)).rejects.toBeInstanceOf(PermanentPictureImportError);
     expect(cancel).toHaveBeenCalledOnce();
   });
+
+  it('enforces actual streamed bytes with absent or understated length headers and accepts the exact limit', async () => {
+    for (const headers of [{}, { 'Content-Length': '2' }]) {
+      const cancel = vi.fn();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (let index = 0; index < 4; index++) controller.enqueue(new Uint8Array([1, 2]));
+          controller.close();
+        }, cancel,
+      });
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { headers }));
+      await expect(downloadInitialPicture('https://img.clerk.com/picture', { ...options, maxBytes: 5 }, fetcher))
+        .rejects.toBeInstanceOf(PermanentPictureImportError);
+      expect(cancel).toHaveBeenCalledOnce();
+    }
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(new Uint8Array([1, 2, 3, 4, 5])));
+    await expect(downloadInitialPicture('https://img.clerk.com/picture', { ...options, maxBytes: 5 }, fetcher))
+      .resolves.toEqual(Buffer.from([1, 2, 3, 4, 5]));
+  });
 });

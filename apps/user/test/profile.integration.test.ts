@@ -199,6 +199,26 @@ describe('Profile commands', () => {
     for (const { payload } of events) expect(payload.profile.aliases).toEqual(changed.aliases);
   });
 
+  it('keeps a scheduled expiry unchanged on retry and reserves the alias until a later release', async () => {
+    const before = (await request('user_1')).json();
+    const other = (await request('user_2')).json();
+    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+    const scheduled = (await scheduleAlias('user_1', before.handle, changed.version)).json();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.parse(scheduled.aliases[0].expiresAt) + 1));
+    try {
+      const repeated = await scheduleAlias('user_1', before.handle, scheduled.version);
+      expect(repeated.statusCode).toBe(200);
+      expect(repeated.json()).toEqual(scheduled);
+      expect((await scheduleAlias('user_1', before.handle, changed.version)).statusCode).toBe(409);
+      expect((await changeHandle('user_2', before.handle, other.version)).statusCode).toBe(409);
+      expect((await request('user_1')).json()).toEqual(scheduled);
+      expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expiry-scheduled'`).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

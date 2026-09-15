@@ -333,6 +333,7 @@ export class ProfileService {
         ),
       });
       if (!alias) throw new AliasNotFoundError('This Handle is not one of your aliases');
+      if (alias.expiresAt) return this.ownerProfile(current, tx);
 
       const now = new Date();
       const expiresAt = new Date(now.getTime() + ALIAS_EXPIRY_GRACE_MS);

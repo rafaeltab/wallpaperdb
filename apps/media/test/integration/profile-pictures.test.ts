@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
-import { PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from '@wallpaperdb/events';
+import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from '@wallpaperdb/events';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -11,9 +11,12 @@ import {
   PostgresTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import sharp from 'sharp';
+import { eq } from 'drizzle-orm';
 import { container } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InProcessMediaTesterBuilder, MediaMigrationsTesterBuilder } from '../builders/index.js';
+import { DatabaseConnection } from '../../src/connections/database.js';
+import { profilePictureHeads } from '../../src/db/schema.js';
 
 describe('Profile picture delivery', () => {
   const availability = new Map<string, number>();
@@ -121,5 +124,50 @@ describe('Profile picture delivery', () => {
       url: '/internal/profile-pictures/pic_delivery/availability',
       authorization: 'Bearer test-media-token', cacheControl: 'no-store',
     });
+  });
+
+  it('projects creation and newer non-picture snapshots before late picture metadata without losing delivery', async () => {
+    const { event, bytes } = await pictureEvent('user_picture_order', 'pic_late_metadata');
+    const created = {
+      eventId: 'evt_picture_profile_created', eventType: PROFILE_CREATED_SUBJECT,
+      timestamp: event.timestamp, change: { type: 'created' },
+      profile: { ...event.profile, version: 1, pictureAssetId: null },
+    };
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, created);
+    const db = container.resolve(DatabaseConnection).getClient().db;
+    await vi.waitFor(async () => {
+      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
+        .toMatchObject({ version: 1, pictureId: null });
+    }, { timeout: 5000, interval: 25 });
+
+    availability.set('pic_late_metadata', 204);
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+      ...event, eventId: 'evt_picture_newer_display_name',
+      change: { type: 'display-name-changed', before: 'Before', after: 'After' },
+      profile: { ...event.profile, version: 3, displayName: 'After' },
+    });
+    await vi.waitFor(async () => {
+      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
+        .toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
+    }, { timeout: 5000, interval: 25 });
+    const waiting = await getPicture('pic_late_metadata');
+    expect(waiting.statusCode).toBe(404);
+    expect(waiting.headers['cache-control']).toBe('no-store');
+
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
+    await vi.waitFor(async () => {
+      const response = await getPicture('pic_late_metadata');
+      expect(response.statusCode).toBe(200);
+      expect(response.rawPayload).toEqual(bytes);
+    }, { timeout: 5000, interval: 25 });
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, { ...created, eventId: 'evt_delayed_picture_creation' });
+    const marker = { ...created, eventId: 'evt_picture_order_marker', profile: { ...created.profile, id: 'user_picture_order_marker' } };
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, marker);
+    await vi.waitFor(async () => {
+      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, marker.profile.id) })).toBeDefined();
+    }, { timeout: 5000, interval: 25 });
+    expect((await getPicture('pic_late_metadata')).statusCode).toBe(200);
+    expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
+      .toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
   });
 });

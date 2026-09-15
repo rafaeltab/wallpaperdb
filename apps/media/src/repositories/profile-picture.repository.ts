@@ -1,4 +1,4 @@
-import type { ProfileUpdatedEvent } from '@wallpaperdb/events';
+import type { ProfileCreatedEvent, ProfileUpdatedEvent } from '@wallpaperdb/events';
 import { and, eq, lt } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../connections/database.js';
@@ -8,7 +8,7 @@ import { profilePictureAssets, profilePictureHeads, type ProfilePictureAsset } f
 export class ProfilePictureRepository {
   constructor(@inject(DatabaseConnection) private readonly database: DatabaseConnection) {}
 
-  async project(event: ProfileUpdatedEvent): Promise<void> {
+  async project(event: ProfileCreatedEvent | ProfileUpdatedEvent): Promise<void> {
     await this.database.getClient().db.transaction(async (tx) => {
       if (event.change.type === 'picture-changed' && event.change.asset) {
         await tx.insert(profilePictureAssets).values({

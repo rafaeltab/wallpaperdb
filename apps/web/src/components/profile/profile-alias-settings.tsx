@@ -46,6 +46,8 @@ export function ProfileAliasSettings({
   const profileWritesPending = useIsMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [pending, setPending] = useState<AliasCommand | null>(null);
   const [open, setOpen] = useState(false);
+  const dialogContent = useRef<HTMLDivElement>(null);
+  const confirmationOpener = useRef<HTMLElement | null>(null);
   const mounted = useRef(false);
   useEffect(() => {
     mounted.current = true;
@@ -99,6 +101,12 @@ export function ProfileAliasSettings({
       : mutation.error?.message);
   const dialog = aliasDialog(pending, profile.handle);
 
+  function openConfirmation() {
+    confirmationOpener.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setDialogOpen(true);
+  }
+
   async function refresh() {
     if (busy()) return;
     mutation.reset();
@@ -116,6 +124,7 @@ export function ProfileAliasSettings({
 
   return (
     <ProfileDialog
+      ref={dialogContent}
       open={open}
       onOpenChange={setOpen}
       title="Previous handles"
@@ -201,7 +210,7 @@ export function ProfileAliasSettings({
                         handle: alias.handle,
                         expectedVersion: profile.version,
                       });
-                      setDialogOpen(true);
+                      openConfirmation();
                     }}
                   >
                     Schedule removal
@@ -279,7 +288,7 @@ export function ProfileAliasSettings({
                               handle: alias.handle,
                               expectedVersion: profile.version,
                             });
-                            setDialogOpen(true);
+                            openConfirmation();
                           }}
                         >
                           Keep alias
@@ -299,7 +308,7 @@ export function ProfileAliasSettings({
                             handle: alias.handle,
                             expectedVersion: profile.version,
                           });
-                          setDialogOpen(true);
+                          openConfirmation();
                         }}
                       >
                         Expire now
@@ -321,11 +330,19 @@ export function ProfileAliasSettings({
             setRefreshError(null);
             setCompleted(null);
             setPending({ action: 'reactivate', handle, expectedVersion: profile.version });
-            setDialogOpen(true);
+            openConfirmation();
           }}
         />
         <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (!open) return;
+              const opener = confirmationOpener.current;
+              if (opener?.isConnected && !opener.matches(':disabled')) opener.focus();
+              else dialogContent.current?.focus();
+            }}
+          >
             <AlertDialogHeader>
               <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
               <AlertDialogDescription>{dialog.description}</AlertDialogDescription>

@@ -107,6 +107,24 @@ describe('ProfileSettingsPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
+  it('returns alias confirmation focus to its specific opener, falling back to the dialog if removed', async () => {
+    const aliases = ['first-name', 'second-name'].map((handle, index) => ({ handle, claimGeneration: index + 1 }));
+    const { queryClient } = renderPage({ ...profile, aliases });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /^Previous handles:/ }));
+    for (const alias of aliases) {
+      const opener = screen.getByRole('button', { name: `Schedule removal for @${alias.handle}` });
+      await user.click(opener);
+      await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+      await waitFor(() => expect(opener).toHaveFocus());
+    }
+    await user.click(screen.getByRole('button', { name: 'Schedule removal for @first-name' }));
+    act(() => queryClient.setQueryData(profileQueryKey(profile.id), { ...profile, aliases: [], version: 2 }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Previous handles' })).toHaveFocus());
+    expect(userApi.scheduleAliasRemoval).not.toHaveBeenCalled();
+  });
+
   it('shows the current Display name and immediately adopts the REST response', async () => {
     const updated = { ...profile, displayName: 'Éowyn 雪', version: 2 };
     vi.mocked(userApi.updateProfile).mockResolvedValue(updated);

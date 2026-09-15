@@ -1,4 +1,4 @@
-// THROWAWAY: four Profile settings layouts on /settings/profile?variant=A|B|C|D.
+// THROWAWAY: five Profile settings layouts on /settings/profile?variant=A|B|C|D|E.
 // All edits stay in React state. Delete after the design decision; do not promote as-is.
 import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Profile } from '@/lib/api/user';
 
-type Variant = 'A' | 'B' | 'C' | 'D';
+type Variant = 'A' | 'B' | 'C' | 'D' | 'E';
 const HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 function relativeAvailability(remainingMs: number) {
   if (remainingMs < 60_000) return 'less than a minute';
@@ -118,7 +118,7 @@ export default function ProfileSettingsPrototype({
     setEditor(null);
   }
   function startBiographyEdit() {
-    if (variant === 'D') {
+    if (variant === 'D' || variant === 'E') {
       setBiographyEdit({ draft: value.biography, preview: false });
       setNotice('');
     } else openEditor('biography');
@@ -141,7 +141,18 @@ export default function ProfileSettingsPrototype({
 
   const avatar = (
     <div className="relative w-fit shrink-0">
-      <Avatar value={value} />
+      {variant === 'E' ? (
+        <ProfilePictureImage
+          key={value.picture ?? 'generated'}
+          profile={{
+            id: profile.id,
+            displayName: value.name,
+            picture: value.picture ? { id: 'prototype-picture', url: value.picture } : null,
+          }}
+        />
+      ) : (
+        <Avatar value={value} />
+      )}
       <PrototypeIconButton
         className="absolute -right-2 -bottom-2"
         buttonClassName="rounded-full border-4 border-card bg-background shadow-sm hover:bg-background dark:hover:bg-background"
@@ -174,7 +185,11 @@ export default function ProfileSettingsPrototype({
     >
       <Link2 className="size-3.5 shrink-0" />
       <span>
-        Previous handles <span aria-hidden="true">·</span> {aliasSummary}
+        {variant === 'E' ? (
+          retained || expiring || historical ? aliasSummary : 'Previous handles'
+        ) : (
+          <>Previous handles <span aria-hidden="true">·</span> {aliasSummary}</>
+        )}
       </span>
       <ChevronRight className="size-3.5 shrink-0" />
     </button>
@@ -287,6 +302,7 @@ export default function ProfileSettingsPrototype({
   const inlineName = (
     <InlineProfileText
       kind="name"
+      appearance={variant === 'E' ? 'profile' : 'settings'}
       value={value.name}
       draft={inlineDrafts.name}
       onDraft={(draft) => setInlineDrafts((current) => ({ ...current, name: draft }))}
@@ -300,6 +316,7 @@ export default function ProfileSettingsPrototype({
     <div className="min-w-0 space-y-3">
       <InlineProfileText
         kind="handle"
+        appearance={variant === 'E' ? 'profile' : 'settings'}
         disabled={handleLocked}
         disabledHintId="prototype-handle-cooldown"
         disabledNotice={
@@ -363,15 +380,17 @@ export default function ProfileSettingsPrototype({
           setInlineDrafts((current) => ({ ...current, handle: null }));
         }}
       />
-      {aliases}
+      {variant !== 'E' && aliases}
     </div>
   );
   return (
     <>
       <div
-        className={`mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' || variant === 'D' ? 'max-w-4xl' : 'max-w-3xl'}`}
+        className={variant === 'E'
+          ? 'mx-auto w-full max-w-5xl px-4 pt-8 pb-48 sm:px-6 sm:pt-12 lg:px-8'
+          : `mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' || variant === 'D' ? 'max-w-4xl' : 'max-w-3xl'}`}
       >
-        <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
+        {variant !== 'E' && <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Your profile</h1>
             <p className="mt-1 text-sm text-muted-foreground">How you appear on WallpaperDB.</p>
@@ -380,15 +399,22 @@ export default function ProfileSettingsPrototype({
             View profile
             <ArrowUpRight className="size-4" />
           </Button>
-        </header>
+        </header>}
         {variant === 'A' ? (
           <VariantA {...parts} />
         ) : variant === 'B' ? (
           <VariantB {...parts} />
         ) : variant === 'C' ? (
           <VariantC {...parts} />
-        ) : (
+        ) : variant === 'D' ? (
           <VariantD {...parts} name={inlineName} handleField={inlineHandle} />
+        ) : (
+          <VariantE
+            {...parts}
+            name={inlineName}
+            handleField={inlineHandle}
+            viewProfile={() => openEditor('public')}
+          />
         )}
         <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
           {notice && (
@@ -455,7 +481,7 @@ export default function ProfileSettingsPrototype({
         variant={variant}
         modalOpen={editor !== null}
         extraControls={
-          variant === 'D' && (
+          (variant === 'D' || variant === 'E') && (
             <Button
               type="button"
               variant={handleLocked ? 'secondary' : 'ghost'}
@@ -604,8 +630,38 @@ export function VariantD({ avatar, name, handleField, biography }: Parts) {
   );
 }
 
+export function VariantE({
+  avatar, name, handleField, biography, aliases, viewProfile,
+}: Parts & { viewProfile: () => void }) {
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm" aria-label="Edit your profile">
+      <div className="relative h-24 bg-linear-to-r from-primary/20 via-primary/10 to-transparent sm:h-32">
+        <div className="absolute top-4 right-4">
+          <Button variant="outline" size="sm" className="bg-background/90" onClick={viewProfile}>
+            View profile <ArrowUpRight className="size-4" />
+          </Button>
+        </div>
+      </div>
+      <div className="px-5 pb-7 sm:px-8 sm:pb-9">
+        <div className="relative -mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-7">
+          {avatar}
+          <div className="min-w-0 flex-1 pb-1">
+            {name}
+            <div className="mt-1">{handleField}</div>
+          </div>
+          <div className="absolute top-full left-0 mt-2 max-w-full sm:left-35">
+            {aliases}
+          </div>
+        </div>
+        <div className="mt-8 border-t pt-6">{biography}</div>
+      </div>
+    </section>
+  );
+}
+
 function InlineProfileText({
   kind,
+  appearance = 'settings',
   value,
   draft,
   onDraft,
@@ -615,6 +671,7 @@ function InlineProfileText({
   disabledNotice,
 }: {
   kind: 'name' | 'handle';
+  appearance?: 'settings' | 'profile';
   value: string;
   draft: string | null;
   onDraft: (draft: string | null) => void;
@@ -639,6 +696,88 @@ function InlineProfileText({
   const valid =
     draft !== null &&
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
+  if (appearance === 'profile') {
+    const typography = kind === 'name'
+      ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl'
+      : 'text-base font-normal text-muted-foreground sm:text-lg';
+    return (
+      <div className="relative flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+        <form
+          className={`flex min-w-0 max-w-full items-center gap-1 ${typography}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (editing && valid && draft.trim() !== value) onSave(draft.trim());
+          }}
+        >
+          <div className="flex min-w-0 items-baseline">
+            {kind === 'handle' && <span aria-hidden="true">@</span>}
+            {editing ? (
+              <input
+                ref={input}
+                id={`prototype-inline-${kind}`}
+                aria-label={label}
+                className="h-[1lh] min-w-0 max-w-full rounded-sm border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] font-[inherit] tracking-[inherit] outline-none [field-sizing:content] focus-visible:ring-2 focus-visible:ring-ring/50"
+                value={draft}
+                maxLength={kind === 'name' ? 80 : undefined}
+                autoComplete="off"
+                spellCheck={kind === 'name'}
+                aria-invalid={!valid}
+                aria-describedby={!valid ? `prototype-inline-${kind}-error` : undefined}
+                onChange={(event) => onDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onDraft(null);
+                  }
+                }}
+              />
+            ) : kind === 'name' ? (
+              <h1 className="min-w-0 break-words">{value}</h1>
+            ) : (
+              <p className="min-w-0 break-all"><span className="sr-only">@</span>{value}</p>
+            )}
+          </div>
+          {editing ? (
+            <>
+              <PrototypeIconButton
+                label={`Save ${label.toLowerCase()}`}
+                type="submit"
+                buttonClassName="size-6"
+                disabled={!valid || draft.trim() === value}
+              >
+                <Check className="size-[1ex]" />
+              </PrototypeIconButton>
+              <PrototypeIconButton
+                label="Cancel"
+                buttonClassName="size-6"
+                onClick={() => onDraft(null)}
+              >
+                <X className="size-[1ex]" />
+              </PrototypeIconButton>
+            </>
+          ) : (
+            <PrototypeIconButton
+              ref={button}
+              label={`Edit ${label.toLowerCase()}`}
+              buttonClassName="size-6"
+              disabled={disabled}
+              aria-describedby={disabled ? disabledHintId : undefined}
+              onClick={() => onDraft(value)}
+            >
+              <Pencil className="size-[1ex]" />
+            </PrototypeIconButton>
+          )}
+        </form>
+        {!editing && disabledNotice}
+        {editing && !valid && (
+          <p id={`prototype-inline-${kind}-error`} role="alert" className="w-full text-xs text-destructive">
+            {kind === 'name' ? 'Enter a display name.' : 'Use lowercase letters, numbers, and single hyphens.'}
+          </p>
+        )}
+      </div>
+    );
+  }
   if (!editing)
     return (
       <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">

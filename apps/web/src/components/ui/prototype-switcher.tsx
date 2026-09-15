@@ -3,17 +3,18 @@ import { type ReactNode, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { PrototypeIconButton } from '@/components/ui/prototype-icon-button';
 
-type PrototypeVariant = 'A' | 'B' | 'C' | 'D';
+type PrototypeVariant = 'A' | 'B' | 'C' | 'D' | 'E';
 
 const names: Record<PrototypeVariant, string> = {
   A: 'Profile card',
   B: 'Profile preview',
   C: 'Editable details',
   D: 'Inline profile',
+  E: 'Edit in place',
 };
 
-const previous: Record<PrototypeVariant, PrototypeVariant> = { A: 'D', B: 'A', C: 'B', D: 'C' };
-const next: Record<PrototypeVariant, PrototypeVariant> = { A: 'B', B: 'C', C: 'D', D: 'A' };
+const previous: Record<PrototypeVariant, PrototypeVariant> = { A: 'E', B: 'A', C: 'B', D: 'C', E: 'D' };
+const next: Record<PrototypeVariant, PrototypeVariant> = { A: 'B', B: 'C', C: 'D', D: 'E', E: 'A' };
 
 // Throwaway controls for comparing local UI variations; remove after choosing a design.
 export function PrototypeSwitcher({

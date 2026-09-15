@@ -10,6 +10,12 @@ describe('Profile picture processing', () => {
     await expect(processProfilePicture(input, { ...limits, maxBytes: input.length - 1 })).rejects.toThrow('Picture exceeds the upload byte limit');
   });
 
+  it.each(['svg', 'tiff'])('rejects unsupported %s pictures', async (format) => {
+    const input = format === 'svg' ? Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2"><rect width="3" height="2" fill="red"/></svg>')
+      : await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } }).tiff().toBuffer();
+    await expect(processProfilePicture(input, limits)).rejects.toThrow('Only JPEG, PNG, and WebP pictures are accepted');
+  });
+
   it.each([
     ['pixel', { ...limits, maxPixels: 5 }],
     ['decoded byte', { ...limits, maxDecodedBytes: 17 }],

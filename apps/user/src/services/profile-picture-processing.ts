@@ -20,16 +20,35 @@ export async function processProfilePicture(
   input: Buffer,
   limits: PictureLimits
 ): Promise<ProcessedPicture> {
-  if (input.length > limits.maxBytes) throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
-  const decoder = sharp(input, { limitInputPixels: limits.maxPixels, failOn: 'warning', sequentialRead: true });
+  if (input.length > limits.maxBytes)
+    throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
+  const supported =
+    (input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff) ||
+    input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+    (input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP');
+  if (!supported)
+    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  const decoder = sharp(input, {
+    limitInputPixels: limits.maxPixels,
+    failOn: 'warning',
+    sequentialRead: true,
+  });
   const metadata = await decoder.metadata();
+  if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
+    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  }
   const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
-  if (!pixels || pixels > limits.maxPixels) throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
+  if (!pixels || pixels > limits.maxPixels)
+    throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
   const bytesPerSample = metadata.depth === 'ushort' || metadata.depth === 'short' ? 2 : 1;
   if (pixels * (metadata.channels ?? 4) * bytesPerSample > limits.maxDecodedBytes) {
     throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
   }
-  const result = await decoder.rotate().webp({ quality: 85 }).timeout({ seconds: 10 }).toBuffer({ resolveWithObject: true });
+  const result = await decoder
+    .rotate()
+    .webp({ quality: 85 })
+    .timeout({ seconds: 10 })
+    .toBuffer({ resolveWithObject: true });
   return {
     bytes: result.data,
     mimeType: 'image/webp',

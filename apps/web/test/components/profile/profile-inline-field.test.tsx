@@ -200,4 +200,21 @@ describe('production inline profile fields', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it.each([false, true])('uses the current clock when a refetch introduces a handle cooldown (expired: %s)', async (expired) => {
+    vi.setSystemTime(new Date('2026-09-15T12:00:00.000Z'));
+    const { client } = renderField('handle');
+    await act(async () => vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000));
+    const changedAt = expired ? Date.now() - (7 * 24 + 1) * 60 * 60 * 1000 : Date.now();
+    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, handle: 'new-ada', version: 2, lastHandleChangedAt: new Date(changedAt).toISOString() }));
+    await flush();
+    const edit = screen.getByRole('button', { name: 'Edit profile handle' });
+    if (expired) {
+      expect(edit).toBeEnabled();
+      expect(screen.queryByText(/Available for change/)).not.toBeInTheDocument();
+    } else {
+      expect(edit).toBeDisabled();
+      expect(screen.getByRole('button', { name: '7 days' })).toBeInTheDocument();
+    }
+  });
+
 });

@@ -67,6 +67,10 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     : profile.lastHandleChangedAt
       ? Date.parse(profile.lastHandleChangedAt) + 7 * 24 * 60 * 60 * 1000
       : Number.NaN;
+  // A refetch can introduce a deadline after this editor has been idle for days.
+  useEffect(() => {
+    if (Number.isFinite(deadline)) setNow(Date.now());
+  }, [deadline]);
   const coolingDown = field === 'handle' && deadline > now;
   useEffect(() => {
     if (!coolingDown) return;

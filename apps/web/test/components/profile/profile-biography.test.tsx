@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
@@ -20,7 +20,9 @@ describe('Biography Markdown', () => {
   it('supports configured long Biographies and limits only an explicitly bounded preview', () => {
     const text = 'a'.repeat(5500);
     const markdown = `**${text}**`;
-    const { rerender } = render(<BiographyMarkdown profileId={profileId} markdown={markdown} maxCharacters={6000} />);
+    const { rerender } = render(
+      <BiographyMarkdown profileId={profileId} markdown={markdown} maxCharacters={6000} />
+    );
     expect(screen.getByText(text).tagName).toBe('STRONG');
     rerender(<BiographyMarkdown profileId={profileId} markdown={markdown} maxCharacters={5000} />);
     expect(screen.getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();

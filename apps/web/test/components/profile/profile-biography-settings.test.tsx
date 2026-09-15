@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
@@ -8,7 +8,9 @@ import { ProfileSettingsPage } from '@/components/profile/profile-settings-page'
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
-vi.mock('@/lib/graphql/client', () => ({ request: vi.fn().mockResolvedValue({ getWallpaper: null }) }));
+vi.mock('@/lib/graphql/client', () => ({
+  request: vi.fn().mockResolvedValue({ getWallpaper: null }),
+}));
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
@@ -58,18 +60,56 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockReset();
   });
 
+  it('blocks owner refresh during a Biography write and keeps the accepted state when refresh fails', async () => {
+    let finishSave: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.updateProfile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishSave = resolve;
+        })
+    );
+    vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
+    const { client } = renderPage();
+    const user = userEvent.setup();
+    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.clear(editor);
+    await user.type(editor, 'Saved Biography');
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    expect(screen.getByRole('button', { name: 'Refresh Biography' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
+    expect(editor).toBeDisabled();
+    expect(userApi.ensureProfile).not.toHaveBeenCalled();
+    const updated = { ...profile, biographyMarkdown: 'Saved Biography', version: 2 };
+    await act(async () => finishSave?.(updated));
+    await user.click(screen.getByRole('button', { name: 'Refresh Biography' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to refresh Biography. Try again.'
+    );
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(editor).toHaveValue('Saved Biography');
+  });
+
   it('preserves a wallpaper Biography draft while the server ownership projection catches up', async () => {
     const biographyMarkdown = '![New wallpaper](wallpaper:wlpr_new)';
-    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(new UserApiError('Wallpaper is not available yet. Newly published wallpapers may take a moment; try again.', 400, { type: 'https://wallpaperdb.test/problems/unavailable-wallpaper' }));
+    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(
+      new UserApiError(
+        'Wallpaper is not available yet. Newly published wallpapers may take a moment; try again.',
+        400,
+        { type: 'https://wallpaperdb.test/problems/unavailable-wallpaper' }
+      )
+    );
     const updated = { ...profile, biographyMarkdown, version: 2 };
     vi.mocked(userApi.updateProfile).mockResolvedValueOnce(updated);
     const { client } = renderPage();
     const user = userEvent.setup();
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
-    await user.paste(biographyMarkdown);
+    fireEvent.change(editor, { target: { value: biographyMarkdown } });
+    expect(editor).toHaveValue(biographyMarkdown);
     await user.click(screen.getByRole('button', { name: 'Save Biography' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Newly published wallpapers may take a moment; try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Newly published wallpapers may take a moment; try again.'
+    );
     expect(editor).toHaveValue(biographyMarkdown);
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
     await user.click(screen.getByRole('button', { name: 'Save Biography' }));

@@ -36,4 +36,27 @@ describe('Profile picture import worker', () => {
       await worker.stop();
     }
   });
+
+  it('waits for the active import during shutdown and does not start another pass', async () => {
+    const timer = new FakeTimerService();
+    let release!: () => void;
+    const active = new Promise<void>((resolve) => { release = resolve; });
+    const run = vi.fn<() => Promise<void>>().mockReturnValueOnce(active).mockResolvedValue();
+    const worker = new ProfilePictureImportWorker(run, { error: vi.fn() }, timer);
+    worker.start();
+    let stopped = false;
+    const shutdown = worker.stop().then(() => { stopped = true; });
+    await timer.tickAsync(1000);
+    try {
+      expect(stopped).toBe(false);
+      expect(run).toHaveBeenCalledOnce();
+    } finally {
+      release();
+      await shutdown;
+    }
+    expect(stopped).toBe(true);
+    await worker.importPending();
+    await timer.tickAsync(1000);
+    expect(run).toHaveBeenCalledOnce();
+  });
 });

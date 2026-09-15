@@ -78,6 +78,26 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('removes the picture with an authoritative null snapshot and preserves its private bytes', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, original.version)).json();
+    const response = await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: uploaded.version } });
+    expect(response.statusCode).toBe(200);
+    const removed = response.json();
+    expect(removed).toMatchObject({ pictureAssetId: null, pictureImportStatus: 'complete', version: uploaded.version + 1 });
+    expect((await ensure()).json()).toEqual(removed);
+    const check = await app.inject({ method: 'GET', url: `/internal/profile-pictures/${uploaded.pictureAssetId}/availability`, headers: { authorization: 'Bearer test-media-token' } });
+    expect(check.statusCode).toBe(404);
+    const [old] = await sql`select * from profile_picture_assets where id = ${uploaded.pictureAssetId}`;
+    expect(old.state).toBe('retired');
+    expect(old.expires_at.getTime() - old.retired_at.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
+    expect((await storage.send(new GetObjectCommand({ Bucket: old.storage_bucket, Key: old.storage_key }))).ContentLength).toBeGreaterThan(0);
+    const [event] = await sql`select payload from outbox_events where payload->'change'->>'source' = 'remove'`;
+    expect(event.payload).toMatchObject({ change: { type: 'picture-changed', source: 'remove', before: uploaded.pictureAssetId, after: null, asset: null }, profile: { pictureAssetId: null, version: removed.version, aliases: removed.aliases } });
+    expect((await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: removed.version } })).json()).toEqual(removed);
+  });
+
   it('replaces a picture with a new immutable ID and immediately retires old public delivery for thirty days', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

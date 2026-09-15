@@ -6,6 +6,7 @@ import multipart from '@fastify/multipart';
 import { type IAuthService, IAuthServiceToken } from '@wallpaperdb/auth';
 import type { FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
+import { ProfileService } from '../services/profile.service.js';
 import type { Config } from '../config.js';
 import { ProfilePictureIngestionService } from '../services/profile-picture-ingestion.service.js';
 
@@ -21,6 +22,12 @@ export default async function profilePictureRoutes(fastify: FastifyInstance): Pr
       .from(profiles).innerJoin(profilePictureAssets, and(eq(profiles.pictureAssetId, profilePictureAssets.id), eq(profiles.id, profilePictureAssets.profileId)))
       .where(and(eq(profilePictureAssets.id, request.params.pictureId), eq(profilePictureAssets.state, 'active'))).limit(1);
     return reply.code(active ? 204 : 404).send();
+  });
+  fastify.delete('/profile/me/picture', async (request, reply) => {
+    const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
+    const body = request.body as { expectedVersion?: unknown } | null;
+    if (!body || typeof body.expectedVersion !== 'number' || !Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1) return reply.code(400).send({ detail: 'A positive integer expected Profile version is required' });
+    return container.resolve(ProfileService).adoptPicture(user.id, null, body.expectedVersion);
   });
   fastify.put('/profile/me/picture', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);

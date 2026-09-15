@@ -820,7 +820,7 @@ export class ProfileService {
           .set({
             state: 'retired',
             retiredAt: now,
-            expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+            expiresAt: new Date(now.getTime() + profileEvidenceRetentionMs(this.config)),
           })
           .where(eq(profilePictureAssets.id, current.pictureAssetId));
       }

@@ -580,6 +580,10 @@ make test
 - Runs or restores unit/integration coverage through Turbo and ranks every in-scope function by CRAP score
 - High scores do not fail the report; test, coverage, and analysis errors do
 
+**make crap-check-types**
+- Runs strict TypeScript checking for the CRAP script and configuration
+- Included in the general Make check and CI targets
+
 **make check-crap CRAP_THRESHOLD=30**
 - Uses the same coverage pipeline and lists only functions exceeding an explicit threshold
 - Exits nonzero for violations or errors; `30` is a calibration example, not a default

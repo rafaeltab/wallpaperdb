@@ -260,6 +260,25 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(profile.handle);
   });
 
+  it('disables both alias restoration actions and explains when no retained slot is available', async () => {
+    renderPage({
+      ...profile,
+      retainedAliasLimit: 0,
+      aliases: [{ handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
+      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({ handle, eligibleUntil: '2099-10-15T12:00:00.000Z', unavailableReason: 'alias-limit' as const })),
+    });
+    const user = userEvent.setup();
+    const keep = screen.getByRole('button', { name: 'Keep alias @expiring-name' });
+    const reactivate = screen.getByRole('button', { name: 'Reactivate @released-name' });
+    expect(keep).toBeDisabled();
+    expect(reactivate).toBeDisabled();
+    expect(screen.getAllByText('Your retained-alias limit is full. Schedule an alias for removal to free a slot.')).toHaveLength(2);
+    await user.click(keep);
+    await user.click(reactivate);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(userApi.reactivateAlias).not.toHaveBeenCalled();
+  });
+
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {
     const alias = {
       handle: 'old-handle',

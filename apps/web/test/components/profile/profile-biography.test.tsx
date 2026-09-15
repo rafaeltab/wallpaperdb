@@ -20,16 +20,66 @@ describe('Biography Markdown', () => {
   beforeEach(() => vi.mocked(request).mockReset());
   afterEach(() => vi.useRealTimers());
 
+  it('starts a fresh retry budget when an exhausted embed changes wallpaper and Profile identity', async () => {
+    vi.useFakeTimers();
+    vi.mocked(request).mockResolvedValue({ getWallpaper: null });
+    const client = new QueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" />
+      </QueryClientProvider>
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    for (const delay of [1000, 2000, 4000]) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    }
+    expect(request).toHaveBeenCalledTimes(4);
+    rerender(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId="user_other" markdown="![Ocean](wallpaper:wlpr_other)" />
+      </QueryClientProvider>
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(request).toHaveBeenCalledTimes(5);
+    for (const delay of [1000, 2000, 4000, 60000]) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    }
+    expect(request).toHaveBeenCalledTimes(8);
+    expect(request).toHaveBeenLastCalledWith(expect.any(String), { wallpaperId: 'wlpr_other' });
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('bounds missing-embed retries and lets a public visitor explicitly try again', async () => {
     vi.useFakeTimers();
     vi.mocked(request).mockResolvedValue({ getWallpaper: null });
     const client = new QueryClient();
-    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    render(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" />
+      </QueryClientProvider>
+    );
     await act(async () => vi.advanceTimersByTimeAsync(1));
-    for (const delay of [1000, 2000, 4000, 60000]) await act(async () => vi.advanceTimersByTimeAsync(delay));
+    for (const delay of [1000, 2000, 4000, 60000])
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
     expect(request).toHaveBeenCalledTimes(4);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/own.webp' }] };
+    const wallpaper: Wallpaper = {
+      wallpaperId: 'wlpr_own',
+      profileId,
+      uploadedAt: '',
+      updatedAt: '',
+      variants: [
+        {
+          width: 800,
+          height: 600,
+          aspectRatio: 4 / 3,
+          format: 'image/webp',
+          fileSizeBytes: 100,
+          createdAt: '',
+          url: '/media/own.webp',
+        },
+      ],
+    };
     vi.mocked(request).mockResolvedValue({ getWallpaper: wallpaper });
     fireEvent.click(screen.getByRole('button', { name: 'Try wallpaper again' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
@@ -39,10 +89,33 @@ describe('Biography Markdown', () => {
 
   it('retries missing and unrenderable own wallpapers until a published variant arrives', async () => {
     vi.useFakeTimers();
-    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/own.webp' }] };
-    vi.mocked(request).mockResolvedValueOnce({ getWallpaper: null }).mockResolvedValueOnce({ getWallpaper: { ...wallpaper, variants: [] } }).mockResolvedValue({ getWallpaper: wallpaper });
+    const wallpaper: Wallpaper = {
+      wallpaperId: 'wlpr_own',
+      profileId,
+      uploadedAt: '',
+      updatedAt: '',
+      variants: [
+        {
+          width: 800,
+          height: 600,
+          aspectRatio: 4 / 3,
+          format: 'image/webp',
+          fileSizeBytes: 100,
+          createdAt: '',
+          url: '/media/own.webp',
+        },
+      ],
+    };
+    vi.mocked(request)
+      .mockResolvedValueOnce({ getWallpaper: null })
+      .mockResolvedValueOnce({ getWallpaper: { ...wallpaper, variants: [] } })
+      .mockResolvedValue({ getWallpaper: wallpaper });
     const client = new QueryClient();
-    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    render(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" />
+      </QueryClientProvider>
+    );
     await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(screen.getByText('Wallpaper unavailable.')).toBeInTheDocument();
     await act(async () => vi.advanceTimersByTimeAsync(1000));

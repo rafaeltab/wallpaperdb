@@ -53,12 +53,12 @@ function renderPage(initial = profile) {
 
 describe('Profile picture settings', () => {
   beforeEach(() => {
-    vi.mocked(useAuth).mockReturnValue({
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
       isSignedIn: true,
       userId: profile.id,
-    } as ReturnType<typeof useAuth>);
+    });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.uploadPicture).mockReset();
     vi.mocked(userApi.removePicture).mockReset();

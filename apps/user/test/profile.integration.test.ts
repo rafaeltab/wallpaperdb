@@ -221,6 +221,7 @@ describe('Profile commands', () => {
 
   it.each([
     '<script>alert(1)</script>',
+    '[![Picture](wallpaper:wlpr_owned)](https://example.com)',
     '[Unsafe](javascript:alert%281%29)',
     '[Credentials](https://user:pass@example.com)',
     '![Remote](https://example.com/image.png)',

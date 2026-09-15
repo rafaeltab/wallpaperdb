@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
@@ -19,6 +19,23 @@ const profileId = 'user_123';
 describe('Biography Markdown', () => {
   beforeEach(() => vi.mocked(request).mockReset());
   afterEach(() => vi.useRealTimers());
+
+  it('bounds missing-embed retries and lets a public visitor explicitly try again', async () => {
+    vi.useFakeTimers();
+    vi.mocked(request).mockResolvedValue({ getWallpaper: null });
+    const client = new QueryClient();
+    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    for (const delay of [1000, 2000, 4000, 60000]) await act(async () => vi.advanceTimersByTimeAsync(delay));
+    expect(request).toHaveBeenCalledTimes(4);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/own.webp' }] };
+    vi.mocked(request).mockResolvedValue({ getWallpaper: wallpaper });
+    fireEvent.click(screen.getByRole('button', { name: 'Try wallpaper again' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(request).toHaveBeenCalledTimes(5);
+  });
 
   it('retries missing and unrenderable own wallpapers until a published variant arrives', async () => {
     vi.useFakeTimers();

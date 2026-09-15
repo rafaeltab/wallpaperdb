@@ -36,6 +36,10 @@ export function BiographyWallpaper({
     return (
       <span className="my-4 block rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
         Wallpaper unavailable.
+        {retryable && <button type="button" aria-label="Try wallpaper again" disabled={query.isFetching} className="ml-2 cursor-pointer text-primary underline underline-offset-4 disabled:opacity-50" onClick={() => {
+          setRetries(0);
+          void query.refetch();
+        }}>Try again</button>}
       </span>
     );
   }

@@ -84,7 +84,7 @@ GraphQL API gateway providing unified access to all wallpaper services.
 **API:**
 - GraphQL endpoint for queries and mutations
 - Search wallpapers by variants (width, height, aspect ratio)
-- Search public Profiles with `searchProfiles(query, first, after)` and cursor pagination. Current Handles rank above aliases, followed by Display name phrases/prefixes and fuzzy names. Biography and alias lists are not exposed as search fields or result lists. Wallpaper documents retain ownership IDs; Profile identity stays in its separate index.
+- Search public Profiles with `searchProfiles(query, first, after)` and cursor pagination. Current Handles rank above aliases, followed by Display name phrases/prefixes and fuzzy names. Biography is excluded from search, and results do not enumerate aliases. Wallpaper documents retain ownership IDs; Profile identity stays in its separate index.
 
 ### Web Frontend
 **Status:** ✅ COMPLETE

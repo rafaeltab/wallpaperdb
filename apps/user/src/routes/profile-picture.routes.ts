@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { DatabaseConnection } from '../connections/database.js';
 import { profiles, profilePictureAssets } from '../db/schema.js';
 import { InvalidProfilePictureError, ProfilePictureTooLargeError } from '../services/profile-picture-processing.js';
+import { PictureStorageUnavailableError } from '../services/profile-picture-storage.js';
 import multipart from '@fastify/multipart';
 import { type IAuthService, IAuthServiceToken } from '@wallpaperdb/auth';
 import type { FastifyInstance } from 'fastify';
@@ -22,6 +23,9 @@ export default async function profilePictureRoutes(fastify: FastifyInstance): Pr
       const status = oversized ? 413 : 400;
       return reply.code(status).type('application/problem+json').send({ type: `https://wallpaperdb.example/problems/${oversized ? 'picture-too-large' : 'invalid-picture'}`, title: oversized ? 'Picture too large' : 'Invalid picture', status, detail: oversized ? 'Picture exceeds the upload byte limit' : error.message, instance: request.url });
     }
+    if (error instanceof PictureStorageUnavailableError) return reply.code(503).type('application/problem+json').send({
+      type: 'https://wallpaperdb.example/problems/picture-storage-unavailable', title: 'Picture storage unavailable', status: 503, detail: error.message, instance: request.url,
+    });
     return reply.send(error);
   });
   await fastify.register(multipart, { limits: { fileSize: config.profilePictureMaxBytes, files: 1, fields: 1, parts: 2, fieldSize: 32 } });

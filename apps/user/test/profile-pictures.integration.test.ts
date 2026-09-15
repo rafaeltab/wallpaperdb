@@ -78,6 +78,24 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('leaves a known private candidate on storage failure and keeps the current picture authoritative', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, original.version)).json();
+    const bucket = config.profilePictureBucket;
+    config.profilePictureBucket = 'missing-picture-bucket';
+    try {
+      const failed = await upload(image, uploaded.version);
+      expect(failed.statusCode).toBe(503);
+      expect(failed.json().type).toContain('picture-storage-unavailable');
+      expect((await ensure()).json()).toEqual(uploaded);
+      const [staged] = await sql`select * from profile_picture_assets where state = 'staged'`;
+      expect(staged.expires_at.getTime() - staged.created_at.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
+      expect((await app.inject({ method: 'GET', url: `/internal/profile-pictures/${staged.id}/availability`, headers: { authorization: 'Bearer test-media-token' } })).statusCode).toBe(404);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(1);
+    } finally { config.profilePictureBucket = bucket; }
+  });
+
   it('reports invalid and oversized uploads without publishing or staging them', async () => {
     const original = (await ensure()).json();
     const invalid = await upload(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), original.version);

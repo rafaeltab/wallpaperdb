@@ -274,4 +274,43 @@ describe('Private Profile picture retention', () => {
     expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
     expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
   });
+
+  it('refuses to start a PUT if its candidate expires while waiting for the Profile lock', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    const owner = await profiles.ensure('user_picture');
+    let locked!: () => void;
+    let release!: () => void;
+    const holding = new Promise<void>((resolve) => { locked = resolve; });
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const locking = sql.begin(async (tx) => {
+      // A non-key update lock permits the staging FK insert while blocking the
+      // stronger Profile lock required immediately before uploading bytes.
+      await tx`select id from profiles where id = ${owner.id} for no key update`;
+      locked();
+      await blocked;
+    });
+    await holding;
+    const sending = vi.spyOn(S3Client.prototype, 'send');
+    const staging = ingestion.stage(owner.id, picture).then((id) => id, (error: unknown) => error);
+    try {
+      await vi.waitFor(async () => {
+        expect(await sql`select id from profile_picture_assets`).toHaveLength(1);
+      });
+      const [asset] = await sql`select id, expires_at from profile_picture_assets`;
+      vi.setSystemTime(asset.expires_at);
+      release();
+      await locking;
+      expect(await staging).toEqual(new Error('Staged Profile picture expired before its upload could start'));
+      expect(sending).not.toHaveBeenCalled();
+      expect(await sql`select id from profile_picture_assets`).toEqual([{ id: asset.id }]);
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+    } finally {
+      release();
+      await locking;
+      await staging;
+      sending.mockRestore();
+      vi.useRealTimers();
+    }
+  });
 });

@@ -207,6 +207,36 @@ describe('Profile commands', () => {
     }
   });
 
+  it.each([0, 1])('rejects alias reactivation without a retained slot at limit %i', async (limit) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    const previousLimit = config.profileRetainedAliasLimit;
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'second-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      vi.setSystemTime(new Date('2030-01-08T00:00:00.000Z'));
+      const current = limit === 0 ? scheduled : (await changeHandle('user_1', 'current-handle', scheduled.version)).json();
+      config.profileRetainedAliasLimit = limit;
+      const before = (await request('user_1')).json();
+      expect(before.historicalHandles).toContainEqual({ handle: original.handle, eligibleUntil: '2030-01-31T00:00:00.000Z', unavailableReason: 'alias-limit' });
+      const rejected = await reactivateAlias('user_1', original.handle, before.version);
+      expect(rejected.statusCode).toBe(409);
+      expect(rejected.json().type).toContain('alias-limit');
+      expect((await request('user_1')).json()).toEqual(before);
+      const released = (await expireAlias('user_1', original.handle, before.version)).json();
+      const rejectedReleased = await reactivateAlias('user_1', original.handle, released.version);
+      expect(rejectedReleased.statusCode).toBe(409);
+      expect(rejectedReleased.json().type).toContain('alias-limit');
+      expect((await request('user_1')).json()).toEqual(released);
+      expect(released.aliases).toEqual(current.aliases.filter((alias: {handle: string}) => alias.handle !== original.handle));
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
+    } finally {
+      config.profileRetainedAliasLimit = previousLimit;
+      vi.useRealTimers();
+    }
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

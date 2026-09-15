@@ -82,6 +82,7 @@ export class InvalidDisplayNameError extends Error {}
 export class InvalidHandleError extends Error {}
 export class InvalidAliasCommandError extends Error {}
 export class IneligibleHandleError extends Error {}
+export class AliasLimitError extends Error {}
 export class AliasNotFoundError extends Error {}
 export class AliasNotScheduledError extends Error {}
 export class HandleUnavailableError extends Error {}
@@ -390,6 +391,19 @@ export class ProfileService {
         throw new HandleUnavailableError('This Handle is already claimed');
       }
       if (existing && !existing.expiresAt) return this.ownerProfile(current, tx);
+      const retained = await tx.query.handleClaims.findMany({
+        where: and(
+          eq(handleClaims.profileId, userId),
+          eq(handleClaims.kind, 'alias'),
+          isNull(handleClaims.expiresAt)
+        ),
+        columns: { handle: true },
+      });
+      if (retained.length >= this.config.profileRetainedAliasLimit) {
+        throw new AliasLimitError(
+          'No retained alias slot is available'
+        );
+      }
       const [alias] = existing
         ? await tx
             .update(handleClaims)
@@ -694,7 +708,11 @@ export class ProfileService {
       aliases: activeAliases,
       historicalHandles: history
         .filter(({ handle }) => handle !== profile.handle && !retained.has(handle))
-        .map((entry) => ({ ...entry, unavailableReason: null })),
+        .map((entry) => ({
+          ...entry,
+          unavailableReason:
+            retained.size >= this.config.profileRetainedAliasLimit ? 'alias-limit' : null,
+        })),
     };
   }
 

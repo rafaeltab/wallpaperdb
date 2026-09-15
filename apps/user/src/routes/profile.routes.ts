@@ -11,6 +11,7 @@ import {
   InvalidHandleError,
   InvalidAliasCommandError,
   IneligibleHandleError,
+  AliasLimitError,
   ProfileService,
   ProfileVersionConflictError,
 } from '../services/profile.service.js';
@@ -63,6 +64,7 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
           error instanceof ProfileVersionConflictError ||
           error instanceof HandleUnavailableError ||
           error instanceof IneligibleHandleError ||
+          error instanceof AliasLimitError ||
           error instanceof InvalidAliasCommandError
         ) {
           const [status, type, title] =
@@ -70,9 +72,11 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
               ? ([409, 'profile-version-conflict', 'Profile version conflict'] as const)
               : error instanceof HandleUnavailableError
                 ? ([409, 'handle-unavailable', 'Handle unavailable'] as const)
-                : error instanceof IneligibleHandleError
-                  ? ([400, 'ineligible-handle', 'Handle is not eligible'] as const)
-                  : ([400, 'invalid-alias-command', 'Invalid alias command'] as const);
+                : error instanceof AliasLimitError
+                  ? ([409, 'alias-limit', 'Retained alias limit reached'] as const)
+                  : error instanceof IneligibleHandleError
+                    ? ([400, 'ineligible-handle', 'Handle is not eligible'] as const)
+                    : ([400, 'invalid-alias-command', 'Invalid alias command'] as const);
           return reply
             .code(status)
             .type('application/problem+json')

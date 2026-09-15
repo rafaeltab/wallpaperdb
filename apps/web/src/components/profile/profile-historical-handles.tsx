@@ -7,7 +7,7 @@ export function historicalHandleUnavailableMessage(history: HistoricalHandle): s
   }
   if (history.unavailableReason === 'claimed') return 'Another Profile has claimed this Handle.';
   if (history.unavailableReason === 'alias-limit') {
-    return 'Your retained-alias limit is full. Schedule an alias for removal to free a slot.';
+    return 'Your retained-alias limit is full.';
   }
   return null;
 }

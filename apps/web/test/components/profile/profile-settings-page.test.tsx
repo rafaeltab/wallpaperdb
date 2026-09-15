@@ -283,11 +283,7 @@ describe('ProfileSettingsPage', () => {
     const reactivate = screen.getByRole('button', { name: 'Reactivate @released-name' });
     expect(keep).toBeDisabled();
     expect(reactivate).toBeDisabled();
-    expect(
-      screen.getAllByText(
-        'Your retained-alias limit is full. Schedule an alias for removal to free a slot.'
-      )
-    ).toHaveLength(2);
+    expect(screen.getAllByText('Your retained-alias limit is full.')).toHaveLength(2);
     await user.click(keep);
     await user.click(reactivate);
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();

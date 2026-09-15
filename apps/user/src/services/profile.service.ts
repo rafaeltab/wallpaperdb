@@ -94,7 +94,11 @@ export class InvalidDisplayNameError extends Error {}
 export class InvalidBiographyError extends Error {}
 export class UnavailableBiographyWallpaperError extends Error {
   constructor(readonly retryable: boolean) {
-    super(retryable ? 'A referenced wallpaper is not available yet. Check the ID or wait for publication and try again.' : 'Biography images must be published wallpapers owned by this Profile.');
+    super(
+      retryable
+        ? 'A referenced wallpaper is not available yet. Check the ID or wait for publication and try again.'
+        : 'Biography images must be published wallpapers owned by this Profile.'
+    );
   }
 }
 export class InvalidHandleError extends Error {}
@@ -885,7 +889,11 @@ export class ProfileService {
     });
   }
 
-  async updateDisplayName(userId: string, displayName: string, expectedVersion: number): Promise<OwnerProfile> {
+  async updateDisplayName(
+    userId: string,
+    displayName: string,
+    expectedVersion: number
+  ): Promise<OwnerProfile> {
     return this.updateDetails(userId, { displayName }, expectedVersion);
   }
 
@@ -894,16 +902,25 @@ export class ProfileService {
     changes: { displayName?: string; biographyMarkdown?: string },
     expectedVersion: number
   ): Promise<OwnerProfile> {
-    const displayName = changes.displayName === undefined ? undefined : normalizeDisplayName(changes.displayName);
+    const displayName =
+      changes.displayName === undefined ? undefined : normalizeDisplayName(changes.displayName);
     if (displayName !== undefined) {
       if (!displayName) throw new InvalidDisplayNameError('Display name must not be blank');
-      if ([...displayName].length > this.config.profileDisplayNameMaxLength) throw new InvalidDisplayNameError(`Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`);
+      if ([...displayName].length > this.config.profileDisplayNameMaxLength)
+        throw new InvalidDisplayNameError(
+          `Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`
+        );
     }
     const biographyMarkdown = changes.biographyMarkdown;
     let wallpaperIds: string[] = [];
     if (biographyMarkdown !== undefined) {
-      const validation = validateProfileMarkdown(biographyMarkdown, { maxCharacters: this.config.profileBiographyMaxLength });
-      if (!validation.valid) throw new InvalidBiographyError(validation.errors[0]?.message ?? 'Biography Markdown is invalid');
+      const validation = validateProfileMarkdown(biographyMarkdown, {
+        maxCharacters: this.config.profileBiographyMaxLength,
+      });
+      if (!validation.valid)
+        throw new InvalidBiographyError(
+          validation.errors[0]?.message ?? 'Biography Markdown is invalid'
+        );
       wallpaperIds = validation.wallpaperIds;
     }
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
@@ -919,13 +936,20 @@ export class ProfileService {
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
-      if ((displayName === undefined || current.displayName === displayName) && (biographyMarkdown === undefined || current.biographyMarkdown === biographyMarkdown)) return this.ownerProfile(current, tx);
+      if (
+        (displayName === undefined || current.displayName === displayName) &&
+        (biographyMarkdown === undefined || current.biographyMarkdown === biographyMarkdown)
+      )
+        return this.ownerProfile(current, tx);
       if (biographyMarkdown !== current.biographyMarkdown && wallpaperIds.length > 0) {
-        const published = await tx.query.wallpaperOwnership.findMany({ where: inArray(wallpaperOwnership.wallpaperId, wallpaperIds) });
-        if (published.some((wallpaper) => wallpaper.profileId !== userId)) throw new UnavailableBiographyWallpaperError(false);
-        if (published.length !== wallpaperIds.length) throw new UnavailableBiographyWallpaperError(true);
+        const published = await tx.query.wallpaperOwnership.findMany({
+          where: inArray(wallpaperOwnership.wallpaperId, wallpaperIds),
+        });
+        if (published.some((wallpaper) => wallpaper.profileId !== userId))
+          throw new UnavailableBiographyWallpaperError(false);
+        if (published.length !== wallpaperIds.length)
+          throw new UnavailableBiographyWallpaperError(true);
       }
-
 
       const now = new Date();
       const [updated] = await tx
@@ -952,11 +976,31 @@ export class ProfileService {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
         timestamp: now.toISOString(),
-        change: current.displayName !== updated.displayName && current.biographyMarkdown !== updated.biographyMarkdown ? {
-          type: 'profile-details-changed', before: { displayName: current.displayName, biographyMarkdown: current.biographyMarkdown }, after: { displayName: updated.displayName, biographyMarkdown: updated.biographyMarkdown },
-        } : current.biographyMarkdown !== updated.biographyMarkdown ? {
-          type: 'biography-changed', before: current.biographyMarkdown, after: updated.biographyMarkdown,
-        } : { type: 'display-name-changed', before: current.displayName, after: updated.displayName },
+        change:
+          current.displayName !== updated.displayName &&
+          current.biographyMarkdown !== updated.biographyMarkdown
+            ? {
+                type: 'profile-details-changed',
+                before: {
+                  displayName: current.displayName,
+                  biographyMarkdown: current.biographyMarkdown,
+                },
+                after: {
+                  displayName: updated.displayName,
+                  biographyMarkdown: updated.biographyMarkdown,
+                },
+              }
+            : current.biographyMarkdown !== updated.biographyMarkdown
+              ? {
+                  type: 'biography-changed',
+                  before: current.biographyMarkdown,
+                  after: updated.biographyMarkdown,
+                }
+              : {
+                  type: 'display-name-changed',
+                  before: current.displayName,
+                  after: updated.displayName,
+                },
         profile: {
           id: updated.id,
           displayName: updated.displayName,

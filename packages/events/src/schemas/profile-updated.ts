@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { PublicProfileSnapshotSchema } from "./profile-created.js";
 
-const ProfileDetailsSchema = z.object({ displayName: z.string().min(1), biographyMarkdown: z.string() }).strict();
+const ProfileDetailsSchema = z
+  .object({ displayName: z.string().min(1), biographyMarkdown: z.string() })
+  .strict();
 
 export const PROFILE_UPDATED_SUBJECT = "profile.updated" as const;
 
@@ -11,8 +13,16 @@ export const ProfileUpdatedEventSchema = z
     eventType: z.literal(PROFILE_UPDATED_SUBJECT),
     timestamp: z.string().datetime(),
     change: z.discriminatedUnion("type", [
-      z.object({ type: z.literal("profile-details-changed"), before: ProfileDetailsSchema, after: ProfileDetailsSchema }).strict(),
-      z.object({ type: z.literal("biography-changed"), before: z.string(), after: z.string() }).strict(),
+      z
+        .object({
+          type: z.literal("profile-details-changed"),
+          before: ProfileDetailsSchema,
+          after: ProfileDetailsSchema,
+        })
+        .strict(),
+      z
+        .object({ type: z.literal("biography-changed"), before: z.string(), after: z.string() })
+        .strict(),
       z
         .object({
           type: z.literal("picture-changed"),

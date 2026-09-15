@@ -253,6 +253,43 @@ describe('Profile commands', () => {
     expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
   });
 
+  it('ends history eligibility at exactly thirty days without renewing it from Display-name snapshots', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+      vi.setSystemTime(new Date('2030-01-30T00:00:00.000Z'));
+      const renamed = (await patch('user_1', 'invented-handle', released.version)).json();
+      expect(renamed.historicalHandles).toEqual(released.historicalHandles);
+      const secondRename = (await patch('user_1', 'another-invention', renamed.version)).json();
+      expect(secondRename.historicalHandles).toEqual(released.historicalHandles);
+      for (const handle of ['invented-handle', 'another-invention', 'arbitrary-alias']) {
+        const rejection = await reactivateAlias('user_1', handle, secondRename.version);
+        expect(rejection.statusCode).toBe(400);
+        expect(rejection.json().type).toContain('ineligible-handle');
+      }
+      const other = (await request('user_2')).json();
+      const wrongOwner = await reactivateAlias('user_2', original.handle, other.version);
+      expect(wrongOwner.statusCode).toBe(400);
+      expect(wrongOwner.json().type).toContain('ineligible-handle');
+      vi.setSystemTime(new Date('2030-01-30T23:59:59.999Z'));
+      expect((await request('user_1')).json().historicalHandles).toEqual(released.historicalHandles);
+      vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
+      const atDeadline = (await request('user_1')).json();
+      expect(atDeadline.historicalHandles).toEqual([]);
+      const expiredHistory = await reactivateAlias('user_1', original.handle, secondRename.version);
+      expect(expiredHistory.statusCode).toBe(400);
+      expect(expiredHistory.json().type).toContain('ineligible-handle');
+      expect((await request('user_1')).json()).toEqual(atDeadline);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

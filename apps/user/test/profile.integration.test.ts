@@ -311,6 +311,34 @@ describe('Profile commands', () => {
     }
   });
 
+  it('requires authentication, ownership, and the last-seen version to schedule an alias', async () => {
+    const before = (await request('user_1')).json();
+    const other = (await request('user_2')).json();
+    const owner = (await changeHandle('user_1', 'current-handle', before.version)).json();
+    const unauthenticated = await app.inject({ method: 'DELETE', url: `/profile/me/aliases/${before.handle}`, payload: { expectedVersion: owner.version } });
+    expect(unauthenticated.statusCode).toBe(401);
+    const token = Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64');
+    for (const payload of [{}, { expectedVersion: '2' }, { expectedVersion: 0 }, { expectedVersion: 1.5 }]) {
+      const invalid = await app.inject({ method: 'DELETE', url: `/profile/me/aliases/${before.handle}`, headers: { authorization: `Bearer ${token}` }, payload });
+      expect(invalid.statusCode).toBe(400);
+      expect(invalid.json().type).toMatch(/invalid-alias-command$/);
+    }
+    const stale = await scheduleAlias('user_1', before.handle, before.version);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    for (const response of [
+      await scheduleAlias('user_2', before.handle, other.version),
+      await scheduleAlias('user_1', owner.handle, owner.version),
+      await scheduleAlias('user_1', 'unclaimed-alias', owner.version),
+    ]) {
+      expect(response.statusCode).toBe(404);
+      expect(response.json().type).toMatch(/alias-not-found$/);
+    }
+    expect((await request('user_1')).json()).toEqual(owner);
+    expect((await request('user_2')).json()).toEqual(other);
+    expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expiry-scheduled'`).toHaveLength(0);
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

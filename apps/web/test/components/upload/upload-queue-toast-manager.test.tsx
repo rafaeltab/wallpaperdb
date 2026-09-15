@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from '@testing-library/
 import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
 import { UploadQueueProvider, useUploadQueue } from '@/contexts/upload-queue-context';
@@ -28,11 +29,13 @@ function QueueControls() {
 
 function QueueApp({ showManager = true }: { showManager?: boolean }) {
   return (
-    <UploadQueueProvider>
-      <QueueControls />
-      {showManager && <UploadQueueToastManager />}
-      <Toaster />
-    </UploadQueueProvider>
+    <ThemeProvider>
+      <UploadQueueProvider>
+        <QueueControls />
+        {showManager && <UploadQueueToastManager />}
+        <Toaster />
+      </UploadQueueProvider>
+    </ThemeProvider>
   );
 }
 
@@ -66,6 +69,19 @@ describe('UploadQueueToastManager', () => {
   afterEach(() => {
     act(() => toast.dismiss());
     cleanup();
+  });
+
+  it('uses the selected application theme for the shared notification stack', async () => {
+    render(
+      <ThemeProvider defaultTheme="dark" storageKey="toast-theme-test">
+        <Toaster />
+      </ThemeProvider>
+    );
+    act(() => {
+      toast.success('Themed profile update');
+    });
+    const message = await screen.findByText('Themed profile update');
+    expect(message.closest('[data-sonner-toaster]')).toHaveAttribute('data-sonner-theme', 'dark');
   });
 
   it('shares the bottom-right notification stack with profile feedback', async () => {
@@ -128,9 +144,7 @@ describe('UploadQueueToastManager', () => {
     expect(navigate).toHaveBeenCalledWith({ to: '/upload' });
 
     view.rerender(<QueueApp showManager={false} />);
-    await waitFor(() =>
-      expect(screen.queryByText('Uploading 1/2 files')).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText('Uploading 1/2 files')).not.toBeInTheDocument());
     expect(screen.getByText('Profile updated')).toBeInTheDocument();
   });
 
@@ -152,8 +166,6 @@ describe('UploadQueueToastManager', () => {
       () => expect(screen.getByRole('status', { name: 'Queue size' })).toHaveTextContent('0'),
       { timeout: 6000 }
     );
-    await waitFor(() =>
-      expect(screen.queryByText('Upload complete')).not.toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.queryByText('Upload complete')).not.toBeInTheDocument());
   });
 });

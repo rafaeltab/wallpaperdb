@@ -115,6 +115,27 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
       return profile;
     },
 
+    async removePicture(options: PictureCommandOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+      const response = await fetch(`${normalizedBaseUrl}/profile/me/picture`, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expectedVersion: options.expectedVersion }),
+      });
+      if (!response.ok) throw await userApiError(response);
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) throw new UserApiError('User API returned a malformed Profile', 502);
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
     async reactivateAlias(options: AliasCommandOptions): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);

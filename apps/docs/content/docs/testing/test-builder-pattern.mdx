@@ -59,11 +59,11 @@ Builders manage setup and cleanup automatically:
 createTesterBuilder()
   .with(DockerTesterBuilder)      // 1. Create network
   .with(PostgresTesterBuilder)    // 2. Start Postgres
-  .with(MinioTesterBuilder)       // 3. Start MinIO
+  .with(MinioTesterBuilder)       // 3. Start SeaweedFS
   .build();
 
-// Setup order:    Docker → Postgres → MinIO
-// Destroy order:  MinIO → Postgres → Docker  (LIFO!)
+// Setup order:    Docker → Postgres → SeaweedFS
+// Destroy order:  SeaweedFS → Postgres → Docker  (LIFO!)
 ```
 
 ## Quick Start
@@ -231,7 +231,7 @@ tester
 
 ### MinioTesterBuilder
 
-Manages MinIO (S3-compatible storage) containers.
+Manages SeaweedFS (S3-compatible storage) containers.
 
 **Dependencies:** `[DockerTesterBuilder]`
 

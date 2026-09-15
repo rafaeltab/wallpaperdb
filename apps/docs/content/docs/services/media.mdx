@@ -3,7 +3,7 @@ title: Media Service
 description: Wallpaper retrieval and on-demand resizing service
 ---
 
-The Media Service handles retrieval and serving of wallpapers from MinIO with on-demand image resizing and format conversion using Sharp.
+The Media Service handles retrieval and serving of wallpapers from SeaweedFS with on-demand image resizing and format conversion using Sharp.
 
 **Status:** ✅ COMPLETE (Production-ready)
 
@@ -22,7 +22,7 @@ make media-dev
 ## Features
 
 ### Implemented ✅
-- **Wallpaper retrieval** from MinIO
+- **Wallpaper retrieval** from SeaweedFS
 - **On-demand image resizing** using Sharp
 - **Multiple resize modes**: contain, cover, fill
 - **Variant selection** (picks best pre-generated variant)
@@ -49,7 +49,7 @@ make media-dev
 2. Validate query parameters (dimensions, fit mode)
 3. Look up wallpaper metadata in database
 4. If not found → 404 (RFC 7807 error)
-5. Download original from MinIO
+5. Download original from SeaweedFS
 6. If resize requested:
    a. Resize using Sharp
    b. Stream resized image to client
@@ -239,10 +239,10 @@ NODE_ENV=development
 # Database
 DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
 
-# MinIO/S3
-MINIO_ENDPOINT=http://localhost:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+# SeaweedFS/S3
+S3_ENDPOINT=http://localhost:8002
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -290,7 +290,7 @@ describe("Media Service", () => {
       ['wlpr_123', 'user_123', 'wlpr_123/original.jpg']
     );
 
-    // Upload test image to MinIO
+    // Upload test image to SeaweedFS
     await tester.minio.send(new PutObjectCommand({
       Bucket: 'wallpapers',
       Key: 'wlpr_123/original.jpg',
@@ -327,7 +327,7 @@ Distributed tracing spans:
 
 - `http.get_wallpaper` - Full retrieval request
 - `wallpaper.retrieve` - Database lookup
-- `wallpaper.download` - MinIO download
+- `wallpaper.download` - SeaweedFS download
 - `wallpaper.resize` - Sharp resize operation
 
 ### Dashboards
@@ -350,7 +350,7 @@ const resizeStream = sharp()
   .resize(width, height, { fit })
   .jpeg({ quality: 85 });
 
-// MinIO download stream → Sharp transform → HTTP response
+// SeaweedFS download stream → Sharp transform → HTTP response
 minioStream.pipe(resizeStream).pipe(reply.raw);
 ```
 
@@ -370,7 +370,7 @@ minioStream.pipe(resizeStream).pipe(reply.raw);
 Future: CloudFlare/CloudFront integration for global delivery:
 
 ```
-Client → CDN → Media Service → MinIO
+Client → CDN → Media Service → SeaweedFS
          ↓
     (cache miss)
 ```

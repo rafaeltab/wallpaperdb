@@ -791,7 +791,7 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
       "id": 21,
       "panels": [],
-      "title": "Storage Operations (S3/MinIO)",
+      "title": "Storage Operations (S3)",
       "type": "row"
     },
     {

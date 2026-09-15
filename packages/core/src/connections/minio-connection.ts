@@ -5,7 +5,7 @@ import type { MinioConfig } from "./types.js";
 export interface MinioConnectionOptions {
   /**
    * Whether to use path-style URLs for S3 requests.
-   * Required for MinIO. Defaults to true.
+   * Required for local S3-compatible storage. Defaults to true.
    *
    * @default true
    */
@@ -13,7 +13,9 @@ export interface MinioConnectionOptions {
 }
 
 /**
- * MinIO/S3 connection manager.
+ * S3 connection manager (SeaweedFS in local development and tests).
+ * The MinioConnection name is retained for existing consumers and health keys;
+ * the implementation uses only the AWS S3 API and accepts any configured endpoint.
  * Extends BaseConnection to provide lifecycle management for S3Client.
  *
  * @example

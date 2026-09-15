@@ -11,8 +11,7 @@ The `docker-compose.yml` file defines all infrastructure services for local deve
 infra/
 └── docker-compose.yml
     ├── postgres (PostgreSQL 16)
-    ├── minio (MinIO latest)
-    ├── minio-init (Bucket initialization)
+    ├── seaweedfs (SeaweedFS 4.47; creates buckets on startup)
     ├── opensearch (OpenSearch 2.11.0)
     ├── opensearch-dashboards
     ├── nats (NATS latest with JetStream)
@@ -38,18 +37,40 @@ postgres:
     test: ["CMD-SHELL", "pg_isready -U wallpaperdb"]
 ```
 
-### MinIO
+### SeaweedFS
+
+The storage service runs all required components with `mini`. Its S3 API is exposed on the worktree's host port. The admin UI and WebDAV are disabled.
+
 ```yaml
-minio:
-  image: minio/minio:latest
-  command: server /data --console-address ":9001"
-  ports: ["9000:9000", "9001:9001"]
+seaweedfs:
+  image: chrislusf/seaweedfs:4.47
+  command:
+    - mini
+    - -dir=/data
+    - -s3.port=9000
+    - -s3.config=/etc/seaweedfs/s3.json
+    - -s3.autoCreateBucket=false
+    - -s3.allowDeleteBucketNotEmpty=false
+    - -admin.ui=false
+    - -webdav=false
+  ports:
+    - "${S3_API_HOST_PORT:-${MINIO_API_HOST_PORT:-9000}}:9000"
   environment:
-    MINIO_ROOT_USER: minioadmin
-    MINIO_ROOT_PASSWORD: minioadmin
+    AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}
+    AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-minioadmin}}
+    S3_BUCKET: wallpapers,example-bucket
   volumes:
-    - minio-data:/data
+    - seaweedfs-data:/data
+    - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+  networks:
+    default:
+      aliases:
+        - minio
 ```
+
+`infra/.env` supplies `S3_API_HOST_PORT=8002` for slot 0. Other slots use `8002 + 10 × slot`. The legacy host port variable and `minio` network alias keep existing generated environments working. Credentials still default to `minioadmin` for local development.
+
+The static S3 configuration grants anonymous reads only to `wallpapers` and `example-bucket`; credentials from the environment permit administration. Read [SeaweedFS setup](/docs/infrastructure/seaweedfs) before migrating existing data. Use the repository Compose file for the complete service definition, including readiness checks.
 
 ### NATS
 ```yaml
@@ -91,7 +112,7 @@ Persistent data storage:
 ```yaml
 volumes:
   postgres-data:
-  minio-data:
+  seaweedfs-data:
   opensearch-data:
   nats-data:
   lgtm-data:
@@ -141,9 +162,10 @@ POSTGRES_DB=wallpaperdb
 POSTGRES_USER=wallpaperdb
 POSTGRES_PASSWORD=wallpaperdb
 
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
+# SeaweedFS S3 API
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_API_HOST_PORT=8002
 
 # pgAdmin
 PGADMIN_DEFAULT_EMAIL=admin@example.com

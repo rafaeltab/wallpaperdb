@@ -31,7 +31,7 @@ Understanding when to use integration tests (in-process) vs E2E tests (container
 ┌──────────────────────────────────────┐
 │  Docker Containers                   │
 │  ├─ Postgres (port 55432)            │
-│  ├─ MinIO (port 55433)               │
+│  ├─ SeaweedFS (port 55433)            │
 │  └─ NATS (port 55434)                │
 └──────────────────────────────────────┘
 ```
@@ -75,7 +75,7 @@ Understanding when to use integration tests (in-process) vs E2E tests (container
 │  ├─ Your Application Container       │
 │  │   └─ connects via host.docker.internal
 │  ├─ Postgres Container               │
-│  ├─ MinIO Container                  │
+│  ├─ SeaweedFS Container               │
 │  └─ NATS Container                   │
 └──────────────────────────────────────┘
 ```
@@ -112,7 +112,7 @@ What are you testing?
 ├─ Database queries / transactions?
 │  └─ → Use Integration Tests
 │
-├─ Service integration (Postgres/MinIO/NATS)?
+├─ Service integration (Postgres/SeaweedFS/NATS)?
 │  └─ → Use Integration Tests
 │
 ├─ Docker image / deployment?

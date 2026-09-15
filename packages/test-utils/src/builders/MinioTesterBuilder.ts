@@ -8,8 +8,7 @@ import {
   type PutObjectCommandInput,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
-import { Wait } from 'testcontainers';
+import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { type AddMethodsType, BaseTesterBuilder, type TesterInstance } from '../framework.js';
 import { dockerStartSemaphore } from '../utils/semaphore.js';
 import type { CleanupTesterBuilder } from './CleanupTesterBuilder.js';
@@ -28,7 +27,7 @@ export interface MinioOptions {
 }
 
 class MinioBuilder {
-  image = 'minio/minio:latest';
+  image = 'chrislusf/seaweedfs:4.47';
   accessKey = 'minioadmin';
   secretKey = 'minioadmin';
   networkAlias = 'minio';
@@ -64,7 +63,7 @@ class MinioBuilder {
 }
 
 export interface MinioConfig {
-  container: StartedMinioContainer;
+  container: StartedTestContainer;
   endpoints: {
     networked: string;
     fromHost: string;
@@ -76,7 +75,8 @@ export interface MinioConfig {
 }
 
 /**
- * Helper class providing namespaced MinIO/S3 operations.
+ * Helper class providing namespaced S3 operations against SeaweedFS.
+ * The Minio names are retained for compatibility with existing test suites.
  * Manages a cached S3Client and provides object storage helpers.
  */
 class MinioHelpers {
@@ -287,7 +287,9 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
       }
 
       /**
-       * Configure and start a MinIO container.
+       * Configure and start a SeaweedFS S3 container.
+       * The withMinio name and default credentials/alias are retained for compatibility.
+       * Custom images must support the SeaweedFS mini command.
        *
        * @param configure - Optional configuration callback
        * @returns this for chaining
@@ -307,18 +309,37 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
         this.addSetupHook(async () => {
           // Use semaphore to limit concurrent container starts
           await dockerStartSemaphore.run(async () => {
-            logger.debug('Starting MinIO container...');
+            logger.debug('Starting SeaweedFS S3 container...');
 
-            let container = new MinioContainer(image);
-
-            container.withPassword(secretKey);
-            container.withUsername(accessKey);
-
-            // Longer timeout when using Docker networks - health check may be slower
-            container.withStartupTimeout(90000);
-            // @testcontainers/minio waits for the live endpoint, which can respond before
-            // MinIO is ready to serve S3 requests such as CreateBucket.
-            container.withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000));
+            let container = new GenericContainer(image)
+              .withEnvironment({
+                AWS_ACCESS_KEY_ID: accessKey,
+                AWS_SECRET_ACCESS_KEY: secretKey,
+              })
+              .withCommand([
+                'mini',
+                '-dir=/data',
+                '-ip=127.0.0.1',
+                '-ip.bind=0.0.0.0',
+                '-s3.port=9000',
+                '-s3.autoCreateBucket=false',
+                '-s3.allowDeleteBucketNotEmpty=false',
+                '-s3.port.iceberg=0',
+                '-s3.port.lance=0',
+                '-admin.ui=false',
+                '-webdav=false',
+                '-master.telemetry=false',
+              ])
+              .withExposedPorts(9000)
+              .withStartupTimeout(90000)
+              // The HTTP endpoint alone does not ensure that the filer and volumes
+              // are ready for S3 writes. Mini logs this after all components start.
+              .withWaitStrategy(
+                Wait.forAll([
+                  Wait.forLogMessage('All enabled components are running and ready to use:'),
+                  Wait.forHttp('/healthz', 9000),
+                ])
+              );
 
             const dockerNetwork = this.docker.network;
             if (dockerNetwork) {
@@ -327,11 +348,12 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
 
             const started = await container.start();
 
-            const ip = started.getIpAddress('bridge');
+            const ip = started.getIpAddress(dockerNetwork?.getName() ?? 'bridge');
+            const port = started.getMappedPort(9000);
             const endpoints = {
               networked: `http://${networkAlias}:9000`,
-              fromHost: `http://${started.getHost()}:${started.getPort()}`,
-              fromHostDockerInternal: `http://host.docker.internal:${started.getPort()}`,
+              fromHost: `http://${started.getHost()}:${port}`,
+              fromHostDockerInternal: `http://host.docker.internal:${port}`,
               directIp: `http://${ip}:9000`,
             };
 
@@ -349,7 +371,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
                 fromHostDockerInternal: endpoints.fromHostDockerInternal,
                 directIp: endpoints.directIp,
               },
-              'MinIO started'
+              'SeaweedFS S3 started'
             );
           });
 
@@ -372,7 +394,7 @@ export class MinioTesterBuilder extends BaseTesterBuilder<
 
         this.addDestroyHook(async () => {
           if (this._minioConfig) {
-            logger.debug('Stopping MinIO container...');
+            logger.debug('Stopping SeaweedFS S3 container...');
             await this._minioConfig.container.stop();
           }
         });

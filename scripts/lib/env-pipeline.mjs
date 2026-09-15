@@ -1,5 +1,20 @@
 import { randomBytes } from "node:crypto";
 
+// Match Compose's fallback precedence before filtering against .env.example keys.
+export function normalizeStorageEnvironment(environment) {
+	const normalized = { ...environment };
+	for (const [current, legacy] of [
+		["S3_ACCESS_KEY_ID", "MINIO_ROOT_USER"],
+		["S3_SECRET_ACCESS_KEY", "MINIO_ROOT_PASSWORD"],
+		["S3_API_HOST_PORT", "MINIO_API_HOST_PORT"],
+	]) {
+		if (!normalized[current] && normalized[legacy]) {
+			normalized[current] = normalized[legacy];
+		}
+	}
+	return normalized;
+}
+
 export function parseEnvValues(content) {
 	const values = Object.create(null);
 	for (const line of content.split("\n")) {

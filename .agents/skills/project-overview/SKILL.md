@@ -16,7 +16,7 @@ WallpaperDB is a wallpaper management system built as an event-driven microservi
 | HTTP servers | Fastify + TSyringe (dependency injection) |
 | Monorepo tooling | Turborepo + pnpm workspaces |
 | Database | PostgreSQL with Drizzle ORM |
-| Object storage | MinIO (S3-compatible) |
+| Object storage | SeaweedFS (S3-compatible; Docker image `chrislusf/seaweedfs:4.47`) |
 | Messaging | NATS JetStream |
 | Testing | Vitest + Testcontainers |
 | Observability | OpenTelemetry + Grafana LGTM stack |

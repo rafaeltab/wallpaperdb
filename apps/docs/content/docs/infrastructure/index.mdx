@@ -28,7 +28,7 @@ make infra-logs
 | Service | Purpose | Ports | Access |
 |---------|---------|-------|--------|
 | [PostgreSQL](/docs/infrastructure/postgresql) | Metadata database | 5432 | `postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb` |
-| [MinIO](/docs/infrastructure/minio) | S3-compatible object storage | 9000, 9001 | Console: http://localhost:9001 |
+| [SeaweedFS](/docs/infrastructure/seaweedfs) | S3-compatible object storage | 8002 (slot 0), 9000 (container) | S3 API: http://localhost:8002 |
 | [NATS](/docs/infrastructure/nats) | Event bus with JetStream | 4222, 8222 | `nats://localhost:4222`, Monitoring: http://localhost:8222 |
 | [Redis](/docs/infrastructure/redis) | Rate limiting cache | 6379 | `redis://localhost:6379` |
 
@@ -55,7 +55,7 @@ make infra-logs
    │           │          │          │
    │           │          │          │
 ┌──▼──────┐ ┌─▼─────┐ ┌─▼────┐  ┌─▼──────┐
-│PostgreSQL│MinIO   │ │NATS  │  │Redis   │
+│PostgreSQL│SeaweedFS│ │NATS  │  │Redis   │
 │         │        │ │      │  │        │
 │Metadata │Objects │ │Events│  │Cache   │
 └─────────┘└────────┘└──────┘  └────────┘
@@ -90,7 +90,7 @@ make infra-logs
    - Create `.env` from `.env.example` (if needed)
    - Pull all Docker images (~2 minutes first time)
    - Start all containers
-   - Initialize MinIO buckets
+   - Initialize SeaweedFS buckets
    - Set up NATS streams
 
 2. **Verify services are healthy:**
@@ -102,7 +102,7 @@ make infra-logs
 
 3. **Access services:**
    - Grafana: http://localhost:3000 (admin/admin)
-   - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+   - SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `minioadmin`)
    - NATS Monitoring: http://localhost:8222
 
 ## Data Persistence
@@ -119,12 +119,14 @@ docker volume inspect wallpaperdb-postgres-data
 
 **Volumes:**
 - `postgres-data` - PostgreSQL database
-- `minio-data` - Object storage
+- `seaweedfs-data` - Object storage
 - `opensearch-data` - Search indices
 - `nats-data` - Message queue persistence
 - `lgtm-data` - Grafana LGTM stack (metrics, logs, traces)
 - `pgadmin-data` - pgAdmin configuration
 - `redis-data` - Redis persistence (AOF)
+
+The old `minio-data` volume is retained separately. SeaweedFS cannot read that format; [copy and verify existing objects](/docs/infrastructure/seaweedfs#existing-minio-data) before retiring the source.
 
 **Reset all data:**
 ```bash
@@ -141,16 +143,17 @@ POSTGRES_DB=wallpaperdb
 POSTGRES_USER=wallpaperdb
 POSTGRES_PASSWORD=wallpaperdb
 
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin
+# SeaweedFS S3 API
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_API_HOST_PORT=8002
 
 # pgAdmin
 PGADMIN_DEFAULT_EMAIL=admin@example.com
 PGADMIN_DEFAULT_PASSWORD=admin
 ```
 
-Default values work out of the box for local development.
+Default values work out of the box for local development. Worktree setup assigns the S3 host port as `8002 + 10 × slot`. Existing `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_API_HOST_PORT` remain fallback settings; see [storage configuration](/docs/infrastructure/seaweedfs#configuration).
 
 ## Health Checks
 
@@ -181,11 +184,11 @@ infra/
 └── nats/init/          # Stream configurations
 ```
 
-**MinIO buckets** are created automatically by the `minio-init` service:
+**SeaweedFS buckets** are created automatically by `weed mini` through `S3_BUCKET`:
 - `wallpapers` - Main wallpaper storage
 - `example-bucket` - Example/test bucket
 
-Both are set to public download access for local development.
+Both allow anonymous object downloads for local development. Listing and writes require credentials. See [SeaweedFS](/docs/infrastructure/seaweedfs) for configuration and the migration procedure for existing MinIO data.
 
 ## Resource Usage
 
@@ -210,7 +213,7 @@ Typical resource consumption (all services running):
 ```bash
 # Find process using port
 lsof -i :5432  # PostgreSQL
-lsof -i :9000  # MinIO
+lsof -i :8002  # SeaweedFS S3 API (slot 0)
 
 # Kill process or change port in docker-compose.yml
 ```
@@ -261,7 +264,7 @@ Services connect to infrastructure via environment variables:
 // In service config
 const config = {
   databaseUrl: process.env.DATABASE_URL,  // PostgreSQL
-  minioEndpoint: process.env.MINIO_ENDPOINT,  // MinIO
+  s3Endpoint: process.env.S3_ENDPOINT,  // SeaweedFS
   natsUrl: process.env.NATS_URL,  // NATS
   redisHost: process.env.REDIS_HOST,  // Redis
   otelEndpoint: process.env.OTLP_ENDPOINT  // Grafana
@@ -286,7 +289,7 @@ See deployment documentation (future) for production setup.
 ## Next Steps
 
 - [PostgreSQL](/docs/infrastructure/postgresql) - Database setup and migrations
-- [MinIO](/docs/infrastructure/minio) - Object storage and bucket management
+- [SeaweedFS](/docs/infrastructure/seaweedfs) - Object storage and bucket management
 - [NATS](/docs/infrastructure/nats) - Event bus and JetStream
 - [Redis](/docs/infrastructure/redis) - Rate limiting cache
 - [Grafana](/docs/infrastructure/grafana) - Observability stack

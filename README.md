@@ -19,9 +19,9 @@ A wallpaper management system built as an event-driven microservices platform. U
 - **Turborepo + pnpm workspaces** — monorepo tooling that caches builds, tests, and linting across all services and shared packages; Turborepo task graphs express dependencies between workspaces
 - **Fastify + TSyringe** — HTTP server framework with constructor-based dependency injection used consistently across all backend services
 - **PostgreSQL + Drizzle ORM** — each service owns its own schema; Drizzle manages type-safe queries and schema migrations
-- **MinIO (S3-compatible object storage)** — wallpaper files are isolated per upload in object storage, decoupled from the database records that describe them
+- **SeaweedFS (S3-compatible object storage)** — wallpaper files are isolated per upload in object storage, decoupled from the database records that describe them
 - **NATS JetStream** — durable pub/sub messaging for event-driven coordination between services; JetStream provides at-least-once delivery guarantees
-- **Vitest + Testcontainers** — tests run against real infrastructure containers (PostgreSQL, MinIO, NATS) in unit, integration, and E2E tiers with distinct contracts at each tier
+- **Vitest + Testcontainers** — tests run against real infrastructure containers (PostgreSQL, SeaweedFS, NATS) in unit, integration, and E2E tiers with distinct contracts at each tier
 - **OpenTelemetry + Grafana LGTM** — traces and metrics exported via OTLP to a Grafana stack; all services share a common telemetry abstraction from `@wallpaperdb/core`
 - **Biome** — single tool for linting and formatting across the entire monorepo
 

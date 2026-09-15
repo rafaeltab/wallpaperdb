@@ -109,8 +109,10 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     setError(null);
     try {
       const updated = await mutation.mutateAsync(command);
+      // Navigation may unmount this editor; keep an existing owner cache current.
+      // Logout removes the query, which must never be recreated by a late response.
+      if (queryClient.getQueryState(key)) queryClient.setQueryData(key, updated);
       if (!live.current) return;
-      queryClient.setQueryData(key, updated);
       setEdit({ value: updated[field], baseValue: updated[field], baseVersion: updated.version, baseProfile: updated });
       setPhase('success');
       if (field === 'handle') { setServerDeadline(null); setNow(Date.now()); }

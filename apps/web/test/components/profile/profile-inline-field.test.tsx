@@ -152,4 +152,22 @@ describe('production inline profile fields', () => {
     expect(screen.getByRole('button', { name: 'Save display name' })).toBeEnabled();
   });
 
+  it.each([false, true])('handles a late save after navigation without a toast (owner removed: %s)', async (removed) => {
+    let resolve: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const { client, unmount } = renderField();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved late' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+    await flush();
+    unmount();
+    if (removed) client.removeQueries({ queryKey: profileQueryKey(profile.id) });
+    const updated = { ...profile, displayName: 'Saved late', version: 2 };
+    await act(async () => resolve?.(updated));
+    await flush();
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(removed ? undefined : updated);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
 });

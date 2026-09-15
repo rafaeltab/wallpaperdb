@@ -1,5 +1,5 @@
 import { useAuth } from '@clerk/react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Loader2, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -96,10 +96,12 @@ function DisplayNameSettings({
   tokenProvider: () => Promise<string | null>;
 }) {
   const queryClient = useQueryClient();
+  const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const mutation = useMutation({
+    mutationKey: profileQueryKey(profile.id),
     mutationFn: () =>
       userApi.updateProfile({
         displayName,
@@ -130,6 +132,7 @@ function DisplayNameSettings({
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (refreshing) return;
     setSaved(false);
     const normalized = displayName.replace(/\s+/gu, ' ').trim();
     if (!normalized) {
@@ -183,7 +186,7 @@ function DisplayNameSettings({
                 <AlertDescription>Display name saved.</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || refreshing}>
               {mutation.isPending && <Loader2 className="animate-spin" />}
               Save Display name
             </Button>
@@ -204,6 +207,7 @@ function HandleSettings({
   tokenProvider: () => Promise<string | null>;
 }) {
   const queryClient = useQueryClient();
+  const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
   const [handle, setHandle] = useState(profile.handle);
   const [saved, setSaved] = useState<'changed' | 'unchanged' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +225,7 @@ function HandleSettings({
   const nextHandleChangeAt =
     nextChangeTime > Date.now() ? new Date(nextChangeTime).toISOString() : null;
   const mutation = useMutation({
+    mutationKey: profileQueryKey(profile.id),
     mutationFn: (command: { handle: string; expectedVersion: number }) =>
       userApi.updateHandle({
         ...command,
@@ -262,6 +267,7 @@ function HandleSettings({
           className="space-y-5"
           onSubmit={(event) => {
             event.preventDefault();
+            if (refreshing) return;
             setSaved(null);
             setError(null);
             const aliases = aliasesToSchedule(profile, handle);
@@ -314,7 +320,7 @@ function HandleSettings({
             </Alert>
           )}
           <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={mutation.isPending || refreshing}>
               {mutation.isPending && <Loader2 className="animate-spin" />}
               Change Handle
             </Button>
@@ -344,6 +350,7 @@ function HandleSettings({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
+                disabled={refreshing}
                 onClick={() => {
                   if (pending)
                     mutation.mutate({

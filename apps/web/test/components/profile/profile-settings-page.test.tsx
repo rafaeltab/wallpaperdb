@@ -334,6 +334,76 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.expireAlias).not.toHaveBeenCalled();
   });
 
+  it('prevents alias refreshes and Profile writes from overwriting each other', async () => {
+    const initial = {
+      ...profile,
+      aliases: [
+        {
+          handle: 'retained-name',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: null,
+        },
+        {
+          handle: 'old-handle',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2099-09-16T12:00:00.000Z',
+        },
+      ],
+    };
+    let finishRefresh!: (value: Profile) => void;
+    let finishExpiry!: (value: Profile) => void;
+    vi.mocked(userApi.ensureProfile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRefresh = resolve;
+        })
+    );
+    vi.mocked(userApi.expireAlias).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishExpiry = resolve;
+        })
+    );
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
+
+    await waitFor(() => expect(userApi.ensureProfile).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Expire @old-handle now' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Schedule removal for @retained-name' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save Display name' })).toBeDisabled();
+    await act(async () => {
+      finishRefresh({ ...initial, version: 2 });
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' })
+    );
+    await waitFor(() => expect(userApi.expireAlias).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Refresh aliases' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
+    expect(userApi.ensureProfile).toHaveBeenCalledOnce();
+    const updated = {
+      ...initial,
+      version: 3,
+      aliases: initial.aliases.filter((alias) => alias.handle !== 'old-handle'),
+    };
+    await act(async () => {
+      finishExpiry(updated);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Refresh aliases' })).toBeEnabled()
+    );
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+  });
+
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
       new UserApiError('Profile has changed since it was last loaded', 409)

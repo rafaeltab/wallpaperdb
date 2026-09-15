@@ -1,4 +1,4 @@
-import { useIsFetching, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -31,11 +31,13 @@ export function ProfileAliasSettings({
 }) {
   const queryClient = useQueryClient();
   const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
+  const profileWritesPending = useIsMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [pending, setPending] = useState<AliasCommand | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [completed, setCompleted] = useState<AliasCommand | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const mutation = useMutation({
+    mutationKey: profileQueryKey(profile.id),
     mutationFn: ({ action, ...command }: AliasCommand) => {
       const options = { ...command, expectedProfileId: profile.id, tokenProvider };
       return action === 'expire'
@@ -57,6 +59,7 @@ export function ProfileAliasSettings({
       : mutation.error?.message);
 
   async function refresh() {
+    if (refreshing || profileWritesPending) return;
     mutation.reset();
     setCompleted(null);
     setRefreshError(null);
@@ -82,7 +85,12 @@ export function ProfileAliasSettings({
       <CardContent className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">Refresh to see the latest alias status.</p>
-          <Button variant="outline" size="sm" disabled={refreshing} onClick={() => void refresh()}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshing || profileWritesPending}
+            onClick={() => void refresh()}
+          >
             Refresh aliases
           </Button>
         </div>
@@ -122,7 +130,7 @@ export function ProfileAliasSettings({
                     variant="outline"
                     size="sm"
                     aria-label={`Schedule removal for @${alias.handle}`}
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || refreshing}
                     onClick={() => {
                       mutation.reset();
                       setRefreshError(null);
@@ -171,7 +179,7 @@ export function ProfileAliasSettings({
                     variant="outline"
                     size="sm"
                     aria-label={`Expire @${alias.handle} now`}
-                    disabled={mutation.isPending}
+                    disabled={mutation.isPending || refreshing}
                     onClick={() => {
                       mutation.reset();
                       setRefreshError(null);
@@ -218,6 +226,7 @@ export function ProfileAliasSettings({
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
+                disabled={refreshing}
                 variant={pending?.action === 'expire' ? 'destructive' : 'default'}
                 onClick={() => {
                   if (pending) mutation.mutate(pending);

@@ -135,6 +135,24 @@ describe('Profile commands', () => {
     });
   }
 
+  it('returns retained alias dates and the configured limit in every owner snapshot', async () => {
+    const before = (await request('user_1')).json();
+    expect(before).toMatchObject({ retainedAliasLimit: 3, aliases: [] });
+    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+    expect(changed.aliases).toEqual([{
+      handle: before.handle,
+      claimGeneration: expect.any(Number),
+      createdAt: changed.lastHandleChangedAt,
+      expiresAt: null,
+    }]);
+    const renamed = (await patch('user_1', 'New name', changed.version)).json();
+    expect(renamed).toMatchObject({ aliases: changed.aliases, retainedAliasLimit: 3 });
+    expect((await request('user_1')).json()).toEqual(renamed);
+    const events = await sql`select payload from outbox_events where subject = 'profile.updated'`;
+    expect(events).toHaveLength(2);
+    for (const { payload } of events) expect(payload.profile.aliases).toEqual(changed.aliases);
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

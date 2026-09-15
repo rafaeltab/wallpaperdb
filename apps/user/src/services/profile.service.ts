@@ -52,7 +52,13 @@ const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
 
 type ProfileReader = Pick<ReturnType<DatabaseConnection['getClient']>['db'], 'query'>;
 export interface OwnerProfile extends Profile {
-  aliases: Array<{ handle: string; claimGeneration: number }>;
+  aliases: Array<{
+    handle: string;
+    claimGeneration: number;
+    createdAt: string;
+    expiresAt: string | null;
+  }>;
+  retainedAliasLimit: number;
 }
 
 export class IdentityUnavailableError extends Error {}
@@ -181,7 +187,7 @@ export class ProfileService {
             aggregateId: userId,
             payload: event,
           });
-          return { ...profile, aliases: [] };
+          return { ...profile, aliases: [], retainedAliasLimit: this.config.profileRetainedAliasLimit };
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -313,10 +319,18 @@ export class ProfileService {
   private async ownerProfile(profile: Profile, reader: ProfileReader): Promise<OwnerProfile> {
     const aliases = await reader.query.handleClaims.findMany({
       where: and(eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'alias')),
-      columns: { handle: true, claimGeneration: true },
+      columns: { handle: true, claimGeneration: true, createdAt: true, expiresAt: true },
       orderBy: [handleClaims.createdAt, handleClaims.handle],
     });
-    return { ...profile, aliases };
+    return {
+      ...profile,
+      retainedAliasLimit: this.config.profileRetainedAliasLimit,
+      aliases: aliases.map((alias) => ({
+        ...alias,
+        createdAt: alias.createdAt.toISOString(),
+        expiresAt: alias.expiresAt?.toISOString() ?? null,
+      })),
+    };
   }
 
   async updateDisplayName(

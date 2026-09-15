@@ -1,0 +1,1 @@
+ALTER TABLE "handle_claims" ADD COLUMN "expires_at" timestamp with time zone;

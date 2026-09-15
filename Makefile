@@ -14,7 +14,7 @@
         tags-dev tags-build tags-start tags-test tags-test-watch tags-format tags-lint tags-check \
         tags-docker-build tags-docker-run tags-docker-stop tags-docker-logs \
         gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
-        web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
+        web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch web-auth-test web-auth-test-stress \
         web-e2e-test web-e2e-test-ui web-e2e-test-unit web-e2e-check-types \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
         docs-dev docs-build docs-start \
@@ -153,6 +153,8 @@ help:
 	@echo "  make web-preview    - Preview production build"
 	@echo "  make web-test       - Run web frontend tests"
 	@echo "  make web-test-watch - Run web frontend tests in watch mode"
+	@echo "  make web-auth-test  - Run only sign-in/sign-up form tests (AUTH_TEST_ARGS='...')"
+	@echo "  make web-auth-test-stress - Repeat auth tests with coverage (AUTH_TEST_RUNS=20)"
 	@echo "  make web-format     - Format web frontend code"
 	@echo "  make web-lint       - Lint web frontend code"
 	@echo "  make web-check      - Type check web frontend"
@@ -568,6 +570,25 @@ web-test:
 
 web-test-watch:
 	@pnpm --filter @wallpaperdb/web test:watch
+
+AUTH_TEST_RUNS ?= 20
+AUTH_TEST_ARGS ?=
+AUTH_TEST_FILES = test/components/sign-in-form.test.tsx test/components/sign-up-form.test.tsx
+
+web-auth-test:
+	@$(TURBO) run build --filter=@wallpaperdb/vitest-config
+	@pnpm --filter @wallpaperdb/web exec vitest run $(AUTH_TEST_FILES) $(AUTH_TEST_ARGS)
+
+web-auth-test-stress:
+	@case '$(AUTH_TEST_RUNS)' in ''|*[!0-9]*|0*) echo 'AUTH_TEST_RUNS must be a positive integer' >&2; exit 1;; esac
+	@$(TURBO) run build --filter=@wallpaperdb/vitest-config
+	@set -e; i=1; while [ $$i -le '$(AUTH_TEST_RUNS)' ]; do \
+		echo "Auth form test run $$i/$(AUTH_TEST_RUNS)"; \
+		pnpm --filter @wallpaperdb/web exec vitest run $(AUTH_TEST_FILES) \
+			--coverage --coverage.reportsDirectory=coverage/auth-stress \
+			--minWorkers=2 --maxWorkers=2; \
+		i=$$((i + 1)); \
+	done
 
 # React Muuri package commands
 react-muuri-build:

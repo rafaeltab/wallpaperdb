@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -8,7 +8,9 @@ vi.mock('@clerk/react', () => ({
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
-    <a href={to} {...props}>{children}</a>
+    <a href={to} {...props}>
+      {children}
+    </a>
   ),
   useNavigate: () => vi.fn(),
 }));
@@ -44,13 +46,14 @@ describe('SignUpForm', () => {
   }
 
   async function submitCredentials(email: string, password: string) {
+    // These tests cover submitted values, not per-keystroke behavior. Avoid a timer per character.
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: email } });
     fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: password } });
     await userEvent.click(screen.getByRole('button', { name: /^sign up$/i }));
   }
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     (useSignUp as Mock).mockReturnValue(mockSignUpReturn());
   });
 
@@ -76,79 +79,41 @@ describe('SignUpForm', () => {
   });
 
   it('shows loading state when sign-up is in progress', () => {
-    (useSignUp as Mock).mockReturnValue(
-      mockSignUpReturn({ fetchStatus: 'fetching' }),
-    );
+    (useSignUp as Mock).mockReturnValue(mockSignUpReturn({ fetchStatus: 'fetching' }));
 
     render(<SignUpForm />);
 
     expect(screen.getByRole('button', { name: /signing up/i })).toBeDisabled();
   });
 
-  it('displays error message when sign-up fails', async () => {
-    mockPassword.mockResolvedValue({ error: null });
+  it('displays error message when sign-up fails', () => {
     (useSignUp as Mock).mockReturnValue(
       mockSignUpReturn({
         errors: {
           global: [{ code: 'signup_rate_limit_exceeded', message: 'Too many sign up attempts' }],
           fields: { emailAddress: null, password: null },
         },
-        signUp: {
-          password: mockPassword,
-          finalize: mockFinalize,
-          sso: mockSso,
-          reset: mockReset,
-          status: 'complete',
-          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
-        },
-        fetchStatus: 'idle',
-      }),
+      })
     );
 
     render(<SignUpForm />);
 
-    await submitCredentials('taken@example.com', 'Password123!');
-
-    await waitFor(() => {
-      expect(mockPassword).toHaveBeenCalledWith({
-        emailAddress: 'taken@example.com',
-        password: 'Password123!',
-      });
-      expect(screen.getByRole('alert')).toHaveTextContent(/too many sign up attempts/i);
-    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/too many sign up attempts/i);
   });
 
-  it('displays field-level error message', async () => {
-    mockPassword.mockResolvedValue({ error: null });
+  it('displays field-level error message', () => {
     (useSignUp as Mock).mockReturnValue(
       mockSignUpReturn({
         errors: {
           global: null,
           fields: { emailAddress: { message: 'Invalid email format' }, password: null },
         },
-        signUp: {
-          password: mockPassword,
-          finalize: mockFinalize,
-          sso: mockSso,
-          reset: mockReset,
-          status: 'complete',
-          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
-        },
-        fetchStatus: 'idle',
-      }),
+      })
     );
 
     render(<SignUpForm />);
 
-    await submitCredentials('bad@example.com', 'Password123!');
-
-    await waitFor(() => {
-      expect(mockPassword).toHaveBeenCalledWith({
-        emailAddress: 'bad@example.com',
-        password: 'Password123!',
-      });
-      expect(screen.getByRole('alert')).toHaveTextContent(/invalid email format/i);
-    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/invalid email format/i);
   });
 
   it('calls signUp.finalize after successful sign-up', async () => {
@@ -159,23 +124,33 @@ describe('SignUpForm', () => {
 
     await submitCredentials('new@example.com', 'Password123!');
 
+    expect(mockPassword).toHaveBeenCalledExactlyOnceWith({
+      emailAddress: 'new@example.com',
+      password: 'Password123!',
+    });
     await waitFor(() => {
       expect(mockFinalize).toHaveBeenCalledWith(
-        expect.objectContaining({ navigate: expect.any(Function) }),
+        expect.objectContaining({ navigate: expect.any(Function) })
       );
     });
   });
 
   it('does not call finalize when password returns an error', async () => {
-    mockPassword.mockResolvedValue({ error: { code: 'form_password_pwned' } });
+    const passwordResult = Promise.resolve({ error: { code: 'form_password_pwned' } });
+    mockPassword.mockReturnValue(passwordResult);
     mockFinalize.mockResolvedValue(undefined);
 
     render(<SignUpForm />);
 
     await submitCredentials('new@example.com', 'Password123!');
 
-    await waitFor(() => {
-      expect(mockPassword).toHaveBeenCalled();
+    expect(mockPassword).toHaveBeenCalledExactlyOnceWith({
+      emailAddress: 'new@example.com',
+      password: 'Password123!',
+    });
+    // Settle the password response and React effects before asserting no finalization.
+    await act(async () => {
+      await passwordResult;
     });
     expect(mockFinalize).not.toHaveBeenCalled();
   });
@@ -190,9 +165,7 @@ describe('SignUpForm', () => {
 
     await waitFor(() => {
       expect(mockReset).toHaveBeenCalled();
-      expect(mockSso).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_google' }),
-      );
+      expect(mockSso).toHaveBeenCalledWith(expect.objectContaining({ strategy: 'oauth_google' }));
     });
   });
 
@@ -206,9 +179,7 @@ describe('SignUpForm', () => {
 
     await waitFor(() => {
       expect(mockReset).toHaveBeenCalled();
-      expect(mockSso).toHaveBeenCalledWith(
-        expect.objectContaining({ strategy: 'oauth_github' }),
-      );
+      expect(mockSso).toHaveBeenCalledWith(expect.objectContaining({ strategy: 'oauth_github' }));
     });
   });
 
@@ -227,7 +198,7 @@ describe('SignUpForm', () => {
           verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
         },
         fetchStatus: 'idle',
-      }),
+      })
     );
 
     render(<SignUpForm />);
@@ -244,66 +215,45 @@ describe('SignUpForm', () => {
   it('displays verification error from fields when verification code fails', async () => {
     mockPassword.mockResolvedValue({ error: null });
     mockSendEmailCode.mockResolvedValue(undefined);
+    const verificationResult = Promise.resolve({ error: { code: 'form_code_incorrect' } });
+    mockVerifyEmailCode.mockReturnValue(verificationResult);
 
-    (useSignUp as Mock).mockReturnValue(
-      mockSignUpReturn({
-        errors: {
-          global: null,
-          fields: { code: { message: 'The verification code you entered is incorrect.' } },
-        },
-        signUp: {
-          password: mockPassword,
-          finalize: mockFinalize,
-          sso: mockSso,
-          reset: mockReset,
-          status: 'missing_requirements',
-          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
-        },
-        fetchStatus: 'idle',
-      }),
-    );
-
-    (useSignUp as Mock).mockImplementation(() => {
-      const callCount = (useSignUp as Mock).mock.calls.length;
-      if (callCount <= 1) {
-        return mockSignUpReturn({
-          signUp: {
-            password: mockPassword,
-            finalize: mockFinalize,
-            sso: mockSso,
-            reset: mockReset,
-            status: 'complete',
-            verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
-          },
-          errors: null,
-          fetchStatus: 'idle',
-        });
-      }
-      return mockSignUpReturn({
-        errors: {
-          global: null,
-          fields: { code: { message: 'The verification code you entered is incorrect.' } },
-        },
-        signUp: {
-          password: mockPassword,
-          finalize: mockFinalize,
-          sso: mockSso,
-          reset: mockReset,
-          status: 'missing_requirements',
-          verifications: { sendEmailCode: mockSendEmailCode, verifyEmailCode: mockVerifyEmailCode },
-        },
-        fetchStatus: 'idle',
-      });
+    const signUpState = mockSignUpReturn({
+      signUp: {
+        ...mockSignUpReturn().signUp,
+        status: 'missing_requirements',
+      },
     });
+    (useSignUp as Mock).mockReturnValue(signUpState);
 
-    render(<SignUpForm />);
+    const { rerender } = render(<SignUpForm />);
 
     await submitCredentials('new@example.com', 'Password123!');
 
-    await waitFor(() => {
-      expect(screen.getByText(/verify your email/i)).toBeInTheDocument();
+    const codeInput = await screen.findByLabelText(/verification code/i);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+    await userEvent.click(screen.getByRole('button', { name: /^verify email$/i }));
+
+    expect(mockVerifyEmailCode).toHaveBeenCalledExactlyOnceWith({ code: '123456' });
+    await act(async () => {
+      await verificationResult;
     });
 
-    expect(screen.getByRole('alert')).toHaveTextContent(/verification code/i);
+    // Clerk publishes errors through the hook after verification settles.
+    (useSignUp as Mock).mockReturnValue({
+      ...signUpState,
+      errors: {
+        global: null,
+        fields: { code: { message: 'The verification code you entered is incorrect.' } },
+      },
+    });
+    rerender(<SignUpForm />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The verification code you entered is incorrect.'
+    );
+    expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    expect(mockFinalize).not.toHaveBeenCalled();
   });
 });

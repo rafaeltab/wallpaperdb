@@ -5,6 +5,7 @@ import { Loader2, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
+import { ProfileBiographySettings } from '@/components/profile/profile-biography-settings';
 import { ProfilePictureSettings } from '@/components/profile/profile-picture-settings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -198,6 +199,7 @@ function DisplayNameSettings({
           </form>
         </CardContent>
       </Card>
+      <ProfileBiographySettings profile={profile} tokenProvider={tokenProvider} />
       <HandleSettings profile={profile} tokenProvider={tokenProvider} />
       <ProfileAliasSettings profile={profile} tokenProvider={tokenProvider} />
     </div>

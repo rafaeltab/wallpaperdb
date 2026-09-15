@@ -404,6 +404,34 @@ describe('ProfileSettingsPage', () => {
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
   });
 
+  it('preserves unsaved identity drafts when refreshing aliases loads changes from another session', async () => {
+    const updated = {
+      ...profile,
+      displayName: 'Remote name',
+      handle: 'remote-handle',
+      version: 2,
+      aliases: [],
+    };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
+    const { queryClient } = renderPage();
+    const user = userEvent.setup();
+    const nameInput = screen.getByRole('textbox', { name: 'Display name' });
+    const handleInput = screen.getByRole('textbox', { name: 'Handle' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'My name draft');
+    await user.clear(handleInput);
+    await user.type(handleInput, 'my-handle-draft');
+    await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
+
+    await waitFor(() =>
+      expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated)
+    );
+    expect(nameInput).toHaveValue('My name draft');
+    expect(handleInput).toHaveValue('my-handle-draft');
+    expect(userApi.updateProfile).not.toHaveBeenCalled();
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+  });
+
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
       new UserApiError('Profile has changed since it was last loaded', 409)

@@ -2,7 +2,7 @@ import { useAuth } from '@clerk/react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Loader2, UserRound } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -97,7 +97,7 @@ function DisplayNameSettings({
 }) {
   const queryClient = useQueryClient();
   const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
-  const [displayName, setDisplayName] = useState(profile.displayName);
+  const [displayName, setDisplayName] = useProfileDraft(profile.displayName);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const mutation = useMutation({
@@ -111,6 +111,7 @@ function DisplayNameSettings({
       }),
     onSuccess: (updated) => {
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
+      setDisplayName(updated.displayName);
       setError(null);
       setSaved(true);
     },
@@ -125,10 +126,6 @@ function DisplayNameSettings({
       }
     },
   });
-
-  useEffect(() => {
-    setDisplayName(profile.displayName);
-  }, [profile.displayName]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -208,7 +205,7 @@ function HandleSettings({
 }) {
   const queryClient = useQueryClient();
   const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
-  const [handle, setHandle] = useState(profile.handle);
+  const [handle, setHandle] = useProfileDraft(profile.handle);
   const [saved, setSaved] = useState<'changed' | 'unchanged' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [serverNextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
@@ -250,8 +247,6 @@ function HandleSettings({
       }
     },
   });
-
-  useEffect(() => setHandle(profile.handle), [profile.handle]);
 
   return (
     <Card className="mt-6">
@@ -367,6 +362,19 @@ function HandleSettings({
       </CardContent>
     </Card>
   );
+}
+
+function useProfileDraft(value: string) {
+  const [draft, setDraft] = useState(value);
+  const previousValue = useRef(value);
+
+  useEffect(() => {
+    const previous = previousValue.current;
+    previousValue.current = value;
+    setDraft((current) => (current === previous ? value : current));
+  }, [value]);
+
+  return [draft, setDraft] as const;
 }
 
 function aliasesToSchedule(profile: Profile, requestedHandle: string): string[] {

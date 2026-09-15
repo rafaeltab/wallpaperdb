@@ -71,4 +71,26 @@ describe('production inline profile fields', () => {
     expect(userApi.updateProfile).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps a dirty draft at its original version until an explicit conflict refresh rebases it', async () => {
+    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(new UserApiError('Changed elsewhere', 409, { type: 'https://example.test/profile-version-conflict' }));
+    vi.mocked(userApi.ensureProfile).mockResolvedValue({ ...profile, displayName: 'Remote name', version: 3 });
+    const { client } = renderField();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    const input = screen.getByRole('textbox', { name: 'Display name' });
+    fireEvent.change(input, { target: { value: 'My draft' } });
+    act(() => { client.setQueryData(profileQueryKey(profile.id), { ...profile, displayName: 'Other name', version: 2 }); });
+    await flush();
+    expect(input).toHaveValue('My draft');
+    fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+    await flush();
+    expect(userApi.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh profile' }));
+    await flush();
+    expect(input).toHaveValue('My draft');
+    vi.mocked(userApi.updateProfile).mockResolvedValue({ ...profile, displayName: 'My draft', version: 4 });
+    fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+    await flush();
+    expect(userApi.updateProfile).toHaveBeenLastCalledWith(expect.objectContaining({ displayName: 'My draft', expectedVersion: 3 }));
+  });
+
 });

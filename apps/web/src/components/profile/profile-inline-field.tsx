@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileActionButton } from './profile-action-button';
-import { type Profile, userApi } from '@/lib/api/user';
+import { Button } from '@/components/ui/button';
+import { type Profile, userApi, UserApiError } from '@/lib/api/user';
 import './profile-edit-feedback.css';
 
 type Field = 'displayName' | 'handle' | 'biographyMarkdown';
@@ -25,6 +26,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const [edit, setEdit] = useState<Edit | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState(false);
   const container = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -42,11 +44,33 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     return () => { live.current = false; clearTimeout(timer.current); };
   }, []);
   useEffect(() => { if (edit) input.current?.focus(); }, [Boolean(edit)]);
+  useEffect(() => {
+    setEdit((current) => current && current.value === current.baseValue ? { value: profile[field], baseValue: profile[field], baseVersion: profile.version } : current);
+  }, [field, profile[field], profile.version]);
+  async function refresh() {
+    if (pending.current || queryClient.isFetching({ queryKey: key }) || queryClient.isMutating({ mutationKey: key })) return;
+    try {
+      await queryClient.refetchQueries({ queryKey: key, exact: true }, { throwOnError: true });
+      if (!live.current) return;
+      const updated = queryClient.getQueryData<Profile>(key);
+      if (!updated) throw new Error('Profile unavailable');
+      setEdit((current) => current ? { value: current.value === current.baseValue ? updated[field] : current.value, baseValue: updated[field], baseVersion: updated.version } : null);
+      setConflict(false);
+      setError(null);
+      clearTimeout(timer.current);
+      setPhase('idle');
+    } catch {
+      if (!live.current) return;
+      setError('Unable to refresh profile. Try again.');
+      toast.error('Unable to refresh profile');
+    }
+  }
   function finish() {
     const restore = container.current?.contains(document.activeElement);
     setEdit(null);
     setPhase('idle');
     setError(null);
+    setConflict(false);
     clearTimeout(timer.current);
     queueMicrotask(() => { if (live.current && restore) opener.current?.focus(); });
   }
@@ -67,7 +91,9 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       if (!live.current) return;
       pending.current = false;
       const message = cause instanceof Error ? cause.message : `Unable to save ${label}.`;
-      setError(message);
+      const versionConflict = cause instanceof UserApiError && Boolean(cause.type?.endsWith('/profile-version-conflict'));
+      setConflict(versionConflict);
+      setError(versionConflict ? 'Your profile changed elsewhere. Refresh profile to keep your draft and try again.' : message);
       setPhase('error');
       toast.error(`Unable to save ${label}`, { description: message });
       timer.current = setTimeout(() => setPhase('idle'), 1600);
@@ -89,6 +115,6 @@ function InlineField({ field, profile, tokenProvider }: Props) {
         <ProfileActionButton ref={opener} label={`Edit ${label}`} textBaseline buttonClassName="size-6" onClick={() => setEdit({ value: profile[field], baseValue: profile[field], baseVersion: profile.version })}><Pencil className="size-[1ex]" /></ProfileActionButton>
       </>}
     </form>
-    {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+    {error && <div role="alert" className="mt-2 text-sm text-destructive">{error}{conflict && <Button type="button" variant="outline" size="sm" className="ml-2" disabled={refreshing || writing || locked} onClick={() => void refresh()}>Refresh profile</Button>}</div>}
   </div>;
 }

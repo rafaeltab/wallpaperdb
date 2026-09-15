@@ -78,6 +78,28 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('rolls back picture activation and retirement when the event cannot commit', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, original.version)).json();
+    await sql.unsafe(`create function reject_picture_event() returns trigger language plpgsql as $$ begin if NEW.payload->'change'->>'type' = 'picture-changed' then raise exception 'picture event rejected'; end if; return NEW; end $$`);
+    await sql.unsafe(`create trigger reject_picture_event before insert on outbox_events for each row execute function reject_picture_event()`);
+    try {
+      expect((await upload(image, uploaded.version)).statusCode).toBe(500);
+      expect((await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: uploaded.version } })).statusCode).toBe(500);
+      expect((await ensure()).json()).toEqual(uploaded);
+      const rows = await sql`select * from profile_picture_assets order by created_at`;
+      expect(rows.map((row) => row.state)).toEqual(['active', 'staged']);
+      expect(rows[0].retired_at).toBeNull();
+      expect(rows[0].expires_at).toBeNull();
+      for (const asset of rows) expect((await storage.send(new GetObjectCommand({ Bucket: asset.storage_bucket, Key: asset.storage_key }))).ContentLength).toBeGreaterThan(0);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(1);
+    } finally {
+      await sql.unsafe('drop trigger reject_picture_event on outbox_events');
+      await sql.unsafe('drop function reject_picture_event()');
+    }
+  });
+
   it('leaves a known private candidate on storage failure and keeps the current picture authoritative', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

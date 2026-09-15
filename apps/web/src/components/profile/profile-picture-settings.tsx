@@ -1,6 +1,7 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
@@ -42,6 +43,26 @@ export function ProfilePictureSettings({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!selected) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selected.picture);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selected]);
+  const busy = () =>
+    queryClient.isFetching({ queryKey: profileQueryKey(profile.id) }) > 0 ||
+    queryClient.isMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
   const importing =
     profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
@@ -57,11 +78,21 @@ export function ProfilePictureSettings({
         ? userApi.uploadPicture({ ...options, picture: command.picture })
         : userApi.removePicture(options);
     },
-    onSuccess: (updated) => {
-      queryClient.setQueryData(profileQueryKey(profile.id), updated);
+    onSuccess: (updated, command) => {
+      if (queryClient.getQueryState(profileQueryKey(profile.id)))
+        queryClient.setQueryData(profileQueryKey(profile.id), updated);
+      if (!mounted.current) return;
       setSelected(null);
       if (input.current) input.current.value = '';
       setError(null);
+      setOpen(false);
+      toast.success(
+        command.action === 'remove' ? 'Generated avatar selected' : 'Profile picture saved'
+      );
+    },
+    onError: (cause) => {
+      if (mounted.current)
+        toast.error('Could not save profile picture', { description: cause.message });
     },
   });
   const feedback =
@@ -72,7 +103,7 @@ export function ProfilePictureSettings({
       : mutation.error?.message);
 
   async function refresh() {
-    if (refreshing || writing) return;
+    if (busy()) return;
     mutation.reset();
     setError(null);
     setSelected(null);
@@ -92,7 +123,14 @@ export function ProfilePictureSettings({
       <ProfilePicture profile={profile} />
       <ProfileDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            setSelected(null);
+            mutation.reset();
+            setError(null);
+          }
+        }}
         title="Profile picture"
         description="Your picture appears on your profile and wallpaper contributions."
         busy={writing}
@@ -107,7 +145,15 @@ export function ProfilePictureSettings({
         }
       >
         <div className="space-y-5">
-          <ProfilePicture profile={profile} />
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt="Selected avatar"
+              className="size-28 rounded-xl object-cover"
+            />
+          ) : (
+            <ProfilePicture profile={profile} />
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -127,16 +173,20 @@ export function ProfilePictureSettings({
             className="space-y-4"
             onSubmit={(event) => {
               event.preventDefault();
-              if (selected && !refreshing && !writing)
-                mutation.mutate({ ...selected, action: 'upload' });
+              if (selected && !busy()) mutation.mutate({ ...selected, action: 'upload' });
             }}
           >
             <Field>
-              <FieldLabel htmlFor="profile-picture">Choose picture</FieldLabel>
+              <FieldLabel className="sr-only" htmlFor="profile-picture">
+                Choose picture
+              </FieldLabel>
               <Input
                 ref={input}
                 id="profile-picture"
                 type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-describedby="picture-limits"
                 accept="image/jpeg,image/png,image/webp"
                 disabled={refreshing || writing}
                 onChange={(event) => {
@@ -159,7 +209,20 @@ export function ProfilePictureSettings({
                   setSelected(picture ? { picture, expectedVersion: profile.version } : null);
                 }}
               />
-              <FieldDescription>
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={refreshing || writing}
+                  onClick={() => input.current?.click()}
+                >
+                  Choose picture
+                </Button>
+                <span className="min-w-0 break-all text-sm text-muted-foreground">
+                  {selected?.picture.name ?? 'No picture selected'}
+                </span>
+              </div>
+              <FieldDescription id="picture-limits">
                 JPEG, PNG, or WebP. Up to {formatFileSize(maxBytes)}
                 {profile.pictureUploadLimits
                   ? ` and ${(profile.pictureUploadLimits.maxPixels / 1000000).toLocaleString(undefined, { maximumFractionDigits: 6 })} megapixels`
@@ -167,27 +230,30 @@ export function ProfilePictureSettings({
                 . Animated images are not supported.
               </FieldDescription>
             </Field>
-            <Button type="submit" disabled={!selected || refreshing || writing}>
-              {mutation.isPending
-                ? 'Saving picture…'
-                : profile.pictureAssetId
-                  ? 'Replace picture'
-                  : 'Upload picture'}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={!selected || refreshing || writing}>
+                {mutation.isPending
+                  ? 'Saving picture…'
+                  : profile.pictureAssetId
+                    ? 'Replace picture'
+                    : 'Upload picture'}
+              </Button>
+              {(profile.pictureAssetId || importing) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={refreshing || writing}
+                  onClick={() => {
+                    mutation.reset();
+                    setRemoveVersion(profile.version);
+                    setDialogOpen(true);
+                  }}
+                >
+                  {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
+                </Button>
+              )}
+            </div>
           </form>
-          {(profile.pictureAssetId || importing) && (
-            <Button
-              variant="outline"
-              disabled={refreshing || writing}
-              onClick={() => {
-                mutation.reset();
-                setRemoveVersion(profile.version);
-                setDialogOpen(true);
-              }}
-            >
-              {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
-            </Button>
-          )}
           <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -202,7 +268,7 @@ export function ProfilePictureSettings({
                 <AlertDialogAction
                   disabled={refreshing || writing}
                   onClick={() => {
-                    if (removeVersion !== null && !refreshing && !writing)
+                    if (removeVersion !== null && !busy())
                       mutation.mutate({ action: 'remove', expectedVersion: removeVersion });
                   }}
                 >
@@ -214,15 +280,6 @@ export function ProfilePictureSettings({
           {feedback && (
             <Alert variant="destructive">
               <AlertDescription>{feedback}</AlertDescription>
-            </Alert>
-          )}
-          {mutation.isSuccess && (
-            <Alert>
-              <AlertDescription>
-                {mutation.variables?.action === 'remove'
-                  ? 'Generated avatar selected. Public views may take a moment to update.'
-                  : 'Picture saved. Public views may take a moment to update.'}
-              </AlertDescription>
             </Alert>
           )}
         </div>

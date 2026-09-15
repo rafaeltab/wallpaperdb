@@ -2,12 +2,14 @@ import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/api/user', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api/user')>();
   return {
@@ -55,6 +57,7 @@ async function renderPage(initial = profile, openPicture = true) {
 
 describe('Profile picture settings', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
@@ -79,6 +82,23 @@ describe('Profile picture settings', () => {
     expect(edit).toHaveFocus();
   });
 
+  it('keeps the selected picture after failure and closes the dialog after a successful retry', async () => {
+    const updated = { ...profile, pictureAssetId: 'saved-picture', version: 2 };
+    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new Error('Upload unavailable')).mockResolvedValueOnce(updated);
+    await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Selected avatar' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Upload unavailable');
+    expect(screen.getByText('portrait.png')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute('src', '/media/profile-pictures/saved-picture');
+    expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
+  });
+
   it('keeps owner refreshes from racing a picture write and reports a failed refresh', async () => {
     let finishUpload: ((value: Profile) => void) | undefined;
     vi.mocked(userApi.uploadPicture).mockImplementation(
@@ -100,6 +120,7 @@ describe('Profile picture settings', () => {
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
     const updated = { ...profile, pictureAssetId: 'picture_new', version: 2 };
     await act(async () => finishUpload?.(updated));
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
     await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Unable to refresh your Profile. Try again.'
@@ -231,8 +252,6 @@ describe('Profile picture settings', () => {
       'src',
       '/media/profile-pictures/picture_new'
     );
-    expect(
-      screen.getByText('Picture saved. Public views may take a moment to update.')
-    ).toBeInTheDocument();
+    expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
   });
 });

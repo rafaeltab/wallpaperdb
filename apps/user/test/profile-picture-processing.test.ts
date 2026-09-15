@@ -5,6 +5,11 @@ import { processProfilePicture } from '../src/services/profile-picture-processin
 const limits = { maxBytes: 5 * 1024 * 1024, maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 };
 
 describe('Profile picture processing', () => {
+  it('rejects oversized encoded pictures before decoding', async () => {
+    const input = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } }).png().toBuffer();
+    await expect(processProfilePicture(input, { ...limits, maxBytes: input.length - 1 })).rejects.toThrow('Picture exceeds the upload byte limit');
+  });
+
   it.each(['jpeg', 'png', 'webp'] as const)('decodes %s and emits normalized WebP without source metadata', async (format) => {
     const input = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } })
       .withMetadata({ orientation: 6 }).toFormat(format).toBuffer();

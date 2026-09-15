@@ -1,5 +1,7 @@
 import sharp from 'sharp';
 
+export class ProfilePictureTooLargeError extends Error {}
+
 export interface PictureLimits {
   maxBytes: number;
   maxPixels: number;
@@ -17,6 +19,7 @@ export async function processProfilePicture(
   input: Buffer,
   limits: PictureLimits
 ): Promise<ProcessedPicture> {
+  if (input.length > limits.maxBytes) throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
   const result = await sharp(input, {
     limitInputPixels: limits.maxPixels,
     failOn: 'warning',

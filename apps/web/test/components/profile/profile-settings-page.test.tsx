@@ -264,15 +264,30 @@ describe('ProfileSettingsPage', () => {
     renderPage({
       ...profile,
       retainedAliasLimit: 0,
-      aliases: [{ handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
-      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({ handle, eligibleUntil: '2099-10-15T12:00:00.000Z', unavailableReason: 'alias-limit' as const })),
+      aliases: [
+        {
+          handle: 'expiring-name',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2099-09-16T12:00:00.000Z',
+        },
+      ],
+      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({
+        handle,
+        eligibleUntil: '2099-10-15T12:00:00.000Z',
+        unavailableReason: 'alias-limit' as const,
+      })),
     });
     const user = userEvent.setup();
     const keep = screen.getByRole('button', { name: 'Keep alias @expiring-name' });
     const reactivate = screen.getByRole('button', { name: 'Reactivate @released-name' });
     expect(keep).toBeDisabled();
     expect(reactivate).toBeDisabled();
-    expect(screen.getAllByText('Your retained-alias limit is full. Schedule an alias for removal to free a slot.')).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        'Your retained-alias limit is full. Schedule an alias for removal to free a slot.'
+      )
+    ).toHaveLength(2);
     await user.click(keep);
     await user.click(reactivate);
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
@@ -282,14 +297,85 @@ describe('ProfileSettingsPage', () => {
   it('disables stale history entries whose reactivation deadline has passed', () => {
     renderPage({
       ...profile,
-      aliases: [{ handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
-      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({ handle, eligibleUntil: '2000-01-01T12:00:00.000Z', unavailableReason: null })),
+      aliases: [
+        {
+          handle: 'expiring-name',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2099-09-16T12:00:00.000Z',
+        },
+      ],
+      historicalHandles: ['expiring-name', 'released-name'].map((handle) => ({
+        handle,
+        eligibleUntil: '2000-01-01T12:00:00.000Z',
+        unavailableReason: null,
+      })),
     });
 
     expect(screen.getByRole('button', { name: 'Keep alias @expiring-name' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Reactivate @released-name' })).toBeDisabled();
-    expect(screen.getAllByText('This Handle is no longer in your 30-day history. Refresh aliases.')).toHaveLength(2);
+    expect(
+      screen.getAllByText('This Handle is no longer in your 30-day history. Refresh aliases.')
+    ).toHaveLength(2);
     expect(userApi.reactivateAlias).not.toHaveBeenCalled();
+  });
+
+  it('preserves the confirmed version after a reactivation conflict and refreshes eligibility', async () => {
+    const initial: Profile = {
+      ...profile,
+      aliases: [],
+      historicalHandles: [
+        {
+          handle: 'old-handle',
+          eligibleUntil: '2099-10-15T12:00:00.000Z',
+          unavailableReason: null,
+        },
+      ],
+    };
+    const changed = { ...initial, version: 2 };
+    const refreshed: Profile = {
+      ...changed,
+      historicalHandles: [
+        {
+          handle: 'old-handle',
+          eligibleUntil: '2099-10-15T12:00:00.000Z',
+          unavailableReason: 'claimed',
+        },
+      ],
+    };
+    vi.mocked(userApi.reactivateAlias).mockRejectedValue(
+      new UserApiError('Profile changed.', 409, {
+        type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+      })
+    );
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(refreshed);
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Reactivate @old-handle' }));
+    await act(async () => {
+      queryClient.setQueryData(profileQueryKey(profile.id), changed);
+    });
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Reactivate alias' })
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your Profile changed elsewhere. Refresh aliases before reactivating again.'
+    );
+    expect(userApi.reactivateAlias).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedVersion: 1 })
+    );
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(changed);
+    expect(screen.queryByRole('list', { name: 'Retained aliases' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Refresh aliases' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Reactivate @old-handle' })).toBeDisabled()
+    );
+    expect(screen.getByText('Another Profile has claimed this Handle.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed);
   });
 
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {

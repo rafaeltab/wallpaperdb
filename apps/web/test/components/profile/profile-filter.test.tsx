@@ -57,4 +57,20 @@ describe('Profile wallpaper filter', () => {
     expect(onChange).toHaveBeenCalledWith('user_Ada');
     await waitFor(() => expect(screen.getByRole('searchbox', { name: 'Profile' })).toHaveValue(''));
   });
+
+  it('restores the selected Profile from its saved ID and lets the reader clear the filter', async () => {
+    mockFetch.mockResolvedValue(response({ profile: { ...ada, biographyMarkdown: '' } }));
+    const user = userEvent.setup();
+    const { onChange } = renderFilter(ada.id);
+
+    expect(await screen.findByText('@ada-lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      operationName: 'GetProfile',
+      variables: { id: 'user_Ada' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
+    expect(onChange).toHaveBeenCalledWith(undefined);
+  });
 });

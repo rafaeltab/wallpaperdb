@@ -4,13 +4,14 @@ import { ProfilePicture } from '@/components/profile/profile-picture';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { searchProfiles } from '@/lib/graphql/profiles';
+import { profileByIdQueryOptions } from '@/lib/profile-query-options';
 
 interface ProfileFilterProps {
   profileId?: string;
   onChange: (profileId?: string) => void;
 }
 
-export function ProfileFilter({ onChange }: ProfileFilterProps) {
+export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
   const inputId = useId();
   const [input, setInput] = useState('');
   const query = input.trim().toLowerCase();
@@ -24,9 +25,30 @@ export function ProfileFilter({ onChange }: ProfileFilterProps) {
     queryFn: () => searchProfiles(debouncedQuery),
     enabled: Boolean(debouncedQuery),
   });
+  const selected = useQuery({
+    ...profileByIdQueryOptions(profileId ?? ''),
+    enabled: Boolean(profileId),
+  });
 
   return (
     <div className="flex max-w-lg flex-col gap-2">
+      {profileId ? (
+        <div className="flex items-center gap-3 rounded-lg border bg-background p-3">
+          {selected.data ? (
+            <>
+              <ProfilePicture profile={selected.data} className="flex size-10 shrink-0 items-center justify-center rounded-full object-cover text-sm font-semibold text-white" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{selected.data.displayName}</span>
+                <span className="block truncate text-xs text-muted-foreground">@{selected.data.handle}</span>
+              </span>
+            </>
+          ) : <span className="flex-1 text-sm text-muted-foreground">Loading selected Profile…</span>}
+          <Button type="button" variant="outline" size="sm" aria-label="Clear Profile filter" onClick={() => {
+            setInput('');
+            onChange(undefined);
+          }}>Clear</Button>
+        </div>
+      ) : null}
       <div>
         <label htmlFor={inputId} className="text-sm font-medium">Profile</label>
         <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">

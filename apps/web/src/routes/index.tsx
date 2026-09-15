@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { AlertCircle, ArrowLeft, ImageOff, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBrowseFilterPanel } from '@/components/browse-filter-panel-context';
+import { ProfileFilter } from '@/components/profile/profile-filter';
 import { WallpaperGridSkeleton } from '@/components/grid';
 import { LoadMoreTrigger } from '@/components/LoadMoreTrigger';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ import {
   type BrowseAspectRatioPresetValue,
   type BrowseAspectRatioValue,
   type BrowseFormatValue,
+  type BrowseSearchState,
 } from '@/lib/browse-filters';
 
 const COLOR_INPUT_DEBOUNCE_MS = 300;
@@ -37,7 +39,7 @@ export const Route = createFileRoute('/')({
 });
 
 export function HomePage() {
-  const { after, color, format, aspectRatio } = Route.useSearch();
+  const { after, color, format, aspectRatio, profileId } = Route.useSearch();
   const navigate = useNavigate();
   const { isOpen } = useBrowseFilterPanel();
   const deviceAspectRatioPreset = useDeviceAspectRatioPreset();
@@ -50,6 +52,7 @@ export function HomePage() {
       filter: buildWallpaperFilter(
         format,
         getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
+        profileId,
       ),
       sort: buildWallpaperSort(color),
     });
@@ -57,6 +60,17 @@ export function HomePage() {
   const handleLoadMore = useCallback(() => {
     fetchNextPage();
   }, [fetchNextPage]);
+
+  const handleProfileChange = useCallback((nextProfileId?: string) => {
+    void navigate({
+      to: '/',
+      search: (previous: BrowseSearchState) => ({
+        ...previous,
+        after: undefined,
+        profileId: nextProfileId,
+      }),
+    });
+  }, [navigate]);
 
   const handleFormatChange = useCallback(
     (nextFormat?: BrowseFormatValue) => {
@@ -170,6 +184,8 @@ export function HomePage() {
           selectedColor={color}
           selectedFormat={format}
           selectedAspectRatio={aspectRatio}
+          selectedProfileId={profileId}
+          onProfileChange={handleProfileChange}
           deviceAspectRatioPreset={deviceAspectRatioPreset}
           onClearColor={handleClearColor}
           onColorInputChange={handleColorInputChange}
@@ -189,6 +205,8 @@ export function HomePage() {
         selectedColor={color}
         selectedFormat={format}
         selectedAspectRatio={aspectRatio}
+        selectedProfileId={profileId}
+        onProfileChange={handleProfileChange}
         deviceAspectRatioPreset={deviceAspectRatioPreset}
         onClearColor={handleClearColor}
         onColorInputChange={handleColorInputChange}
@@ -211,6 +229,8 @@ function BrowseFilterPanel({
   selectedColor,
   selectedFormat,
   selectedAspectRatio,
+  selectedProfileId,
+  onProfileChange,
   deviceAspectRatioPreset,
   onClearColor,
   onColorInputChange,
@@ -222,6 +242,8 @@ function BrowseFilterPanel({
   selectedColor?: string;
   selectedFormat?: BrowseFormatValue;
   selectedAspectRatio?: BrowseAspectRatioValue;
+  selectedProfileId?: string;
+  onProfileChange: (profileId?: string) => void;
   deviceAspectRatioPreset: BrowseAspectRatioPresetValue;
   onClearColor: () => void;
   onColorInputChange: (color: string) => void;
@@ -233,6 +255,7 @@ function BrowseFilterPanel({
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         {isOpen ? (
           <div className="flex flex-col gap-4">
+            <ProfileFilter profileId={selectedProfileId} onChange={onProfileChange} />
             <div className="flex flex-col gap-2">
               <div>
                 <label htmlFor="browse-color" className="text-sm font-medium text-foreground">

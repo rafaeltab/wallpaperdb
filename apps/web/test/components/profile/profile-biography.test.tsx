@@ -13,6 +13,15 @@ vi.mock('@tanstack/react-router', () => ({ Link: ({ children, params }: { childr
 const profileId = 'user_123';
 
 describe('Biography Markdown', () => {
+  it.each(['missing', 'foreign', 'mismatched'] as const)('withholds an embed when public Wallpaper data is %s', async (state) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wallpaper: Wallpaper = { wallpaperId: state === 'mismatched' ? 'different_wallpaper' : 'wlpr_own', profileId: state === 'foreign' ? 'another_user' : profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/foreign.webp' }] };
+    vi.mocked(request).mockResolvedValueOnce({ getWallpaper: state === 'missing' ? null : wallpaper });
+    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    expect(await screen.findByText('Wallpaper unavailable.')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('renders a published own-Wallpaper shorthand through the shared plugin and verified Wallpaper data', async () => {
     const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/wallpapers/wlpr_own.webp' }] };
     vi.mocked(request).mockResolvedValueOnce({ getWallpaper: wallpaper });

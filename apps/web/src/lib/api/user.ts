@@ -18,6 +18,7 @@ export interface Profile {
   handle: string;
   displayName: string;
   biographyMarkdown: string;
+  biographyMaxLength?: number;
   pictureAssetId: string | null;
   pictureImportStatus?: 'pending' | 'retrying' | 'complete';
   pictureUploadLimits?: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
@@ -60,7 +61,8 @@ interface EnsureProfileOptions {
 }
 
 interface UpdateProfileOptions {
-  displayName: string;
+  displayName?: string;
+  biographyMarkdown?: string;
   expectedVersion: number;
   expectedProfileId?: string;
   tokenProvider?: () => Promise<string | null>;
@@ -285,6 +287,7 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
         },
         body: JSON.stringify({
           displayName: options.displayName,
+          biographyMarkdown: options.biographyMarkdown,
           expectedVersion: options.expectedVersion,
         }),
       });

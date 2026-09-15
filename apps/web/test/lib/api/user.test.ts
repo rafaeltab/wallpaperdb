@@ -64,6 +64,22 @@ describe('User API client', () => {
     });
   });
 
+  it('patches authored Biography Markdown without sending an unrelated Display name', async () => {
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const biographyMarkdown = '**Hello** 👋\n\nMy wallpaper collection.';
+    const updated = { ...profile, biographyMarkdown, biographyMaxLength: 5000, version: 2 };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated)));
+    vi.stubGlobal('fetch', fetch);
+    const client = createUserApiClient({ baseUrl: '/user', tokenProvider });
+
+    await expect(client.updateProfile({ biographyMarkdown, expectedVersion: 1, expectedProfileId: profile.id })).resolves.toEqual(updated);
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me', {
+      method: 'PATCH',
+      headers: { Accept: 'application/json', Authorization: 'Bearer fresh-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ biographyMarkdown, expectedVersion: 1 }),
+    });
+  });
+
   it('uploads a picture as authenticated multipart data with the confirmed Profile version', async () => {
     const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
     const picture = new File(['png-bytes'], 'portrait.png', { type: 'image/png' });

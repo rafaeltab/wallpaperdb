@@ -18,6 +18,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
       updateHandle: vi.fn(),
       scheduleAliasRemoval: vi.fn(),
       expireAlias: vi.fn(),
+      reactivateAlias: vi.fn(),
     },
   };
 });
@@ -72,6 +73,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.updateHandle).mockReset();
     vi.mocked(userApi.scheduleAliasRemoval).mockReset();
     vi.mocked(userApi.expireAlias).mockReset();
+    vi.mocked(userApi.reactivateAlias).mockReset();
   });
 
   it('shows the current Display name and immediately adopts the REST response', async () => {
@@ -124,6 +126,79 @@ describe('ProfileSettingsPage', () => {
         .getByText(new Date(expiresAt).toLocaleString(), { exact: false })
         .closest('time')
     ).toHaveAttribute('dateTime', expiresAt);
+  });
+
+  it('shows historical eligibility and confirms restoring an available Handle as an alias', async () => {
+    const eligibleUntil = '2099-10-15T12:34:56.789Z';
+    const claimed = {
+      handle: 'claimed-name',
+      eligibleUntil: '2099-10-16T12:00:00.000Z',
+      unavailableReason: 'claimed' as const,
+    };
+    const initial: Profile = {
+      ...profile,
+      lastHandleChangedAt: '2099-09-14T12:00:00.000Z',
+      aliases: [],
+      historicalHandles: [
+        { handle: 'old-handle', eligibleUntil, unavailableReason: null },
+        claimed,
+      ],
+    };
+    const updated = {
+      ...initial,
+      version: 2,
+      aliases: [
+        {
+          handle: 'old-handle',
+          claimGeneration: 2,
+          createdAt: '2026-09-15T12:00:00.000Z',
+          expiresAt: null,
+        },
+      ],
+      historicalHandles: [claimed],
+    };
+    vi.mocked(userApi.reactivateAlias).mockResolvedValue(updated);
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    const history = screen.getByRole('list', { name: 'Historical Handles' });
+    expect(within(history).getByText(new Date(eligibleUntil).toLocaleString())).toHaveAttribute(
+      'dateTime',
+      eligibleUntil
+    );
+    expect(
+      within(history).getByRole('button', { name: 'Reactivate @claimed-name' })
+    ).toBeDisabled();
+    expect(
+      within(history).getByText('Another Profile has claimed this Handle.')
+    ).toBeInTheDocument();
+    await user.click(within(history).getByRole('button', { name: 'Reactivate @old-handle' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('retained alias slot');
+    expect(dialog).toHaveTextContent(`Your current Handle will stay @${profile.handle}`);
+    expect(userApi.reactivateAlias).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Reactivate alias' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '@old-handle is now a retained alias.'
+    );
+    expect(userApi.reactivateAlias).toHaveBeenCalledWith({
+      handle: 'old-handle',
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(profile.handle);
+    expect(
+      within(screen.getByRole('list', { name: 'Retained aliases' })).getByText('@old-handle')
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Historical Handles' })).queryByText('@old-handle')
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Next Handle change available/)).toHaveTextContent(
+      new Date('2099-09-21T12:00:00.000Z').toLocaleString()
+    );
   });
 
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {

@@ -1,6 +1,7 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
+import { ProfileHistoricalHandles } from '@/components/profile/profile-historical-handles';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -17,10 +18,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 interface AliasCommand {
-  action: 'schedule' | 'expire';
+  action: 'schedule' | 'expire' | 'reactivate';
   handle: string;
   expectedVersion: number;
 }
+
+const actionVerbs = { schedule: 'scheduling', expire: 'expiring', reactivate: 'reactivating' };
 
 export function ProfileAliasSettings({
   profile,
@@ -40,6 +43,7 @@ export function ProfileAliasSettings({
     mutationKey: profileQueryKey(profile.id),
     mutationFn: ({ action, ...command }: AliasCommand) => {
       const options = { ...command, expectedProfileId: profile.id, tokenProvider };
+      if (action === 'reactivate') return userApi.reactivateAlias(options);
       return action === 'expire'
         ? userApi.expireAlias(options)
         : userApi.scheduleAliasRemoval(options);
@@ -55,8 +59,9 @@ export function ProfileAliasSettings({
     refreshError ??
     (mutation.error instanceof UserApiError &&
     mutation.error.type?.endsWith('/profile-version-conflict')
-      ? `Your Profile changed elsewhere. Refresh aliases before ${mutation.variables?.action === 'expire' ? 'expiring' : 'scheduling'} again.`
+      ? `Your Profile changed elsewhere. Refresh aliases before ${actionVerbs[mutation.variables?.action ?? 'schedule']} again.`
       : mutation.error?.message);
+  const dialog = aliasDialog(pending, profile.handle);
 
   async function refresh() {
     if (refreshing || profileWritesPending) return;
@@ -102,9 +107,11 @@ export function ProfileAliasSettings({
         {completed && (
           <Alert role="status">
             <AlertDescription>
-              {completed.action === 'expire'
-                ? `@${completed.handle} has expired and no longer redirects to your Profile. Public links may take a moment to update.`
-                : `Removal scheduled for @${completed.handle}.`}
+              {completed.action === 'reactivate'
+                ? `@${completed.handle} is now a retained alias. Public links may take a moment to update.`
+                : completed.action === 'expire'
+                  ? `@${completed.handle} has expired and no longer redirects to your Profile. Public links may take a moment to update.`
+                  : `Removal scheduled for @${completed.handle}.`}
             </AlertDescription>
           </Alert>
         )}
@@ -201,27 +208,22 @@ export function ProfileAliasSettings({
             <p className="mt-3 text-sm text-muted-foreground">No expiring aliases.</p>
           )}
         </section>
+        <ProfileHistoricalHandles
+          profile={profile}
+          disabled={mutation.isPending || refreshing}
+          onReactivate={(handle) => {
+            mutation.reset();
+            setRefreshError(null);
+            setCompleted(null);
+            setPending({ action: 'reactivate', handle, expectedVersion: profile.version });
+            setDialogOpen(true);
+          }}
+        />
         <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>
-                {pending?.action === 'expire' ? 'Expire alias now?' : 'Schedule alias removal?'}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {pending?.action === 'expire' ? (
-                  <>
-                    @{pending.handle} will stop redirecting immediately. This Handle will become
-                    available for another User to claim. Existing links using this address will no
-                    longer lead to your Profile.
-                  </>
-                ) : (
-                  <>
-                    @{pending?.handle} will expire 24 hours after you confirm. This Profile address
-                    will redirect until it expires, then stop redirecting to your Profile. It stops
-                    counting toward your retained limit immediately.
-                  </>
-                )}
-              </AlertDialogDescription>
+              <AlertDialogTitle>{dialog.title}</AlertDialogTitle>
+              <AlertDialogDescription>{dialog.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -232,7 +234,7 @@ export function ProfileAliasSettings({
                   if (pending) mutation.mutate(pending);
                 }}
               >
-                {pending?.action === 'expire' ? 'Expire now' : 'Schedule removal'}
+                {dialog.button}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -240,4 +242,28 @@ export function ProfileAliasSettings({
       </CardContent>
     </Card>
   );
+}
+
+function aliasDialog(command: AliasCommand | null, currentHandle: string) {
+  const handle = command?.handle ?? '';
+  switch (command?.action) {
+    case 'reactivate':
+      return {
+        title: 'Reactivate historical Handle?',
+        description: `@${handle} will redirect to your Profile and use one retained alias slot. Your current Handle will stay @${currentHandle}, and its change cooldown will stay the same.`,
+        button: 'Reactivate alias',
+      };
+    case 'expire':
+      return {
+        title: 'Expire alias now?',
+        description: `@${handle} will stop redirecting immediately. This Handle will become available for another User to claim. Existing links using this address will no longer lead to your Profile.`,
+        button: 'Expire now',
+      };
+    default:
+      return {
+        title: 'Schedule alias removal?',
+        description: `@${handle} will expire 24 hours after you confirm. This Profile address will redirect until it expires, then stop redirecting to your Profile. It stops counting toward your retained limit immediately.`,
+        button: 'Schedule removal',
+      };
+  }
 }

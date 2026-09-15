@@ -5,20 +5,20 @@ description: Step-by-step guide for creating a new microservice in apps/ or a ne
 
 # Create Service
 
+Use [CODING_STANDARDS.md](../../../CODING_STANDARDS.md) for architecture and testing requirements. This skill covers the work needed to integrate a workspace into the repository.
+
 ## Creating a New Microservice (`apps/`)
 
 ### 1. Scaffold the Service
 
-Copy the structure of `apps/ingestor` as your starting point. It is the canonical reference service — fully integrated with all shared packages, CI, and observability.
+Use existing services such as `apps/ingestor` as references for package scripts, CI, and runtime wiring. Design the application's capabilities and interfaces using the coding standards.
 
 ### 2. Wire Up Shared Packages
 
-Every service must consume:
+Available shared packages (select those needed by the service's adapters):
 
 - **`@wallpaperdb/core`** — connection managers (database, SeaweedFS, NATS, Redis, OTEL), config schemas, telemetry helpers (`withSpan`, `recordCounter`, `recordHistogram`), health aggregator, OpenAPI plugin, RFC 7807 error classes
 - **`@wallpaperdb/events`** — event schemas (Zod), `BaseEventPublisher`, `BaseEventConsumer`
-
-Optional (add as needed):
 - **`@wallpaperdb/test-utils`** — TesterBuilder pattern for integration and E2E test setup
 - **`@wallpaperdb/testcontainers`** — custom NATS container with JetStream
 - **`@wallpaperdb/url-ipv4-resolver`** — SSRF-safe URL validation
@@ -143,7 +143,7 @@ Follow the `package.json` conventions from an existing package (e.g. `packages/c
 
 ### 2. Add Tests with Vitest
 
-All shared packages have unit tests. No containers required — keep them fast. Place tests alongside source or in a `test/` subdirectory following the pattern of the package being created.
+Choose test boundaries using [CODING_STANDARDS.md — Testing](../../../CODING_STANDARDS.md#testing). Use existing workspace Vitest configurations and Make targets as references for wiring the selected tests into the repository.
 
 ### 3. Use Shared Make Commands
 

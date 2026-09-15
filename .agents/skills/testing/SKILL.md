@@ -1,34 +1,21 @@
 ---
 name: testing
-description: Testing strategy for WallpaperDB: three test tiers (unit, integration, E2E), how to run them, coverage, and debugging. Use when writing tests, diagnosing test failures, or deciding which tier a new test belongs in.
+description: WallpaperDB test commands, infrastructure, coverage reports, and debugging. Use when running tests or working with repository test tooling; read CODING_STANDARDS.md to choose behavioral test boundaries.
 ---
 
 # Testing
 
-## Three Test Tiers
+Choose test boundaries and required behavioral coverage using [CODING_STANDARDS.md — Testing](../../../CODING_STANDARDS.md#testing).
 
-### Unit Tests
+## Existing command groups
 
-- **Where:** `packages/` (e.g. `core`, `events`, `url-ipv4-resolver`)
-- **Characteristics:** Fast, no containers, pure logic
-- **Run:** `make test-unit`
-- **Use for:** Pure functions, schema validation, utility logic — anything that has no external dependencies
+These names select workspace scripts in the current Make/Turbo setup. They do not prescribe a test's public boundary or where a capability must live.
 
-### Integration Tests
-
-- **Where:** `apps/` (e.g. `ingestor`, `media`, `gateway`)
-- **Characteristics:** Uses Testcontainers for real PostgreSQL, SeaweedFS, and NATS; the application runs in-process in the same Node.js process as the tests
-- **Run:** `make test-integration`
-- **Use for:** Full workflows involving the database, object storage, or messaging — anything that requires real infrastructure
-- **Speed:** ~2–5 seconds per suite (fast because the app is in-process)
-
-### E2E Tests
-
-- **Where:** `apps/*-e2e` (e.g. `ingestor-e2e`)
-- **Characteristics:** Application runs inside a Docker container; tests the actual deployment artifact
-- **Run:** `make test-e2e`
-- **Use for:** Smoke-testing the built Docker image; verifying the service starts and responds correctly end-to-end
-- **Speed:** ~10–30 seconds (slow due to Docker image build and container startup)
+| Command | Workspace script |
+| --- | --- |
+| `make test-unit` | `test:unit` |
+| `make test-integration` | `test:integration` |
+| `make test-e2e` | `test:e2e` |
 
 ## Infrastructure Requirement
 

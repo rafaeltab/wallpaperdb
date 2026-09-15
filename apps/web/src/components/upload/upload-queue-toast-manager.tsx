@@ -1,7 +1,8 @@
 import { useRouter } from '@tanstack/react-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { UploadQueueToast } from './upload-queue-toast';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useUploadQueue } from '@/contexts/upload-queue-context';
+import { UploadQueueToast } from './upload-queue-toast';
 
 const AUTO_DISMISS_DELAY = 5000; // 5 seconds
 
@@ -17,6 +18,7 @@ export function UploadQueueToastManager() {
     resumeQueue,
   } = useUploadQueue();
   const router = useRouter();
+  const toastId = useId();
   const [isVisible, setIsVisible] = useState(false);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,29 +66,53 @@ export function UploadQueueToastManager() {
     };
   }, [isComplete, hasFailuresOrDuplicates, handleDismiss]);
 
-  const handleNavigateToUpload = () => {
-    router.navigate({ to: '/upload' });
-  };
+  useEffect(() => {
+    if (!isVisible || !hasFiles) {
+      toast.dismiss(toastId);
+      return;
+    }
 
-  if (!isVisible || !hasFiles) {
-    return null;
-  }
+    toast.custom(
+      () => (
+        <UploadQueueToast
+          files={state.files}
+          counts={counts}
+          progress={progress}
+          isPaused={state.isPaused}
+          isStopped={state.isStopped}
+          pausedUntil={state.pausedUntil}
+          onStopQueue={stopQueue}
+          onResumeQueue={resumeQueue}
+          onRetryFailed={retryFailed}
+          onClearCompleted={handleDismiss}
+          onNavigateToUpload={() => router.navigate({ to: '/upload' })}
+        />
+      ),
+      { id: toastId, duration: Infinity, dismissible: false, className: 'w-full' }
+    );
+  }, [
+    isVisible,
+    hasFiles,
+    toastId,
+    state.files,
+    state.isPaused,
+    state.isStopped,
+    state.pausedUntil,
+    counts,
+    progress,
+    stopQueue,
+    resumeQueue,
+    retryFailed,
+    handleDismiss,
+    router,
+  ]);
 
-  return (
-    <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-5 duration-300">
-      <UploadQueueToast
-        files={state.files}
-        counts={counts}
-        progress={progress}
-        isPaused={state.isPaused}
-        isStopped={state.isStopped}
-        pausedUntil={state.pausedUntil}
-        onStopQueue={stopQueue}
-        onResumeQueue={resumeQueue}
-        onRetryFailed={retryFailed}
-        onClearCompleted={handleDismiss}
-        onNavigateToUpload={handleNavigateToUpload}
-      />
-    </div>
+  useEffect(
+    () => () => {
+      toast.dismiss(toastId);
+    },
+    [toastId]
   );
+
+  return null;
 }

@@ -116,7 +116,7 @@ export function UploadQueueToast({
       onClick={handleToastClick}
       onKeyDown={handleKeyDown}
       className={cn(
-        'w-80 rounded-lg border bg-background p-4 shadow-lg cursor-pointer',
+        'w-full rounded-lg border bg-popover text-popover-foreground p-4 shadow-lg cursor-pointer',
         'hover:border-primary/50 transition-colors',
         'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
       )}

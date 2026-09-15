@@ -525,14 +525,14 @@ function PictureEditor({ value, update, cancel }: EditorProps) {
       </p>
       <div className="flex gap-2">
         <Button
-          className="flex-1"
+          className="min-w-0 flex-1 px-2 text-xs sm:text-sm"
           disabled={!filename}
           onClick={() => update({ picture }, 'Profile picture updated')}
         >
           Replace picture
         </Button>
         <Button
-          className="flex-1"
+          className="min-w-0 flex-1 px-2 text-xs sm:text-sm"
           variant="outline"
           disabled={!value.picture}
           onClick={() => update({ picture: null }, 'Profile picture removed')}

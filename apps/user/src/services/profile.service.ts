@@ -814,6 +814,9 @@ export class ProfileService {
         : null;
       if (assetId && !asset) throw new Error('Staged Profile picture is missing');
       const now = new Date();
+      if (asset && (!asset.expiresAt || asset.expiresAt <= now)) {
+        throw new Error('Staged Profile picture has expired');
+      }
       if (current.pictureAssetId) {
         await tx
           .update(profilePictureAssets)

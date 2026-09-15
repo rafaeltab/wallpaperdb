@@ -124,10 +124,7 @@ export class ProfileRepository {
     const client = this.openSearchConnection.getClient();
     const aliasFilter = {
       bool: {
-        filter: [
-          { term: { 'aliases.handle': normalizedHandle } },
-          activeAliasFilter(),
-        ],
+        filter: [{ term: { 'aliases.handle': normalizedHandle } }, activeAliasFilter()],
       },
     };
     // Compare each kind of claim by the requested Handle's generation. A newer

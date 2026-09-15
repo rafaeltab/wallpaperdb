@@ -338,6 +338,33 @@ describe('Profile commands', () => {
     expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(Number(wonReactivation));
   });
 
+  it('serializes keeping an alias against its due expiry with one accepted transition', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const alias = scheduled.aliases[0];
+      const candidate = { profileId: original.id, handle: alias.handle, claimGeneration: alias.claimGeneration };
+      vi.setSystemTime(new Date(alias.expiresAt));
+      const [keep, expired] = await Promise.all([
+        reactivateAlias('user_1', original.handle, scheduled.version),
+        service().expireDueAlias(candidate, new Date()),
+      ]);
+      expect(keep.statusCode).toBe(expired ? 409 : 200);
+      const after = (await request('user_1')).json();
+      expect(after).toMatchObject({ handle: changed.handle, version: scheduled.version + 1 });
+      expect(after.aliases).toEqual(expired ? [] : [{ ...alias, createdAt: alias.expiresAt, expiresAt: null }]);
+      const transitions = await sql`select payload from outbox_events where payload->'change'->>'type' in ('alias-expired', 'alias-reactivated')`;
+      expect(transitions).toHaveLength(1);
+      expect(transitions[0].payload.change.type).toBe(expired ? 'alias-expired' : 'alias-reactivated');
+      expect(await service().expireDueAlias(candidate, new Date())).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

@@ -10,6 +10,13 @@ describe('Profile picture processing', () => {
     await expect(processProfilePicture(input, { ...limits, maxBytes: input.length - 1 })).rejects.toThrow('Picture exceeds the upload byte limit');
   });
 
+  it('reports malformed or truncated picture bytes as validation failures', async () => {
+    const jpeg = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } }).jpeg().toBuffer();
+    for (const input of [jpeg.subarray(0, 40), Buffer.from([0xff, 0xd8, 0xff, 0x00])]) {
+      await expect(processProfilePicture(input, limits)).rejects.toThrow('Picture could not be decoded');
+    }
+  });
+
   it.each(['webp', 'png'])('rejects animated %s instead of silently selecting its first frame', async (format) => {
     // Two one-pixel frames with distinct colors.
     const gif = Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b', 'hex');

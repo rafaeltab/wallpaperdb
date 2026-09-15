@@ -44,34 +44,42 @@ export async function processProfilePicture(
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
   if (hasPngAnimation(input))
     throw new InvalidProfilePictureError('Animated pictures are not accepted');
-  const decoder = sharp(input, {
-    limitInputPixels: limits.maxPixels,
-    failOn: 'warning',
-    sequentialRead: true,
-  });
-  const metadata = await decoder.metadata();
-  if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
-    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  try {
+    const decoder = sharp(input, {
+      limitInputPixels: limits.maxPixels,
+      failOn: 'warning',
+      sequentialRead: true,
+    });
+    const metadata = await decoder.metadata();
+    if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
+      throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+    }
+    if ((metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined) {
+      throw new InvalidProfilePictureError('Animated pictures are not accepted');
+    }
+    const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
+    if (!pixels || pixels > limits.maxPixels)
+      throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
+    const bytesPerSample = metadata.depth === 'ushort' || metadata.depth === 'short' ? 2 : 1;
+    if (pixels * (metadata.channels ?? 4) * bytesPerSample > limits.maxDecodedBytes) {
+      throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
+    }
+    const result = await decoder
+      .rotate()
+      .webp({ quality: 85 })
+      .timeout({ seconds: 10 })
+      .toBuffer({ resolveWithObject: true });
+    return {
+      bytes: result.data,
+      mimeType: 'image/webp',
+      width: result.info.width,
+      height: result.info.height,
+    };
+  } catch (error) {
+    if (error instanceof InvalidProfilePictureError) throw error;
+    if (error instanceof Error && /pixel limit/i.test(error.message)) {
+      throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
+    }
+    throw new InvalidProfilePictureError('Picture could not be decoded', { cause: error });
   }
-  if ((metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined) {
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
-  }
-  const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
-  if (!pixels || pixels > limits.maxPixels)
-    throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
-  const bytesPerSample = metadata.depth === 'ushort' || metadata.depth === 'short' ? 2 : 1;
-  if (pixels * (metadata.channels ?? 4) * bytesPerSample > limits.maxDecodedBytes) {
-    throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
-  }
-  const result = await decoder
-    .rotate()
-    .webp({ quality: 85 })
-    .timeout({ seconds: 10 })
-    .toBuffer({ resolveWithObject: true });
-  return {
-    bytes: result.data,
-    mimeType: 'image/webp',
-    width: result.info.width,
-    height: result.info.height,
-  };
 }

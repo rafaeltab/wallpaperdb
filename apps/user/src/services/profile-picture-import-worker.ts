@@ -18,23 +18,30 @@ export class ProfilePictureImportWorker {
   start(): void {
     if (this.interval) return;
     this.stopping = false;
-    void this.importPending();
-    this.interval = this.timer.setInterval(() => this.importPending(), 1000);
+    const run = () => this.importPending().catch(() => {});
+    void run();
+    this.interval = this.timer.setInterval(run, 1000);
   }
 
   async stop(): Promise<void> {
     this.stopping = true;
     if (this.interval) this.timer.clearInterval(this.interval);
     this.interval = null;
-    await this.inFlight;
+    // The cycle reports its own failure; shutdown must still close dependencies.
+    await this.inFlight?.catch(() => {});
   }
 
   importPending(): Promise<void> {
     if (this.stopping) return Promise.resolve();
     if (this.inFlight) return this.inFlight;
-    this.inFlight = this.runImportBatch().finally(() => {
-      this.inFlight = null;
-    });
+    this.inFlight = this.runImportBatch()
+      .catch((error: unknown) => {
+        this.logger.error({ category: 'profile-picture-import' }, 'Profile picture import cycle failed');
+        throw error;
+      })
+      .finally(() => {
+        this.inFlight = null;
+      });
     return this.inFlight;
   }
 }

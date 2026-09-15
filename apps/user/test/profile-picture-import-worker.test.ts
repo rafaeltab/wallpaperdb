@@ -9,6 +9,7 @@ describe('Profile picture import worker', () => {
     const worker = new ProfilePictureImportWorker(run, { error: vi.fn() }, timer);
     worker.start();
     expect(run).toHaveBeenCalledOnce();
+    await worker.importPending();
     await timer.tickAsync(999);
     expect(run).toHaveBeenCalledOnce();
     await timer.tickAsync(1);
@@ -56,6 +57,20 @@ describe('Profile picture import worker', () => {
     }
     expect(stopped).toBe(true);
     await worker.importPending();
+    await timer.tickAsync(1000);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('reports a failed cycle without private error details and lets shutdown finish', async () => {
+    const timer = new FakeTimerService();
+    const failure = new Error('https://img.clerk.com/private?token=secret', { cause: { url: 'private-source' } });
+    const run = vi.fn<() => Promise<void>>().mockRejectedValue(failure);
+    const logger = { error: vi.fn() };
+    const worker = new ProfilePictureImportWorker(run, logger, timer);
+    worker.start();
+    await expect(worker.stop()).resolves.toBeUndefined();
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error).toHaveBeenCalledWith({ category: 'profile-picture-import' }, 'Profile picture import cycle failed');
     await timer.tickAsync(1000);
     expect(run).toHaveBeenCalledOnce();
   });

@@ -3,7 +3,7 @@ import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -16,7 +16,7 @@ import { wallpapers } from "../src/db/schema.js";
 import { StuckUploadsReconciliation } from "../src/services/reconciliation/stuck-uploads-reconciliation.service.js";
 import { MissingEventsReconciliation } from "../src/services/reconciliation/missing-events-reconciliation.service.js";
 import { OrphanedIntentsReconciliation } from "../src/services/reconciliation/orphaned-intents-reconciliation.service.js";
-import { OrphanedMinioReconciliation } from "../src/services/reconciliation/orphaned-minio-reconciliation.service.js";
+import { OrphanedS3Reconciliation } from "../src/services/reconciliation/orphaned-s3-reconciliation.service.js";
 import {
     IngestorDrizzleTesterBuilder,
     IngestorMigrationsTesterBuilder,
@@ -52,7 +52,7 @@ describe("Reconciliation Service Tests", () => {
             .with(RedisTesterBuilder)
             .with(IngestorDrizzleTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(InProcessIngestorTesterBuilder)
             .build();
@@ -65,9 +65,9 @@ describe("Reconciliation Service Tests", () => {
             )
             .withPostgresAutoCleanup(["wallpapers"])
             .withMigrations()
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((builder) => builder.withJetstream())
             .withNatsAutoCleanup()
             .withStream("WALLPAPER")
@@ -87,8 +87,8 @@ describe("Reconciliation Service Tests", () => {
         // Clean up database before each test
         await tester.getDrizzle().delete(wallpapers);
 
-        // Clean up MinIO bucket before each test
-        await tester.minio.cleanupBuckets();
+        // Clean up S3 bucket before each test
+        await tester.s3.cleanupBuckets();
 
         // Clean up NATS stream before each test
         try {
@@ -112,7 +112,7 @@ describe("Reconciliation Service Tests", () => {
         minutesAgo: number,
         options: {
             userId?: string;
-            hasMinioFile?: boolean;
+            hasS3File?: boolean;
             uploadAttempts?: number;
         } = {},
     ) {
@@ -142,17 +142,17 @@ describe("Reconciliation Service Tests", () => {
                         width: 1920,
                         height: 1080,
                         storageKey: `${id}/original.jpg`,
-                        storageBucket: tester.getMinio().buckets[0],
+                        storageBucket: tester.getS3().buckets[0],
                         originalFilename: "test.jpg",
                     }
                     : {}),
             });
 
-        // Optionally create MinIO file
-        if (options.hasMinioFile) {
-            await tester.minio.getS3Client().send(
+        // Optionally create S3 file
+        if (options.hasS3File) {
+            await tester.s3.getS3Client().send(
                 new PutObjectCommand({
-                    Bucket: tester.minio.config.buckets[0],
+                    Bucket: tester.s3.config.buckets[0],
                     Key: `${id}/original.jpg`,
                     Body: Buffer.from("test image data"),
                     ContentType: "image/jpeg",
@@ -164,14 +164,14 @@ describe("Reconciliation Service Tests", () => {
     }
 
     /**
-     * Test Helper: Create an orphaned MinIO object (no DB record)
+     * Test Helper: Create an orphaned S3 object (no DB record)
      */
-    async function createOrphanedMinioObject(id?: string) {
+    async function createOrphanedS3Object(id?: string) {
         const wallpaperId = id || `wlpr_${ulid()}`;
 
-        await tester.minio.getS3Client().send(
+        await tester.s3.getS3Client().send(
             new PutObjectCommand({
-                Bucket: tester.minio.config.buckets[0],
+                Bucket: tester.s3.config.buckets[0],
                 Key: `${wallpaperId}/original.jpg`,
                 Body: Buffer.from("orphaned file data"),
                 ContentType: "image/jpeg",
@@ -182,13 +182,13 @@ describe("Reconciliation Service Tests", () => {
     }
 
     /**
-     * Test Helper: Check if MinIO object exists
+     * Test Helper: Check if S3 object exists
      */
-    async function minioObjectExists(wallpaperId: string): Promise<boolean> {
+    async function s3ObjectExists(wallpaperId: string): Promise<boolean> {
         try {
-            await tester.minio.getS3Client().send(
+            await tester.s3.getS3Client().send(
                 new HeadObjectCommand({
-                    Bucket: tester.minio.config.buckets[0],
+                    Bucket: tester.s3.config.buckets[0],
                     Key: `${wallpaperId}/original.jpg`,
                 }),
             );
@@ -238,11 +238,11 @@ describe("Reconciliation Service Tests", () => {
     }
 
     describe("Stuck Uploading State Recovery", () => {
-        it("should mark upload as failed when MinIO upload failed and file does not exist", async () => {
+        it("should mark upload as failed when S3 upload failed and file does not exist", async () => {
             // Create stuck upload in 'uploading' state (>10 minutes ago)
-            // MinIO file does NOT exist, and max retries reached
+            // S3 file does NOT exist, and max retries reached
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: false,
+                hasS3File: false,
                 uploadAttempts: 3,
             });
 
@@ -257,11 +257,11 @@ describe("Reconciliation Service Tests", () => {
             expect(record?.processingError).toContain("Max retries exceeded");
         });
 
-        it("should recover upload to stored when file exists in MinIO", async () => {
+        it("should recover upload to stored when file exists in S3", async () => {
             // Create stuck upload in 'uploading' state (>10 minutes ago)
-            // MinIO file DOES exist
+            // S3 file DOES exist
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: true,
+                hasS3File: true,
                 uploadAttempts: 0,
             });
 
@@ -278,7 +278,7 @@ describe("Reconciliation Service Tests", () => {
         it("should retry upload when attempts < 3", async () => {
             // Create stuck upload with 2 retry attempts
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: false,
+                hasS3File: false,
                 uploadAttempts: 2,
             });
 
@@ -297,7 +297,7 @@ describe("Reconciliation Service Tests", () => {
         it("should mark as failed when retry attempts >= 3", async () => {
             // Create stuck upload with 3 retry attempts
             const id = await createStuckUpload("uploading", 15, {
-                hasMinioFile: false,
+                hasS3File: false,
                 uploadAttempts: 3,
             });
 
@@ -315,7 +315,7 @@ describe("Reconciliation Service Tests", () => {
         it("should not touch recent uploads in uploading state", async () => {
             // Create recent upload (< 10 minutes ago)
             const id = await createStuckUpload("uploading", 5, {
-                hasMinioFile: false,
+                hasS3File: false,
             });
 
             // Run reconciliation
@@ -467,25 +467,25 @@ describe("Reconciliation Service Tests", () => {
         });
     });
 
-    describe("Orphaned MinIO Object Cleanup", () => {
-        it("should delete MinIO objects without database records", async () => {
-            // Create orphaned MinIO object (no DB record)
-            const id = await createOrphanedMinioObject();
+    describe("Orphaned S3 Object Cleanup", () => {
+        it("should delete S3 objects without database records", async () => {
+            // Create orphaned S3 object (no DB record)
+            const id = await createOrphanedS3Object();
 
             // Verify file exists before cleanup
-            expect(await minioObjectExists(id)).toBe(true);
+            expect(await s3ObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
-            await orphanedMinioService.reconcile();
+            const orphanedS3Service = tester.getApp().container.resolve(OrphanedS3Reconciliation);
+            await orphanedS3Service.reconcile();
 
-            // Verify: MinIO object should be deleted
-            expect(await minioObjectExists(id)).toBe(false);
+            // Verify: S3 object should be deleted
+            expect(await s3ObjectExists(id)).toBe(false);
         });
 
-        it("should delete MinIO objects with failed database records", async () => {
-            // Create MinIO object
-            const id = await createOrphanedMinioObject();
+        it("should delete S3 objects with failed database records", async () => {
+            // Create S3 object
+            const id = await createOrphanedS3Object();
 
             // Create corresponding 'failed' DB record
             await tester
@@ -502,72 +502,72 @@ describe("Reconciliation Service Tests", () => {
                 });
 
             // Verify file exists before cleanup
-            expect(await minioObjectExists(id)).toBe(true);
+            expect(await s3ObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
-            await orphanedMinioService.reconcile();
+            const orphanedS3Service = tester.getApp().container.resolve(OrphanedS3Reconciliation);
+            await orphanedS3Service.reconcile();
 
-            // Verify: MinIO object should be deleted
-            expect(await minioObjectExists(id)).toBe(false);
+            // Verify: S3 object should be deleted
+            expect(await s3ObjectExists(id)).toBe(false);
         });
 
-        it("should preserve MinIO objects with valid database records", async () => {
-            // Create record with MinIO file
+        it("should preserve S3 objects with valid database records", async () => {
+            // Create record with S3 file
             const id = await createStuckUpload("stored", 5, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
             // Verify file exists before cleanup
-            expect(await minioObjectExists(id)).toBe(true);
+            expect(await s3ObjectExists(id)).toBe(true);
 
             // Run reconciliation
-            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
-            await orphanedMinioService.reconcile();
+            const orphanedS3Service = tester.getApp().container.resolve(OrphanedS3Reconciliation);
+            await orphanedS3Service.reconcile();
 
-            // Verify: MinIO object should still exist
-            expect(await minioObjectExists(id)).toBe(true);
+            // Verify: S3 object should still exist
+            expect(await s3ObjectExists(id)).toBe(true);
         });
 
         it("should handle batching for large number of objects", async () => {
-            // Create 20 orphaned MinIO objects
+            // Create 20 orphaned S3 objects
             const ids = await Promise.all(
-                Array.from({ length: 20 }, () => createOrphanedMinioObject()),
+                Array.from({ length: 20 }, () => createOrphanedS3Object()),
             );
 
             // Run reconciliation
-            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
-            await orphanedMinioService.reconcile();
+            const orphanedS3Service = tester.getApp().container.resolve(OrphanedS3Reconciliation);
+            await orphanedS3Service.reconcile();
 
             // Verify: All orphaned objects deleted
             for (const id of ids) {
-                expect(await minioObjectExists(id)).toBe(false);
+                expect(await s3ObjectExists(id)).toBe(false);
             }
         });
 
         it("should handle mixed scenario with valid and orphaned objects", async () => {
-            // Create valid upload with MinIO file
+            // Create valid upload with S3 file
             const validId = await createStuckUpload("processing", 5, {
-                hasMinioFile: true,
+                hasS3File: true,
             });
 
-            // Create orphaned MinIO objects
+            // Create orphaned S3 objects
             const orphanedIds = await Promise.all([
-                createOrphanedMinioObject(),
-                createOrphanedMinioObject(),
-                createOrphanedMinioObject(),
+                createOrphanedS3Object(),
+                createOrphanedS3Object(),
+                createOrphanedS3Object(),
             ]);
 
             // Run reconciliation
-            const orphanedMinioService = tester.getApp().container.resolve(OrphanedMinioReconciliation);
-            await orphanedMinioService.reconcile();
+            const orphanedS3Service = tester.getApp().container.resolve(OrphanedS3Reconciliation);
+            await orphanedS3Service.reconcile();
 
             // Verify: Valid object preserved
-            expect(await minioObjectExists(validId)).toBe(true);
+            expect(await s3ObjectExists(validId)).toBe(true);
 
             // Verify: Orphaned objects deleted
             for (const id of orphanedIds) {
-                expect(await minioObjectExists(id)).toBe(false);
+                expect(await s3ObjectExists(id)).toBe(false);
             }
         });
     });

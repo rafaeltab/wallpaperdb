@@ -12,7 +12,7 @@ import type { Readable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import { ResolutionMatcherService } from './resolution-matcher.service.js';
 import { EventsService, type GeneratedVariant } from './events.service.js';
 import type { Config, ResolutionPreset } from '../config.js';
@@ -22,15 +22,15 @@ import type { Config, ResolutionPreset } from '../config.js';
  *
  * Orchestrates the variant generation flow:
  * 1. Determine applicable resolution presets based on aspect ratio
- * 2. Download original file from MinIO
+ * 2. Download original file from S3
  * 3. Generate variants using Sharp (streaming for memory efficiency)
- * 4. Upload variants to MinIO
+ * 4. Upload variants to S3
  * 5. Publish wallpaper.variant.uploaded events
  */
 @injectable()
 export class VariantGeneratorService {
   constructor(
-    @inject(MinioConnection) private readonly minio: MinioConnection,
+    @inject(S3Connection) private readonly s3: S3Connection,
     @inject(ResolutionMatcherService) private readonly resolutionMatcher: ResolutionMatcherService,
     @inject(EventsService) private readonly events: EventsService,
     @inject('config') private readonly config: Config
@@ -121,10 +121,10 @@ export class VariantGeneratorService {
    * Generate a single variant at the specified resolution.
    *
    * Uses Sharp streaming for memory-efficient processing:
-   * 1. Stream original from MinIO
+   * 1. Stream original from S3
    * 2. Pipe through Sharp transformer
    * 3. Collect in memory buffer (necessary for file size calculation)
-   * 4. Upload to MinIO
+   * 4. Upload to S3
    *
    * @param wallpaper - The wallpaper metadata
    * @param preset - The target resolution preset
@@ -149,12 +149,12 @@ export class VariantGeneratorService {
         const extension = this.getExtensionFromMimeType(wallpaper.mimeType);
         const storageKey = `${wallpaper.id}/variant_${preset.width}x${preset.height}.${extension}`;
 
-        // Download original from MinIO
+        // Download original from S3
         const getCommand = new GetObjectCommand({
           Bucket: wallpaper.storageBucket,
           Key: wallpaper.storageKey,
         });
-        const response = await this.minio.getClient().send(getCommand);
+        const response = await this.s3.getClient().send(getCommand);
 
         if (!response.Body) {
           throw new Error(`Failed to download original file: ${wallpaper.storageKey}`);
@@ -181,14 +181,14 @@ export class VariantGeneratorService {
 
         span.setAttribute('output_size_bytes', fileSizeBytes);
 
-        // Upload to MinIO
+        // Upload to S3
         const putCommand = new PutObjectCommand({
           Bucket: wallpaper.storageBucket,
           Key: storageKey,
           Body: buffer,
           ContentType: wallpaper.mimeType,
         });
-        await this.minio.getClient().send(putCommand);
+        await this.s3.getClient().send(putCommand);
 
         const durationMs = Date.now() - startTime;
         span.setAttribute('duration_ms', durationMs);

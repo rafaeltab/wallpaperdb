@@ -19,7 +19,7 @@ const configSchema = z.object({
   ...ServerConfigSchema.shape,
   // Database config
   ...DatabaseConfigSchema.shape,
-  // S3/MinIO config (read-only access)
+  // S3 config (read-only access)
   ...S3ConfigSchema.shape,
   // NATS config (event consumer)
   ...NatsConfigSchema.shape,
@@ -43,7 +43,7 @@ export function loadConfig(): Config {
     // Database
     databaseUrl: process.env.DATABASE_URL,
 
-    // S3/MinIO (read-only access)
+    // S3 (read-only access)
     s3Endpoint: process.env.S3_ENDPOINT,
     s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,

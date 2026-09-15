@@ -78,7 +78,7 @@ Everything runs behind a single ingress at **http://localhost:8000**.
 | http://localhost:8000/opensearch-dashboards | OpenSearch Dashboards |
 | http://localhost:8000/nats | NATS monitoring |
 
-SeaweedFS exposes its S3 API at **http://localhost:8002** for slot 0 (`8002 + 10 × slot` for other worktrees). The default access key and secret key are both `minioadmin`. Use the AWS CLI or another S3 client to administer objects. Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout to release the old storage port and network alias. See [storage setup and migration](apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data) for instructions if you have already switched and for copying existing data without deleting its volumes.
+SeaweedFS exposes its S3 API at **http://localhost:8002** for slot 0 (`8002 + 10 × slot` for other worktrees). The default access key and secret key are both `storageadmin`. Use the AWS CLI or another S3 client to administer objects. Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout to release the old storage port. See [storage setup and migration](apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data) for instructions if you have already switched and for copying existing data without deleting its volumes.
 
 Individual service health checks:
 ```bash

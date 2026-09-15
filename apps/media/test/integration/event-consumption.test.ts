@@ -6,7 +6,7 @@ import {
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
 } from "@wallpaperdb/test-utils";
@@ -26,7 +26,7 @@ describe("Media Service - Event Consumption", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(MediaMigrationsTesterBuilder)
             .with(InProcessMediaTesterBuilder)
@@ -38,8 +38,8 @@ describe("Media Service - Event Consumption", () => {
             .withPostgres((builder) =>
                 builder.withDatabase(`test_media_events_${Date.now()}`),
             )
-            .withMinio()
-            .withMinioBucket("wallpapers")
+            .withS3()
+            .withS3Bucket("wallpapers")
             .withNats((builder) => builder.withJetstream())
             .withStream("WALLPAPER")
             .withMigrations()
@@ -311,9 +311,9 @@ describe("Media Service - Event Consumption", () => {
             0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
         ]);
 
-        // Upload the image to MinIO first (simulating what ingestor does)
+        // Upload the image to S3 first (simulating what ingestor does)
         const storageKey = "wlpr_test_005/original.jpg";
-        await tester.minio.uploadObject("wallpapers", storageKey, imageBuffer);
+        await tester.s3.uploadObject("wallpapers", storageKey, imageBuffer);
 
         // Publish wallpaper.uploaded event
         const event: WallpaperUploadedEvent = {
@@ -370,10 +370,10 @@ describe("Media Service - Event Consumption", () => {
         expect(responseBuffer).toEqual(imageBuffer);
     });
 
-    it("should return 404 when wallpaper exists in DB but file missing from MinIO", async () => {
+    it("should return 404 when wallpaper exists in DB but file missing from S3", async () => {
         const js = await tester.nats.getJsClient();
 
-        // Publish event for a wallpaper (but DON'T upload to MinIO)
+        // Publish event for a wallpaper (but DON'T upload to S3)
         const event: WallpaperUploadedEvent = {
             eventId: "evt_test_006",
             eventType: "wallpaper.uploaded",
@@ -408,7 +408,7 @@ describe("Media Service - Event Consumption", () => {
 
         expect(dbResult).toBeDefined();
 
-        // Try to GET the wallpaper (should fail - file not in MinIO)
+        // Try to GET the wallpaper (should fail - file not in S3)
         const app = tester.getApp();
         const response = await app.inject({
             method: "GET",

@@ -20,8 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # SeaweedFS - S3-compatible object storage. Keep the legacy DNS alias for
-  # existing generated .env files; new worktrees use seaweedfs:9000.
+  # SeaweedFS - S3-compatible object storage.
   seaweedfs:
     image: chrislusf/seaweedfs:4.47
     restart: unless-stopped
@@ -35,20 +34,15 @@ services:
       - -admin.ui=false
       - -webdav=false
     environment:
-      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-${MINIO_ROOT_USER:-minioadmin}}
-      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:-minioadmin}}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-storageadmin}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-storageadmin}
       S3_BUCKET: wallpapers,example-bucket
     ports:
-      - "${S3_API_HOST_PORT:-${MINIO_API_HOST_PORT:-9000}}:9000"
+      - "${S3_API_HOST_PORT:-9000}:9000"
     volumes:
-      # SeaweedFS cannot read the old MinIO disk format. Preserve minio-data
-      # separately; see the object storage migration guide before copying data.
+      # Keep previous storage volumes separate; see the migration guide before copying data.
       - seaweedfs-data:/data
       - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
-    networks:
-      default:
-        aliases:
-          - minio
     healthcheck:
       # The status endpoint responds before bucket bootstrap finishes. Verify
       # authenticated S3 access to both buckets before declaring readiness.

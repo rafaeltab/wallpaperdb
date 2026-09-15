@@ -1,61 +1,57 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
-import { normalizeStorageEnvironment } from "./env-pipeline.mjs";
+import { applyOverrides, extractKeys, filterApplicableSecrets, parseEnvValues } from "./env-pipeline.mjs";
 
-test("legacy storage credentials and port survive environment generation", () => {
-	const environment = Object.freeze({
-		MINIO_ROOT_USER: "custom-storage-user",
-		MINIO_ROOT_PASSWORD: "custom-storage-secret",
-		MINIO_API_HOST_PORT: "8122",
-		NATS_URL: "nats://custom-nats:4222",
-	});
+const templatePaths = [
+  "infra/.env.example",
+  "apps/ingestor/.env.example",
+  "apps/media/.env.example",
+  "apps/color-extractor/.env.example",
+  "apps/variant-generator/.env.example",
+];
 
-	assert.deepEqual(normalizeStorageEnvironment(environment), {
-		...environment,
-		S3_ACCESS_KEY_ID: "custom-storage-user",
-		S3_SECRET_ACCESS_KEY: "custom-storage-secret",
-		S3_API_HOST_PORT: "8122",
-	});
+for (const path of templatePaths) {
+  test(`${path} preserves custom S3 credentials during environment generation`, () => {
+    const template = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+    const credentials = Object.freeze({
+      S3_ACCESS_KEY_ID: "custom-storage-user",
+      S3_SECRET_ACCESS_KEY: "custom-storage-secret",
+    });
+    const applicable = filterApplicableSecrets(credentials, extractKeys(template), path, () => {});
+    const generated = parseEnvValues(applyOverrides(template, applicable, {}));
+
+    assert.equal(generated.S3_ACCESS_KEY_ID, credentials.S3_ACCESS_KEY_ID);
+    assert.equal(generated.S3_SECRET_ACCESS_KEY, credentials.S3_SECRET_ACCESS_KEY);
+  });
+}
+
+test("storage host port overrides the worktree slot without leaking unrelated secrets", () => {
+  const template = readFileSync(new URL("../../infra/.env.example", import.meta.url), "utf8");
+  const secrets = { S3_API_HOST_PORT: "8122", UNRELATED_API_SECRET: "private-value" };
+  const worktreeContent = applyOverrides(template, { S3_API_HOST_PORT: "8012" }, {});
+  const applicable = filterApplicableSecrets(secrets, extractKeys(template), "infra", () => {});
+  const generated = parseEnvValues(applyOverrides(worktreeContent, applicable, {}));
+
+  assert.equal(generated.S3_API_HOST_PORT, "8122");
+  assert.equal(generated.UNRELATED_API_SECRET, undefined);
 });
 
-test("explicit S3 credentials and port take precedence over legacy values", () => {
-	const environment = {
-		S3_ACCESS_KEY_ID: "new-storage-user",
-		S3_SECRET_ACCESS_KEY: "new-storage-secret",
-		S3_API_HOST_PORT: "0",
-		MINIO_ROOT_USER: "old-storage-user",
-		MINIO_ROOT_PASSWORD: "old-storage-secret",
-		MINIO_API_HOST_PORT: "8122",
-	};
+test("empty storage secrets preserve development credentials from the template", () => {
+  const template = readFileSync(new URL("../../infra/.env.example", import.meta.url), "utf8");
+  const applicable = filterApplicableSecrets({ S3_ACCESS_KEY_ID: "", S3_SECRET_ACCESS_KEY: "" },
+    extractKeys(template), "infra", () => {});
+  const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
-	assert.deepEqual(normalizeStorageEnvironment(environment), environment);
+  assert.equal(generated.S3_ACCESS_KEY_ID, "storageadmin");
+  assert.equal(generated.S3_SECRET_ACCESS_KEY, "storageadmin");
 });
 
-test("empty S3 settings fall back to configured legacy values", () => {
-	assert.deepEqual(normalizeStorageEnvironment({
-		S3_ACCESS_KEY_ID: "",
-		S3_SECRET_ACCESS_KEY: "",
-		S3_API_HOST_PORT: "",
-		MINIO_ROOT_USER: "legacy-user",
-		MINIO_ROOT_PASSWORD: "legacy-secret",
-		MINIO_API_HOST_PORT: "8122",
-	}), {
-		S3_ACCESS_KEY_ID: "legacy-user",
-		S3_SECRET_ACCESS_KEY: "legacy-secret",
-		S3_API_HOST_PORT: "8122",
-		MINIO_ROOT_USER: "legacy-user",
-		MINIO_ROOT_PASSWORD: "legacy-secret",
-		MINIO_API_HOST_PORT: "8122",
-	});
-});
+test("ingestor environment generation preserves a custom S3 cleanup interval", () => {
+  const template = readFileSync(new URL("../../apps/ingestor/.env.example", import.meta.url), "utf8");
+  const applicable = filterApplicableSecrets({ S3_CLEANUP_INTERVAL_MS: "60000" },
+    extractKeys(template), "apps/ingestor", () => {});
+  const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
-test("unconfigured storage values leave defaults to the environment template", () => {
-	const environment = {
-		DATABASE_URL: "postgresql://database/wallpaperdb",
-		MINIO_ROOT_USER: "",
-		S3_SECRET_ACCESS_KEY: "",
-	};
-
-	assert.deepEqual(normalizeStorageEnvironment(environment), environment);
-	assert.deepEqual(normalizeStorageEnvironment({}), {});
+  assert.equal(generated.S3_CLEANUP_INTERVAL_MS, "60000");
 });

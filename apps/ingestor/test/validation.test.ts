@@ -3,7 +3,7 @@ import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
     FixturesTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -21,7 +21,7 @@ describe("Validation Integration Tests", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(FixturesTesterBuilder)
@@ -34,9 +34,9 @@ describe("Validation Integration Tests", () => {
         tester
             .withPostgres((b) => b.withDatabase(`test_validation_${Date.now()}`))
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats((b) => b.withJetstream())
             .withNatsAutoCleanup()
             .withMigrations()
@@ -61,7 +61,7 @@ describe("Validation Integration Tests", () => {
     });
 
     beforeEach(async () => {
-        await tester.minio.cleanupBuckets();
+        await tester.s3.cleanupBuckets();
     });
 
     describe("File Format Validation", () => {

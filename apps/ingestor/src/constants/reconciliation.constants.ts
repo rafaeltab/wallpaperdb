@@ -15,6 +15,6 @@ export const ReconciliationConstants = {
   /** Maximum upload retry attempts before marking as failed */
   MAX_UPLOAD_RETRIES: 3,
 
-  /** Batch size for processing MinIO objects during cleanup */
-  MINIO_CLEANUP_BATCH_SIZE: 20,
+  /** Batch size for processing S3 objects during cleanup */
+  S3_CLEANUP_BATCH_SIZE: 20,
 } as const;

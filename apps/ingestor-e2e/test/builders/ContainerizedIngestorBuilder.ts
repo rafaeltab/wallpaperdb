@@ -2,7 +2,7 @@ import {
     type AddMethodsType,
     BaseTesterBuilder,
     type DockerTesterBuilder,
-    type MinioTesterBuilder,
+    type S3TesterBuilder,
     type NatsTesterBuilder,
     type PostgresTesterBuilder,
     type RedisTesterBuilder,
@@ -55,7 +55,7 @@ export interface ContainerizedIngestorOptions {
  * const TesterClass = createTesterBuilder()
  *   .with(DockerTesterBuilder)
  *   .with(PostgresTesterBuilder)
- *   .with(MinioTesterBuilder)
+ *   .with(S3TesterBuilder)
  *   .with(NatsTesterBuilder)
  *   .with(ContainerizedIngestorTesterBuilder)
  *   .build();
@@ -64,7 +64,7 @@ export interface ContainerizedIngestorOptions {
  * tester
  *   .withNetwork()
  *   .withPostgres((b) => b.withNetworkAlias('postgres'))
- *   .withMinio((b) => b.withNetworkAlias('minio'))
+ *   .withS3((b) => b.withNetworkAlias('s3'))
  *   .withNats((b) => b.withNetworkAlias('nats'));
  *
  * await tester.setup();
@@ -77,7 +77,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
     [
         DockerTesterBuilder,
         PostgresTesterBuilder,
-        MinioTesterBuilder,
+        S3TesterBuilder,
         NatsTesterBuilder,
         RedisTesterBuilder,
     ]
@@ -95,7 +95,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
             [
                 DockerTesterBuilder,
                 PostgresTesterBuilder,
-                MinioTesterBuilder,
+                S3TesterBuilder,
                 NatsTesterBuilder,
                 RedisTesterBuilder,
             ]
@@ -124,12 +124,12 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                     );
                     const network = this.docker.network;
                     const postgres = this.getPostgres();
-                    const minio = this.getMinio();
+                    const s3 = this.getS3();
                     const nats = this.getNats();
 
-                    if (!postgres || !minio || !nats) {
+                    if (!postgres || !s3 || !nats) {
                         throw new Error(
-                            "ContainerizedIngestorTesterBuilder requires DockerTesterBuilder, PostgresTesterBuilder, MinioTesterBuilder, and NatsTesterBuilder",
+                            "ContainerizedIngestorTesterBuilder requires DockerTesterBuilder, PostgresTesterBuilder, S3TesterBuilder, and NatsTesterBuilder",
                         );
                     }
 
@@ -148,12 +148,12 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                                 ? postgres.connectionStrings.networked
                                 : postgres.connectionStrings.directIp,
                             S3_ENDPOINT: network
-                                ? minio.endpoints.networked
-                                : minio.endpoints.directIp,
-                            S3_ACCESS_KEY_ID: minio.options.accessKey,
-                            S3_SECRET_ACCESS_KEY: minio.options.secretKey,
+                                ? s3.endpoints.networked
+                                : s3.endpoints.directIp,
+                            S3_ACCESS_KEY_ID: s3.options.accessKey,
+                            S3_SECRET_ACCESS_KEY: s3.options.secretKey,
                             S3_BUCKET:
-                                minio.buckets.length > 0 ? minio.buckets[0] : "wallpapers",
+                                s3.buckets.length > 0 ? s3.buckets[0] : "wallpapers",
                             NATS_URL: network
                                 ? nats.endpoints.networked
                                 : nats.endpoints.directIp,
@@ -163,7 +163,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
                             PORT: "3001",
                             // Explicitly set fast reconciliation intervals for E2E tests
                             RECONCILIATION_INTERVAL_MS: "1000", // 1 second for E2E tests
-                            MINIO_CLEANUP_INTERVAL_MS: "2000", // 2 seconds for E2E tests
+                            S3_CLEANUP_INTERVAL_MS: "2000", // 2 seconds for E2E tests
                         };
 
                         // Add Redis if enabled

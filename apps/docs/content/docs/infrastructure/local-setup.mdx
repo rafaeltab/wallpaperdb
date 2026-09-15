@@ -142,7 +142,7 @@ This starts all services in development mode with hot-reload.
 - Grafana: http://localhost:3000
 - SeaweedFS S3 API: http://localhost:8002 (slot 0)
 
-The S3 endpoint uses `8002 + 10 × slot` for other worktrees; inspect `S3_API_HOST_PORT` in `infra/.env`. Apps in Docker use `http://seaweedfs:9000`. For an existing environment, follow the [MinIO data migration procedure](/docs/infrastructure/seaweedfs#existing-minio-data) before relying on stored wallpapers.
+The S3 endpoint uses `8002 + 10 × slot` for other worktrees; inspect `S3_API_HOST_PORT` in `infra/.env`. Apps in Docker use `http://seaweedfs:9000`. For an existing environment, follow the [S3 data migration procedure](/docs/infrastructure/seaweedfs#existing-minio-data) before relying on stored wallpapers.
 
 ## Verifying Setup
 
@@ -158,7 +158,7 @@ curl http://localhost:3001/health
   "status": "healthy",
   "checks": {
     "database": { "status": "healthy" },
-    "minio": { "status": "healthy" },
+    "s3": { "status": "healthy" },
     "nats": { "status": "healthy" },
     "redis": { "status": "healthy" }
   }

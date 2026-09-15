@@ -1,7 +1,7 @@
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -18,7 +18,7 @@ describe("Health Endpoint E2E", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
@@ -32,9 +32,9 @@ describe("Health Endpoint E2E", () => {
                 builder.withDatabase(`test_e2e_health_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats()
             .withNatsAutoCleanup()
             .withStream("WALLPAPER")
@@ -77,7 +77,7 @@ describe("Health Endpoint E2E", () => {
             status: "healthy",
             checks: {
                 database: true,
-                minio: true,
+                s3: true,
                 nats: true,
                 otel: true,
             },

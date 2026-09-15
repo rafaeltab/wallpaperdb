@@ -1,8 +1,8 @@
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { BaseConnection } from "./base/base-connection.js";
-import type { MinioConfig } from "./types.js";
+import type { S3Config } from "./types.js";
 
-export interface MinioConnectionOptions {
+export interface S3ConnectionOptions {
   /**
    * Whether to use path-style URLs for S3 requests.
    * Required for local S3-compatible storage. Defaults to true.
@@ -14,13 +14,12 @@ export interface MinioConnectionOptions {
 
 /**
  * S3 connection manager (SeaweedFS in local development and tests).
- * The MinioConnection name is retained for existing consumers and health keys;
- * the implementation uses only the AWS S3 API and accepts any configured endpoint.
+ * Uses the AWS S3 API and accepts any configured S3-compatible endpoint.
  * Extends BaseConnection to provide lifecycle management for S3Client.
  *
  * @example
  * ```typescript
- * const connection = new MinioConnection(config);
+ * const connection = new S3Connection(config);
  * await connection.initialize();
  *
  * const client = connection.getClient();
@@ -29,10 +28,10 @@ export interface MinioConnectionOptions {
  * await connection.close();
  * ```
  */
-export class MinioConnection extends BaseConnection<S3Client, MinioConfig> {
+export class S3Connection extends BaseConnection<S3Client, S3Config> {
   constructor(
-    config: MinioConfig,
-    private readonly options: MinioConnectionOptions = {}
+    config: S3Config,
+    private readonly options: S3ConnectionOptions = {}
   ) {
     super(config);
   }
@@ -54,7 +53,7 @@ export class MinioConnection extends BaseConnection<S3Client, MinioConfig> {
   }
 
   /**
-   * Check MinIO connection health by attempting to access the configured bucket.
+   * Check S3 connection health by attempting to access the configured bucket.
    *
    * @returns true if bucket is accessible, false otherwise
    */
@@ -67,7 +66,7 @@ export class MinioConnection extends BaseConnection<S3Client, MinioConfig> {
       );
       return true;
     } catch (error) {
-      console.error("MinIO health check failed:", error);
+      console.error("S3 health check failed:", error);
       return false;
     }
   }

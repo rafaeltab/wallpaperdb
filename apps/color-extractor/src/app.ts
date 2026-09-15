@@ -3,7 +3,7 @@ import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import type { Config } from './config.js';
-import { MinioConnection } from './connections/minio.js';
+import { S3Connection } from './connections/s3.js';
 import { NatsConnectionManager } from './connections/nats.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
@@ -11,7 +11,7 @@ import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper
 import { ColorExtractionProcessor } from './services/color-extraction-processor.js';
 import { EventsService } from './services/events.service.js';
 import { HsvEmbeddingStrategy } from './services/hsv-embedding-strategy.js';
-import { MinioImageReader } from './services/minio-image-reader.js';
+import { S3ImageReader } from './services/s3-image-reader.js';
 import {
   COLORS_EXTRACTED_PUBLISHER,
   COLOR_EXTRACTION_USE_CASE,
@@ -38,10 +38,10 @@ export async function createApp(
   options?: { logger?: boolean; enableOtel?: boolean }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
-  container.registerSingleton(MinioConnection, MinioConnection);
+  container.registerSingleton(S3Connection, S3Connection);
   container.registerSingleton(NatsConnectionManager, NatsConnectionManager);
   container.register(HsvEmbeddingStrategy, { useClass: HsvEmbeddingStrategy });
-  container.register(IMAGE_READER, { useClass: MinioImageReader });
+  container.register(IMAGE_READER, { useClass: S3ImageReader });
   container.register(HISTOGRAM_PROVIDER, { useClass: SharpHistogramProvider });
   container.register(COLORS_EXTRACTED_PUBLISHER, { useClass: EventsService });
   container.register(COLOR_EXTRACTION_USE_CASE, { useClass: ColorExtractionProcessor });
@@ -106,8 +106,8 @@ export async function createApp(
   fastify.log.info('Initializing connections...');
 
   try {
-    await container.resolve(MinioConnection).initialize();
-    fastify.log.info('MinIO connection created');
+    await container.resolve(S3Connection).initialize();
+    fastify.log.info('S3 connection created');
 
     await container.resolve(NatsConnectionManager).initialize();
     fastify.log.info('NATS connection created');
@@ -141,7 +141,7 @@ export async function createApp(
     }
 
     await container.resolve(NatsConnectionManager).close();
-    await container.resolve(MinioConnection).close();
+    await container.resolve(S3Connection).close();
     await shutdownOtel();
   });
 

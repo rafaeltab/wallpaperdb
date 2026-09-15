@@ -2,7 +2,7 @@ import "reflect-metadata";
 import {
 	createDefaultTesterBuilder,
 	DockerTesterBuilder,
-	MinioTesterBuilder,
+	S3TesterBuilder,
 	NatsTesterBuilder,
 	PostgresTesterBuilder,
 } from "@wallpaperdb/test-utils";
@@ -17,7 +17,7 @@ describe("Media Service - Health Endpoint", () => {
 		const TesterClass = createDefaultTesterBuilder()
 			.with(DockerTesterBuilder)
 			.with(PostgresTesterBuilder)
-			.with(MinioTesterBuilder)
+			.with(S3TesterBuilder)
 			.with(NatsTesterBuilder)
 			.with(MediaMigrationsTesterBuilder)
 			.with(InProcessMediaTesterBuilder)
@@ -30,8 +30,8 @@ describe("Media Service - Health Endpoint", () => {
 			.withPostgres((builder) =>
 				builder.withDatabase(`test_media_health_${Date.now()}`),
 			)
-			.withMinio()
-			.withMinioBucket("wallpapers")
+			.withS3()
+			.withS3Bucket("wallpapers")
 			.withNats((builder) => builder.withJetstream())
 			.withStream("WALLPAPER")
 			.withMigrations()
@@ -68,7 +68,7 @@ describe("Media Service - Health Endpoint", () => {
 		expect(body.status).toBe("healthy");
 		expect(body.checks).toBeDefined();
 		expect(body.checks.database).toBeDefined();
-		expect(body.checks.minio).toBeDefined();
+		expect(body.checks.s3).toBeDefined();
 		expect(body.checks.nats).toBeDefined();
 		expect(body.timestamp).toBeDefined();
 	});
@@ -99,7 +99,7 @@ describe("Media Service - Health Endpoint", () => {
 
 		// Verify all required dependencies are checked
 		expect(body.checks).toHaveProperty("database");
-		expect(body.checks).toHaveProperty("minio");
+		expect(body.checks).toHaveProperty("s3");
 		expect(body.checks).toHaveProperty("nats");
 
 		// Media service should have otel check (initialized)

@@ -19,4 +19,4 @@ Shared infrastructure foundation for all WallpaperDB microservices, providing th
 - **`@kubiks/otel-drizzle`** instruments Drizzle ORM queries with OpenTelemetry spans, capturing query text as span attributes
 - **Source-only package** — exports point directly to TypeScript source files with no build step; consuming services compile it as part of their own build via Turborepo workspace dependencies
 
-The public `MinioConnection` name is retained for compatibility. It uses the AWS SDK S3 client and works with SeaweedFS through the existing `S3_*` configuration.
+`S3Connection` uses the AWS SDK S3 client and connects to SeaweedFS or another S3-compatible endpoint through the `S3_*` configuration.

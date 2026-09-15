@@ -12,10 +12,10 @@ Replace all `console.log/error` with Pino structured logging.
 
 ```typescript
 // apps/ingestor/src/services/storage.service.ts:78
-console.error('MinIO upload failed:', error);
+console.error('S3 upload failed:', error);
 
 // apps/ingestor/src/services/storage.service.ts:142
-console.error('Failed to delete from MinIO:', error);
+console.error('Failed to delete from S3:', error);
 
 // apps/ingestor/src/services/reconciliation/base-reconciliation.service.ts:136
 console.error(`Error in ${operationName}:`, error);
@@ -36,7 +36,7 @@ export class StorageService {
     try {
       // ...
     } catch (error) {
-      this.logger.error('MinIO upload failed', {
+      this.logger.error('S3 upload failed', {
         wallpaperId,
         error: error instanceof Error ? error.message : String(error),
       });

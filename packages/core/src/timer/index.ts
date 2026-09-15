@@ -3,7 +3,7 @@
  *
  * Inject this into any class that calls setInterval/setTimeout so that tests
  * can swap in FakeTimerService and control time deterministically without
- * touching global timers (which would freeze PostgreSQL, NATS, and MinIO
+ * touching global timers (which would freeze PostgreSQL, NATS, and S3
  * drivers used in integration tests).
  */
 export interface TimerService {

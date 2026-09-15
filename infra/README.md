@@ -42,9 +42,9 @@ make infra-logs     # Tail logs from all services
 After starting the infrastructure:
 
 - PostgreSQL: `postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb`
-- SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `minioadmin`)
+- SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `storageadmin`)
   - Other worktrees use `8002 + 10 × slot`; check `S3_API_HOST_PORT` in `infra/.env`.
-  - Applications in Docker use `http://seaweedfs:9000`. Use an S3 client for object administration; the old `/minio` console route is removed.
+  - Applications in Docker use `http://seaweedfs:9000`. Use an S3 client for object administration.
 - OpenSearch: http://localhost:9200
 - OpenSearch Dashboards: http://localhost:5601
 - NATS: `nats://localhost:4222`
@@ -55,7 +55,7 @@ After starting the infrastructure:
 
 ## Configuration
 
-The worktree setup generates `infra/.env` from `.env.example`. The default values work for local development. Storage uses `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_API_HOST_PORT`. Legacy `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, and `MINIO_API_HOST_PORT` values remain fallbacks when the corresponding S3 variable is absent. The `minio` Docker network alias remains available for existing app environments.
+The worktree setup generates `infra/.env` from `.env.example`. The default values work for local development. Storage uses `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_API_HOST_PORT`. Existing environments must update their storage variables and regenerate application endpoints as described in the [migration guide](../apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data).
 
 ## Volumes
 
@@ -66,7 +66,7 @@ All data is persisted in Docker volumes:
 - `nats-data` - Message queue data
 - `lgtm-data` - Grafana LGTM stack (metrics, logs, traces, dashboards)
 
-Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout. If already switched, follow the migration guide to remove the orphaned MinIO containers without removing volumes; otherwise the old service can retain the S3 port and network alias. The old `minio-data` volume is retained and is incompatible with SeaweedFS. Existing data is not copied automatically. Back up the database and objects, copy through the S3 API with metadata preservation, and verify the destination before retiring the source. See the [migration procedure](../apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data).
+Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout. If already switched, follow the migration guide to remove the orphaned MinIO containers without removing volumes; otherwise the old service can retain the S3 port. The old `minio-data` volume is retained and is incompatible with SeaweedFS. Existing data is not copied automatically. Back up the database and objects, copy through the S3 API with metadata preservation, and verify the destination before retiring the source. See the [migration procedure](../apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data).
 
 ## Initialization Scripts
 
@@ -75,7 +75,7 @@ Example initialization scripts are provided in:
 - `opensearch/init/` - Index creation scripts
 - `nats/init/` - Stream creation scripts
 
-SeaweedFS `mini` creates `wallpapers` and `example-bucket` automatically from `S3_BUCKET`. The pinned image is `chrislusf/seaweedfs:4.47`; no separate bucket initializer or MinIO client is required.
+SeaweedFS `mini` creates `wallpapers` and `example-bucket` automatically from `S3_BUCKET`. The pinned image is `chrislusf/seaweedfs:4.47`; no separate bucket initializer or separate storage client is required.
 
 ## Observability with LGTM
 

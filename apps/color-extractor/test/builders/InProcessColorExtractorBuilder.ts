@@ -1,7 +1,7 @@
 import {
   type AddMethodsType,
   BaseTesterBuilder,
-  type MinioTesterBuilder,
+  type S3TesterBuilder,
   type NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import type { FastifyInstance } from 'fastify';
@@ -19,7 +19,7 @@ export interface InProcessColorExtractorOptions {
 
 export class InProcessColorExtractorTesterBuilder extends BaseTesterBuilder<
   'InProcessColorExtractor',
-  [MinioTesterBuilder, NatsTesterBuilder]
+  [S3TesterBuilder, NatsTesterBuilder]
 > {
   readonly name = 'InProcessColorExtractor' as const;
   private options: InProcessColorExtractorOptions;
@@ -29,7 +29,7 @@ export class InProcessColorExtractorTesterBuilder extends BaseTesterBuilder<
     this.options = options;
   }
 
-  addMethods<TBase extends AddMethodsType<[MinioTesterBuilder, NatsTesterBuilder]>>(
+  addMethods<TBase extends AddMethodsType<[S3TesterBuilder, NatsTesterBuilder]>>(
     Base: TBase
   ) {
     const options = this.options;
@@ -41,12 +41,12 @@ export class InProcessColorExtractorTesterBuilder extends BaseTesterBuilder<
       withColorExtractorEnvironment() {
         this.addSetupHook(async () => {
           logger.debug('[InProcessColorExtractor] Setting up environment variables');
-          const minio = this.getMinio();
+          const s3 = this.getS3();
           const nats = this.getNats();
 
-          if (!minio || !nats) {
+          if (!s3 || !nats) {
             throw new Error(
-              'InProcessColorExtractorTesterBuilder requires MinioTesterBuilder and NatsTesterBuilder'
+              'InProcessColorExtractorTesterBuilder requires S3TesterBuilder and NatsTesterBuilder'
             );
           }
 
@@ -54,10 +54,10 @@ export class InProcessColorExtractorTesterBuilder extends BaseTesterBuilder<
 
           process.env.NODE_ENV = 'test';
           process.env.PORT = '3004';
-          process.env.S3_ENDPOINT = minio.endpoints.fromHost;
-          process.env.S3_ACCESS_KEY_ID = minio.options.accessKey;
-          process.env.S3_SECRET_ACCESS_KEY = minio.options.secretKey;
-          process.env.S3_BUCKET = minio.buckets.length > 0 ? minio.buckets[0] : 'wallpapers';
+          process.env.S3_ENDPOINT = s3.endpoints.fromHost;
+          process.env.S3_ACCESS_KEY_ID = s3.options.accessKey;
+          process.env.S3_SECRET_ACCESS_KEY = s3.options.secretKey;
+          process.env.S3_BUCKET = s3.buckets.length > 0 ? s3.buckets[0] : 'wallpapers';
           process.env.NATS_URL = nats.endpoints.fromHost;
           process.env.NATS_STREAM = nats.streams.length > 0 ? nats.streams[0] : 'WALLPAPER';
           process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318/v1/traces';

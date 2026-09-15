@@ -10,7 +10,7 @@
 import {
     createDefaultTesterBuilder,
     DockerTesterBuilder,
-    MinioTesterBuilder,
+    S3TesterBuilder,
     NatsTesterBuilder,
     PostgresTesterBuilder,
     RedisTesterBuilder,
@@ -95,7 +95,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                     rateLimitMax: 10,
                     rateLimitWindowMs: 10000,
                     reconciliationIntervalMs: 60000,
-                    minioCleanupIntervalMs: 60000,
+                    s3CleanupIntervalMs: 60000,
                 },
             });
         }
@@ -105,7 +105,7 @@ describe("E2E Multi-Instance Rate Limiting", () => {
         const TesterClass = createDefaultTesterBuilder()
             .with(DockerTesterBuilder)
             .with(PostgresTesterBuilder)
-            .with(MinioTesterBuilder)
+            .with(S3TesterBuilder)
             .with(NatsTesterBuilder)
             .with(RedisTesterBuilder)
             .with(IngestorMigrationsTesterBuilder)
@@ -119,9 +119,9 @@ describe("E2E Multi-Instance Rate Limiting", () => {
                 builder.withDatabase(`test_e2e_rate_limit_${Date.now()}`),
             )
             .withPostgresAutoCleanup(["wallpapers"])
-            .withMinio()
-            .withMinioBucket("wallpapers")
-            .withMinioAutoCleanup()
+            .withS3()
+            .withS3Bucket("wallpapers")
+            .withS3AutoCleanup()
             .withNats()
             .withStream("WALLPAPER")
             .withNatsAutoCleanup()

@@ -49,8 +49,8 @@ NODE_ENV=development
 
 # SeaweedFS/S3
 S3_ENDPOINT=http://localhost:8002
-S3_ACCESS_KEY_ID=minioadmin
-S3_SECRET_ACCESS_KEY=minioadmin
+S3_ACCESS_KEY_ID=storageadmin
+S3_SECRET_ACCESS_KEY=storageadmin
 S3_BUCKET=wallpapers
 S3_REGION=us-east-1
 
@@ -81,7 +81,7 @@ Health check with dependency status.
 {
   "status": "healthy",
   "checks": {
-    "minio": true,
+    "s3": true,
     "nats": true,
     "otel": true
   }

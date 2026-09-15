@@ -49,7 +49,7 @@ export class MyCustomTesterBuilder extends BaseTesterBuilder<
 ```typescript
 export class MyCustomTesterBuilder extends BaseTesterBuilder<
   "MyCustom",
-  [PostgresTesterBuilder, MinioTesterBuilder]  // Requires both
+  [PostgresTesterBuilder, S3TesterBuilder]  // Requires both
 > {
   readonly name = "MyCustom" as const;
 }
@@ -59,7 +59,7 @@ export class MyCustomTesterBuilder extends BaseTesterBuilder<
 
 ```typescript
 addMethods<
-  TBase extends AddMethodsType<[PostgresTesterBuilder, MinioTesterBuilder]>
+  TBase extends AddMethodsType<[PostgresTesterBuilder, S3TesterBuilder]>
 >(Base: TBase) {
   return class extends Base {
     override async setup(): Promise<void> {
@@ -156,7 +156,7 @@ import type { FastifyInstance } from "fastify";
 import {
   BaseTesterBuilder,
   type PostgresTesterBuilder,
-  type MinioTesterBuilder,
+  type S3TesterBuilder,
   type NatsTesterBuilder,
   type AddMethodsType,
 } from "@wallpaperdb/test-utils";
@@ -164,13 +164,13 @@ import { createApp } from "../../src/app.js";
 
 export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
   "InProcessIngestor",
-  [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+  [PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]
 > {
   readonly name = "InProcessIngestor" as const;
 
   addMethods<
     TBase extends AddMethodsType<
-      [PostgresTesterBuilder, MinioTesterBuilder, NatsTesterBuilder]
+      [PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]
     >,
   >(Base: TBase) {
     return class extends Base {
@@ -180,12 +180,12 @@ export class InProcessIngestorTesterBuilder extends BaseTesterBuilder<
         await super.setup();
 
         const postgres = this.getPostgres();
-        const minio = this.getMinio();
+        const s3 = this.getS3();
         const nats = this.getNats();
 
         // Set environment variables
         process.env.DATABASE_URL = postgres.connectionString;
-        process.env.S3_ENDPOINT = minio.endpoint;
+        process.env.S3_ENDPOINT = s3.endpoints.fromHost;
         process.env.NATS_URL = nats.endpoint;
 
         // Create app
@@ -234,7 +234,7 @@ class RateLimitIngestorTesterBuilder extends InProcessIngestorTesterBuilder {
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(PostgresTesterBuilder)
-  .with(MinioTesterBuilder)
+  .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
   .with(RedisTesterBuilder)
   .with(IngestorMigrationsTesterBuilder)
@@ -266,7 +266,7 @@ override async setup(): Promise<void> {
   await super.setup();
 
   const postgres = this.getPostgres();
-  const minio = this.getMinio();
+  const s3 = this.getS3();
   const nats = this.getNats();
 
   console.log(postgres.connectionString);

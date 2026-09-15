@@ -271,7 +271,7 @@ apps/<service-name>/
 │   │   └── <feature>.service.ts
 │   ├── connections/
 │   │   ├── database.ts     # Service-specific connection
-│   │   ├── minio.ts
+│   │   ├── s3.ts
 │   │   └── nats.ts
 │   ├── db/
 │   │   └── schema.ts       # Drizzle schema
@@ -324,12 +324,12 @@ export const config: Config = MyServiceConfigSchema.parse(process.env);
 **Use shared connection managers:**
 
 ```typescript
-import { DatabaseConnection, MinioConnection, NatsConnectionManager } from '@wallpaperdb/core/connections';
+import { DatabaseConnection, S3Connection, NatsConnectionManager } from '@wallpaperdb/core/connections';
 import { container } from 'tsyringe';
 
 // Register connections
 container.registerSingleton(DatabaseConnection);
-container.registerSingleton(MinioConnection);
+container.registerSingleton(S3Connection);
 container.registerSingleton(NatsConnectionManager);
 container.register('config', { useValue: config });
 
@@ -337,8 +337,8 @@ container.register('config', { useValue: config });
 const db = container.resolve(DatabaseConnection);
 await db.initialize();
 
-const minio = container.resolve(MinioConnection);
-await minio.initialize();
+const s3 = container.resolve(S3Connection);
+await s3.initialize();
 
 const nats = container.resolve(NatsConnectionManager);
 await nats.initialize();
@@ -532,7 +532,7 @@ describe('My Service', () => {
   it('should process feature', async () => {
     const { app, db, cleanup } = await new TesterBuilder()
       .withPostgres()
-      .withMinIO()
+      .withS3()
       .withNATS()
       .withRedis()
       .withMyServiceApp()

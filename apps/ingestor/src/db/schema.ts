@@ -16,8 +16,8 @@ export const fileTypeEnum = pgEnum('file_type', ['image', 'video']);
 
 export const uploadStateEnum = pgEnum('upload_state', [
   'initiated', // Intent recorded, nothing uploaded yet
-  'uploading', // MinIO upload in progress
-  'stored', // In MinIO + DB, awaiting NATS publish
+  'uploading', // S3 upload in progress
+  'stored', // In S3 + DB, awaiting NATS publish
   'processing', // Event published, downstream processing
   'completed', // All downstream processing complete
   'failed', // Terminal failure state

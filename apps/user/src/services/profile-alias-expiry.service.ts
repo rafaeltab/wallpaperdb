@@ -38,7 +38,9 @@ export class ProfileAliasExpiryWorker {
     this.stopping = true;
     if (this.interval) this.timer.clearInterval(this.interval);
     this.interval = null;
-    await this.inFlight;
+    // A failed scan is reported by the running cycle; it must not prevent
+    // the application from closing its remaining dependencies.
+    await this.inFlight?.catch(() => {});
   }
 
   expirePending(): Promise<void> {

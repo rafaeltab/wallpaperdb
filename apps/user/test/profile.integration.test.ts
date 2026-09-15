@@ -328,6 +328,23 @@ describe('Profile commands', () => {
     }
   });
 
+  it('drains a failed alias scan during shutdown without preventing dependency cleanup', async () => {
+    const failure = new Error('database scan failed');
+    const scan = vi.spyOn(database.getClient().db.query.handleClaims, 'findMany').mockRejectedValue(failure);
+    const timer = new FakeTimerService();
+    const logger = { error: vi.fn() };
+    const worker = new ProfileAliasExpiryWorker(database, async () => false, logger, timer);
+    try {
+      worker.start();
+      await expect(worker.stop()).resolves.toBeUndefined();
+      expect(logger.error).toHaveBeenCalledWith({ err: failure }, 'Profile alias expiry cycle failed');
+      await timer.tickAsync(1_000);
+      expect(scan).toHaveBeenCalledTimes(1);
+    } finally {
+      scan.mockRestore();
+    }
+  });
+
   it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
     const before = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();

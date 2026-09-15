@@ -14,7 +14,8 @@ Available alternatives:
 - C — Editable details: a compact list with clear labels and section boundaries.
 - D — Inline profile (prototype 4): B’s composition with matching inline text editors and a custom banner.
 
-All alternatives use dialogs for pictures, biography and previous handles.
+All alternatives use dialogs for pictures and previous handles. A/B/C retain biography dialogs;
+D edits biography inline. D also offers a banner dialog.
 Use “Profile handle” in user-facing copy. Show routine refresh only as contextual recovery
 in the eventual implementation. The current biography refresh reloads the profile, preserves
 unsaved text, updates its concurrency version, and retries embedded wallpaper previews.
@@ -34,7 +35,8 @@ When selected, implement the chosen behavior with TDD and remove this prototype 
   familiar settings navigation. Uses more vertical space on a phone.
 - `/web/settings/profile?variant=D` — **Inline profile** (prototype 4): B’s banner/overlapping-avatar
   layout. Display name and @handle start as text with pencils; both become matching inline
-  inputs with Save/Cancel. The banner has its own local chooser, preview, save, and remove flow.
+  inputs with Save/Cancel, stacked display name above handle. Biography edits inline using the
+  same Write/Preview flow. The banner has its own local chooser, preview, save, and remove flow.
 
 Use the floating arrows or left/right keys to compare. Edits carry across variants.
 Arrow keys keep their normal behavior in fields and dialogs. **Example content** adds a
@@ -85,3 +87,52 @@ adding a custom profile banner. Prototype D implements this direction without AP
 
 Decision pending: user's assessment of D, then implement the selected production flow with
 TDD and remove these throwaway alternatives. PR #208 remains unchanged.
+
+
+## Inline biography and handle availability refinement
+
+The user refined D: biography editing should expand in place, and display name should sit
+above the handle at every screen size. Implemented while retaining picture/banner dialogs
+and the previously accepted previous-handles details dialog.
+
+- Biography keeps Write/Preview, character count, Markdown help, Save/Cancel and Escape.
+  Unsaved draft and preview mode survive variant switches. Enter inserts a newline.
+- Cooldown now derives from the owner's `lastHandleChangedAt` plus seven days, disables the
+  handle pencil, and shows the exact next-change date/time and explanation. Saving a handle
+  starts a local seven-day cooldown and focuses that explanation. Availability is checked
+  every minute. **Cooldown** in the prototype bar toggles this local scenario; Reset restores
+  the loaded profile. This toolbar override never affects backend policy.
+- Existing production behavior differs: it shows the next-change date, but leaves the input
+  and submit enabled. The server enforces seven days and returns HTTP 429 with authoritative
+  `nextHandleChangeAt`. The production redesign should retain that server authority.
+- agent-browser verified desktop and 390px/320px mobile: inline biography entry/focus,
+  rendered Markdown preview, save, cancellation/Escape, stacked identity, no horizontal
+  overflow, cooldown preview toggle, and actual local handle save -> disabled editing and
+  focus on the availability message. Independent review passed after correcting that focus.
+- Focused Biome passes. TypeScript still reports 72 existing diagnostics, none in the edited
+  source files. The prototype remains local, with incremental commits and no PR update.
+
+## Full banner support: assessment, not implementation
+
+Planning estimate: **3–5 focused engineering days** for static JPEG/PNG/WebP upload,
+replacement, removal, public display, tests, review and browser verification. Draggable
+crop/focal-point editing would add roughly **1–2 days**. These ranges depend on implementation
+and verification findings; they are not a delivery commitment.
+
+Reuse existing image validation/normalization, private object storage, version-safe asset
+adoption, cleanup retries, and origin availability checks. The production public profile
+already has the gradient banner and overlapping avatar composition.
+
+Add a banner asset reference and explicit image role to User's schema with migration;
+version-safe banner commands; banner metadata in profile events, Gateway projection/GraphQL,
+and Media delivery/authorization; actual frontend upload/error states and public rendering.
+Verify independent avatar/banner ownership, concurrent changes, retirement/cleanup, removal,
+and compatibility with older events. A separate service or bucket is not required.
+
+Implementation seams inspected:
+- `apps/user/src/services/profile-picture-processing.ts`
+- `apps/user/src/services/profile.service.ts`
+- `apps/user/src/services/profile-picture-retention.service.ts`
+- `apps/media/src/services/profile-picture.service.ts`
+- `packages/events/src/schemas/profile-updated.ts`
+- `apps/web/src/components/profile/public-profile-page.tsx`

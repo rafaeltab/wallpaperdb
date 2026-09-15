@@ -39,6 +39,10 @@ export function ProfileBootstrap() {
       }),
     enabled: Boolean(activeUserId),
     staleTime: Infinity,
+    refetchInterval: (query) => {
+      const status = query.state.data?.pictureImportStatus;
+      return status === 'pending' || status === 'retrying' ? 5000 : false;
+    },
   });
 
   return null;

@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileBootstrap, profileQueryKey } from '@/components/profile-bootstrap';
 import { userApi, type Profile } from '@/lib/api/user';
 
@@ -47,6 +47,7 @@ function renderBootstrap() {
 }
 
 describe('ProfileBootstrap', () => {
+  afterEach(() => vi.useRealTimers());
   beforeEach(() => {
     vi.mocked(userApi.ensureProfile).mockReset();
     auth();
@@ -61,6 +62,23 @@ describe('ProfileBootstrap', () => {
 
     await act(async () => {});
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
+  });
+
+  it('refreshes pending and retrying picture imports until the authoritative picture is complete', async () => {
+    vi.useFakeTimers();
+    vi.mocked(userApi.ensureProfile)
+      .mockResolvedValueOnce({ ...profile, pictureImportStatus: 'pending' })
+      .mockResolvedValueOnce({ ...profile, pictureImportStatus: 'retrying' })
+      .mockResolvedValue({ ...profile, pictureImportStatus: 'complete', pictureAssetId: 'imported_picture', version: 2 });
+    const { queryClient } = renderBootstrap();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'pending' });
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'retrying' });
+    await act(async () => vi.advanceTimersByTimeAsync(5000));
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toMatchObject({ pictureImportStatus: 'complete', pictureAssetId: 'imported_picture' });
+    await act(async () => vi.advanceTimersByTimeAsync(20000));
+    expect(userApi.ensureProfile).toHaveBeenCalledTimes(3);
   });
 
   it('retains the ensured Profile in the signed-in user query cache', async () => {

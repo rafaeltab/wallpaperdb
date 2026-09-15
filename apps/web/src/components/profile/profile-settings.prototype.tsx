@@ -13,6 +13,17 @@ import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C' | 'D';
 const HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+function relativeAvailability(remainingMs: number) {
+  if (remainingMs < 60_000) return 'Available for change in less than a minute';
+  const [duration, unit] =
+    remainingMs >= 86400000
+      ? ([86400000, 'day'] as const)
+      : remainingMs >= 3600000
+        ? ([3600000, 'hour'] as const)
+        : ([60000, 'minute'] as const);
+  const count = Math.ceil(remainingMs / duration);
+  return `Available for change in ${count} ${unit}${count === 1 ? '' : 's'}`;
+}
 type BiographyEdit = { draft: string; preview: boolean };
 type Editor = 'picture' | 'banner' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
@@ -292,14 +303,30 @@ export default function ProfileSettingsPrototype({
         kind="handle"
         disabled={handleLocked}
         disabledHintId="prototype-handle-cooldown"
+        disabledNotice={
+          handleLocked &&
+          value.nextHandleChangeAt && (
+            <span
+              id="prototype-handle-cooldown"
+              tabIndex={-1}
+              className="text-xs leading-5 text-muted-foreground focus:outline-none"
+            >
+              <time dateTime={value.nextHandleChangeAt}>
+                {relativeAvailability(Date.parse(value.nextHandleChangeAt) - now)}
+              </time>
+            </span>
+          )
+        }
         value={value.handle}
         draft={inlineDrafts.handle}
         onDraft={(draft) => setInlineDrafts((current) => ({ ...current, handle: draft }))}
         onSave={(handle) => {
+          const changedAt = Date.now();
+          setNow(changedAt);
           update(
             {
               handle,
-              nextHandleChangeAt: new Date(Date.now() + HANDLE_COOLDOWN_MS).toISOString(),
+              nextHandleChangeAt: new Date(changedAt + HANDLE_COOLDOWN_MS).toISOString(),
               aliases: [
                 { handle: value.handle, status: 'retained' },
                 ...value.aliases.filter((alias) => alias.handle !== handle),
@@ -311,28 +338,6 @@ export default function ProfileSettingsPrototype({
           setInlineDrafts((current) => ({ ...current, handle: null }));
         }}
       />
-      {handleLocked && value.nextHandleChangeAt && (
-        <p
-          id="prototype-handle-cooldown"
-          tabIndex={-1}
-          className="flex items-start gap-2 text-xs leading-5 text-muted-foreground focus:outline-none"
-        >
-          <Clock3 className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Available to change{' '}
-            <time dateTime={value.nextHandleChangeAt}>
-              {new Date(value.nextHandleChangeAt).toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </time>
-            .<span className="block">You can change your handle once every seven days.</span>
-          </span>
-        </p>
-      )}
       {aliases}
     </div>
   );
@@ -431,11 +436,13 @@ export default function ProfileSettingsPrototype({
               aria-label="Preview handle cooldown"
               aria-pressed={handleLocked}
               onClick={() => {
+                const previewNow = Date.now();
+                setNow(previewNow);
                 setValue((current) => ({
                   ...current,
                   nextHandleChangeAt: handleLocked
                     ? null
-                    : new Date(Date.now() + HANDLE_COOLDOWN_MS - 86400000).toISOString(),
+                    : new Date(previewNow + HANDLE_COOLDOWN_MS).toISOString(),
                 }));
                 setInlineDrafts((current) => ({ ...current, handle: null }));
                 setNotice('');
@@ -597,6 +604,7 @@ function InlineProfileText({
   onSave,
   disabled = false,
   disabledHintId,
+  disabledNotice,
 }: {
   kind: 'name' | 'handle';
   value: string;
@@ -605,6 +613,7 @@ function InlineProfileText({
   onSave: (value: string) => void;
   disabled?: boolean;
   disabledHintId?: string;
+  disabledNotice?: ReactNode;
 }) {
   const editing = draft !== null && !disabled;
   const label = kind === 'name' ? 'Display name' : 'Profile handle';
@@ -624,28 +633,31 @@ function InlineProfileText({
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
   if (!editing)
     return (
-      <div className="flex min-w-0 items-center gap-2">
-        {kind === 'name' ? (
-          <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
-            {value}
-          </h2>
-        ) : (
-          <p className="min-w-0 break-all text-xl font-medium text-muted-foreground sm:text-2xl">
-            @{value}
-          </p>
-        )}
-        <Button
-          ref={button}
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 text-muted-foreground"
-          aria-label={`Edit ${label.toLowerCase()}`}
-          disabled={disabled}
-          aria-describedby={disabled ? disabledHintId : undefined}
-          onClick={() => onDraft(value)}
-        >
-          <Pencil className="size-4" />
-        </Button>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex min-w-0 max-w-full items-center gap-2">
+          {kind === 'name' ? (
+            <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+              {value}
+            </h2>
+          ) : (
+            <p className="min-w-0 break-all text-xl font-medium text-muted-foreground sm:text-2xl">
+              @{value}
+            </p>
+          )}
+          <Button
+            ref={button}
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground"
+            aria-label={`Edit ${label.toLowerCase()}`}
+            disabled={disabled}
+            aria-describedby={disabled ? disabledHintId : undefined}
+            onClick={() => onDraft(value)}
+          >
+            <Pencil className="size-4" />
+          </Button>
+        </div>
+        {disabledNotice}
       </div>
     );
   return (

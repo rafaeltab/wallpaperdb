@@ -3,12 +3,14 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { createNatsContainer } from '@wallpaperdb/testcontainers';
 import postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadConfig, type Config } from '../src/config.js';
 import { DatabaseConnection } from '../src/connections/database.js';
+import { NatsConnectionManager } from '../src/connections/nats.js';
 import { ProfileEventRetentionService } from '../src/services/profile-event-retention.service.js';
-import { ProfileOutboxPublisherWorker } from '../src/services/profile-outbox-publisher.service.js';
+import { NatsProfileEventPublisher, ProfileOutboxPublisherWorker } from '../src/services/profile-outbox-publisher.service.js';
 import { ProfileService } from '../src/services/profile.service.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
@@ -93,6 +95,47 @@ describe('Profile event evidence retention', () => {
     } finally {
       await sql.unsafe('drop trigger if exists reject_evidence_delete on outbox_events');
       await sql.unsafe('drop function reject_evidence_delete()');
+    }
+  });
+
+  it('keeps failed and unacknowledged events until publication succeeds without removing NATS projection history', async () => {
+    config.profileEvidenceRetentionDays = 7;
+    await profiles.ensure('user_evidence');
+    const cleanup = new ProfileEventRetentionService(database, config, logger);
+    const now = new Date('2030-01-08T00:00:00.000Z');
+    const failedPublisher = new ProfileOutboxPublisherWorker(database, {
+      publish: async () => { throw new Error('NATS unavailable'); },
+    }, logger);
+    await failedPublisher.publishPending();
+    expect(await cleanup.cleanupExpired(now)).toEqual({ deleted: 0, failed: 0 });
+    expect(await sql`select published_at from outbox_events`).toEqual([{ published_at: null }]);
+
+    const natsContainer = await createNatsContainer();
+    const nats = new NatsConnectionManager({ ...config, natsUrl: natsContainer.getConnectionUrl() });
+    await nats.initialize();
+    try {
+      const streams = (await nats.getClient().jetstreamManager()).streams;
+      await streams.add({ name: 'PROFILE', subjects: ['profile.>'], max_age: 0 });
+      const publisher = new ProfileOutboxPublisherWorker(database, new NatsProfileEventPublisher(nats, config), logger);
+      await sql.unsafe(`create function reject_ack_record() returns trigger language plpgsql as $$ begin raise exception 'ack persistence failed'; end $$`);
+      await sql.unsafe('create trigger reject_ack_record before update on outbox_events for each row execute function reject_ack_record()');
+      try {
+        await publisher.publishPending();
+        expect((await streams.info('PROFILE')).state.messages).toBe(1);
+        expect(await cleanup.cleanupExpired(now)).toEqual({ deleted: 0, failed: 0 });
+      } finally {
+        await sql.unsafe('drop trigger reject_ack_record on outbox_events');
+        await sql.unsafe('drop function reject_ack_record()');
+      }
+      await publisher.publishPending();
+      expect(await cleanup.cleanupExpired(now)).toEqual({ deleted: 1, failed: 0 });
+      expect(await sql`select id from outbox_events`).toEqual([]);
+      const retained = await streams.info('PROFILE');
+      expect(retained.config.max_age).toBe(0);
+      expect(retained.state.messages).toBe(1);
+    } finally {
+      await nats.close();
+      await natsContainer.stop();
     }
   });
 });

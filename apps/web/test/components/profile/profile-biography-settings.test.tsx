@@ -156,7 +156,10 @@ describe('Biography settings', () => {
     );
     expect(editor).toHaveValue(biographyMarkdown);
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(),
+      { timeout: 2200 }
+    );
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
   });
@@ -172,14 +175,20 @@ describe('Biography settings', () => {
     let editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.type(editor, '**Wallpaper collector**');
     await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(within(screen.getByRole('region', { name: 'Biography preview' })).getByText('Wallpaper collector').tagName).toBe('STRONG');
+    expect(
+      within(screen.getByRole('region', { name: 'Biography preview' })).getByText(
+        'Wallpaper collector'
+      ).tagName
+    ).toBe('STRONG');
     await user.click(screen.getByRole('button', { name: 'Write' }));
     editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, '<script>alert(1)</script>');
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     expect(
-      within(screen.getByRole('region', { name: 'Biography preview' })).getByText('This Biography cannot be displayed safely.')
+      within(screen.getByRole('region', { name: 'Biography preview' })).getByText(
+        'This Biography cannot be displayed safely.'
+      )
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
@@ -235,7 +244,10 @@ describe('Biography settings', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh profile' }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     expect(editor).toHaveValue('My draft');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(),
+      { timeout: 2200 }
+    );
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.updateProfile).toHaveBeenLastCalledWith(
@@ -279,7 +291,10 @@ describe('Biography settings', () => {
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, biographyMarkdown);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await waitFor(
+      () => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(),
+      { timeout: 2200 }
+    );
     await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.updateProfile).toHaveBeenCalledWith({

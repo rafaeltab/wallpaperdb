@@ -77,12 +77,12 @@ function renderPage(initialProfile: Profile = profile) {
 describe('ProfileSettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
       isLoaded: true,
       isSignedIn: true,
       userId: profile.id,
-    } as ReturnType<typeof useAuth>);
+    });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
     vi.mocked(userApi.updateHandle).mockReset();
@@ -769,7 +769,7 @@ describe('ProfileSettingsPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Profile handle' }), 'first-user-draft');
     const auth = vi.mocked(useAuth)();
     if (!auth.isLoaded || !auth.isSignedIn) throw new Error('Expected a signed-in test User');
-    vi.mocked(useAuth).mockReturnValue({ ...auth, userId: otherProfile.id });
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({ ...auth, userId: otherProfile.id });
     queryClient.setQueryData(profileQueryKey(otherProfile.id), otherProfile);
     rerender(
       <QueryClientProvider client={queryClient}>

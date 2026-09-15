@@ -51,7 +51,8 @@ async function renderPage(initial = profile, openPicture = true) {
       </QueryClientProvider>
     ),
   };
-  if (openPicture) await userEvent.setup().click(screen.getByRole('button', { name: 'Edit profile picture' }));
+  if (openPicture)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Edit profile picture' }));
   return view;
 }
 
@@ -84,10 +85,15 @@ describe('Profile picture settings', () => {
 
   it('keeps the selected picture after failure and closes the dialog after a successful retry', async () => {
     const updated = { ...profile, pictureAssetId: 'saved-picture', version: 2 };
-    vi.mocked(userApi.uploadPicture).mockRejectedValueOnce(new Error('Upload unavailable')).mockResolvedValueOnce(updated);
+    vi.mocked(userApi.uploadPicture)
+      .mockRejectedValueOnce(new Error('Upload unavailable'))
+      .mockResolvedValueOnce(updated);
     await renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['png'], 'portrait.png', { type: 'image/png' })
+    );
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Selected avatar' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Upload picture' }));
@@ -95,16 +101,27 @@ describe('Profile picture settings', () => {
     expect(screen.getByText('portrait.png')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Upload picture' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute('src', '/media/profile-pictures/saved-picture');
+    expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
+      'src',
+      '/media/profile-pictures/saved-picture'
+    );
     expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
   });
 
   it('does not overwrite a recreated owner cache with a picture response from an earlier session', async () => {
     let finish: ((value: Profile) => void) | undefined;
-    vi.mocked(userApi.uploadPicture).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(userApi.uploadPicture).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
     const { client, unmount } = await renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['png'], 'portrait.png', { type: 'image/png' })
+    );
     await user.click(screen.getByRole('button', { name: 'Upload picture' }));
     unmount();
     client.removeQueries({ queryKey: profileQueryKey(profile.id) });

@@ -50,13 +50,20 @@ function renderPage(initial = profile) {
 
 describe('Production profile overview', () => {
   beforeEach(() => {
-    vi.mocked(useAuth, { partial: true }).mockReturnValue({ getToken: vi.fn().mockResolvedValue('token'), isLoaded: true, isSignedIn: true, userId: profile.id });
+    vi.mocked(useAuth, { partial: true }).mockReturnValue({
+      getToken: vi.fn().mockResolvedValue('token'),
+      isLoaded: true,
+      isSignedIn: true,
+      userId: profile.id,
+    });
   });
   it('starts with a minimal overview and opens the matching public preview without wallpapers', async () => {
     renderPage();
     const user = userEvent.setup();
     expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '@ada')).toBeInTheDocument();
+    expect(
+      screen.getByText((_, element) => element?.tagName === 'P' && element.textContent === '@ada')
+    ).toBeInTheDocument();
     expect(screen.getByText('Original Biography')).toBeInTheDocument();
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'View profile' }));

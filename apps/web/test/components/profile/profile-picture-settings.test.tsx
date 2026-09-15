@@ -64,6 +64,15 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('rejects unsupported picture files before sending an upload', async () => {
+    renderPage();
+    const user = userEvent.setup({ applyAccept: false });
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['<svg/>'], 'picture.svg', { type: 'image/svg+xml' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, or WebP picture.');
+    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+  });
+
   it('lets a generated-avatar choice cancel a pending import before any picture is available', async () => {
     const updated = { ...profile, version: 2 };
     vi.mocked(userApi.removePicture).mockResolvedValue(updated);

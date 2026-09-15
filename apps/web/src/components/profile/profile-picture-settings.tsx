@@ -37,6 +37,7 @@ export function ProfilePictureSettings({
   const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const importing = profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   const mutation = useMutation({
     mutationKey: profileQueryKey(profile.id),
@@ -88,7 +89,13 @@ export function ProfilePictureSettings({
               disabled={refreshing || writing}
               onChange={(event) => {
                 mutation.reset();
+                setError(null);
                 const picture = event.target.files?.[0];
+                if (picture && !['image/jpeg', 'image/png', 'image/webp'].includes(picture.type)) {
+                  setSelected(null);
+                  setError('Choose a JPEG, PNG, or WebP picture.');
+                  return;
+                }
                 setSelected(picture ? { picture, expectedVersion: profile.version } : null);
               }}
             />
@@ -137,9 +144,9 @@ export function ProfilePictureSettings({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        {mutation.error && (
+        {(error || mutation.error) && (
           <Alert variant="destructive">
-            <AlertDescription>{mutation.error.message}</AlertDescription>
+            <AlertDescription>{error || mutation.error?.message}</AlertDescription>
           </Alert>
         )}
         {mutation.isSuccess && (

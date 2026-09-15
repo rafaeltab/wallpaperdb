@@ -128,7 +128,7 @@ describe('Profile picture settings', () => {
       new File(['12345'], 'large.png', { type: 'image/png' })
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Picture must be at most 4 bytes.');
-    expect(screen.getByText(/2,000,000 pixels/)).toBeInTheDocument();
+    expect(screen.getByText(/Up to 4 B and 2 megapixels/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
   });

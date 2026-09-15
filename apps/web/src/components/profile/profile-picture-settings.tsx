@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
+import { formatFileSize } from '@/lib/utils/wallpaper';
 
 type PictureCommand =
   | { action: 'upload'; picture: File; expectedVersion: number }
@@ -102,11 +103,11 @@ export function ProfilePictureSettings({
           {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
         </Button>
         {importing && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <output className="block text-sm text-muted-foreground">
             {profile.pictureImportStatus === 'retrying'
               ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
               : 'Importing your account picture. You can keep editing your Profile while it loads.'}
-          </p>
+          </output>
         )}
         <form
           className="space-y-4"
@@ -142,9 +143,9 @@ export function ProfilePictureSettings({
               }}
             />
             <FieldDescription>
-              JPEG, PNG, or WebP. Up to {maxBytes.toLocaleString()} bytes
+              JPEG, PNG, or WebP. Up to {formatFileSize(maxBytes)}
               {profile.pictureUploadLimits
-                ? ` and ${profile.pictureUploadLimits.maxPixels.toLocaleString()} pixels`
+                ? ` and ${(profile.pictureUploadLimits.maxPixels / 1000000).toLocaleString(undefined, { maximumFractionDigits: 6 })} megapixels`
                 : ''}
               . Animated images are not supported.
             </FieldDescription>

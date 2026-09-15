@@ -74,6 +74,51 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("resolves scheduled aliases during grace and stops exactly at expiry before projection catches up", async () => {
+        const expiresAt = "2030-01-02T12:00:00.000Z";
+        const profile = {
+            id: "user_alias_deadline",
+            displayName: "Alias Owner",
+            handle: "deadline-current",
+            claimGeneration: 4,
+            aliases: [
+                { handle: "deadline-alias", claimGeneration: 1, expiresAt },
+                { handle: "legacy-alias", claimGeneration: 2 },
+                { handle: "retained-alias", claimGeneration: 3, expiresAt: null },
+            ],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 4,
+            createdAt: "2030-01-01T12:00:00.000Z",
+            updatedAt: "2030-01-01T12:00:00.000Z",
+        };
+        await container.resolve(ProfileRepository).project(profile);
+        const read = () => query(`query {
+            scheduled: profileByHandle(handle: "deadline-alias") { profile { id } }
+            legacy: profileByHandle(handle: "legacy-alias") { profile { id } }
+            retained: profileByHandle(handle: "retained-alias") { profile { id } }
+            current: profileByHandle(handle: "deadline-current") { profile { id } }
+        }`);
+        const resolved = { profile: { id: profile.id } };
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+            vi.setSystemTime(new Date(Date.parse(expiresAt) - 1));
+            const grace = await read();
+            expect(grace.errors).toBeUndefined();
+            expect(grace.data).toEqual({
+                scheduled: resolved, legacy: resolved, retained: resolved, current: resolved,
+            });
+            vi.setSystemTime(new Date(expiresAt));
+            const expired = await read();
+            expect(expired.errors).toBeUndefined();
+            expect(expired.data).toEqual({
+                scheduled: null, legacy: resolved, retained: resolved, current: resolved,
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it("adds alias routing to an existing Profile index without losing Profiles", async () => {
         const indexManager = container.resolve(IndexManagerService);
         const client = container.resolve(OpenSearchConnection).getClient();

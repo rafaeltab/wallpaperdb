@@ -68,7 +68,22 @@ export class ProfileRepository {
     const normalizedHandle = handle.toLowerCase();
     const index = this.indexManager.getIndexName(profileIndexDefinition.key);
     const client = this.openSearchConnection.getClient();
-    const aliasFilter = { term: { 'aliases.handle': normalizedHandle } };
+    const aliasFilter = {
+      bool: {
+        filter: [
+          { term: { 'aliases.handle': normalizedHandle } },
+          {
+            bool: {
+              should: [
+                { bool: { must_not: { exists: { field: 'aliases.expiresAt' } } } },
+                { range: { 'aliases.expiresAt': { gt: new Date().toISOString() } } },
+              ],
+              minimum_should_match: 1,
+            },
+          },
+        ],
+      },
+    };
     // Compare each kind of claim by the requested Handle's generation. A newer
     // current Handle or unrelated alias must not make an older claim win.
     const [currentResult, aliasResult] = await Promise.all([

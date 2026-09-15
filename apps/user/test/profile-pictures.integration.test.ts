@@ -78,6 +78,19 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('serializes competing picture uploads so only one command activates at a Profile version', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const results = await Promise.all([upload(image, original.version), upload(image, original.version)]);
+    expect(results.map((result) => result.statusCode).sort()).toEqual([200, 409]);
+    const winner = results.find((result) => result.statusCode === 200)!.json();
+    expect((await ensure()).json()).toEqual(winner);
+    const assets = await sql`select * from profile_picture_assets`;
+    expect(assets.filter((asset) => asset.state === 'active').map((asset) => asset.id)).toEqual([winner.pictureAssetId]);
+    expect(assets.filter((asset) => asset.state === 'staged')).toHaveLength(1);
+    expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(1);
+  });
+
   it('rolls back picture activation and retirement when the event cannot commit', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

@@ -10,8 +10,8 @@ vi.mock('@clerk/react', () => ({
 }));
 
 vi.mock('@tanstack/react-router', () => ({
-  Link: ({ children, to, ...props }: { children: React.ReactNode; to: string }) => (
-    <a href={to} {...props}>
+  Link: ({ children, to, params, ...props }: { children: React.ReactNode; to: string; params?: Record<string, string> }) => (
+    <a href={Object.entries(params ?? {}).reduce((href, [key, value]) => href.replace(`$${key}`, value), to)} {...props}>
       {children}
     </a>
   ),
@@ -119,8 +119,8 @@ describe('UserMenu', () => {
     expect(screen.getByRole('menuitem', { name: /sign out/i })).toBeInTheDocument();
   });
 
-  it('links to Profile settings when signed in', async () => {
-    (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true });
+  it('links to the signed-in user profile instead of settings', async () => {
+    (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true, userId: 'user_jane' });
     (useUser as Mock).mockReturnValue({
       isLoaded: true,
       user: {
@@ -136,8 +136,9 @@ describe('UserMenu', () => {
     const trigger = screen.getByRole('button', { name: /jane smith/i });
     await user.click(trigger);
 
-    const profileItem = screen.getByRole('menuitem', { name: /profile settings/i });
-    expect(profileItem).toHaveAttribute('href', '/settings/profile');
+    const profileItem = screen.getByRole('menuitem', { name: /your profile/i });
+    expect(profileItem).toHaveAttribute('href', '/profiles/id/user_jane');
+    expect(screen.queryByRole('menuitem', { name: /profile settings/i })).not.toBeInTheDocument();
   });
 
   it('calls signOut when sign out is clicked', async () => {

@@ -57,16 +57,16 @@ export function UserMenu() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link to="/settings/profile" aria-label="Profile settings">
-            <UserIcon className="mr-2 h-4 w-4" />
-            Profile settings
+      <DropdownMenuContent align="end" className="w-48 min-w-48">
+        <DropdownMenuItem asChild className="whitespace-nowrap" disabled={!userId}>
+          <Link to="/profiles/id/$profileId" params={{ profileId: userId ?? '' }} aria-label="Your profile">
+            <UserIcon className="h-4 w-4" />
+            Your profile
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => void signOut({ redirectUrl: buildUrl('/') })}>
-          <LogOut className="mr-2 h-4 w-4" />
+        <DropdownMenuItem className="whitespace-nowrap" onClick={() => void signOut({ redirectUrl: buildUrl('/') })}>
+          <LogOut className="h-4 w-4" />
           Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

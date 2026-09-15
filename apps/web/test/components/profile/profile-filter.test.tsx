@@ -73,4 +73,22 @@ describe('Profile wallpaper filter', () => {
     await user.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
+
+  it('explains search loading, failure, and empty results while allowing a retry', async () => {
+    let rejectSearch: (error: Error) => void = () => {};
+    mockFetch.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectSearch = reject; }));
+    const user = userEvent.setup();
+    const { onChange } = renderFilter();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), 'missing');
+    expect(await screen.findByRole('status')).toHaveTextContent('Searching Profiles…');
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    rejectSearch(new Error('offline'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not search Profiles. Try again.');
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [], pageInfo: { hasNextPage: false, hasPreviousPage: false },
+    } }));
+    await user.click(screen.getByRole('button', { name: 'Retry Profile search' }));
+    expect(await screen.findByText('No Profiles found. Try another Handle or Display name.')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

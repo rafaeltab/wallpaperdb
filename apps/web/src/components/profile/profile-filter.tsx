@@ -24,6 +24,7 @@ export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
     queryKey: ['profile-search', debouncedQuery],
     queryFn: () => searchProfiles(debouncedQuery),
     enabled: Boolean(debouncedQuery),
+    retry: false,
   });
   const selected = useQuery({
     ...profileByIdQueryOptions(profileId ?? ''),
@@ -64,6 +65,18 @@ export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
         aria-describedby={`${inputId}-hint`}
         onChange={(event) => setInput(event.target.value)}
       />
+      {query && (query !== debouncedQuery || results.isLoading) ? (
+        <p role="status" className="text-xs text-muted-foreground">Searching Profiles…</p>
+      ) : null}
+      {query && query === debouncedQuery && results.isError ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="alert" className="text-xs text-destructive">Could not search Profiles. Try again.</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()} aria-label="Retry Profile search">Try again</Button>
+        </div>
+      ) : null}
+      {query && query === debouncedQuery && results.data?.edges.length === 0 ? (
+        <p role="status" className="text-xs text-muted-foreground">No Profiles found. Try another Handle or Display name.</p>
+      ) : null}
       {query && query === debouncedQuery && results.data ? (
         <ul aria-label="Matching Profiles" className="max-h-64 overflow-y-auto rounded-lg border bg-background p-1">
           {results.data.edges.map(({ node: profile }) => (

@@ -74,6 +74,77 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("keeps a reactivated scheduled alias routing past its canceled deadline without exposing owner history", async () => {
+        const timestamp = "2030-01-01T12:00:00.000Z";
+        const expiresAt = "2030-01-02T12:00:00.000Z";
+        const scheduled = {
+            id: "user_reactivated_schedule",
+            displayName: "Alias Owner",
+            handle: "cancellation-current",
+            claimGeneration: 2,
+            aliases: [{ handle: "canceled-expiry", claimGeneration: 1, createdAt: timestamp, expiresAt }],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 3,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            eventId: "evt_schedule_before_cancellation",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "alias-expiry-scheduled", handle: "canceled-expiry", before: null, after: expiresAt },
+            profile: scheduled,
+        });
+        await eventually(
+            () => query(`query { profile(id: "${scheduled.id}") { version } }`),
+            (result) => result.data.profile?.version === 3,
+        );
+        const readAtDeadline = async () => {
+            vi.useFakeTimers({ toFake: ["Date"] });
+            vi.setSystemTime(new Date(expiresAt));
+            try {
+                return await query(`query {
+                    profileByHandle(handle: "canceled-expiry") { isAlias canonicalHandle profile { id version } }
+                }`);
+            } finally {
+                vi.useRealTimers();
+            }
+        };
+        expect((await readAtDeadline()).data.profileByHandle).toBeNull();
+
+        const reactivated = {
+            ...scheduled, version: 4,
+            aliases: [{ ...scheduled.aliases[0], expiresAt: null }],
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            eventId: "evt_cancel_alias_expiry",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "alias-reactivated", handle: "canceled-expiry", claimGeneration: 1, before: expiresAt, after: null },
+            profile: reactivated,
+        });
+        await eventually(
+            () => query(`query { profile(id: "${scheduled.id}") { version } }`),
+            (result) => result.data.profile?.version === 4,
+        );
+        const result = await readAtDeadline();
+        expect(result.errors).toBeUndefined();
+        expect(result.data.profileByHandle).toEqual({
+            isAlias: true, canonicalHandle: scheduled.handle, profile: { id: scheduled.id, version: 4 },
+        });
+        expect((await container.resolve(ProfileRepository).findById(scheduled.id))?.aliases).toEqual(reactivated.aliases);
+
+        for (const field of ["aliases", "historicalHandles"]) {
+            const enumeration = await tester.getApp().inject({
+                method: "POST",
+                url: "/graphql",
+                payload: { query: `query { profile(id: "${scheduled.id}") { ${field} } }` },
+            });
+            expect(enumeration.json().errors[0].message).toContain(`Cannot query field "${field}" on type "Profile"`);
+        }
+    });
+
     it("restores a released alias from reactivation and ignores an older expiry event", async () => {
         const timestamp = "2030-01-01T12:00:00.000Z";
         const released = {

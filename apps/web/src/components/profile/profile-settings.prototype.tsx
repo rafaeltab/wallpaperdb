@@ -4,6 +4,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
 import { ProfilePictureImage } from '@/components/profile/profile-picture';
 import { ProfileOverview } from '@/components/profile/public-profile-page';
@@ -97,7 +98,6 @@ export default function ProfileSettingsPrototype({
   const [editor, setEditor] = useState<Editor>(null);
   const [biographyEdit, setBiographyEdit] = useState<BiographyEdit | null>(null);
   const biographyEditButton = useRef<HTMLButtonElement>(null);
-  const [notice, setNotice] = useState('');
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -110,17 +110,15 @@ export default function ProfileSettingsPrototype({
   function openEditor(next: Editor) {
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setEditor(next);
-    setNotice('');
   }
   function update(patch: Partial<DraftProfile>, message: string) {
     setValue((current) => ({ ...current, ...patch }));
-    setNotice(message);
+    toast.success(message);
     setEditor(null);
   }
   function startBiographyEdit() {
     if (variant === 'D' || variant === 'E') {
       setBiographyEdit({ draft: value.biography, preview: false });
-      setNotice('');
     } else openEditor('biography');
   }
   function finishBiographyEdit() {
@@ -465,14 +463,6 @@ export default function ProfileSettingsPrototype({
             viewProfile={() => openEditor('public')}
           />
         )}
-        <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
-          {notice && (
-            <>
-              <Check className="size-4" />
-              {notice}
-            </>
-          )}
-        </output>
       </div>
       <PrototypeModal editor={editor} close={() => setEditor(null)} opener={opener.current}>
         {editor === 'picture' && (
@@ -547,7 +537,6 @@ export default function ProfileSettingsPrototype({
                     : new Date(previewNow + HANDLE_COOLDOWN_MS).toISOString(),
                 }));
                 setInlineDrafts((current) => ({ ...current, handle: null }));
-                setNotice('');
               }}
             >
               <Clock3 />
@@ -564,7 +553,6 @@ export default function ProfileSettingsPrototype({
           setHandle(fresh.handle);
           setInlineDrafts({ name: null, handle: null });
           setBiographyEdit(null);
-          setNotice('');
         }}
         onExample={() => {
           setValue((current) => ({
@@ -585,7 +573,7 @@ export default function ProfileSettingsPrototype({
               },
             ],
           }));
-          setNotice('Example biography and previous handles loaded');
+          toast.info('Example biography and previous handles loaded');
         }}
         state={{
           ...value,
@@ -810,7 +798,7 @@ function InlineProfileText({
                 buttonClassName="size-6"
                 disabled={!valid || draft.trim() === value}
               >
-                <Check className="size-[1ex]" />
+                <Check className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
               </PrototypeIconButton>
               <PrototypeIconButton
                 label="Cancel"
@@ -818,7 +806,7 @@ function InlineProfileText({
                 buttonClassName="size-6"
                 onClick={() => onDraft(null)}
               >
-                <X className="size-[1ex]" />
+                <X className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
               </PrototypeIconButton>
             </>
           ) : (
@@ -834,7 +822,7 @@ function InlineProfileText({
                 onDraft(value);
               }}
             >
-              <Pencil className="size-[1ex]" />
+              <Pencil className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
             </PrototypeIconButton>
           )}
         </form>
@@ -875,7 +863,7 @@ function InlineProfileText({
             aria-describedby={disabled ? disabledHintId : undefined}
             onClick={() => onDraft(value)}
           >
-            <Pencil className="size-[1ex]" />
+            <Pencil className={kind === 'handle' ? 'size-3.5' : 'size-[1ex]'} />
           </PrototypeIconButton>
         </div>
         {disabledNotice}

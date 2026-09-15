@@ -400,9 +400,7 @@ export class ProfileService {
         columns: { handle: true },
       });
       if (retained.length >= this.config.profileRetainedAliasLimit) {
-        throw new AliasLimitError(
-          'No retained alias slot is available'
-        );
+        throw new AliasLimitError('No retained alias slot is available');
       }
       const [alias] = existing
         ? await tx
@@ -702,17 +700,34 @@ export class ProfileService {
       activeAliases.filter((alias) => alias.expiresAt === null).map((alias) => alias.handle)
     );
     const history = await recentHistoricalHandles(reader, profile.id, now);
+    const historicalHandles = history.filter(
+      ({ handle }) => handle !== profile.handle && !retained.has(handle)
+    );
+    const claims =
+      historicalHandles.length > 0
+        ? await reader.query.handleClaims.findMany({
+            where: inArray(
+              handleClaims.handle,
+              historicalHandles.map(({ handle }) => handle)
+            ),
+            columns: { handle: true, profileId: true },
+          })
+        : [];
+    const claimedByOthers = new Set(
+      claims.filter((claim) => claim.profileId !== profile.id).map((claim) => claim.handle)
+    );
     return {
       ...profile,
       retainedAliasLimit: this.config.profileRetainedAliasLimit,
       aliases: activeAliases,
-      historicalHandles: history
-        .filter(({ handle }) => handle !== profile.handle && !retained.has(handle))
-        .map((entry) => ({
-          ...entry,
-          unavailableReason:
-            retained.size >= this.config.profileRetainedAliasLimit ? 'alias-limit' : null,
-        })),
+      historicalHandles: historicalHandles.map((entry) => ({
+        ...entry,
+        unavailableReason: claimedByOthers.has(entry.handle)
+          ? 'claimed'
+          : retained.size >= this.config.profileRetainedAliasLimit
+            ? 'alias-limit'
+            : null,
+      })),
     };
   }
 

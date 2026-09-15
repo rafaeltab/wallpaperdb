@@ -237,6 +237,22 @@ describe('Profile commands', () => {
     }
   });
 
+  it('reports another Profile claim and rejects reactivating its historical Handle', async () => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+    const other = (await request('user_2')).json();
+    expect((await changeHandle('user_2', original.handle, other.version)).statusCode).toBe(200);
+    const before = (await request('user_1')).json();
+    expect(before.historicalHandles).toEqual([{ ...released.historicalHandles[0], unavailableReason: 'claimed' }]);
+    const response = await reactivateAlias('user_1', original.handle, released.version);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().type).toContain('handle-unavailable');
+    expect((await request('user_1')).json()).toEqual(before);
+    expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

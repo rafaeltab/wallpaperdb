@@ -314,6 +314,30 @@ describe('Profile commands', () => {
     }
   });
 
+  it('allows exactly one claimant when historical reactivation races a different Profile', async () => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+    const other = (await request('user_2')).json();
+    const [reactivation, competingClaim] = await Promise.all([
+      reactivateAlias('user_1', original.handle, released.version),
+      changeHandle('user_2', original.handle, other.version),
+    ]);
+    expect([reactivation.statusCode, competingClaim.statusCode].sort()).toEqual([200, 409]);
+    const wonReactivation = reactivation.statusCode === 200;
+    const claims = await sql`select profile_id, claim_generation from handle_claims where handle = ${original.handle}`;
+    expect(claims).toHaveLength(1);
+    expect(claims[0].profile_id).toBe(wonReactivation ? 'user_1' : 'user_2');
+    expect(Number(claims[0].claim_generation)).toBeGreaterThan(scheduled.aliases[0].claimGeneration);
+    const ownerAfter = (await request('user_1')).json();
+    expect(ownerAfter).toMatchObject({ handle: changed.handle, version: released.version + Number(wonReactivation) });
+    expect(ownerAfter.aliases).toHaveLength(Number(wonReactivation));
+    const otherAfter = (await request('user_2')).json();
+    expect(otherAfter).toMatchObject({ handle: wonReactivation ? other.handle : original.handle, version: other.version + Number(!wonReactivation) });
+    expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(Number(wonReactivation));
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

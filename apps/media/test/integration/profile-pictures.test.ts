@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from '@wallpaperdb/events';
 import {
   createDefaultTesterBuilder,
@@ -30,7 +30,9 @@ describe('Profile picture delivery', () => {
       return;
     }
     const pictureId = request.url?.match(/^\/internal\/profile-pictures\/([^/]+)\/availability$/)?.[1];
-    response.writeHead(pictureId ? availability.get(pictureId) ?? 404 : 404).end();
+    const status = pictureId ? availability.get(pictureId) ?? 404 : 404;
+    if (status === 0) request.socket.destroy();
+    else response.writeHead(status).end();
   });
   const setup = () => {
     const Tester = createDefaultTesterBuilder()
@@ -197,5 +199,34 @@ describe('Profile picture delivery', () => {
     const anonymous = await fetch(`${tester.minio.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`);
     expect(anonymous.status).toBe(403);
     await anonymous.body?.cancel();
+  });
+
+  it('fails closed without caching authority and storage errors, allowing the same picture URL to recover', async () => {
+    const { event, bytes } = await pictureEvent('user_picture_retry', 'pic_retry');
+    availability.set('pic_retry', 204);
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
+    await vi.waitFor(async () => expect((await getPicture('pic_retry')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+
+    for (const status of [401, 403, 500, 302, 0]) {
+      availability.set('pic_retry', status);
+      const response = await getPicture('pic_retry');
+      expect(response.statusCode).toBe(503);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers.location).toBeUndefined();
+      expect(response.body).not.toContain('user_picture_retry/pic_retry.webp');
+      expect(response.rawPayload).not.toEqual(bytes);
+    }
+    availability.set('pic_retry', 204);
+    const key = 'user_picture_retry/pic_retry.webp';
+    await tester.minio.getS3Client().send(new DeleteObjectCommand({ Bucket: 'profile-pictures', Key: key }));
+    const missingObject = await getPicture('pic_retry');
+    expect(missingObject.statusCode).toBe(503);
+    expect(missingObject.headers['cache-control']).toBe('no-store');
+    expect(missingObject.body).not.toContain(key);
+    await tester.minio.uploadObject('profile-pictures', key, bytes);
+    const recovered = await getPicture('pic_retry');
+    expect(recovered.statusCode).toBe(200);
+    expect(recovered.rawPayload).toEqual(bytes);
+    expect(recovered.headers['cache-control']).toBe('public, max-age=31536000, immutable');
   });
 });

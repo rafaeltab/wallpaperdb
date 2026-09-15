@@ -27,20 +27,23 @@ export function ProfileHistoricalHandles({
 
   return (
     <section aria-labelledby="historical-handles-heading">
-      <h2 id="historical-handles-heading" className="font-medium">
+      <h2
+        id="historical-handles-heading"
+        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+      >
         Historical Handles
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Reactivate a recent Handle as a retained alias.
       </p>
       {history.length ? (
-        <ul aria-labelledby="historical-handles-heading" className="mt-3 divide-y">
+        <ul aria-labelledby="historical-handles-heading" className="mt-3 space-y-2">
           {history.map((entry) => {
             const unavailable = historicalHandleUnavailableMessage(entry);
             return (
               <li
                 key={entry.handle}
-                className="flex flex-wrap items-center justify-between gap-3 py-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 p-3"
               >
                 <div>
                   <p className="break-all font-medium">@{entry.handle}</p>

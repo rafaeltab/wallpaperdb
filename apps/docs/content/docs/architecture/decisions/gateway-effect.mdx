@@ -1,0 +1,8 @@
+---
+title: Effect in the Gateway
+description: Effect execution with explicit application interfaces
+---
+
+The gateway uses Effect 3 for execution, typed outcomes, tracing and scoped resource release while retaining its existing transports and stores. Constructor-injected TypeScript ports and namespaced symbol tokens keep application interfaces explicit; the composition root chooses adapters without a global dependency container.
+
+This is a gateway-scoped adoption. The detailed decision, trade-offs and compatibility behavior are recorded in `apps/gateway/docs/adr/0001-effect-execution-with-explicit-ports.md`; the bounded-context language is recorded in `apps/gateway/CONTEXT.md`.

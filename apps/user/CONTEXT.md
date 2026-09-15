@@ -34,4 +34,5 @@ _Avoid_: Description, bio
 
 **Profile event**:
 An append-only record of an accepted change to a Profile or its Handle aliases. Profile events explain recent state changes but are not the source of current Profile state.
+Published event details expire after the configured rolling retention window (30 days by default). Unpublished events remain available for delivery; their age still limits Handle reactivation. Current state and active routing claims survive evidence cleanup.
 _Avoid_: Event-sourced Profile, permanent history

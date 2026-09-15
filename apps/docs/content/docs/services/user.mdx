@@ -28,6 +28,7 @@ make dev PACKAGE=user
 - **Alias expiry** with a 24-hour redirect grace, automatic claim release, and confirmed early expiry
 - **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
+- **Evidence retention** for published Profile events and private retired pictures, with a configurable 30-day default
 - **Profile pictures** with asynchronous initial import, bounded image decoding, private object storage, and immediate origin retirement
 - **Health checks** for database and message queue connectivity
 
@@ -117,13 +118,13 @@ Public Handle lookup excludes aliases at their expiry timestamp, even if the rem
 
 Reactivates an eligible historical Handle using `{ "expectedVersion": 2 }`. A released Handle receives a new claim generation and becomes a retained alias. For an owned expiring alias, reactivation cancels expiry, preserves the existing claim generation, and starts a new retention timestamp. Both transitions require a free retained-alias slot and atomically update the Profile version and append an `alias-reactivated` event with the complete public snapshot.
 
-The command returns the authoritative owner Profile. A Handle outside the User's recent history returns `400` with `ineligible-handle`. Another Profile's claim returns `409` with `handle-unavailable`; a full retained-alias limit returns `409` with `alias-limit`. Stale versions return `409` with `profile-version-conflict`. An already retained alias at the current version returns unchanged state while its Handle remains eligible in the 30-day history.
+The command returns the authoritative owner Profile. A Handle outside the User's recent history returns `400` with `ineligible-handle`. Another Profile's claim returns `409` with `handle-unavailable`; a full retained-alias limit returns `409` with `alias-limit`. Stale versions return `409` with `profile-version-conflict`. An already retained alias at the current version returns unchanged state while its Handle remains eligible in the configured event history (30 days by default).
 
 ### Recent Handle eligibility
 
 Authenticated owner responses include `historicalHandles`, each with `handle`, `eligibleUntil`, and nullable `unavailableReason` (`claimed` or `alias-limit`). Current Handles and owned retained aliases are excluded. Settings use this list to offer reactivation or cancellation of an owned alias's removal, and explain blocked choices. This owner history is not part of the public GraphQL model or public event snapshot.
 
-Eligibility comes from typed Handle transitions in the retained Profile event history: creation, Handle changes (including automatically scheduled aliases), scheduling, expiry, and reactivation. Unrelated edits and repeated alias values in public snapshots do not renew history. Each accepted event stores its acceptance timestamp in `outbox_events.created_at`; the latest qualifying event sets the Handle's eligibility deadline 30 days later. At that exact deadline the Handle is ineligible, even if the event has not yet been physically deleted. History lookup uses the Profile ID and timestamp index and reads only relevant transition fields.
+Eligibility comes from typed Handle transitions in the retained Profile event history: creation, Handle changes (including automatically scheduled aliases), scheduling, expiry, and reactivation. Unrelated edits and repeated alias values in public snapshots do not renew history. Each accepted event stores its acceptance timestamp in `outbox_events.created_at`; the latest qualifying event sets the Handle's eligibility deadline after `PROFILE_EVIDENCE_RETENTION_DAYS` (30 days by default). At that exact deadline the Handle is ineligible, even if the event has not yet been physically deleted or published. History lookup uses the Profile ID and timestamp index and reads only relevant transition fields.
 
 ### PUT /profile/me/picture
 
@@ -133,7 +134,15 @@ User records a private staged asset before writing its object. Activation locks 
 
 ### DELETE /profile/me/picture
 
-Removes the current picture using `{ "expectedVersion": 2 }`, returns the updated owner Profile, and uses the deterministic generated avatar. A manual upload or removal cancels the initial Clerk import so a late import cannot overwrite the User's choice. Replaced and removed objects remain private evidence for 30 days.
+Removes the current picture using `{ "expectedVersion": 2 }`, returns the updated owner Profile, and uses the deterministic generated avatar. A manual upload or removal cancels the initial Clerk import so a late import cannot overwrite the User's choice. Replaced and removed objects remain private evidence for the configured retention window (30 days by default).
+
+### Evidence cleanup
+
+The retention worker removes Profile event rows whose acceptance time is at or before the rolling cutoff, but only after successful NATS publication has been acknowledged. Failed or unpublished events stay in the outbox for retry. Their continued presence does not extend Handle reactivation eligibility.
+
+Private staged and retired picture objects become eligible for deletion at their recorded expiry. The configured duration applies when new deadlines are assigned; changing it does not shorten or extend an existing asset's recorded deadline. Cleanup preserves current Profile rows, active assets, Handle claims, aliases, and downstream projections.
+
+NATS events remain indefinitely retained for projection rebuilds under the temporary policy tracked in [#162](https://github.com/rafaeltab/wallpaperdb/issues/162). This cleanup does not change stream retention or implement GDPR erasure across systems.
 
 ### Initial picture import
 
@@ -200,6 +209,7 @@ PROFILE_HANDLE_MAX_LENGTH=30
 PROFILE_DISPLAY_NAME_MAX_LENGTH=80
 PROFILE_RETAINED_ALIAS_LIMIT=3
 PROFILE_BIOGRAPHY_MAX_LENGTH=5000
+PROFILE_EVIDENCE_RETENTION_DAYS=30
 
 # Private Profile pictures
 S3_ENDPOINT=http://localhost:9000

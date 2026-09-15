@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { userApi, type Profile } from '@/lib/api/user';
+import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 export function ProfileAliasSettings({
   profile,
@@ -36,6 +36,11 @@ export function ProfileAliasSettings({
   });
   const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
   const expiring = (profile.aliases ?? []).filter((alias) => alias.expiresAt);
+  const error =
+    mutation.error instanceof UserApiError &&
+    mutation.error.type?.endsWith('/profile-version-conflict')
+      ? 'Your Profile changed elsewhere. Reload before scheduling again.'
+      : mutation.error?.message;
 
   return (
     <Card className="mt-6">
@@ -47,6 +52,11 @@ export function ProfileAliasSettings({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {scheduledHandle && (
           <Alert role="status">
             <AlertDescription>Removal scheduled for @{scheduledHandle}.</AlertDescription>
@@ -76,6 +86,7 @@ export function ProfileAliasSettings({
                     aria-label={`Schedule removal for @${alias.handle}`}
                     disabled={mutation.isPending}
                     onClick={() => {
+                      mutation.reset();
                       setScheduledHandle(null);
                       setPending({ handle: alias.handle, expectedVersion: profile.version });
                     }}

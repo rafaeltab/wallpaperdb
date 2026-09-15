@@ -154,6 +154,30 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByText('0 of 3 retained aliases')).toBeInTheDocument();
   });
 
+  it('keeps a retained alias and explains when scheduling loses an optimistic concurrency race', async () => {
+    const initial = {
+      ...profile,
+      aliases: [{ handle: 'old-handle', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null }],
+    };
+    vi.mocked(userApi.scheduleAliasRemoval).mockRejectedValue(
+      new UserApiError('Profile has changed.', 409, {
+        type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+      })
+    );
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole('button', { name: 'Schedule removal for @old-handle' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Schedule removal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your Profile changed elsewhere. Reload before scheduling again.'
+    );
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(initial);
+    expect(within(screen.getByRole('list', { name: /retained aliases/i })).getByText('@old-handle')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
       new UserApiError('Profile has changed since it was last loaded', 409)

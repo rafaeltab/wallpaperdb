@@ -40,9 +40,9 @@ create_stream_if_not_exists() {
   echo ""
 }
 
-# Create WALLPAPER stream
+# Create WALLPAPER stream. Keep publication history for ownership projection rebuilds.
 # Handles: wallpaper.uploaded, wallpaper.processed, wallpaper.deleted, etc.
-create_stream_if_not_exists "WALLPAPER" "wallpaper.>"
+create_stream_if_not_exists "WALLPAPER" "wallpaper.>" "0"
 
 # Profile state changes are retained independently for read-model rebuilds.
 create_stream_if_not_exists "PROFILE" "profile.>" "0"

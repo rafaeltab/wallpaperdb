@@ -9,9 +9,10 @@ import { profileByIdQueryOptions } from '@/lib/profile-query-options';
 interface ProfileFilterProps {
   profileId?: string;
   onChange: (profileId?: string) => void;
+  collapsed?: boolean;
 }
 
-export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
+export function ProfileFilter({ profileId, onChange, collapsed = false }: ProfileFilterProps) {
   const inputId = useId();
   const [input, setInput] = useState('');
   const query = input.trim().toLowerCase();
@@ -50,6 +51,7 @@ export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
           }}>Clear</Button>
         </div>
       ) : null}
+      {!collapsed ? <>
       <div>
         <label htmlFor={inputId} className="text-sm font-medium">Profile</label>
         <p id={`${inputId}-hint`} className="text-xs text-muted-foreground">
@@ -101,6 +103,7 @@ export function ProfileFilter({ profileId, onChange }: ProfileFilterProps) {
           ))}
         </ul>
       ) : null}
+      </> : null}
     </div>
   );
 }

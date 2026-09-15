@@ -221,6 +221,18 @@ describe('HomePage browse filters', () => {
     expect(screen.queryByText('JPEG')).not.toBeInTheDocument();
   });
 
+  it('keeps the selected Profile visible and removable when filters are collapsed', async () => {
+    mockUseSearch.mockReturnValue({ profileId: 'user_Ada' });
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ data: { profile: {
+      id: 'user_Ada', handle: 'ada', displayName: 'Ada Lovelace', picture: null,
+    } } }), { headers: { 'content-type': 'application/json' } }));
+    render(<HomePage />);
+    expect(await screen.findByText('@ada')).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox', { name: 'Profile' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
+    expect(mockNavigate.mock.calls[0][0].search({ profileId: 'user_Ada' }).profileId).toBeUndefined();
+  });
+
   it('shows the resolved device aspect ratio as a neutral badge when the panel is collapsed', () => {
     mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: undefined, aspectRatio: 'device' });
 

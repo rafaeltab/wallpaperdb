@@ -233,9 +233,11 @@ function BrowseFilterPanel({
   return (
     <section className="border-b bg-muted/20 px-4 py-3">
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
+        {isOpen || selectedProfileId ? (
+          <ProfileFilter profileId={selectedProfileId} onChange={onProfileChange} collapsed={!isOpen} />
+        ) : null}
         {isOpen ? (
           <div className="flex flex-col gap-4">
-            <ProfileFilter profileId={selectedProfileId} onChange={onProfileChange} />
             <div className="flex flex-col gap-2">
               <div>
                 <label htmlFor="browse-color" className="text-sm font-medium text-foreground">

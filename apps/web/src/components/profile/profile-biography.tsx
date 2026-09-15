@@ -17,14 +17,14 @@ export function ProfileBiography({
 }: {
   profile: Pick<Profile, 'id' | 'version' | 'biographyMarkdown'>;
 }) {
-  const { profile: owner, refreshedAt } = useOwnerProfile(profile.id);
+  const { profile: owner } = useOwnerProfile(profile.id);
   const current =
     owner?.id === profile.id && owner.version >= (profile.version ?? 0) ? owner : profile;
   return (
     <BiographyMarkdown
       markdown={current.biographyMarkdown}
       profileId={profile.id}
-      refreshKey={current === owner ? refreshedAt : 0}
+      refreshKey={current.version ?? 0}
     />
   );
 }

@@ -10,6 +10,14 @@ describe('Profile picture processing', () => {
     await expect(processProfilePicture(input, { ...limits, maxBytes: input.length - 1 })).rejects.toThrow('Picture exceeds the upload byte limit');
   });
 
+  it.each([
+    ['pixel', { ...limits, maxPixels: 5 }],
+    ['decoded byte', { ...limits, maxDecodedBytes: 17 }],
+  ] as const)('rejects pictures exceeding the configured %s limit', async (_name, configuredLimits) => {
+    const input = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } }).png().toBuffer();
+    await expect(processProfilePicture(input, configuredLimits)).rejects.toThrow(/limit/);
+  });
+
   it.each(['jpeg', 'png', 'webp'] as const)('decodes %s and emits normalized WebP without source metadata', async (format) => {
     const input = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } })
       .withMetadata({ orientation: 6 }).toFormat(format).toBuffer();

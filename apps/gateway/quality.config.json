@@ -1,0 +1,17 @@
+{
+  "crapThreshold": 30,
+  "capabilities": ["catalogue", "projection", "admission", "availability"],
+  "publicModules": [
+    "catalogue",
+    "projection",
+    "admission",
+    "availability",
+    "graphql",
+    "cursors",
+    "http",
+    "adapters/events",
+    "adapters/opensearch",
+    "adapters/redis",
+    "adapters/availability"
+  ]
+}

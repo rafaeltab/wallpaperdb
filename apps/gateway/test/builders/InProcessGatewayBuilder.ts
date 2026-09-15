@@ -1,161 +1,96 @@
 import {
-    type AddMethodsType,
-    BaseTesterBuilder,
-    type OpenSearchConfig,
-    type OpenSearchTesterBuilder,
-    NatsTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import type { FastifyInstance } from "fastify";
-import { container } from "tsyringe";
-import { createApp } from "../../src/app.js";
-import type { Config } from "../../src/config.js";
-import { IndexManagerService } from "../../src/services/index-manager.service.js";
-import { createTestLogger } from "@wallpaperdb/test-logger";
+  type AddMethodsType,
+  BaseTesterBuilder,
+  type OpenSearchTesterBuilder,
+  type NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import type { FastifyInstance } from 'fastify';
+import { createApp } from '../../src/app.js';
+import type { Config } from '../../src/config.js';
 
-const logger = createTestLogger("InProcessGatewayBuilder");
-
-/**
- * Options for InProcessGatewayMixin
- */
 export interface InProcessGatewayOptions {
-    /** Config overrides */
-    configOverrides?: Partial<Config>;
-    /** Enable Fastify logger (default: false) */
-    logger?: boolean;
+  configOverrides?: Partial<Config>;
+  logger?: boolean;
 }
 
-/**
- * Mixin that creates an in-process Fastify app for the Gateway service.
- */
+/** Each fixture owns its application and configuration; no global DI or environment. */
 export class InProcessGatewayTesterBuilder extends BaseTesterBuilder<
-    "InProcessGateway",
-    [OpenSearchTesterBuilder, NatsTesterBuilder]
+  'InProcessGateway',
+  [OpenSearchTesterBuilder, NatsTesterBuilder]
 > {
-    readonly name = "InProcessGateway" as const;
-    private options: InProcessGatewayOptions;
+  readonly name = 'InProcessGateway';
 
-    constructor(options: InProcessGatewayOptions = {}) {
-        super();
-        this.options = options;
-    }
+  constructor(private readonly options: InProcessGatewayOptions = {}) {
+    super();
+  }
 
-    addMethods<
-        TBase extends AddMethodsType<[OpenSearchTesterBuilder, NatsTesterBuilder]>,
-    >(Base: TBase) {
-        const options = this.options;
+  addMethods<TBase extends AddMethodsType<[OpenSearchTesterBuilder, NatsTesterBuilder]>>(
+    Base: TBase
+  ) {
+    const options = this.options;
+    return class extends Base {
+      private application: FastifyInstance | undefined;
+      private applicationConfig: Config | undefined;
+      private appHookRegistered = false;
 
-        return class extends Base {
-            app: FastifyInstance | null = null;
-            _appInitialized = false;
+      withInProcessApp(overrides: Partial<Config> = {}) {
+        if (this.appHookRegistered) return this;
+        this.appHookRegistered = true;
+        this.addSetupHook(async () => {
+          const search = this.opensearch.config;
+          const config: Config = {
+            port: 3004,
+            nodeEnv: 'test',
+            opensearchUrl: search.endpoint.fromHost,
+            opensearchIndex: 'test_wallpapers',
+            opensearchUsername: search.username,
+            opensearchPassword: search.password,
+            natsUrl: this.nats.config.endpoints.fromHost,
+            natsStream: 'WALLPAPER',
+            redisEnabled: false,
+            redisHost: '127.0.0.1',
+            redisPort: 6379,
+            otelServiceName: 'gateway',
+            mediaServiceUrl: 'http://media.example.test',
+            mediaPublicPath: '/media',
+            graphqlMaxDepth: 5,
+            graphqlMaxComplexity: 1000,
+            graphqlMaxUniqueFields: 50,
+            graphqlMaxAliases: 20,
+            graphqlMaxBatchSize: 10,
+            graphqlIntrospectionEnabled: true,
+            rateLimitEnabled: true,
+            rateLimitMaxAnonymous: 100,
+            rateLimitWindowMs: 60000,
+            cursorSecret: 'gateway-test-secret-at-least-thirty-two-characters',
+            cursorExpirationMs: 7 * 24 * 60 * 60 * 1000,
+            colorSpreadStrategy: 'linear',
+            ...options.configOverrides,
+            ...overrides,
+          };
+          this.applicationConfig = config;
+          this.application = await createApp(config, {
+            logger: options.logger ?? false,
+            enableOtel: false,
+          });
+        });
+        this.addDestroyHook(async () => {
+          await this.application?.close();
+          this.application = undefined;
+        });
+        return this;
+      }
 
-            withGatewayEnvironment() {
-                this.addSetupHook(async () => {
-                    logger.debug("[InProcessGateway] Setting up environment variables");
-                    const opensearch: OpenSearchConfig | undefined =
-                        this.opensearch.tryGetConfig();
-                    const nats = this.getNats();
+      getGatewayConfig(): Config {
+        if (!this.applicationConfig) throw new Error('Call setup() before getGatewayConfig().');
+        return this.applicationConfig;
+      }
 
-                    if (!opensearch || !nats) {
-                        throw new Error(
-                            "InProcessGatewayTesterBuilder requires opensearch and nats",
-                        );
-                    }
-
-                    logger.debug("Creating in-process Fastify app...");
-
-                    // Set environment variables for loadConfig()
-                    process.env.NODE_ENV = "test";
-                    process.env.OPENSEARCH_URL = opensearch.endpoint.fromHost;
-                    process.env.OPENSEARCH_INDEX = "test_wallpapers";
-                    process.env.OPENSEARCH_PASSWORD = opensearch.password;
-                    process.env.OPENSEARCH_USERNAME = opensearch.username;
-                    process.env.NATS_URL = nats.endpoints.fromHost; // Placeholder for now
-                    process.env.NATS_STREAM = nats.streams[0];
-                    process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
-                        "http://localhost:4318/v1/traces";
-                    process.env.MEDIA_SERVICE_URL = "http://localhost:3003";
-                    process.env.CURSOR_SECRET =
-                        "ba2f8de80021b4223e94c9dbf184551efd27cd301a26d43e0c1c82d01cf79c5f"; // Test secret
-                    process.env.REDIS_ENABLED = "false"; // Use in-memory fallback for tests
-                    // NOTE: config.ts calls dotenv's loadEnv() at module-load time, which loads
-                    // .env (containing GRAPHQL_INTROSPECTION_ENABLED=false) before this builder
-                    // sets env vars. We must explicitly override to enable introspection in tests.
-                    process.env.GRAPHQL_INTROSPECTION_ENABLED = "true";
-
-                    // Apply config overrides
-                    if (options.configOverrides) {
-                        for (const [key, value] of Object.entries(
-                            options.configOverrides,
-                        )) {
-                            if (value !== undefined) {
-                                // Convert camelCase to SCREAMING_SNAKE_CASE
-                                const envKey = key
-                                    .replace(/([A-Z])/g, "_$1")
-                                    .toUpperCase()
-                                    .replace(/^_/, "");
-                                process.env[envKey] = String(value);
-                            }
-                        }
-                    }
-
-                    logger.debug("[InProcessGateway] Environment variables set up");
-                });
-                return this;
-            }
-
-            /**
-             * Enable in-process Fastify app creation during setup.
-             */
-            withInProcessApp() {
-                if (this._appInitialized) {
-                    return this; // Already registered
-                }
-
-                this._appInitialized = true;
-                this.withGatewayEnvironment();
-
-                this.addSetupHook(async () => {
-                    logger.debug("[InProcessGateway] Creating app via setup hook");
-
-                    // Import config at runtime to pick up environment variables
-                    const { loadConfig } = await import("../../src/config.js");
-                    const config = loadConfig();
-                    container.registerInstance("config", config);
-
-                    // Create Fastify app
-                    this.app = await createApp(config, {
-                        logger: options.logger ?? false,
-                        enableOtel: false,
-                    });
-
-                    await container.resolve(IndexManagerService).createIndex();
-
-                    logger.debug("In-process Fastify app ready");
-                });
-
-                this.addDestroyHook(async () => {
-                    if (this.app) {
-                        logger.debug("Closing in-process Fastify app...");
-                        await container.resolve(IndexManagerService).deleteIndex();
-                        await this.app.close();
-                        this.app = null;
-                    }
-                });
-
-                return this;
-            }
-
-            /**
-             * Get the Fastify app instance
-             */
-            getApp(): FastifyInstance {
-                if (!this.app) {
-                    throw new Error(
-                        "App not initialized. Did you call withInProcessApp() and setup() first?",
-                    );
-                }
-                return this.app;
-            }
-        };
-    }
+      getApp(): FastifyInstance {
+        if (!this.application)
+          throw new Error('Call withInProcessApp() and setup() before getApp().');
+        return this.application;
+      }
+    };
+  }
 }

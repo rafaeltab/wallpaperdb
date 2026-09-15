@@ -1,1149 +1,175 @@
-import "reflect-metadata";
-import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from "@wallpaperdb/events";
-import { container } from "tsyringe";
-import { describe, expect, it, vi } from "vitest";
-import { OpenSearchConnection } from "../src/connections/opensearch.js";
-import { profilesIndexMapping } from "../src/opensearch/mappings.js";
-import { ProfileRepository } from "../src/repositories/profile.repository.js";
-import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
-import { IndexManagerService } from "../src/services/index-manager.service.js";
-import { tester } from "./setup.js";
+import { Client } from '@opensearch-project/opensearch';
+import { Effect } from 'effect';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  createOpenSearchGateway,
+  type OpenSearchGateway,
+} from '../src/adapters/opensearch/index.js';
+import type { Profile, ReadOutcome } from '../src/catalogue/index.js';
+import { createProjection, type ProjectCatalogue } from '../src/projection/index.js';
+import { createGatewayTester } from './setup.js';
 
-interface ProfileSnapshot {
-    id: string;
-    displayName: string;
-    handle: string;
-    claimGeneration: number;
-    aliases?: Array<{ handle: string; claimGeneration: number }>;
-    biographyMarkdown: string;
-    pictureAssetId: string | null;
-    version: number;
-    createdAt: string;
-    updatedAt: string;
+const timestamp = '2026-01-01T00:00:00.000Z';
+function profile(id: string, overrides: Partial<Profile> = {}): Profile {
+  return {
+    id,
+    displayName: id,
+    handle: id,
+    claimGeneration: 1,
+    biographyMarkdown: '',
+    pictureAssetId: null,
+    version: 1,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  };
+}
+function found<T>(outcome: ReadOutcome<T>): T {
+  expect(outcome._tag).toBe('Found');
+  if (outcome._tag !== 'Found') throw new Error('Catalogue unavailable');
+  return outcome.value;
 }
 
-function profileCreated(profile: ProfileSnapshot, eventId: string) {
-    return {
-        eventId,
-        eventType: PROFILE_CREATED_SUBJECT,
-        timestamp: profile.updatedAt,
-        change: { type: "created" },
-        profile,
-    };
-}
+describe('OpenSearch profile projection port contract', () => {
+  const tester = createGatewayTester({ app: false });
+  let adapter: OpenSearchGateway;
+  let project: ProjectCatalogue;
+  let client: Client;
+  beforeAll(async () => {
+    await tester.setup();
+    adapter = createOpenSearchGateway({ url: tester.opensearch.config.endpoint.fromHost });
+    await adapter.start();
+    project = createProjection(adapter.projectionStore);
+    client = new Client({ node: tester.opensearch.config.endpoint.fromHost });
+  }, 120_000);
+  afterAll(async () => {
+    await client?.close();
+    await adapter?.stop();
+    await tester.destroy();
+  });
 
-function profileUpdated(
-    profile: ProfileSnapshot,
-    eventId: string,
-    before: string,
-) {
-    return {
-        eventId,
-        eventType: PROFILE_UPDATED_SUBJECT,
-        timestamp: profile.updatedAt,
-        change: {
-            type: "display-name-changed",
-            before,
-            after: profile.displayName,
+  function publish(snapshot: Profile) {
+    return Effect.runPromise(
+      project.record({
+        _tag: 'ProfilePublished',
+        profile: snapshot,
+        occurrence: {
+          source: 'wallpaperdb/profile',
+          id: `${snapshot.id}-${snapshot.version}`,
+          occurredAt: snapshot.updatedAt,
         },
-        profile,
+      })
+    );
+  }
+  async function byId(id: string) {
+    return found(await Effect.runPromise(adapter.read.profile(id)));
+  }
+  async function byHandle(handle: string) {
+    return found(await Effect.runPromise(adapter.read.profileByHandle(handle)));
+  }
+
+  it('stores and reads the gateway-owned profile snapshot', async () => {
+    const snapshot = profile('profile-reader', {
+      displayName: 'Reader',
+      biographyMarkdown: 'A biography',
+      pictureAssetId: 'picture-1',
+    });
+    expect(await publish(snapshot)).toEqual({ _tag: 'Completed' });
+    expect(await byId(snapshot.id)).toEqual(snapshot);
+    expect(await byHandle('PROFILE-READER')).toEqual(snapshot);
+    expect(await byHandle('profile-read')).toBeNull();
+  });
+
+  it('updates the complete profile snapshot when its version advances', async () => {
+    const original = profile('profile-updated');
+    await publish(original);
+    const current = {
+      ...original,
+      displayName: 'Current',
+      handle: 'current-handle',
+      biographyMarkdown: 'Updated biography',
+      pictureAssetId: 'picture-2',
+      version: 2,
+      updatedAt: '2026-02-01T00:00:00.000Z',
     };
-}
+    await publish(current);
+    expect(await byId(original.id)).toEqual(current);
+    expect(await byHandle(original.handle)).toBeNull();
+    expect(await byHandle(current.handle)).toEqual(current);
+  });
 
-async function query(query: string) {
-    const response = await tester.getApp().inject({
-        method: "POST",
-        url: "/graphql",
-        headers: { "content-type": "application/json" },
-        payload: JSON.stringify({ query }),
+  it('ignores stale and duplicate profile versions atomically', async () => {
+    const current = profile('profile-version', { version: 3, displayName: 'Current' });
+    await publish(current);
+    expect(await publish({ ...current, version: 2, displayName: 'Stale' })).toEqual({
+      _tag: 'Ignored',
     });
-
-    expect(response.statusCode).toBe(200);
-    return JSON.parse(response.body);
-}
-
-async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => boolean): Promise<T> {
-    const deadline = Date.now() + 5000;
-    let value = await read();
-    while (!predicate(value) && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        value = await read();
-    }
-    expect(predicate(value)).toBe(true);
-    return value;
-}
-
-describe("Profile projection integration", () => {
-    it("publishes authored Biography Markdown unchanged and never restores an older edit", async () => {
-        const timestamp = "2026-09-15T02:30:00.000Z";
-        const authored = "## My work\n\n**Night skies** & mountains 🌌\n\n![Aurora](wallpaper:wlpr_01ARZ3NDEKTSV4RRFFQ69G5FAV)\n\n[Portfolio](https://EXAMPLE.com/work?q=one&view=two)\n\n`<em>literal code</em>`";
-        const profile = {
-            id: "user_biography_projection",
-            displayName: "Biography Author",
-            handle: "biography-author",
-            claimGeneration: 1,
-            aliases: [],
-            biographyMarkdown: authored,
-            pictureAssetId: null,
-            version: 2,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const event = {
-            eventId: "evt_biography_authored",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "biography-changed", before: "", after: authored },
-            profile,
-        };
-        const read = () => query(`query {
-            profile(id: "${profile.id}") { id version biographyMarkdown }
-            profileByHandle(handle: "${profile.handle}") { profile { version biographyMarkdown } }
-        }`);
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
-        // ID reads are realtime; Handle search becomes visible after the index refresh.
-        const result = await eventually(read, (value) =>
-            value.data.profile?.version === 2 && value.data.profileByHandle?.profile.version === 2,
-        );
-        expect(result.errors).toBeUndefined();
-        expect(result.data.profile.biographyMarkdown).toBe(authored);
-        expect(result.data.profileByHandle.profile.biographyMarkdown).toBe(authored);
-
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            ...event,
-            eventId: "evt_biography_cleared",
-            change: { type: "biography-changed", before: authored, after: "" },
-            profile: { ...profile, biographyMarkdown: "", version: 3 },
-        });
-        await eventually(read, (value) => value.data.profile?.version === 3);
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...event, eventId: "evt_biography_replayed" });
-        const marker = { ...profile, id: "user_biography_marker", handle: "biography-marker" };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_biography_marker", "Old Name"));
-        await eventually(
-            () => container.resolve(ProfileRepository).findById(marker.id),
-            (value) => value !== null,
-        );
-        expect((await read()).data.profile).toEqual({ id: profile.id, version: 3, biographyMarkdown: "" });
+    expect(await publish({ ...current, displayName: 'Duplicate overwrite' })).toEqual({
+      _tag: 'Ignored',
     });
+    expect(await byId(current.id)).toEqual(current);
+  });
 
-    it("projects picture imports, replacements, and removal without reviving a replayed asset", async () => {
-        const timestamp = "2026-09-15T00:00:00.000Z";
-        const profile = {
-            id: "user_picture_lifecycle",
-            displayName: "Picture Owner",
-            handle: "picture-lifecycle",
-            claimGeneration: 1,
-            aliases: [],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const event = (
-            pictureId: string | null,
-            version: number,
-            before: string | null,
-            source: "clerk-import" | "upload" | "remove",
-        ): ProfileUpdatedEvent => ({
-            eventId: `evt_picture_lifecycle_${version}`,
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: {
-                type: "picture-changed", before, after: pictureId, source,
-                asset: pictureId ? {
-                    id: pictureId,
-                    storageBucket: "private-profile-pictures",
-                    storageKey: `${profile.id}/${pictureId}.webp`,
-                    mimeType: "image/webp", width: 128, height: 128, fileSizeBytes: 1024,
-                } : null,
-            },
-            profile: { ...profile, pictureAssetId: pictureId, version },
-        });
-        const read = () => query(`query {
-            profile(id: "${profile.id}") { id version picture { id url } }
-        }`);
-        const imported = event("pic_imported", 2, null, "clerk-import");
-        const uploaded = event("pic_replaced", 3, "pic_imported", "upload");
+  it('converges on the greatest profile version during concurrent writes', async () => {
+    const original = profile('profile-concurrent');
+    await Promise.all([
+      publish(original),
+      publish({ ...original, version: 3 }),
+      publish({ ...original, version: 2 }),
+    ]);
+    expect((await byId(original.id))?.version).toBe(3);
+  });
 
-        for (const update of [imported, uploaded]) {
-            await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, update);
-            const result = await eventually(read, (value) => value.data.profile?.version === update.profile.version);
-            expect(result.errors).toBeUndefined();
-            expect(result.data.profile.picture).toEqual({
-                id: update.profile.pictureAssetId,
-                url: `${process.env.MEDIA_SERVICE_URL}/profile-pictures/${update.profile.pictureAssetId}`,
-            });
-            expect(JSON.stringify(result)).not.toContain("private-profile-pictures");
-            const projected = await container.resolve(ProfileRepository).findById(profile.id);
-            expect(projected).not.toHaveProperty("change");
-            expect(projected).not.toHaveProperty("storageKey");
-        }
+  it('accepts an updated profile before its created event', async () => {
+    const latest = profile('updated-before-created', { version: 2 });
+    await publish(latest);
+    await publish({ ...latest, version: 1 });
+    expect(await byId(latest.id)).toEqual(latest);
+  });
 
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event(null, 4, "pic_replaced", "remove"));
-        await eventually(read, (value) => value.data.profile?.version === 4);
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...uploaded, eventId: "evt_picture_stale_replay" });
-        const marker = { ...profile, id: "user_picture_marker", handle: "picture-marker" };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_picture_marker", "Earlier Name"));
-        await eventually(
-            () => container.resolve(ProfileRepository).findById(marker.id),
-            (value) => value !== null,
-        );
-        expect((await read()).data.profile).toEqual({ id: profile.id, version: 4, picture: null });
+  it('chooses the latest handle claim when snapshots temporarily share a handle', async () => {
+    const original = profile('original-claim', { handle: 'reclaimed-handle', claimGeneration: 1 });
+    const current = profile('current-claim', { handle: 'reclaimed-handle', claimGeneration: 2 });
+    await publish(current);
+    await publish(original);
+    expect(await byHandle('reclaimed-handle')).toEqual(current);
+  });
+
+  it('returns null for missing IDs and handles', async () => {
+    expect(await byId('missing-id')).toBeNull();
+    expect(await byHandle('missing-handle')).toBeNull();
+  });
+
+  it('preserves duplicate IDs, input order and missing slots in batch reads', async () => {
+    const first = profile('batch-first');
+    const second = profile('batch-second');
+    await publish(first);
+    await publish(second);
+    expect(
+      found(
+        await Effect.runPromise(
+          adapter.read.profiles([second.id, first.id, 'missing-batch', second.id])
+        )
+      )
+    ).toEqual([second, first, null, second]);
+    expect(found(await Effect.runPromise(adapter.read.profiles([])))).toEqual([]);
+  });
+
+  it('rejects malformed stored profiles at each read boundary', async () => {
+    await client.index({
+      index: 'profiles',
+      id: 'malformed-profile',
+      body: { id: 'malformed-profile', handle: 'malformed-profile', claimGeneration: 1 },
+      refresh: true,
     });
-
-    it("keeps a reactivated scheduled alias routing past its canceled deadline without exposing owner history", async () => {
-        const timestamp = "2030-01-01T12:00:00.000Z";
-        const expiresAt = "2030-01-02T12:00:00.000Z";
-        const scheduled = {
-            id: "user_reactivated_schedule",
-            displayName: "Alias Owner",
-            handle: "cancellation-current",
-            claimGeneration: 2,
-            aliases: [{ handle: "canceled-expiry", claimGeneration: 1, createdAt: timestamp, expiresAt }],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 3,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            eventId: "evt_schedule_before_cancellation",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "alias-expiry-scheduled", handle: "canceled-expiry", before: null, after: expiresAt },
-            profile: scheduled,
-        });
-        await eventually(
-            () => query(`query { profile(id: "${scheduled.id}") { version } }`),
-            (result) => result.data.profile?.version === 3,
-        );
-        const readAtDeadline = async () => {
-            vi.useFakeTimers({ toFake: ["Date"] });
-            vi.setSystemTime(new Date(expiresAt));
-            try {
-                return await query(`query {
-                    profileByHandle(handle: "canceled-expiry") { isAlias canonicalHandle profile { id version } }
-                }`);
-            } finally {
-                vi.useRealTimers();
-            }
-        };
-        expect((await readAtDeadline()).data.profileByHandle).toBeNull();
-
-        const reactivated = {
-            ...scheduled, version: 4,
-            aliases: [{ ...scheduled.aliases[0], expiresAt: null }],
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            eventId: "evt_cancel_alias_expiry",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "alias-reactivated", handle: "canceled-expiry", claimGeneration: 1, before: expiresAt, after: null },
-            profile: reactivated,
-        });
-        await eventually(
-            () => query(`query { profile(id: "${scheduled.id}") { version } }`),
-            (result) => result.data.profile?.version === 4,
-        );
-        const result = await readAtDeadline();
-        expect(result.errors).toBeUndefined();
-        expect(result.data.profileByHandle).toEqual({
-            isAlias: true, canonicalHandle: scheduled.handle, profile: { id: scheduled.id, version: 4 },
-        });
-        expect((await container.resolve(ProfileRepository).findById(scheduled.id))?.aliases).toEqual(reactivated.aliases);
-
-        for (const field of ["aliases", "historicalHandles"]) {
-            const enumeration = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                payload: { query: `query { profile(id: "${scheduled.id}") { ${field} } }` },
-            });
-            expect(enumeration.json().errors[0].message).toContain(`Cannot query field "${field}" on type "Profile"`);
-        }
+    expect(await Effect.runPromise(adapter.read.profile('malformed-profile'))).toEqual({
+      _tag: 'Unavailable',
     });
-
-    it("restores a released alias from reactivation and ignores an older expiry event", async () => {
-        const timestamp = "2030-01-01T12:00:00.000Z";
-        const released = {
-            id: "user_reactivated_release",
-            displayName: "Alias Owner",
-            handle: "reactivation-current",
-            claimGeneration: 3,
-            aliases: [],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 4,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const expiry = {
-            eventId: "evt_release_before_reactivation",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: {
-                type: "alias-expired", handle: "released-alias", claimGeneration: 1,
-                before: "2030-01-02T12:00:00.000Z", after: null, reason: "immediate",
-            },
-            profile: released,
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, expiry);
-        await eventually(
-            () => query(`query { profile(id: "${released.id}") { version } }`),
-            (result) => result.data.profile?.version === 4,
-        );
-        const read = () => query(`query {
-            profileByHandle(handle: "Released-Alias") { isAlias canonicalHandle profile { id version } }
-        }`);
-        expect((await read()).data.profileByHandle).toBeNull();
-
-        const reactivated = {
-            ...released, version: 5,
-            aliases: [{ handle: "released-alias", claimGeneration: 4, createdAt: timestamp, expiresAt: null }],
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            eventId: "evt_reactivate_released_alias",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "alias-reactivated", handle: "released-alias", claimGeneration: 4, before: null, after: null },
-            profile: reactivated,
-        });
-        await eventually(
-            () => query(`query { profile(id: "${released.id}") { version } }`),
-            (result) => result.data.profile?.version === 5,
-        );
-        const expected = {
-            isAlias: true, canonicalHandle: released.handle, profile: { id: released.id, version: 5 },
-        };
-        expect((await read()).data.profileByHandle).toEqual(expected);
-
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            ...expiry, eventId: "evt_delayed_expiry_after_reactivation",
-        });
-        const marker = { ...released, id: "user_reactivation_marker", handle: "reactivation-marker" };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_reactivation_marker", "Before"));
-        // This consumer reaches the marker after processing the delayed expiry.
-        await eventually(
-            () => query(`query { profile(id: "${marker.id}") { version } }`),
-            (result) => result.data.profile?.version === marker.version,
-        );
-        const result = await read();
-        expect(result.errors).toBeUndefined();
-        expect(result.data.profileByHandle).toEqual(expected);
-        expect((await container.resolve(ProfileRepository).findById(released.id))?.aliases).toEqual(reactivated.aliases);
+    expect(await Effect.runPromise(adapter.read.profileByHandle('malformed-profile'))).toEqual({
+      _tag: 'Unavailable',
     });
-
-    it("routes a reclaimed Handle to its newer generation while the old alias snapshot still appears active", async () => {
-        const timestamp = "2030-01-01T12:00:00.000Z";
-        const original = {
-            id: "user_reclaimed_original",
-            displayName: "Original Owner",
-            handle: "original-owner",
-            claimGeneration: 4,
-            aliases: [{ handle: "reclaimed-handle", claimGeneration: 1, expiresAt: "2030-01-02T12:00:00.000Z" }],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 3,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const repository = container.resolve(ProfileRepository);
-        await repository.project(original);
-        const read = () => query(`query {
-            profileByHandle(handle: "reclaimed-handle") { isAlias canonicalHandle profile { id } }
-        }`);
-        vi.useFakeTimers({ toFake: ["Date"] });
-        vi.setSystemTime(new Date(timestamp));
-        try {
-            expect((await read()).data.profileByHandle).toEqual({
-                isAlias: true, canonicalHandle: original.handle, profile: { id: original.id },
-            });
-            // Immediate release and reclamation reached the new owner projection first.
-            await repository.project({
-                ...original, id: "user_reclaimed_new", displayName: "New Owner",
-                handle: "reclaimed-handle", claimGeneration: 5, aliases: [], version: 1,
-            });
-            const result = await read();
-            expect(result.errors).toBeUndefined();
-            expect(result.data.profileByHandle).toEqual({
-                isAlias: false, canonicalHandle: "reclaimed-handle", profile: { id: "user_reclaimed_new" },
-            });
-        } finally {
-            vi.useRealTimers();
-        }
+    expect(await Effect.runPromise(adapter.read.profiles(['malformed-profile']))).toEqual({
+      _tag: 'Unavailable',
     });
-
-    it.each(["scheduled", "immediate"])("projects %s alias expiry without letting stale events restore routing", async (reason) => {
-        const timestamp = "2030-01-01T12:00:00.000Z";
-        const expiresAt = "2030-01-02T12:00:00.000Z";
-        const profile = {
-            id: `user_expiry_${reason}`,
-            displayName: "Alias Owner",
-            handle: `expiry-current-${reason}`,
-            claimGeneration: 3,
-            aliases: [
-                { handle: `expiring-${reason}`, claimGeneration: 1, expiresAt },
-                { handle: `retained-${reason}`, claimGeneration: 2, expiresAt: null },
-            ],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 3,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const scheduled = {
-            eventId: `evt_schedule_${reason}`,
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "alias-expiry-scheduled", handle: `expiring-${reason}`, before: null, after: expiresAt },
-            profile,
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, scheduled);
-        await eventually(
-            () => query(`query { profile(id: "${profile.id}") { version } }`),
-            (result) => result.data.profile?.version === 3,
-        );
-        const read = async () => {
-            // Query during grace so date filtering cannot mask a missing projection update.
-            vi.useFakeTimers({ toFake: ["Date"] });
-            vi.setSystemTime(new Date(timestamp));
-            try {
-                return await query(`query {
-                    expired: profileByHandle(handle: "expiring-${reason}") { profile { id } }
-                    retained: profileByHandle(handle: "retained-${reason}") { profile { id } }
-                    profile(id: "${profile.id}") { version }
-                }`);
-            } finally {
-                vi.useRealTimers();
-            }
-        };
-        const before = await read();
-        expect(before.errors).toBeUndefined();
-        expect(before.data.expired).toEqual({ profile: { id: profile.id } });
-
-        const expiry = {
-            eventId: `evt_expired_${reason}`,
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp: reason === "scheduled" ? expiresAt : timestamp,
-            change: {
-                type: "alias-expired",
-                handle: `expiring-${reason}`,
-                claimGeneration: 1,
-                before: expiresAt,
-                after: null,
-                reason,
-            },
-            profile: { ...profile, version: 4, aliases: [profile.aliases[1]] },
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, expiry);
-        await eventually(
-            () => query(`query { profile(id: "${profile.id}") { version } }`),
-            (result) => result.data.profile?.version === 4,
-        );
-        expect((await read()).data).toEqual({
-            expired: null, retained: { profile: { id: profile.id } }, profile: { version: 4 },
-        });
-
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            ...scheduled, eventId: `evt_stale_schedule_${reason}`,
-        });
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            ...expiry, eventId: `evt_duplicate_expiry_${reason}`,
-        });
-        const marker = { ...expiry.profile, id: `user_expiry_marker_${reason}`, handle: `marker-${reason}`, aliases: [] };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, `evt_marker_${reason}`, "Before"));
-        // The same consumer processes the marker after both replayed events.
-        await eventually(
-            () => query(`query { profile(id: "${marker.id}") { version } }`),
-            (result) => result.data.profile?.version === 4,
-        );
-        const after = await read();
-        expect(after.errors).toBeUndefined();
-        expect(after.data).toEqual({
-            expired: null, retained: { profile: { id: profile.id } }, profile: { version: 4 },
-        });
-    });
-
-    it("resolves scheduled aliases during grace and stops exactly at expiry before projection catches up", async () => {
-        const expiresAt = "2030-01-02T12:00:00.000Z";
-        const profile = {
-            id: "user_alias_deadline",
-            displayName: "Alias Owner",
-            handle: "deadline-current",
-            claimGeneration: 4,
-            aliases: [
-                { handle: "deadline-alias", claimGeneration: 1, expiresAt },
-                { handle: "legacy-alias", claimGeneration: 2 },
-                { handle: "retained-alias", claimGeneration: 3, expiresAt: null },
-            ],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 4,
-            createdAt: "2030-01-01T12:00:00.000Z",
-            updatedAt: "2030-01-01T12:00:00.000Z",
-        };
-        await container.resolve(ProfileRepository).project(profile);
-        const read = () => query(`query {
-            scheduled: profileByHandle(handle: "deadline-alias") { profile { id } }
-            legacy: profileByHandle(handle: "legacy-alias") { profile { id } }
-            retained: profileByHandle(handle: "retained-alias") { profile { id } }
-            current: profileByHandle(handle: "deadline-current") { profile { id } }
-        }`);
-        const resolved = { profile: { id: profile.id } };
-        vi.useFakeTimers({ toFake: ["Date"] });
-        try {
-            vi.setSystemTime(new Date(Date.parse(expiresAt) - 1));
-            const grace = await read();
-            expect(grace.errors).toBeUndefined();
-            expect(grace.data).toEqual({
-                scheduled: resolved, legacy: resolved, retained: resolved, current: resolved,
-            });
-            vi.setSystemTime(new Date(expiresAt));
-            const expired = await read();
-            expect(expired.errors).toBeUndefined();
-            expect(expired.data).toEqual({
-                scheduled: null, legacy: resolved, retained: resolved, current: resolved,
-            });
-        } finally {
-            vi.useRealTimers();
-        }
-    });
-
-    it("adds alias routing to an existing Profile index without losing Profiles", async () => {
-        const indexManager = container.resolve(IndexManagerService);
-        const client = container.resolve(OpenSearchConnection).getClient();
-        await indexManager.deleteIndex("profiles");
-        await client.indices.create({
-            index: indexManager.getIndexName("profiles"),
-            body: {
-                mappings: {
-                    properties: Object.fromEntries(
-                        Object.entries(profilesIndexMapping.properties).filter(([name]) => name !== "aliases"),
-                    ),
-                },
-            },
-        });
-        const timestamp = "2026-01-01T00:00:00.000Z";
-        const existing = {
-            id: "user_existing_index",
-            displayName: "Existing Profile",
-            handle: "existing-profile",
-            claimGeneration: 1,
-            biographyMarkdown: "Preserved biography",
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const repository = container.resolve(ProfileRepository);
-        await repository.project(existing);
-
-        // This is the normal startup path, before Profile consumers start.
-        await indexManager.createIndex();
-        const preserved = await query(`query {
-            profile(id: "${existing.id}") { id displayName biographyMarkdown version }
-        }`);
-        expect(preserved.data.profile).toEqual({
-            id: existing.id,
-            displayName: existing.displayName,
-            biographyMarkdown: existing.biographyMarkdown,
-            version: 1,
-        });
-
-        await repository.project({
-            ...existing,
-            handle: "updated-profile",
-            claimGeneration: 2,
-            aliases: [{ handle: existing.handle, claimGeneration: existing.claimGeneration }],
-            version: 2,
-        });
-        const result = await query(`query {
-            profileByHandle(handle: "existing-profile") {
-                isAlias canonicalHandle profile { id }
-            }
-        }`);
-        expect(result.errors).toBeUndefined();
-        expect(result.data.profileByHandle).toEqual({
-            isAlias: true,
-            canonicalHandle: "updated-profile",
-            profile: { id: existing.id },
-        });
-    });
-
-    it("selects the highest matching claim generation during projection lag", async () => {
-        const timestamp = "2026-01-01T00:00:00.000Z";
-        const base = {
-            displayName: "Profile Owner",
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        const repository = container.resolve(ProfileRepository);
-        await repository.project({
-            ...base,
-            id: "user_stale_aliases",
-            handle: "unrelated-current",
-            claimGeneration: 100,
-            aliases: [
-                { handle: "reclaimed-current", claimGeneration: 10 },
-                { handle: "reclaimed-alias", claimGeneration: 20 },
-                { handle: "unrelated-alias", claimGeneration: 99 },
-            ],
-        });
-        await repository.project({
-            ...base,
-            id: "user_current_winner",
-            handle: "reclaimed-current",
-            claimGeneration: 11,
-        });
-        await repository.project({
-            ...base,
-            id: "user_stale_current",
-            handle: "reclaimed-current",
-            claimGeneration: 9,
-        });
-        await repository.project({
-            ...base,
-            id: "user_alias_winner",
-            handle: "canonical-alias-owner",
-            claimGeneration: 40,
-            aliases: [{ handle: "reclaimed-alias", claimGeneration: 21 }],
-        });
-
-        const result = await query(`query {
-            current: profileByHandle(handle: "reclaimed-current") {
-                isAlias canonicalHandle profile { id }
-            }
-            alias: profileByHandle(handle: "reclaimed-alias") {
-                isAlias canonicalHandle profile { id }
-            }
-        }`);
-
-        expect(result.errors).toBeUndefined();
-        expect(result.data).toEqual({
-            current: {
-                isAlias: false,
-                canonicalHandle: "reclaimed-current",
-                profile: { id: "user_current_winner" },
-            },
-            alias: {
-                isAlias: true,
-                canonicalHandle: "canonical-alias-owner",
-                profile: { id: "user_alias_winner" },
-            },
-        });
-    });
-
-    it("resolves former Handle aliases after projecting a Handle change", async () => {
-        const timestamp = "2026-01-01T00:00:00.000Z";
-        const original = {
-            id: "user_handle_change",
-            displayName: "Profile Owner",
-            handle: "original-handle",
-            claimGeneration: 1,
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(original, "evt_handle_created"),
-        );
-        const updated = {
-            ...original,
-            handle: "current-handle",
-            claimGeneration: 2,
-            aliases: [{ handle: original.handle, claimGeneration: original.claimGeneration }],
-            version: 2,
-            updatedAt: "2026-01-08T00:00:00.000Z",
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            eventId: "evt_handle_changed",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp: updated.updatedAt,
-            change: { type: "handle-changed", before: original.handle, after: updated.handle },
-            profile: updated,
-        });
-        await eventually(
-            () => query(`query { profile(id: "${original.id}") { version } }`),
-            (result) => result.data.profile?.version === 2,
-        );
-
-        const result = await query(`query {
-            current: profileByHandle(handle: "current-handle") {
-                requestedHandle isAlias canonicalHandle profile { id canonicalPath }
-            }
-            previous: profileByHandle(handle: "Original-Handle") {
-                requestedHandle isAlias canonicalHandle profile { id canonicalPath }
-            }
-            partial: profileByHandle(handle: "original") { profile { id } }
-        }`);
-
-        expect(result.errors).toBeUndefined();
-        expect(result.data).toEqual({
-            current: {
-                requestedHandle: "current-handle",
-                isAlias: false,
-                canonicalHandle: "current-handle",
-                profile: { id: original.id, canonicalPath: "/profiles/@current-handle" },
-            },
-            previous: {
-                requestedHandle: "Original-Handle",
-                isAlias: true,
-                canonicalHandle: "current-handle",
-                profile: { id: original.id, canonicalPath: "/profiles/@current-handle" },
-            },
-            partial: null,
-        });
-        const aliasEnumeration = await tester.getApp().inject({
-            method: "POST",
-            url: "/graphql",
-            payload: { query: `query { profile(id: "${original.id}") { aliases } }` },
-        });
-        expect(aliasEnumeration.json().errors[0].message).toContain(
-            'Cannot query field "aliases" on type "Profile"',
-        );
-    });
-
-    it("projects scheduled aliases without exposing the owner's alias list through GraphQL", async () => {
-        const timestamp = new Date().toISOString();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-        const profile = {
-            id: "user_scheduled_alias",
-            displayName: "Alias Owner",
-            handle: "scheduled-current",
-            claimGeneration: 2,
-            aliases: [{ handle: "scheduled-alias", claimGeneration: 1, createdAt: timestamp, expiresAt }],
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 3,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        };
-        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-            eventId: "evt_alias_scheduled",
-            eventType: PROFILE_UPDATED_SUBJECT,
-            timestamp,
-            change: { type: "alias-expiry-scheduled", handle: "scheduled-alias", before: null, after: expiresAt },
-            profile,
-        });
-        await eventually(
-            () => query(`query { profile(id: "${profile.id}") { version } }`),
-            (result) => result.data.profile?.version === 3,
-        );
-        const result = await query(`query {
-            profileByHandle(handle: "scheduled-alias") {
-                isAlias canonicalHandle profile { id }
-            }
-        }`);
-        expect(result.errors).toBeUndefined();
-        expect(result.data.profileByHandle).toEqual({
-            isAlias: true,
-            canonicalHandle: profile.handle,
-            profile: { id: profile.id },
-        });
-        const projected = await container.resolve(ProfileRepository).findById(profile.id);
-        expect(projected?.aliases).toEqual(profile.aliases);
-        const enumeration = await tester.getApp().inject({
-            method: "POST",
-            url: "/graphql",
-            payload: { query: `query { profile(id: "${profile.id}") { aliases } }` },
-        });
-        expect(enumeration.json().errors[0].message).toContain('Cannot query field "aliases" on type "Profile"');
-    });
-
-    it("projects an updated Display name through the public GraphQL Profile", async () => {
-        const createdAt = "2026-01-01T00:00:00.000Z";
-        const original = {
-            id: "user_display_name_update",
-            displayName: "Before",
-            handle: "before",
-            claimGeneration: 1,
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 1,
-            createdAt,
-            updatedAt: createdAt,
-        };
-        const updated = {
-            ...original,
-            displayName: "After",
-            version: 2,
-            updatedAt: "2026-01-02T00:00:00.000Z",
-        };
-
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(original, "evt_display_name_created"),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_UPDATED_SUBJECT,
-            profileUpdated(updated, "evt_display_name_updated", original.displayName),
-        );
-
-        const result = await eventually(
-            () => query(`query { profile(id: "user_display_name_update") { displayName version } }`),
-            (value) => value.data.profile?.version === 2,
-        );
-        expect(result.data.profile).toEqual({ displayName: "After", version: 2 });
-    });
-
-    it("atomically ignores duplicate and stale Profile versions", async () => {
-        const createdAt = "2026-01-01T00:00:00.000Z";
-        const current = {
-            id: "user_profile_versions",
-            displayName: "Current Name",
-            handle: "current-handle",
-            claimGeneration: 2,
-            biographyMarkdown: "Current biography",
-            pictureAssetId: null,
-            version: 2,
-            createdAt,
-            updatedAt: "2026-01-03T00:00:00.000Z",
-        };
-
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(current, "evt_profile_current"),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                { ...current, version: 3, displayName: "Final Name", handle: "final-handle" },
-                "evt_profile_final",
-            ),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                {
-                    ...current,
-                    version: 3,
-                    displayName: "Duplicate overwrite",
-                    handle: "duplicate-handle",
-                },
-                "evt_profile_duplicate",
-            ),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                {
-                    ...current,
-                    displayName: "Stale overwrite",
-                    handle: "stale-handle",
-                    version: 1,
-                    updatedAt: "2026-01-02T00:00:00.000Z",
-                },
-                "evt_profile_stale",
-            ),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                {
-                    ...current,
-                    id: "user_profile_marker",
-                    displayName: "Marker",
-                    handle: "marker",
-                    version: 1,
-                },
-                "evt_profile_marker",
-            ),
-        );
-
-        await eventually(
-            () => container.resolve(ProfileRepository).findById("user_profile_marker"),
-            (value) => value !== null,
-        );
-        const profile = await container.resolve(ProfileRepository).findById("user_profile_versions");
-
-        const result = await query(`
-            query {
-                profile(id: "user_profile_versions") {
-                    displayName
-                    handle
-                    version
-                }
-            }
-        `);
-        expect(result.errors).toBeUndefined();
-        expect(profile?.version).toBe(3);
-        expect(result.data.profile).toEqual({
-            displayName: "Final Name",
-            handle: "final-handle",
-            version: 3,
-        });
-    });
-
-    it("reads Profiles exactly by ID and current Handle with canonical picture data", async () => {
-        const timestamp = "2026-02-01T00:00:00.000Z";
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                {
-                    id: "user_profile_reads",
-                    displayName: "Profile Reader",
-                    handle: "profile-reader",
-                    claimGeneration: 1,
-                    biographyMarkdown: "Reads profiles",
-                    pictureAssetId: "pic_profile_reads",
-                    version: 1,
-                    createdAt: timestamp,
-                    updatedAt: timestamp,
-                },
-                "evt_profile_reads",
-            ),
-        );
-        await tester.nats.publishEvent(
-            PROFILE_CREATED_SUBJECT,
-            profileCreated(
-                {
-                    id: "user_profile_no_picture",
-                    displayName: "No Picture",
-                    handle: "no-picture",
-                    claimGeneration: 1,
-                    biographyMarkdown: "",
-                    pictureAssetId: null,
-                    version: 1,
-                    createdAt: timestamp,
-                    updatedAt: timestamp,
-                },
-                "evt_profile_no_picture",
-            ),
-        );
-
-        await eventually(
-            () => container.resolve(ProfileRepository).findById("user_profile_no_picture"),
-            (value) => value !== null,
-        );
-        const result = await query(`
-                    query {
-                        byId: profile(id: "user_profile_reads") {
-                            id
-                            displayName
-                            handle
-                            biographyMarkdown
-                            canonicalPath
-                            picture { id url }
-                        }
-                        byHandle: profileByHandle(handle: "profile-reader") {
-                            requestedHandle
-                            isAlias
-                            canonicalHandle
-                            profile { id handle canonicalPath }
-                        }
-                        mixedCaseHandle: profileByHandle(handle: "Profile-Reader") {
-                            requestedHandle
-                            isAlias
-                            canonicalHandle
-                            profile { id handle canonicalPath }
-                        }
-                        partialHandle: profileByHandle(handle: "profile-read") { profile { id } }
-                        missingId: profile(id: "user_profile_missing") { id }
-                        noPicture: profileByHandle(handle: "no-picture") { profile { picture { id } } }
-                    }
-                `);
-
-        expect(result.errors).toBeUndefined();
-        expect(result.data).toEqual({
-            byId: {
-                id: "user_profile_reads",
-                displayName: "Profile Reader",
-                handle: "profile-reader",
-                biographyMarkdown: "Reads profiles",
-                canonicalPath: "/profiles/@profile-reader",
-                picture: {
-                    id: "pic_profile_reads",
-                    url: `${process.env.MEDIA_SERVICE_URL}/profile-pictures/pic_profile_reads`,
-                },
-            },
-            byHandle: {
-                requestedHandle: "profile-reader",
-                isAlias: false,
-                canonicalHandle: "profile-reader",
-                profile: {
-                    id: "user_profile_reads",
-                    handle: "profile-reader",
-                    canonicalPath: "/profiles/@profile-reader",
-                },
-            },
-            mixedCaseHandle: {
-                requestedHandle: "Profile-Reader",
-                isAlias: false,
-                canonicalHandle: "profile-reader",
-                profile: {
-                    id: "user_profile_reads",
-                    handle: "profile-reader",
-                    canonicalPath: "/profiles/@profile-reader",
-                },
-            },
-            partialHandle: null,
-            missingId: null,
-            noPicture: { profile: { picture: null } },
-        });
-    });
-
-    it("paginates only the wallpapers owned by a Profile", async () => {
-        const timestamp = "2026-03-01T00:00:00.000Z";
-        await container.resolve(ProfileRepository).project({
-            id: "user_profile_wallpapers",
-            displayName: "Wallpaper Owner",
-            handle: "wallpaper-owner",
-            claimGeneration: 1,
-            biographyMarkdown: "",
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-        });
-
-        const wallpaperRepository = container.resolve(WallpaperRepository);
-        for (const [wallpaperId, userId] of [
-            ["wlpr_profile_001", "user_profile_wallpapers"],
-            ["wlpr_profile_002", "user_profile_wallpapers"],
-            ["wlpr_profile_003", "user_profile_wallpapers"],
-            ["wlpr_other_profile", "user_other_profile"],
-        ]) {
-            await wallpaperRepository.upsert({
-                wallpaperId,
-                userId,
-                variants: [],
-                uploadedAt: timestamp,
-                updatedAt: timestamp,
-            });
-        }
-
-        const firstPage = await query(`
-            query {
-                profile(id: "user_profile_wallpapers") {
-                    wallpapers(first: 2) {
-                        edges { node { wallpaperId profileId } }
-                        pageInfo { hasNextPage endCursor }
-                    }
-                }
-            }
-        `);
-
-        expect(firstPage.errors).toBeUndefined();
-        expect(firstPage.data.profile.wallpapers.edges).toEqual([
-            { node: { wallpaperId: "wlpr_profile_001", profileId: "user_profile_wallpapers" } },
-            { node: { wallpaperId: "wlpr_profile_002", profileId: "user_profile_wallpapers" } },
-        ]);
-        expect(firstPage.data.profile.wallpapers.pageInfo.hasNextPage).toBe(true);
-
-        const secondPage = await query(`
-            query {
-                profile(id: "user_profile_wallpapers") {
-                    wallpapers(first: 2, after: "${firstPage.data.profile.wallpapers.pageInfo.endCursor}") {
-                        edges { node { wallpaperId profileId } }
-                        pageInfo { hasNextPage hasPreviousPage }
-                    }
-                }
-            }
-        `);
-
-        expect(secondPage.errors).toBeUndefined();
-        expect(secondPage.data.profile.wallpapers).toEqual({
-            edges: [
-                { node: { wallpaperId: "wlpr_profile_003", profileId: "user_profile_wallpapers" } },
-            ],
-            pageInfo: { hasNextPage: false, hasPreviousPage: true },
-        });
-    });
-
-    it("batch-resolves nullable Profile relationships for wallpaper results", async () => {
-        const timestamp = "2026-03-02T00:00:00.000Z";
-        const profileRepository = container.resolve(ProfileRepository);
-        for (const [id, handle] of [
-            ["user_profile_batch_a", "batch-a"],
-            ["user_profile_batch_b", "batch-b"],
-        ]) {
-            await profileRepository.project({
-                id,
-                displayName: handle,
-                handle,
-                claimGeneration: 1,
-                biographyMarkdown: "",
-                pictureAssetId: null,
-                version: 1,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-            });
-        }
-
-        const wallpaperRepository = container.resolve(WallpaperRepository);
-        for (const [wallpaperId, userId] of [
-            ["wlpr_batch_001", "user_profile_batch_a"],
-            ["wlpr_batch_002", "user_profile_batch_a"],
-            ["wlpr_batch_003", "user_profile_batch_b"],
-            ["wlpr_batch_004", "user_profile_missing"],
-        ]) {
-            await wallpaperRepository.upsert({
-                wallpaperId,
-                userId,
-                variants: [],
-                uploadedAt: timestamp,
-                updatedAt: timestamp,
-            });
-        }
-
-        const findByIds = vi.spyOn(profileRepository, "findByIds");
-        const result = await query(`
-            query {
-                searchWallpapers(first: 10) {
-                    edges {
-                        node {
-                            wallpaperId
-                            profileId
-                            profile { id handle }
-                        }
-                    }
-                }
-            }
-        `);
-
-        expect(result.errors).toBeUndefined();
-        expect(result.data.searchWallpapers.edges).toEqual([
-            {
-                node: {
-                    wallpaperId: "wlpr_batch_001",
-                    profileId: "user_profile_batch_a",
-                    profile: { id: "user_profile_batch_a", handle: "batch-a" },
-                },
-            },
-            {
-                node: {
-                    wallpaperId: "wlpr_batch_002",
-                    profileId: "user_profile_batch_a",
-                    profile: { id: "user_profile_batch_a", handle: "batch-a" },
-                },
-            },
-            {
-                node: {
-                    wallpaperId: "wlpr_batch_003",
-                    profileId: "user_profile_batch_b",
-                    profile: { id: "user_profile_batch_b", handle: "batch-b" },
-                },
-            },
-            {
-                node: {
-                    wallpaperId: "wlpr_batch_004",
-                    profileId: "user_profile_missing",
-                    profile: null,
-                },
-            },
-        ]);
-        expect(findByIds).toHaveBeenCalledTimes(1);
-        expect(findByIds).toHaveBeenCalledWith([
-            "user_profile_batch_a",
-            "user_profile_batch_a",
-            "user_profile_batch_b",
-            "user_profile_missing",
-        ]);
-    });
+  });
 });

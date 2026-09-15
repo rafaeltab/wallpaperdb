@@ -1,466 +1,278 @@
 import type { IncomingHttpHeaders } from 'node:http';
-import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
+import { Effect, Either, Exit, Schema } from 'effect';
 import { GraphQLError } from 'graphql';
-import { inject, singleton } from 'tsyringe';
-import type { Config } from '../config.js';
-import { InvalidCursorError } from '../errors/graphql-errors.js';
-import { type ProfileDocument, ProfileRepository } from '../repositories/profile.repository.js';
-import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
-import {
-  type ColorInput as ColorSortColorInput,
-  ColorSortService,
-} from '../services/color-sort.service.js';
-import { CursorService, type CursorValue } from '../services/cursor.service.js';
-import { GatewayAttributes } from '../telemetry/attributes.js';
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+import { traceGatewayEffect } from '../runtime.js';
+import type {
+  Catalogue,
+  Profile,
+  ReadOutcome,
+  SearchOutcome,
+  SearchWallpapers,
+  Wallpaper,
+} from '../catalogue/index.js';
 
-/**
- * Validate wallpaper ID format
- * @throws Error if wallpaperId is invalid
- */
-function validateWallpaperId(wallpaperId: string): void {
-  if (!wallpaperId || wallpaperId.trim() === '') {
-    throw new Error('wallpaperId cannot be empty');
-  }
-  if (!wallpaperId.startsWith('wlpr_')) {
-    throw new Error('wallpaperId must start with "wlpr_"');
-  }
+export interface MediaUrls {
+  mediaServiceUrl: string;
+  mediaPublicBaseUrl?: string;
+  mediaPublicPath: string;
 }
-
-interface WallpaperFilter {
-  profileId?: string;
-  userId?: string;
-  variants?: {
-    width?: number;
-    height?: number;
-    aspectRatio?: number;
-    format?: string;
-  };
+interface GraphqlContext {
+  reply?: { request?: { headers: IncomingHttpHeaders } };
 }
-
-interface SearchArgs {
-  filter?: WallpaperFilter;
-  sort?: {
-    color?: {
-      colors: ColorSortColorInput[];
-    };
-  };
-  first?: number;
-  after?: string;
-  last?: number;
-  before?: string;
-}
-
-interface GetWallpaperArgs {
-  wallpaperId: string;
-}
-
-interface ProfileArgs {
-  id: string;
-}
-
-interface ProfileByHandleArgs {
-  handle: string;
-}
-
-interface SearchProfilesArgs {
-  query: string;
-  first?: number | null;
-  after?: string | null;
-}
-
-interface GraphQLContext {
-  reply?: {
-    request?: {
-      headers: IncomingHttpHeaders;
-      hostname?: string;
-      protocol?: string;
-    };
-  };
-}
-
-interface Variant {
+interface VariantView {
   width: number;
   height: number;
   aspectRatio: number;
   format: string;
   fileSizeBytes: number;
   createdAt: string;
-}
-
-interface Wallpaper {
   wallpaperId: string;
-  userId: string;
-  variants: Variant[];
+}
+interface WallpaperView {
+  wallpaperId: string;
+  profileId: string;
+  variants: VariantView[];
   uploadedAt: string;
   updatedAt: string;
 }
-
-/**
- * GraphQL resolvers for the Gateway service
- */
-@singleton()
-export class Resolvers {
-  private readonly colorSortService = new ColorSortService();
-
+interface ProfileView {
+  id: string;
+  handle: string;
+  displayName: string;
+  biographyMarkdown: string;
+  pictureAssetId: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+const nullableOptional = <A, I>(schema: Schema.Schema<A, I>) =>
+  Schema.optional(Schema.NullOr(schema));
+const searchArguments = Schema.Struct({
+  first: nullableOptional(Schema.Number),
+  last: nullableOptional(Schema.Number),
+  after: nullableOptional(Schema.String),
+  before: nullableOptional(Schema.String),
+  filter: nullableOptional(
+    Schema.Struct({
+      profileId: nullableOptional(Schema.String),
+      userId: nullableOptional(Schema.String),
+      variants: nullableOptional(
+        Schema.Struct({
+          width: nullableOptional(Schema.Number),
+          height: nullableOptional(Schema.Number),
+          aspectRatio: nullableOptional(Schema.Number),
+          format: nullableOptional(Schema.String),
+        })
+      ),
+    })
+  ),
+  sort: nullableOptional(
+    Schema.Struct({
+      color: nullableOptional(
+        Schema.Struct({
+          colors: Schema.Array(
+            Schema.Struct({
+              color: Schema.String,
+              amount: Schema.Finite,
+              spread: nullableOptional(Schema.Finite),
+            })
+          ),
+        })
+      ),
+    })
+  ),
+});
+function parse<A, I>(schema: Schema.Schema<A, I>, input: unknown): A {
+  const result = Schema.decodeUnknownEither(schema)(input);
+  if (Either.isLeft(result))
+    throw new GraphQLError('Invalid query arguments', { extensions: { code: 'BAD_USER_INPUT' } });
+  return result.right;
+}
+function searchInput(input: unknown): SearchWallpapers {
+  const args = parse(searchArguments, input);
+  const variants = args.filter?.variants;
+  return {
+    first: args.first ?? undefined,
+    last: args.last ?? undefined,
+    after: args.after ?? undefined,
+    before: args.before ?? undefined,
+    profileId: args.filter?.profileId ?? args.filter?.userId ?? undefined,
+    variants: variants
+      ? {
+          width: variants.width ?? undefined,
+          height: variants.height ?? undefined,
+          aspectRatio: variants.aspectRatio ?? undefined,
+          format: variants.format ?? undefined,
+        }
+      : undefined,
+    colors: args.sort?.color?.colors.map((color) => ({
+      color: color.color,
+      amount: color.amount,
+      spread: color.spread ?? undefined,
+    })),
+  };
+}
+function wallpaperView(wallpaper: Wallpaper): WallpaperView {
+  return {
+    wallpaperId: wallpaper.wallpaperId,
+    profileId: wallpaper.profileId,
+    uploadedAt: wallpaper.uploadedAt,
+    updatedAt: wallpaper.updatedAt,
+    variants: wallpaper.variants.map((variant) => ({
+      width: variant.width,
+      height: variant.height,
+      aspectRatio: variant.aspectRatio,
+      format: variant.format,
+      fileSizeBytes: variant.fileSizeBytes,
+      createdAt: variant.createdAt,
+      wallpaperId: wallpaper.wallpaperId,
+    })),
+  };
+}
+function profileView(profile: Profile): ProfileView {
+  return {
+    id: profile.id,
+    handle: profile.handle,
+    displayName: profile.displayName,
+    biographyMarkdown: profile.biographyMarkdown,
+    pictureAssetId: profile.pictureAssetId,
+    version: profile.version,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
+}
+async function run<A>(effect: Effect.Effect<A>): Promise<A> {
+  const exit = await Effect.runPromiseExit(traceGatewayEffect(effect));
+  if (Exit.isFailure(exit))
+    throw new GraphQLError('An unexpected error occurred', {
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+  return exit.value;
+}
+function readValue<A>(result: ReadOutcome<A>): A {
+  switch (result._tag) {
+    case 'Found':
+      return result.value;
+    case 'Unavailable':
+      throw new GraphQLError('The catalogue is temporarily unavailable', {
+        extensions: { code: 'SERVICE_UNAVAILABLE' },
+      });
+  }
+}
+function searchValue(result: SearchOutcome) {
+  switch (result._tag) {
+    case 'Found':
+      return {
+        edges: result.value.wallpapers.map((wallpaper) => ({ node: wallpaperView(wallpaper) })),
+        pageInfo: { ...result.value.pageInfo },
+      };
+    case 'Unavailable':
+      throw new GraphQLError('The catalogue is temporarily unavailable', {
+        extensions: { code: 'SERVICE_UNAVAILABLE' },
+      });
+    case 'InvalidCursor':
+      throw new GraphQLError('Invalid or expired cursor', {
+        extensions: { code: 'INVALID_CURSOR' },
+      });
+    case 'InvalidSearch':
+      throw new GraphQLError(result.reason, { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+}
+export class GraphqlAdapter {
   constructor(
-    @inject(WallpaperRepository) private readonly repository: WallpaperRepository,
-    @inject(ProfileRepository) private readonly profileRepository: ProfileRepository,
-    @inject(CursorService) private readonly cursorService: CursorService,
-    @inject('config') private readonly config: Config
+    private readonly catalogue: Catalogue,
+    private readonly media: MediaUrls
   ) {}
-
-  /**
-   * Get resolvers object for Mercurius
-   */
-  getResolvers() {
+  resolvers() {
     return {
       Query: {
-        searchProfiles: async (_parent: unknown, args: SearchProfilesArgs) => {
-          return await this.searchProfiles(args);
+        searchWallpapers: async (_parent: unknown, args: unknown) => this.search(searchInput(args)),
+        getWallpaper: async (_parent: unknown, args: unknown) => {
+          const { wallpaperId } = parse(Schema.Struct({ wallpaperId: Schema.String }), args);
+          if (!wallpaperId.trim())
+            throw new GraphQLError('wallpaperId cannot be empty', {
+              extensions: { code: 'BAD_USER_INPUT' },
+            });
+          if (!wallpaperId.startsWith('wlpr_'))
+            throw new GraphQLError('wallpaperId must start with "wlpr_"', {
+              extensions: { code: 'BAD_USER_INPUT' },
+            });
+          const started = Date.now();
+          const value = readValue(await run(this.catalogue.wallpaper(wallpaperId)));
+          recordQuery('getWallpaper', started, value ? 1 : 0, Boolean(value));
+          return value ? wallpaperView(value) : null;
         },
-        searchWallpapers: async (_parent: unknown, args: SearchArgs) => {
-          return await this.searchWallpapers(args);
+        profile: async (_parent: unknown, args: unknown) => {
+          const { id } = parse(Schema.Struct({ id: Schema.NonEmptyString }), args);
+          const value = readValue(await run(this.catalogue.profile(id)));
+          return value ? profileView(value) : null;
         },
-        getWallpaper: async (_parent: unknown, args: GetWallpaperArgs) => {
-          return await this.getWallpaper(args);
-        },
-        profile: async (_parent: unknown, args: ProfileArgs) => {
-          return await this.profileRepository.findById(args.id);
-        },
-        profileByHandle: async (_parent: unknown, args: ProfileByHandleArgs) => {
-          const profile = await this.profileRepository.findByHandle(args.handle);
-          if (!profile) return null;
-          return {
-            profile,
-            requestedHandle: args.handle,
-            isAlias: profile.handle !== args.handle.toLowerCase(),
-            canonicalHandle: profile.handle,
-          };
+        profileByHandle: async (_parent: unknown, args: unknown) => {
+          const { handle } = parse(Schema.Struct({ handle: Schema.NonEmptyString }), args);
+          const value = readValue(await run(this.catalogue.profileByHandle(handle)));
+          return value ? profileView(value) : null;
         },
       },
       Profile: {
-        canonicalPath: (profile: ProfileDocument) => `/profiles/@${profile.handle}`,
-        picture: (profile: ProfileDocument, _args: unknown, context: GraphQLContext) => {
-          if (!profile.pictureAssetId) return null;
-          return {
-            id: profile.pictureAssetId,
-            url: `${this.getPublicMediaBaseUrl(context)}/profile-pictures/${profile.pictureAssetId}`,
-          };
-        },
-        wallpapers: async (profile: ProfileDocument, args: SearchArgs) => {
-          return await this.searchWallpapers({
-            ...args,
-            filter: { profileId: profile.id },
-          });
-        },
+        canonicalPath: (profile: ProfileView) => `/profiles/@${profile.handle}`,
+        picture: (profile: ProfileView, _args: unknown, context: GraphqlContext) =>
+          profile.pictureAssetId
+            ? {
+                id: profile.pictureAssetId,
+                url: `${this.mediaBase(context)}/profile-pictures/${profile.pictureAssetId}`,
+              }
+            : null,
+        wallpapers: async (profile: ProfileView, args: unknown) =>
+          this.search({ ...searchInput(args), profileId: profile.id }),
       },
-      Wallpaper: {
-        profileId: (wallpaper: Wallpaper) => wallpaper.userId,
-        userId: (wallpaper: Wallpaper) => wallpaper.userId,
-      },
+      Wallpaper: { userId: (wallpaper: WallpaperView) => wallpaper.profileId },
       Variant: {
-        url: (
-          parent: Variant & { __wallpaperId?: string },
-          _args: unknown,
-          context: GraphQLContext
-        ) => {
-          return this.getVariantUrl(parent, context);
-        },
+        url: (variant: VariantView, _args: unknown, context: GraphqlContext) =>
+          `${this.mediaBase(context)}/wallpapers/${variant.wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`,
       },
     };
   }
-
-  getLoaders() {
+  loaders() {
     return {
       Wallpaper: {
-        profile: async (queries: Array<{ obj: Wallpaper }>) => {
-          return await this.profileRepository.findByIds(queries.map(({ obj }) => obj.userId));
-        },
+        profile: async (queries: Array<{ obj: WallpaperView }>) =>
+          readValue(
+            await run(this.catalogue.profiles(queries.map(({ obj }) => obj.profileId)))
+          ).map((profile) => (profile ? profileView(profile) : null)),
       },
     };
   }
-
-  private async searchProfiles(args: SearchProfilesArgs) {
-    const query = args.query.trim().replace(/^@/, '').trim().toLowerCase();
-    const limit = args.first ?? 10;
-    if (query.length === 0 || [...query].length > 100) {
-      throw new GraphQLError('Profile search query must contain 1 to 100 characters', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
-    }
-    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
-      throw new GraphQLError('Profile search first must be between 1 and 50', {
-        extensions: { code: 'BAD_USER_INPUT' },
-      });
-    }
-    let searchAfter: CursorValue[] | undefined;
-    if (args.after != null) {
-      if (args.after.length === 0 || args.after.length > 2048) {
-        throw new InvalidCursorError('Invalid Profile search cursor');
-      }
-      const values = this.cursorService.decode(args.after);
-      const [namespace, cursorQuery, score, profileId] = values;
-      if (
-        values.length !== 4 ||
-        namespace !== 'profiles' ||
-        cursorQuery !== query ||
-        typeof score !== 'number' ||
-        !Number.isInteger(score) ||
-        score < 1 ||
-        score > 6 ||
-        typeof profileId !== 'string' ||
-        profileId.length === 0
-      ) {
-        throw new InvalidCursorError('Profile search cursor does not match this query');
-      }
-      searchAfter = [score, profileId];
-    }
-    const results = await this.profileRepository.search({
-      query,
-      size: limit + 1,
-      searchAfter,
-    });
-    const page = results.slice(0, limit);
-    const cursors = page.map(({ cursorValues }) =>
-      this.cursorService.encode(['profiles', query, ...cursorValues])
-    );
-    return {
-      edges: page.map(({ profile }) => ({ node: profile })),
-      pageInfo: {
-        hasNextPage: results.length > limit,
-        hasPreviousPage: Boolean(args.after),
-        startCursor: cursors[0] ?? null,
-        endCursor: cursors.at(-1) ?? null,
-      },
-    };
+  private async search(input: SearchWallpapers) {
+    const started = Date.now();
+    const result = searchValue(await run(this.catalogue.search(input)));
+    recordQuery('searchWallpapers', started, result.edges.length);
+    return result;
   }
-
-  /**
-   * Search wallpapers with filters and pagination
-   */
-  private async searchWallpapers(args: SearchArgs) {
-    const limit = args.first ?? args.last ?? 10;
-    const profileId = args.filter?.profileId ?? args.filter?.userId;
-    const isBackwardPagination = args.last !== undefined && args.before !== undefined;
-    const colorSort = args.sort?.color;
-    const colorVector = colorSort
-      ? this.colorSortService.buildQueryVector({ colors: colorSort.colors })
-      : undefined;
-    const sortOrder = colorVector
-      ? isBackwardPagination
-        ? 'asc'
-        : 'desc'
-      : isBackwardPagination
-        ? 'desc'
-        : 'asc';
-
-    return await withSpan(
-      'graphql.resolve.searchWallpapers',
-      {
-        [GatewayAttributes.GRAPHQL_OPERATION_NAME]: 'searchWallpapers',
-        [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
-        [GatewayAttributes.SEARCH_PAGE_SIZE]: limit,
-        [GatewayAttributes.SEARCH_FILTER_USER_ID]: profileId ?? 'none',
-        [GatewayAttributes.SEARCH_FILTER_HAS_VARIANT]: args.filter?.variants ? 'true' : 'false',
-      },
-      async (span) => {
-        const startTime = Date.now();
-
-        // Decode cursor if provided
-        let searchAfter: CursorValue[] | undefined;
-        if (args.after) {
-          searchAfter = this.cursorService.decode(args.after);
-        } else if (args.before) {
-          searchAfter = this.cursorService.decode(args.before);
-        }
-
-        span.setAttribute('search.cursor.present', searchAfter ? 'true' : 'false');
-
-        // Backward pagination walks the same cursor values in reverse order.
-        const result = await this.repository.search({
-          userId: profileId,
-          variantFilters: args.filter?.variants,
-          colorVector,
-          searchAfter,
-          size: limit + 1, // Fetch one extra to determine hasNextPage
-          sortOrder,
-        });
-
-        // Check if there are more results
-        const hasMore = result.documents.length > limit;
-        let documents = hasMore ? result.documents.slice(0, limit) : result.documents;
-        let cursorValues = hasMore ? result.cursorValues.slice(0, limit) : result.cursorValues;
-
-        if (isBackwardPagination) {
-          documents = [...documents].reverse();
-          cursorValues = [...cursorValues].reverse();
-        }
-
-        // Attach wallpaperId to variants for URL resolution
-        const edges = documents.map((doc: Wallpaper) => ({
-          node: {
-            ...doc,
-            variants: doc.variants.map((v) => ({
-              ...v,
-              __wallpaperId: doc.wallpaperId,
-            })),
-          },
-        }));
-
-        // Generate cursors
-        const startCursor = cursorValues[0] ? this.cursorService.encode(cursorValues[0]) : null;
-        const lastCursorValues = cursorValues.at(-1);
-        const endCursor = lastCursorValues ? this.cursorService.encode(lastCursorValues) : null;
-
-        const hasNextPage = isBackwardPagination
-          ? Boolean(args.before && edges.length > 0)
-          : hasMore;
-        const hasPreviousPage = isBackwardPagination ? hasMore : Boolean(args.after);
-
-        // Record span attributes and metrics
-        span.setAttribute(GatewayAttributes.SEARCH_TOTAL_RESULTS, result.total);
-        span.setAttribute(GatewayAttributes.GRAPHQL_RESULT_COUNT, edges.length);
-        span.setAttribute(GatewayAttributes.SEARCH_HAS_NEXT_PAGE, hasNextPage);
-        span.setAttribute(GatewayAttributes.SEARCH_HAS_PREV_PAGE, hasPreviousPage);
-
-        const durationMs = Date.now() - startTime;
-        recordCounter('graphql.query.total', 1, {
-          operation: 'searchWallpapers',
-        });
-        recordHistogram('graphql.query.duration_ms', durationMs, {
-          operation: 'searchWallpapers',
-        });
-        recordHistogram('graphql.query.result_count', edges.length, {
-          operation: 'searchWallpapers',
-        });
-
-        return {
-          edges,
-          pageInfo: {
-            hasNextPage,
-            hasPreviousPage,
-            startCursor,
-            endCursor,
-          },
-        };
-      }
-    );
-  }
-
-  /**
-   * Get a specific wallpaper by ID
-   */
-  private async getWallpaper(args: GetWallpaperArgs): Promise<Wallpaper | null> {
-    // Validate wallpaper ID format
-    validateWallpaperId(args.wallpaperId);
-
-    return await withSpan(
-      'graphql.resolve.getWallpaper',
-      {
-        [GatewayAttributes.GRAPHQL_OPERATION_NAME]: 'getWallpaper',
-        [GatewayAttributes.GRAPHQL_OPERATION_TYPE]: 'query',
-        [Attributes.WALLPAPER_ID]: args.wallpaperId,
-      },
-      async (span) => {
-        const startTime = Date.now();
-
-        // Query repository
-        const wallpaper = await this.repository.findById(args.wallpaperId);
-
-        // Record metrics
-        const found = wallpaper !== null;
-        span.setAttribute(GatewayAttributes.OPENSEARCH_DOC_EXISTS, found);
-
-        const durationMs = Date.now() - startTime;
-        recordCounter('graphql.query.total', 1, {
-          operation: 'getWallpaper',
-          found: found.toString(),
-        });
-        recordHistogram('graphql.query.duration_ms', durationMs, {
-          operation: 'getWallpaper',
-        });
-
-        // If not found, return null
-        if (!wallpaper) {
-          return null;
-        }
-
-        // Attach wallpaperId to variants for URL resolution
-        return {
-          ...wallpaper,
-          variants: wallpaper.variants.map((v) => ({
-            ...v,
-            __wallpaperId: wallpaper.wallpaperId,
-          })),
-        };
-      }
-    );
-  }
-
-  /**
-   * Get URL for a variant (field resolver)
-   */
-  private getVariantUrl(
-    variant: Variant & { __wallpaperId?: string },
-    context?: GraphQLContext
-  ): string {
-    const mediaServiceUrl = this.getPublicMediaBaseUrl(context);
-    const wallpaperId = variant.__wallpaperId;
-
-    return `${mediaServiceUrl}/wallpapers/${wallpaperId}?w=${variant.width}&h=${variant.height}&format=${variant.format}`;
-  }
-
-  private getPublicMediaBaseUrl(context?: GraphQLContext): string {
-    if (this.config.mediaPublicBaseUrl) {
-      return trimTrailingSlash(this.config.mediaPublicBaseUrl);
-    }
-
-    const requestOrigin = getRequestOrigin(context);
-    if (!requestOrigin) {
-      return trimTrailingSlash(this.config.mediaServiceUrl);
-    }
-
-    const mediaPath = this.config.mediaPublicPath.startsWith('/')
-      ? this.config.mediaPublicPath
-      : `/${this.config.mediaPublicPath}`;
-
-    return `${requestOrigin}${trimTrailingSlash(mediaPath)}`;
+  private mediaBase(context?: GraphqlContext): string {
+    if (this.media.mediaPublicBaseUrl) return trimTrailingSlash(this.media.mediaPublicBaseUrl);
+    const origin = requestOrigin(context);
+    if (!origin) return trimTrailingSlash(this.media.mediaServiceUrl);
+    const path = this.media.mediaPublicPath.startsWith('/')
+      ? this.media.mediaPublicPath
+      : `/${this.media.mediaPublicPath}`;
+    return `${origin}${trimTrailingSlash(path)}`;
   }
 }
-
-function getRequestOrigin(context?: GraphQLContext): string | undefined {
+function requestOrigin(context?: GraphqlContext): string | undefined {
   const request = context?.reply?.request;
-  if (!request) {
-    return undefined;
-  }
-
-  const origin = firstHeaderValue(request.headers.origin);
-  if (origin && isHttpOrigin(origin)) {
-    return trimTrailingSlash(origin);
-  }
-
-  const forwardedProto = firstHeaderValue(request.headers['x-forwarded-proto']);
-  const forwardedHost = firstHeaderValue(request.headers['x-forwarded-host']);
-
-  if (!forwardedProto || !forwardedHost) {
-    return undefined;
-  }
-
-  const normalizedProtocol = forwardedProto.split(',')[0]?.trim();
-  const normalizedHost = forwardedHost.split(',')[0]?.trim();
-
-  if (!normalizedHost || !normalizedProtocol) {
-    return undefined;
-  }
-
-  const forwardedOrigin = `${normalizedProtocol}://${normalizedHost}`;
+  if (!request) return undefined;
+  const origin = firstHeader(request.headers.origin);
+  if (origin && isHttpOrigin(origin)) return trimTrailingSlash(origin);
+  const protocol = firstHeader(request.headers['x-forwarded-proto'])?.split(',')[0]?.trim();
+  const host = firstHeader(request.headers['x-forwarded-host'])?.split(',')[0]?.trim();
+  if (!protocol || !host) return undefined;
+  const forwardedOrigin = `${protocol}://${host}`;
   return isHttpOrigin(forwardedOrigin) ? forwardedOrigin : undefined;
 }
-
-function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
-
 function isHttpOrigin(value: string): boolean {
   try {
     const url = new URL(value);
@@ -469,7 +281,20 @@ function isHttpOrigin(value: string): boolean {
     return false;
   }
 }
-
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
+}
+
+/** Metrics remain at the GraphQL operation boundary and cannot change query results. */
+function recordQuery(operation: string, started: number, count: number, found?: boolean): void {
+  try {
+    recordCounter('graphql.query.total', 1, {
+      operation,
+      ...(found === undefined ? {} : { found: String(found) }),
+    });
+    recordHistogram('graphql.query.duration_ms', Date.now() - started, { operation });
+    recordHistogram('graphql.query.result_count', count, { operation });
+  } catch {
+    // Telemetry is best effort; the catalogue outcome remains authoritative.
+  }
 }

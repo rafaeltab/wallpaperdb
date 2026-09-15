@@ -1,0 +1,8 @@
+{
+  "description": "Untouched gateway before the Effect migration; Vitest v3.2.4 V8 coverage over all src/**/*.ts, excluding only *.test.ts and *.d.ts.",
+  "tests": { "passed": 151, "skipped": 1, "files": 8 },
+  "statements": { "covered": 2044, "total": 2278, "pct": 89.72 },
+  "branches": { "covered": 336, "total": 384, "pct": 87.5 },
+  "functions": { "covered": 119, "total": 123, "pct": 96.74 },
+  "lines": { "covered": 2044, "total": 2278, "pct": 89.72 }
+}

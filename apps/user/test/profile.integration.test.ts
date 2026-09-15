@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -180,6 +181,23 @@ describe('Profile commands', () => {
     };
     await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
+
+  it.each([
+    '<script>alert(1)</script>',
+    '[Unsafe](javascript:alert%281%29)',
+    '[Credentials](https://user:pass@example.com)',
+    '![Remote](https://example.com/image.png)',
+    '[Custom](wallpaper:wlpr_owned)',
+    '![Data](data:image/png;base64,eA==)',
+  ])('enforces shared malicious-Markdown policy without partial Profile changes: %s', async (biographyMarkdown) => {
+    expect(validateProfileMarkdown(biographyMarkdown).valid).toBe(false);
+    const original = (await request('user_1')).json();
+    const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: original.id })).toString('base64')}` }, payload: { displayName: 'Rejected Name', biographyMarkdown, expectedVersion: original.version } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().type).toContain('invalid-biography');
+    expect((await request('user_1')).json()).toEqual(original);
+    expect((await sql`select id from outbox_events where subject = 'profile.updated'`)).toHaveLength(0);
+  });
 
   it('projects publication before lazy Profile creation and preserves ownership across replay', async () => {
     await publishBiographyWallpaper('wlpr_before_profile', 'user_1');

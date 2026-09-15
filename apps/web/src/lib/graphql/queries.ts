@@ -83,6 +83,32 @@ export const GET_PROFILE = gql`
   }
 `;
 
+export const SEARCH_PROFILES = gql`
+  query SearchProfiles($query: String!, $first: Int, $after: String) {
+    searchProfiles(query: $query, first: $first, after: $after) {
+      edges {
+        node {
+          id
+          version
+          handle
+          displayName
+          picture {
+            id
+            url
+          }
+          canonicalPath
+        }
+      }
+      pageInfo {
+        hasNextPage
+        hasPreviousPage
+        startCursor
+        endCursor
+      }
+    }
+  }
+`;
+
 export const GET_PROFILE_BY_HANDLE = gql`
   query GetProfileByHandle($handle: String!) {
     profileByHandle(handle: $handle) {

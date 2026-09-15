@@ -82,3 +82,10 @@ export interface HandleResolution {
   isAlias: boolean;
   canonicalHandle: string;
 }
+
+export type ProfileSearchResult = Omit<Profile, 'biographyMarkdown'>;
+
+export interface ProfileConnection {
+  edges: Array<{ node: ProfileSearchResult }>;
+  pageInfo: PageInfo;
+}

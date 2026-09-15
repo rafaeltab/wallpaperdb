@@ -83,6 +83,8 @@ Updates the signed-in User's Display name, Biography Markdown, or both. The requ
 
 The shared Profile Markdown policy rejects raw HTML, unsafe or credential-bearing URLs, ordinary image URLs, and unsupported schemes. External destinations require HTTPS. Images use `![Alt text](wallpaper:<wallpaper-id>)` and must reference published wallpapers owned by the same Profile. User maintains a minimal local ownership projection from `wallpaper.uploaded` events; a new upload may briefly be unavailable for embedding until its event arrives.
 
+An unavailable wallpaper returns an `unavailable-wallpaper` problem. Its `retryable` field is `true` when the local projection has not received the wallpaper, and `false` when it belongs to another Profile. The draft remains available for correction or retry. This projection stores only wallpaper and Profile IDs and accepts uploads that precede lazy Profile creation.
+
 Validation errors return `400`; stale versions return `409 Conflict`. Neither changes Profile state or records an event. A successful command returns the authoritative updated Profile immediately and records a versioned `profile.updated` event in the same transaction. A Biography edit records `biography-changed`, and a combined name/Biography edit records `profile-details-changed`, each with before/after values. GraphQL exposes the authored Markdown for direct React rendering; generated HTML is never persisted.
 
 ### PUT /profile/me/handle

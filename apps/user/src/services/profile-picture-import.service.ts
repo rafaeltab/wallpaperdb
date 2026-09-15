@@ -31,9 +31,15 @@ export class ProfilePictureImportService {
         return { ...current, leaseToken };
       });
       if (!job?.sourceUrl) continue;
-      const bytes = await downloadInitialPicture(job.sourceUrl, { maxBytes: this.config.profilePictureMaxBytes, timeoutMs: this.config.profilePictureImportTimeoutMs, allowedHosts: this.config.profilePictureImportHosts });
-      const assetId = await this.ingestion.stage(job.profileId, bytes);
-      await this.profiles.adoptPicture(job.profileId, assetId, undefined, job.leaseToken);
+      try {
+        const bytes = await downloadInitialPicture(job.sourceUrl, { maxBytes: this.config.profilePictureMaxBytes, timeoutMs: this.config.profilePictureImportTimeoutMs, allowedHosts: this.config.profilePictureImportHosts });
+        const assetId = await this.ingestion.stage(job.profileId, bytes);
+        await this.profiles.adoptPicture(job.profileId, assetId, undefined, job.leaseToken);
+      } catch {
+        // Never retain or report transport exceptions: they may contain the captured private URL.
+        const delay = Math.min(3_600_000, 1_000 * 2 ** Math.min(job.attempts, 12));
+        await db.update(profilePictureImports).set({ status: 'retrying', nextAttemptAt: new Date(Date.now() + delay), leaseToken: null, leaseUntil: null }).where(and(eq(profilePictureImports.profileId, job.profileId), eq(profilePictureImports.leaseToken, job.leaseToken)));
+      }
     }
   }
 }

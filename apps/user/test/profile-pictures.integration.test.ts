@@ -80,6 +80,35 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('retries transient imports after backoff without starving another due Profile', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    initialImageUrl = 'https://img.clerk.com/retry-picture';
+    const pending = (await ensure('a_retry')).json();
+    initialImageUrl = 'https://img.clerk.com/healthy-picture';
+    await ensure('b_healthy');
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).includes('retry-picture')) throw new Error('Temporary image service failure');
+      return new Response(new Uint8Array(image));
+    });
+    try {
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure('a_retry')).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'retrying' });
+      expect((await ensure('b_healthy')).json().pictureImportStatus).toBe('complete');
+      const [job] = await sql`select * from profile_picture_imports where profile_id = 'a_retry'`;
+      expect(job).toMatchObject({ attempts: 1, lease_token: null, lease_until: null, source_url: 'https://img.clerk.com/retry-picture' });
+      expect(job.next_attempt_at.toISOString()).toBe('2030-01-01T00:00:01.000Z');
+      fetcher.mockClear();
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect(fetcher).not.toHaveBeenCalled();
+      vi.setSystemTime(job.next_attempt_at);
+      fetcher.mockResolvedValue(new Response(new Uint8Array(image)));
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure('a_retry')).json()).toMatchObject({ version: pending.version + 1, pictureImportStatus: 'complete', pictureAssetId: expect.stringMatching(/^pic_/) });
+    } finally { fetcher.mockRestore(); vi.useRealTimers(); }
+  });
+
   it('imports the captured initial picture asynchronously using the latest Profile version', async () => {
     initialImageUrl = 'https://img.clerk.com/initial-picture?private=initial-secret';
     const pending = (await ensure()).json();

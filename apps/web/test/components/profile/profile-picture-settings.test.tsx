@@ -64,6 +64,16 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('enforces the server byte limit and shows its picture constraints before upload', async () => {
+    renderPage({ ...profile, pictureUploadLimits: { maxBytes: 4, maxPixels: 2000000, maxDecodedBytes: 8000000 } });
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['12345'], 'large.png', { type: 'image/png' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Picture must be at most 4 bytes.');
+    expect(screen.getByText(/2,000,000 pixels/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
+    expect(userApi.uploadPicture).not.toHaveBeenCalled();
+  });
+
   it('rejects unsupported picture files before sending an upload', async () => {
     renderPage();
     const user = userEvent.setup({ applyAccept: false });

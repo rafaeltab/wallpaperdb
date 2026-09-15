@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { userApi, type Profile } from '@/lib/api/user';
 
@@ -38,6 +38,7 @@ export function ProfilePictureSettings({
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
   const importing = profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   const mutation = useMutation({
     mutationKey: profileQueryKey(profile.id),
@@ -96,9 +97,17 @@ export function ProfilePictureSettings({
                   setError('Choose a JPEG, PNG, or WebP picture.');
                   return;
                 }
+                if (picture && picture.size > maxBytes) {
+                  setSelected(null);
+                  setError(`Picture must be at most ${maxBytes.toLocaleString()} bytes.`);
+                  return;
+                }
                 setSelected(picture ? { picture, expectedVersion: profile.version } : null);
               }}
             />
+            <FieldDescription>
+              JPEG, PNG, or WebP. Up to {maxBytes.toLocaleString()} bytes{profile.pictureUploadLimits ? ` and ${profile.pictureUploadLimits.maxPixels.toLocaleString()} pixels` : ''}. Animated images are not supported.
+            </FieldDescription>
           </Field>
           <Button type="submit" disabled={!selected || refreshing || writing}>
             {mutation.isPending

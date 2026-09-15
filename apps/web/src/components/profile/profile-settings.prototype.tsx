@@ -13,13 +13,20 @@ import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C';
 type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
-type PreviousHandle = { handle: string; status: 'retained' | 'expiring' | 'historical' };
+type PreviousHandle = {
+  handle: string;
+  status: 'retained' | 'expiring' | 'historical';
+  expiresAt?: string | null;
+  eligibleUntil?: string;
+  unavailableReason?: string | null;
+};
 type DraftProfile = {
   name: string;
   handle: string;
   biography: string;
   picture: string | null;
   aliases: PreviousHandle[];
+  retainedLimit: number;
 };
 
 function initialProfile(profile: Profile): DraftProfile {
@@ -27,6 +34,7 @@ function initialProfile(profile: Profile): DraftProfile {
     name: profile.displayName,
     handle: profile.handle,
     biography: profile.biographyMarkdown,
+    retainedLimit: profile.retainedAliasLimit ?? 3,
     picture: profile.pictureAssetId
       ? `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(profile.pictureAssetId)}`
       : null,
@@ -34,11 +42,20 @@ function initialProfile(profile: Profile): DraftProfile {
       ...(profile.aliases ?? []).map((alias) => ({
         handle: alias.handle,
         status: alias.expiresAt ? ('expiring' as const) : ('retained' as const),
+        expiresAt: alias.expiresAt,
       })),
-      ...(profile.historicalHandles ?? []).map((alias) => ({
-        handle: alias.handle,
-        status: 'historical' as const,
-      })),
+      ...(profile.historicalHandles ?? [])
+        .filter(
+          (alias) =>
+            alias.handle !== profile.handle &&
+            !profile.aliases?.some((active) => active.handle === alias.handle)
+        )
+        .map((alias) => ({
+          handle: alias.handle,
+          status: 'historical' as const,
+          eligibleUntil: alias.eligibleUntil,
+          unavailableReason: alias.unavailableReason,
+        })),
     ],
   };
 }
@@ -294,8 +311,16 @@ export default function ProfileSettingsPrototype({
               'Collecting quiet landscapes, thoughtful architecture, and the occasional splash of colour.\n\nMostly here for **the details**.',
             aliases: [
               { handle: 'rafael-bieze', status: 'retained' },
-              { handle: 'rafael-archive', status: 'expiring' },
-              { handle: 'rafael-design', status: 'historical' },
+              {
+                handle: 'rafael-archive',
+                status: 'expiring',
+                expiresAt: new Date(Date.now() + 86400000).toISOString(),
+              },
+              {
+                handle: 'rafael-design',
+                status: 'historical',
+                eligibleUntil: new Date(Date.now() + 7 * 86400000).toISOString(),
+              },
             ],
           }));
           setNotice('Example biography and previous handles loaded');
@@ -427,9 +452,9 @@ function PrototypeModal({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[80] bg-black/65 backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 z-[90] max-h-[88dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7"
+          className="fixed top-1/2 left-1/2 z-50 max-h-[88dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             opener?.focus();
@@ -603,7 +628,12 @@ function NameEditor({ value, update, cancel }: EditorProps) {
     >
       <label htmlFor="prototype-name" className="block space-y-2 text-sm font-medium">
         <span>Display name</span>
-        <Input value={draft} maxLength={80} onChange={(event) => setDraft(event.target.value)} />
+        <Input
+          id="prototype-name"
+          value={draft}
+          maxLength={80}
+          onChange={(event) => setDraft(event.target.value)}
+        />
       </label>
       <div className="flex justify-end gap-2">
         <Button variant="outline" type="button" onClick={cancel}>
@@ -643,7 +673,7 @@ function AliasesEditor({
               </h3>
               <span className="text-xs text-muted-foreground">
                 {items.length}
-                {status === 'retained' ? ' of 3' : ''}
+                {status === 'retained' ? ` of ${value.retainedLimit}` : ''}
               </span>
             </div>
             {items.length ? (
@@ -659,20 +689,32 @@ function AliasesEditor({
                           ? 'Redirect active'
                           : status === 'expiring'
                             ? 'Removal scheduled'
-                            : 'Available to restore'}
+                            : alias.unavailableReason
+                              ? 'Unavailable'
+                              : 'Available to restore'}
                       </span>
                     </div>
                     <p className="mt-2 text-xs leading-5 text-muted-foreground">
                       {status === 'retained'
                         ? `Redirects to @${value.handle}.`
                         : status === 'expiring'
-                          ? 'Redirect stays active until the removal takes effect.'
-                          : 'Restore this handle to redirect people to your profile.'}
+                          ? alias.expiresAt
+                            ? `Redirect ends ${new Date(alias.expiresAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.`
+                            : 'Redirect stays active until the removal takes effect.'
+                          : alias.eligibleUntil
+                            ? `Can be restored until ${new Date(alias.eligibleUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.`
+                            : 'Restore this handle to redirect people to your profile.'}
                     </p>
                     <Button
                       size="sm"
                       variant="outline"
                       className="mt-3"
+                      disabled={
+                        status === 'historical' &&
+                        (Boolean(alias.unavailableReason) ||
+                          value.aliases.filter((item) => item.status === 'retained').length >=
+                            value.retainedLimit)
+                      }
                       onClick={() => {
                         const nextStatus =
                           status === 'retained'
@@ -682,7 +724,16 @@ function AliasesEditor({
                               : 'retained';
                         onChange(
                           value.aliases.map((item) =>
-                            item.handle === alias.handle ? { ...item, status: nextStatus } : item
+                            item.handle === alias.handle
+                              ? {
+                                  ...item,
+                                  status: nextStatus,
+                                  expiresAt:
+                                    nextStatus === 'expiring'
+                                      ? new Date(Date.now() + 86400000).toISOString()
+                                      : null,
+                                }
+                              : item
                           )
                         );
                         setFeedback(

@@ -274,6 +274,53 @@ describe("Profile projection integration", () => {
         );
     });
 
+    it("projects scheduled aliases without exposing the owner's alias list through GraphQL", async () => {
+        const timestamp = new Date().toISOString();
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+        const profile = {
+            id: "user_scheduled_alias",
+            displayName: "Alias Owner",
+            handle: "scheduled-current",
+            claimGeneration: 2,
+            aliases: [{ handle: "scheduled-alias", claimGeneration: 1, createdAt: timestamp, expiresAt }],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 3,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            eventId: "evt_alias_scheduled",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "alias-expiry-scheduled", handle: "scheduled-alias", before: null, after: expiresAt },
+            profile,
+        });
+        await eventually(
+            () => query(`query { profile(id: "${profile.id}") { version } }`),
+            (result) => result.data.profile?.version === 3,
+        );
+        const result = await query(`query {
+            profileByHandle(handle: "scheduled-alias") {
+                isAlias canonicalHandle profile { id }
+            }
+        }`);
+        expect(result.errors).toBeUndefined();
+        expect(result.data.profileByHandle).toEqual({
+            isAlias: true,
+            canonicalHandle: profile.handle,
+            profile: { id: profile.id },
+        });
+        const projected = await container.resolve(ProfileRepository).findById(profile.id);
+        expect(projected?.aliases).toEqual(profile.aliases);
+        const enumeration = await tester.getApp().inject({
+            method: "POST",
+            url: "/graphql",
+            payload: { query: `query { profile(id: "${profile.id}") { aliases } }` },
+        });
+        expect(enumeration.json().errors[0].message).toContain('Cannot query field "aliases" on type "Profile"');
+    });
+
     it("projects an updated Display name through the public GraphQL Profile", async () => {
         const createdAt = "2026-01-01T00:00:00.000Z";
         const original = {

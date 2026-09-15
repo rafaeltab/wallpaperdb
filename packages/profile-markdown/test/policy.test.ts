@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { countProfileMarkdownCharacters, validateProfileMarkdown } from "../src/index.js";
+import { countProfileMarkdownCharacters, normalizeProfileLink, validateProfileMarkdown } from "../src/index.js";
 
 describe("Profile Markdown policy", () => {
+  it("normalizes external HTTPS destinations and exposes the actual hostname", () => {
+    expect(normalizeProfileLink("HTTPS://BÜCHER.Example:443/a/../photo?q=1#view")).toEqual({
+      href: "https://xn--bcher-kva.example/photo?q=1#view", hostname: "xn--bcher-kva.example"
+    });
+    expect(validateProfileMarkdown("[Gallery](https://example.com/photos)" )).toEqual({ valid: true, wallpaperIds: [] });
+  });
   it("counts Unicode code points and enforces the configurable authored-source limit", () => {
     expect(countProfileMarkdownCharacters("😀é" )).toBe(2);
     expect(validateProfileMarkdown("😀é", { maxCharacters: 2 })).toEqual({ valid: true, wallpaperIds: [] });

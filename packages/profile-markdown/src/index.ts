@@ -56,3 +56,18 @@ export function validateProfileMarkdown(
   }
   return errors.length > 0 ? { valid: false, errors } : { valid: true, wallpaperIds: [] };
 }
+
+export interface ProfileLinkDestination {
+  href: string;
+  hostname: string;
+}
+
+export function normalizeProfileLink(target: string): ProfileLinkDestination | null {
+  try {
+    const url = new URL(target);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return { href: url.href, hostname: url.hostname };
+  } catch {
+    return null;
+  }
+}

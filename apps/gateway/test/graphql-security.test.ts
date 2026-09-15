@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { buildSchema, parse } from 'graphql';
 import { container } from 'tsyringe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ProfileRepository } from '../src/repositories/profile.repository.js';
 import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
 import { QueryComplexityService } from '../src/services/query-complexity.service.js';
 import { tester } from './setup.js';
@@ -247,6 +248,33 @@ describe('GraphQL Security', () => {
   });
 
   describe('Query Complexity Analysis', () => {
+    it.each(['', '(query: "sky", first: null)', '(query: "sky", first: 10)'])(
+      'rejects nested Profile search amplification before searching (%s)',
+      async (argumentsText) => {
+        const search = vi.spyOn(container.resolve(ProfileRepository), 'search');
+        try {
+          const response = await tester.getApp().inject({
+            method: 'POST',
+            url: '/graphql',
+            payload: {
+              query: `query {
+                searchProfiles${argumentsText || '(query: "sky")'} {
+                  edges { node { ...Contributions } }
+                }
+              }
+              fragment Contributions on Profile {
+                wallpapers { edges { node { wallpaperId } } }
+              }`,
+            },
+          });
+          expect(response.json().errors?.[0].extensions?.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+          expect(search).not.toHaveBeenCalled();
+        } finally {
+          search.mockRestore();
+        }
+      }
+    );
+
     it.each(['POST', 'GET'] as const)('analyzes only the selected operation for %s requests', async (method) => {
       const parameters = {
         operationName: 'Chosen',

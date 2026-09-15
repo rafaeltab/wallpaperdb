@@ -30,6 +30,7 @@ export class QueryComplexityService {
   private readonly FIELD_COSTS: Record<string, number> = {
     // Base query costs
     'Query.searchWallpapers': 10,
+    'Query.searchProfiles': 10,
     'Query.getWallpaper': 5,
 
     // Expensive nested fields
@@ -89,10 +90,17 @@ export class QueryComplexityService {
           const fieldName = parentType ? `${parentType.name}.${node.name.value}` : node.name.value;
           const fieldCost = this.FIELD_COSTS[fieldName] ?? this.FIELD_COSTS.DEFAULT_FIELD;
           const isConnection =
-            fieldName === 'Query.searchWallpapers' || fieldName === 'Profile.wallpapers';
+            fieldName === 'Query.searchWallpapers' ||
+            fieldName === 'Query.searchProfiles' ||
+            fieldName === 'Profile.wallpapers';
 
           // Only connection edges repeat per result; pageInfo is resolved once.
-          if (fieldName === 'WallpaperConnection.edges') multiplier *= pageSize;
+          if (
+            fieldName === 'WallpaperConnection.edges' ||
+            fieldName === 'ProfileConnection.edges'
+          ) {
+            multiplier *= pageSize;
+          }
           const listMultiplier = this.getListMultiplier(
             node,
             resolvedVariables.coerced,

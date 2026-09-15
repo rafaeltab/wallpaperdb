@@ -6,9 +6,10 @@ import { Dialog } from 'radix-ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
 import { ProfilePictureImage } from '@/components/profile/profile-picture';
-import { ProfileOverview, ProfileWallpapers } from '@/components/profile/public-profile-page';
+import { ProfileOverview } from '@/components/profile/public-profile-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PrototypeIconButton } from '@/components/ui/prototype-icon-button';
 import { PrototypeSwitcher } from '@/components/ui/prototype-switcher';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -141,15 +142,14 @@ export default function ProfileSettingsPrototype({
   const avatar = (
     <div className="relative w-fit shrink-0">
       <Avatar value={value} />
-      <Button
-        variant="outline"
-        size="icon"
-        className="absolute -right-2 -bottom-2 rounded-full border-4 border-card bg-background text-muted-foreground shadow-sm hover:bg-background hover:text-foreground dark:hover:bg-background"
-        aria-label="Edit profile picture"
+      <PrototypeIconButton
+        className="absolute -right-2 -bottom-2"
+        buttonClassName="rounded-full border-4 border-card bg-background shadow-sm hover:bg-background dark:hover:bg-background"
+        label="Edit profile picture"
         onClick={() => openEditor('picture')}
       >
-        <Pencil className="size-4" />
-      </Button>
+        <Pencil className="size-3.5" />
+      </PrototypeIconButton>
     </div>
   );
   const name = (
@@ -157,15 +157,13 @@ export default function ProfileSettingsPrototype({
       <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
         {value.name}
       </h2>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Edit display name"
-        className="shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+      <PrototypeIconButton
+        label="Edit display name"
+        className="text-2xl sm:text-3xl"
         onClick={() => openEditor('name')}
       >
-        <Pencil className="size-4" />
-      </Button>
+        <Pencil className="size-[1ex]" />
+      </PrototypeIconButton>
     </div>
   );
   const aliases = (
@@ -450,7 +448,6 @@ export default function ProfileSettingsPrototype({
                 </Link>
               </Button>
             </div>
-            <ProfileWallpapers profileId={profile.id} />
           </div>
         )}
       </PrototypeModal>
@@ -655,18 +652,16 @@ function InlineProfileText({
               @{value}
             </p>
           )}
-          <Button
+          <PrototypeIconButton
             ref={button}
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
-            aria-label={`Edit ${label.toLowerCase()}`}
+            label={`Edit ${label.toLowerCase()}`}
+            className={kind === 'name' ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}
             disabled={disabled}
             aria-describedby={disabled ? disabledHintId : undefined}
             onClick={() => onDraft(value)}
           >
-            <Pencil className="size-5 sm:size-6" strokeWidth={1.5} />
-          </Button>
+            <Pencil className="size-[1ex]" />
+          </PrototypeIconButton>
         </div>
         {disabledNotice}
       </div>
@@ -812,16 +807,9 @@ function PrototypeModal({
           <Dialog.Description className="mt-1 mb-6 pr-6 text-sm leading-6 text-muted-foreground">
             {editor && descriptions[editor]}
           </Dialog.Description>
-          <Dialog.Close asChild>
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              className="absolute top-4 right-4"
-              aria-label="Close dialog"
-            >
-              <X />
-            </Button>
-          </Dialog.Close>
+          <PrototypeIconButton label="Close" className="absolute top-4 right-4" onClick={close}>
+            <X className="size-3.5" />
+          </PrototypeIconButton>
           {children}
         </Dialog.Content>
       </Dialog.Portal>

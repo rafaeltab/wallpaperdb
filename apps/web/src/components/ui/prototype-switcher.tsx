@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
 import { type ReactNode, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { PrototypeIconButton } from '@/components/ui/prototype-icon-button';
 
 type PrototypeVariant = 'A' | 'B' | 'C' | 'D';
 
@@ -82,15 +83,9 @@ export function PrototypeSwitcher({
         Prototype · Edits stay here
       </p>
       <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Previous prototype variant"
-          onClick={() => onChange(previous[variant])}
-        >
+        <PrototypeIconButton label="Previous prototype" onClick={() => onChange(previous[variant])}>
           <ArrowLeft aria-hidden="true" />
-        </Button>
+        </PrototypeIconButton>
         <p
           className="min-w-0 text-center text-sm font-medium"
           aria-live="polite"
@@ -99,15 +94,9 @@ export function PrototypeSwitcher({
           <span className="mr-2 text-amber-700 dark:text-amber-300">{variant}</span>
           {names[variant]}
         </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Next prototype variant"
-          onClick={() => onChange(next[variant])}
-        >
+        <PrototypeIconButton label="Next prototype" onClick={() => onChange(next[variant])}>
           <ArrowRight aria-hidden="true" />
-        </Button>
+        </PrototypeIconButton>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-1 border-t border-border/60 pt-1">
         <Button type="button" variant="ghost" size="xs" onClick={onReset}>

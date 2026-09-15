@@ -43,6 +43,13 @@
       "when": 1789433786167,
       "tag": "0005_steady_sunset_bain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789437011732,
+      "tag": "0006_smooth_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

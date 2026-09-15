@@ -12,6 +12,7 @@ import { registerRoutes } from './routes/index.js';
 import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
 import { ProfileAliasExpiryWorker } from './services/profile-alias-expiry.service.js';
 import { ProfileService } from './services/profile.service.js';
+import { ProfilePictureStorage } from './services/profile-picture-storage.js';
 import {
   NatsProfileEventPublisher,
   ProfileOutboxPublisherWorker,
@@ -122,6 +123,7 @@ export async function createApp(
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
     await aliasExpiryWorker?.stop();
+    container.resolve(ProfilePictureStorage).close();
     await outboxPublisher?.stop();
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();

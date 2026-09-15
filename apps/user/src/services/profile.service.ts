@@ -11,7 +11,7 @@ import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
-import { handleClaims, outboxEvents, type Profile, profiles } from '../db/schema.js';
+import { handleClaims, outboxEvents, type Profile, profiles, profilePictureAssets } from '../db/schema.js';
 import {
   type ExternalIdentity,
   type IdentityProvider,
@@ -63,6 +63,8 @@ export interface AliasClaimReference {
   claimGeneration: number;
 }
 export interface OwnerProfile extends Profile {
+  pictureImportStatus: 'pending' | 'retrying' | 'complete';
+  pictureUploadLimits: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
   aliases: Array<{
     handle: string;
     claimGeneration: number;
@@ -214,6 +216,8 @@ export class ProfileService {
             aliases: [],
             retainedAliasLimit: this.config.profileRetainedAliasLimit,
             historicalHandles: [],
+            pictureImportStatus: 'complete',
+            pictureUploadLimits: this.pictureUploadLimits(),
           };
         });
       } catch (error) {
@@ -720,6 +724,8 @@ export class ProfileService {
       ...profile,
       retainedAliasLimit: this.config.profileRetainedAliasLimit,
       aliases: activeAliases,
+      pictureImportStatus: 'complete',
+      pictureUploadLimits: this.pictureUploadLimits(),
       historicalHandles: historicalHandles.map((entry) => ({
         ...entry,
         unavailableReason: claimedByOthers.has(entry.handle)
@@ -729,6 +735,38 @@ export class ProfileService {
             : null,
       })),
     };
+  }
+
+  private pictureUploadLimits(): OwnerProfile['pictureUploadLimits'] {
+    return { maxBytes: this.config.profilePictureMaxBytes, maxPixels: this.config.profilePictureMaxPixels, maxDecodedBytes: this.config.profilePictureMaxDecodedBytes };
+  }
+
+  async adoptPicture(userId: string, assetId: string, expectedVersion: number): Promise<OwnerProfile> {
+    return this.database.getClient().db.transaction(async (tx) => {
+      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
+      if (!current || current.version !== expectedVersion) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      const asset = await tx.query.profilePictureAssets.findFirst({ where: and(eq(profilePictureAssets.id, assetId), eq(profilePictureAssets.profileId, userId), eq(profilePictureAssets.state, 'staged')) });
+      if (!asset) throw new Error('Staged Profile picture is missing');
+      const now = new Date();
+      await tx.update(profilePictureAssets).set({ state: 'active', expiresAt: null }).where(eq(profilePictureAssets.id, assetId));
+      const [updated] = await tx.update(profiles).set({ pictureAssetId: assetId, version: current.version + 1, updatedAt: now }).where(eq(profiles.id, userId)).returning();
+      const claim = await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, updated.handle) });
+      if (!claim) throw new Error('Current Profile Handle claim is missing');
+      const aliases = await this.profileAliases(updated, tx);
+      const event: ProfileUpdatedEvent = {
+        eventId: `evt_${ulid()}`, eventType: PROFILE_UPDATED_SUBJECT, timestamp: now.toISOString(),
+        change: { type: 'picture-changed', before: current.pictureAssetId, after: assetId, source: 'upload', asset: {
+          id: asset.id, storageBucket: asset.storageBucket, storageKey: asset.storageKey, mimeType: asset.mimeType,
+          width: asset.width, height: asset.height, fileSizeBytes: asset.fileSizeBytes,
+        } },
+        profile: { id: updated.id, displayName: updated.displayName, handle: updated.handle, claimGeneration: claim.claimGeneration,
+          aliases, biographyMarkdown: updated.biographyMarkdown, pictureAssetId: updated.pictureAssetId,
+          version: updated.version, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() },
+      };
+      ProfileUpdatedEventSchema.parse(event);
+      await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event, createdAt: now });
+      return this.ownerProfile(updated, tx, aliases, now);
+    });
   }
 
   async updateDisplayName(

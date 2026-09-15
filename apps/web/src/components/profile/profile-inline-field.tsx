@@ -11,7 +11,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { type Profile, userApi, UserApiError } from '@/lib/api/user';
+import { positiveIntegerEnv } from '@/lib/runtime-config';
 import './profile-edit-feedback.css';
+
+const DISPLAY_NAME_MAX_LENGTH = positiveIntegerEnv(import.meta.env.VITE_PROFILE_DISPLAY_NAME_MAX_LENGTH, 80);
 
 type Field = 'displayName' | 'handle' | 'biographyMarkdown';
 type Props = { field: Field; profile: Profile; tokenProvider: () => Promise<string | null> };
@@ -97,7 +100,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     queueMicrotask(() => { if (live.current && restore) opener.current?.focus(); });
   }
   async function save(command = edit, confirmed = false) {
-    if (!command || (field === 'biographyMarkdown' && !validateProfileMarkdown(command.value, { maxCharacters: profile.biographyMaxLength ?? 5000 }).valid) || pending.current || coolingDown || phase !== 'idle' || queryClient.isFetching({ queryKey: key }) || queryClient.isMutating({ mutationKey: key })) return;
+    if (!command || fieldError(field, command.value, profile.biographyMaxLength ?? 5000) || pending.current || coolingDown || phase !== 'idle' || queryClient.isFetching({ queryKey: key }) || queryClient.isMutating({ mutationKey: key })) return;
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
     if (!confirmed && aliases.length) { setConfirmation({ command, aliases }); return; }
     setConfirmation(null);
@@ -127,7 +130,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
   }
   const maxCharacters = profile.biographyMaxLength ?? 5000;
-  const validationError = edit && field === 'biographyMarkdown' ? validateProfileMarkdown(edit.value, { maxCharacters }).errors?.[0]?.message : undefined;
+  const validationError = edit ? fieldError(field, edit.value, maxCharacters) : undefined;
   const locked = phase === 'saving' || phase === 'success';
   const actionLabel = phase === 'saving' ? `Saving ${label}` : phase === 'success' ? `${title} saved` : phase === 'error' ? `${title} save failed` : `Save ${label}`;
   const typography = field === 'displayName' ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl' : 'text-base font-normal text-muted-foreground sm:text-lg';
@@ -197,4 +200,15 @@ function aliasesToSchedule(profile: Profile, requestedHandle: string): string[] 
   const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt && alias.handle !== normalized);
   const candidates = [...retained.map((alias) => alias.handle), profile.handle];
   return candidates.slice(0, Math.max(0, candidates.length - (profile.retainedAliasLimit ?? 3)));
+}
+
+function fieldError(field: Field, value: string, maxCharacters: number): string | undefined {
+  if (field === 'biographyMarkdown') {
+    const result = validateProfileMarkdown(value, { maxCharacters });
+    return result.valid ? undefined : result.errors[0]?.message;
+  }
+  const normalized = value.replace(/\s+/gu, ' ').trim();
+  if (!normalized) return `${field === 'displayName' ? 'Display name' : 'Profile handle'} must not be blank.`;
+  if (field === 'displayName' && [...normalized].length > DISPLAY_NAME_MAX_LENGTH) return `Display name must be at most ${DISPLAY_NAME_MAX_LENGTH} characters.`;
+  return undefined;
 }

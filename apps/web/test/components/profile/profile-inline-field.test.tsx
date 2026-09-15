@@ -137,4 +137,19 @@ describe('production inline profile fields', () => {
     expect(screen.getByText('No biography yet.')).toBeInTheDocument();
   });
 
+  it('validates normalized display names by Unicode characters without truncating the raw input', async () => {
+    renderField();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    const input = screen.getByRole('textbox', { name: 'Display name' });
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(screen.getByRole('button', { name: 'Save display name' })).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Display name must not be blank');
+    fireEvent.change(input, { target: { value: '😀'.repeat(81) } });
+    expect(screen.getByRole('button', { name: 'Save display name' })).toBeDisabled();
+    fireEvent.change(input, { target: { value: '😀'.repeat(80) + '    ' } });
+    expect(input).toHaveValue('😀'.repeat(80) + '    ');
+    expect(input).not.toHaveAttribute('maxlength');
+    expect(screen.getByRole('button', { name: 'Save display name' })).toBeEnabled();
+  });
+
 });

@@ -245,4 +245,15 @@ describe('Private Profile picture retention', () => {
       ]);
     } finally { deleting.mockRestore(); }
   });
+
+  it('preserves a currently referenced picture even if its asset state incorrectly says retired', async () => {
+    const owner = await profiles.ensure('user_picture');
+    const current = await ingestion.upload(owner.id, picture, owner.version);
+    const expiresAt = new Date();
+    await sql`update profile_picture_assets set state = 'retired', expires_at = ${expiresAt} where id = ${current.pictureAssetId!}`;
+    expect(await retention.cleanupExpired(expiresAt)).toEqual({ deleted: 0, failed: 0 });
+    expect((await object(current.pictureAssetId!)).ContentType).toBe('image/webp');
+    expect(await profiles.ensure(owner.id)).toEqual(current);
+    expect(await sql`select id from profile_picture_assets`).toEqual([{ id: current.pictureAssetId }]);
+  });
 });

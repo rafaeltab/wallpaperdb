@@ -64,7 +64,7 @@ interface UpdateHandleOptions {
   tokenProvider?: () => Promise<string | null>;
 }
 
-interface ScheduleAliasRemovalOptions {
+interface AliasCommandOptions {
   handle: string;
   expectedVersion: number;
   expectedProfileId?: string;
@@ -75,7 +75,35 @@ export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOpt
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   return {
-    async scheduleAliasRemoval(options: ScheduleAliasRemovalOptions): Promise<Profile> {
+    async expireAlias(options: AliasCommandOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+
+      const response = await fetch(
+        `${normalizedBaseUrl}/profile/me/aliases/${encodeURIComponent(options.handle)}/expire`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ expectedVersion: options.expectedVersion }),
+        }
+      );
+      if (!response.ok) throw await userApiError(response);
+
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) {
+        throw new UserApiError('User API returned a malformed Profile', 502);
+      }
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
+    async scheduleAliasRemoval(options: AliasCommandOptions): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);
 

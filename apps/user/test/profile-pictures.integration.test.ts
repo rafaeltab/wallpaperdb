@@ -43,7 +43,7 @@ describe('Profile picture commands', () => {
     config = {
       port: 3009, nodeEnv: 'test', databaseUrl: postgresContainer.getConnectionUri(),
       natsUrl: natsContainer.getConnectionUrl(), natsStream: 'WALLPAPER', otelServiceName: 'user-picture-test',
-      profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80, profileRetainedAliasLimit: 3,
+      profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80, profileBiographyMaxLength: 5000, profileRetainedAliasLimit: 3,
       s3Endpoint: minioContainer.getConnectionUrl(), s3AccessKeyId: minioContainer.getUsername(),
       s3SecretAccessKey: minioContainer.getPassword(), s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,

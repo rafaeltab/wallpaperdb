@@ -83,7 +83,7 @@ describe('Profile commands', () => {
       otelServiceName: 'user-test',
       profileHandleMinLength: 1,
       profileHandleMaxLength: 20,
-      profileDisplayNameMaxLength: 80,
+      profileDisplayNameMaxLength: 80, profileBiographyMaxLength: 5000,
       profileRetainedAliasLimit: 3,
       s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,

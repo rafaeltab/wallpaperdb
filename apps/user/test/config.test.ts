@@ -16,6 +16,15 @@ describe('User service configuration', () => {
     process.env = { ...originalEnv };
   });
 
+  it('configures the Biography character limit with a default of five thousand', () => {
+    delete process.env.PROFILE_BIOGRAPHY_MAX_LENGTH;
+    expect(loadConfig().profileBiographyMaxLength).toBe(5000);
+    process.env.PROFILE_BIOGRAPHY_MAX_LENGTH = '1200';
+    expect(loadConfig().profileBiographyMaxLength).toBe(1200);
+    process.env.PROFILE_BIOGRAPHY_MAX_LENGTH = '0';
+    expect(() => loadConfig()).toThrow();
+  });
+
   it('configures private picture storage and bounded image/import limits', () => {
     for (const name of ['PROFILE_PICTURE_BUCKET', 'PROFILE_PICTURE_MAX_BYTES', 'PROFILE_PICTURE_MAX_PIXELS', 'PROFILE_PICTURE_MAX_DECODED_BYTES', 'PROFILE_PICTURE_IMPORT_TIMEOUT_MS', 'PROFILE_PICTURE_IMPORT_HOSTS']) delete process.env[name];
     expect(loadConfig()).toMatchObject({

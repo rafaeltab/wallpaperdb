@@ -167,6 +167,21 @@ describe('Profile commands', () => {
     });
   }
 
+  it('stores authored Biography Markdown and returns a complete authoritative versioned snapshot', async () => {
+    const original = (await request('user_1')).json();
+    const authored = '  # Hello 👋\n\nA **Biography** with `<literal>` code.\n';
+    const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { biographyMarkdown: authored, expectedVersion: original.version } });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json();
+    expect(updated).toMatchObject({ biographyMarkdown: authored, displayName: original.displayName, version: original.version + 1, biographyMaxLength: 5000, aliases: original.aliases });
+    expect((await request('user_1')).json()).toEqual(updated);
+    const [event] = await sql`select payload, created_at from outbox_events where payload->'change'->>'type' = 'biography-changed'`;
+    expect(event.created_at.toISOString()).toBe(event.payload.timestamp);
+    expect(event.payload).toMatchObject({ change: { type: 'biography-changed', before: '', after: authored }, profile: { biographyMarkdown: authored, version: updated.version, aliases: updated.aliases, pictureAssetId: updated.pictureAssetId } });
+    expect(event.payload.profile).not.toHaveProperty('biographyHtml');
+    expect(event.payload.profile).not.toHaveProperty('biographyMaxLength');
+  });
+
   it('reactivates a released historical Handle with a new claim and authoritative event', async () => {
     const original = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();

@@ -8,6 +8,7 @@ import {
   HandleCooldownError,
   HandleUnavailableError,
   InvalidDisplayNameError,
+  InvalidBiographyError,
   InvalidHandleError,
   InvalidAliasCommandError,
   IneligibleHandleError,
@@ -17,7 +18,8 @@ import {
 } from '../services/profile.service.js';
 
 interface ProfileUpdateBody {
-  displayName: string;
+  displayName?: string;
+  biographyMarkdown?: string;
   expectedVersion: number;
 }
 
@@ -25,7 +27,7 @@ function isProfileUpdateBody(body: unknown): body is ProfileUpdateBody {
   if (!body || typeof body !== 'object') return false;
 
   const update = body as Record<string, unknown>;
-  return typeof update.displayName === 'string' && typeof update.expectedVersion === 'number';
+  return typeof update.expectedVersion === 'number' && (typeof update.displayName === 'string' || typeof update.biographyMarkdown === 'string') && (update.displayName === undefined || typeof update.displayName === 'string') && (update.biographyMarkdown === undefined || typeof update.biographyMarkdown === 'string');
 }
 
 function isHandleChangeBody(body: unknown): body is { handle: string; expectedVersion: number } {
@@ -274,7 +276,7 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
         type: 'https://wallpaperdb.example/problems/invalid-profile-update',
         title: 'Invalid Profile update',
         status: 400,
-        detail: 'Display name and expected Profile version are required',
+        detail: 'Display name or Biography and an expected Profile version are required',
         instance: request.url,
       });
     }
@@ -282,9 +284,12 @@ export default async function profileRoutes(fastify: FastifyInstance): Promise<v
     try {
       const profile = await container
         .resolve(ProfileService)
-        .updateDisplayName(user.id, request.body.displayName, request.body.expectedVersion);
+        .updateDetails(user.id, request.body, request.body.expectedVersion);
       return reply.code(200).send(profile);
     } catch (error) {
+      if (error instanceof InvalidBiographyError) return reply.code(400).type('application/problem+json').send({
+        type: 'https://wallpaperdb.example/problems/invalid-biography', title: 'Invalid Biography', status: 400, detail: error.message, instance: request.url,
+      });
       if (error instanceof InvalidDisplayNameError) {
         return reply.code(400).type('application/problem+json').send({
           type: 'https://wallpaperdb.example/problems/invalid-display-name',

@@ -1,3 +1,4 @@
+import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import {
   PROFILE_CREATED_SUBJECT,
   type ProfileCreatedEvent,
@@ -70,6 +71,7 @@ export interface AliasClaimReference {
   claimGeneration: number;
 }
 export interface OwnerProfile extends Profile {
+  biographyMaxLength: number;
   pictureImportStatus: 'pending' | 'retrying' | 'complete';
   pictureUploadLimits: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
   aliases: Array<{
@@ -88,6 +90,7 @@ export interface OwnerProfile extends Profile {
 
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
+export class InvalidBiographyError extends Error {}
 export class InvalidHandleError extends Error {}
 export class InvalidAliasCommandError extends Error {}
 export class IneligibleHandleError extends Error {}
@@ -735,6 +738,7 @@ export class ProfileService {
     return {
       ...profile,
       retainedAliasLimit: this.config.profileRetainedAliasLimit,
+      biographyMaxLength: this.config.profileBiographyMaxLength,
       aliases: activeAliases,
       pictureImportStatus: pictureImport?.status ?? 'complete',
       pictureUploadLimits: this.pictureUploadLimits(),
@@ -875,17 +879,24 @@ export class ProfileService {
     });
   }
 
-  async updateDisplayName(
+  async updateDisplayName(userId: string, displayName: string, expectedVersion: number): Promise<OwnerProfile> {
+    return this.updateDetails(userId, { displayName }, expectedVersion);
+  }
+
+  async updateDetails(
     userId: string,
-    requestedDisplayName: string,
+    changes: { displayName?: string; biographyMarkdown?: string },
     expectedVersion: number
   ): Promise<OwnerProfile> {
-    const displayName = normalizeDisplayName(requestedDisplayName);
-    if (!displayName) throw new InvalidDisplayNameError('Display name must not be blank');
-    if ([...displayName].length > this.config.profileDisplayNameMaxLength) {
-      throw new InvalidDisplayNameError(
-        `Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`
-      );
+    const displayName = changes.displayName === undefined ? undefined : normalizeDisplayName(changes.displayName);
+    if (displayName !== undefined) {
+      if (!displayName) throw new InvalidDisplayNameError('Display name must not be blank');
+      if ([...displayName].length > this.config.profileDisplayNameMaxLength) throw new InvalidDisplayNameError(`Display name must be at most ${this.config.profileDisplayNameMaxLength} characters`);
+    }
+    const biographyMarkdown = changes.biographyMarkdown;
+    if (biographyMarkdown !== undefined) {
+      const validation = validateProfileMarkdown(biographyMarkdown);
+      if (!validation.valid) throw new InvalidBiographyError(validation.errors[0]?.message ?? 'Biography Markdown is invalid');
     }
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
       throw new InvalidDisplayNameError('Expected Profile version must be a positive integer');
@@ -900,13 +911,14 @@ export class ProfileService {
       if (!current || current.version !== expectedVersion) {
         throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
       }
-      if (current.displayName === displayName) return this.ownerProfile(current, tx);
+      if ((displayName === undefined || current.displayName === displayName) && (biographyMarkdown === undefined || current.biographyMarkdown === biographyMarkdown)) return this.ownerProfile(current, tx);
 
       const now = new Date();
       const [updated] = await tx
         .update(profiles)
         .set({
-          displayName,
+          displayName: displayName ?? current.displayName,
+          biographyMarkdown: biographyMarkdown ?? current.biographyMarkdown,
           version: sql`${profiles.version} + 1`,
           updatedAt: now,
         })
@@ -926,11 +938,9 @@ export class ProfileService {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
         timestamp: now.toISOString(),
-        change: {
-          type: 'display-name-changed',
-          before: current.displayName,
-          after: updated.displayName,
-        },
+        change: current.biographyMarkdown !== updated.biographyMarkdown ? {
+          type: 'biography-changed', before: current.biographyMarkdown, after: updated.biographyMarkdown,
+        } : { type: 'display-name-changed', before: current.displayName, after: updated.displayName },
         profile: {
           id: updated.id,
           displayName: updated.displayName,

@@ -37,6 +37,7 @@ export function ProfilePictureSettings({
   const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const importing = profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   const mutation = useMutation({
     mutationKey: profileQueryKey(profile.id),
     mutationFn: (command: PictureCommand) => {
@@ -66,6 +67,9 @@ export function ProfilePictureSettings({
       </CardHeader>
       <CardContent className="space-y-5">
         <ProfilePicture profile={profile} />
+        {importing && <p role="status" className="text-sm text-muted-foreground">
+          {profile.pictureImportStatus === 'retrying' ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.' : 'Importing your account picture. You can keep editing your Profile while it loads.'}
+        </p>}
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -97,7 +101,7 @@ export function ProfilePictureSettings({
                 : 'Upload picture'}
           </Button>
         </form>
-        {profile.pictureAssetId && (
+        {(profile.pictureAssetId || importing) && (
           <Button
             variant="outline"
             disabled={refreshing || writing}
@@ -107,7 +111,7 @@ export function ProfilePictureSettings({
               setDialogOpen(true);
             }}
           >
-            Remove picture
+            {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
           </Button>
         )}
         <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>

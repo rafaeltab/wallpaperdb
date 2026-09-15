@@ -64,6 +64,19 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('lets a generated-avatar choice cancel a pending import before any picture is available', async () => {
+    const updated = { ...profile, version: 2 };
+    vi.mocked(userApi.removePicture).mockResolvedValue(updated);
+    const { client } = renderPage({ ...profile, pictureImportStatus: 'pending' });
+    const user = userEvent.setup();
+    expect(screen.getByText(/importing your account picture/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel picture import' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Use generated avatar' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+    expect(userApi.removePicture).toHaveBeenCalledWith({ expectedVersion: 1, expectedProfileId: profile.id, tokenProvider: expect.any(Function) });
+    expect(screen.queryByRole('button', { name: 'Cancel picture import' })).not.toBeInTheDocument();
+  });
+
   it('confirms picture removal with the version seen when the dialog opened and keeps cancellation local', async () => {
     const initial = { ...profile, pictureAssetId: 'picture_old' };
     const updated = { ...profile, version: 3 };

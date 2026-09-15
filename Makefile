@@ -28,6 +28,7 @@ SANDCASTLE_AUTH_DIR ?= .sandcastle
 SANDCASTLE_OPENCODE_AUTH ?= $(HOME)/.local/share/opencode/auth.json
 GITHUB_CLI ?= gh
 TURBO := "$(CURDIR)/node_modules/.bin/turbo"
+CI_CONCURRENCY ?= 1
 
 # PACKAGE is a workspace basename; SERVICE selects a Compose app; DB selects a database.
 PACKAGE ?=
@@ -246,7 +247,7 @@ ci: test-make crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; 
 	@echo "Running full CI checks locally..."
 	@set -e; \
 	start_time=$$(date +%s); \
-	$(TURBO) run build lint check-types test:unit test:integration $(if $(filter 1,$(FORCE)),--force); \
+	$(TURBO) run build lint check-types test:unit test:integration --concurrency=$(CI_CONCURRENCY) $(if $(filter 1,$(FORCE)),--force); \
 	$(TURBO) run test:e2e --concurrency=1 $(if $(filter 1,$(FORCE)),--force); \
 	pnpm coverage:merge; \
 	end_time=$$(date +%s); \

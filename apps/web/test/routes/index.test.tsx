@@ -144,6 +144,22 @@ describe('HomePage browse filters', () => {
     });
   });
 
+  it.each([
+    { isLoading: true, error: null },
+    { isLoading: false, error: new Error('Gateway unavailable') },
+  ])('keeps Profile filtering available while wallpaper state is $isLoading / $error', ({ isLoading, error }) => {
+    mockUseSearch.mockReturnValue({ profileId: 'user_Ada' });
+    mockFetch.mockResolvedValue(new Response(JSON.stringify({ data: { profile: null } }), {
+      headers: { 'content-type': 'application/json' },
+    }));
+    (useBrowseFilterPanel as Mock).mockReturnValue({ isOpen: true });
+    (useWallpaperInfiniteQuery as Mock).mockReturnValue({ isLoading, error, fetchNextPage: vi.fn() });
+    render(<HomePage />);
+    expect(screen.getByRole('searchbox', { name: 'Profile' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
+    expect(mockNavigate.mock.calls[0][0].search({ profileId: 'user_Ada' })).toMatchObject({ profileId: undefined });
+  });
+
   it('passes the selected URL-backed format into wallpaper search', () => {
     mockUseSearch.mockReturnValue({ after: undefined, color: undefined, format: 'png', aspectRatio: undefined });
 

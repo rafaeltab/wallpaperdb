@@ -165,37 +165,7 @@ export function HomePage() {
       }
     };
   }, []);
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (error) {
-    return <ErrorState error={error} />;
-  }
-
   const wallpapers = data?.pages.flatMap((page) => page.edges.map((edge) => edge.node)) ?? [];
-
-  if (wallpapers.length === 0) {
-    return (
-      <div>
-        <BrowseFilterPanel
-          isOpen={isOpen}
-          draftColor={draftColor}
-          selectedColor={color}
-          selectedFormat={format}
-          selectedAspectRatio={aspectRatio}
-          selectedProfileId={profileId}
-          onProfileChange={handleProfileChange}
-          deviceAspectRatioPreset={deviceAspectRatioPreset}
-          onClearColor={handleClearColor}
-          onColorInputChange={handleColorInputChange}
-          onFormatChange={handleFormatChange}
-          onAspectRatioChange={handleAspectRatioChange}
-        />
-        <EmptyState hasCursor={!!after} />
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -213,12 +183,22 @@ export function HomePage() {
         onFormatChange={handleFormatChange}
         onAspectRatioChange={handleAspectRatioChange}
       />
-      <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
-      <LoadMoreTrigger
-        onLoadMore={handleLoadMore}
-        hasMore={hasNextPage ?? false}
-        isLoading={isFetchingNextPage}
-      />
+      {isLoading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState error={error} />
+      ) : wallpapers.length === 0 ? (
+        <EmptyState hasCursor={!!after} />
+      ) : (
+        <>
+          <WallpaperGrid wallpapers={wallpapers} isLoadingMore={isFetchingNextPage} />
+          <LoadMoreTrigger
+            onLoadMore={handleLoadMore}
+            hasMore={hasNextPage ?? false}
+            isLoading={isFetchingNextPage}
+          />
+        </>
+      )}
     </div>
   );
 }

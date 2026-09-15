@@ -118,6 +118,39 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("validates an alias expiry schedule with its authoritative snapshot", () => {
+      const expiresAt = "2026-10-01T00:00:00.000Z";
+      const scheduled = {
+        ...event,
+        change: {
+          type: "alias-expiry-scheduled",
+          handle: "ada",
+          before: null,
+          after: expiresAt,
+        },
+        profile: {
+          ...event.profile,
+          aliases: [
+            { handle: "ada", claimGeneration: 1, createdAt: timestamp, expiresAt },
+          ],
+        },
+      };
+
+      expect(ProfileUpdatedEventSchema.parse(scheduled)).toEqual(scheduled);
+      expect(
+        ProfileUpdatedEventSchema.safeParse({
+          ...scheduled,
+          change: { ...scheduled.change, after: "tomorrow" },
+        }).success
+      ).toBe(false);
+      expect(
+        ProfileUpdatedEventSchema.safeParse({
+          ...scheduled,
+          change: { ...scheduled.change, before: timestamp },
+        }).success
+      ).toBe(false);
+    });
+
     it("rejects private or incomplete changes", () => {
       expect(
         ProfileUpdatedEventSchema.safeParse({

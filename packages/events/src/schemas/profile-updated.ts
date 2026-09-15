@@ -8,13 +8,30 @@ export const ProfileUpdatedEventSchema = z
     eventId: z.string().min(1),
     eventType: z.literal(PROFILE_UPDATED_SUBJECT),
     timestamp: z.string().datetime(),
-    change: z
-      .object({
-        type: z.enum(["display-name-changed", "handle-changed"]),
-        before: z.string().min(1),
-        after: z.string().min(1),
-      })
-      .strict(),
+    change: z.discriminatedUnion("type", [
+      z
+        .object({
+          type: z.literal("display-name-changed"),
+          before: z.string().min(1),
+          after: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("handle-changed"),
+          before: z.string().min(1),
+          after: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          type: z.literal("alias-expiry-scheduled"),
+          handle: z.string().min(1),
+          before: z.null(),
+          after: z.string().datetime(),
+        })
+        .strict(),
+    ]),
     profile: PublicProfileSnapshotSchema,
   })
   .strict();

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { ProfilePicture } from '@/components/profile/profile-picture';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,11 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 250);
     return () => window.clearTimeout(timeout);
   }, [query]);
-  const results = useQuery({
+  const results = useInfiniteQuery({
     queryKey: ['profile-search', debouncedQuery],
-    queryFn: () => searchProfiles(debouncedQuery),
+    queryFn: ({ pageParam }) => searchProfiles(debouncedQuery, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.pageInfo.hasNextPage ? page.pageInfo.endCursor : undefined,
     enabled: Boolean(debouncedQuery),
     retry: false,
   });
@@ -86,12 +88,12 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
           <Button type="button" variant="outline" size="sm" onClick={() => void results.refetch()} aria-label="Retry Profile search">Try again</Button>
         </div>
       ) : null}
-      {query && query === debouncedQuery && results.data?.edges.length === 0 ? (
+      {query && query === debouncedQuery && results.data?.pages[0].edges.length === 0 ? (
         <p role="status" className="text-xs text-muted-foreground">No Profiles found. Try another Handle or Display name.</p>
       ) : null}
       {query && query === debouncedQuery && results.data ? (
         <ul aria-label="Matching Profiles" className="max-h-64 overflow-y-auto rounded-lg border bg-background p-1">
-          {results.data.edges.map(({ node: profile }) => (
+          {results.data.pages.flatMap((page) => page.edges).map(({ node: profile }) => (
             <li key={profile.id}>
               <Button
                 type="button"
@@ -112,6 +114,11 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
             </li>
           ))}
         </ul>
+      ) : null}
+      {query && query === debouncedQuery && results.hasNextPage ? (
+        <Button type="button" variant="outline" size="sm" disabled={results.isFetchingNextPage} onClick={() => void results.fetchNextPage()}>
+          {results.isFetchingNextPage ? 'Loading more Profiles…' : 'Load more Profiles'}
+        </Button>
       ) : null}
       </> : null}
     </div>

@@ -105,4 +105,24 @@ describe('Profile wallpaper filter', () => {
     await user.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
     expect(onChange).toHaveBeenCalledWith(undefined);
   });
+
+  it('loads another page with its opaque cursor and can select a later result', async () => {
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [{ node: ada }],
+      pageInfo: { hasNextPage: true, hasPreviousPage: false, endCursor: 'opaque_cursor' },
+    } }));
+    const user = userEvent.setup();
+    const { onChange } = renderFilter();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), 'ada');
+    const loadMore = await screen.findByRole('button', { name: 'Load more Profiles' });
+    mockFetch.mockResolvedValueOnce(response({ searchProfiles: {
+      edges: [{ node: { ...ada, id: 'user_Grace', handle: 'grace', displayName: 'Grace Hopper' } }],
+      pageInfo: { hasNextPage: false, hasPreviousPage: true },
+    } }));
+    await user.click(loadMore);
+    await user.click(await screen.findByRole('button', { name: 'Select Grace Hopper (@grace)' }));
+    const [, init] = mockFetch.mock.calls[1] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).variables).toEqual({ query: 'ada', first: 10, after: 'opaque_cursor' });
+    expect(onChange).toHaveBeenCalledWith('user_Grace');
+  });
 });

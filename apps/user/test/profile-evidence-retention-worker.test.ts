@@ -25,4 +25,20 @@ describe('Profile evidence retention worker', () => {
     await timer.tickAsync(1000);
     expect(events).toHaveBeenCalledTimes(2);
   });
+
+  it('isolates a failed event scan so pictures still expire and the next tick retries events', async () => {
+    const timer = new FakeTimerService();
+    const events = vi.fn().mockRejectedValueOnce(new Error('database unavailable')).mockResolvedValue({ deleted: 1, failed: 0 });
+    const pictures = vi.fn(async () => ({ deleted: 2, failed: 0 }));
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const worker = new ProfileEvidenceRetentionWorker(events, pictures, logger, timer);
+    worker.start();
+    await worker.cleanupPending();
+    expect(pictures).toHaveBeenCalledTimes(1);
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ category: 'profile-event-retention' }), expect.stringContaining('failed'));
+    await timer.tickAsync(1000);
+    expect(events).toHaveBeenCalledTimes(2);
+    expect(pictures).toHaveBeenCalledTimes(2);
+    await worker.stop();
+  });
 });

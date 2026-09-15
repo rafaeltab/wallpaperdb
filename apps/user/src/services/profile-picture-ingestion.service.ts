@@ -19,6 +19,11 @@ export class ProfilePictureIngestionService {
   ) {}
 
   async upload(userId: string, bytes: Buffer, expectedVersion: number): Promise<OwnerProfile> {
+    const id = await this.stage(userId, bytes);
+    return this.profiles.adoptPicture(userId, id, expectedVersion);
+  }
+
+  async stage(userId: string, bytes: Buffer): Promise<string> {
     const picture = await processProfilePicture(bytes, { maxBytes: this.config.profilePictureMaxBytes,
       maxPixels: this.config.profilePictureMaxPixels, maxDecodedBytes: this.config.profilePictureMaxDecodedBytes });
     const id = `pic_${ulid()}`;
@@ -31,6 +36,6 @@ export class ProfilePictureIngestionService {
       state: 'staged', createdAt: now, expiresAt: new Date(now.getTime() + PRIVATE_RETENTION_MS),
     }).returning();
     await this.storage.put(asset, picture.bytes);
-    return this.profiles.adoptPicture(userId, id, expectedVersion);
+    return id;
   }
 }

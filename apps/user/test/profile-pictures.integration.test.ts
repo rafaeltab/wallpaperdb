@@ -15,6 +15,7 @@ import { container } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
+import { ProfilePictureImportService } from '../src/services/profile-picture-import.service.js';
 import { IdentityProviderToken } from '../src/services/clerk-identity.service.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
@@ -78,6 +79,29 @@ describe('Profile picture commands', () => {
     ]);
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
+
+  it('imports the captured initial picture asynchronously using the latest Profile version', async () => {
+    initialImageUrl = 'https://img.clerk.com/initial-picture?private=initial-secret';
+    const pending = (await ensure()).json();
+    const renamed = (await app.inject({ method: 'PATCH', url: '/profile/me', headers: auth(), payload: { expectedVersion: pending.version, displayName: 'Edited While Importing' } })).json();
+    initialImageUrl = 'https://img.clerk.com/later-picture';
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array(image)));
+    try {
+      await container.resolve(ProfilePictureImportService).importPending();
+      const imported = (await ensure()).json();
+      expect(imported).toMatchObject({ pictureAssetId: expect.stringMatching(/^pic_/), pictureImportStatus: 'complete', version: renamed.version + 1, displayName: renamed.displayName });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(fetcher.mock.calls[0][0]).toBe('https://img.clerk.com/initial-picture?private=initial-secret');
+      const [job] = await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
+      expect(job).toMatchObject({ source_url: null, status: 'complete', lease_token: null, lease_until: null });
+      const [event] = await sql`select payload from outbox_events where payload->'change'->>'source' = 'clerk-import'`;
+      expect(event.payload).toMatchObject({ change: { type: 'picture-changed', source: 'clerk-import', before: null, after: imported.pictureAssetId }, profile: { version: imported.version, displayName: renamed.displayName, aliases: imported.aliases } });
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect((await ensure()).json()).toEqual(imported);
+    } finally { fetcher.mockRestore(); }
+  });
 
   it('captures the initial Clerk picture privately without downloading or blocking Profile creation', async () => {
     initialImageUrl = 'https://img.clerk.com/initial-picture?private=initial-secret';

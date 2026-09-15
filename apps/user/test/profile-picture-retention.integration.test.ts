@@ -221,4 +221,28 @@ describe('Private Profile picture retention', () => {
       }]);
     } finally { unavailable.mockRestore(); }
   });
+
+  it('preserves a picture adopted after the cleanup candidate scan', async () => {
+    const firstOwner = await profiles.ensure('first_picture');
+    const firstId = await ingestion.stage(firstOwner.id, picture);
+    const owner = await profiles.ensure('user_picture');
+    const adoptedId = await ingestion.stage(owner.id, picture);
+    const [asset] = await sql`select expires_at from profile_picture_assets where id = ${adoptedId}`;
+    // The first DELETE is the barrier: both candidates were selected, but the
+    // second Profile can still adopt its candidate before cleanup locks it.
+    const deleting = vi.spyOn(S3Client.prototype, 'send').mockImplementationOnce(async (command) => {
+      deleting.mockRestore();
+      await profiles.adoptPicture(owner.id, adoptedId, owner.version);
+      return objectStorage.send(command);
+    });
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+      expect(await profiles.ensure(owner.id)).toMatchObject({ pictureAssetId: adoptedId, version: owner.version + 1 });
+      expect((await object(adoptedId)).ContentType).toBe('image/webp');
+      await expect(object(firstId, firstOwner.id)).rejects.toMatchObject({ name: 'NoSuchKey' });
+      expect(await sql`select id, state, expires_at from profile_picture_assets`).toEqual([
+        { id: adoptedId, state: 'active', expires_at: null },
+      ]);
+    } finally { deleting.mockRestore(); }
+  });
 });

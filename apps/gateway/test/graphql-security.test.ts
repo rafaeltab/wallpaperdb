@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { buildSchema, parse } from 'graphql';
 import { container } from 'tsyringe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ProfileRepository } from '../src/repositories/profile.repository.js';
+import { OpenSearchConnection } from '../src/connections/opensearch.js';
 import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
 import { QueryComplexityService } from '../src/services/query-complexity.service.js';
 import { tester } from './setup.js';
@@ -251,7 +251,7 @@ describe('GraphQL Security', () => {
     it.each(['', '(query: "sky", first: null)', '(query: "sky", first: 10)'])(
       'rejects nested Profile search amplification before searching (%s)',
       async (argumentsText) => {
-        const search = vi.spyOn(container.resolve(ProfileRepository), 'search');
+        const search = vi.spyOn(container.resolve(OpenSearchConnection).getClient(), 'search');
         try {
           const response = await tester.getApp().inject({
             method: 'POST',

@@ -70,33 +70,53 @@ export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
 
 export const pictureAssetState = pgEnum('picture_asset_state', ['staged', 'active', 'retired']);
-export const profilePictureAssets = pgTable('profile_picture_assets', {
-  id: text('id').primaryKey(),
-  profileId: text('profile_id').notNull().references(() => profiles.id),
-  storageBucket: text('storage_bucket').notNull(),
-  storageKey: text('storage_key').notNull(),
-  mimeType: text('mime_type').$type<'image/webp'>().notNull(),
-  width: integer('width').notNull(),
-  height: integer('height').notNull(),
-  fileSizeBytes: integer('file_size_bytes').notNull(),
-  state: pictureAssetState('state').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  retiredAt: timestamp('retired_at', { withTimezone: true }),
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
-}, (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt)]);
+export const profilePictureAssets = pgTable(
+  'profile_picture_assets',
+  {
+    id: text('id').primaryKey(),
+    profileId: text('profile_id')
+      .notNull()
+      .references(() => profiles.id),
+    storageBucket: text('storage_bucket').notNull(),
+    storageKey: text('storage_key').notNull(),
+    mimeType: text('mime_type').$type<'image/webp'>().notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    fileSizeBytes: integer('file_size_bytes').notNull(),
+    state: pictureAssetState('state').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    retiredAt: timestamp('retired_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+  },
+  (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt)]
+);
 export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
 export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;
 
-export const pictureImportStatus = pgEnum('picture_import_status', ['pending', 'retrying', 'complete']);
-export const profilePictureImports = pgTable('profile_picture_imports', {
-  profileId: text('profile_id').primaryKey().references(() => profiles.id),
-  sourceUrl: text('source_url'),
-  status: pictureImportStatus('status').notNull().default('pending'),
-  attempts: integer('attempts').notNull().default(0),
-  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
-  leaseUntil: timestamp('lease_until', { withTimezone: true }),
-  leaseToken: text('lease_token'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [index('profile_picture_imports_due_idx').on(table.nextAttemptAt, table.profileId).where(sql`${table.status} != 'complete'`)]);
+export const pictureImportStatus = pgEnum('picture_import_status', [
+  'pending',
+  'retrying',
+  'complete',
+]);
+export const profilePictureImports = pgTable(
+  'profile_picture_imports',
+  {
+    profileId: text('profile_id')
+      .primaryKey()
+      .references(() => profiles.id),
+    sourceUrl: text('source_url'),
+    status: pictureImportStatus('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp('lease_until', { withTimezone: true }),
+    leaseToken: text('lease_token'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('profile_picture_imports_due_idx')
+      .on(table.nextAttemptAt, table.profileId)
+      .where(sql`${table.status} != 'complete'`),
+  ]
+);
 export type ProfilePictureImport = typeof profilePictureImports.$inferSelect;
 export type NewProfilePictureImport = typeof profilePictureImports.$inferInsert;

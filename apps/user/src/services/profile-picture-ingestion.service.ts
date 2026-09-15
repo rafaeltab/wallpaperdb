@@ -24,17 +24,32 @@ export class ProfilePictureIngestionService {
   }
 
   async stage(userId: string, bytes: Buffer): Promise<string> {
-    const picture = await processProfilePicture(bytes, { maxBytes: this.config.profilePictureMaxBytes,
-      maxPixels: this.config.profilePictureMaxPixels, maxDecodedBytes: this.config.profilePictureMaxDecodedBytes });
+    const picture = await processProfilePicture(bytes, {
+      maxBytes: this.config.profilePictureMaxBytes,
+      maxPixels: this.config.profilePictureMaxPixels,
+      maxDecodedBytes: this.config.profilePictureMaxDecodedBytes,
+    });
     const id = `pic_${ulid()}`;
     const now = new Date();
     // Record the private candidate before PUT. A failed or ambiguous adoption must
     // never delete bytes that a committed Profile may already reference.
-    const [asset] = await this.database.getClient().db.insert(profilePictureAssets).values({
-      id, profileId: userId, storageBucket: this.config.profilePictureBucket, storageKey: `${userId}/${id}.webp`,
-      mimeType: picture.mimeType, width: picture.width, height: picture.height, fileSizeBytes: picture.bytes.length,
-      state: 'staged', createdAt: now, expiresAt: new Date(now.getTime() + PRIVATE_RETENTION_MS),
-    }).returning();
+    const [asset] = await this.database
+      .getClient()
+      .db.insert(profilePictureAssets)
+      .values({
+        id,
+        profileId: userId,
+        storageBucket: this.config.profilePictureBucket,
+        storageKey: `${userId}/${id}.webp`,
+        mimeType: picture.mimeType,
+        width: picture.width,
+        height: picture.height,
+        fileSizeBytes: picture.bytes.length,
+        state: 'staged',
+        createdAt: now,
+        expiresAt: new Date(now.getTime() + PRIVATE_RETENTION_MS),
+      })
+      .returning();
     await this.storage.put(asset, picture.bytes);
     return id;
   }

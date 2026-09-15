@@ -11,7 +11,14 @@ import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
-import { handleClaims, outboxEvents, type Profile, profiles, profilePictureAssets, profilePictureImports } from '../db/schema.js';
+import {
+  handleClaims,
+  outboxEvents,
+  type Profile,
+  profiles,
+  profilePictureAssets,
+  profilePictureImports,
+} from '../db/schema.js';
 import {
   type ExternalIdentity,
   type IdentityProvider,
@@ -185,7 +192,13 @@ export class ProfileService {
             .values({ handle, profileId: userId, kind: 'profile' })
             .returning();
 
-          if (identity.imageUrl) await tx.insert(profilePictureImports).values({ profileId: userId, sourceUrl: identity.imageUrl, createdAt: now, nextAttemptAt: now });
+          if (identity.imageUrl)
+            await tx.insert(profilePictureImports).values({
+              profileId: userId,
+              sourceUrl: identity.imageUrl,
+              createdAt: now,
+              nextAttemptAt: now,
+            });
 
           const event: ProfileCreatedEvent = {
             eventId: `evt_${ulid()}`,
@@ -694,7 +707,10 @@ export class ProfileService {
     aliases?: OwnerProfile['aliases'],
     now = new Date()
   ): Promise<OwnerProfile> {
-    const pictureImport = await reader.query.profilePictureImports.findFirst({ where: eq(profilePictureImports.profileId, profile.id), columns: { status: true } });
+    const pictureImport = await reader.query.profilePictureImports.findFirst({
+      where: eq(profilePictureImports.profileId, profile.id),
+      columns: { status: true },
+    });
     const activeAliases = aliases ?? (await this.profileAliases(profile, reader));
     const retained = new Set(
       activeAliases.filter((alias) => alias.expiresAt === null).map((alias) => alias.handle)
@@ -734,42 +750,127 @@ export class ProfileService {
   }
 
   private pictureUploadLimits(): OwnerProfile['pictureUploadLimits'] {
-    return { maxBytes: this.config.profilePictureMaxBytes, maxPixels: this.config.profilePictureMaxPixels, maxDecodedBytes: this.config.profilePictureMaxDecodedBytes };
+    return {
+      maxBytes: this.config.profilePictureMaxBytes,
+      maxPixels: this.config.profilePictureMaxPixels,
+      maxDecodedBytes: this.config.profilePictureMaxDecodedBytes,
+    };
   }
 
-  async adoptPicture(userId: string, assetId: string | null, expectedVersion: number | undefined, importLeaseToken?: string): Promise<OwnerProfile> {
+  async adoptPicture(
+    userId: string,
+    assetId: string | null,
+    expectedVersion: number | undefined,
+    importLeaseToken?: string
+  ): Promise<OwnerProfile> {
     return this.database.getClient().db.transaction(async (tx) => {
-      const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
-      if (!current) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      const [job] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, userId)).for('update');
+      const [current] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('update');
+      if (!current)
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      const [job] = await tx
+        .select()
+        .from(profilePictureImports)
+        .where(eq(profilePictureImports.profileId, userId))
+        .for('update');
       if (importLeaseToken) {
-        if (!job || job.leaseToken !== importLeaseToken || job.status === 'complete' || current.pictureAssetId !== null) return this.ownerProfile(current, tx);
-      } else if (current.version !== expectedVersion) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      if (current.pictureAssetId === assetId && (!job || job.status === 'complete')) return this.ownerProfile(current, tx);
-      const asset = assetId ? await tx.query.profilePictureAssets.findFirst({ where: and(eq(profilePictureAssets.id, assetId), eq(profilePictureAssets.profileId, userId), eq(profilePictureAssets.state, 'staged')) }) : null;
+        if (
+          !job ||
+          job.leaseToken !== importLeaseToken ||
+          job.status === 'complete' ||
+          current.pictureAssetId !== null
+        )
+          return this.ownerProfile(current, tx);
+      } else if (current.version !== expectedVersion)
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      if (current.pictureAssetId === assetId && (!job || job.status === 'complete'))
+        return this.ownerProfile(current, tx);
+      const asset = assetId
+        ? await tx.query.profilePictureAssets.findFirst({
+            where: and(
+              eq(profilePictureAssets.id, assetId),
+              eq(profilePictureAssets.profileId, userId),
+              eq(profilePictureAssets.state, 'staged')
+            ),
+          })
+        : null;
       if (assetId && !asset) throw new Error('Staged Profile picture is missing');
       const now = new Date();
       if (current.pictureAssetId) {
-        await tx.update(profilePictureAssets).set({ state: 'retired', retiredAt: now, expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }).where(eq(profilePictureAssets.id, current.pictureAssetId));
+        await tx
+          .update(profilePictureAssets)
+          .set({
+            state: 'retired',
+            retiredAt: now,
+            expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          })
+          .where(eq(profilePictureAssets.id, current.pictureAssetId));
       }
-      if (assetId) await tx.update(profilePictureAssets).set({ state: 'active', expiresAt: null }).where(eq(profilePictureAssets.id, assetId));
-      if (job) await tx.update(profilePictureImports).set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null }).where(eq(profilePictureImports.profileId, userId));
-      const [updated] = await tx.update(profiles).set({ pictureAssetId: assetId, version: current.version + 1, updatedAt: now }).where(eq(profiles.id, userId)).returning();
-      const claim = await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, updated.handle) });
+      if (assetId)
+        await tx
+          .update(profilePictureAssets)
+          .set({ state: 'active', expiresAt: null })
+          .where(eq(profilePictureAssets.id, assetId));
+      if (job)
+        await tx
+          .update(profilePictureImports)
+          .set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null })
+          .where(eq(profilePictureImports.profileId, userId));
+      const [updated] = await tx
+        .update(profiles)
+        .set({ pictureAssetId: assetId, version: current.version + 1, updatedAt: now })
+        .where(eq(profiles.id, userId))
+        .returning();
+      const claim = await tx.query.handleClaims.findFirst({
+        where: eq(handleClaims.handle, updated.handle),
+      });
       if (!claim) throw new Error('Current Profile Handle claim is missing');
       const aliases = await this.profileAliases(updated, tx);
       const event: ProfileUpdatedEvent = {
-        eventId: `evt_${ulid()}`, eventType: PROFILE_UPDATED_SUBJECT, timestamp: now.toISOString(),
-        change: { type: 'picture-changed', before: current.pictureAssetId, after: assetId, source: importLeaseToken ? 'clerk-import' : assetId ? 'upload' : 'remove', asset: asset ? {
-          id: asset.id, storageBucket: asset.storageBucket, storageKey: asset.storageKey, mimeType: asset.mimeType,
-          width: asset.width, height: asset.height, fileSizeBytes: asset.fileSizeBytes,
-        } : null },
-        profile: { id: updated.id, displayName: updated.displayName, handle: updated.handle, claimGeneration: claim.claimGeneration,
-          aliases, biographyMarkdown: updated.biographyMarkdown, pictureAssetId: updated.pictureAssetId,
-          version: updated.version, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() },
+        eventId: `evt_${ulid()}`,
+        eventType: PROFILE_UPDATED_SUBJECT,
+        timestamp: now.toISOString(),
+        change: {
+          type: 'picture-changed',
+          before: current.pictureAssetId,
+          after: assetId,
+          source: importLeaseToken ? 'clerk-import' : assetId ? 'upload' : 'remove',
+          asset: asset
+            ? {
+                id: asset.id,
+                storageBucket: asset.storageBucket,
+                storageKey: asset.storageKey,
+                mimeType: asset.mimeType,
+                width: asset.width,
+                height: asset.height,
+                fileSizeBytes: asset.fileSizeBytes,
+              }
+            : null,
+        },
+        profile: {
+          id: updated.id,
+          displayName: updated.displayName,
+          handle: updated.handle,
+          claimGeneration: claim.claimGeneration,
+          aliases,
+          biographyMarkdown: updated.biographyMarkdown,
+          pictureAssetId: updated.pictureAssetId,
+          version: updated.version,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
       };
       ProfileUpdatedEventSchema.parse(event);
-      await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event, createdAt: now });
+      await tx.insert(outboxEvents).values({
+        id: event.eventId,
+        subject: event.eventType,
+        aggregateId: userId,
+        payload: event,
+        createdAt: now,
+      });
       return this.ownerProfile(updated, tx, aliases, now);
     });
   }

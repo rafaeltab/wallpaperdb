@@ -85,9 +85,8 @@ export function loadConfig(): Config {
       process.env.PROFILE_PICTURE_IMPORT_TIMEOUT_MS,
       10_000
     ),
-    profilePictureImportHosts: getEnv(
-      'PROFILE_PICTURE_IMPORT_HOSTS',
-      'img.clerk.com,images.clerk.dev'
+    profilePictureImportHosts: (
+      getEnv('PROFILE_PICTURE_IMPORT_HOSTS', 'img.clerk.com,images.clerk.dev') ?? ''
     )
       .split(',')
       .map((host) => host.trim().toLowerCase())

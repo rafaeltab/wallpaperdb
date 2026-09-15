@@ -38,7 +38,12 @@ declare module 'fastify' {
 
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean; aliasExpiryTimer?: TimerService; pictureImportTimer?: TimerService }
+  options?: {
+    logger?: boolean;
+    enableOtel?: boolean;
+    aliasExpiryTimer?: TimerService;
+    pictureImportTimer?: TimerService;
+  }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
   container.register(IdentityProviderToken, { useClass: ClerkIdentityProvider });
@@ -117,7 +122,8 @@ export async function createApp(
       options?.aliasExpiryTimer
     );
     pictureImportWorker = new ProfilePictureImportWorker(
-      async (isStopping) => container.resolve(ProfilePictureImportService).importPending(isStopping),
+      async (isStopping) =>
+        container.resolve(ProfilePictureImportService).importPending(isStopping),
       fastify.log,
       options?.pictureImportTimer
     );

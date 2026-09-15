@@ -1,10 +1,12 @@
 import tailwindcss from '@tailwindcss/vite';
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
 export default defineBaseConfig({
-  plugins: [react(), tailwindcss()],
+  // Unit coverage must also work in a fresh checkout without a dev-server run.
+  plugins: [TanStackRouterVite(), react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -28,7 +30,7 @@ export default defineBaseConfig({
         'test/**/*.ts',
         'src/routeTree.gen.ts',
       ],
-      reportsDirectory: './coverage',
+      reportsDirectory: './coverage/unit',
     },
   },
 });

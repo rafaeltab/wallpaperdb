@@ -12,7 +12,7 @@ export default defineBaseConfig({
 			provider: "v8",
 			include: ["src/**/*.ts"],
 			exclude: ["src/**/*.test.ts", "src/**/*.d.ts", "test/**/*.ts"],
-			reportsDirectory: "./coverage",
+			reportsDirectory: "./coverage/unit",
 		},
 	},
 });

@@ -1,0 +1,129 @@
+---
+title: Local CRAP Scores
+description: Rank function change risk and calibrate a local threshold using unit and integration coverage
+---
+
+CRAP (Change Risk Anti-Pattern) combines cyclomatic complexity with coverage to
+help prioritize functions for tests or refactoring. It measures change risk, not
+developer performance or overall code quality.
+
+## Run the complete ranking
+
+Install dependencies with `make install`, and have Docker available for integration
+tests. Node.js 22.13 or later is required by the pinned analyzer.
+
+```bash
+make crap
+```
+
+The command runs `test:unit` and `test:integration` through Turborepo, including
+their prerequisite library builds. Tasks run one at a time to limit machine load.
+Valid cache hits restore coverage without rerunning tests. Successful task logs
+are suppressed; task selection, cache totals, and errors appear on stderr.
+
+Stdout lists every in-scope function, sorted from highest to lowest CRAP score.
+Each tab-separated row contains CRAP score, complexity, effective coverage,
+repository-relative source file and line, and function name. Ties sort by location
+and name. High scores do not make this reporting command fail.
+
+## Preview a threshold
+
+```bash
+make check-crap CRAP_THRESHOLD=30
+```
+
+`30` is an example for calibration, not a repository policy. The threshold is
+required and must be finite and non-negative. Missing or invalid values fail
+before tests run. The check uses the same full-repository pipeline as the report,
+including when only tests changed.
+
+Only functions whose unrounded score **exceeds** the threshold appear on stdout.
+The check exits nonzero when violations exist; equality passes. A passing check
+has empty stdout and a concise summary on stderr. Both commands fail if a test,
+build, expected coverage report, coverage combination, source parsing, or analysis
+fails. They never fall back to an old report after a failed task.
+
+## How scores are calculated
+
+```text
+CRAP = complexity² × (1 − coverage)³ + complexity
+```
+
+Here coverage is a fraction from 0 to 1. Effective coverage is the lower applicable
+percentage of statement and branch coverage. A branchless function uses statement
+coverage. Missing or unmatched coverage, including a missing applicable branch or
+statement measurement, contributes 0%. Functions stay in the inventory even when
+their workspace has no unit or integration coverage task.
+
+For example, complexity 4 with 100% statement coverage and 50% branch coverage
+uses 50% effective coverage and scores 6. With no coverage it scores 20.
+
+`scripts/crap.mjs` owns orchestration, merging, missing-coverage policy, sorting,
+and exit behavior. The exact-pinned `@barney-media/crap-typescript-core` 0.5.2
+provides TypeScript/TSX parsing, cyclomatic complexity, Istanbul attribution, and
+the formula. Its Vitest adapter is not used. Re-evaluate the pin when migrating
+from Vitest 3 to Vitest 4, while retaining Turbo orchestration and the Make interface.
+
+## Coverage freshness and scope
+
+Unit and integration tasks write to separate workspace directories:
+
+- `coverage/unit/coverage-final.json`
+- `coverage/integration/coverage-final.json`
+
+The Turbo task outputs declare these same directories, and test inputs include
+the workspace's default tracked inputs, including test and configuration files.
+Before each invocation, the wrapper removes the expected tier outputs. Each must
+then be produced by a successful task or restored by Turbo for current inputs.
+An arbitrary file already on disk is not accepted as current coverage.
+
+Istanbul statement, function, and branch counters are merged by source location
+before attribution; percentages are not averaged. Paths from cached reports made
+in another checkout are rebased using the producing workspace's full path. The
+combined JSON is temporary and removed after analysis. Existing Codecov policies
+and LCOV merging remain unchanged.
+
+Vitest 3 emits synthetic `(empty-report)` records for unloaded modules. Their
+whole-file function/branch spans are not function measurements and can contain
+invalid remapped columns. These records contribute missing coverage (0%); a real
+measurement from the other tier takes precedence.
+
+`crap.config.mjs` centralizes the scope and generated-code exclusions:
+
+- Maintained `apps/*/src` and `packages/*/src` TypeScript and TSX functions are
+  included, including reusable `test-utils`, `testcontainers`, `test-logger`, and
+  `vitest-config` libraries.
+- Documentation and browser/distributed E2E workspaces are excluded.
+- Test cases, specifications, setup files, fixtures, mocks, stories, declarations,
+  generated sources, dependencies, and build/coverage output are excluded.
+- Only unit and integration task outputs are consumed. Libraries currently
+  tested exclusively through `test:e2e` remain in scope with missing coverage
+  scored as zero. E2E tests are not run by either command.
+
+When adding a workspace with unit/integration tests, enable JSON coverage in its
+test script/config and use the corresponding tier directory. Source inventory
+and participating test tasks are discovered automatically.
+
+Run one CRAP command at a time, without a simultaneous test run writing the same
+coverage directories. If a process is forcibly killed, remove
+`coverage/.crap-lock` after confirming it is no longer running.
+
+## Calibration and manual verification
+
+This release is local-only. Maintainers will select a permanent threshold and
+resolve existing violations before a later change calls `make check-crap` from CI.
+No CI gate, hosted report, or automated wrapper tests are introduced here.
+
+To verify changes manually at the public command interface:
+
+1. Run `make crap` twice. Confirm descending scores, source locations, and identical
+   output; the second run should restore valid cached coverage.
+2. Sample branching, branchless, and missing-coverage functions against their
+   source and Istanbul counters. Confirm both included support libraries and
+   excluded source categories.
+3. Run the check with no threshold, a permissive threshold, and a restrictive
+   threshold. Confirm usage failure, success, and violations-only failure.
+4. Confirm a failing coverage task or malformed produced coverage report fails
+   without printing a ranking or accepting a stale report.
+
+Reuse valid caches for these checks to avoid repeated integration execution.

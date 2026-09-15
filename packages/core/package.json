@@ -50,8 +50,8 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "test": "vitest run",
-    "test:unit": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.config.integration.ts",
+    "test:unit": "vitest run --config vitest.config.ts --coverage",
+    "test:integration": "vitest run --config vitest.config.integration.ts --coverage",
     "test:watch": "vitest",
     "check-types": "tsc --noEmit"
   },

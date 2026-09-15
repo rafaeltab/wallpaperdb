@@ -576,6 +576,15 @@ make test
 - Shows per-package coverage
 - Equivalent to: `node scripts/coverage-summary.js`
 
+**make crap**
+- Runs or restores unit/integration coverage through Turbo and ranks every in-scope function by CRAP score
+- High scores do not fail the report; test, coverage, and analysis errors do
+
+**make check-crap CRAP_THRESHOLD=30**
+- Uses the same coverage pipeline and lists only functions exceeding an explicit threshold
+- Exits nonzero for violations or errors; `30` is a calibration example, not a default
+- See [Local CRAP Scores](/docs/guides/crap-scores) for scope, calculation, and cache behavior
+
 **Example:**
 ```bash
 make test-coverage

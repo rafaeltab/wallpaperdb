@@ -82,13 +82,10 @@
         "test:unit": {
             "cache": true,
             "inputs": [
-                "src/**",
-                "test/**",
-                "vitest.*.ts",
-                "package.json"
+                "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/**"
+                "coverage/unit/**"
             ],
             "dependsOn": [
                 "^build"
@@ -97,13 +94,10 @@
         "test:integration": {
             "cache": true,
             "inputs": [
-                "src/**",
-                "test/**",
-                "vitest.*.ts",
-                "package.json"
+                "$TURBO_DEFAULT$"
             ],
             "outputs": [
-                "coverage/**"
+                "coverage/integration/**"
             ],
             "dependsOn": [
                 "^build"

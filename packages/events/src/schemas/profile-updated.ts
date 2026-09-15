@@ -43,6 +43,15 @@ export const ProfileUpdatedEventSchema = z
         .strict(),
       z
         .object({
+          type: z.literal("alias-reactivated"),
+          handle: z.string().min(1),
+          claimGeneration: z.number().int().positive(),
+          before: z.string().datetime().nullable(),
+          after: z.null(),
+        })
+        .strict(),
+      z
+        .object({
           type: z.literal("alias-expired"),
           handle: z.string().min(1),
           claimGeneration: z.number().int().positive(),

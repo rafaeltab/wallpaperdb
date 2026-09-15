@@ -118,6 +118,19 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("records released alias reactivation and scheduled expiry cancellation", () => {
+      for (const before of [null, timestamp]) {
+        const reactivated = {
+          ...event,
+          change: { type: "alias-reactivated", handle: "old-handle", claimGeneration: 3, before, after: null },
+          profile: { ...event.profile, aliases: [{ handle: "old-handle", claimGeneration: 3, createdAt: timestamp, expiresAt: null }] },
+        };
+        expect(ProfileUpdatedEventSchema.parse(reactivated)).toEqual(reactivated);
+        expect(ProfileUpdatedEventSchema.safeParse({ ...reactivated, change: { ...reactivated.change, claimGeneration: 0 } }).success).toBe(false);
+        expect(ProfileUpdatedEventSchema.safeParse({ ...reactivated, change: { ...reactivated.change, before: "yesterday" } }).success).toBe(false);
+      }
+    });
+
     it("records automatic and immediate alias expiry with the released claim generation", () => {
       for (const reason of ["scheduled", "immediate"]) {
         const expired = {

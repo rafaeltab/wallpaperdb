@@ -6,6 +6,7 @@ import {
   type ProfileDocument,
   ProfileRepository,
 } from '../src/repositories/profile.repository.js';
+import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
 import { CursorService } from '../src/services/cursor.service.js';
 import { tester } from './setup.js';
 
@@ -41,6 +42,44 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('filters wallpapers by the selected immutable Profile ID after a Handle rename', async () => {
+    await project({ id: 'user_selected', handle: 'sky-artist', displayName: 'Blue Skies' });
+    await project({ id: 'user_other', handle: 'other-artist', displayName: 'Blue Skies' });
+    const wallpapers = container.resolve(WallpaperRepository);
+    const documents = [
+      { wallpaperId: 'wlpr_selected', userId: 'user_selected' },
+      { wallpaperId: 'wlpr_same_name', userId: 'user_other' },
+      { wallpaperId: 'wlpr_id_prefix', userId: 'user_selected_extra' },
+    ].map((identity) => ({
+      ...identity, variants: [],
+      uploadedAt: '2026-09-15T00:00:00.000Z', updatedAt: '2026-09-15T00:00:00.000Z',
+    }));
+    for (const document of documents) await wallpapers.upsert(document);
+    const discovery = await search('sky-artis');
+    expect(discovery.errors).toBeUndefined();
+    const selectedId = discovery.data.searchProfiles.edges[0].node.id;
+    await project({ id: selectedId, handle: 'evening-artist', displayName: 'Blue Skies', version: 2 });
+
+    const response = await tester.getApp().inject({
+      method: 'POST', url: '/graphql',
+      payload: {
+        query: `query SelectedWallpapers($profileId: ID!) {
+          searchWallpapers(filter: { profileId: $profileId }, first: 10) {
+            edges { node { wallpaperId profileId profile { id handle displayName } } }
+          }
+        }`,
+        variables: { profileId: selectedId },
+      },
+    });
+    expect(response.json().errors).toBeUndefined();
+    expect(response.json().data.searchWallpapers.edges).toEqual([{ node: {
+      wallpaperId: 'wlpr_selected', profileId: 'user_selected',
+      profile: { id: 'user_selected', handle: 'evening-artist', displayName: 'Blue Skies' },
+    } }]);
+    // Profile presentation resolves from its own index; wallpaper documents retain only ownership.
+    expect(await wallpapers.findById('wlpr_selected')).toEqual(documents[0]);
+  });
+
   it('keeps current Handles first in discovery while exact resolution honors the newest matching claim', async () => {
     await project({ id: 'user_old_current', handle: 'reclaimed', claimGeneration: 10 });
     await project({

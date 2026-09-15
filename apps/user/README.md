@@ -9,6 +9,8 @@ Owns WallpaperDB Profiles. It verifies Clerk-authenticated Users, persists publi
 - Schedules alias removal with a 24-hour grace period and releases claims automatically or through a confirmed immediate-expiry command
 - Reactivates eligible historical Handles from the retained 30-day event window, including canceling scheduled alias expiry
 - Safely edits Display names through `PATCH /profile/me` with optimistic concurrency
+- Imports the initial Clerk picture asynchronously and accepts validated picture uploads and removal with optimistic concurrency
+- Keeps picture objects private and authorizes Media delivery only for the current asset
 - Derives unique, configurable Handles with monotonic claim generations from Clerk identity data or a generated fallback
 - Atomically persists Profile state, Handle claims, and typed outbox events for creation and updates
 - Provides health and readiness endpoints for infrastructure monitoring

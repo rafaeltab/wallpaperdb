@@ -28,6 +28,7 @@ make dev PACKAGE=user
 - **Alias expiry** with a 24-hour redirect grace, automatic claim release, and confirmed early expiry
 - **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
+- **Profile pictures** with asynchronous initial import, bounded image decoding, private object storage, and immediate origin retirement
 - **Health checks** for database and message queue connectivity
 
 ### Observability
@@ -118,6 +119,24 @@ Authenticated owner responses include `historicalHandles`, each with `handle`, `
 
 Eligibility comes from typed Handle transitions in the retained Profile event history: creation, Handle changes (including automatically scheduled aliases), scheduling, expiry, and reactivation. Unrelated edits and repeated alias values in public snapshots do not renew history. Each accepted event stores its acceptance timestamp in `outbox_events.created_at`; the latest qualifying event sets the Handle's eligibility deadline 30 days later. At that exact deadline the Handle is ineligible, even if the event has not yet been physically deleted. History lookup uses the Profile ID and timestamp index and reads only relevant transition fields.
 
+### PUT /profile/me/picture
+
+Uploads a Profile picture using authenticated `multipart/form-data` with a `picture` file and decimal `expectedVersion` field. JPEG, PNG, and WebP inputs are decoded and re-encoded as metadata-free WebP. SVG, animation, malformed images, and inputs exceeding the configured byte, pixel, or decoded-memory limits are rejected. Each accepted upload gets a new immutable asset ID and returns the authoritative owner Profile; stale versions return `409`.
+
+User records a private staged asset before writing its object. Activation locks the Profile, checks the version, retires the former asset, and writes the `picture-changed` event in the same database transaction. Failed writes or activation leave a tracked private asset for later cleanup. Media receives storage metadata through events, while public Profile snapshots contain only the asset ID.
+
+### DELETE /profile/me/picture
+
+Removes the current picture using `{ "expectedVersion": 2 }`, returns the updated owner Profile, and uses the deterministic generated avatar. A manual upload or removal cancels the initial Clerk import so a late import cannot overwrite the User's choice. Replaced and removed objects remain private evidence for 30 days.
+
+### Initial picture import
+
+Profile creation captures the initial Clerk image URL in a private durable job. The worker downloads and validates it asynchronously; failure does not block creation. Retries use the captured URL, and later Clerk edits do not synchronize into WallpaperDB. Owner responses include `pictureImportStatus` (`pending`, `retrying`, or `complete`) and `pictureUploadLimits` (`maxBytes`, `maxPixels`, and `maxDecodedBytes`). Settings refresh while the import is pending and update immediately from accepted picture commands.
+
+### Internal picture availability
+
+`GET /internal/profile-pictures/:pictureId/availability` requires the shared `USER_MEDIA_SERVICE_TOKEN` bearer token. It returns `204` only for the committed current public picture and `404` otherwise. Media checks this uncached endpoint before every origin delivery and fails closed on errors. Successful Media image responses use immutable caching; already downloaded or cached copies cannot be recalled. See [Profile picture delivery](/docs/architecture/decisions/profile-picture-delivery) for the service boundary and cache behavior.
+
 ### GET /health
 
 Health check with dependency status.
@@ -174,7 +193,22 @@ PROFILE_HANDLE_MIN_LENGTH=1
 PROFILE_HANDLE_MAX_LENGTH=30
 PROFILE_DISPLAY_NAME_MAX_LENGTH=80
 PROFILE_RETAINED_ALIAS_LIMIT=3
+
+# Private Profile pictures
+S3_ENDPOINT=http://localhost:9000
+S3_ACCESS_KEY_ID=minioadmin
+S3_SECRET_ACCESS_KEY=minioadmin
+S3_REGION=us-east-1
+PROFILE_PICTURE_BUCKET=profile-pictures
+PROFILE_PICTURE_MAX_BYTES=5242880
+PROFILE_PICTURE_MAX_PIXELS=16000000
+PROFILE_PICTURE_MAX_DECODED_BYTES=67108864
+PROFILE_PICTURE_IMPORT_HOSTS=img.clerk.com,images.clerk.dev
+PROFILE_PICTURE_IMPORT_TIMEOUT_MS=10000
+USER_MEDIA_SERVICE_TOKEN=replace_with_shared_random_token
 ```
+
+The picture bucket must have no anonymous access. Configure the same service token in Media and set its `USER_SERVICE_URL` to the internal User origin. Worktree setup supplies both automatically for Docker development. Import hosts are exact trusted HTTPS hosts; use a narrowly scoped allowlist for a custom Clerk image domain.
 
 ## Testing
 

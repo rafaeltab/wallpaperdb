@@ -15,9 +15,28 @@ export type ProfileMarkdownValidation =
 
 const parser = unified().use(remarkParse).use(remarkGfm);
 const allowedNodes = new Set([
-  "root", "paragraph", "text", "heading", "thematicBreak", "blockquote", "list", "listItem",
-  "break", "code", "inlineCode", "emphasis", "strong", "delete", "table", "tableRow",
-  "tableCell", "link", "image", "definition", "linkReference", "imageReference",
+  "root",
+  "paragraph",
+  "text",
+  "heading",
+  "thematicBreak",
+  "blockquote",
+  "list",
+  "listItem",
+  "break",
+  "code",
+  "inlineCode",
+  "emphasis",
+  "strong",
+  "delete",
+  "table",
+  "tableRow",
+  "tableCell",
+  "link",
+  "image",
+  "definition",
+  "linkReference",
+  "imageReference",
 ]);
 
 function flatten(root: Root): Nodes[] {
@@ -43,11 +62,16 @@ export function countProfileMarkdownCharacters(source: string): number {
 
 export function validateProfileMarkdown(
   source: string,
-  options: ProfileMarkdownOptions = {},
+  options: ProfileMarkdownOptions = {}
 ): ProfileMarkdownValidation {
   const maxCharacters = options.maxCharacters === undefined ? 5000 : options.maxCharacters;
   if (maxCharacters !== null && countProfileMarkdownCharacters(source) > maxCharacters) {
-    return { valid: false, errors: [{ code: "too-long", message: `Biography must be ${maxCharacters} characters or fewer.` }] };
+    return {
+      valid: false,
+      errors: [
+        { code: "too-long", message: `Biography must be ${maxCharacters} characters or fewer.` },
+      ],
+    };
   }
   return validateTree(parser.parse(source));
 }
@@ -77,24 +101,49 @@ function validateTree(root: Root): ProfileMarkdownValidation {
   const definitions = definitionsIn(nodes);
   for (const node of nodes) {
     if (!allowedNodes.has(node.type)) {
-      errors.push({ code: "unsupported-syntax", message: "This Markdown syntax is not supported." });
+      errors.push({
+        code: "unsupported-syntax",
+        message: "This Markdown syntax is not supported.",
+      });
     }
-    const definition = node.type === "linkReference" || node.type === "imageReference"
-      ? definitions.get(node.identifier.toUpperCase()) : undefined;
+    const definition =
+      node.type === "linkReference" || node.type === "imageReference"
+        ? definitions.get(node.identifier.toUpperCase())
+        : undefined;
     const target = "url" in node ? node.url : definition?.url;
-    if ((node.type === "link" || node.type === "linkReference") && (!target || !normalizeProfileLink(target))) {
-      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+    if (
+      (node.type === "link" || node.type === "linkReference") &&
+      (!target || !normalizeProfileLink(target))
+    ) {
+      errors.push({
+        code: "invalid-link",
+        message: "Links must use absolute HTTPS URLs without credentials.",
+      });
     }
-    if (node.type === "definition" && !normalizeProfileLink(node.url) && !wallpaperTarget(node.url)) {
-      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+    if (
+      node.type === "definition" &&
+      !normalizeProfileLink(node.url) &&
+      !wallpaperTarget(node.url)
+    ) {
+      errors.push({
+        code: "invalid-link",
+        message: "Links must use absolute HTTPS URLs without credentials.",
+      });
     }
     if (node.type === "image" || node.type === "imageReference") {
       const id = target ? wallpaperTarget(target) : null;
       if (id) wallpaperIds.add(id);
-      else errors.push({ code: "invalid-image", message: "Images must reference your published wallpapers using wallpaper:<wallpaper-id>." });
+      else
+        errors.push({
+          code: "invalid-image",
+          message:
+            "Images must reference your published wallpapers using wallpaper:<wallpaper-id>.",
+        });
     }
   }
-  return errors.length > 0 ? { valid: false, errors } : { valid: true, wallpaperIds: [...wallpaperIds] };
+  return errors.length > 0
+    ? { valid: false, errors }
+    : { valid: true, wallpaperIds: [...wallpaperIds] };
 }
 
 export interface ProfileLinkDestination {
@@ -118,7 +167,6 @@ export function normalizeProfileLink(target: string): ProfileLinkDestination | n
     return null;
   }
 }
-
 
 export class ProfileMarkdownError extends Error {
   constructor(readonly issues: ProfileMarkdownIssue[]) {
@@ -150,13 +198,14 @@ export const remarkProfileMarkdown: Plugin<[], Root> = () => (tree) => {
       if (destination) node.url = destination.href;
     }
     if (node.type === "image" || node.type === "imageReference") {
-      const target = node.type === "image" ? node.url : definitions.get(node.identifier.toUpperCase())?.url;
+      const target =
+        node.type === "image" ? node.url : definitions.get(node.identifier.toUpperCase())?.url;
       const id = target ? wallpaperTarget(target) : null;
       if (!id) continue; // validateTree has already rejected invalid image targets.
       node.data = {
         hName: "span",
         hProperties: { dataWallpaperId: id },
-        hChildren: [{type: "text", value: node.alt ?? ""}],
+        hChildren: [{ type: "text", value: node.alt ?? "" }],
       };
     }
   }

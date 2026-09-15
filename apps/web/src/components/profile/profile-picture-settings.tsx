@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { userApi, type Profile } from '@/lib/api/user';
+import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 type PictureCommand =
   | { action: 'upload'; picture: File; expectedVersion: number }
@@ -39,7 +39,8 @@ export function ProfilePictureSettings({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
-  const importing = profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
+  const importing =
+    profile.pictureImportStatus === 'pending' || profile.pictureImportStatus === 'retrying';
   const mutation = useMutation({
     mutationKey: profileQueryKey(profile.id),
     mutationFn: (command: PictureCommand) => {
@@ -56,8 +57,31 @@ export function ProfilePictureSettings({
       queryClient.setQueryData(profileQueryKey(profile.id), updated);
       setSelected(null);
       if (input.current) input.current.value = '';
+      setError(null);
     },
   });
+  const feedback =
+    error ??
+    (mutation.error instanceof UserApiError &&
+    mutation.error.type?.endsWith('/profile-version-conflict')
+      ? 'Your Profile changed elsewhere. Refresh Profile before trying again.'
+      : mutation.error?.message);
+
+  async function refresh() {
+    if (refreshing || writing) return;
+    mutation.reset();
+    setError(null);
+    setSelected(null);
+    if (input.current) input.current.value = '';
+    try {
+      await queryClient.refetchQueries(
+        { queryKey: profileQueryKey(profile.id), exact: true },
+        { throwOnError: true }
+      );
+    } catch {
+      setError('Unable to refresh your Profile. Try again.');
+    }
+  }
 
   return (
     <Card className="mb-6">
@@ -69,9 +93,21 @@ export function ProfilePictureSettings({
       </CardHeader>
       <CardContent className="space-y-5">
         <ProfilePicture profile={profile} />
-        {importing && <p role="status" className="text-sm text-muted-foreground">
-          {profile.pictureImportStatus === 'retrying' ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.' : 'Importing your account picture. You can keep editing your Profile while it loads.'}
-        </p>}
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={refreshing || writing}
+          onClick={() => void refresh()}
+        >
+          {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
+        </Button>
+        {importing && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {profile.pictureImportStatus === 'retrying'
+              ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
+              : 'Importing your account picture. You can keep editing your Profile while it loads.'}
+          </p>
+        )}
         <form
           className="space-y-4"
           onSubmit={(event) => {
@@ -106,7 +142,11 @@ export function ProfilePictureSettings({
               }}
             />
             <FieldDescription>
-              JPEG, PNG, or WebP. Up to {maxBytes.toLocaleString()} bytes{profile.pictureUploadLimits ? ` and ${profile.pictureUploadLimits.maxPixels.toLocaleString()} pixels` : ''}. Animated images are not supported.
+              JPEG, PNG, or WebP. Up to {maxBytes.toLocaleString()} bytes
+              {profile.pictureUploadLimits
+                ? ` and ${profile.pictureUploadLimits.maxPixels.toLocaleString()} pixels`
+                : ''}
+              . Animated images are not supported.
             </FieldDescription>
           </Field>
           <Button type="submit" disabled={!selected || refreshing || writing}>
@@ -153,9 +193,9 @@ export function ProfilePictureSettings({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        {(error || mutation.error) && (
+        {feedback && (
           <Alert variant="destructive">
-            <AlertDescription>{error || mutation.error?.message}</AlertDescription>
+            <AlertDescription>{feedback}</AlertDescription>
           </Alert>
         )}
         {mutation.isSuccess && (

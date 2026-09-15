@@ -64,10 +64,40 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
-  it('enforces the server byte limit and shows its picture constraints before upload', async () => {
-    renderPage({ ...profile, pictureUploadLimits: { maxBytes: 4, maxPixels: 2000000, maxDecodedBytes: 8000000 } });
+  it('explains stale picture commands and refreshes the owner before selecting another upload', async () => {
+    vi.mocked(userApi.uploadPicture).mockRejectedValue(
+      new UserApiError('Conflict', 409, {
+        type: 'https://wallpaperdb.test/problems/profile-version-conflict',
+      })
+    );
+    const updated = { ...profile, version: 2, pictureAssetId: 'remote_picture' };
+    vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
+    const { client } = renderPage();
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['12345'], 'large.png', { type: 'image/png' }));
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['png'], 'portrait.png', { type: 'image/png' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your Profile changed elsewhere. Refresh Profile before trying again.'
+    );
+    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
+    await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Replace picture' })).toBeDisabled();
+  });
+
+  it('enforces the server byte limit and shows its picture constraints before upload', async () => {
+    renderPage({
+      ...profile,
+      pictureUploadLimits: { maxBytes: 4, maxPixels: 2000000, maxDecodedBytes: 8000000 },
+    });
+    const user = userEvent.setup();
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['12345'], 'large.png', { type: 'image/png' })
+    );
     expect(screen.getByRole('alert')).toHaveTextContent('Picture must be at most 4 bytes.');
     expect(screen.getByText(/2,000,000 pixels/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
@@ -77,7 +107,10 @@ describe('Profile picture settings', () => {
   it('rejects unsupported picture files before sending an upload', async () => {
     renderPage();
     const user = userEvent.setup({ applyAccept: false });
-    await user.upload(screen.getByLabelText('Choose picture'), new File(['<svg/>'], 'picture.svg', { type: 'image/svg+xml' }));
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['<svg/>'], 'picture.svg', { type: 'image/svg+xml' })
+    );
     expect(screen.getByRole('alert')).toHaveTextContent('Choose a JPEG, PNG, or WebP picture.');
     expect(screen.getByRole('button', { name: 'Upload picture' })).toBeDisabled();
     expect(userApi.uploadPicture).not.toHaveBeenCalled();
@@ -90,9 +123,15 @@ describe('Profile picture settings', () => {
     const user = userEvent.setup();
     expect(screen.getByText(/importing your account picture/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Cancel picture import' }));
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Use generated avatar' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Use generated avatar' })
+    );
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
-    expect(userApi.removePicture).toHaveBeenCalledWith({ expectedVersion: 1, expectedProfileId: profile.id, tokenProvider: expect.any(Function) });
+    expect(userApi.removePicture).toHaveBeenCalledWith({
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
     expect(screen.queryByRole('button', { name: 'Cancel picture import' })).not.toBeInTheDocument();
   });
 

@@ -31,9 +31,9 @@ Look for the originating spec, in this order:
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".
 
-### 3. Identify the standards sources
+### 3. Read the coding standards
 
-Anything in the repo that documents how code should be written, such as `CODING_STANDARDS.md` or `CONTRIBUTING.md`.
+Use the repository root's [CODING_STANDARDS.md](../../../CODING_STANDARDS.md) as the authoritative coding and testing standard. Skills and contribution guides govern their respective workflows; existing implementation examples and historical plans do not add coding standards.
 
 ### 4. Spawn both sub-agents in parallel
 

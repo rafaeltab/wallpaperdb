@@ -1,3 +1,7 @@
+## Coding standards
+
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for the authoritative coding and testing requirements. Skills and contribution guides govern their respective workflows; implementation examples do not add coding standards.
+
 ## Agent skills
 
 ### Issue tracker

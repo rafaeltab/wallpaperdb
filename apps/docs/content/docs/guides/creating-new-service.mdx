@@ -1,9 +1,9 @@
 ---
 title: Creating a New Service
-description: Complete guide to building a new microservice in WallpaperDB
+description: Workspace setup, infrastructure references, and delivery workflow for a new service
 ---
 
-This guide walks through creating a new microservice for WallpaperDB using the established patterns and shared packages.
+This guide covers workspace setup and tooling integration for a new WallpaperDB service. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) defines application architecture, ports, dependency injection, failures, and test boundaries. The infrastructure snippets below illustrate existing package APIs and wiring that may still need migration to those standards.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ This guide walks through creating a new microservice for WallpaperDB using the e
 
 **Estimated time:** ~1 week per service (with shared packages)
 
-## Service Template Structure
+## Existing Infrastructure Layout (Reference)
 
 ```
 apps/my-service/
@@ -29,16 +29,10 @@ apps/my-service/
 │   │   └── otel.ts
 │   ├── db/
 │   │   └── schema.ts            # Drizzle schema
-│   ├── routes/
-│   │   ├── index.ts             # Route registration
-│   │   ├── health.routes.ts
-│   │   └── my-feature.routes.ts
-│   ├── services/                 # Business logic
-│   │   └── my-feature.service.ts
-│   ├── repositories/             # Database access
-│   │   └── my-entity.repository.ts
-│   └── errors/
-│       └── problem-details.ts   # RFC 7807 errors
+│   └── routes/
+│       ├── index.ts             # Route registration
+│       ├── health.routes.ts
+│       └── my-feature.routes.ts
 ├── test/                         # Integration tests
 │   ├── setup.ts
 │   └── my-feature.test.ts
@@ -53,7 +47,7 @@ apps/my-service/
 
 ```bash
 # Create service directory
-mkdir -p apps/my-service/src/{connections,routes,services,repositories,errors,db}
+mkdir -p apps/my-service/src
 mkdir -p apps/my-service/test
 mkdir -p apps/my-service/drizzle
 
@@ -257,38 +251,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
 
 ## Step 8: Business Logic
 
-**Create `src/services/my-feature.service.ts`:**
-
-```typescript
-import { singleton } from "tsyringe";
-import { DatabaseConnection } from "../connections/database.js";
-import { withSpan } from "@wallpaperdb/core/telemetry";
-import { Attributes } from "@wallpaperdb/core/telemetry/attributes";
-
-@singleton()
-export class MyFeatureService {
-  constructor(private db: DatabaseConnection) {}
-
-  async processFeature(userId: string, data: unknown) {
-    return await withSpan(
-      "my_feature.process",
-      { [Attributes.USER_ID]: userId },
-      async (span) => {
-        const pool = this.db.getClient();
-
-        // Business logic here
-        const result = await pool.query(
-          "SELECT * FROM my_entities WHERE user_id = $1",
-          [userId]
-        );
-
-        span.setAttribute("entities.count", result.rows.length);
-        return result.rows;
-      }
-    );
-  }
-}
-```
+Use [Coding Standards — Architecture](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#architecture), [Ports and transactions](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#ports-and-transactions), and [Application programming model](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#application-programming-model) to design the service's capabilities and their public interfaces.
 
 ## Step 9: Fastify App
 
@@ -479,7 +442,9 @@ curl http://localhost:3003/health
 make my-service-test
 ```
 
-## Using Shared Packages
+## Existing Shared Package APIs
+
+These snippets illustrate current package APIs. [Coding Standards — Cross-application interactions and contracts](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#cross-application-interactions-and-contracts) and [Delivery reliability](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#delivery-reliability) define the event contracts and guarantees required of an application using them.
 
 ### @wallpaperdb/core
 
@@ -495,9 +460,6 @@ import { withSpan, recordCounter } from "@wallpaperdb/core/telemetry";
 
 // Health
 import { HealthAggregator } from "@wallpaperdb/core/health";
-
-// Errors
-import { ValidationError, NotFoundError } from "@wallpaperdb/core/errors";
 ```
 
 ### @wallpaperdb/events
@@ -552,52 +514,9 @@ class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
 }
 ```
 
-## Best Practices
+## Workflow and Infrastructure Examples
 
-### 1. Use Dependency Injection
-
-```typescript
-@singleton()
-export class MyService {
-  constructor(
-    private db: DatabaseConnection,
-    private s3: S3Connection,
-    private nats: NatsConnectionManager
-  ) {}
-}
-```
-
-### 2. Add OpenTelemetry Spans
-
-```typescript
-async myOperation(userId: string) {
-  return await withSpan(
-    "my.operation",
-    { [Attributes.USER_ID]: userId },
-    async (span) => {
-      // Operation logic
-      span.setAttribute("custom.attr", "value");
-      return result;
-    }
-  );
-}
-```
-
-### 3. Use RFC 7807 Errors
-
-```typescript
-import { ValidationError, NotFoundError } from "@wallpaperdb/core/errors";
-
-if (!entity) {
-  throw new NotFoundError("Entity not found", { entityId: id });
-}
-
-if (invalid) {
-  throw new ValidationError("Invalid input", { field: "name" });
-}
-```
-
-### 4. Write Tests First (TDD)
+### Write Tests First (TDD)
 
 ```typescript
 describe("Feature", () => {
@@ -615,9 +534,9 @@ describe("Feature", () => {
 });
 ```
 
-### 5. Use Health Checks
+### Health Check Registration
 
-Register all dependencies in health aggregator:
+Existing health aggregator registration:
 
 ```typescript
 aggregator.register("database", () => db.checkHealth());
@@ -650,53 +569,6 @@ jobs:
 - [ ] Makefile commands added
 - [ ] README.md created
 - [ ] CI/CD pipeline configured
-
-## Common Patterns
-
-### Event-Driven Service
-
-Consume events, process, publish new events:
-
-```typescript
-class MyConsumer extends BaseEventConsumer {
-  async handleMessage(event: UploadedEvent) {
-    // Process event
-    const result = await this.processService.process(event);
-
-    // Publish result
-    await this.publisher.publish({
-      entityId: result.id,
-      status: "completed"
-    });
-  }
-}
-```
-
-### API Service
-
-HTTP endpoints with validation:
-
-```typescript
-app.post("/entities", async (request, reply) => {
-  const data = RequestSchema.parse(request.body);
-  const entity = await service.create(data);
-  reply.code(201).send(entity);
-});
-```
-
-### Background Worker
-
-Scheduled jobs:
-
-```typescript
-import { CronJob } from "cron";
-
-const job = new CronJob("0 */5 * * * *", async () => {
-  await reconciliationService.run();
-});
-
-job.start();
-```
 
 ## Next Steps
 

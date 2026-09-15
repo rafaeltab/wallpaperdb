@@ -1,10 +1,10 @@
 # @wallpaperdb/docs
 
-The primary documentation site for WallpaperDB, serving as a single authoritative reference for developers and AI agents working across the monorepo.
+The primary documentation site for WallpaperDB, covering development workflows and the monorepo's architecture and operations. Coding standards live in [CODING_STANDARDS.md](../../CODING_STANDARDS.md).
 
 ## Key Capabilities
 
-- Hosts MDX-authored documentation covering development guidelines, architectural decisions, testing strategy, service descriptions, shared package references, and operational guides
+- Hosts MDX-authored documentation covering development workflows, architectural decisions, testing strategy, service descriptions, shared package references, and operational guides
 - Auto-generates REST API reference pages from the OpenAPI specifications exported by each service, keeping the API docs in sync with the live service contracts
 - Exposes a full-text endpoint formatted for LLM consumption, enabling AI agents to retrieve the entire documentation corpus in a single request
 

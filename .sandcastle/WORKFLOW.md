@@ -1,17 +1,11 @@
-# WallpaperDB Sandcastle Coding Standards
+# WallpaperDB Sandcastle Workflow
 
-## General
+Read [CODING_STANDARDS.md](../CODING_STANDARDS.md) for the repository's coding and testing requirements. This file covers Sandcastle execution.
+
+## Change scope
 
 - Keep changes small, issue-scoped, and easy to review.
-- Prefer explicit, boring TypeScript over clever abstractions.
 - Preserve existing public behavior unless the issue explicitly requests a behavior change.
-- Do not leave commented-out code, vague TODOs, or unrelated cleanup in commits.
-
-## TypeScript
-
-- Keep type safety strong: avoid `any`, unsafe casts, and unchecked non-null assertions unless they are narrowly justified.
-- Prefer named exports and existing workspace conventions.
-- Keep GraphQL/API contracts aligned with existing schema/resolver patterns.
 
 ## Testing and Verification
 

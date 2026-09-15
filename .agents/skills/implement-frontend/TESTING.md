@@ -1,6 +1,6 @@
 # Testing
 
-> For general test commands, coverage, and test tiers, see the `testing` skill.
+Choose test boundaries using [CODING_STANDARDS.md — Testing](../../../CODING_STANDARDS.md#testing). For repository test commands, coverage reports, and infrastructure, see the `testing` skill. The examples below describe the existing frontend test tooling.
 
 Frontend tests use **Vitest v3** + **Testing Library** + **jsdom**. All test files live in `apps/web/test/` mirroring `src/`.
 

@@ -1,26 +1,11 @@
 ---
 title: Testing Strategies
-description: When to use unit, integration, and E2E tests in WallpaperDB
+description: Existing test commands, infrastructure examples, coverage reports, and debugging
 ---
 
-WallpaperDB organizes tests by resource intensity to optimize local development speed and CI/CD reliability. This guide helps you choose the right test type for your needs.
+This guide documents existing test command groups, infrastructure setup, and debugging workflows. [CODING_STANDARDS.md — Testing](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#testing) defines the required test boundaries and coverage. The command groups below describe current tooling; their names do not determine which boundary owns a behavior.
 
-## Quick Decision Tree
-
-```
-Is this pure logic with no external dependencies?
-└─ YES → Unit test (make test-unit)
-└─ NO  → Does it test the full deployment artifact?
-   ├─ YES → E2E test (make test-e2e)
-   └─ NO  → Integration test (make test-integration)
-```
-
-**Rule of thumb:**
-- **Unit tests:** Pure functions, utilities, schemas, validators
-- **Integration tests:** Routes, services, database interactions, NATS publishing
-- **E2E tests:** Docker deployment, multi-container orchestration, production-like scenarios
-
-## Test Categories
+## Existing Test Command Groups
 
 ### Unit Tests
 
@@ -30,7 +15,7 @@ Is this pure logic with no external dependencies?
 - No external dependencies (databases, message queues, object storage)
 - Pure logic testing
 
-**When to use:**
+**Examples in the existing suites:**
 - Testing utility functions
 - Validating Zod schemas
 - Testing error classes
@@ -89,7 +74,7 @@ describe('DatabaseConfigSchema', () => {
 - App runs in-process (same Node.js runtime)
 - Tests full request/response cycle
 
-**When to use:**
+**Examples in the existing suites:**
 - Testing HTTP routes
 - Testing database operations (Drizzle ORM)
 - Testing SeaweedFS uploads
@@ -169,7 +154,7 @@ describe('POST /upload', () => {
 - App runs in separate container
 - Full production-like environment
 
-**When to use:**
+**Examples in the existing suites:**
 - Testing Docker image build
 - Testing environment variable configuration
 - Testing multi-container orchestration
@@ -230,7 +215,7 @@ describe('Ingestor E2E - Health endpoints', () => {
 - Not suitable for TDD
 - Harder to debug (logs across containers)
 
-## Test Organization
+## Existing Test Organization
 
 ### By Intensity
 
@@ -320,12 +305,7 @@ const { client, cleanup } = await new TesterBuilder()
 
 **See also:** [Guide: TesterBuilder Pattern](/docs/packages/test-utils)
 
-## Coverage Requirements
-
-**Target coverage:**
-- Unit tests: 90%+ coverage
-- Integration tests: 80%+ coverage
-- E2E tests: Critical paths only (health, upload, retrieval)
+## Coverage Reports
 
 **Generate coverage:**
 ```bash
@@ -340,28 +320,9 @@ open coverage/index.html    # View HTML report
 - `html` - Interactive browser report (`coverage/index.html`)
 - `lcov` - For Codecov integration (`coverage/lcov.info`)
 
-## Testing Best Practices
+## Testing Workflow and Examples
 
-### 1. Test Pyramid
-
-Maintain a healthy test distribution:
-
-```
-     /\
-    /E2E\          10% - Critical paths only
-   /------\
-  / Integ \       30% - Routes, services, workflows
- /----------\
-/    Unit    \    60% - Pure logic, utilities, validators
-/-------------\
-```
-
-**Why?**
-- Unit tests are fast → quick feedback loop
-- Integration tests catch bugs → confidence in integrations
-- E2E tests verify deployment → production readiness
-
-### 2. Test-First Development (TDD)
+### Test-First Development (TDD)
 
 **Write tests before implementation:**
 
@@ -387,7 +348,7 @@ make test-unit
 # 5. Refactor and repeat
 ```
 
-### 3. Arrange-Act-Assert
+### Arrange-Act-Assert
 
 Structure tests clearly:
 
@@ -410,7 +371,7 @@ it('should upload wallpaper successfully', async () => {
 });
 ```
 
-### 4. Test Isolation
+### Test Isolation
 
 **Each test should be independent:**
 - Don't rely on test execution order
@@ -443,9 +404,9 @@ describe('Upload flow', () => {
 });
 ```
 
-### 5. Descriptive Test Names
+### Descriptive Test Names
 
-**Use full sentences that describe behavior:**
+Examples of names that describe behavior:
 
 ❌ **Bad:**
 ```typescript
@@ -459,7 +420,7 @@ it('should upload JPEG wallpaper successfully', async () => { ... });
 it('should return 400 when file format is invalid', async () => { ... });
 ```
 
-### 6. Test Edge Cases
+### Test Edge Cases
 
 Don't just test the happy path:
 
@@ -474,7 +435,7 @@ describe('File validation', () => {
 });
 ```
 
-### 7. Use Fixtures
+### Use Fixtures
 
 **Create reusable test data:**
 
@@ -498,7 +459,7 @@ it('should reject GIF', async () => {
 });
 ```
 
-### 8. Container Reuse
+### Container Reuse
 
 **Reuse containers across test files:**
 
@@ -754,5 +715,5 @@ See [Guide: TesterBuilder Migration](/docs/packages/test-utils#migration-guide)
 
 - [Package: test-utils](/docs/packages/test-utils) - TesterBuilder framework
 - [Package: testcontainers](/docs/packages/testcontainers) - Custom container implementations
-- [Development Guidelines](/docs/development-guidelines) - TDD workflow
+- [Development Workflow](/docs/development-guidelines) - TDD workflow
 - [Guide: Creating New Service](/docs/guides/creating-new-service) - Service testing setup

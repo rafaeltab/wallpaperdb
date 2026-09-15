@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { DatabaseConnection } from '../connections/database.js';
 import { profiles, profilePictureAssets } from '../db/schema.js';
+import { InvalidProfilePictureError, ProfilePictureTooLargeError } from '../services/profile-picture-processing.js';
 import multipart from '@fastify/multipart';
 import { type IAuthService, IAuthServiceToken } from '@wallpaperdb/auth';
 import type { FastifyInstance } from 'fastify';
@@ -16,6 +17,11 @@ export default async function profilePictureRoutes(fastify: FastifyInstance): Pr
     if (error instanceof ProfileVersionConflictError) return reply.code(409).type('application/problem+json').send({
       type: 'https://wallpaperdb.example/problems/profile-version-conflict', title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
     });
+    if (error instanceof InvalidProfilePictureError || error instanceof ProfilePictureTooLargeError || error.code === 'FST_REQ_FILE_TOO_LARGE') {
+      const oversized = error instanceof ProfilePictureTooLargeError || error.code === 'FST_REQ_FILE_TOO_LARGE';
+      const status = oversized ? 413 : 400;
+      return reply.code(status).type('application/problem+json').send({ type: `https://wallpaperdb.example/problems/${oversized ? 'picture-too-large' : 'invalid-picture'}`, title: oversized ? 'Picture too large' : 'Invalid picture', status, detail: oversized ? 'Picture exceeds the upload byte limit' : error.message, instance: request.url });
+    }
     return reply.send(error);
   });
   await fastify.register(multipart, { limits: { fileSize: config.profilePictureMaxBytes, files: 1, fields: 1, parts: 2, fieldSize: 32 } });

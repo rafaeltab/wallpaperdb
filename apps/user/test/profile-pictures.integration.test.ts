@@ -78,6 +78,19 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('reports invalid and oversized uploads without publishing or staging them', async () => {
+    const original = (await ensure()).json();
+    const invalid = await upload(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), original.version);
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().type).toContain('invalid-picture');
+    const tooLarge = await upload(Buffer.alloc(config.profilePictureMaxBytes + 1), original.version);
+    expect(tooLarge.statusCode).toBe(413);
+    expect(tooLarge.json().type).toContain('picture-too-large');
+    expect((await ensure()).json()).toEqual(original);
+    expect((await sql`select id from profile_picture_assets`)).toHaveLength(0);
+    expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(0);
+  });
+
   it('rejects stale picture commands with version conflicts without changing public state', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

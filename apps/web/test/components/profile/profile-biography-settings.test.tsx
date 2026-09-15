@@ -57,6 +57,15 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockReset();
   });
 
+  it('keeps an unchanged Biography unsavable and adopts fresh text while the editor is pristine', async () => {
+    const { client } = renderPage();
+    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, biographyMarkdown: 'Fresh Biography', version: 2 }));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Biography Markdown' })).toHaveValue('Fresh Biography'));
+    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(userApi.updateProfile).not.toHaveBeenCalled();
+  });
+
   it('keeps an edit based on its original version until the author deliberately refreshes after a conflict', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValueOnce(
       new UserApiError('Conflict', 409, {

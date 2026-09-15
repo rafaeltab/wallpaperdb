@@ -98,7 +98,7 @@ export function ProfileBiographySettings({
           className="space-y-5"
           onSubmit={(event) => {
             event.preventDefault();
-            if (validation.valid && !refreshing && !writing) {
+          if (draft !== profile.biographyMarkdown && validation.valid && !refreshing && !writing) {
               setRefreshed(null);
               setRefreshError(null);
               mutation.mutate({ biographyMarkdown: draft, expectedVersion: edit.baseVersion });
@@ -142,7 +142,7 @@ export function ProfileBiographySettings({
               </AlertDescription>
             </Alert>
           )}
-          <Button type="submit" disabled={!validation.valid || refreshing || writing}>
+        <Button type="submit" disabled={draft === profile.biographyMarkdown || !validation.valid || refreshing || writing}>
             Save Biography
           </Button>
           <Button

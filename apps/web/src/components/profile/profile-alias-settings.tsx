@@ -55,7 +55,7 @@ export function ProfileAliasSettings({
     refreshError ??
     (mutation.error instanceof UserApiError &&
     mutation.error.type?.endsWith('/profile-version-conflict')
-      ? `Your Profile changed elsewhere. Reload before ${mutation.variables?.action === 'expire' ? 'expiring' : 'scheduling'} again.`
+      ? `Your Profile changed elsewhere. Refresh aliases before ${mutation.variables?.action === 'expire' ? 'expiring' : 'scheduling'} again.`
       : mutation.error?.message);
 
   async function refresh() {

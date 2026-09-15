@@ -194,7 +194,7 @@ describe('ProfileSettingsPage', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your Profile changed elsewhere. Reload before scheduling again.'
+      'Your Profile changed elsewhere. Refresh aliases before scheduling again.'
     );
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(initial);
     expect(
@@ -290,7 +290,7 @@ describe('ProfileSettingsPage', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your Profile changed elsewhere. Reload before expiring again.'
+      'Your Profile changed elsewhere. Refresh aliases before expiring again.'
     );
     expect(userApi.expireAlias).toHaveBeenCalledWith(
       expect.objectContaining({ expectedVersion: 1 })

@@ -1,20 +1,22 @@
 // THROWAWAY: four Profile settings layouts on /settings/profile?variant=A|B|C|D.
 // All edits stay in React state. Delete after the design decision; do not promote as-is.
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
+import { ProfileOverview, ProfileWallpapers } from '@/components/profile/public-profile-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PrototypeSwitcher } from '@/components/ui/prototype-switcher';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C' | 'D';
 const HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 function relativeAvailability(remainingMs: number) {
-  if (remainingMs < 60_000) return 'Available for change in less than a minute';
+  if (remainingMs < 60_000) return 'less than a minute';
   const [duration, unit] =
     remainingMs >= 86400000
       ? ([86400000, 'day'] as const)
@@ -22,10 +24,10 @@ function relativeAvailability(remainingMs: number) {
         ? ([3600000, 'hour'] as const)
         : ([60000, 'minute'] as const);
   const count = Math.ceil(remainingMs / duration);
-  return `Available for change in ${count} ${unit}${count === 1 ? '' : 's'}`;
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 type BiographyEdit = { draft: string; preview: boolean };
-type Editor = 'picture' | 'banner' | 'biography' | 'name' | 'aliases' | 'public' | null;
+type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
   handle: string;
   status: 'retained' | 'expiring' | 'historical';
@@ -38,7 +40,6 @@ type DraftProfile = {
   handle: string;
   biography: string;
   picture: string | null;
-  banner: string | null;
   aliases: PreviousHandle[];
   retainedLimit: number;
   nextHandleChangeAt: string | null;
@@ -50,7 +51,6 @@ function initialProfile(profile: Profile): DraftProfile {
     name: profile.displayName,
     handle: profile.handle,
     biography: profile.biographyMarkdown,
-    banner: null,
     retainedLimit: profile.retainedAliasLimit ?? 3,
     nextHandleChangeAt: nextChange > Date.now() ? new Date(nextChange).toISOString() : null,
     picture: profile.pictureAssetId
@@ -143,7 +143,7 @@ export default function ProfileSettingsPrototype({
       <Button
         variant="outline"
         size="icon"
-        className="absolute -right-2 -bottom-2 rounded-full border-4 border-card bg-background shadow-sm"
+        className="absolute -right-2 -bottom-2 rounded-full border-4 border-card bg-background text-muted-foreground shadow-sm hover:bg-background hover:text-foreground dark:hover:bg-background"
         aria-label="Edit profile picture"
         onClick={() => openEditor('picture')}
       >
@@ -160,7 +160,7 @@ export default function ProfileSettingsPrototype({
         variant="ghost"
         size="icon-sm"
         aria-label="Edit display name"
-        className="shrink-0 text-muted-foreground"
+        className="shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
         onClick={() => openEditor('name')}
       >
         <Pencil className="size-4" />
@@ -247,7 +247,7 @@ export default function ProfileSettingsPrototype({
             ref={biographyEditButton}
             variant="ghost"
             size="sm"
-            className="text-muted-foreground"
+            className="text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
             onClick={startBiographyEdit}
           >
             <Pencil className="size-3.5" />
@@ -311,9 +311,30 @@ export default function ProfileSettingsPrototype({
               tabIndex={-1}
               className="text-xs leading-5 text-muted-foreground focus:outline-none"
             >
-              <time dateTime={value.nextHandleChangeAt}>
-                {relativeAvailability(Date.parse(value.nextHandleChangeAt) - now)}
-              </time>
+              Available for change in{' '}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="cursor-help underline decoration-dotted underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring"
+                  >
+                    <time dateTime={value.nextHandleChangeAt}>
+                      {relativeAvailability(Date.parse(value.nextHandleChangeAt) - now)}
+                    </time>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={6}>
+                  {new Date(value.nextHandleChangeAt).toLocaleString(undefined, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    timeZoneName: 'long',
+                  })}
+                </TooltipContent>
+              </Tooltip>
             </span>
           )
         }
@@ -363,13 +384,7 @@ export default function ProfileSettingsPrototype({
         ) : variant === 'C' ? (
           <VariantC {...parts} />
         ) : (
-          <VariantD
-            {...parts}
-            name={inlineName}
-            handleField={inlineHandle}
-            banner={value.banner}
-            editBanner={() => openEditor('banner')}
-          />
+          <VariantD {...parts} name={inlineName} handleField={inlineHandle} />
         )}
         <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
           {notice && (
@@ -383,9 +398,6 @@ export default function ProfileSettingsPrototype({
       <PrototypeModal editor={editor} close={() => setEditor(null)} opener={opener.current}>
         {editor === 'picture' && (
           <PictureEditor value={value} update={update} cancel={() => setEditor(null)} />
-        )}
-        {editor === 'banner' && (
-          <BannerEditor value={value} update={update} cancel={() => setEditor(null)} />
         )}
         {editor === 'biography' && (
           <BiographyEditor
@@ -405,22 +417,26 @@ export default function ProfileSettingsPrototype({
           />
         )}
         {editor === 'public' && (
-          <div className="space-y-6">
-            {variant === 'D' && (
-              <div className="h-28 overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-muted">
-                {value.banner && (
-                  <img src={value.banner} alt="" className="size-full object-cover" />
-                )}
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-5">
-              <Avatar value={value} />
-              <div>
-                <h3 className="text-2xl font-semibold">{value.name}</h3>
-                <p className="text-muted-foreground">@{value.handle}</p>
-              </div>
+          <div>
+            <ProfileOverview
+              profile={{ displayName: value.name, handle: value.handle }}
+              picture={<Avatar value={value} publicPreview />}
+              biography={<BiographyMarkdown markdown={value.biography} profileId={profile.id} />}
+            />
+            <div className="mt-5 flex justify-end">
+              <Button asChild variant="outline">
+                <Link
+                  to="/profiles/id/$profileId"
+                  params={{ profileId: profile.id }}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open your profile
+                  <ArrowUpRight className="size-4" />
+                </Link>
+              </Button>
             </div>
-            <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
+            <ProfileWallpapers profileId={profile.id} />
           </div>
         )}
       </PrototypeModal>
@@ -488,7 +504,6 @@ export default function ProfileSettingsPrototype({
         state={{
           ...value,
           picture: value.picture ? 'Picture set' : 'Generated initials',
-          banner: value.banner ? 'Custom banner set' : 'Default gradient',
           handleDraft: handle,
           inlineDrafts,
           biographyEdit,
@@ -560,28 +575,10 @@ export function VariantC({ avatar, name, handleField, biography }: Parts) {
   );
 }
 
-export function VariantD({
-  avatar,
-  name,
-  handleField,
-  biography,
-  banner,
-  editBanner,
-}: Parts & { banner: string | null; editBanner: () => void }) {
+export function VariantD({ avatar, name, handleField, biography }: Parts) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
-      <div className="relative h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36">
-        {banner && <img src={banner} alt="" className="size-full object-cover" />}
-        <Button
-          variant="outline"
-          size="sm"
-          className="absolute top-4 right-4 bg-background/90 shadow-sm backdrop-blur-sm"
-          onClick={editBanner}
-        >
-          <Pencil className="size-3.5" />
-          Edit banner
-        </Button>
-      </div>
+      <div className="h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36" />
       <div className="px-5 pb-7 sm:px-9 sm:pb-9">
         <div className="relative -mt-12 mb-6 w-fit rounded-3xl border-4 border-card bg-card">
           {avatar}
@@ -633,7 +630,7 @@ function InlineProfileText({
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
   if (!editing)
     return (
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <div className="flex min-w-0 max-w-full items-center gap-2">
           {kind === 'name' ? (
             <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
@@ -648,13 +645,13 @@ function InlineProfileText({
             ref={button}
             variant="ghost"
             size="icon-sm"
-            className="shrink-0 text-muted-foreground"
+            className="shrink-0 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
             aria-label={`Edit ${label.toLowerCase()}`}
             disabled={disabled}
             aria-describedby={disabled ? disabledHintId : undefined}
             onClick={() => onDraft(value)}
           >
-            <Pencil className="size-4" />
+            <Pencil className="size-5 sm:size-6" strokeWidth={1.5} />
           </Button>
         </div>
         {disabledNotice}
@@ -732,10 +729,18 @@ function InlineProfileText({
   );
 }
 
-function Avatar({ value, large = false }: { value: DraftProfile; large?: boolean }) {
+function Avatar({
+  value,
+  large = false,
+  publicPreview = false,
+}: {
+  value: DraftProfile;
+  large?: boolean;
+  publicPreview?: boolean;
+}) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 font-semibold text-primary ${large ? 'size-36 text-4xl' : 'size-24 text-3xl'}`}
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 font-semibold text-primary ${publicPreview ? 'size-24 border-4 border-card text-2xl shadow-sm sm:size-28 sm:text-3xl' : large ? 'size-36 text-4xl' : 'size-24 text-3xl'}`}
     >
       {value.picture ? (
         <img className="size-full object-cover" src={value.picture} alt={value.name} />
@@ -767,7 +772,6 @@ function PrototypeModal({
 }) {
   const titles = {
     picture: 'Profile picture',
-    banner: 'Profile banner',
     biography: 'Edit biography',
     name: 'Display name',
     aliases: 'Previous handles',
@@ -775,7 +779,6 @@ function PrototypeModal({
   };
   const descriptions = {
     picture: 'Choose the picture people see on your profile and contributions.',
-    banner: 'Give your profile a backdrop that feels like you.',
     biography: 'Tell people a little about yourself and your collection.',
     name: 'The name people see alongside your contributions.',
     aliases: 'Previous handles help people find you after a change.',
@@ -791,7 +794,7 @@ function PrototypeModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
-          className="fixed top-1/2 left-1/2 z-50 max-h-[88dvh] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7"
+          className={`fixed top-1/2 left-1/2 z-50 max-h-[88dvh] w-[calc(100%-2rem)] ${editor === 'public' ? 'max-w-5xl' : 'max-w-xl'} -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7`}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             opener?.focus();
@@ -825,67 +828,6 @@ type EditorProps = {
   update: (patch: Partial<DraftProfile>, message: string) => void;
   cancel: () => void;
 };
-function BannerEditor({ value, update, cancel }: EditorProps) {
-  const [banner, setBanner] = useState(value.banner);
-  const [filename, setFilename] = useState('');
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <div className="space-y-5">
-      <div className="aspect-[3/1] overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:aspect-[5/1]">
-        {banner && <img src={banner} alt="Banner preview" className="size-full object-cover" />}
-      </div>
-      <input
-        ref={input}
-        id="prototype-banner-file"
-        className="sr-only"
-        tabIndex={-1}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        aria-label="Choose banner file"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = () => {
-            setBanner(String(reader.result));
-            setFilename(file.name);
-          };
-          reader.readAsDataURL(file);
-        }}
-      />
-      <Button variant="outline" className="w-full" onClick={() => input.current?.click()}>
-        <Upload className="size-4" />
-        {filename ? 'Choose another banner' : 'Choose banner'}
-      </Button>
-      {filename && <p className="break-all text-sm text-muted-foreground">{filename}</p>}
-      <p className="text-xs leading-5 text-muted-foreground">
-        JPEG, PNG or WebP. Wide images work best; your banner is cropped to fill the available
-        space.
-      </p>
-      <div className="flex gap-2">
-        <Button
-          className="min-w-0 flex-1"
-          disabled={!filename}
-          onClick={() => update({ banner }, 'Profile banner updated')}
-        >
-          Save banner
-        </Button>
-        <Button
-          variant="outline"
-          className="min-w-0 flex-1"
-          disabled={!value.banner}
-          onClick={() => update({ banner: null }, 'Default banner restored')}
-        >
-          Remove banner
-        </Button>
-      </div>
-      <Button variant="ghost" className="w-full" onClick={cancel}>
-        Cancel
-      </Button>
-    </div>
-  );
-}
-
 function PictureEditor({ value, update, cancel }: EditorProps) {
   const [picture, setPicture] = useState(value.picture);
   const [filename, setFilename] = useState('');

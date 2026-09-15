@@ -1,8 +1,7 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import { Link } from '@tanstack/react-router';
-import { LogOut, LogIn, UserIcon } from 'lucide-react';
+import { LogIn, LogOut, UserIcon } from 'lucide-react';
 import { ProfilePicture } from '@/components/profile/profile-picture';
-import { useOwnerProfile } from '@/hooks/use-owner-profile';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useOwnerProfile } from '@/hooks/use-owner-profile';
 
 function buildUrl(path: string): string {
   const basePath = import.meta.env.VITE_BASE_PATH || '';
@@ -59,13 +59,20 @@ export function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 min-w-48">
         <DropdownMenuItem asChild className="whitespace-nowrap" disabled={!userId}>
-          <Link to="/profiles/id/$profileId" params={{ profileId: userId ?? '' }} aria-label="Your profile">
+          <Link
+            to="/profiles/id/$profileId"
+            params={{ profileId: userId ?? '' }}
+            aria-label="Your profile"
+          >
             <UserIcon className="h-4 w-4" />
             Your profile
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="whitespace-nowrap" onClick={() => void signOut({ redirectUrl: buildUrl('/') })}>
+        <DropdownMenuItem
+          className="whitespace-nowrap"
+          onClick={() => void signOut({ redirectUrl: buildUrl('/') })}
+        >
           <LogOut className="h-4 w-4" />
           Sign out
         </DropdownMenuItem>

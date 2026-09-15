@@ -17,6 +17,7 @@ vi.mock('@/lib/api/user', async (importOriginal) => {
       updateProfile: vi.fn(),
       updateHandle: vi.fn(),
       scheduleAliasRemoval: vi.fn(),
+      expireAlias: vi.fn(),
     },
   };
 });
@@ -70,6 +71,7 @@ describe('ProfileSettingsPage', () => {
     vi.mocked(userApi.updateProfile).mockReset();
     vi.mocked(userApi.updateHandle).mockReset();
     vi.mocked(userApi.scheduleAliasRemoval).mockReset();
+    vi.mocked(userApi.expireAlias).mockReset();
   });
 
   it('shows the current Display name and immediately adopts the REST response', async () => {
@@ -165,7 +167,9 @@ describe('ProfileSettingsPage', () => {
     expect(
       within(expiring).getByText(new Date(expiresAt).toLocaleString()).closest('time')
     ).toHaveAttribute('dateTime', expiresAt);
-    expect(within(expiring).queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      within(expiring).queryByRole('button', { name: /schedule removal/i })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('0 of 3 retained aliases')).toBeInTheDocument();
   });
 
@@ -197,6 +201,64 @@ describe('ProfileSettingsPage', () => {
       within(screen.getByRole('list', { name: /retained aliases/i })).getByText('@old-handle')
     ).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('confirms immediate expiry before removing an expiring alias from authoritative owner state', async () => {
+    const retained = {
+      handle: 'retained-name',
+      claimGeneration: 1,
+      createdAt: profile.createdAt,
+      expiresAt: null,
+    };
+    const initial = {
+      ...profile,
+      aliases: [
+        retained,
+        {
+          handle: 'old-handle',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2099-09-16T12:00:00.000Z',
+        },
+      ],
+    };
+    const updated = { ...initial, version: 2, aliases: [retained] };
+    vi.mocked(userApi.expireAlias).mockResolvedValue(updated);
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+
+    expect(
+      within(screen.getByRole('list', { name: 'Retained aliases' })).queryByRole('button', {
+        name: /expire/i,
+      })
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('@old-handle');
+    expect(dialog).toHaveTextContent('stop redirecting immediately');
+    expect(dialog).toHaveTextContent('available for another User to claim');
+    expect(userApi.expireAlias).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(userApi.expireAlias).not.toHaveBeenCalled();
+    expect(screen.getByText('@old-handle')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' })
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      '@old-handle has expired and no longer redirects to your Profile.'
+    );
+    expect(userApi.expireAlias).toHaveBeenCalledWith({
+      handle: 'old-handle',
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(screen.queryByRole('list', { name: 'Expiring aliases' })).not.toBeInTheDocument();
+    expect(screen.getByText('@retained-name')).toBeInTheDocument();
   });
 
   it('retains unsaved input and explains a stale edit', async () => {

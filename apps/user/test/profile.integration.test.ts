@@ -387,6 +387,28 @@ describe('Profile commands', () => {
     expect(await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`).toHaveLength(1);
   });
 
+  it('requires authentication and valid versioned commands to reactivate aliases', async () => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const url = `/profile/me/aliases/${original.handle}`;
+    expect((await app.inject({ method: 'PUT', url, payload: { expectedVersion: scheduled.version } })).statusCode).toBe(401);
+    const token = Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64');
+    for (const payload of [{}, { expectedVersion: '3' }, { expectedVersion: 0 }, { expectedVersion: -1 }, { expectedVersion: 1.5 }]) {
+      const response = await app.inject({ method: 'PUT', url, headers: { authorization: `Bearer ${token}` }, payload });
+      expect(response.statusCode).toBe(400);
+      expect(response.json().type).toContain('invalid-alias-command');
+    }
+    const currentHandle = await reactivateAlias('user_1', changed.handle.toUpperCase(), scheduled.version);
+    expect(currentHandle.statusCode).toBe(400);
+    expect(currentHandle.json().type).toContain('invalid-alias-command');
+    const stale = await reactivateAlias('user_1', original.handle, changed.version);
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json().type).toContain('profile-version-conflict');
+    expect((await request('user_1')).json()).toEqual(scheduled);
+    expect(await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`).toHaveLength(0);
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

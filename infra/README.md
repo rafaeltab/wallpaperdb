@@ -77,6 +77,10 @@ Example initialization scripts are provided in:
 
 SeaweedFS `mini` creates `wallpapers` and `example-bucket` automatically from `S3_BUCKET`. The pinned image is `chrislusf/seaweedfs:4.47`; no separate bucket initializer or separate storage client is required.
 
+Profile pictures use the separate `profile-pictures` bucket, with anonymous access explicitly disabled. Keep this bucket private: User writes pictures and Media delivers them only after checking current public availability with User. The existing public wallpaper buckets must not hold Profile pictures. If `PROFILE_PICTURE_BUCKET` is customized, provision that bucket with the same private policy.
+
+Worktree setup generates a persistent `USER_MEDIA_SERVICE_TOKEN` and supplies it to User and Media. Docker Media uses `USER_SERVICE_URL=http://user:3009`. For host-based development, configure the same token in both services and point Media at the host User URL. A missing or mismatched token makes picture delivery unavailable. The token is never included in web configuration.
+
 ## Observability with LGTM
 
 The Grafana LGTM stack provides a complete observability solution:

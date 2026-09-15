@@ -71,4 +71,28 @@ describe('Profile event evidence retention', () => {
     expect(await sql`select * from handle_claims order by handle`).toEqual(claims);
     expect(await profiles.ensure(original.id)).toMatchObject({ handle: current.handle, version: current.version, aliases: current.aliases });
   });
+
+  it('continues beyond a failed deletion and the first batch then retries the retained event', async () => {
+    const original = await profiles.ensure('user_evidence');
+    const [event] = await sql`select * from outbox_events`;
+    await sql`delete from outbox_events`;
+    for (let i = 0; i < 102; i++) {
+      await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at, published_at)
+        values (${`evt_${i.toString().padStart(3, '0')}`}, ${event.subject}, ${original.id}, ${sql.json(event.payload)}, '2030-01-01', '2030-01-01')`;
+    }
+    await sql.unsafe(`create function reject_evidence_delete() returns trigger language plpgsql as $$ begin if OLD.id = 'evt_000' then raise exception 'evidence delete rejected'; end if; return OLD; end $$`);
+    await sql.unsafe('create trigger reject_evidence_delete before delete on outbox_events for each row execute function reject_evidence_delete()');
+    const cleanup = new ProfileEventRetentionService(database, config, logger);
+    try {
+      expect(await cleanup.cleanupExpired(new Date('2030-01-31T00:00:00.000Z'))).toEqual({ deleted: 99, failed: 1 });
+      expect(await cleanup.cleanupExpired(new Date('2030-01-31T00:00:00.000Z'))).toEqual({ deleted: 2, failed: 0 });
+      expect(await sql`select id from outbox_events`).toEqual([{ id: 'evt_000' }]);
+      expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ eventId: 'evt_000' }), expect.stringContaining('retry'));
+      await sql.unsafe('drop trigger reject_evidence_delete on outbox_events');
+      expect(await cleanup.cleanupExpired(new Date('2030-01-31T00:00:00.000Z'))).toEqual({ deleted: 1, failed: 0 });
+    } finally {
+      await sql.unsafe('drop trigger if exists reject_evidence_delete on outbox_events');
+      await sql.unsafe('drop function reject_evidence_delete()');
+    }
+  });
 });

@@ -67,7 +67,9 @@ describe('Biography settings', () => {
     expect(within(preview).getByText('Wallpaper collector').tagName).toBe('STRONG');
     await user.clear(editor);
     await user.type(editor, '<script>alert(1)</script>');
-    expect(within(preview).getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();
+    expect(
+      within(preview).getByText('This Biography cannot be displayed safely.')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
   });

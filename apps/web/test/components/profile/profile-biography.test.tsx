@@ -8,25 +8,78 @@ import { request } from '@/lib/graphql/client';
 import type { Wallpaper } from '@/lib/graphql/types';
 
 vi.mock('@/lib/graphql/client', () => ({ request: vi.fn() }));
-vi.mock('@tanstack/react-router', () => ({ Link: ({ children, params }: { children: React.ReactNode; params: { wallpaperId: string } }) => <a href={`/wallpapers/${params.wallpaperId}`}>{children}</a> }));
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, params }: { children: React.ReactNode; params: { wallpaperId: string } }) => (
+    <a href={`/wallpapers/${params.wallpaperId}`}>{children}</a>
+  ),
+}));
 
 const profileId = 'user_123';
 
 describe('Biography Markdown', () => {
-  it.each(['missing', 'foreign', 'mismatched'] as const)('withholds an embed when public Wallpaper data is %s', async (state) => {
+  it.each([
+    'missing',
+    'foreign',
+    'mismatched',
+  ] as const)('withholds an embed when public Wallpaper data is %s', async (state) => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wallpaper: Wallpaper = { wallpaperId: state === 'mismatched' ? 'different_wallpaper' : 'wlpr_own', profileId: state === 'foreign' ? 'another_user' : profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/foreign.webp' }] };
-    vi.mocked(request).mockResolvedValueOnce({ getWallpaper: state === 'missing' ? null : wallpaper });
-    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    const wallpaper: Wallpaper = {
+      wallpaperId: state === 'mismatched' ? 'different_wallpaper' : 'wlpr_own',
+      profileId: state === 'foreign' ? 'another_user' : profileId,
+      uploadedAt: '',
+      updatedAt: '',
+      variants: [
+        {
+          width: 800,
+          height: 600,
+          aspectRatio: 4 / 3,
+          format: 'image/webp',
+          fileSizeBytes: 100,
+          createdAt: '',
+          url: '/media/foreign.webp',
+        },
+      ],
+    };
+    vi.mocked(request).mockResolvedValueOnce({
+      getWallpaper: state === 'missing' ? null : wallpaper,
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" />
+      </QueryClientProvider>
+    );
     expect(await screen.findByText('Wallpaper unavailable.')).toBeInTheDocument();
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('renders a published own-Wallpaper shorthand through the shared plugin and verified Wallpaper data', async () => {
-    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/wallpapers/wlpr_own.webp' }] };
+    const wallpaper: Wallpaper = {
+      wallpaperId: 'wlpr_own',
+      profileId,
+      uploadedAt: '',
+      updatedAt: '',
+      variants: [
+        {
+          width: 800,
+          height: 600,
+          aspectRatio: 4 / 3,
+          format: 'image/webp',
+          fileSizeBytes: 100,
+          createdAt: '',
+          url: '/media/wallpapers/wlpr_own.webp',
+        },
+      ],
+    };
     vi.mocked(request).mockResolvedValueOnce({ getWallpaper: wallpaper });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const { container } = render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="My favorite: ![Forest at dawn](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <BiographyMarkdown
+          profileId={profileId}
+          markdown="My favorite: ![Forest at dawn](wallpaper:wlpr_own)"
+        />
+      </QueryClientProvider>
+    );
     const picture = await screen.findByRole('img', { name: 'Forest at dawn' });
     expect(picture).toHaveAttribute('src', '/media/wallpapers/wlpr_own.webp');
     expect(picture.closest('a')).toHaveAttribute('href', '/wallpapers/wlpr_own');
@@ -36,7 +89,12 @@ describe('Biography Markdown', () => {
 
   it('shows the normalized external destination and requires a keyboard-accessible warning before navigation', async () => {
     const user = userEvent.setup();
-    const { container } = render(<BiographyMarkdown profileId={profileId} markdown="[My website](https://EXAMPLE.com:443/path?q=one#about)" />);
+    const { container } = render(
+      <BiographyMarkdown
+        profileId={profileId}
+        markdown="[My website](https://EXAMPLE.com:443/path?q=one#about)"
+      />
+    );
     expect(container.querySelector('a[href^="https:"]')).toBeNull();
     const trigger = screen.getByRole('button', { name: /my website.*example.com/i });
     await user.tab();
@@ -56,7 +114,15 @@ describe('Biography Markdown', () => {
 
   it('fails closed for malicious Markdown that the shared authoring policy rejects', () => {
     const { rerender, container } = render(<BiographyMarkdown profileId={profileId} markdown="" />);
-    for (const markdown of ['<img src=x onerror=alert(1)>', '[click](javascript:alert(1))', '[click](https://user:password@example.com)', '![photo](https://images.example/picture.png)', '![photo](data:image/png;base64,AAAA)', '[download](ftp://files.example/a)']) {
+    for (const markdown of [
+      '<img src=x onerror=alert(1)>',
+      '[click](javascript:alert(1))',
+      '[click](https://user:password@example.com)',
+      '![photo](https://images.example/picture.png)',
+      '![photo](data:image/png;base64,AAAA)',
+      '[download](ftp://files.example/a)',
+      '[![Forest](wallpaper:wlpr_own)](https://example.com)',
+    ]) {
       expect(validateProfileMarkdown(markdown).valid).toBe(false);
       rerender(<BiographyMarkdown profileId={profileId} markdown={markdown} />);
       expect(screen.getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();
@@ -65,7 +131,14 @@ describe('Biography Markdown', () => {
   });
 
   it('renders the allowed Markdown and GFM subset into semantic React elements', () => {
-    render(<BiographyMarkdown profileId={profileId} markdown={'# About me\n\n**Wallpaper collector** and ~~retired gamer~~.\n\n- Nature\n- Space\n\n> Made with care\n\n```text\nconst greeting = "hello";\n```\n\n| Genre | Count |\n| --- | --- |\n| Nature | 12 |'} />);
+    render(
+      <BiographyMarkdown
+        profileId={profileId}
+        markdown={
+          '# About me\n\n**Wallpaper collector** and ~~retired gamer~~.\n\n- Nature\n- Space\n\n> Made with care\n\n```text\nconst greeting = "hello";\n```\n\n| Genre | Count |\n| --- | --- |\n| Nature | 12 |'
+        }
+      />
+    );
     expect(screen.getByRole('heading', { name: 'About me' })).toBeInTheDocument();
     expect(screen.getByText('Wallpaper collector').tagName).toBe('STRONG');
     expect(screen.getByText('retired gamer').tagName).toBe('DEL');

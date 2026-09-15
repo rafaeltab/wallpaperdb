@@ -44,18 +44,43 @@ describe('PublicProfilePage', () => {
   });
 
   it('renders authoritative owner Biography Markdown immediately and accepts a newer public projection', () => {
-    const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: '**Projected Biography**', picture: null, canonicalPath: '/profiles/@ada', version: 1 };
-    const owner = { ...profile, biographyMarkdown: '**Owner Biography**', pictureAssetId: null, version: 2 };
+    const profile = {
+      id: 'user_ada',
+      handle: 'ada',
+      displayName: 'Ada Lovelace',
+      biographyMarkdown: '**Projected Biography**',
+      picture: null,
+      canonicalPath: '/profiles/@ada',
+      version: 1,
+    };
+    const owner = {
+      ...profile,
+      biographyMarkdown: '**Owner Biography**',
+      pictureAssetId: null,
+      version: 2,
+    };
     const client = new QueryClient();
     client.setQueryData(profileQueryKey(profile.id), owner);
-    const view = (version: number) => <QueryClientProvider client={client}><PublicProfilePage profile={{ ...profile, version }} /></QueryClientProvider>;
+    const view = (version: number) => (
+      <QueryClientProvider client={client}>
+        <PublicProfilePage profile={{ ...profile, version }} />
+      </QueryClientProvider>
+    );
     const rendered = render(view(1));
     expect(screen.getByText('Owner Biography').tagName).toBe('STRONG');
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...owner, biographyMarkdown: '**Saved Biography**', version: 3 }));
+    act(() =>
+      client.setQueryData(profileQueryKey(profile.id), {
+        ...owner,
+        biographyMarkdown: '**Saved Biography**',
+        version: 3,
+      })
+    );
     expect(screen.getByText('Saved Biography').tagName).toBe('STRONG');
     rendered.rerender(view(4));
     expect(screen.getByText('Projected Biography').tagName).toBe('STRONG');
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...owner, id: 'another_user', version: 5 }));
+    act(() =>
+      client.setQueryData(profileQueryKey(profile.id), { ...owner, id: 'another_user', version: 5 })
+    );
     expect(screen.queryByText('Owner Biography')).not.toBeInTheDocument();
   });
 
@@ -82,7 +107,7 @@ describe('PublicProfilePage', () => {
     rerender(<PublicProfilePage profile={profile} />);
     expect(screen.getByRole('img', { name: "Ada Lovelace's profile picture" })).toHaveAttribute(
       'style',
-      fallbackStyle,
+      fallbackStyle
     );
   });
 
@@ -97,12 +122,12 @@ describe('PublicProfilePage', () => {
           picture: { id: 'picture_1', url: 'https://media.example/profile-picture.webp' },
           canonicalPath: '/profiles/@grace-hopper',
         }}
-      />,
+      />
     );
 
     expect(screen.getByRole('img', { name: "Grace Hopper's profile picture" })).toHaveAttribute(
       'src',
-      'https://media.example/profile-picture.webp',
+      'https://media.example/profile-picture.webp'
     );
     expect(screen.getByText('Compiler pioneer')).toBeInTheDocument();
   });
@@ -133,7 +158,7 @@ describe('PublicProfilePage', () => {
           picture: null,
           canonicalPath: '/profiles/@grace-hopper',
         }}
-      />,
+      />
     );
 
     expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
@@ -212,7 +237,7 @@ describe('PublicProfilePage', () => {
           picture: null,
           canonicalPath: '/profiles/@loaded',
         }}
-      />,
+      />
     );
 
     expect(screen.getByText('wlpr_loaded')).toBeInTheDocument();

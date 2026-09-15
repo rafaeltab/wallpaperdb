@@ -33,7 +33,9 @@ export function PublicProfilePage({ profile }: PublicProfilePageProps) {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Biography
             </h2>
-            <div className="mt-3 min-w-0 max-w-3xl"><ProfileBiography profile={profile} /></div>
+            <div className="mt-3 min-w-0 max-w-3xl">
+              <ProfileBiography profile={profile} />
+            </div>
           </div>
         </div>
       </section>

@@ -155,27 +155,36 @@ export function ProfileBiographySettings({
             </Alert>
           )}
           <div className="flex flex-wrap gap-2">
-          <Button
-            type="submit"
-            disabled={
-              draft === profile.biographyMarkdown || !validation.valid || refreshing || writing
-            }
-          >
-            Save Biography
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={refreshing || writing}
-            onClick={() => void refresh()}
-          >
-            Refresh Biography
-          </Button>
+            <Button
+              type="submit"
+              disabled={
+                draft === profile.biographyMarkdown || !validation.valid || refreshing || writing
+              }
+            >
+              Save Biography
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={refreshing || writing}
+              onClick={() => void refresh()}
+            >
+              Refresh Biography
+            </Button>
           </div>
         </form>
         <section aria-labelledby="biography-preview-title" className="mt-6 min-w-0 border-t pt-5">
-          <h3 id="biography-preview-title" className="mb-3 text-sm font-semibold text-muted-foreground">Biography preview</h3>
-          <BiographyMarkdown markdown={draft} profileId={profile.id} maxCharacters={maxCharacters} />
+          <h3
+            id="biography-preview-title"
+            className="mb-3 text-sm font-semibold text-muted-foreground"
+          >
+            Biography preview
+          </h3>
+          <BiographyMarkdown
+            markdown={draft}
+            profileId={profile.id}
+            maxCharacters={maxCharacters}
+          />
         </section>
       </CardContent>
     </Card>

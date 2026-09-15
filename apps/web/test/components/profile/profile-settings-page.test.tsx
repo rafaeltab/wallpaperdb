@@ -311,7 +311,7 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByRole('button', { name: 'Keep alias @expiring-name' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Reactivate @released-name' })).toBeDisabled();
     expect(
-      screen.getAllByText('This Handle is no longer in your 30-day history. Refresh aliases.')
+      screen.getAllByText('This Handle is no longer in your recent history. Refresh aliases.')
     ).toHaveLength(2);
     expect(userApi.reactivateAlias).not.toHaveBeenCalled();
   });

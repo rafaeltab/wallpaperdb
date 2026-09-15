@@ -3,7 +3,7 @@ import type { HistoricalHandle, Profile } from '@/lib/api/user';
 
 export function historicalHandleUnavailableMessage(history: HistoricalHandle): string | null {
   if (Date.parse(history.eligibleUntil) <= Date.now()) {
-    return 'This Handle is no longer in your 30-day history. Refresh aliases.';
+    return 'This Handle is no longer in your recent history. Refresh aliases.';
   }
   if (history.unavailableReason === 'claimed') return 'Another Profile has claimed this Handle.';
   if (history.unavailableReason === 'alias-limit') {
@@ -31,7 +31,7 @@ export function ProfileHistoricalHandles({
         Historical Handles
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Reactivate a Handle from your last 30 days of history as a retained alias.
+        Reactivate a recent Handle as a retained alias.
       </p>
       {history.length ? (
         <ul aria-labelledby="historical-handles-heading" className="mt-3 divide-y">

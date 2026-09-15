@@ -20,7 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "composite": true,
     "allowImportingTsExtensions": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "erasableSyntaxOnly": true
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules"]

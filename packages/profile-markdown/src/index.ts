@@ -178,8 +178,11 @@ export function normalizeProfileLink(target: string): ProfileLinkDestination | n
 }
 
 export class ProfileMarkdownError extends Error {
-  constructor(readonly issues: ProfileMarkdownIssue[]) {
+  readonly issues: ProfileMarkdownIssue[];
+
+  constructor(issues: ProfileMarkdownIssue[]) {
     super(issues.map((issue) => issue.message).join(" "));
+    this.issues = issues;
     this.name = "ProfileMarkdownError";
   }
 }

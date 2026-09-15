@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
@@ -359,6 +359,28 @@ describe('ProfileSettingsPage', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Handle unchanged.');
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(userApi.updateHandle).toHaveBeenCalledOnce();
+  });
+
+  it('confirms the version shown in the capacity warning even if Profile state changes while it is open', async () => {
+    const initial = { ...profile, retainedAliasLimit: 0, aliases: [] };
+    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError('Profile changed.', 409, {
+      type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+    }));
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.clear(input);
+    await user.type(input, 'new-handle');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+
+    await act(async () => {
+      queryClient.setQueryData(profileQueryKey(profile.id), { ...initial, version: 2 });
+    });
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile changed elsewhere.');
+    expect(userApi.updateHandle).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    expect(input).toHaveValue('new-handle');
   });
 
   it('validates the 80-character limit before sending', async () => {

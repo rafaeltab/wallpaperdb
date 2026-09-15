@@ -324,7 +324,12 @@ export default function ProfileSettingsPrototype({
                     </time>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
+                <TooltipContent
+                  side="bottom"
+                  sideOffset={6}
+                  collisionPadding={16}
+                  className="max-w-[calc(100vw-2rem)] sm:max-w-xs"
+                >
                   {new Date(value.nextHandleChangeAt).toLocaleString(undefined, {
                     weekday: 'long',
                     year: 'numeric',

@@ -78,8 +78,14 @@ export function ProfilePictureSettings({
         ? userApi.uploadPicture({ ...options, picture: command.picture })
         : userApi.removePicture(options);
     },
-    onSuccess: (updated, command) => {
-      if (queryClient.getQueryState(profileQueryKey(profile.id)))
+    onMutate: () =>
+      queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }),
+    onSuccess: (updated, command, ownerQuery) => {
+      if (
+        ownerQuery &&
+        queryClient.getQueryCache().find({ queryKey: profileQueryKey(profile.id), exact: true }) ===
+          ownerQuery
+      )
         queryClient.setQueryData(profileQueryKey(profile.id), updated);
       if (!mounted.current) return;
       setSelected(null);

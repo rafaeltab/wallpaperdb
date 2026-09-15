@@ -99,6 +99,22 @@ describe('Profile picture settings', () => {
     expect(toast.success).toHaveBeenLastCalledWith('Profile picture saved');
   });
 
+  it('does not overwrite a recreated owner cache with a picture response from an earlier session', async () => {
+    let finish: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.uploadPicture).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const { client, unmount } = await renderPage();
+    const user = userEvent.setup();
+    await user.upload(screen.getByLabelText('Choose picture'), new File(['png'], 'portrait.png', { type: 'image/png' }));
+    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    unmount();
+    client.removeQueries({ queryKey: profileQueryKey(profile.id) });
+    const newSession = { ...profile, version: 5 };
+    client.setQueryData(profileQueryKey(profile.id), newSession);
+    await act(async () => finish?.({ ...profile, version: 2, pictureAssetId: 'late-picture' }));
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(newSession);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it('keeps owner refreshes from racing a picture write and reports a failed refresh', async () => {
     let finishUpload: ((value: Profile) => void) | undefined;
     vi.mocked(userApi.uploadPicture).mockImplementation(

@@ -182,6 +182,24 @@ describe('Profile commands', () => {
     await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
 
+  it('clears Biography with version checks while preserving aliases and treating identical drafts as no-ops', async () => {
+    const initial = (await request('user_1')).json();
+    const original = (await changeHandle('user_1', 'biography-writer', initial.version)).json();
+    const headers = { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: original.id })).toString('base64')}` };
+    const save = (biographyMarkdown: string, expectedVersion: number) => app.inject({ method: 'PATCH', url: '/profile/me', headers, payload: { biographyMarkdown, expectedVersion } });
+    const edited = (await save('Original **Biography**', original.version)).json();
+    expect((await save(edited.biographyMarkdown, edited.version)).json()).toEqual(edited);
+    expect((await save(edited.biographyMarkdown, original.version)).statusCode).toBe(409);
+    const clearedResponse = await save('', edited.version);
+    expect(clearedResponse.statusCode).toBe(200);
+    const cleared = clearedResponse.json();
+    expect(cleared).toMatchObject({ biographyMarkdown: '', version: edited.version + 1, aliases: original.aliases });
+    expect((await save('', cleared.version)).json()).toEqual(cleared);
+    const events = await sql`select payload from outbox_events where payload->'change'->>'type' = 'biography-changed' order by created_at`;
+    expect(events).toHaveLength(2);
+    expect(events[1].payload).toMatchObject({ change: { type: 'biography-changed', before: edited.biographyMarkdown, after: '' }, profile: { biographyMarkdown: '', version: cleared.version, aliases: original.aliases } });
+  });
+
   it.each([
     '<script>alert(1)</script>',
     '[Unsafe](javascript:alert%281%29)',

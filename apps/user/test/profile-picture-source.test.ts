@@ -120,4 +120,15 @@ describe('Initial Profile picture download', () => {
       else expect(failure).not.toBeInstanceOf(PermanentPictureImportError);
     }
   });
+
+  it('keeps external failure details containing the private captured source out of retry errors', async () => {
+    const source = 'https://img.clerk.com/private-picture?token=secret';
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValue(new Error(`Cannot download ${source}`));
+    const failure = await downloadInitialPicture(source, options, fetcher).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure).not.toBeInstanceOf(PermanentPictureImportError);
+    expect(String(failure)).not.toContain(source);
+    expect(String(failure)).not.toContain('secret');
+    expect(failure).not.toHaveProperty('cause');
+  });
 });

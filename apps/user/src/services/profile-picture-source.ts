@@ -38,6 +38,10 @@ export async function downloadInitialPicture(
   });
   try {
     return await Promise.race([readSource(source, options, fetcher, controller.signal), deadline]);
+  } catch (error) {
+    if (error instanceof PermanentPictureImportError) throw error;
+    // Transport errors may contain the private captured URL, including its query string.
+    throw new Error('Initial picture download is temporarily unavailable');
   } finally {
     clearTimeout(timer);
   }

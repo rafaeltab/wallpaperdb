@@ -256,4 +256,22 @@ describe('Private Profile picture retention', () => {
     expect(await profiles.ensure(owner.id)).toEqual(current);
     expect(await sql`select id from profile_picture_assets`).toEqual([{ id: current.pictureAssetId }]);
   });
+
+  it('retries the retained cleanup record after S3 succeeds but its database deletion rolls back', async () => {
+    const owner = await profiles.ensure('user_picture');
+    const assetId = await ingestion.stage(owner.id, picture);
+    const [asset] = await sql`select expires_at from profile_picture_assets where id = ${assetId}`;
+    await sql.unsafe(`create function reject_picture_cleanup() returns trigger language plpgsql as $$ begin raise exception 'picture cleanup rejected'; end $$`);
+    await sql.unsafe('create trigger reject_picture_cleanup before delete on profile_picture_assets for each row execute function reject_picture_cleanup()');
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 1 });
+      await expect(object(assetId)).rejects.toMatchObject({ name: 'NoSuchKey' });
+      expect(await sql`select id from profile_picture_assets`).toEqual([{ id: assetId }]);
+    } finally {
+      await sql.unsafe('drop trigger reject_picture_cleanup on profile_picture_assets');
+      await sql.unsafe('drop function reject_picture_cleanup()');
+    }
+    expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+    expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
+  });
 });

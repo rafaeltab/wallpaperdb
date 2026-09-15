@@ -18,25 +18,24 @@ export function UploadQueueToastManager() {
     resumeQueue,
   } = useUploadQueue();
   const router = useRouter();
-  const toastId = useId();
+  const toastPrefix = useId();
+  const toastGeneration = useRef(0);
+  const toastId = useRef<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFiles = state.files.length > 0;
   const isUploading = counts.uploading > 0 || counts.pending > 0;
-  const isComplete = hasFiles && !isUploading && !state.isPaused;
+  const isComplete = hasFiles && !isUploading && !state.isPaused && !state.isStopped;
   const hasFailuresOrDuplicates = counts.failed > 0 || counts.duplicate > 0;
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false);
-    // Clear completed files after animation
-    setTimeout(() => {
-      clearCompleted();
-      // If all files were completed, also cancel to reset state fully
-      if (!state.files.some((f) => f.status === 'failed' || f.status === 'pending')) {
-        cancelAll();
-      }
-    }, 300);
+    // Sonner owns the exit animation. Clear now so a later upload cannot be cancelled.
+    clearCompleted();
+    if (!state.files.some((f) => f.status !== 'success' && f.status !== 'duplicate')) {
+      cancelAll();
+    }
   }, [clearCompleted, cancelAll, state.files]);
 
   // Show toast when files are added
@@ -45,6 +44,12 @@ export function UploadQueueToastManager() {
       setIsVisible(true);
     }
   }, [hasFiles]);
+
+  useEffect(() => {
+    if (isUploading) {
+      setIsVisible(true);
+    }
+  }, [isUploading]);
 
   // Auto-dismiss when complete and no failures/duplicates
   useEffect(() => {
@@ -68,10 +73,15 @@ export function UploadQueueToastManager() {
 
   useEffect(() => {
     if (!isVisible || !hasFiles) {
-      toast.dismiss(toastId);
+      if (toastId.current !== null) {
+        toast.dismiss(toastId.current);
+        toastId.current = null;
+      }
       return;
     }
 
+    // A new batch gets a new identity even while the previous toast is exiting.
+    toastId.current ??= `${toastPrefix}-${toastGeneration.current++}`;
     toast.custom(
       () => (
         <UploadQueueToast
@@ -88,12 +98,17 @@ export function UploadQueueToastManager() {
           onNavigateToUpload={() => router.navigate({ to: '/upload' })}
         />
       ),
-      { id: toastId, duration: Infinity, dismissible: false, className: 'w-full' }
+      {
+        id: toastId.current,
+        duration: Infinity,
+        dismissible: false,
+        className: 'w-full',
+      }
     );
   }, [
     isVisible,
     hasFiles,
-    toastId,
+    toastPrefix,
     state.files,
     state.isPaused,
     state.isStopped,
@@ -109,9 +124,12 @@ export function UploadQueueToastManager() {
 
   useEffect(
     () => () => {
-      toast.dismiss(toastId);
+      if (toastId.current !== null) {
+        toast.dismiss(toastId.current);
+        toastId.current = null;
+      }
     },
-    [toastId]
+    []
   );
 
   return null;

@@ -6,6 +6,16 @@ import { useEffect, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui/field';
@@ -198,6 +208,11 @@ function HandleSettings({
   const [saved, setSaved] = useState<'changed' | 'unchanged' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [serverNextHandleChangeAt, setNextHandleChangeAt] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    handle: string;
+    expectedVersion: number;
+    aliases: string[];
+  } | null>(null);
   const nextChangeTime = serverNextHandleChangeAt
     ? Date.parse(serverNextHandleChangeAt)
     : profile.lastHandleChangedAt
@@ -206,10 +221,9 @@ function HandleSettings({
   const nextHandleChangeAt =
     nextChangeTime > Date.now() ? new Date(nextChangeTime).toISOString() : null;
   const mutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (command: { handle: string; expectedVersion: number }) =>
       userApi.updateHandle({
-        handle,
-        expectedVersion: profile.version,
+        ...command,
         expectedProfileId: profile.id,
         tokenProvider,
       }),
@@ -250,7 +264,10 @@ function HandleSettings({
             event.preventDefault();
             setSaved(null);
             setError(null);
-            mutation.mutate();
+            const aliases = aliasesToSchedule(profile, handle);
+            const command = { handle, expectedVersion: profile.version };
+            if (aliases.length) setPending({ ...command, aliases });
+            else mutation.mutate(command);
           }}
         >
           <Field data-invalid={Boolean(error)}>
@@ -308,7 +325,54 @@ function HandleSettings({
             </Button>
           </div>
         </form>
+        <AlertDialog
+          open={Boolean(pending)}
+          onOpenChange={(open) => {
+            if (!open) setPending(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change Handle and schedule alias removal?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Your retained-alias limit is {profile.retainedAliasLimit ?? 3}. Changing your Handle
+                will schedule {pending?.aliases.map((alias) => `@${alias}`).join(', ')} for removal.
+                These addresses will redirect for 24 hours after confirmation, then expire and stop
+                redirecting to your Profile.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pending)
+                    mutation.mutate({
+                      handle: pending.handle,
+                      expectedVersion: pending.expectedVersion,
+                    });
+                }}
+              >
+                Confirm Handle change
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );
+}
+
+function aliasesToSchedule(profile: Profile, requestedHandle: string): string[] {
+  const normalized = requestedHandle
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (normalized === profile.handle) return [];
+
+  // The owner response orders aliases oldest first; the former current Handle is newest.
+  const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
+  const candidates = [...retained.map((alias) => alias.handle), profile.handle];
+  return candidates.slice(0, Math.max(0, candidates.length - (profile.retainedAliasLimit ?? 3)));
 }

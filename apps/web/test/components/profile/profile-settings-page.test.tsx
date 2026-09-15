@@ -227,6 +227,55 @@ describe('ProfileSettingsPage', () => {
     );
   });
 
+  it('warns which oldest retained alias will expire before confirming a Handle change at capacity', async () => {
+    const aliases = ['oldest', 'middle', 'newest'].map((handle, index) => ({
+      handle,
+      claimGeneration: 1,
+      createdAt: `2026-09-0${index + 1}T12:00:00.000Z`,
+      expiresAt: null,
+    }));
+    const expiresAt = '2026-09-16T15:01:02.345Z';
+    const updated = {
+      ...profile,
+      handle: 'new-handle',
+      version: 2,
+      aliases: [
+        ...aliases.map((alias) => ({ ...alias, expiresAt: alias.handle === 'oldest' ? expiresAt : null })),
+        { handle: profile.handle, claimGeneration: 1, createdAt: '2026-09-15T15:01:02.345Z', expiresAt: null },
+      ],
+    };
+    vi.mocked(userApi.updateHandle).mockResolvedValue(updated);
+    renderPage({ ...profile, aliases });
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+
+    await user.clear(input);
+    await user.type(input, 'New Handle');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('@oldest');
+    expect(dialog).not.toHaveTextContent('@middle');
+    expect(dialog).toHaveTextContent('24 hours');
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+    expect(input).toHaveValue('New Handle');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' }));
+
+    await waitFor(() => expect(input).toHaveValue('new-handle'));
+    expect(userApi.updateHandle).toHaveBeenCalledWith({
+      handle: 'New Handle',
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    const expiring = screen.getByRole('list', { name: /expiring aliases/i });
+    expect(within(expiring).getByText('@oldest')).toBeInTheDocument();
+    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString())).toHaveAttribute('dateTime', expiresAt);
+  });
+
   it('validates the 80-character limit before sending', async () => {
     renderPage();
     const user = userEvent.setup();

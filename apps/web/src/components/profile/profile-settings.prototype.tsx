@@ -149,12 +149,17 @@ export default function ProfileSettingsPrototype({
       if (shouldFail) {
         toast.error(`Couldn't save ${saveLabels[field].toLowerCase()}`, {
           id: SAVE_TOAST_ID,
+          position: 'top-right',
           description: 'Your changes are still here. Please try again.',
         });
       } else {
         commit();
         finishSave.current = finish;
-        toast.success(`${saveLabels[field]} saved`, { id: SAVE_TOAST_ID, description: null });
+        toast.success(`${saveLabels[field]} saved`, {
+          id: SAVE_TOAST_ID,
+          position: 'top-right',
+          description: null,
+        });
       }
       saveTimer.current = window.setTimeout(() => {
         saveTimer.current = null;
@@ -179,7 +184,7 @@ export default function ProfileSettingsPrototype({
   }
   function update(patch: Partial<DraftProfile>, message: string) {
     setValue((current) => ({ ...current, ...patch }));
-    toast.success(message);
+    toast.success(message, { position: 'top-right' });
     setEditor(null);
   }
   function startBiographyEdit() {
@@ -188,7 +193,9 @@ export default function ProfileSettingsPrototype({
     } else openEditor('biography');
   }
   function finishBiographyEdit() {
-    const restoreFocus = document.activeElement?.closest('[data-prototype-biography-editor]');
+    const restoreFocus =
+      document.activeElement === document.body ||
+      document.activeElement?.closest('[data-prototype-biography-editor]');
     setBiographyEdit(null);
     if (restoreFocus) requestAnimationFrame(() => biographyEditButton.current?.focus());
   }
@@ -695,7 +702,7 @@ export default function ProfileSettingsPrototype({
               },
             ],
           }));
-          toast.info('Example biography and previous handles loaded');
+          toast.info('Example biography and previous handles loaded', { position: 'top-right' });
         }}
         state={{
           ...value,
@@ -1299,7 +1306,11 @@ function BiographyEditor({
     if (inline) textarea.current?.focus();
   }, [inline]);
   useEffect(() => {
-    if (phase === 'error' && container.current?.contains(document.activeElement)) {
+    if (
+      phase === 'error' &&
+      (document.activeElement === document.body ||
+        container.current?.contains(document.activeElement))
+    ) {
       textarea.current?.focus();
     }
   }, [phase]);

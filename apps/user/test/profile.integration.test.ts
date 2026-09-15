@@ -60,6 +60,7 @@ describe('Profile commands', () => {
   let app: FastifyInstance;
   let database: DatabaseConnection;
   const identities = new FakeIdentityProvider();
+  const aliasExpiryTimer = new FakeTimerService();
   let config: Config;
 
   beforeAll(async () => {
@@ -85,7 +86,7 @@ describe('Profile commands', () => {
       profileRetainedAliasLimit: 3,
     };
     container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false });
+    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer });
     container.register(IdentityProviderToken, { useValue: identities });
     database = container.resolve(DatabaseConnection);
   });
@@ -202,6 +203,29 @@ describe('Profile commands', () => {
       const [claimEvent] = await sql`select payload from outbox_events where aggregate_id = 'user_2' and subject = 'profile.updated'`;
       expect(claimEvent.payload.profile.claimGeneration).toBeGreaterThan(alias.claimGeneration);
       expect((await request('user_1')).json()).toEqual(expired);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('automatically expires due aliases through the running application worker', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const deadline = new Date(scheduled.aliases[0].expiresAt);
+      vi.setSystemTime(new Date(deadline.getTime() - 1));
+      await aliasExpiryTimer.tickAsync(1_000);
+      expect((await request('user_1')).json()).toEqual(scheduled);
+      vi.setSystemTime(deadline);
+      await aliasExpiryTimer.tickAsync(1_000);
+      const expired = (await request('user_1')).json();
+      expect(expired).toMatchObject({ aliases: [], version: scheduled.version + 1 });
+      await aliasExpiryTimer.tickAsync(1_000);
+      expect((await request('user_1')).json()).toEqual(expired);
+      expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }

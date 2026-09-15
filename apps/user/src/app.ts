@@ -1,5 +1,6 @@
 import { registerAuth } from '@wallpaperdb/auth';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
+import type { TimerService } from '@wallpaperdb/core/timer';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
 import type { Config } from './config.js';
@@ -9,6 +10,8 @@ import { registerUserCors } from './http/cors.js';
 import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
 import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
+import { ProfileAliasExpiryWorker } from './services/profile-alias-expiry.service.js';
+import { ProfileService } from './services/profile.service.js';
 import {
   NatsProfileEventPublisher,
   ProfileOutboxPublisherWorker,
@@ -32,7 +35,7 @@ declare module 'fastify' {
 
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean }
+  options?: { logger?: boolean; enableOtel?: boolean; aliasExpiryTimer?: TimerService }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
   container.register(IdentityProviderToken, { useClass: ClerkIdentityProvider });
@@ -89,6 +92,7 @@ export async function createApp(
   fastify.log.info('Initializing connections...');
 
   let outboxPublisher: ProfileOutboxPublisherWorker | null = null;
+  let aliasExpiryWorker: ProfileAliasExpiryWorker | null = null;
 
   try {
     await container.resolve(DatabaseConnection).initialize();
@@ -102,6 +106,12 @@ export async function createApp(
       new NatsProfileEventPublisher(container.resolve(NatsConnectionManager), config),
       fastify.log
     );
+    aliasExpiryWorker = new ProfileAliasExpiryWorker(
+      container.resolve(DatabaseConnection),
+      (reference, now) => container.resolve(ProfileService).expireDueAlias(reference, now),
+      fastify.log,
+      options?.aliasExpiryTimer
+    );
     fastify.connectionsState.connectionsInitialized = true;
     fastify.log.info('All connections initialized successfully');
   } catch (error) {
@@ -111,6 +121,7 @@ export async function createApp(
 
   fastify.addHook('onClose', async () => {
     fastify.connectionsState.isShuttingDown = true;
+    await aliasExpiryWorker?.stop();
     await outboxPublisher?.stop();
     await container.resolve(NatsConnectionManager).close();
     await container.resolve(DatabaseConnection).close();
@@ -121,6 +132,8 @@ export async function createApp(
 
   outboxPublisher?.start();
   fastify.log.info('Profile outbox publisher started');
+  aliasExpiryWorker?.start();
+  fastify.log.info('Profile alias expiry worker started');
 
   return fastify;
 }

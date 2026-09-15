@@ -1,0 +1,1 @@
+CREATE INDEX "handle_claims_due_expiry_idx" ON "handle_claims" USING btree ("expires_at","handle") WHERE "handle_claims"."kind" = 'alias' and "handle_claims"."expires_at" is not null;

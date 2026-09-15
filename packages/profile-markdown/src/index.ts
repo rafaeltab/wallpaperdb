@@ -4,7 +4,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 
 export interface ProfileMarkdownIssue {
-  code: "unsupported-syntax" | "too-long";
+  code: "unsupported-syntax" | "too-long" | "invalid-link";
   message: string;
 }
 
@@ -50,6 +50,9 @@ export function validateProfileMarkdown(
   }
   const errors: ProfileMarkdownIssue[] = [];
   for (const node of flatten(parser.parse(source))) {
+    if ((node.type === "link" || node.type === "definition") && !normalizeProfileLink(node.url)) {
+      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+    }
     if (!allowedNodes.has(node.type)) {
       errors.push({ code: "unsupported-syntax", message: "This Markdown syntax is not supported." });
     }
@@ -63,6 +66,13 @@ export interface ProfileLinkDestination {
 }
 
 export function normalizeProfileLink(target: string): ProfileLinkDestination | null {
+  if (!/^https:\/\//i.test(target)) return null;
+  for (const character of target) {
+    const code = character.charCodeAt(0);
+    if (code <= 32 || (code >= 127 && code <= 159) || character === "\\") return null;
+  }
+  // Even empty credentials are misleading when displayed as an external destination.
+  if (target.slice(8).split(/[/?#]/, 1)[0]?.includes("@")) return null;
   try {
     const url = new URL(target);
     if (url.protocol !== "https:" || url.username || url.password) return null;

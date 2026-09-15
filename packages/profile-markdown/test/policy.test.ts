@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { countProfileMarkdownCharacters, normalizeProfileLink, validateProfileMarkdown } from "../src/index.js";
 
 describe("Profile Markdown policy", () => {
+  it.each([
+    "[x](javascript:alert(1))", "[x](JaVaScRiPt:alert(1))", "[x](javascript&#58;alert(1))",
+    "[x](java&#x09;script:alert(1))", "[x](data:text/html;base64,abc)", "[x](mailto:a@example.com)",
+    "[x](http://example.com)", "[x](//example.com)", "[x](/relative)", "[x](#anchor)",
+    "[x](https://user:pass@example.com)", "[x](wallpaper:wlpr_one)", "[x](ftp://example.com)",
+    "[x](https:example.com)", "[x](https://@example.com)", "[x](<https://example.com/a&#10;b>)",
+    "[x](<https://example.com/&#92;evil>)", "<http://example.com>", "http://example.com",
+    "person@example.com", "[x][bad]\n\n[bad]: javascript:alert(1)",
+  ])("rejects unsafe or unsupported link targets: %s", (source) => {
+    expect(validateProfileMarkdown(source).valid).toBe(false);
+  });
   it("normalizes external HTTPS destinations and exposes the actual hostname", () => {
     expect(normalizeProfileLink("HTTPS://BÜCHER.Example:443/a/../photo?q=1#view")).toEqual({
       href: "https://xn--bcher-kva.example/photo?q=1#view", hostname: "xn--bcher-kva.example"

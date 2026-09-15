@@ -57,7 +57,8 @@
 
 ## Public HTTP APIs
 
-- HTTP error bodies use RFC 9457 Problem Details with a correct status code and an explicit, stable problem-type URI; `about:blank` is prohibited. WallpaperDB-specific types use `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/<type>.md`, whether or not the documentation file exists yet. Driving adapters translate application outcomes into safe client-relevant details; unexpected defects use an explicit generic-server problem type and never expose stack traces, vendor failures, secrets, or implementation details.
+- REST error bodies and HTTP transport error bodies outside GraphQL responses use RFC 9457 Problem Details with a correct status code and an explicit, stable problem-type URI; `about:blank` is prohibited. WallpaperDB-specific types use `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/<type>.md`, whether or not the documentation file exists yet. Driving adapters translate application outcomes into safe client-relevant details; unexpected defects use an explicit generic-server problem type and never expose stack traces, vendor failures, secrets, or implementation details.
+- GraphQL request and execution errors retain GraphQL's standard response format, including syntax and validation failures returned with an HTTP error status. Preserve the required `errors` and applicable `data` entries, put application-specific error metadata in `extensions`, and apply the same safe-detail and information-disclosure rules.
 - HTTP and GraphQL schemas are adapter contracts distinct from application and domain types. While WallpaperDB has no production or external consumers, breaking changes may update a contract and all of its usages, tests, and generated schemas together; do not introduce versioning until consumers require independent migration.
 
 ## Observability

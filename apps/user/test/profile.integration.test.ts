@@ -135,6 +135,52 @@ describe('Profile commands', () => {
     });
   }
 
+  async function scheduleAlias(userId: string, handle: string, expectedVersion: number) {
+    const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+    return app.inject({
+      method: 'DELETE',
+      url: `/profile/me/aliases/${encodeURIComponent(handle)}`,
+      headers: { authorization: `Bearer ${token}` },
+      payload: { expectedVersion },
+    });
+  }
+
+  it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
+    const before = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
+    const now = new Date('2030-01-01T12:00:00.000Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+    try {
+      const response = await scheduleAlias('user_1', before.handle.toUpperCase(), changed.version);
+      expect(response.statusCode).toBe(200);
+      const scheduled = response.json();
+      const expiresAt = '2030-01-02T12:00:00.000Z';
+      expect(scheduled).toMatchObject({
+        handle: changed.handle, version: 3, lastHandleChangedAt: changed.lastHandleChangedAt,
+        aliases: [{ ...changed.aliases[0], expiresAt }],
+      });
+      const events = await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-expiry-scheduled'`;
+      expect(events).toHaveLength(1);
+      expect(events[0].payload).toMatchObject({
+        eventType: 'profile.updated', timestamp: now.toISOString(),
+        change: { type: 'alias-expiry-scheduled', handle: before.handle, before: null, after: expiresAt },
+        profile: { handle: changed.handle, version: 3, aliases: scheduled.aliases },
+      });
+      const renamed = (await patch('user_1', 'Renamed', scheduled.version)).json();
+      expect(renamed.aliases).toEqual(scheduled.aliases);
+      expect((await request('user_1')).json()).toEqual(renamed);
+      const publisher = new FakeProfileEventPublisher();
+      await new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} }).publishPending();
+      expect(publisher.events).toContainEqual(expect.objectContaining({
+        change: events[0].payload.change,
+        profile: expect.objectContaining({ aliases: scheduled.aliases }),
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns retained alias dates and the configured limit in every owner snapshot', async () => {
     const before = (await request('user_1')).json();
     expect(before).toMatchObject({ retainedAliasLimit: 3, aliases: [] });

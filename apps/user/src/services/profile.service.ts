@@ -49,6 +49,7 @@ const RESERVED_HANDLES = new Set([
 ]);
 const FALLBACK_ADJECTIVES = ['quiet', 'bright', 'silver', 'wild'];
 const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
+const ALIAS_EXPIRY_GRACE_MS = 24 * 60 * 60 * 1000;
 
 type ProfileReader = Pick<ReturnType<DatabaseConnection['getClient']>['db'], 'query'>;
 export interface OwnerProfile extends Profile {
@@ -64,6 +65,8 @@ export interface OwnerProfile extends Profile {
 export class IdentityUnavailableError extends Error {}
 export class InvalidDisplayNameError extends Error {}
 export class InvalidHandleError extends Error {}
+export class InvalidAliasCommandError extends Error {}
+export class AliasNotFoundError extends Error {}
 export class HandleUnavailableError extends Error {}
 export class HandleCooldownError extends Error {
   constructor(readonly nextHandleChangeAt: Date) {
@@ -302,6 +305,71 @@ export class ProfileService {
           throw new HandleUnavailableError('This Handle is already in use; choose another name');
         throw error;
       });
+  }
+
+  async scheduleAliasExpiry(
+    userId: string,
+    requestedHandle: string,
+    expectedVersion: number
+  ): Promise<OwnerProfile> {
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new InvalidAliasCommandError('Expected Profile version must be a positive integer');
+    }
+    const handle = requestedHandle.toLowerCase();
+    return this.database.getClient().db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('update');
+      if (!current || current.version !== expectedVersion) {
+        throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      }
+      const alias = await tx.query.handleClaims.findFirst({
+        where: and(
+          eq(handleClaims.handle, handle),
+          eq(handleClaims.profileId, userId),
+          eq(handleClaims.kind, 'alias')
+        ),
+      });
+      if (!alias) throw new AliasNotFoundError('This Handle is not one of your aliases');
+
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + ALIAS_EXPIRY_GRACE_MS);
+      await tx.update(handleClaims).set({ expiresAt }).where(eq(handleClaims.handle, handle));
+      const [updated] = await tx.update(profiles).set({
+        version: sql`${profiles.version} + 1`,
+        updatedAt: now,
+      }).where(eq(profiles.id, userId)).returning();
+      const claim = await tx.query.handleClaims.findFirst({
+        where: eq(handleClaims.handle, updated.handle),
+      });
+      if (!claim) throw new Error('Current Profile Handle claim is missing');
+      const owner = await this.ownerProfile(updated, tx);
+      const event: ProfileUpdatedEvent = {
+        eventId: `evt_${ulid()}`,
+        eventType: PROFILE_UPDATED_SUBJECT,
+        timestamp: now.toISOString(),
+        change: { type: 'alias-expiry-scheduled', handle, before: null, after: expiresAt.toISOString() },
+        profile: {
+          id: updated.id,
+          displayName: updated.displayName,
+          handle: updated.handle,
+          claimGeneration: claim.claimGeneration,
+          aliases: owner.aliases,
+          biographyMarkdown: updated.biographyMarkdown,
+          pictureAssetId: updated.pictureAssetId,
+          version: updated.version,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        },
+      };
+      ProfileUpdatedEventSchema.parse(event);
+      await tx.insert(outboxEvents).values({
+        id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event,
+      });
+      return owner;
+    });
   }
 
   private async findOwnerProfile(userId: string): Promise<OwnerProfile | undefined> {

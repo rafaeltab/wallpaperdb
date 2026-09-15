@@ -48,6 +48,10 @@ export async function downloadInitialPicture(
       }
       continue;
     }
+    if (Number(response.headers.get('content-length')) > options.maxBytes) {
+      await response.body?.cancel();
+      throw new PermanentPictureImportError('Initial picture exceeds the byte limit');
+    }
     return Buffer.from(await response.arrayBuffer());
   }
 }

@@ -55,4 +55,14 @@ describe('Initial Profile picture download', () => {
       expect(fetcher).toHaveBeenCalledTimes(4);
     }
   });
+
+  it('rejects an oversized declared body and cancels it before reading picture bytes', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); controller.close(); }, cancel,
+    });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(body, { headers: { 'Content-Length': '1025' } }));
+    await expect(downloadInitialPicture('https://img.clerk.com/picture', options, fetcher)).rejects.toBeInstanceOf(PermanentPictureImportError);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

@@ -142,6 +142,10 @@ The retention worker removes Profile event rows whose acceptance time is at or b
 
 Private staged and retired picture objects become eligible for deletion at their recorded expiry. The configured duration applies when new deadlines are assigned; changing it does not shorten or extend an existing asset's recorded deadline. Cleanup preserves current Profile rows, active assets, Handle claims, aliases, and downstream projections.
 
+The worker runs at startup and once per second, with at most 100 event candidates and 100 picture candidates per cycle. It advances past failed or locked entries and revisits them after the scan wraps, so one unavailable object cannot block later cleanup. Cycles do not overlap within a worker, and shutdown drains the current cycle before closing storage and database connections.
+
+The structured `Profile evidence cleanup completed` log reports `eventsDeleted`, `picturesDeleted`, and `failed` when a cycle has an outcome. Failures remain retryable. Picture deletion keeps its database tracking row until storage deletion succeeds; repeated deletion of an already absent object is safe.
+
 NATS events remain indefinitely retained for projection rebuilds under the temporary policy tracked in [#162](https://github.com/rafaeltab/wallpaperdb/issues/162). This cleanup does not change stream retention or implement GDPR erasure across systems.
 
 ### Initial picture import

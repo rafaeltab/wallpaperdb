@@ -426,6 +426,30 @@ describe('Profile commands', () => {
     expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
   });
 
+  it('uses the configured evidence window for historical Handle eligibility even while events remain unpublished', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    config.profileEvidenceRetentionDays = 7;
+    try {
+      const original = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+      expect(released.historicalHandles).toEqual([{
+        handle: original.handle, eligibleUntil: '2030-01-08T00:00:00.000Z', unavailableReason: null,
+      }]);
+      vi.setSystemTime(new Date('2030-01-07T23:59:59.999Z'));
+      expect((await request('user_1')).json().historicalHandles).toEqual(released.historicalHandles);
+      vi.setSystemTime(new Date('2030-01-08T00:00:00.000Z'));
+      expect((await request('user_1')).json().historicalHandles).toEqual([]);
+      expect((await reactivateAlias('user_1', original.handle, released.version)).statusCode).toBe(400);
+      expect((await sql`select id from outbox_events where published_at is null`).length).toBeGreaterThan(0);
+    } finally {
+      config.profileEvidenceRetentionDays = 30;
+      vi.useRealTimers();
+    }
+  });
+
   it('ends history eligibility at exactly thirty days without renewing it from Display-name snapshots', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

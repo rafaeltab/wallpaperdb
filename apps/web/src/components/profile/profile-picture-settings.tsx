@@ -1,7 +1,10 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Pencil } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { profileQueryKey } from '@/components/profile-bootstrap';
+import { ProfileActionButton } from '@/components/profile/profile-action-button';
+import { ProfileDialog } from '@/components/profile/profile-dialog';
 import { ProfilePicture } from '@/components/profile/profile-picture';
+import { profileQueryKey } from '@/components/profile-bootstrap';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -14,10 +17,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { userApi, UserApiError, type Profile } from '@/lib/api/user';
+import { type Profile, UserApiError, userApi } from '@/lib/api/user';
 import { formatFileSize } from '@/lib/utils/wallpaper';
 
 type PictureCommand =
@@ -38,6 +40,7 @@ export function ProfilePictureSettings({
   const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
   const [removeVersion, setRemoveVersion] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const maxBytes = profile.pictureUploadLimits?.maxBytes ?? 5 * 1024 * 1024;
   const importing =
@@ -85,130 +88,145 @@ export function ProfilePictureSettings({
   }
 
   return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>Profile picture</CardTitle>
-        <CardDescription>
-          Your picture appears on your Profile and wallpaper contributions.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <ProfilePicture profile={profile} />
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={refreshing || writing}
-          onClick={() => void refresh()}
-        >
-          {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
-        </Button>
-        {importing && (
-          <output className="block text-sm text-muted-foreground">
-            {profile.pictureImportStatus === 'retrying'
-              ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
-              : 'Importing your account picture. You can keep editing your Profile while it loads.'}
-          </output>
-        )}
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (selected && !refreshing && !writing)
-              mutation.mutate({ ...selected, action: 'upload' });
-          }}
-        >
-          <Field>
-            <FieldLabel htmlFor="profile-picture">Choose picture</FieldLabel>
-            <Input
-              ref={input}
-              id="profile-picture"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={refreshing || writing}
-              onChange={(event) => {
-                mutation.reset();
-                setError(null);
-                const picture = event.target.files?.[0];
-                if (picture && !['image/jpeg', 'image/png', 'image/webp'].includes(picture.type)) {
-                  setSelected(null);
-                  setError('Choose a JPEG, PNG, or WebP picture.');
-                  return;
-                }
-                if (picture && picture.size > maxBytes) {
-                  setSelected(null);
-                  setError(`Picture must be at most ${maxBytes.toLocaleString()} bytes.`);
-                  return;
-                }
-                setSelected(picture ? { picture, expectedVersion: profile.version } : null);
-              }}
-            />
-            <FieldDescription>
-              JPEG, PNG, or WebP. Up to {formatFileSize(maxBytes)}
-              {profile.pictureUploadLimits
-                ? ` and ${(profile.pictureUploadLimits.maxPixels / 1000000).toLocaleString(undefined, { maximumFractionDigits: 6 })} megapixels`
-                : ''}
-              . Animated images are not supported.
-            </FieldDescription>
-          </Field>
-          <Button type="submit" disabled={!selected || refreshing || writing}>
-            {mutation.isPending
-              ? 'Saving picture…'
-              : profile.pictureAssetId
-                ? 'Replace picture'
-                : 'Upload picture'}
-          </Button>
-        </form>
-        {(profile.pictureAssetId || importing) && (
+    <div className="relative w-fit shrink-0">
+      <ProfilePicture profile={profile} />
+      <ProfileDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Profile picture"
+        description="Your picture appears on your profile and wallpaper contributions."
+        busy={writing}
+        trigger={
+          <ProfileActionButton
+            label="Edit profile picture"
+            className="absolute -right-2 -bottom-2"
+            buttonClassName="rounded-full border-4 border-card bg-background shadow-sm hover:bg-background dark:hover:bg-background"
+          >
+            <Pencil className="size-3.5" />
+          </ProfileActionButton>
+        }
+      >
+        <div className="space-y-5">
+          <ProfilePicture profile={profile} />
           <Button
             variant="outline"
+            size="sm"
             disabled={refreshing || writing}
-            onClick={() => {
-              mutation.reset();
-              setRemoveVersion(profile.version);
-              setDialogOpen(true);
+            onClick={() => void refresh()}
+          >
+            {refreshing ? 'Refreshing Profile…' : 'Refresh Profile'}
+          </Button>
+          {importing && (
+            <output className="block text-sm text-muted-foreground">
+              {profile.pictureImportStatus === 'retrying'
+                ? 'Your account picture import is retrying. You can upload a picture or choose your generated avatar now.'
+                : 'Importing your account picture. You can keep editing your Profile while it loads.'}
+            </output>
+          )}
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (selected && !refreshing && !writing)
+                mutation.mutate({ ...selected, action: 'upload' });
             }}
           >
-            {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
-          </Button>
-        )}
-        <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Use a generated avatar?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Use your generated avatar and stop any pending picture import. A removed picture
-                stops being publicly available as services update.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
+            <Field>
+              <FieldLabel htmlFor="profile-picture">Choose picture</FieldLabel>
+              <Input
+                ref={input}
+                id="profile-picture"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
                 disabled={refreshing || writing}
-                onClick={() => {
-                  if (removeVersion !== null && !refreshing && !writing)
-                    mutation.mutate({ action: 'remove', expectedVersion: removeVersion });
+                onChange={(event) => {
+                  mutation.reset();
+                  setError(null);
+                  const picture = event.target.files?.[0];
+                  if (
+                    picture &&
+                    !['image/jpeg', 'image/png', 'image/webp'].includes(picture.type)
+                  ) {
+                    setSelected(null);
+                    setError('Choose a JPEG, PNG, or WebP picture.');
+                    return;
+                  }
+                  if (picture && picture.size > maxBytes) {
+                    setSelected(null);
+                    setError(`Picture must be at most ${maxBytes.toLocaleString()} bytes.`);
+                    return;
+                  }
+                  setSelected(picture ? { picture, expectedVersion: profile.version } : null);
                 }}
-              >
-                Use generated avatar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        {feedback && (
-          <Alert variant="destructive">
-            <AlertDescription>{feedback}</AlertDescription>
-          </Alert>
-        )}
-        {mutation.isSuccess && (
-          <Alert>
-            <AlertDescription>
-              {mutation.variables?.action === 'remove'
-                ? 'Generated avatar selected. Public views may take a moment to update.'
-                : 'Picture saved. Public views may take a moment to update.'}
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
+              />
+              <FieldDescription>
+                JPEG, PNG, or WebP. Up to {formatFileSize(maxBytes)}
+                {profile.pictureUploadLimits
+                  ? ` and ${(profile.pictureUploadLimits.maxPixels / 1000000).toLocaleString(undefined, { maximumFractionDigits: 6 })} megapixels`
+                  : ''}
+                . Animated images are not supported.
+              </FieldDescription>
+            </Field>
+            <Button type="submit" disabled={!selected || refreshing || writing}>
+              {mutation.isPending
+                ? 'Saving picture…'
+                : profile.pictureAssetId
+                  ? 'Replace picture'
+                  : 'Upload picture'}
+            </Button>
+          </form>
+          {(profile.pictureAssetId || importing) && (
+            <Button
+              variant="outline"
+              disabled={refreshing || writing}
+              onClick={() => {
+                mutation.reset();
+                setRemoveVersion(profile.version);
+                setDialogOpen(true);
+              }}
+            >
+              {profile.pictureAssetId ? 'Remove picture' : 'Cancel picture import'}
+            </Button>
+          )}
+          <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Use a generated avatar?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Use your generated avatar and stop any pending picture import. A removed picture
+                  stops being publicly available as services update.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={refreshing || writing}
+                  onClick={() => {
+                    if (removeVersion !== null && !refreshing && !writing)
+                      mutation.mutate({ action: 'remove', expectedVersion: removeVersion });
+                  }}
+                >
+                  Use generated avatar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          {feedback && (
+            <Alert variant="destructive">
+              <AlertDescription>{feedback}</AlertDescription>
+            </Alert>
+          )}
+          {mutation.isSuccess && (
+            <Alert>
+              <AlertDescription>
+                {mutation.variables?.action === 'remove'
+                  ? 'Generated avatar selected. Public views may take a moment to update.'
+                  : 'Picture saved. Public views may take a moment to update.'}
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </ProfileDialog>
+    </div>
   );
 }

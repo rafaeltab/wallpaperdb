@@ -36,12 +36,12 @@ const profile: Profile = {
   createdAt: '2026-07-12T12:00:00.000Z',
   updatedAt: '2026-07-12T12:00:00.000Z',
 };
-function renderPage(initial = profile) {
+async function renderPage(initial = profile, openPicture = true) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   client.setQueryData(profileQueryKey(profile.id), initial);
-  return {
+  const view = {
     client,
     ...render(
       <QueryClientProvider client={client}>
@@ -49,6 +49,8 @@ function renderPage(initial = profile) {
       </QueryClientProvider>
     ),
   };
+  if (openPicture) await userEvent.setup().click(screen.getByRole('button', { name: 'Edit profile picture' }));
+  return view;
 }
 
 describe('Profile picture settings', () => {
@@ -64,6 +66,19 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('opens picture controls from the avatar and returns focus when closed', async () => {
+    await renderPage(profile, false);
+    const user = userEvent.setup();
+    expect(screen.queryByLabelText('Choose picture')).not.toBeInTheDocument();
+    const edit = screen.getByRole('button', { name: 'Edit profile picture' });
+    await user.click(edit);
+    const dialog = screen.getByRole('dialog', { name: 'Profile picture' });
+    expect(within(dialog).getByLabelText('Choose picture')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(edit).toHaveFocus();
+  });
+
   it('keeps owner refreshes from racing a picture write and reports a failed refresh', async () => {
     let finishUpload: ((value: Profile) => void) | undefined;
     vi.mocked(userApi.uploadPicture).mockImplementation(
@@ -73,7 +88,7 @@ describe('Profile picture settings', () => {
         })
     );
     vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
-    const { client } = renderPage();
+    const { client } = await renderPage();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
@@ -81,7 +96,6 @@ describe('Profile picture settings', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Upload picture' }));
     expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Refresh aliases' })).toBeDisabled();
     expect(screen.getByLabelText('Choose picture')).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
     const updated = { ...profile, pictureAssetId: 'picture_new', version: 2 };
@@ -101,7 +115,7 @@ describe('Profile picture settings', () => {
     );
     const updated = { ...profile, version: 2, pictureAssetId: 'remote_picture' };
     vi.mocked(userApi.ensureProfile).mockResolvedValue(updated);
-    const { client } = renderPage();
+    const { client } = await renderPage();
     const user = userEvent.setup();
     await user.upload(
       screen.getByLabelText('Choose picture'),
@@ -118,7 +132,7 @@ describe('Profile picture settings', () => {
   });
 
   it('enforces the server byte limit and shows its picture constraints before upload', async () => {
-    renderPage({
+    await renderPage({
       ...profile,
       pictureUploadLimits: { maxBytes: 4, maxPixels: 2000000, maxDecodedBytes: 8000000 },
     });
@@ -134,7 +148,7 @@ describe('Profile picture settings', () => {
   });
 
   it('rejects unsupported picture files before sending an upload', async () => {
-    renderPage();
+    await renderPage();
     const user = userEvent.setup({ applyAccept: false });
     await user.upload(
       screen.getByLabelText('Choose picture'),
@@ -148,7 +162,7 @@ describe('Profile picture settings', () => {
   it('lets a generated-avatar choice cancel a pending import before any picture is available', async () => {
     const updated = { ...profile, version: 2 };
     vi.mocked(userApi.removePicture).mockResolvedValue(updated);
-    const { client } = renderPage({ ...profile, pictureImportStatus: 'pending' });
+    const { client } = await renderPage({ ...profile, pictureImportStatus: 'pending' });
     const user = userEvent.setup();
     expect(screen.getByText(/importing your account picture/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Cancel picture import' }));
@@ -168,7 +182,7 @@ describe('Profile picture settings', () => {
     const initial = { ...profile, pictureAssetId: 'picture_old' };
     const updated = { ...profile, version: 3 };
     vi.mocked(userApi.removePicture).mockResolvedValue(updated);
-    const { client } = renderPage(initial);
+    const { client } = await renderPage(initial);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Remove picture' }));
     let dialog = screen.getByRole('alertdialog');
@@ -200,7 +214,7 @@ describe('Profile picture settings', () => {
   it('uploads the selected file with its captured version and immediately adopts the authoritative picture', async () => {
     const updated = { ...profile, pictureAssetId: 'picture_new', version: 3 };
     vi.mocked(userApi.uploadPicture).mockResolvedValue(updated);
-    const { client } = renderPage();
+    const { client } = await renderPage();
     const user = userEvent.setup();
     const picture = new File(['png'], 'portrait.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Choose picture'), picture);

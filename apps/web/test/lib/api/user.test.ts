@@ -70,22 +70,26 @@ describe('User API client', () => {
       ...profile,
       version: 2,
       retainedAliasLimit: 3,
-      aliases: [{
-        handle: 'old-handle',
-        claimGeneration: 1,
-        createdAt: '2026-09-01T12:00:00.000Z',
-        expiresAt: '2026-09-15T12:34:56.789Z',
-      }],
+      aliases: [
+        {
+          handle: 'old-handle',
+          claimGeneration: 1,
+          createdAt: '2026-09-01T12:00:00.000Z',
+          expiresAt: '2026-09-15T12:34:56.789Z',
+        },
+      ],
     };
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated)));
     vi.stubGlobal('fetch', fetch);
     const client = createUserApiClient({ baseUrl: '/user/', tokenProvider });
 
-    await expect(client.scheduleAliasRemoval({
-      handle: 'old-handle',
-      expectedVersion: 1,
-      expectedProfileId: profile.id,
-    })).resolves.toEqual(updated);
+    await expect(
+      client.scheduleAliasRemoval({
+        handle: 'old-handle',
+        expectedVersion: 1,
+        expectedProfileId: profile.id,
+      })
+    ).resolves.toEqual(updated);
     expect(tokenProvider).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledWith('/user/profile/me/aliases/old-handle', {
       method: 'DELETE',

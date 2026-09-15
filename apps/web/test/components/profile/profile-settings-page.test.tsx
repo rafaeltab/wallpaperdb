@@ -101,7 +101,12 @@ describe('ProfileSettingsPage', () => {
       ...profile,
       retainedAliasLimit: 2,
       aliases: [
-        { handle: 'retained-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
+        {
+          handle: 'retained-name',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: null,
+        },
         { handle: 'expiring-name', claimGeneration: 1, createdAt: profile.createdAt, expiresAt },
       ],
     });
@@ -112,7 +117,11 @@ describe('ProfileSettingsPage', () => {
     expect(within(retained).queryByText('@expiring-name')).not.toBeInTheDocument();
     expect(within(expiring).getByText('@expiring-name')).toBeInTheDocument();
     expect(screen.getByText('1 of 2 retained aliases')).toBeInTheDocument();
-    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString(), { exact: false }).closest('time')).toHaveAttribute('dateTime', expiresAt);
+    expect(
+      within(expiring)
+        .getByText(new Date(expiresAt).toLocaleString(), { exact: false })
+        .closest('time')
+    ).toHaveAttribute('dateTime', expiresAt);
   });
 
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {
@@ -138,9 +147,13 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.scheduleAliasRemoval).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole('button', { name: 'Schedule removal for @old-handle' }));
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Schedule removal' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Schedule removal' })
+    );
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Removal scheduled for @old-handle.');
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Removal scheduled for @old-handle.'
+    );
     expect(userApi.scheduleAliasRemoval).toHaveBeenCalledWith({
       handle: 'old-handle',
       expectedVersion: 1,
@@ -149,7 +162,9 @@ describe('ProfileSettingsPage', () => {
     });
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
     const expiring = screen.getByRole('list', { name: /expiring aliases/i });
-    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString()).closest('time')).toHaveAttribute('dateTime', expiresAt);
+    expect(
+      within(expiring).getByText(new Date(expiresAt).toLocaleString()).closest('time')
+    ).toHaveAttribute('dateTime', expiresAt);
     expect(within(expiring).queryByRole('button')).not.toBeInTheDocument();
     expect(screen.getByText('0 of 3 retained aliases')).toBeInTheDocument();
   });
@@ -157,7 +172,9 @@ describe('ProfileSettingsPage', () => {
   it('keeps a retained alias and explains when scheduling loses an optimistic concurrency race', async () => {
     const initial = {
       ...profile,
-      aliases: [{ handle: 'old-handle', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null }],
+      aliases: [
+        { handle: 'old-handle', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
+      ],
     };
     vi.mocked(userApi.scheduleAliasRemoval).mockRejectedValue(
       new UserApiError('Profile has changed.', 409, {
@@ -168,13 +185,17 @@ describe('ProfileSettingsPage', () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByRole('button', { name: 'Schedule removal for @old-handle' }));
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Schedule removal' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Schedule removal' })
+    );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Your Profile changed elsewhere. Reload before scheduling again.'
     );
     expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(initial);
-    expect(within(screen.getByRole('list', { name: /retained aliases/i })).getByText('@old-handle')).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: /retained aliases/i })).getByText('@old-handle')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
@@ -240,8 +261,16 @@ describe('ProfileSettingsPage', () => {
       handle: 'new-handle',
       version: 2,
       aliases: [
-        ...aliases.map((alias) => ({ ...alias, expiresAt: alias.handle === 'oldest' ? expiresAt : null })),
-        { handle: profile.handle, claimGeneration: 1, createdAt: '2026-09-15T15:01:02.345Z', expiresAt: null },
+        ...aliases.map((alias) => ({
+          ...alias,
+          expiresAt: alias.handle === 'oldest' ? expiresAt : null,
+        })),
+        {
+          handle: profile.handle,
+          claimGeneration: 1,
+          createdAt: '2026-09-15T15:01:02.345Z',
+          expiresAt: null,
+        },
       ],
     };
     vi.mocked(userApi.updateHandle).mockResolvedValue(updated);
@@ -262,7 +291,9 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.updateHandle).not.toHaveBeenCalled();
     expect(input).toHaveValue('New Handle');
     await user.click(screen.getByRole('button', { name: 'Change Handle' }));
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' })
+    );
 
     await waitFor(() => expect(input).toHaveValue('new-handle'));
     expect(userApi.updateHandle).toHaveBeenCalledWith({
@@ -273,7 +304,10 @@ describe('ProfileSettingsPage', () => {
     });
     const expiring = screen.getByRole('list', { name: /expiring aliases/i });
     expect(within(expiring).getByText('@oldest')).toBeInTheDocument();
-    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString())).toHaveAttribute('dateTime', expiresAt);
+    expect(within(expiring).getByText(new Date(expiresAt).toLocaleString())).toHaveAttribute(
+      'dateTime',
+      expiresAt
+    );
   });
 
   it('promotes a normalized retained alias at capacity without warning about an expiry that will not occur', async () => {
@@ -283,7 +317,11 @@ describe('ProfileSettingsPage', () => {
       createdAt: `2026-09-0${index + 1}T12:00:00.000Z`,
       expiresAt: null,
     }));
-    vi.mocked(userApi.updateHandle).mockResolvedValue({ ...profile, handle: 'my-alias', version: 2 });
+    vi.mocked(userApi.updateHandle).mockResolvedValue({
+      ...profile,
+      handle: 'my-alias',
+      version: 2,
+    });
     renderPage({ ...profile, aliases });
     const user = userEvent.setup();
     const input = screen.getByRole('textbox', { name: /^handle$/i });
@@ -319,7 +357,12 @@ describe('ProfileSettingsPage', () => {
       ...profile,
       retainedAliasLimit: 1,
       aliases: [
-        { handle: 'already-expiring', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2026-09-16T12:00:00.000Z' },
+        {
+          handle: 'already-expiring',
+          claimGeneration: 1,
+          createdAt: profile.createdAt,
+          expiresAt: '2026-09-16T12:00:00.000Z',
+        },
         { handle: 'oldest', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
         { handle: 'newest', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
       ],
@@ -363,9 +406,11 @@ describe('ProfileSettingsPage', () => {
 
   it('confirms the version shown in the capacity warning even if Profile state changes while it is open', async () => {
     const initial = { ...profile, retainedAliasLimit: 0, aliases: [] };
-    vi.mocked(userApi.updateHandle).mockRejectedValue(new UserApiError('Profile changed.', 409, {
-      type: 'https://wallpaperdb.example/problems/profile-version-conflict',
-    }));
+    vi.mocked(userApi.updateHandle).mockRejectedValue(
+      new UserApiError('Profile changed.', 409, {
+        type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+      })
+    );
     const { queryClient } = renderPage(initial);
     const user = userEvent.setup();
     const input = screen.getByRole('textbox', { name: /^handle$/i });
@@ -376,10 +421,14 @@ describe('ProfileSettingsPage', () => {
     await act(async () => {
       queryClient.setQueryData(profileQueryKey(profile.id), { ...initial, version: 2 });
     });
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Confirm Handle change' })
+    );
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile changed elsewhere.');
-    expect(userApi.updateHandle).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    expect(userApi.updateHandle).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedVersion: 1 })
+    );
     expect(input).toHaveValue('new-handle');
   });
 

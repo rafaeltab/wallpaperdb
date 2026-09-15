@@ -180,15 +180,22 @@ export default function ProfileSettingsPrototype({
   const aliases = (
     <button
       type="button"
+      aria-label={`Previous handles: ${aliasSummary}`}
       className="flex max-w-full items-center gap-1.5 rounded text-left text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
       onClick={() => openEditor('aliases')}
     >
       <Link2 className="size-3.5 shrink-0" />
       <span>
         {variant === 'E' ? (
-          retained || expiring || historical ? aliasSummary : 'Previous handles'
+          retained || expiring || historical ? (
+            aliasSummary
+          ) : (
+            'Previous handles'
+          )
         ) : (
-          <>Previous handles <span aria-hidden="true">·</span> {aliasSummary}</>
+          <>
+            Previous handles <span aria-hidden="true">·</span> {aliasSummary}
+          </>
         )}
       </span>
       <ChevronRight className="size-3.5 shrink-0" />
@@ -252,29 +259,65 @@ export default function ProfileSettingsPrototype({
       {aliases}
     </div>
   );
-  const biography = variant === 'E' ? (
-    <section className="min-w-0 max-w-3xl">
-      <div className="relative h-5">
-        <h2 className="sr-only">Biography</h2>
-        {!biographyEdit && (
-          <PrototypeIconButton
-            ref={biographyEditButton}
-            className="absolute top-0 right-0 text-base"
-            buttonClassName="size-5"
-            label="Edit biography"
-            onClick={startBiographyEdit}
-          >
-            <Pencil className="size-3.5" />
-          </PrototypeIconButton>
-        )}
-      </div>
-      <div className="mt-3 min-w-0 max-w-3xl">
-        {biographyEdit ? (
+  const biography =
+    variant === 'E' ? (
+      <section className="min-w-0 max-w-3xl">
+        <div className="relative h-5">
+          <h2 className="sr-only">Biography</h2>
+          {!biographyEdit && (
+            <PrototypeIconButton
+              ref={biographyEditButton}
+              className="absolute top-0 right-0 text-base"
+              buttonClassName="size-5"
+              label="Edit biography"
+              onClick={startBiographyEdit}
+            >
+              <Pencil className="size-3.5" />
+            </PrototypeIconButton>
+          )}
+        </div>
+        <div className="mt-3 min-w-0 max-w-3xl">
+          {biographyEdit ? (
+            <BiographyEditor
+              value={value}
+              profile={profile}
+              inline
+              compact
+              edit={biographyEdit}
+              onEdit={setBiographyEdit}
+              update={(patch, message) => {
+                update(patch, message);
+                finishBiographyEdit();
+              }}
+              cancel={finishBiographyEdit}
+            />
+          ) : (
+            <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
+          )}
+        </div>
+      </section>
+    ) : (
+      <section className="min-w-0 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-sm font-medium">Biography</h3>
+          {!(variant === 'D' && biographyEdit) && (
+            <Button
+              ref={biographyEditButton}
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+              onClick={startBiographyEdit}
+            >
+              <Pencil className="size-3.5" />
+              Edit<span className="sr-only"> biography</span>
+            </Button>
+          )}
+        </div>
+        {variant === 'D' && biographyEdit ? (
           <BiographyEditor
             value={value}
             profile={profile}
             inline
-            compact
             edit={biographyEdit}
             onEdit={setBiographyEdit}
             update={(patch, message) => {
@@ -283,57 +326,22 @@ export default function ProfileSettingsPrototype({
             }}
             cancel={finishBiographyEdit}
           />
-        ) : (
+        ) : value.biography.trim() ? (
           <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
-        )}
-      </div>
-    </section>
-  ) : (
-    <section className="min-w-0 space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-sm font-medium">Biography</h3>
-        {!(variant === 'D' && biographyEdit) && (
-          <Button
-            ref={biographyEditButton}
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+        ) : (
+          <button
+            className="w-full rounded-lg border border-dashed p-5 text-left text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            type="button"
             onClick={startBiographyEdit}
           >
-            <Pencil className="size-3.5" />
-            Edit<span className="sr-only"> biography</span>
-          </Button>
+            A little about you, and the wallpapers you love.
+            <span className="mt-2 block font-medium text-foreground">
+              Add a biography <span aria-hidden="true">→</span>
+            </span>
+          </button>
         )}
-      </div>
-      {variant === 'D' && biographyEdit ? (
-        <BiographyEditor
-          value={value}
-          profile={profile}
-          inline
-          edit={biographyEdit}
-          onEdit={setBiographyEdit}
-          update={(patch, message) => {
-            update(patch, message);
-            finishBiographyEdit();
-          }}
-          cancel={finishBiographyEdit}
-        />
-      ) : value.biography.trim() ? (
-        <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
-      ) : (
-        <button
-          className="w-full rounded-lg border border-dashed p-5 text-left text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
-          type="button"
-          onClick={startBiographyEdit}
-        >
-          A little about you, and the wallpapers you love.
-          <span className="mt-2 block font-medium text-foreground">
-            Add a biography <span aria-hidden="true">→</span>
-          </span>
-        </button>
-      )}
-    </section>
-  );
+      </section>
+    );
   const parts = { avatar, name, handleField, biography, aliases };
   const inlineName = (
     <InlineProfileText
@@ -422,20 +430,24 @@ export default function ProfileSettingsPrototype({
   return (
     <>
       <div
-        className={variant === 'E'
-          ? 'mx-auto w-full max-w-5xl px-4 pt-8 pb-48 sm:px-6 sm:pt-12 lg:px-8'
-          : `mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' || variant === 'D' ? 'max-w-4xl' : 'max-w-3xl'}`}
+        className={
+          variant === 'E'
+            ? 'mx-auto w-full max-w-5xl px-4 pt-8 pb-48 sm:px-6 sm:pt-12 lg:px-8'
+            : `mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' || variant === 'D' ? 'max-w-4xl' : 'max-w-3xl'}`
+        }
       >
-        {variant !== 'E' && <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Your profile</h1>
-            <p className="mt-1 text-sm text-muted-foreground">How you appear on WallpaperDB.</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => openEditor('public')}>
-            View profile
-            <ArrowUpRight className="size-4" />
-          </Button>
-        </header>}
+        {variant !== 'E' && (
+          <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Your profile</h1>
+              <p className="mt-1 text-sm text-muted-foreground">How you appear on WallpaperDB.</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => openEditor('public')}>
+              View profile
+              <ArrowUpRight className="size-4" />
+            </Button>
+          </header>
+        )}
         {variant === 'A' ? (
           <VariantA {...parts} />
         ) : variant === 'B' ? (
@@ -667,10 +679,18 @@ export function VariantD({ avatar, name, handleField, biography }: Parts) {
 }
 
 export function VariantE({
-  avatar, name, handleField, biography, aliases, viewProfile,
+  avatar,
+  name,
+  handleField,
+  biography,
+  aliases,
+  viewProfile,
 }: Parts & { viewProfile: () => void }) {
   return (
-    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm" aria-label="Edit your profile">
+    <section
+      className="overflow-hidden rounded-2xl border bg-card shadow-sm"
+      aria-label="Edit your profile"
+    >
       <div className="relative h-24 bg-linear-to-r from-primary/20 via-primary/10 to-transparent sm:h-32">
         <div className="absolute top-4 right-4">
           <Button variant="outline" size="sm" className="bg-background/90" onClick={viewProfile}>
@@ -685,9 +705,7 @@ export function VariantE({
             {name}
             <div className="mt-1">{handleField}</div>
           </div>
-          <div className="absolute top-full left-0 mt-2 max-w-full sm:left-35">
-            {aliases}
-          </div>
+          <div className="absolute top-full left-0 mt-2 max-w-full sm:left-35">{aliases}</div>
         </div>
         <div className="mt-8 border-t pt-6">{biography}</div>
       </div>
@@ -720,6 +738,8 @@ function InlineProfileText({
   const label = kind === 'name' ? 'Display name' : 'Profile handle';
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const profileForm = useRef<HTMLFormElement>(null);
+  const readHeight = useRef<number | undefined>(undefined);
   const wasEditing = useRef(false);
   useEffect(() => {
     if (editing) input.current?.focus();
@@ -733,13 +753,16 @@ function InlineProfileText({
     draft !== null &&
     (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
   if (appearance === 'profile') {
-    const typography = kind === 'name'
-      ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl'
-      : 'text-base font-normal text-muted-foreground sm:text-lg';
+    const typography =
+      kind === 'name'
+        ? 'text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl'
+        : 'text-base font-normal text-muted-foreground sm:text-lg';
     return (
       <div className="relative flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
         <form
-          className={`flex min-w-0 max-w-full items-center gap-1 ${typography}`}
+          ref={profileForm}
+          className={`flex min-w-0 max-w-full gap-1 ${editing ? 'items-start' : 'items-center'} ${typography}`}
+          style={{ minHeight: editing ? readHeight.current : undefined }}
           onSubmit={(event) => {
             event.preventDefault();
             if (editing && valid && draft.trim() !== value) onSave(draft.trim());
@@ -771,7 +794,10 @@ function InlineProfileText({
             ) : kind === 'name' ? (
               <h1 className="min-w-0 break-words">{value}</h1>
             ) : (
-              <p className="min-w-0 break-all"><span className="sr-only">@</span>{value}</p>
+              <p className="min-w-0 break-all">
+                <span className="sr-only">@</span>
+                {value}
+              </p>
             )}
           </div>
           {editing ? (
@@ -779,6 +805,7 @@ function InlineProfileText({
               <PrototypeIconButton
                 label={`Save ${label.toLowerCase()}`}
                 type="submit"
+                className="mt-[calc((1lh-1.5rem)/2)]"
                 buttonClassName="size-6"
                 disabled={!valid || draft.trim() === value}
               >
@@ -786,6 +813,7 @@ function InlineProfileText({
               </PrototypeIconButton>
               <PrototypeIconButton
                 label="Cancel"
+                className="mt-[calc((1lh-1.5rem)/2)]"
                 buttonClassName="size-6"
                 onClick={() => onDraft(null)}
               >
@@ -799,7 +827,10 @@ function InlineProfileText({
               buttonClassName="size-6"
               disabled={disabled}
               aria-describedby={disabled ? disabledHintId : undefined}
-              onClick={() => onDraft(value)}
+              onClick={() => {
+                readHeight.current = profileForm.current?.getBoundingClientRect().height;
+                onDraft(value);
+              }}
             >
               <Pencil className="size-[1ex]" />
             </PrototypeIconButton>
@@ -807,8 +838,14 @@ function InlineProfileText({
         </form>
         {!editing && disabledNotice}
         {editing && !valid && (
-          <p id={`prototype-inline-${kind}-error`} role="alert" className="w-full text-xs text-destructive">
-            {kind === 'name' ? 'Enter a display name.' : 'Use lowercase letters, numbers, and single hyphens.'}
+          <p
+            id={`prototype-inline-${kind}-error`}
+            role="alert"
+            className="w-full text-xs text-destructive"
+          >
+            {kind === 'name'
+              ? 'Enter a display name.'
+              : 'Use lowercase letters, numbers, and single hyphens.'}
           </p>
         )}
       </div>
@@ -1086,9 +1123,13 @@ function BiographyEditor({
   const limit = profile.biographyMaxLength ?? 5000;
   return (
     <div className="relative space-y-4">
-      <fieldset className={compact
-        ? 'absolute -top-8 left-0 flex h-5 gap-1'
-        : 'flex gap-1 rounded-lg bg-muted/60 p-1'}>
+      <fieldset
+        className={
+          compact
+            ? 'absolute -top-8 left-0 flex h-5 gap-1'
+            : 'flex gap-1 rounded-lg bg-muted/60 p-1'
+        }
+      >
         <legend className="sr-only">Biography editor view</legend>
         <Button
           className={compact ? 'h-5 px-2 text-xs' : 'flex-1'}
@@ -1119,9 +1160,11 @@ function BiographyEditor({
           <Textarea
             ref={textarea}
             id="prototype-biography"
-            className={compact
-              ? 'min-h-48 resize-y rounded-sm border-0 bg-transparent p-0 text-base leading-7 shadow-none md:text-base dark:bg-transparent'
-              : 'min-h-48 resize-y text-sm leading-6'}
+            className={
+              compact
+                ? 'min-h-48 resize-y rounded-sm border-0 bg-transparent p-0 text-base leading-7 shadow-none md:text-base dark:bg-transparent'
+                : 'min-h-48 resize-y text-sm leading-6'
+            }
             placeholder="A little about you…"
             value={draft}
             onChange={(event) => setEdit({ ...currentEdit, draft: event.target.value })}

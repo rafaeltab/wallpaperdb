@@ -13,7 +13,13 @@ const names: Record<PrototypeVariant, string> = {
   E: 'Edit in place',
 };
 
-const previous: Record<PrototypeVariant, PrototypeVariant> = { A: 'E', B: 'A', C: 'B', D: 'C', E: 'D' };
+const previous: Record<PrototypeVariant, PrototypeVariant> = {
+  A: 'E',
+  B: 'A',
+  C: 'B',
+  D: 'C',
+  E: 'D',
+};
 const next: Record<PrototypeVariant, PrototypeVariant> = { A: 'B', B: 'C', C: 'D', D: 'E', E: 'A' };
 
 // Throwaway controls for comparing local UI variations; remove after choosing a design.

@@ -1,15 +1,14 @@
 ---
 title: Error Handling
-description: RFC 7807 Problem Details pattern for structured HTTP errors
+description: Reference for existing Problem Details helpers and HTTP adapter examples
 ---
 
-WallpaperDB uses RFC 7807 Problem Details for all HTTP API errors, providing machine-readable error responses with consistent structure and extensibility.
+This page documents existing `ProblemDetailsError` helpers and HTTP adapter examples. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) defines the required application failure model, HTTP error format, problem-type URLs, and safe-detail rules, including the GraphQL response exception. The examples below describe existing implementations that may still need migration to those standards.
 
 ## Quick Reference
 
-**Base classes:**
+**Existing HTTP error helper:**
 - `ProblemDetailsError` - RFC 7807 compliant errors (for HTTP APIs)
-- `ApplicationError` - Generic application errors (for internal use)
 
 **Response format:**
 ```json
@@ -25,11 +24,11 @@ WallpaperDB uses RFC 7807 Problem Details for all HTTP API errors, providing mac
 
 **Content-Type:** `application/problem+json`
 
-## RFC 7807 Overview
+## Existing Problem Details Shape
 
-[RFC 7807](https://tools.ietf.org/html/rfc7807) defines a standard format for HTTP API error responses:
+The existing helpers were written against [RFC 7807](https://tools.ietf.org/html/rfc7807). Current requirements are in [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#public-http-apis).
 
-**Required fields:**
+**Fields in the helper's output:**
 - `type` - URI identifying the problem type (permanent, dereferenceable documentation URL)
 - `title` - Short, human-readable summary (same for all occurrences of this type)
 - `status` - HTTP status code
@@ -41,7 +40,7 @@ Additional context can be added as custom fields (e.g., `receivedMimeType`, `tra
 
 **Benefits:**
 - Machine-readable error types
-- Consistent structure across all APIs
+- Consistent structure for HTTP clients consuming these responses
 - Extensible with custom fields
 - Self-documenting (type URL points to docs)
 - Better client error handling
@@ -80,7 +79,7 @@ export abstract class ProblemDetailsError extends Error {
 }
 ```
 
-## Creating Custom Errors
+## Existing Custom Error Examples
 
 ### Basic Error
 
@@ -375,65 +374,9 @@ export class EventPublishingFailedError extends ProblemDetailsError {
 }
 ```
 
-## ApplicationError (Internal Use)
-
-For non-HTTP errors (internal application logic):
-
-```typescript
-import { ApplicationError, ValidationError } from '@wallpaperdb/core/errors';
-
-export class MyServiceError extends ApplicationError {
-  readonly code = 'MY_SERVICE_ERROR';
-  readonly statusCode = 500;
-}
-
-// Pre-defined errors in @wallpaperdb/core/errors:
-// - InternalError (500)
-// - DataIncompleteError (500)
-// - NotFoundError (404)
-// - ValidationError (400)
-// - UnauthorizedError (401)
-// - ForbiddenError (403)
-// - ConflictError (409)
-```
-
-**Usage:**
-```typescript
-import { ValidationError } from '@wallpaperdb/core/errors';
-
-function processData(data: unknown) {
-  if (!isValid(data)) {
-    throw new ValidationError('Invalid data format', { receivedType: typeof data });
-  }
-}
-```
-
-**Difference from ProblemDetailsError:**
-- `ApplicationError` is for internal use (services, background jobs)
-- `ProblemDetailsError` is for HTTP API responses (routes)
-- `ApplicationError` has `code` and `context`, `ProblemDetailsError` has `type`, `title`, `instance`
-
 ## Error Documentation URLs
 
-**Best practice:** Host documentation for each error type at its `type` URL.
-
-**Example structure:**
-```
-https://wallpaperdb.example/problems/
-  ├── missing-user-id          → Docs for MissingUserId
-  ├── invalid-file-format      → Docs for InvalidFileFormatError
-  ├── file-too-large           → Docs for FileTooLargeError
-  └── rate-limit-exceeded      → Docs for RateLimitExceededError
-```
-
-**Documentation should include:**
-- Description of the error
-- Common causes
-- How to fix it
-- Related API documentation
-- Example request/response
-
-**Future:** Auto-generate error documentation from TypeScript definitions.
+The placeholder URLs in the existing examples predate the accepted problem-type URI scheme. Use [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#public-http-apis) for the required URLs.
 
 ## Client-Side Error Handling
 
@@ -539,19 +482,6 @@ describe('POST /upload', () => {
   });
 });
 ```
-
-## Best Practices
-
-1. **Use specific error types** - Create dedicated error classes for each failure mode
-2. **Include context** - Pass relevant data in `extensions` for debugging
-3. **Consistent URLs** - Use permanent, dereferenceable URLs for `type`
-4. **Document errors** - Host documentation at the `type` URL
-5. **Add trace IDs** - Include `traceId` in 5xx errors for debugging
-6. **Test error paths** - Write tests for all error scenarios
-7. **Don't leak internals** - Avoid exposing stack traces or sensitive data in error responses
-8. **Use retry headers** - Include `Retry-After` for rate limits and temporary failures
-9. **Log before throwing** - Log errors with full context before throwing
-10. **Catch at boundaries** - Catch and serialize errors at route handlers, not in services
 
 ## Related Documentation
 

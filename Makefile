@@ -52,7 +52,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 .PHONY: help install dev build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
-        migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info \
+        migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
         storage-test storage-infra-test coverage-summary crap check-crap crap-check-types \
         worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci clean
 
@@ -178,6 +178,9 @@ redis-info: ## Show Redis info
 nats-setup-streams: ## Initialize NATS streams
 	@NATS_SERVER=nats://localhost:$(NATS_HOST_PORT) ./infra/nats/init/setup-streams.sh
 
+nats-stream-setup-test: ## Verify stream creation and retention upgrades
+	@pnpm exec vitest run infra/nats/init/setup-streams.test.ts --maxWorkers=1 --no-file-parallelism
+
 nats-stream-list: ## List NATS streams
 	@nats stream list --server nats://localhost:$(NATS_HOST_PORT)
 
@@ -245,6 +248,7 @@ worktree-env-test: ## Verify generated service credentials and environment rules
 
 ci: test-make crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
 	@$(MAKE) worktree-env-test
+	@$(MAKE) nats-stream-setup-test
 	@$(MAKE) sandcastle-test
 	@$(MAKE) sandcastle-check-types
 	@$(MAKE) storage-infra-test

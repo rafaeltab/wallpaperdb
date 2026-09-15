@@ -10,14 +10,14 @@ After starting the infrastructure, run the setup script:
 make nats-setup-streams
 ```
 
-This will create all required streams for the application.
+This creates missing streams and updates existing streams' age limits in place, preserving their messages and other settings.
 
 ## Available Scripts
 
 ### `setup-streams.sh`
-Main setup script that creates all required NATS JetStream streams.
+Main setup script that creates required NATS JetStream streams and applies their retention age limits.
 
-- **Idempotent**: Safe to run multiple times (checks if stream exists first)
+- **Idempotent**: Safe to run multiple times; existing streams are updated without replacement
 - **Environment variable**: Set `NATS_SERVER` to override default (`nats://localhost:4222`)
 
 **Usage:**
@@ -35,16 +35,17 @@ NATS_SERVER=nats://other-host:4222 ./infra/nats/init/setup-streams.sh
 ## Stream Definitions
 
 ### WALLPAPER Stream
-- **Subjects**: `wallpaper.*` (e.g., `wallpaper.uploaded`, `wallpaper.processed`)
+- **Subjects**: `wallpaper.>` (e.g., `wallpaper.uploaded`, `wallpaper.processed`)
 - **Storage**: File-based persistence
 - **Retention**: Limits-based (no automatic deletion)
-- **Max Age**: 1 year
+- **Max Age**: Unlimited pending the cross-application retention review in issue #162
 - **Max Messages**: Unlimited
 - **Max Bytes**: Unlimited
 
 Used by:
 - **Ingestor Service**: Publishes `wallpaper.uploaded` events
 - **Media Service**: Consumes `wallpaper.uploaded` events
+- **User Service**: Replays publication events into the Biography wallpaper ownership projection
 
 ### PROFILE Stream
 - **Subjects**: `profile.>` (e.g., `profile.created`)
@@ -53,6 +54,8 @@ Used by:
 - **Max Age**: Unlimited pending the cross-application retention review in issue #162
 
 Used by the User Service transactional outbox and downstream Profile projections.
+
+Run setup when upgrading an existing installation to remove the former one-year WALLPAPER age limit. [NATS defines a zero maximum age as unlimited](https://nats-io.github.io/nats.js/jetstream/types/StreamUpdateConfig.html); the setup script applies this through the CLI without deleting or recreating streams. Events already expired before the upgrade cannot be recovered by replay.
 
 ## Management Commands
 
@@ -71,12 +74,12 @@ make nats-stream-info
 To add a new stream, edit `setup-streams.sh` and add:
 
 ```bash
-create_stream_if_not_exists "STREAM_NAME" "subject.pattern.>"
+ensure_stream "STREAM_NAME" "subject.pattern.>"
 ```
 
 Example:
 ```bash
-create_stream_if_not_exists "ANALYTICS" "analytics.>"
+ensure_stream "ANALYTICS" "analytics.>"
 ```
 
 ## Testing vs Production
@@ -94,7 +97,7 @@ make nats-setup-streams
 ## Troubleshooting
 
 ### Stream already exists
-This is normal - the script is idempotent and will skip existing streams.
+This is normal: the script updates the configured age limit in place and preserves retained messages.
 
 ### Connection refused
 Ensure NATS is running:
@@ -126,7 +129,7 @@ All streams use the following default configuration:
 - **Retention**: Limits-based
 - **Max Messages**: Unlimited (-1)
 - **Max Bytes**: Unlimited (-1)
-- **Max Age**: 1 year
+- **Max Age**: Unlimited (0)
 - **Max Message Size**: Unlimited (-1)
 - **Discard Policy**: Old (discard oldest when limits reached)
 - **Acknowledgments**: Enabled

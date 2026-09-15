@@ -18,6 +18,8 @@ import {
   IdentityProviderToken,
 } from './clerk-identity.service.js';
 
+import { type ProfileReader, recentHistoricalHandles } from './profile-history.js';
+
 const RESERVED_HANDLES = new Set([
   'admin',
   'api',
@@ -51,7 +53,6 @@ const FALLBACK_ADJECTIVES = ['quiet', 'bright', 'silver', 'wild'];
 const FALLBACK_NOUNS = ['aurora', 'canvas', 'horizon', 'pixel'];
 const ALIAS_EXPIRY_GRACE_MS = 24 * 60 * 60 * 1000;
 
-type ProfileReader = Pick<ReturnType<DatabaseConnection['getClient']>['db'], 'query'>;
 type ProfileTransaction = Parameters<
   Parameters<ReturnType<DatabaseConnection['getClient']>['db']['transaction']>[0]
 >[0];
@@ -69,6 +70,11 @@ export interface OwnerProfile extends Profile {
     expiresAt: string | null;
   }>;
   retainedAliasLimit: number;
+  historicalHandles: Array<{
+    handle: string;
+    eligibleUntil: string;
+    unavailableReason: null | 'claimed' | 'alias-limit';
+  }>;
 }
 
 export class IdentityUnavailableError extends Error {}
@@ -199,11 +205,13 @@ export class ProfileService {
             subject: event.eventType,
             aggregateId: userId,
             payload: event,
+            createdAt: now,
           });
           return {
             ...profile,
             aliases: [],
             retainedAliasLimit: this.config.profileRetainedAliasLimit,
+            historicalHandles: [],
           };
         });
       } catch (error) {
@@ -308,7 +316,7 @@ export class ProfileService {
               )
             );
         }
-        const owner = await this.ownerProfile(updated, tx);
+        const aliases = await this.profileAliases(updated, tx);
         const event: ProfileUpdatedEvent = {
           eventId: `evt_${ulid()}`,
           eventType: PROFILE_UPDATED_SUBJECT,
@@ -324,7 +332,7 @@ export class ProfileService {
             displayName: updated.displayName,
             handle: updated.handle,
             claimGeneration: claim.claimGeneration,
-            aliases: owner.aliases,
+            aliases,
             biographyMarkdown: updated.biographyMarkdown,
             pictureAssetId: updated.pictureAssetId,
             version: updated.version,
@@ -338,8 +346,9 @@ export class ProfileService {
           subject: event.eventType,
           aggregateId: userId,
           payload: event,
+          createdAt: now,
         });
-        return owner;
+        return this.ownerProfile(updated, tx, aliases, now);
       })
       .catch((error: unknown) => {
         if (isUniqueViolation(error))
@@ -391,7 +400,7 @@ export class ProfileService {
         where: eq(handleClaims.handle, updated.handle),
       });
       if (!claim) throw new Error('Current Profile Handle claim is missing');
-      const owner = await this.ownerProfile(updated, tx);
+      const aliases = await this.profileAliases(updated, tx);
       const event: ProfileUpdatedEvent = {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
@@ -407,7 +416,7 @@ export class ProfileService {
           displayName: updated.displayName,
           handle: updated.handle,
           claimGeneration: claim.claimGeneration,
-          aliases: owner.aliases,
+          aliases,
           biographyMarkdown: updated.biographyMarkdown,
           pictureAssetId: updated.pictureAssetId,
           version: updated.version,
@@ -421,8 +430,9 @@ export class ProfileService {
         subject: event.eventType,
         aggregateId: userId,
         payload: event,
+        createdAt: now,
       });
-      return owner;
+      return this.ownerProfile(updated, tx, aliases, now);
     });
   }
 
@@ -511,7 +521,7 @@ export class ProfileService {
       where: eq(handleClaims.handle, profile.handle),
     });
     if (!claim) throw new Error('Current Profile Handle claim is missing');
-    const owner = await this.ownerProfile(updated, tx);
+    const aliases = await this.profileAliases(updated, tx);
     const event: ProfileUpdatedEvent = {
       eventId: `evt_${ulid()}`,
       eventType: PROFILE_UPDATED_SUBJECT,
@@ -529,7 +539,7 @@ export class ProfileService {
         displayName: updated.displayName,
         handle: updated.handle,
         claimGeneration: claim.claimGeneration,
-        aliases: owner.aliases,
+        aliases,
         biographyMarkdown: updated.biographyMarkdown,
         pictureAssetId: updated.pictureAssetId,
         version: updated.version,
@@ -538,15 +548,14 @@ export class ProfileService {
       },
     };
     ProfileUpdatedEventSchema.parse(event);
-    await tx
-      .insert(outboxEvents)
-      .values({
-        id: event.eventId,
-        subject: event.eventType,
-        aggregateId: profile.id,
-        payload: event,
-      });
-    return owner;
+    await tx.insert(outboxEvents).values({
+      id: event.eventId,
+      subject: event.eventType,
+      aggregateId: profile.id,
+      payload: event,
+      createdAt: now,
+    });
+    return this.ownerProfile(updated, tx, aliases, now);
   }
 
   private async findOwnerProfile(userId: string): Promise<OwnerProfile | undefined> {
@@ -561,20 +570,40 @@ export class ProfileService {
     });
   }
 
-  private async ownerProfile(profile: Profile, reader: ProfileReader): Promise<OwnerProfile> {
+  private async profileAliases(
+    profile: Profile,
+    reader: ProfileReader
+  ): Promise<OwnerProfile['aliases']> {
     const aliases = await reader.query.handleClaims.findMany({
       where: and(eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'alias')),
       columns: { handle: true, claimGeneration: true, createdAt: true, expiresAt: true },
       orderBy: [handleClaims.createdAt, handleClaims.handle],
     });
+    return aliases.map((alias) => ({
+      ...alias,
+      createdAt: alias.createdAt.toISOString(),
+      expiresAt: alias.expiresAt?.toISOString() ?? null,
+    }));
+  }
+
+  private async ownerProfile(
+    profile: Profile,
+    reader: ProfileReader,
+    aliases?: OwnerProfile['aliases'],
+    now = new Date()
+  ): Promise<OwnerProfile> {
+    const activeAliases = aliases ?? (await this.profileAliases(profile, reader));
+    const retained = new Set(
+      activeAliases.filter((alias) => alias.expiresAt === null).map((alias) => alias.handle)
+    );
+    const history = await recentHistoricalHandles(reader, profile.id, now);
     return {
       ...profile,
       retainedAliasLimit: this.config.profileRetainedAliasLimit,
-      aliases: aliases.map((alias) => ({
-        ...alias,
-        createdAt: alias.createdAt.toISOString(),
-        expiresAt: alias.expiresAt?.toISOString() ?? null,
-      })),
+      aliases: activeAliases,
+      historicalHandles: history
+        .filter(({ handle }) => handle !== profile.handle && !retained.has(handle))
+        .map((entry) => ({ ...entry, unavailableReason: null })),
     };
   }
 
@@ -624,7 +653,7 @@ export class ProfileService {
       });
       if (!claim) throw new Error('Current Profile Handle claim is missing');
 
-      const owner = await this.ownerProfile(updated, tx);
+      const aliases = await this.profileAliases(updated, tx);
       const event: ProfileUpdatedEvent = {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
@@ -639,7 +668,7 @@ export class ProfileService {
           displayName: updated.displayName,
           handle: updated.handle,
           claimGeneration: claim.claimGeneration,
-          aliases: owner.aliases,
+          aliases,
           biographyMarkdown: updated.biographyMarkdown,
           pictureAssetId: updated.pictureAssetId,
           version: updated.version,
@@ -653,8 +682,9 @@ export class ProfileService {
         subject: event.eventType,
         aggregateId: userId,
         payload: event,
+        createdAt: now,
       });
-      return owner;
+      return this.ownerProfile(updated, tx, aliases, now);
     });
   }
 

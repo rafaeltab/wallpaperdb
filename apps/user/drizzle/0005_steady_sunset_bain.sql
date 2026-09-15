@@ -1,0 +1,1 @@
+CREATE INDEX "outbox_events_profile_history_idx" ON "outbox_events" USING btree ("aggregate_id","created_at");

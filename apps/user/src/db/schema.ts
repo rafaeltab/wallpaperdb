@@ -59,7 +59,10 @@ export const outboxEvents = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp('published_at', { withTimezone: true }),
   },
-  (table) => [index('outbox_events_unpublished_idx').on(table.publishedAt)]
+  (table) => [
+    index('outbox_events_unpublished_idx').on(table.publishedAt),
+    index('outbox_events_profile_history_idx').on(table.aggregateId, table.createdAt),
+  ]
 );
 
 export type Profile = typeof profiles.$inferSelect;

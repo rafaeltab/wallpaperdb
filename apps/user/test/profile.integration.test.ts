@@ -155,6 +155,27 @@ describe('Profile commands', () => {
     });
   }
 
+  it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      expect(original.historicalHandles).toEqual([]);
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      expect(changed.historicalHandles).toEqual([]);
+      vi.setSystemTime(new Date('2030-02-10T00:00:00.000Z'));
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      expect(scheduled.historicalHandles).toEqual([{ handle: original.handle, eligibleUntil: '2030-03-12T00:00:00.000Z', unavailableReason: null }]);
+      expect((await request('user_1')).json()).toEqual(scheduled);
+      vi.setSystemTime(new Date('2030-02-11T00:00:00.000Z'));
+      const expired = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+      expect(expired.historicalHandles).toEqual([{ handle: original.handle, eligibleUntil: '2030-03-13T00:00:00.000Z', unavailableReason: null }]);
+      expect((await request('user_1')).json()).toEqual(expired);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('immediately expires a scheduled alias through a versioned owner command', async () => {
     const original = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();

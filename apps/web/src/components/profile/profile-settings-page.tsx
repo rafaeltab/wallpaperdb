@@ -5,6 +5,7 @@ import { Loader2, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
+import { ProfilePictureSettings } from '@/components/profile/profile-picture-settings';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -162,6 +163,7 @@ function DisplayNameSettings({
         </div>
       </div>
 
+      <ProfilePictureSettings profile={profile} tokenProvider={tokenProvider} />
       <Card>
         <CardHeader>
           <CardTitle>Public identity</CardTitle>

@@ -68,13 +68,33 @@ describe('UserMenu', () => {
 
   it('uses WallpaperDB owner pictures and generated avatars without returning to the Clerk image', () => {
     (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true, userId: 'user_123' });
-    (useUser as Mock).mockReturnValue({ user: { fullName: 'Ada Lovelace', imageUrl: 'https://clerk.example/avatar.png' } });
+    (useUser as Mock).mockReturnValue({
+      user: { fullName: 'Ada Lovelace', imageUrl: 'https://clerk.example/avatar.png' },
+    });
     const client = new QueryClient();
-    const { container } = render(<QueryClientProvider client={client}><UserMenu /></QueryClientProvider>);
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <UserMenu />
+      </QueryClientProvider>
+    );
     expect(screen.getByRole('img')).toHaveTextContent('AL');
-    act(() => client.setQueryData(profileQueryKey('user_123'), { id: 'user_123', displayName: 'Ada Lovelace', pictureAssetId: 'owner_picture', version: 2 }));
+    act(() =>
+      client.setQueryData(profileQueryKey('user_123'), {
+        id: 'user_123',
+        displayName: 'Ada Lovelace',
+        pictureAssetId: 'owner_picture',
+        version: 2,
+      })
+    );
     expect(screen.getByRole('img')).toHaveAttribute('src', '/media/profile-pictures/owner_picture');
-    act(() => client.setQueryData(profileQueryKey('user_123'), { id: 'user_123', displayName: 'Ada Lovelace', pictureAssetId: null, version: 3 }));
+    act(() =>
+      client.setQueryData(profileQueryKey('user_123'), {
+        id: 'user_123',
+        displayName: 'Ada Lovelace',
+        pictureAssetId: null,
+        version: 3,
+      })
+    );
     expect(screen.getByRole('img')).toHaveTextContent('AL');
     expect(container.querySelector('img[src*="clerk.example"]')).toBeNull();
   });

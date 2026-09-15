@@ -40,14 +40,18 @@ export function UserMenu() {
   }
 
   if (!user) return null;
-  const displayName = owner?.displayName || user.fullName || user.primaryEmailAddress?.emailAddress || 'Your Profile';
+  const displayName =
+    owner?.displayName || user.fullName || user.primaryEmailAddress?.emailAddress || 'Your Profile';
   const profile = owner ?? { id: userId ?? 'current-user', displayName, pictureAssetId: null };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button data-testid="user-menu-trigger" variant="ghost" size="sm" className="gap-2">
-          <ProfilePicture profile={profile} className="flex size-6 shrink-0 items-center justify-center rounded-full object-cover text-xs font-medium text-white" />
+          <ProfilePicture
+            profile={profile}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full object-cover text-xs font-medium text-white"
+          />
           <span data-testid="user-menu-user-name" className="hidden sm:inline">
             {displayName}
           </span>

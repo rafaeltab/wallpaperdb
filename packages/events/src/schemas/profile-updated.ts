@@ -15,15 +15,18 @@ export const ProfileUpdatedEventSchema = z
           before: z.string().min(1).nullable(),
           after: z.string().min(1).nullable(),
           source: z.enum(["upload", "clerk-import", "remove"]),
-          asset: z.object({
-            id: z.string().min(1),
-            storageBucket: z.string().min(1),
-            storageKey: z.string().min(1),
-            mimeType: z.literal("image/webp"),
-            width: z.number().int().positive(),
-            height: z.number().int().positive(),
-            fileSizeBytes: z.number().int().positive(),
-          }).strict().nullable(),
+          asset: z
+            .object({
+              id: z.string().min(1),
+              storageBucket: z.string().min(1),
+              storageKey: z.string().min(1),
+              mimeType: z.literal("image/webp"),
+              width: z.number().int().positive(),
+              height: z.number().int().positive(),
+              fileSizeBytes: z.number().int().positive(),
+            })
+            .strict()
+            .nullable(),
         })
         .strict(),
       z

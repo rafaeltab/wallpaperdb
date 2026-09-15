@@ -938,7 +938,9 @@ export class ProfileService {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
         timestamp: now.toISOString(),
-        change: current.biographyMarkdown !== updated.biographyMarkdown ? {
+        change: current.displayName !== updated.displayName && current.biographyMarkdown !== updated.biographyMarkdown ? {
+          type: 'profile-details-changed', before: { displayName: current.displayName, biographyMarkdown: current.biographyMarkdown }, after: { displayName: updated.displayName, biographyMarkdown: updated.biographyMarkdown },
+        } : current.biographyMarkdown !== updated.biographyMarkdown ? {
           type: 'biography-changed', before: current.biographyMarkdown, after: updated.biographyMarkdown,
         } : { type: 'display-name-changed', before: current.displayName, after: updated.displayName },
         profile: {

@@ -167,6 +167,19 @@ describe('Profile commands', () => {
     });
   }
 
+  it('audits a combined Display-name and Biography edit in one atomic Profile version', async () => {
+    const original = (await request('user_1')).json();
+    const biographyMarkdown = 'A new **Biography**.';
+    const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { displayName: '  New Name  ', biographyMarkdown, expectedVersion: original.version } });
+    expect(response.statusCode).toBe(200);
+    const updated = response.json();
+    expect(updated).toMatchObject({ displayName: 'New Name', biographyMarkdown, version: original.version + 1 });
+    const [event] = await sql`select payload from outbox_events where subject = 'profile.updated'`;
+    expect(event.payload.change).toEqual({ type: 'profile-details-changed', before: { displayName: original.displayName, biographyMarkdown: original.biographyMarkdown }, after: { displayName: updated.displayName, biographyMarkdown } });
+    expect(event.payload.profile).toMatchObject({ displayName: 'New Name', biographyMarkdown, version: updated.version, aliases: updated.aliases });
+    expect((await sql`select id from outbox_events where subject = 'profile.updated'`)).toHaveLength(1);
+  });
+
   it('enforces the configured Biography limit in Unicode code points without truncating authored text', async () => {
     const previousLimit = config.profileBiographyMaxLength;
     config.profileBiographyMaxLength = 4;

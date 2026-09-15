@@ -118,6 +118,14 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("records combined Profile details with explicit before and after values", () => {
+      const before = { displayName: "Old Name", biographyMarkdown: "Old **Biography**" };
+      const after = { displayName: "New Name", biographyMarkdown: "" };
+      const changed = { ...event, change: { type: "profile-details-changed", before, after }, profile: { ...event.profile, ...after } };
+      expect(ProfileUpdatedEventSchema.parse(changed)).toEqual(changed);
+      expect(ProfileUpdatedEventSchema.safeParse({ ...changed, change: { ...changed.change, before: { displayName: "Old Name" } } }).success).toBe(false);
+    });
+
     it("records authored Biography changes including clearing without generating HTML", () => {
       for (const after of ["  # Hello 👋\n\n`<literal>`\n", ""]) {
         const changed = { ...event, change: { type: "biography-changed", before: "Previous **Biography**", after }, profile: { ...event.profile, biographyMarkdown: after } };

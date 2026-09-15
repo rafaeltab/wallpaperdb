@@ -99,8 +99,9 @@ describe('User API client', () => {
     vi.stubGlobal('fetch', fetch);
     const client = createUserApiClient({ baseUrl: '/user/', tokenProvider });
 
-    await expect(client.removePicture({ expectedVersion: 2, expectedProfileId: profile.id }))
-      .resolves.toEqual(updated);
+    await expect(
+      client.removePicture({ expectedVersion: 2, expectedProfileId: profile.id })
+    ).resolves.toEqual(updated);
     expect(tokenProvider).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledWith('/user/profile/me/picture', {
       method: 'DELETE',

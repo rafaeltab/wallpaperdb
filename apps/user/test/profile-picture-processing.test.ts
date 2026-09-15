@@ -10,6 +10,15 @@ describe('Profile picture processing', () => {
     await expect(processProfilePicture(input, { ...limits, maxBytes: input.length - 1 })).rejects.toThrow('Picture exceeds the upload byte limit');
   });
 
+  it.each(['webp', 'png'])('rejects animated %s instead of silently selecting its first frame', async (format) => {
+    // Two one-pixel frames with distinct colors.
+    const gif = Buffer.from('47494638396101000100800000000000ffffff21ff0b4e45545343415045322e30030100000021f904000a0000002c000000000100010000020244010021f904000a0000002c00000000010001000002024c01003b', 'hex');
+    const input = format === 'webp' ? await sharp(gif, { animated: true }).webp().toBuffer()
+      : Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAABAAAAAQAAAAAAAAAAAAEACgAAWn8w0AAAAA1JREFUeJxj+M/A8B8ABQAB/4mZPR0AAAAaZmNUTAAAAAEAAAABAAAAAQAAAAAAAAAAAAEACgAAwQzaBAAAABFmZEFUAAAAAnicY2Bg+P8fAAMCAf/1e6XXAAAAAElFTkSuQmCC', 'base64');
+    if (format === 'webp') expect((await sharp(input).metadata()).pages).toBe(2);
+    await expect(processProfilePicture(input, limits)).rejects.toThrow('Animated pictures are not accepted');
+  });
+
   it.each(['svg', 'tiff'])('rejects unsupported %s pictures', async (format) => {
     const input = format === 'svg' ? Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2"><rect width="3" height="2" fill="red"/></svg>')
       : await sharp({ create: { width: 3, height: 2, channels: 3, background: '#3578aa' } }).tiff().toBuffer();

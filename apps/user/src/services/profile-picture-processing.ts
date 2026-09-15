@@ -16,6 +16,20 @@ export interface ProcessedPicture {
   height: number;
 }
 
+function hasPngAnimation(input: Buffer): boolean {
+  if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return false;
+  for (let offset = 8; offset + 12 <= input.length; ) {
+    const length = input.readUInt32BE(offset);
+    if (length > input.length - offset - 12)
+      throw new InvalidProfilePictureError('Picture could not be decoded');
+    const type = input.toString('ascii', offset + 4, offset + 8);
+    if (type === 'acTL') return true;
+    if (type === 'IEND') break;
+    offset += length + 12;
+  }
+  return false;
+}
+
 export async function processProfilePicture(
   input: Buffer,
   limits: PictureLimits
@@ -28,6 +42,8 @@ export async function processProfilePicture(
     (input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP');
   if (!supported)
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  if (hasPngAnimation(input))
+    throw new InvalidProfilePictureError('Animated pictures are not accepted');
   const decoder = sharp(input, {
     limitInputPixels: limits.maxPixels,
     failOn: 'warning',
@@ -36,6 +52,9 @@ export async function processProfilePicture(
   const metadata = await decoder.metadata();
   if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  }
+  if ((metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined) {
+    throw new InvalidProfilePictureError('Animated pictures are not accepted');
   }
   const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
   if (!pixels || pixels > limits.maxPixels)

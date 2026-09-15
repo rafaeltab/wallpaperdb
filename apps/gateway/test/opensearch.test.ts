@@ -2,6 +2,8 @@ import "reflect-metadata";
 import { Client } from "@opensearch-project/opensearch";
 import { container } from "tsyringe";
 import { beforeAll, describe, expect, it } from "vitest";
+import { profilesIndexMapping } from "../src/opensearch/mappings.js";
+import { ProfileRepository } from "../src/repositories/profile.repository.js";
 import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
 import { IndexManagerService } from "../src/services/index-manager.service.js";
 import { tester } from "./setup.js";
@@ -18,6 +20,52 @@ describe("OpenSearch Integration", () => {
     }, 60000);
 
     describe("IndexManagerService", () => {
+        it("adds alias lifetime date mappings to an existing index without losing Profiles", async () => {
+            const indexManager = container.resolve(IndexManagerService);
+            const profileRepository = container.resolve(ProfileRepository);
+            const indexName = indexManager.getIndexName("profiles");
+            await indexManager.deleteIndex("profiles");
+            await client.indices.create({
+                index: indexName,
+                body: {
+                    mappings: {
+                        properties: {
+                            ...profilesIndexMapping.properties,
+                            aliases: {
+                                type: "nested",
+                                properties: {
+                                    handle: { type: "keyword" },
+                                    claimGeneration: { type: "long" },
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            const profile = {
+                id: "user_existing_alias_mapping",
+                displayName: "Alias Owner",
+                handle: "mapping-current",
+                claimGeneration: 2,
+                aliases: [{ handle: "mapping-alias", claimGeneration: 1 }],
+                biographyMarkdown: "",
+                pictureAssetId: null,
+                version: 2,
+                createdAt: "2026-01-01T00:00:00.000Z",
+                updatedAt: "2026-01-02T00:00:00.000Z",
+            };
+            await profileRepository.project(profile);
+
+            await indexManager.createIndex("profiles");
+
+            const index = await client.indices.get({ index: indexName });
+            expect(index.body[indexName].mappings.properties.aliases).toMatchObject({
+                type: "nested",
+                properties: { createdAt: { type: "date" }, expiresAt: { type: "date" } },
+            });
+            expect(await profileRepository.findById(profile.id)).toEqual(profile);
+        });
+
         it("should manage independently mapped named indexes", async () => {
             const indexManager = container.resolve(IndexManagerService);
             const indexName = "test-secondary-index";

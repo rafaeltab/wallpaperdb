@@ -61,6 +61,8 @@ export const profilesIndexMapping = {
       properties: {
         handle: { type: 'keyword' },
         claimGeneration: { type: 'long' },
+        createdAt: { type: 'date' },
+        expiresAt: { type: 'date' },
       },
     },
     biographyMarkdown: { type: 'text', index: false },

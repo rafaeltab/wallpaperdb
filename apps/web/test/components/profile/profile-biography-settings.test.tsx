@@ -2,12 +2,14 @@ import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileSettingsPage } from '@/components/profile/profile-settings-page';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 import { request } from '@/lib/graphql/client';
 
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/graphql/client', () => ({
   request: vi.fn().mockResolvedValue({ getWallpaper: null }),
@@ -52,6 +54,7 @@ function renderPage(initial = profile) {
 describe('Biography settings', () => {
   afterEach(() => vi.useRealTimers());
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(request).mockReset().mockResolvedValue({ getWallpaper: null });
     vi.mocked(useAuth, { partial: true }).mockReturnValue({
       getToken: vi.fn().mockResolvedValue('token'),
@@ -68,6 +71,8 @@ describe('Biography settings', () => {
     const initial = { ...profile, biographyMarkdown: '![Forest](wallpaper:wlpr_own)' };
     vi.mocked(userApi.ensureProfile).mockResolvedValue(initial);
     renderPage(initial);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit biography' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
     for (const delay of [1000, 2000, 4000])
       await act(async () => vi.advanceTimersByTimeAsync(delay));
@@ -91,7 +96,7 @@ describe('Biography settings', () => {
         ],
       },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh Biography' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh preview' }));
     await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
     expect(request).toHaveBeenCalledTimes(5);
@@ -108,19 +113,20 @@ describe('Biography settings', () => {
     vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
     const { client } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, 'Saved Biography');
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
-    expect(screen.getByRole('button', { name: 'Refresh Biography' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
+    await user.click(screen.getByRole('button', { name: 'Edit profile picture' }));
     expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
     expect(editor).toBeDisabled();
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
     const updated = { ...profile, biographyMarkdown: 'Saved Biography', version: 2 };
     await act(async () => finishSave?.(updated));
-    await user.click(screen.getByRole('button', { name: 'Refresh Biography' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Unable to refresh Biography. Try again.'
+      'Unable to refresh your Profile. Try again.'
     );
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
     expect(editor).toHaveValue('Saved Biography');
@@ -139,40 +145,50 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockResolvedValueOnce(updated);
     const { client } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     fireEvent.change(editor, { target: { value: biographyMarkdown } });
     expect(editor).toHaveValue(biographyMarkdown);
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Newly published wallpapers may take a moment; try again.'
     );
     expect(editor).toHaveValue(biographyMarkdown);
     expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(profile);
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
   });
 
   it('previews the draft through the shared safe renderer and shows an empty Biography state', async () => {
     renderPage({ ...profile, biographyMarkdown: '', biographyMaxLength: 6000 });
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
     const preview = screen.getByRole('region', { name: 'Biography preview' });
     expect(within(preview).getByText('No biography yet.')).toBeInTheDocument();
-    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.click(screen.getByRole('button', { name: 'Write' }));
+    let editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.type(editor, '**Wallpaper collector**');
-    expect(within(preview).getByText('Wallpaper collector').tagName).toBe('STRONG');
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(within(screen.getByRole('region', { name: 'Biography preview' })).getByText('Wallpaper collector').tagName).toBe('STRONG');
+    await user.click(screen.getByRole('button', { name: 'Write' }));
+    editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, '<script>alert(1)</script>');
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
     expect(
-      within(preview).getByText('This Biography cannot be displayed safely.')
+      within(screen.getByRole('region', { name: 'Biography preview' })).getByText('This Biography cannot be displayed safely.')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
   });
 
   it('keeps an unchanged Biography unsavable and adopts fresh text while the editor is pristine', async () => {
     const { client } = renderPage();
-    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Edit biography' }));
+    expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
     act(() =>
       client.setQueryData(profileQueryKey(profile.id), {
         ...profile,
@@ -185,7 +201,7 @@ describe('Biography settings', () => {
         'Fresh Biography'
       )
     );
-    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
   });
 
@@ -201,26 +217,26 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockResolvedValueOnce(updated);
     const { client } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, 'My draft');
     act(() => client.setQueryData(profileQueryKey(profile.id), remote));
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() =>
       expect(userApi.updateProfile).toHaveBeenCalledWith(
         expect.objectContaining({ biographyMarkdown: 'My draft', expectedVersion: 1 })
       )
     );
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Your Profile changed elsewhere. Refresh Biography before saving again.'
+      'Your profile changed elsewhere. Refresh profile to keep your draft and try again.'
     );
     expect(editor).toHaveValue('My draft');
-    await user.click(screen.getByRole('button', { name: 'Refresh Biography' }));
-    expect(
-      await screen.findByText('Biography refreshed. Your unsaved draft is preserved.')
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Refresh profile' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     expect(editor).toHaveValue('My draft');
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.updateProfile).toHaveBeenLastCalledWith(
       expect.objectContaining({ biographyMarkdown: 'My draft', expectedVersion: 2 })
@@ -236,15 +252,16 @@ describe('Biography settings', () => {
     });
     renderPage(initial);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.type(editor, '🙂🙂a');
     expect(screen.getByText('3 / 2 characters')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
     await user.clear(editor);
     await user.type(editor, '🙂🙂');
     expect(screen.getByText('2 / 2 characters')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() =>
       expect(userApi.updateProfile).toHaveBeenCalledWith(
         expect.objectContaining({ biographyMarkdown: '🙂🙂' })
@@ -258,10 +275,12 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockResolvedValue(updated);
     const { client } = renderPage();
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Edit biography' }));
     const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
     await user.clear(editor);
     await user.type(editor, biographyMarkdown);
-    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save biography' })).toBeEnabled(), { timeout: 2200 });
+    await user.click(screen.getByRole('button', { name: 'Save biography' }));
     await waitFor(() => expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated));
     expect(userApi.updateProfile).toHaveBeenCalledWith({
       biographyMarkdown,
@@ -270,8 +289,6 @@ describe('Biography settings', () => {
       tokenProvider: expect.any(Function),
     });
     expect(editor).toHaveValue(biographyMarkdown);
-    expect(
-      screen.getByText('Biography saved. Public views may take a moment to update.')
-    ).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith('Biography updated');
   });
 });

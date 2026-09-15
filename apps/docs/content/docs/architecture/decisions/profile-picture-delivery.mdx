@@ -9,4 +9,4 @@ Before each origin response, Media asks User whether the asset is still the curr
 
 Successful image responses use immutable caching. Removal prevents subsequent origin delivery; it cannot recall copies already downloaded or cached by browsers or a CDN. A User outage makes picture delivery unavailable. Missing assets and other errors are not cached, so a newly accepted image can become available after its projection arrives.
 
-User retains replaced and removed objects privately for 30 days. Public responses and GraphQL expose only the immutable asset ID and Media URL, never object-store credentials or the captured Clerk import URL.
+User retains replaced and removed objects privately for the configured window (30 days by default). Each asset keeps its recorded expiry when configuration changes. Public responses and GraphQL expose only the immutable asset ID and Media URL, never object-store credentials or the captured Clerk import URL.

@@ -4,4 +4,4 @@ User owns immutable Profile picture assets in private object storage and publish
 
 ## Consequences
 
-Picture delivery depends on User availability and adds an uncached authority request. Successful responses retain immutable browser/CDN caching, so removal stops subsequent origin delivery but cannot recall already downloaded or cached copies. Error responses are not cached, allowing a newly accepted picture to become available as its Media projection catches up. Retired objects remain private evidence until the 30-day retention worker deletes them.
+Picture delivery depends on User availability and adds an uncached authority request. Successful responses retain immutable browser/CDN caching, so removal stops subsequent origin delivery but cannot recall already downloaded or cached copies. Error responses are not cached, allowing a newly accepted picture to become available as its Media projection catches up. Retired objects remain private evidence until the retention worker deletes them after their configured window (30 days by default). Their recorded expiry is preserved when configuration changes.

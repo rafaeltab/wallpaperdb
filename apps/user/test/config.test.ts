@@ -16,6 +16,17 @@ describe('User service configuration', () => {
     process.env = { ...originalEnv };
   });
 
+  it('defaults Profile evidence retention to thirty days and permits a positive configured window', () => {
+    delete process.env.PROFILE_EVIDENCE_RETENTION_DAYS;
+    expect(loadConfig().profileEvidenceRetentionDays).toBe(30);
+    process.env.PROFILE_EVIDENCE_RETENTION_DAYS = '7';
+    expect(loadConfig().profileEvidenceRetentionDays).toBe(7);
+    process.env.PROFILE_EVIDENCE_RETENTION_DAYS = '0';
+    expect(() => loadConfig()).toThrow();
+    process.env.PROFILE_EVIDENCE_RETENTION_DAYS = '-1';
+    expect(() => loadConfig()).toThrow();
+  });
+
   it('configures the Biography character limit with a default of five thousand', () => {
     delete process.env.PROFILE_BIOGRAPHY_MAX_LENGTH;
     expect(loadConfig().profileBiographyMaxLength).toBe(5000);

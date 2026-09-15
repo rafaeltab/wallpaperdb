@@ -478,7 +478,7 @@ describe('Profile commands', () => {
       expect(reclaimed.statusCode).toBe(200);
       const [claimEvent] = await sql`select payload from outbox_events where aggregate_id = 'user_2' and subject = 'profile.updated'`;
       expect(claimEvent.payload.profile.claimGeneration).toBeGreaterThan(alias.claimGeneration);
-      expect((await request('user_1')).json()).toEqual(expired);
+      expect((await request('user_1')).json()).toEqual({ ...expired, historicalHandles: [{ ...expired.historicalHandles[0], unavailableReason: 'claimed' }] });
     } finally {
       vi.useRealTimers();
     }

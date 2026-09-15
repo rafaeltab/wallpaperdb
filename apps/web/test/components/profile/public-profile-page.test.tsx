@@ -1,9 +1,17 @@
+import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { PublicProfilePage } from '@/components/profile/public-profile-page';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
+
+vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, to, search, ...props }: { children: React.ReactNode; to: string; search?: Record<string, string> }) => (
+    <a href={to + (search && Object.keys(search).length ? `?${new URLSearchParams(search)}` : '')} {...props}>{children}</a>
+  ),
+}));
 
 vi.mock('@/hooks/useWallpaperInfiniteQuery', () => ({
   useWallpaperInfiniteQuery: vi.fn(),
@@ -33,6 +41,7 @@ vi.mock('@/components/LoadMoreTrigger', () => ({
 describe('PublicProfilePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: false, userId: null });
     (useWallpaperInfiniteQuery as Mock).mockReturnValue({
       data: { pages: [] },
       isLoading: false,
@@ -41,6 +50,19 @@ describe('PublicProfilePage', () => {
       hasNextPage: false,
       fetchNextPage: vi.fn(),
     });
+  });
+
+  it('offers profile editing only to the authenticated profile owner', () => {
+    const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: '', picture: null, canonicalPath: '/profiles/@ada' };
+    (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: true, userId: 'user_ada' });
+    const rendered = render(<PublicProfilePage profile={profile} />);
+    expect(screen.getByRole('link', { name: 'Edit profile' })).toHaveAttribute('href', '/settings/profile?variant=D');
+    (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: true, userId: 'user_other' });
+    rendered.rerender(<PublicProfilePage profile={profile} />);
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument();
+    (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: false, userId: null });
+    rendered.rerender(<PublicProfilePage profile={profile} />);
+    expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument();
   });
 
   it('renders authoritative owner Biography Markdown immediately and accepts a newer public projection', () => {

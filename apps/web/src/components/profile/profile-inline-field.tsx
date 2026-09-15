@@ -4,7 +4,7 @@ import {
   validateProfileMarkdown,
 } from '@wallpaperdb/profile-markdown';
 import { Check, Loader2, Pencil, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import {
@@ -47,6 +47,7 @@ export function ProfileInlineField(props: Props) {
 
 function InlineField({ field, profile, tokenProvider }: Props) {
   const queryClient = useQueryClient();
+  const errorId = useId();
   const key = profileQueryKey(profile.id);
   const refreshing = useIsFetching({ queryKey: key }) > 0;
   const writing = useIsMutating({ mutationKey: key }) > 0;
@@ -105,7 +106,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   }, []);
   const editing = edit !== null;
   useEffect(() => {
-    if (editing && !preview) (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
+    if (editing && !preview)
+      (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
     else if (!editing && restoreFocus.current) {
       restoreFocus.current = false;
       if (opener.current?.disabled) availability.current?.focus();
@@ -163,7 +165,6 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     setError(null);
     setConflict(false);
     clearTimeout(timer.current);
-
   }
   async function save(command = edit, confirmed = false) {
     if (
@@ -251,11 +252,14 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const iconSize = field === 'displayName' ? 'size-[1ex]' : 'size-3.5';
   const actions = (
     <>
+      <output className="sr-only" aria-live="polite">
+        {phase === 'idle' ? '' : actionLabel}
+      </output>
       <ProfileActionButton
         label={actionLabel}
         type="submit"
         textBaseline={field !== 'biographyMarkdown'}
-        buttonClassName="size-6"
+        buttonClassName={phase === 'idle' ? 'size-6' : 'size-6 disabled:opacity-100'}
         disabled={
           Boolean(validationError) ||
           phase !== 'idle' ||
@@ -288,7 +292,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const errorNotice = (
     <>
       {(error || validationError) && (
-        <div role="alert" className="mt-2 text-sm text-destructive">
+        <div role="alert" id={errorId} className="mt-2 w-full text-sm text-destructive">
           {error ?? validationError}
           {conflict && (
             <Button
@@ -373,7 +377,8 @@ function InlineField({ field, profile, tokenProvider }: Props) {
                   rows={7}
                   className="min-h-48 w-full font-mono text-sm"
                   disabled={locked || refreshing || writing}
-                  aria-invalid={Boolean(validationError)}
+                  aria-invalid={Boolean(validationError || error)}
+                  aria-describedby={validationError || error ? errorId : undefined}
                   onChange={(event) => setEdit({ ...edit, value: event.target.value })}
                   onKeyDown={(event) => {
                     if (event.key === 'Escape' && !locked) finish();
@@ -433,40 +438,61 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       </div>
     );
   return (
-    <div ref={container} className="min-w-0">
-      <form
-        className={`flex min-w-0 max-w-full items-baseline gap-1 ${typography}`}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void save();
-        }}
-      >
-        {field === 'handle' && <span aria-hidden="true">@</span>}
-        {edit ? (
-          <>
-            <input
-              ref={input}
-              aria-label={title}
-              className="h-[1lh] min-w-0 max-w-full [field-sizing:content] rounded border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] tracking-[inherit] outline-none [font-weight:inherit] focus-visible:ring-2 focus-visible:ring-ring"
-              value={edit.value}
-              disabled={locked}
-              onChange={(event) => setEdit({ ...edit, value: event.target.value })}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && !locked) finish();
-              }}
-            />
-            {actions}
-          </>
-        ) : (
-          <>
-            {field === 'displayName' ? (
-              <h1 className="min-w-0 break-words">{profile[field]}</h1>
+    <div
+      ref={container}
+      className={field === 'handle' ? 'flex min-w-0 flex-wrap items-baseline gap-x-4' : 'min-w-0'}
+    >
+      <div className="grid min-w-0 max-w-full">
+        {editing && (
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none invisible col-start-1 row-start-1 flex min-w-0 items-baseline gap-1 ${typography}`}
+          >
+            <span className="min-w-0 break-words">
+              {field === 'handle' ? '@' : ''}
+              {profile[field]}
+            </span>
+            <span className="w-6 shrink-0">&nbsp;</span>
+          </div>
+        )}
+        <form
+          className={`col-start-1 row-start-1 flex min-w-0 max-w-full self-start items-baseline gap-1 ${typography}`}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void save();
+          }}
+        >
+          <div className="flex min-w-0 items-baseline">
+            {field === 'handle' && <span aria-hidden="true">@</span>}
+            {edit ? (
+              <input
+                ref={input}
+                aria-label={title}
+                aria-invalid={Boolean(validationError || error)}
+                aria-describedby={validationError || error ? errorId : undefined}
+                className="h-[1lh] min-w-0 max-w-full [field-sizing:content] rounded border-0 bg-transparent p-0 text-[length:inherit] leading-[inherit] tracking-[inherit] outline-none [font-weight:inherit] focus-visible:ring-2 focus-visible:ring-ring"
+                value={edit.value}
+                disabled={locked || refreshing || writing}
+                autoComplete={field === 'displayName' ? 'name' : 'off'}
+                autoCapitalize={field === 'handle' ? 'none' : undefined}
+                spellCheck={field === 'handle' ? false : undefined}
+                onChange={(event) => setEdit({ ...edit, value: event.target.value })}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && !locked) finish();
+                }}
+              />
+            ) : field === 'displayName' ? (
+              <h1 className="min-w-0 break-words">{profile.displayName}</h1>
             ) : (
               <p className="min-w-0 break-words">
                 <span className="sr-only">@</span>
-                {profile[field]}
+                {profile.handle}
               </p>
             )}
+          </div>
+          {edit ? (
+            actions
+          ) : (
             <ProfileActionButton
               ref={opener}
               label={`Edit ${label}`}
@@ -484,11 +510,11 @@ function InlineField({ field, profile, tokenProvider }: Props) {
             >
               <Pencil className={iconSize} />
             </ProfileActionButton>
-          </>
-        )}
-      </form>
+          )}
+        </form>
+      </div>
       {coolingDown && (
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Available for change in{' '}
           <Tooltip>
             <TooltipTrigger asChild>

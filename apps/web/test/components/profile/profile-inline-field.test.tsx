@@ -52,4 +52,23 @@ describe('production inline profile fields', () => {
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Ada Byron' })).toBeInTheDocument();
   });
+  it('preserves the failed draft with error feedback, then accepts a retry', async () => {
+    vi.mocked(userApi.updateProfile).mockRejectedValueOnce(new Error('Offline'));
+    vi.mocked(userApi.updateProfile).mockResolvedValueOnce({ ...profile, displayName: 'Ada Byron', version: 2 });
+    renderField();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    const input = screen.getByRole('textbox', { name: 'Display name' });
+    fireEvent.change(input, { target: { value: 'Ada Byron' } });
+    fireEvent.submit(input.closest('form')!);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Display name save failed' })).toBeDisabled();
+    expect(input).toBeEnabled();
+    expect(input).toHaveValue('Ada Byron');
+    expect(toast.error).toHaveBeenCalledWith('Unable to save display name', { description: 'Offline' });
+    await act(async () => vi.advanceTimersByTimeAsync(1600));
+    fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+    await flush();
+    expect(userApi.updateProfile).toHaveBeenCalledTimes(2);
+  });
+
 });

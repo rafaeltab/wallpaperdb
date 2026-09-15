@@ -80,6 +80,21 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it.each(['invalid-picture', 'source-not-found'])('settles permanent %s import failures on the generated fallback', async (failure) => {
+    initialImageUrl = 'https://img.clerk.com/permanently-invalid-picture';
+    const pending = (await ensure()).json();
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(failure === 'source-not-found' ? new Response(null, { status: 404 }) : new Response('<svg/>'));
+    try {
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure()).json()).toMatchObject({ pictureAssetId: null, pictureImportStatus: 'complete', version: pending.version });
+      const [job] = await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
+      expect(job).toMatchObject({ source_url: null, lease_token: null, lease_until: null });
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(0);
+    } finally { fetcher.mockRestore(); }
+  });
+
   it('retries transient imports after backoff without starving another due Profile', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

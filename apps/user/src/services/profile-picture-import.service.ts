@@ -5,7 +5,8 @@ import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
 import { profilePictureImports } from '../db/schema.js';
 import { ProfilePictureIngestionService } from './profile-picture-ingestion.service.js';
-import { downloadInitialPicture } from './profile-picture-source.js';
+import { InvalidProfilePictureError, ProfilePictureTooLargeError } from './profile-picture-processing.js';
+import { downloadInitialPicture, PermanentPictureImportError } from './profile-picture-source.js';
 import { ProfileService } from './profile.service.js';
 
 @singleton()
@@ -35,10 +36,11 @@ export class ProfilePictureImportService {
         const bytes = await downloadInitialPicture(job.sourceUrl, { maxBytes: this.config.profilePictureMaxBytes, timeoutMs: this.config.profilePictureImportTimeoutMs, allowedHosts: this.config.profilePictureImportHosts });
         const assetId = await this.ingestion.stage(job.profileId, bytes);
         await this.profiles.adoptPicture(job.profileId, assetId, undefined, job.leaseToken);
-      } catch {
+      } catch (error) {
         // Never retain or report transport exceptions: they may contain the captured private URL.
         const delay = Math.min(3_600_000, 1_000 * 2 ** Math.min(job.attempts, 12));
-        await db.update(profilePictureImports).set({ status: 'retrying', nextAttemptAt: new Date(Date.now() + delay), leaseToken: null, leaseUntil: null }).where(and(eq(profilePictureImports.profileId, job.profileId), eq(profilePictureImports.leaseToken, job.leaseToken)));
+        const permanent = error instanceof PermanentPictureImportError || error instanceof InvalidProfilePictureError || error instanceof ProfilePictureTooLargeError;
+        await db.update(profilePictureImports).set({ status: permanent ? 'complete' : 'retrying', sourceUrl: permanent ? null : job.sourceUrl, nextAttemptAt: new Date(Date.now() + delay), leaseToken: null, leaseUntil: null }).where(and(eq(profilePictureImports.profileId, job.profileId), eq(profilePictureImports.leaseToken, job.leaseToken)));
       }
     }
   }

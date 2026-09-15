@@ -12,7 +12,7 @@ import postgres from 'postgres';
 import sharp from 'sharp';
 import { Wait } from 'testcontainers';
 import { container } from 'tsyringe';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import { IdentityProviderToken } from '../src/services/clerk-identity.service.js';
@@ -27,6 +27,7 @@ describe('Profile picture commands', () => {
   let storage: S3Client;
   let app: FastifyInstance;
   let config: Config;
+  let initialImageUrl: string | undefined;
 
   beforeAll(async () => {
     [postgresContainer, natsContainer, minioContainer] = await Promise.all([
@@ -52,10 +53,10 @@ describe('Profile picture commands', () => {
     await storage.send(new CreateBucketCommand({ Bucket: config.profilePictureBucket }));
     container.clearInstances();
     app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService() });
-    container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null }) } });
+    container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } });
   });
 
-  beforeEach(async () => { await sql`truncate table outbox_events, handle_claims, profiles cascade`; });
+  beforeEach(async () => { initialImageUrl = undefined; await sql`truncate table outbox_events, handle_claims, profiles cascade`; });
   afterAll(async () => {
     await app?.close();
     await sql?.end();
@@ -77,6 +78,25 @@ describe('Profile picture commands', () => {
     ]);
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
+
+  it('captures the initial Clerk picture privately without downloading or blocking Profile creation', async () => {
+    initialImageUrl = 'https://img.clerk.com/initial-picture?private=initial-secret';
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Image service unavailable'));
+    try {
+      const response = await ensure();
+      expect(response.statusCode).toBe(200);
+      const profile = response.json();
+      expect(profile).toMatchObject({ pictureAssetId: null, pictureImportStatus: 'pending', version: 1 });
+      expect(fetcher).not.toHaveBeenCalled();
+      const [job] = await sql`select * from profile_picture_imports where profile_id = ${profile.id}`;
+      expect(job).toMatchObject({ source_url: initialImageUrl, status: 'pending', attempts: 0 });
+      initialImageUrl = 'https://img.clerk.com/later-picture';
+      expect((await ensure()).json()).toEqual(profile);
+      expect((await sql`select source_url from profile_picture_imports where profile_id = ${profile.id}`)[0].source_url).toBe(job.source_url);
+      expect(JSON.stringify(profile)).not.toContain('initial-secret');
+      expect(JSON.stringify(await sql`select payload from outbox_events`)).not.toContain('initial-secret');
+    } finally { fetcher.mockRestore(); }
+  });
 
   it('serializes competing picture uploads so only one command activates at a Profile version', async () => {
     const original = (await ensure()).json();

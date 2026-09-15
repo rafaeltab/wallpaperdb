@@ -86,3 +86,17 @@ export const profilePictureAssets = pgTable('profile_picture_assets', {
 }, (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt)]);
 export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
 export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;
+
+export const pictureImportStatus = pgEnum('picture_import_status', ['pending', 'retrying', 'complete']);
+export const profilePictureImports = pgTable('profile_picture_imports', {
+  profileId: text('profile_id').primaryKey().references(() => profiles.id),
+  sourceUrl: text('source_url'),
+  status: pictureImportStatus('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+  leaseUntil: timestamp('lease_until', { withTimezone: true }),
+  leaseToken: text('lease_token'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index('profile_picture_imports_due_idx').on(table.nextAttemptAt, table.profileId).where(sql`${table.status} != 'complete'`)]);
+export type ProfilePictureImport = typeof profilePictureImports.$inferSelect;
+export type NewProfilePictureImport = typeof profilePictureImports.$inferInsert;

@@ -11,7 +11,7 @@ import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
-import { handleClaims, outboxEvents, type Profile, profiles, profilePictureAssets } from '../db/schema.js';
+import { handleClaims, outboxEvents, type Profile, profiles, profilePictureAssets, profilePictureImports } from '../db/schema.js';
 import {
   type ExternalIdentity,
   type IdentityProvider,
@@ -185,6 +185,8 @@ export class ProfileService {
             .values({ handle, profileId: userId, kind: 'profile' })
             .returning();
 
+          if (identity.imageUrl) await tx.insert(profilePictureImports).values({ profileId: userId, sourceUrl: identity.imageUrl, createdAt: now, nextAttemptAt: now });
+
           const event: ProfileCreatedEvent = {
             eventId: `evt_${ulid()}`,
             eventType: PROFILE_CREATED_SUBJECT,
@@ -211,14 +213,7 @@ export class ProfileService {
             payload: event,
             createdAt: now,
           });
-          return {
-            ...profile,
-            aliases: [],
-            retainedAliasLimit: this.config.profileRetainedAliasLimit,
-            historicalHandles: [],
-            pictureImportStatus: 'complete',
-            pictureUploadLimits: this.pictureUploadLimits(),
-          };
+          return this.ownerProfile(profile, tx, [], now);
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -699,6 +694,7 @@ export class ProfileService {
     aliases?: OwnerProfile['aliases'],
     now = new Date()
   ): Promise<OwnerProfile> {
+    const pictureImport = await reader.query.profilePictureImports.findFirst({ where: eq(profilePictureImports.profileId, profile.id), columns: { status: true } });
     const activeAliases = aliases ?? (await this.profileAliases(profile, reader));
     const retained = new Set(
       activeAliases.filter((alias) => alias.expiresAt === null).map((alias) => alias.handle)
@@ -724,7 +720,7 @@ export class ProfileService {
       ...profile,
       retainedAliasLimit: this.config.profileRetainedAliasLimit,
       aliases: activeAliases,
-      pictureImportStatus: 'complete',
+      pictureImportStatus: pictureImport?.status ?? 'complete',
       pictureUploadLimits: this.pictureUploadLimits(),
       historicalHandles: historicalHandles.map((entry) => ({
         ...entry,

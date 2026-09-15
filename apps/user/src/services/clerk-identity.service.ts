@@ -6,6 +6,7 @@ export interface ExternalIdentity {
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
+  imageUrl?: string | null;
 }
 
 export interface IdentityProvider {
@@ -29,6 +30,7 @@ export class ClerkIdentityProvider implements IdentityProvider {
       displayName: null,
       firstName: user.firstName,
       lastName: user.lastName,
+      imageUrl: user.hasImage ? user.imageUrl : null,
     };
   }
 }

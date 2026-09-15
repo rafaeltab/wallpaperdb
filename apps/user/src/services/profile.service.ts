@@ -190,7 +190,11 @@ export class ProfileService {
             aggregateId: userId,
             payload: event,
           });
-          return { ...profile, aliases: [], retainedAliasLimit: this.config.profileRetainedAliasLimit };
+          return {
+            ...profile,
+            aliases: [],
+            retainedAliasLimit: this.config.profileRetainedAliasLimit,
+          };
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -284,16 +288,27 @@ export class ProfileService {
           .slice(0, Math.max(0, retained.length - this.config.profileRetainedAliasLimit))
           .map((alias) => ({ handle: alias.handle, expiresAt: expiresAt.toISOString() }));
         if (scheduledAliases.length > 0) {
-          await tx.update(handleClaims).set({ expiresAt }).where(
-            inArray(handleClaims.handle, scheduledAliases.map((alias) => alias.handle))
-          );
+          await tx
+            .update(handleClaims)
+            .set({ expiresAt })
+            .where(
+              inArray(
+                handleClaims.handle,
+                scheduledAliases.map((alias) => alias.handle)
+              )
+            );
         }
         const owner = await this.ownerProfile(updated, tx);
         const event: ProfileUpdatedEvent = {
           eventId: `evt_${ulid()}`,
           eventType: PROFILE_UPDATED_SUBJECT,
           timestamp: now.toISOString(),
-          change: { type: 'handle-changed', before: current.handle, after: handle, scheduledAliases },
+          change: {
+            type: 'handle-changed',
+            before: current.handle,
+            after: handle,
+            scheduledAliases,
+          },
           profile: {
             id: updated.id,
             displayName: updated.displayName,
@@ -308,14 +323,12 @@ export class ProfileService {
           },
         };
         ProfileUpdatedEventSchema.parse(event);
-        await tx
-          .insert(outboxEvents)
-          .values({
-            id: event.eventId,
-            subject: event.eventType,
-            aggregateId: userId,
-            payload: event,
-          });
+        await tx.insert(outboxEvents).values({
+          id: event.eventId,
+          subject: event.eventType,
+          aggregateId: userId,
+          payload: event,
+        });
         return owner;
       })
       .catch((error: unknown) => {
@@ -356,10 +369,14 @@ export class ProfileService {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + ALIAS_EXPIRY_GRACE_MS);
       await tx.update(handleClaims).set({ expiresAt }).where(eq(handleClaims.handle, handle));
-      const [updated] = await tx.update(profiles).set({
-        version: sql`${profiles.version} + 1`,
-        updatedAt: now,
-      }).where(eq(profiles.id, userId)).returning();
+      const [updated] = await tx
+        .update(profiles)
+        .set({
+          version: sql`${profiles.version} + 1`,
+          updatedAt: now,
+        })
+        .where(eq(profiles.id, userId))
+        .returning();
       const claim = await tx.query.handleClaims.findFirst({
         where: eq(handleClaims.handle, updated.handle),
       });
@@ -369,7 +386,12 @@ export class ProfileService {
         eventId: `evt_${ulid()}`,
         eventType: PROFILE_UPDATED_SUBJECT,
         timestamp: now.toISOString(),
-        change: { type: 'alias-expiry-scheduled', handle, before: null, after: expiresAt.toISOString() },
+        change: {
+          type: 'alias-expiry-scheduled',
+          handle,
+          before: null,
+          after: expiresAt.toISOString(),
+        },
         profile: {
           id: updated.id,
           displayName: updated.displayName,
@@ -385,7 +407,10 @@ export class ProfileService {
       };
       ProfileUpdatedEventSchema.parse(event);
       await tx.insert(outboxEvents).values({
-        id: event.eventId, subject: event.eventType, aggregateId: userId, payload: event,
+        id: event.eventId,
+        subject: event.eventType,
+        aggregateId: userId,
+        payload: event,
       });
       return owner;
     });

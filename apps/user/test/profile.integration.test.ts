@@ -285,6 +285,32 @@ describe('Profile commands', () => {
     }
   });
 
+  it('enforces a reduced limit of zero by scheduling all excess aliases in one change', async () => {
+    const previousLimit = config.profileRetainedAliasLimit;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const before = (await request('user_1')).json();
+      const changed = (await changeHandle('user_1', 'first', before.version)).json();
+      config.profileRetainedAliasLimit = 0;
+      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
+      const response = await changeHandle('user_1', 'second', changed.version);
+      expect(response.statusCode).toBe(200);
+      const updated = response.json();
+      const expiresAt = '2030-01-09T12:00:00.000Z';
+      expect(updated.retainedAliasLimit).toBe(0);
+      expect(updated.aliases).toHaveLength(2);
+      expect(updated.aliases.every((alias: { expiresAt: string | null }) => alias.expiresAt === expiresAt)).toBe(true);
+      const [event] = await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
+      expect(event.payload.change.scheduledAliases).toEqual([
+        { handle: before.handle, expiresAt }, { handle: 'first', expiresAt },
+      ]);
+    } finally {
+      config.profileRetainedAliasLimit = previousLimit;
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

@@ -37,36 +37,52 @@ function isHandleChangeBody(body: unknown): body is { handle: string; expectedVe
 }
 
 export default async function profileRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.delete<{ Params: { handle: string } }>('/profile/me/aliases/:handle', async (request, reply) => {
-    const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
-    const body = request.body as { expectedVersion?: unknown } | null;
-    if (!body || typeof body.expectedVersion !== 'number') {
-      return reply.code(400).type('application/problem+json').send({
-        type: 'https://wallpaperdb.example/problems/invalid-alias-command',
-        title: 'Invalid alias command', status: 400,
-        detail: 'A positive integer expected Profile version is required', instance: request.url,
-      });
-    }
-    try {
-      const profile = await container.resolve(ProfileService).scheduleAliasExpiry(
-        user.id, request.params.handle, body.expectedVersion
-      );
-      return reply.code(200).send(profile);
-    } catch (error) {
-      if (error instanceof ProfileVersionConflictError || error instanceof AliasNotFoundError || error instanceof InvalidAliasCommandError) {
-        const [status, type, title] = error instanceof ProfileVersionConflictError
-          ? [409, 'profile-version-conflict', 'Profile version conflict'] as const
-          : error instanceof AliasNotFoundError
-            ? [404, 'alias-not-found', 'Alias not found'] as const
-            : [400, 'invalid-alias-command', 'Invalid alias command'] as const;
-        return reply.code(status).type('application/problem+json').send({
-          type: `https://wallpaperdb.example/problems/${type}`,
-          title, status, detail: error.message, instance: request.url,
+  fastify.delete<{ Params: { handle: string } }>(
+    '/profile/me/aliases/:handle',
+    async (request, reply) => {
+      const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);
+      const body = request.body as { expectedVersion?: unknown } | null;
+      if (!body || typeof body.expectedVersion !== 'number') {
+        return reply.code(400).type('application/problem+json').send({
+          type: 'https://wallpaperdb.example/problems/invalid-alias-command',
+          title: 'Invalid alias command',
+          status: 400,
+          detail: 'A positive integer expected Profile version is required',
+          instance: request.url,
         });
       }
-      throw error;
+      try {
+        const profile = await container
+          .resolve(ProfileService)
+          .scheduleAliasExpiry(user.id, request.params.handle, body.expectedVersion);
+        return reply.code(200).send(profile);
+      } catch (error) {
+        if (
+          error instanceof ProfileVersionConflictError ||
+          error instanceof AliasNotFoundError ||
+          error instanceof InvalidAliasCommandError
+        ) {
+          const [status, type, title] =
+            error instanceof ProfileVersionConflictError
+              ? ([409, 'profile-version-conflict', 'Profile version conflict'] as const)
+              : error instanceof AliasNotFoundError
+                ? ([404, 'alias-not-found', 'Alias not found'] as const)
+                : ([400, 'invalid-alias-command', 'Invalid alias command'] as const);
+          return reply
+            .code(status)
+            .type('application/problem+json')
+            .send({
+              type: `https://wallpaperdb.example/problems/${type}`,
+              title,
+              status,
+              detail: error.message,
+              instance: request.url,
+            });
+        }
+        throw error;
+      }
     }
-  });
+  );
 
   fastify.post('/profile/me/ensure', async (request, reply) => {
     const user = container.resolve<IAuthService>(IAuthServiceToken).getUser(request);

@@ -1,20 +1,18 @@
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
-import { inject, singleton } from 'tsyringe';
-import { DatabaseConnection } from '../connections/database.js';
+import type { DatabaseConnection } from '../connections/database.js';
 import { type ProfilePictureAsset, profilePictureAssets, profiles } from '../db/schema.js';
-import { ProfilePictureStorage } from './profile-picture-storage.js';
+import type { ProfilePictureStorage } from './profile-picture-storage.js';
 
 interface PictureRetentionLogger {
   error(bindings: object, message: string): void;
 }
 
-@singleton()
 export class ProfilePictureRetentionService {
   private cursor: Pick<ProfilePictureAsset, 'expiresAt' | 'id'> | undefined;
 
   constructor(
-    @inject(DatabaseConnection) private readonly database: DatabaseConnection,
-    @inject(ProfilePictureStorage) private readonly storage: ProfilePictureStorage,
+    private readonly database: DatabaseConnection,
+    private readonly storage: ProfilePictureStorage,
     private readonly logger: PictureRetentionLogger
   ) {}
 

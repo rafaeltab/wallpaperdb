@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C' | 'D';
+const HANDLE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 type BiographyEdit = { draft: string; preview: boolean };
 type Editor = 'picture' | 'banner' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
@@ -29,15 +30,18 @@ type DraftProfile = {
   banner: string | null;
   aliases: PreviousHandle[];
   retainedLimit: number;
+  nextHandleChangeAt: string | null;
 };
 
 function initialProfile(profile: Profile): DraftProfile {
+  const nextChange = Date.parse(profile.lastHandleChangedAt ?? '') + HANDLE_COOLDOWN_MS;
   return {
     name: profile.displayName,
     handle: profile.handle,
     biography: profile.biographyMarkdown,
     banner: null,
     retainedLimit: profile.retainedAliasLimit ?? 3,
+    nextHandleChangeAt: nextChange > Date.now() ? new Date(nextChange).toISOString() : null,
     picture: profile.pictureAssetId
       ? `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(profile.pictureAssetId)}`
       : null,
@@ -81,6 +85,14 @@ export default function ProfileSettingsPrototype({
   const [biographyEdit, setBiographyEdit] = useState<BiographyEdit | null>(null);
   const biographyEditButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState('');
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const handleLocked = Boolean(
+    value.nextHandleChangeAt && Date.parse(value.nextHandleChangeAt) > now
+  );
   const opener = useRef<HTMLElement | null>(null);
   function openEditor(next: Editor) {
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -278,6 +290,8 @@ export default function ProfileSettingsPrototype({
     <div className="min-w-0 space-y-3">
       <InlineProfileText
         kind="handle"
+        disabled={handleLocked}
+        disabledHintId="prototype-handle-cooldown"
         value={value.handle}
         draft={inlineDrafts.handle}
         onDraft={(draft) => setInlineDrafts((current) => ({ ...current, handle: draft }))}
@@ -285,6 +299,7 @@ export default function ProfileSettingsPrototype({
           update(
             {
               handle,
+              nextHandleChangeAt: new Date(Date.now() + HANDLE_COOLDOWN_MS).toISOString(),
               aliases: [
                 { handle: value.handle, status: 'retained' },
                 ...value.aliases.filter((alias) => alias.handle !== handle),
@@ -296,6 +311,27 @@ export default function ProfileSettingsPrototype({
           setInlineDrafts((current) => ({ ...current, handle: null }));
         }}
       />
+      {handleLocked && value.nextHandleChangeAt && (
+        <p
+          id="prototype-handle-cooldown"
+          className="flex items-start gap-2 text-xs leading-5 text-muted-foreground"
+        >
+          <Clock3 className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            Available to change{' '}
+            <time dateTime={value.nextHandleChangeAt}>
+              {new Date(value.nextHandleChangeAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                timeZoneName: 'short',
+              })}
+            </time>
+            .<span className="block">You can change your handle once every seven days.</span>
+          </span>
+        </p>
+      )}
       {aliases}
     </div>
   );
@@ -385,6 +421,30 @@ export default function ProfileSettingsPrototype({
       <PrototypeSwitcher
         variant={variant}
         modalOpen={editor !== null}
+        extraControls={
+          variant === 'D' && (
+            <Button
+              type="button"
+              variant={handleLocked ? 'secondary' : 'ghost'}
+              size="xs"
+              aria-label="Preview handle cooldown"
+              aria-pressed={handleLocked}
+              onClick={() => {
+                setValue((current) => ({
+                  ...current,
+                  nextHandleChangeAt: handleLocked
+                    ? null
+                    : new Date(Date.now() + HANDLE_COOLDOWN_MS - 86400000).toISOString(),
+                }));
+                setInlineDrafts((current) => ({ ...current, handle: null }));
+                setNotice('');
+              }}
+            >
+              <Clock3 />
+              Cooldown
+            </Button>
+          )
+        }
         onChange={(next) =>
           void navigate({ search: { variant: next }, replace: true, resetScroll: false })
         }
@@ -534,14 +594,18 @@ function InlineProfileText({
   draft,
   onDraft,
   onSave,
+  disabled = false,
+  disabledHintId,
 }: {
   kind: 'name' | 'handle';
   value: string;
   draft: string | null;
   onDraft: (draft: string | null) => void;
   onSave: (value: string) => void;
+  disabled?: boolean;
+  disabledHintId?: string;
 }) {
-  const editing = draft !== null;
+  const editing = draft !== null && !disabled;
   const label = kind === 'name' ? 'Display name' : 'Profile handle';
   const input = useRef<HTMLInputElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -572,6 +636,8 @@ function InlineProfileText({
           size="icon-sm"
           className="shrink-0 text-muted-foreground"
           aria-label={`Edit ${label.toLowerCase()}`}
+          disabled={disabled}
+          aria-describedby={disabled ? disabledHintId : undefined}
           onClick={() => onDraft(value)}
         >
           <Pencil className="size-4" />

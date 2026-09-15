@@ -1,5 +1,5 @@
 import { ArrowLeft, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
-import { useEffect } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
 type PrototypeVariant = 'A' | 'B' | 'C' | 'D';
@@ -22,6 +22,7 @@ export function PrototypeSwitcher({
   onExample,
   state,
   modalOpen,
+  extraControls,
 }: {
   variant: PrototypeVariant;
   onChange: (variant: PrototypeVariant) => void;
@@ -29,6 +30,7 @@ export function PrototypeSwitcher({
   onExample: () => void;
   state: unknown;
   modalOpen: boolean;
+  extraControls?: ReactNode;
 }) {
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -107,7 +109,7 @@ export function PrototypeSwitcher({
           <ArrowRight aria-hidden="true" />
         </Button>
       </div>
-      <div className="flex items-center justify-center gap-1 border-t border-border/60 pt-1">
+      <div className="flex flex-wrap items-center justify-center gap-1 border-t border-border/60 pt-1">
         <Button type="button" variant="ghost" size="xs" onClick={onReset}>
           <RotateCcw aria-hidden="true" />
           Reset
@@ -116,6 +118,7 @@ export function PrototypeSwitcher({
           <Sparkles aria-hidden="true" />
           Example content
         </Button>
+        {extraControls}
       </div>
       <details className="mt-1 text-xs">
         <summary className="cursor-pointer rounded px-2 py-1 text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">

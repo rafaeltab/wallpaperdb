@@ -75,14 +75,16 @@ GraphQL API gateway providing unified access to all wallpaper services.
 - GraphQL API using Mercurius
 - OpenSearch integration for fast wallpaper search
 - Variant-based filtering (resolution, aspect ratio, format)
+- Profile discovery by Handle, active alias, or Display name, followed by exact Profile-ID wallpaper filtering
 - Event-driven metadata synchronization
 
 **Event-driven:**
-- Consumes: `wallpaper.uploaded`, `wallpaper.variant.available`
+- Consumes: `wallpaper.uploaded`, `wallpaper.variant.available`, `profile.created`, `profile.updated`
 
 **API:**
 - GraphQL endpoint for queries and mutations
 - Search wallpapers by variants (width, height, aspect ratio)
+- Search public Profiles with `searchProfiles(query, first, after)` and cursor pagination. Current Handles rank above aliases, followed by Display name phrases/prefixes and fuzzy names. Biography and alias lists are not exposed as search fields or result lists. Wallpaper documents retain ownership IDs; Profile identity stays in its separate index.
 
 ### Web Frontend
 **Status:** ✅ COMPLETE

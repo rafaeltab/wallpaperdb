@@ -17,6 +17,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { createApp } from '../src/app.js';
 import type { Config } from '../src/config.js';
 import { ProfilePictureImportService } from '../src/services/profile-picture-import.service.js';
+import { ProfilePictureIngestionService } from '../src/services/profile-picture-ingestion.service.js';
+import { ProfileService } from '../src/services/profile.service.js';
 import { IdentityProviderToken } from '../src/services/clerk-identity.service.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
@@ -101,6 +103,30 @@ describe('Profile picture commands', () => {
       expect(asset).toEqual({ state: 'retired', retired_at: new Date('2030-01-02T00:00:00.000Z'), expires_at: new Date('2030-01-09T00:00:00.000Z') });
     } finally {
       config.profileEvidenceRetentionDays = 30;
+      vi.useRealTimers();
+    }
+  });
+
+  it('accepts a staged picture before expiry and rejects activation at the deadline without changing current state', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    try {
+      const original = (await ensure()).json();
+      const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+      const ingestion = container.resolve(ProfilePictureIngestionService);
+      const profiles = container.resolve(ProfileService);
+      const first = await ingestion.stage(original.id, image);
+      const expired = await ingestion.stage(original.id, image);
+      vi.setSystemTime(new Date('2030-01-30T23:59:59.999Z'));
+      const active = await profiles.adoptPicture(original.id, first, original.version);
+      const before = (await ensure()).json();
+      const events = await sql`select id from outbox_events order by id`;
+      vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
+      await expect(profiles.adoptPicture(original.id, expired, active.version)).rejects.toThrow('expired');
+      expect((await ensure()).json()).toEqual(before);
+      expect(await sql`select id from outbox_events order by id`).toEqual(events);
+      expect(await sql`select id from profile_picture_assets where state = 'active'`).toEqual([{ id: first }]);
+    } finally {
       vi.useRealTimers();
     }
   });

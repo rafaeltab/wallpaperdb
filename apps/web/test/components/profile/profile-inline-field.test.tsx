@@ -217,4 +217,34 @@ describe('production inline profile fields', () => {
     }
   });
 
+  it.each(['stay', 'external', 'external-then-blur'])('restores biography focus after native disabled-button blur without stealing focus (%s)', async (destination) => {
+    let resolve: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise((done) => { resolve = done; }));
+    renderField('biographyMarkdown');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit biography' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Saved biography' } });
+    const save = screen.getByRole('button', { name: 'Save biography' });
+    act(() => save.focus());
+    fireEvent.click(save);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Saving biography' })).toBeDisabled();
+    // Real browsers can drop focus to the body when the focused save button disables.
+    act(() => {
+      // jsdom keeps disabled buttons focused even when blur() is called.
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute('tabindex');
+    });
+    expect(document.body).toHaveFocus();
+    const external = screen.getByRole('button', { name: 'Other action' });
+    if (destination !== 'stay') act(() => external.focus());
+    if (destination === 'external-then-blur') act(() => external.blur());
+    await act(async () => resolve?.({ ...profile, biographyMarkdown: 'Saved biography', version: 2 }));
+    await flush();
+    await act(async () => vi.advanceTimersByTimeAsync(1600));
+    if (destination === 'stay') expect(screen.getByRole('button', { name: 'Edit biography' })).toHaveFocus();
+    else if (destination === 'external') expect(external).toHaveFocus();
+    else expect(document.body).toHaveFocus();
+  });
+
 });

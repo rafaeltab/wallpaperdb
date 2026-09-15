@@ -78,6 +78,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     return () => clearTimeout(tick);
   }, [coolingDown, deadline, now]);
   const container = useRef<HTMLDivElement>(null);
+  const confirmationDialog = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
@@ -85,6 +86,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   const live = useRef(true);
   const pending = useRef(false);
   const restoreFocus = useRef(false);
+  const saveOwnsFocus = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const label = labels[field];
   const title = label[0].toUpperCase() + label.slice(1);
@@ -103,9 +105,23 @@ function InlineField({ field, profile, tokenProvider }: Props) {
   });
   useEffect(() => {
     live.current = true;
+    function releaseFocusOwnership(event: Event) {
+      const target = event.target;
+      if (!saveOwnsFocus.current || !(target instanceof Node)) return;
+      // Disabling a focused control may send focus to the body without user intent.
+      if (event.type === 'focusin' && target === document.body) return;
+      if (!container.current?.contains(target) && !confirmationDialog.current?.contains(target)) {
+        saveOwnsFocus.current = false;
+      }
+    }
+    document.addEventListener('focusin', releaseFocusOwnership);
+    document.addEventListener('pointerdown', releaseFocusOwnership, true);
     return () => {
       live.current = false;
+      saveOwnsFocus.current = false;
       clearTimeout(timer.current);
+      document.removeEventListener('focusin', releaseFocusOwnership);
+      document.removeEventListener('pointerdown', releaseFocusOwnership, true);
     };
   }, []);
   const editing = edit !== null;
@@ -163,7 +179,11 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
   }
   function finish() {
-    restoreFocus.current = Boolean(container.current?.contains(document.activeElement));
+    restoreFocus.current = Boolean(
+      container.current?.contains(document.activeElement) ||
+        (saveOwnsFocus.current && document.activeElement === document.body)
+    );
+    saveOwnsFocus.current = false;
     setEdit(null);
     setPhase('idle');
     setError(null);
@@ -182,6 +202,10 @@ function InlineField({ field, profile, tokenProvider }: Props) {
       queryClient.isMutating({ mutationKey: key })
     )
       return;
+    saveOwnsFocus.current = Boolean(
+      container.current?.contains(document.activeElement) ||
+        confirmationDialog.current?.contains(document.activeElement)
+    );
     const aliases = field === 'handle' ? aliasesToSchedule(command.baseProfile, command.value) : [];
     if (!confirmed && aliases.length) {
       setConfirmation({ command, aliases });
@@ -553,7 +577,7 @@ function InlineField({ field, profile, tokenProvider }: Props) {
           if (!open) setConfirmation(null);
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent ref={confirmationDialog}>
           <AlertDialogHeader>
             <AlertDialogTitle>Change profile handle and schedule alias removal?</AlertDialogTitle>
             <AlertDialogDescription>

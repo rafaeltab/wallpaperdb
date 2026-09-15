@@ -247,4 +247,30 @@ describe('production inline profile fields', () => {
     else expect(document.body).toHaveFocus();
   });
 
+  it.each([false, true])('focuses the preserved draft after native blur on failure unless focus moved away (%s)', async (movedAway) => {
+    let reject: ((cause: Error) => void) | undefined;
+    vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+    renderField('biographyMarkdown');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit biography' }));
+    const input = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    fireEvent.change(input, { target: { value: 'Keep this draft' } });
+    const save = screen.getByRole('button', { name: 'Save biography' });
+    act(() => save.focus());
+    fireEvent.click(save);
+    await flush();
+    act(() => {
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute('tabindex');
+    });
+    const external = screen.getByRole('button', { name: 'Other action' });
+    if (movedAway) act(() => external.focus());
+    await act(async () => reject?.(new Error('Offline')));
+    await flush();
+    expect(input).toHaveValue('Keep this draft');
+    expect(input).toBeEnabled();
+    if (movedAway) expect(external).toHaveFocus();
+    else expect(input).toHaveFocus();
+  });
+
 });

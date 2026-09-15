@@ -135,6 +135,20 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     }
   }, [editing, field, preview]);
   useEffect(() => {
+    if (phase !== 'error' || writing || refreshing || !saveOwnsFocus.current) return;
+    if (document.activeElement !== document.body) {
+      saveOwnsFocus.current = false;
+      return;
+    }
+    // Wait for the failed mutation to release the disabled draft before focusing it.
+    if (field === 'biographyMarkdown' && preview) {
+      setPreview(false);
+      return;
+    }
+    (field === 'biographyMarkdown' ? textarea.current : input.current)?.focus();
+    saveOwnsFocus.current = false;
+  }, [phase, writing, refreshing, field, preview]);
+  useEffect(() => {
     setEdit((current) =>
       current && current.value === current.baseValue
         ? {

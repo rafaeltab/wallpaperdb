@@ -264,7 +264,7 @@ export default function ProfileSettingsPrototype({
             label="Edit biography"
             onClick={startBiographyEdit}
           >
-            <Pencil className="size-[1ex]" />
+            <Pencil className="size-3.5" />
           </PrototypeIconButton>
         )}
       </div>
@@ -1155,10 +1155,10 @@ function BiographyEditor({
             disabled={count > limit || draft === value.biography}
             onClick={() => update({ biography: draft }, 'Biography saved')}
           >
-            <Check className="size-[1ex]" />
+            <Check className="size-3.5" />
           </PrototypeIconButton>
           <PrototypeIconButton label="Cancel" buttonClassName="size-5" onClick={cancel}>
-            <X className="size-[1ex]" />
+            <X className="size-3.5" />
           </PrototypeIconButton>
         </div>
       ) : (

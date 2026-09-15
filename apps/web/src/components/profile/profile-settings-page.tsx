@@ -372,7 +372,9 @@ function aliasesToSchedule(profile: Profile, requestedHandle: string): string[] 
   if (normalized === profile.handle) return [];
 
   // The owner response orders aliases oldest first; the former current Handle is newest.
-  const retained = (profile.aliases ?? []).filter((alias) => !alias.expiresAt);
+  const retained = (profile.aliases ?? []).filter(
+    (alias) => !alias.expiresAt && alias.handle !== normalized
+  );
   const candidates = [...retained.map((alias) => alias.handle), profile.handle];
   return candidates.slice(0, Math.max(0, candidates.length - (profile.retainedAliasLimit ?? 3)));
 }

@@ -276,6 +276,27 @@ describe('ProfileSettingsPage', () => {
     expect(within(expiring).getByText(new Date(expiresAt).toLocaleString())).toHaveAttribute('dateTime', expiresAt);
   });
 
+  it('promotes a normalized retained alias at capacity without warning about an expiry that will not occur', async () => {
+    const aliases = ['oldest', 'my-alias', 'newest'].map((handle, index) => ({
+      handle,
+      claimGeneration: 1,
+      createdAt: `2026-09-0${index + 1}T12:00:00.000Z`,
+      expiresAt: null,
+    }));
+    vi.mocked(userApi.updateHandle).mockResolvedValue({ ...profile, handle: 'my-alias', version: 2 });
+    renderPage({ ...profile, aliases });
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+
+    await user.clear(input);
+    await user.type(input, 'Mý Alias');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+
+    await waitFor(() => expect(userApi.updateHandle).toHaveBeenCalledOnce());
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(input).toHaveValue('my-alias');
+  });
+
   it('validates the 80-character limit before sending', async () => {
     renderPage();
     const user = userEvent.setup();

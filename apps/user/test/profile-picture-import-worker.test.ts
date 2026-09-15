@@ -88,4 +88,26 @@ describe('Profile picture import worker', () => {
     expect(logger.error).toHaveBeenCalledOnce();
     await worker.stop();
   });
+
+  it('signals shutdown to the active batch so it skips later jobs after draining the current job', async () => {
+    const timer = new FakeTimerService();
+    let completeFirstJob!: () => void;
+    const firstJob = new Promise<void>((resolve) => { completeFirstJob = resolve; });
+    const jobs: string[] = [];
+    const run = async (isStopping: () => boolean) => {
+      jobs.push('current');
+      await firstJob;
+      if (!isStopping?.()) jobs.push('next');
+    };
+    const logger = { error: vi.fn() };
+    const worker = new ProfilePictureImportWorker(run, logger, timer);
+    worker.start();
+    const shutdown = worker.stop();
+    completeFirstJob();
+    await shutdown;
+    expect(jobs).toEqual(['current']);
+    expect(logger.error).not.toHaveBeenCalled();
+    await timer.tickAsync(1000);
+    expect(jobs).toEqual(['current']);
+  });
 });

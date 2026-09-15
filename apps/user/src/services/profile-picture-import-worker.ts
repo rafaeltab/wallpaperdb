@@ -10,7 +10,7 @@ export class ProfilePictureImportWorker {
   private stopping = false;
 
   constructor(
-    private readonly runImportBatch: () => Promise<void>,
+    private readonly runImportBatch: (isStopping: () => boolean) => Promise<void>,
     private readonly logger: ImportLogger,
     private readonly timer: TimerService = new SystemTimerService()
   ) {}
@@ -34,7 +34,7 @@ export class ProfilePictureImportWorker {
   importPending(): Promise<void> {
     if (this.stopping) return Promise.resolve();
     if (this.inFlight) return this.inFlight;
-    this.inFlight = this.runImportBatch()
+    this.inFlight = this.runImportBatch(() => this.stopping)
       .catch((error: unknown) => {
         this.logger.error(
           { category: 'profile-picture-import' },

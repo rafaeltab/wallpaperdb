@@ -261,6 +261,28 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByText('@retained-name')).toBeInTheDocument();
   });
 
+  it('preserves the confirmed version and explains an expiry conflict without removing the alias locally', async () => {
+    const initial = {
+      ...profile,
+      aliases: [{ handle: 'old-handle', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2099-09-16T12:00:00.000Z' }],
+    };
+    const refreshed = { ...initial, version: 2 };
+    vi.mocked(userApi.expireAlias).mockRejectedValue(new UserApiError('Profile changed.', 409, {
+      type: 'https://wallpaperdb.example/problems/profile-version-conflict',
+    }));
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Expire @old-handle now' }));
+    await act(async () => { queryClient.setQueryData(profileQueryKey(profile.id), refreshed); });
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Expire now' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your Profile changed elsewhere. Reload before expiring again.');
+    expect(userApi.expireAlias).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 1 }));
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(refreshed);
+    expect(within(screen.getByRole('list', { name: 'Expiring aliases' })).getByText('@old-handle')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('retains unsaved input and explains a stale edit', async () => {
     vi.mocked(userApi.updateProfile).mockRejectedValue(
       new UserApiError('Profile has changed since it was last loaded', 409)

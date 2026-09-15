@@ -170,4 +170,16 @@ describe('production inline profile fields', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
+  it('returns focus to the handle availability tooltip after a successful change locks editing', async () => {
+    vi.mocked(userApi.updateHandle).mockResolvedValue({ ...profile, handle: 'new-ada', version: 2, lastHandleChangedAt: new Date().toISOString() });
+    renderField('handle');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile handle' }));
+    const input = screen.getByRole('textbox', { name: 'Profile handle' });
+    fireEvent.change(input, { target: { value: 'new-ada' } });
+    fireEvent.submit(input.closest('form')!);
+    await flush();
+    await act(async () => vi.advanceTimersByTimeAsync(1600));
+    expect(screen.getByRole('button', { name: '7 days' })).toHaveFocus();
+  });
+
 });

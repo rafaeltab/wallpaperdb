@@ -314,6 +314,30 @@ describe('ProfileSettingsPage', () => {
     expect(screen.getByText('0 of 0 retained aliases')).toBeInTheDocument();
   });
 
+  it('names every retained alias affected by a lowered limit and excludes aliases already expiring', async () => {
+    renderPage({
+      ...profile,
+      retainedAliasLimit: 1,
+      aliases: [
+        { handle: 'already-expiring', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: '2026-09-16T12:00:00.000Z' },
+        { handle: 'oldest', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
+        { handle: 'newest', claimGeneration: 1, createdAt: profile.createdAt, expiresAt: null },
+      ],
+    });
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.clear(input);
+    await user.type(input, 'new-handle');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('limit is 1');
+    expect(dialog).toHaveTextContent('@oldest, @newest');
+    expect(dialog).not.toHaveTextContent('@already-expiring');
+    expect(dialog).not.toHaveTextContent(`@${profile.handle}`);
+    expect(userApi.updateHandle).not.toHaveBeenCalled();
+  });
+
   it('validates the 80-character limit before sending', async () => {
     renderPage();
     const user = userEvent.setup();

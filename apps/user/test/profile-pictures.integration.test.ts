@@ -86,6 +86,25 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('retains a removed picture for the configured window from retirement', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    config.profileEvidenceRetentionDays = 7;
+    try {
+      const original = (await ensure()).json();
+      const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+      const uploaded = (await upload(image, original.version)).json();
+      vi.setSystemTime(new Date('2030-01-02T00:00:00.000Z'));
+      const removed = await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: uploaded.version } });
+      expect(removed.statusCode).toBe(200);
+      const [asset] = await sql`select state, retired_at, expires_at from profile_picture_assets where id = ${uploaded.pictureAssetId}`;
+      expect(asset).toEqual({ state: 'retired', retired_at: new Date('2030-01-02T00:00:00.000Z'), expires_at: new Date('2030-01-09T00:00:00.000Z') });
+    } finally {
+      config.profileEvidenceRetentionDays = 30;
+      vi.useRealTimers();
+    }
+  });
+
   it('requires owner authentication and keeps picture commands scoped to that Profile', async () => {
     for (const method of ['PUT', 'DELETE'] as const) {
       expect((await app.inject({ method, url: '/profile/me/picture', payload: { expectedVersion: 1 } })).statusCode).toBe(401);

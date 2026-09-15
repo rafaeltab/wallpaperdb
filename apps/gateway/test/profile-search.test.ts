@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { container } from 'tsyringe';
 import { describe, expect, it, vi } from 'vitest';
+import type { Config } from '../src/config.js';
 import {
   type ProfileDocument,
   ProfileRepository,
 } from '../src/repositories/profile.repository.js';
+import { CursorService } from '../src/services/cursor.service.js';
 import { tester } from './setup.js';
 
 async function project(overrides: Partial<ProfileDocument> & Pick<ProfileDocument, 'id' | 'handle'>) {
@@ -39,6 +41,43 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('accepts only unexpired signed Profile cursors bound to the normalized search query', async () => {
+    await project({ id: 'user_cursor_a', handle: 'aurora' });
+    await project({ id: 'user_cursor_b', handle: 'aurora-night' });
+    const first = await search('aurora', 1);
+    const cursor = first.data.searchProfiles.pageInfo.endCursor;
+    const second = await search('  AURORA  ', 1, cursor);
+    expect(second.errors).toBeUndefined();
+    expect(second.data.searchProfiles.edges[0].node.id).toBe('user_cursor_b');
+
+    const wrongQuery = await search('another', 1, cursor);
+    expect(wrongQuery.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
+
+    const signer = container.resolve(CursorService);
+    for (const invalidCursor of [
+      '', 'not-a-cursor', 'x'.repeat(2049),
+      signer.encode(['user_cursor_a']),
+      signer.encode(['wallpapers', 'aurora', 6, 'user_cursor_a']),
+      signer.encode(['profiles', 'aurora', '6', 'user_cursor_a']),
+      signer.encode(['profiles', 'aurora', 7, 'user_cursor_a']),
+      signer.encode(['profiles', 'aurora', 6, '']),
+      signer.encode(['profiles', 'aurora', 6, 'user_cursor_a', 'extra']),
+    ]) {
+      const result = await search('aurora', 1, invalidCursor);
+      expect(result.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
+    }
+
+    const now = Date.now();
+    const config = container.resolve<Config>('config');
+    vi.spyOn(Date, 'now').mockReturnValue(now + config.cursorExpirationMs + 1);
+    try {
+      const expired = await search('aurora', 1, cursor);
+      expect(expired.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
   it('normalizes Profile search text and rejects unbounded or empty requests', async () => {
     await project({ id: 'user_normalized', handle: 'aurora' });
     const normalized = await search('  AuRoRa  ', 1);

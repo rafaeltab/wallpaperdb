@@ -3,6 +3,7 @@ import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaper
 import { GraphQLError } from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
+import { InvalidCursorError } from '../errors/graphql-errors.js';
 import { type ProfileDocument, ProfileRepository } from '../repositories/profile.repository.js';
 import { WallpaperRepository } from '../repositories/wallpaper.repository.js';
 import {
@@ -192,7 +193,28 @@ export class Resolvers {
         extensions: { code: 'BAD_USER_INPUT' },
       });
     }
-    const searchAfter = args.after ? this.cursorService.decode(args.after).slice(2) : undefined;
+    let searchAfter: CursorValue[] | undefined;
+    if (args.after != null) {
+      if (args.after.length === 0 || args.after.length > 2048) {
+        throw new InvalidCursorError('Invalid Profile search cursor');
+      }
+      const values = this.cursorService.decode(args.after);
+      const [namespace, cursorQuery, score, profileId] = values;
+      if (
+        values.length !== 4 ||
+        namespace !== 'profiles' ||
+        cursorQuery !== query ||
+        typeof score !== 'number' ||
+        !Number.isInteger(score) ||
+        score < 1 ||
+        score > 6 ||
+        typeof profileId !== 'string' ||
+        profileId.length === 0
+      ) {
+        throw new InvalidCursorError('Profile search cursor does not match this query');
+      }
+      searchAfter = [score, profileId];
+    }
     const results = await this.profileRepository.search({
       query,
       size: limit + 1,

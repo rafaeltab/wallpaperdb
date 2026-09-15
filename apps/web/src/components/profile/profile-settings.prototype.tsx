@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C' | 'D';
-type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
+type Editor = 'picture' | 'banner' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
   handle: string;
   status: 'retained' | 'expiring' | 'historical';
@@ -25,6 +25,7 @@ type DraftProfile = {
   handle: string;
   biography: string;
   picture: string | null;
+  banner: string | null;
   aliases: PreviousHandle[];
   retainedLimit: number;
 };
@@ -34,6 +35,7 @@ function initialProfile(profile: Profile): DraftProfile {
     name: profile.displayName,
     handle: profile.handle,
     biography: profile.biographyMarkdown,
+    banner: null,
     retainedLimit: profile.retainedAliasLimit ?? 3,
     picture: profile.pictureAssetId
       ? `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(profile.pictureAssetId)}`
@@ -290,7 +292,13 @@ export default function ProfileSettingsPrototype({
         ) : variant === 'C' ? (
           <VariantC {...parts} />
         ) : (
-          <VariantD {...parts} name={inlineName} handleField={inlineHandle} />
+          <VariantD
+            {...parts}
+            name={inlineName}
+            handleField={inlineHandle}
+            banner={value.banner}
+            editBanner={() => openEditor('banner')}
+          />
         )}
         <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
           {notice && (
@@ -304,6 +312,9 @@ export default function ProfileSettingsPrototype({
       <PrototypeModal editor={editor} close={() => setEditor(null)} opener={opener.current}>
         {editor === 'picture' && (
           <PictureEditor value={value} update={update} cancel={() => setEditor(null)} />
+        )}
+        {editor === 'banner' && (
+          <BannerEditor value={value} update={update} cancel={() => setEditor(null)} />
         )}
         {editor === 'biography' && (
           <BiographyEditor
@@ -324,6 +335,13 @@ export default function ProfileSettingsPrototype({
         )}
         {editor === 'public' && (
           <div className="space-y-6">
+            {variant === 'D' && (
+              <div className="h-28 overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-muted">
+                {value.banner && (
+                  <img src={value.banner} alt="" className="size-full object-cover" />
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-5">
               <Avatar value={value} />
               <div>
@@ -372,6 +390,7 @@ export default function ProfileSettingsPrototype({
         state={{
           ...value,
           picture: value.picture ? 'Picture set' : 'Generated initials',
+          banner: value.banner ? 'Custom banner set' : 'Default gradient',
           handleDraft: handle,
           inlineDrafts,
           editor,
@@ -442,10 +461,28 @@ export function VariantC({ avatar, name, handleField, biography }: Parts) {
   );
 }
 
-export function VariantD({ avatar, name, handleField, biography }: Parts) {
+export function VariantD({
+  avatar,
+  name,
+  handleField,
+  biography,
+  banner,
+  editBanner,
+}: Parts & { banner: string | null; editBanner: () => void }) {
   return (
     <div className="overflow-hidden rounded-2xl border bg-card">
-      <div className="h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36" />
+      <div className="relative h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36">
+        {banner && <img src={banner} alt="" className="size-full object-cover" />}
+        <Button
+          variant="outline"
+          size="sm"
+          className="absolute top-4 right-4 bg-background/90 shadow-sm backdrop-blur-sm"
+          onClick={editBanner}
+        >
+          <Pencil className="size-3.5" />
+          Edit banner
+        </Button>
+      </div>
       <div className="px-5 pb-7 sm:px-9 sm:pb-9">
         <div className="relative -mt-12 mb-6 w-fit rounded-3xl border-4 border-card bg-card">
           {avatar}
@@ -617,6 +654,7 @@ function PrototypeModal({
 }) {
   const titles = {
     picture: 'Profile picture',
+    banner: 'Profile banner',
     biography: 'Edit biography',
     name: 'Display name',
     aliases: 'Previous handles',
@@ -624,6 +662,7 @@ function PrototypeModal({
   };
   const descriptions = {
     picture: 'Choose the picture people see on your profile and contributions.',
+    banner: 'Give your profile a backdrop that feels like you.',
     biography: 'Tell people a little about yourself and your collection.',
     name: 'The name people see alongside your contributions.',
     aliases: 'Previous handles help people find you after a change.',
@@ -673,6 +712,67 @@ type EditorProps = {
   update: (patch: Partial<DraftProfile>, message: string) => void;
   cancel: () => void;
 };
+function BannerEditor({ value, update, cancel }: EditorProps) {
+  const [banner, setBanner] = useState(value.banner);
+  const [filename, setFilename] = useState('');
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <div className="space-y-5">
+      <div className="aspect-[3/1] overflow-hidden rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:aspect-[5/1]">
+        {banner && <img src={banner} alt="Banner preview" className="size-full object-cover" />}
+      </div>
+      <input
+        ref={input}
+        id="prototype-banner-file"
+        className="sr-only"
+        tabIndex={-1}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        aria-label="Choose banner file"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            setBanner(String(reader.result));
+            setFilename(file.name);
+          };
+          reader.readAsDataURL(file);
+        }}
+      />
+      <Button variant="outline" className="w-full" onClick={() => input.current?.click()}>
+        <Upload className="size-4" />
+        {filename ? 'Choose another banner' : 'Choose banner'}
+      </Button>
+      {filename && <p className="break-all text-sm text-muted-foreground">{filename}</p>}
+      <p className="text-xs leading-5 text-muted-foreground">
+        JPEG, PNG or WebP. Wide images work best; your banner is cropped to fill the available
+        space.
+      </p>
+      <div className="flex gap-2">
+        <Button
+          className="min-w-0 flex-1"
+          disabled={!filename}
+          onClick={() => update({ banner }, 'Profile banner updated')}
+        >
+          Save banner
+        </Button>
+        <Button
+          variant="outline"
+          className="min-w-0 flex-1"
+          disabled={!value.banner}
+          onClick={() => update({ banner: null }, 'Default banner restored')}
+        >
+          Remove banner
+        </Button>
+      </div>
+      <Button variant="ghost" className="w-full" onClick={cancel}>
+        Cancel
+      </Button>
+    </div>
+  );
+}
+
 function PictureEditor({ value, update, cancel }: EditorProps) {
   const [picture, setPicture] = useState(value.picture);
   const [filename, setFilename] = useState('');

@@ -370,6 +370,30 @@ describe('Profile commands', () => {
     }
   });
 
+  it('rolls back explicit and automatic scheduling when recording the Profile event fails', async () => {
+    const previousLimit = config.profileRetainedAliasLimit;
+    config.profileRetainedAliasLimit = 1;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    const initial = (await request('user_1')).json();
+    const owner = (await changeHandle('user_1', 'current', initial.version)).json();
+    await sql.unsafe(`create function reject_alias_event() returns trigger language plpgsql as $$ begin if new.subject = 'profile.updated' then raise exception 'alias event rejected'; end if; return new; end $$`);
+    await sql.unsafe(`create trigger reject_alias_event before insert on outbox_events for each row execute function reject_alias_event()`);
+    try {
+      expect((await scheduleAlias('user_1', initial.handle, owner.version)).statusCode).toBe(500);
+      expect((await request('user_1')).json()).toEqual(owner);
+      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
+      expect((await changeHandle('user_1', 'rollback-next', owner.version)).statusCode).toBe(500);
+      expect((await request('user_1')).json()).toEqual(owner);
+      expect(await sql`select * from handle_claims where handle = 'rollback-next'`).toHaveLength(0);
+      expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(1);
+    } finally {
+      await sql.unsafe('drop trigger reject_alias_event on outbox_events; drop function reject_alias_event()');
+      config.profileRetainedAliasLimit = previousLimit;
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

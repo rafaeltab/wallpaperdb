@@ -4,13 +4,18 @@ import { DatabaseConnection } from '../connections/database.js';
 import { type ProfilePictureAsset, profilePictureAssets, profiles } from '../db/schema.js';
 import { ProfilePictureStorage } from './profile-picture-storage.js';
 
+interface PictureRetentionLogger {
+  error(bindings: object, message: string): void;
+}
+
 @singleton()
 export class ProfilePictureRetentionService {
   private cursor: Pick<ProfilePictureAsset, 'expiresAt' | 'id'> | undefined;
 
   constructor(
     @inject(DatabaseConnection) private readonly database: DatabaseConnection,
-    @inject(ProfilePictureStorage) private readonly storage: ProfilePictureStorage
+    @inject(ProfilePictureStorage) private readonly storage: ProfilePictureStorage,
+    private readonly logger: PictureRetentionLogger
   ) {}
 
   async cleanupExpired(
@@ -64,6 +69,10 @@ export class ProfilePictureRetentionService {
         // Keep the row after failed/ambiguous DELETE or database commit.
         // Deleting an already absent S3 key is safe on the next attempt.
         result.failed++;
+        this.logger.error(
+          { category: 'profile-picture-retention', assetId: candidate.id },
+          'Profile picture cleanup failed; will retry'
+        );
       }
     }
     if (candidates.length < 100 && !isStopping()) this.cursor = undefined;

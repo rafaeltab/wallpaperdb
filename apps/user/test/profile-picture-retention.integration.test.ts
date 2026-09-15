@@ -31,6 +31,8 @@ describe('Private Profile picture retention', () => {
   let retention: ProfilePictureRetentionService;
   let config: Config;
   let picture: Buffer;
+  const errors: Array<{ bindings: object; message: string }> = [];
+  const logger = { error: (bindings: object, message: string) => { errors.push({ bindings, message }); } };
 
   beforeAll(async () => {
     [postgresContainer, minioContainer] = await Promise.all([
@@ -70,7 +72,8 @@ describe('Private Profile picture retention', () => {
 
   beforeEach(async () => {
     await sql`truncate table outbox_events, handle_claims, profiles cascade`;
-    retention = new ProfilePictureRetentionService(database, storage);
+    errors.length = 0;
+    retention = new ProfilePictureRetentionService(database, storage, logger);
   });
 
   afterAll(async () => {
@@ -203,5 +206,19 @@ describe('Private Profile picture retention', () => {
       await staging;
       stalled.mockRestore();
     }
+  });
+
+  it('identifies each failed picture cleanup without logging storage credentials or object content', async () => {
+    const owner = await profiles.ensure('user_picture');
+    const assetId = await ingestion.stage(owner.id, picture);
+    const [asset] = await sql`select expires_at from profile_picture_assets where id = ${assetId}`;
+    const unavailable = vi.spyOn(S3Client.prototype, 'send').mockRejectedValueOnce(new Error('private storage credentials'));
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 1 });
+      expect(errors).toEqual([{
+        bindings: { category: 'profile-picture-retention', assetId },
+        message: 'Profile picture cleanup failed; will retry',
+      }]);
+    } finally { unavailable.mockRestore(); }
   });
 });

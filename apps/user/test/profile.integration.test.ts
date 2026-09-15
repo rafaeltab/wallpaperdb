@@ -365,6 +365,28 @@ describe('Profile commands', () => {
     }
   });
 
+  it.each([false, true])('rolls back reactivation claims and state when its event fails (released=%s)', async (released) => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const before = released ? (await expireAlias('user_1', original.handle, scheduled.version)).json() : scheduled;
+    const claimsBefore = await sql`select * from handle_claims where profile_id = 'user_1' order by handle`;
+    await sql.unsafe(`create function reject_reactivation_event() returns trigger language plpgsql as $$ begin if new.payload->'change'->>'type' = 'alias-reactivated' then raise exception 'reactivation event rejected'; end if; return new; end $$`);
+    await sql.unsafe('create trigger reject_reactivation_event before insert on outbox_events for each row execute function reject_reactivation_event()');
+    try {
+      expect((await reactivateAlias('user_1', original.handle, before.version)).statusCode).toBe(500);
+      expect((await request('user_1')).json()).toEqual(before);
+      expect(await sql`select * from handle_claims where profile_id = 'user_1' order by handle`).toEqual(claimsBefore);
+      expect(await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`).toHaveLength(0);
+    } finally {
+      await sql.unsafe('drop trigger reject_reactivation_event on outbox_events; drop function reject_reactivation_event()');
+    }
+    const retried = await reactivateAlias('user_1', original.handle, before.version);
+    expect(retried.statusCode).toBe(200);
+    expect(retried.json().version).toBe(before.version + 1);
+    expect(await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`).toHaveLength(1);
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

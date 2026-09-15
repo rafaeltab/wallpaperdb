@@ -41,6 +41,29 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('searches active aliases without searching Biography or publicly enumerating aliases', async () => {
+    await project({
+      id: 'user_private_aliases', handle: 'current-name',
+      aliases: [{ handle: 'former-discovery-name', claimGeneration: 2 }],
+      biographyMarkdown: 'biographyuniqueneedle',
+    });
+    const result = await search('former-discovery-name');
+    expect(result.errors).toBeUndefined();
+    expect(result.data.searchProfiles.edges[0].node).toMatchObject({
+      id: 'user_private_aliases', handle: 'current-name', canonicalPath: '/profiles/@current-name',
+    });
+    expect(JSON.stringify(result)).not.toContain('former-discovery-name');
+    const biographyOnly = await search('biographyuniqueneedle');
+    expect(biographyOnly.errors).toBeUndefined();
+    expect(biographyOnly.data.searchProfiles.edges).toEqual([]);
+
+    const enumeration = await tester.getApp().inject({
+      method: 'POST', url: '/graphql',
+      payload: { query: '{ searchProfiles(query: "former-discovery-name") { edges { node { aliases { handle } } } } }' },
+    });
+    expect(enumeration.json().errors[0].message).toContain('Cannot query field "aliases"');
+  });
+
   it('accepts the displayed @Handle syntax and shares its cursor with the plain Handle query', async () => {
     await project({ id: 'user_at_a', handle: 'aurora' });
     await project({ id: 'user_at_b', handle: 'aurora-night' });

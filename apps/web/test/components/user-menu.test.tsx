@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -18,6 +19,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import { UserMenu } from '@/components/user-menu';
+import { profileQueryKey } from '@/components/profile-bootstrap';
 
 describe('UserMenu', () => {
   const mockSignOut = vi.fn();
@@ -62,6 +64,19 @@ describe('UserMenu', () => {
     expect(screen.getByTestId('user-menu-trigger')).toBeInTheDocument();
     expect(screen.getByTestId('user-menu-user-name')).toHaveTextContent('John Doe');
     expect(screen.getByText('John Doe')).toBeInTheDocument();
+  });
+
+  it('uses WallpaperDB owner pictures and generated avatars without returning to the Clerk image', () => {
+    (useAuth as Mock).mockReturnValue({ isSignedIn: true, isLoaded: true, userId: 'user_123' });
+    (useUser as Mock).mockReturnValue({ user: { fullName: 'Ada Lovelace', imageUrl: 'https://clerk.example/avatar.png' } });
+    const client = new QueryClient();
+    const { container } = render(<QueryClientProvider client={client}><UserMenu /></QueryClientProvider>);
+    expect(screen.getByRole('img')).toHaveTextContent('AL');
+    act(() => client.setQueryData(profileQueryKey('user_123'), { id: 'user_123', displayName: 'Ada Lovelace', pictureAssetId: 'owner_picture', version: 2 }));
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/media/profile-pictures/owner_picture');
+    act(() => client.setQueryData(profileQueryKey('user_123'), { id: 'user_123', displayName: 'Ada Lovelace', pictureAssetId: null, version: 3 }));
+    expect(screen.getByRole('img')).toHaveTextContent('AL');
+    expect(container.querySelector('img[src*="clerk.example"]')).toBeNull();
   });
 
   it('shows sign out option in dropdown when signed in', async () => {

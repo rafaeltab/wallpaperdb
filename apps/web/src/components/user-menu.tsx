@@ -1,6 +1,8 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import { Link } from '@tanstack/react-router';
 import { LogOut, LogIn, UserIcon } from 'lucide-react';
+import { ProfilePicture } from '@/components/profile/profile-picture';
+import { useOwnerProfile } from '@/hooks/use-owner-profile';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,9 +19,10 @@ function buildUrl(path: string): string {
 }
 
 export function UserMenu() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, userId } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const owner = useOwnerProfile(isSignedIn ? (userId ?? '') : '');
 
   if (!isLoaded) {
     return null;
@@ -37,14 +40,16 @@ export function UserMenu() {
   }
 
   if (!user) return null;
+  const displayName = owner?.displayName || user.fullName || user.primaryEmailAddress?.emailAddress || 'Your Profile';
+  const profile = owner ?? { id: userId ?? 'current-user', displayName, pictureAssetId: null };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button data-testid="user-menu-trigger" variant="ghost" size="sm" className="gap-2">
-          <img src={user.imageUrl} alt="" className="h-6 w-6 rounded-full" aria-hidden="true" />
+          <ProfilePicture profile={profile} className="flex size-6 shrink-0 items-center justify-center rounded-full object-cover text-xs font-medium text-white" />
           <span data-testid="user-menu-user-name" className="hidden sm:inline">
-            {user.fullName || user.primaryEmailAddress?.emailAddress}
+            {displayName}
           </span>
         </Button>
       </DropdownMenuTrigger>

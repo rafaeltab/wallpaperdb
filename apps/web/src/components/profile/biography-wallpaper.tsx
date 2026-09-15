@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
 import { useWallpaperQuery } from '@/hooks/useWallpaperQuery';
 
 export function BiographyWallpaper({
@@ -10,11 +11,22 @@ export function BiographyWallpaper({
   profileId: string;
   alt: string;
 }) {
-  const query = useWallpaperQuery(wallpaperId);
+  const query = useWallpaperQuery(wallpaperId, { staleTime: 0, retry: false });
+  const [retries, setRetries] = useState(0);
+  const wallpaper = query.data;
+  const variant = wallpaper?.variants?.[0];
+  const matches = wallpaper?.wallpaperId === wallpaperId && wallpaper.profileId === profileId;
+  const retryable = !wallpaper || (matches && !variant);
+  useEffect(() => {
+    if (query.isPending || query.isFetching || !retryable || retries >= 3) return;
+    const timeout = window.setTimeout(() => {
+      setRetries((count) => count + 1);
+      void query.refetch();
+    }, 1000 * 2 ** retries);
+    return () => window.clearTimeout(timeout);
+  }, [query.isPending, query.isFetching, query.refetch, retryable, retries]);
   if (query.isPending)
     return <output className="my-4 block text-sm text-muted-foreground">Loading wallpaper…</output>;
-  const wallpaper = query.data;
-  const variant = wallpaper?.variants[0];
   if (
     !wallpaper ||
     wallpaper.wallpaperId !== wallpaperId ||

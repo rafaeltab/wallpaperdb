@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
 import { request } from '@/lib/graphql/client';
@@ -17,6 +17,24 @@ vi.mock('@tanstack/react-router', () => ({
 const profileId = 'user_123';
 
 describe('Biography Markdown', () => {
+  beforeEach(() => vi.mocked(request).mockReset());
+  afterEach(() => vi.useRealTimers());
+
+  it('retries missing and unrenderable own wallpapers until a published variant arrives', async () => {
+    vi.useFakeTimers();
+    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/own.webp' }] };
+    vi.mocked(request).mockResolvedValueOnce({ getWallpaper: null }).mockResolvedValueOnce({ getWallpaper: { ...wallpaper, variants: [] } }).mockResolvedValue({ getWallpaper: wallpaper });
+    const client = new QueryClient();
+    render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="![Forest](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByText('Wallpaper unavailable.')).toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    expect(screen.getByRole('img', { name: 'Forest' })).toHaveAttribute('src', '/media/own.webp');
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
   it('supports configured long Biographies and limits only an explicitly bounded preview', () => {
     const text = 'a'.repeat(5500);
     const markdown = `**${text}**`;

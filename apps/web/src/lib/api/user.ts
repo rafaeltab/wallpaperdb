@@ -19,6 +19,8 @@ export interface Profile {
   displayName: string;
   biographyMarkdown: string;
   pictureAssetId: string | null;
+  pictureImportStatus?: 'pending' | 'retrying' | 'complete';
+  pictureUploadLimits?: { maxBytes: number; maxPixels: number; maxDecodedBytes: number };
   version: number;
   createdAt: string;
   updatedAt: string;
@@ -78,10 +80,41 @@ interface AliasCommandOptions {
   tokenProvider?: () => Promise<string | null>;
 }
 
+interface PictureCommandOptions {
+  expectedVersion: number;
+  expectedProfileId?: string;
+  tokenProvider?: () => Promise<string | null>;
+}
+
+interface UploadPictureOptions extends PictureCommandOptions {
+  picture: File;
+}
+
 export function createUserApiClient({ baseUrl, tokenProvider }: UserApiClientOptions) {
   const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
 
   return {
+    async uploadPicture(options: UploadPictureOptions): Promise<Profile> {
+      const token = await (options.tokenProvider ?? tokenProvider)();
+      if (!token) throw new UserApiError('Authentication token is not ready', 401);
+      const form = new FormData();
+      form.set('picture', options.picture);
+      form.set('expectedVersion', String(options.expectedVersion));
+
+      const response = await fetch(`${normalizedBaseUrl}/profile/me/picture`, {
+        method: 'PUT',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!response.ok) throw await userApiError(response);
+      const profile: unknown = await response.json();
+      if (!isProfile(profile)) throw new UserApiError('User API returned a malformed Profile', 502);
+      if (options.expectedProfileId && profile.id !== options.expectedProfileId) {
+        throw new UserApiError('User API returned a Profile for another User', 502);
+      }
+      return profile;
+    },
+
     async reactivateAlias(options: AliasCommandOptions): Promise<Profile> {
       const token = await (options.tokenProvider ?? tokenProvider)();
       if (!token) throw new UserApiError('Authentication token is not ready', 401);

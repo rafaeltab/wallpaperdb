@@ -64,6 +64,34 @@ describe('User API client', () => {
     });
   });
 
+  it('uploads a picture as authenticated multipart data with the confirmed Profile version', async () => {
+    const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
+    const picture = new File(['png-bytes'], 'portrait.png', { type: 'image/png' });
+    const updated = {
+      ...profile,
+      version: 2,
+      pictureAssetId: 'picture_new',
+      pictureImportStatus: 'complete',
+      pictureUploadLimits: { maxBytes: 5242880, maxPixels: 20000000, maxDecodedBytes: 80000000 },
+    };
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(updated)));
+    vi.stubGlobal('fetch', fetch);
+    const client = createUserApiClient({ baseUrl: '/user/', tokenProvider });
+
+    await expect(
+      client.uploadPicture({ picture, expectedVersion: 1, expectedProfileId: profile.id })
+    ).resolves.toEqual(updated);
+    expect(tokenProvider).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledWith('/user/profile/me/picture', {
+      method: 'PUT',
+      headers: { Accept: 'application/json', Authorization: 'Bearer fresh-token' },
+      body: expect.any(FormData),
+    });
+    const body = fetch.mock.calls[0]?.[1].body;
+    expect(body.get('picture')).toBe(picture);
+    expect(body.get('expectedVersion')).toBe('1');
+  });
+
   it('schedules an alias with a fresh token and adopts its exact expiry from the owner response', async () => {
     const tokenProvider = vi.fn().mockResolvedValue('fresh-token');
     const updated = {

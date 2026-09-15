@@ -30,6 +30,7 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
   const selected = useQuery({
     ...profileByIdQueryOptions(profileId ?? ''),
     enabled: Boolean(profileId),
+    retry: false,
   });
 
   return (
@@ -44,7 +45,16 @@ export function ProfileFilter({ profileId, onChange, collapsed = false }: Profil
                 <span className="block truncate text-xs text-muted-foreground">@{selected.data.handle}</span>
               </span>
             </>
-          ) : <span className="flex-1 text-sm text-muted-foreground">Loading selected Profile…</span>}
+          ) : selected.isError ? (
+            <div className="min-w-0 flex-1">
+              <p role="alert" className="text-xs text-destructive">Could not load the selected Profile.</p>
+              <Button type="button" variant="link" size="sm" className="h-auto p-0" aria-label="Retry selected Profile" onClick={() => void selected.refetch()}>Try again</Button>
+            </div>
+          ) : (
+            <span className="flex-1 text-sm text-muted-foreground">
+              {selected.isLoading ? 'Loading selected Profile…' : 'Selected Profile is unavailable.'}
+            </span>
+          )}
           <Button type="button" variant="outline" size="sm" aria-label="Clear Profile filter" onClick={() => {
             setInput('');
             onChange(undefined);

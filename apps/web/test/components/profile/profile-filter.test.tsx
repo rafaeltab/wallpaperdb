@@ -91,4 +91,18 @@ describe('Profile wallpaper filter', () => {
     expect(await screen.findByText('No Profiles found. Try another Handle or Display name.')).toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('keeps an unavailable selected Profile removable and retries lookup failures', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('offline'));
+    const user = userEvent.setup();
+    const { onChange } = renderFilter(ada.id);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the selected Profile.');
+    expect(onChange).not.toHaveBeenCalled();
+    mockFetch.mockResolvedValueOnce(response({ profile: null }));
+    await user.click(screen.getByRole('button', { name: 'Retry selected Profile' }));
+    expect(await screen.findByText('Selected Profile is unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading selected Profile…')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear Profile filter' }));
+    expect(onChange).toHaveBeenCalledWith(undefined);
+  });
 });

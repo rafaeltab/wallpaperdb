@@ -177,3 +177,25 @@ hover and keyboard focus, centered pencil/text rows, public preview, real profil
 owner edit link. The first four focused test files passed all 48 tests. Biome passed. App
 TypeScript reports 71 pre-existing diagnostics, none in changed source files; importing the
 existing missing test helper removed one prior diagnostic.
+
+
+### Final navigation and mobile verification
+
+Browser verification exposed an existing infinite loop when intent-preloading a Profile ID
+link: href-only canonical redirects recursively preloaded the original route. Canonical
+redirects now use typed router destinations and handle parameters. Three bounded real-router
+regressions cover repeated ID, bare-handle, and alias preloads under `/web`; all three failed
+before the fix. They and the ten existing loader tests pass (13 tests), in addition to the
+48 component tests above. Review checked the shared redirect fix, and agent-browser repeated
+menu hover/click → canonical Profile → Edit profile successfully with cached data.
+
+At 320px, the public page, owner edit action, account menu, editor, and preview fit without
+horizontal overflow. Account menu entries remain one line. The full date tooltip has 16px
+screen gutters, including keyboard focus. Closing the preview restores focus to “View profile.”
+Desktop verification confirmed that pencil glyph color changes on hover while the background
+stays transparent; icon and text line centers match. Light and dark layouts were inspected.
+
+Final app TypeScript check remains at 71 existing diagnostics, with none in the changed source
+or new redirect tests. Scoped Biome and whitespace checks pass. Verification browser sessions
+are closed; the user's running development stack is left running. All changes are committed
+locally, with no push or update to PR #208.

@@ -108,7 +108,6 @@ function ProfileEditor({
           </>
         }
         details={<ProfileAliasSettings profile={profile} tokenProvider={tokenProvider} />}
-        biographyHeading={false}
         biography={
           <ProfileInlineField
             field="biographyMarkdown"

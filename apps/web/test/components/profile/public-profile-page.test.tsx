@@ -171,7 +171,7 @@ describe('PublicProfilePage', () => {
 
     expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
     expect(screen.getByText('@ada-lovelace')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Biography' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Biography' })).not.toBeInTheDocument();
     expect(screen.getByText('No biography yet.')).toBeInTheDocument();
     expect(firstFallback).toHaveTextContent('AL');
 

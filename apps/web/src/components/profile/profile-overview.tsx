@@ -8,7 +8,6 @@ export function ProfileOverview({
   actions,
   identity,
   details,
-  biographyHeading = true,
 }: {
   profile: Pick<Profile, 'displayName' | 'handle'>;
   picture: ReactNode;
@@ -16,7 +15,6 @@ export function ProfileOverview({
   actions?: ReactNode;
   identity?: ReactNode;
   details?: ReactNode;
-  biographyHeading?: boolean;
 }) {
   return (
     <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -44,12 +42,7 @@ export function ProfileOverview({
         </div>
 
         <div className="mt-8 border-t pt-6">
-          {biographyHeading && (
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Biography
-            </h2>
-          )}
-          <div className={biographyHeading ? 'mt-3 min-w-0' : 'min-w-0'}>{biography}</div>
+          <div className="min-w-0">{biography}</div>
         </div>
       </div>
     </section>

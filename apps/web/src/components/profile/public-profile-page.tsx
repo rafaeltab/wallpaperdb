@@ -87,10 +87,7 @@ export function ProfileWallpapers({ profileId }: { profileId: string }) {
   }
 
   return (
-    <section className="mt-10" aria-labelledby="profile-wallpapers-heading">
-      <h2 id="profile-wallpapers-heading" className="mb-5 text-2xl font-bold tracking-tight">
-        Wallpapers
-      </h2>
+    <section className="mt-10" aria-label="Wallpapers">
       {content}
     </section>
   );

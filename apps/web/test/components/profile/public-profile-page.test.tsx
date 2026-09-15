@@ -236,7 +236,8 @@ describe('PublicProfilePage', () => {
     expect(useWallpaperInfiniteQuery).toHaveBeenCalledWith({
       filter: { profileId: 'user_grace' },
     });
-    expect(screen.getByRole('heading', { name: 'Wallpapers' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Wallpapers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Wallpapers' })).toBeInTheDocument();
     expect(screen.getByText('wlpr_profile_001')).toBeInTheDocument();
     expect(screen.getByText('wlpr_profile_002')).toBeInTheDocument();
 

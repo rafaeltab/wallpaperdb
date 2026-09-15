@@ -181,7 +181,7 @@ function DisplayNameSettings({
         </CardContent>
       </Card>
       <HandleSettings profile={profile} tokenProvider={tokenProvider} />
-      <ProfileAliasSettings profile={profile} />
+      <ProfileAliasSettings profile={profile} tokenProvider={tokenProvider} />
     </div>
   );
 }

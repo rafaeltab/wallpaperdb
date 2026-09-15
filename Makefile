@@ -54,7 +54,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
         storage-test storage-infra-test coverage-summary crap check-crap crap-check-types \
-        worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci clean
+        worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci-runner-test ci clean
 
 help: ## Show commands and selectors
 	@echo "WallpaperDB — project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
@@ -246,7 +246,11 @@ test-make: ## Test command routing without starting services
 worktree-env-test: ## Verify generated service credentials and environment rules
 	@pnpm exec vitest run scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism
 
+ci-runner-test: ## Verify CI stops and reports failures correctly
+	@pnpm exec vitest run scripts/ci-runner.test.ts --maxWorkers=1 --no-file-parallelism
+
 ci: test-make crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
+	@$(MAKE) ci-runner-test
 	@$(MAKE) worktree-env-test
 	@$(MAKE) nats-stream-setup-test
 	@$(MAKE) sandcastle-test

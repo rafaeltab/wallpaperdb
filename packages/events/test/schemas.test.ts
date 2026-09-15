@@ -38,6 +38,34 @@ describe("Event Schemas", () => {
       expect(ProfileCreatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("preserves alias lifetime metadata while accepting retained snapshots", () => {
+      const alias = { handle: "ada", claimGeneration: 1 };
+      const snapshotWithAliases = (aliases: unknown[]) => ({
+        ...event,
+        profile: { ...event.profile, aliases },
+      });
+      const withLifetime = snapshotWithAliases([
+        { ...alias, createdAt: timestamp, expiresAt: null },
+        {
+          handle: "ada-byron",
+          claimGeneration: 2,
+          createdAt: timestamp,
+          expiresAt: "2026-10-01T00:00:00.000Z",
+        },
+      ]);
+
+      expect(ProfileCreatedEventSchema.parse(withLifetime)).toEqual(withLifetime);
+      expect(ProfileCreatedEventSchema.safeParse(snapshotWithAliases([alias])).success).toBe(
+        true
+      );
+      expect(ProfileCreatedEventSchema.safeParse(event).success).toBe(true);
+      expect(
+        ProfileCreatedEventSchema.safeParse(
+          snapshotWithAliases([{ ...alias, createdAt: timestamp, expiresAt: "tomorrow" }])
+        ).success
+      ).toBe(false);
+    });
+
     it("rejects an invalid profile version", () => {
       expect(
         ProfileCreatedEventSchema.safeParse({

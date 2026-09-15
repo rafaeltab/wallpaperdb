@@ -15,6 +15,9 @@ export const PublicProfileSnapshotSchema = z
           .object({
             handle: z.string().min(1),
             claimGeneration: z.number().int().positive(),
+            // Retained snapshots predate alias lifetime metadata.
+            createdAt: z.string().datetime().optional(),
+            expiresAt: z.string().datetime().nullable().optional(),
           })
           .strict()
       )

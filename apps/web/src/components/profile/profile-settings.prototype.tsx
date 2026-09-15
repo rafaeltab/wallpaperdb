@@ -983,6 +983,7 @@ function PrototypeModal({
   opener: HTMLElement | null;
   children: ReactNode;
 }) {
+  const title = useRef<HTMLHeadingElement>(null);
   const titles = {
     picture: 'Profile picture',
     biography: 'Edit biography',
@@ -1008,12 +1009,20 @@ function PrototypeModal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm" />
         <Dialog.Content
           className={`fixed top-1/2 left-1/2 z-50 max-h-[88dvh] w-[calc(100%-2rem)] ${editor === 'public' ? 'max-w-5xl' : 'max-w-xl'} -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-card p-5 shadow-2xl sm:p-7`}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            title.current?.focus();
+          }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             opener?.focus();
           }}
         >
-          <Dialog.Title className="pr-9 text-lg font-semibold">
+          <Dialog.Title
+            ref={title}
+            tabIndex={-1}
+            className="pr-9 text-lg font-semibold outline-none"
+          >
             {editor && titles[editor]}
           </Dialog.Title>
           <Dialog.Description className="mt-1 mb-6 pr-6 text-sm leading-6 text-muted-foreground">

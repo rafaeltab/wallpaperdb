@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileFilter } from '@/components/profile/profile-filter';
@@ -124,5 +124,20 @@ describe('Profile wallpaper filter', () => {
     const [, init] = mockFetch.mock.calls[1] as [string, RequestInit];
     expect(JSON.parse(init.body as string).variables).toEqual({ query: 'ada', first: 10, after: 'opaque_cursor' });
     expect(onChange).toHaveBeenCalledWith('user_Grace');
+  });
+
+  it('accepts a displayed @Handle and does not search a lone @', async () => {
+    mockFetch.mockResolvedValue(response({ searchProfiles: {
+      edges: [{ node: ada }], pageInfo: { hasNextPage: false, hasPreviousPage: false },
+    } }));
+    const user = userEvent.setup();
+    renderFilter();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), '@');
+    await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(mockFetch).not.toHaveBeenCalled();
+    await user.type(screen.getByRole('searchbox', { name: 'Profile' }), ' ADA ');
+    await screen.findByRole('button', { name: 'Select Ada Lovelace (@ada-lovelace)' });
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).variables.query).toBe('ada');
   });
 });

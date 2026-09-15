@@ -15,7 +15,7 @@ interface ProfileFilterProps {
 export function ProfileFilter({ profileId, onChange, collapsed = false }: ProfileFilterProps) {
   const inputId = useId();
   const [input, setInput] = useState('');
-  const query = input.trim().toLowerCase();
+  const query = input.trim().replace(/^@/, '').trim().toLowerCase();
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query), 250);

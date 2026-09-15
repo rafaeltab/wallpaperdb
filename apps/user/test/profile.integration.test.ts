@@ -82,6 +82,7 @@ describe('Profile commands', () => {
       profileHandleMinLength: 1,
       profileHandleMaxLength: 20,
       profileDisplayNameMaxLength: 80,
+      profileRetainedAliasLimit: 3,
     };
     container.clearInstances();
     app = await createApp(config, { logger: false, enableOtel: false });

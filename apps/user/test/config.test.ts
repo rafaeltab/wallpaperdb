@@ -16,6 +16,17 @@ describe('User service configuration', () => {
     process.env = { ...originalEnv };
   });
 
+  it('defaults retained aliases to three and accepts a configurable non-negative limit', () => {
+    delete process.env.PROFILE_RETAINED_ALIAS_LIMIT;
+    expect(loadConfig().profileRetainedAliasLimit).toBe(3);
+    process.env.PROFILE_RETAINED_ALIAS_LIMIT = '1';
+    expect(loadConfig().profileRetainedAliasLimit).toBe(1);
+    process.env.PROFILE_RETAINED_ALIAS_LIMIT = '0';
+    expect(loadConfig().profileRetainedAliasLimit).toBe(0);
+    process.env.PROFILE_RETAINED_ALIAS_LIMIT = '-1';
+    expect(() => loadConfig()).toThrow();
+  });
+
   it('accepts a short configured Handle maximum', () => {
     process.env.PROFILE_HANDLE_MAX_LENGTH = '3';
 

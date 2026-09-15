@@ -22,6 +22,7 @@ const configSchema = z
     profileHandleMinLength: z.number().int().min(1).max(63),
     profileHandleMaxLength: z.number().int().min(1).max(64),
     profileDisplayNameMaxLength: z.number().int().positive(),
+    profileRetainedAliasLimit: z.number().int().nonnegative(),
   })
   .superRefine((config, context) => {
     if (config.profileHandleMinLength > config.profileHandleMaxLength) {
@@ -57,6 +58,7 @@ export function loadConfig(): Config {
     profileHandleMinLength: parseIntEnv(process.env.PROFILE_HANDLE_MIN_LENGTH, 1),
     profileHandleMaxLength: parseIntEnv(process.env.PROFILE_HANDLE_MAX_LENGTH, 30),
     profileDisplayNameMaxLength: parseIntEnv(process.env.PROFILE_DISPLAY_NAME_MAX_LENGTH, 80),
+    profileRetainedAliasLimit: parseIntEnv(process.env.PROFILE_RETAINED_ALIAS_LIMIT, 3),
   };
 
   return configSchema.parse(raw);

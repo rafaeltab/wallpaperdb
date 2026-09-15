@@ -36,7 +36,10 @@ export class ProfilePictureImportWorker {
     if (this.inFlight) return this.inFlight;
     this.inFlight = this.runImportBatch()
       .catch((error: unknown) => {
-        this.logger.error({ category: 'profile-picture-import' }, 'Profile picture import cycle failed');
+        this.logger.error(
+          { category: 'profile-picture-import' },
+          'Profile picture import cycle failed'
+        );
         throw error;
       })
       .finally(() => {

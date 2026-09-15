@@ -11,6 +11,9 @@ import { getOtelSdk, shutdownOtel } from './otel-init.js';
 import { registerRoutes } from './routes/index.js';
 import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
 import { ProfileAliasExpiryWorker } from './services/profile-alias-expiry.service.js';
+import { ProfileEventRetentionService } from './services/profile-event-retention.service.js';
+import { ProfileEvidenceRetentionWorker } from './services/profile-evidence-retention-worker.js';
+import { ProfilePictureRetentionService } from './services/profile-picture-retention.service.js';
 import { ProfileService } from './services/profile.service.js';
 import { ProfilePictureStorage } from './services/profile-picture-storage.js';
 import { ProfilePictureImportService } from './services/profile-picture-import.service.js';
@@ -44,6 +47,7 @@ export async function createApp(
     enableOtel?: boolean;
     aliasExpiryTimer?: TimerService;
     pictureImportTimer?: TimerService;
+    evidenceRetentionTimer?: TimerService;
   }
 ): Promise<FastifyInstance> {
   container.register('config', { useValue: config });
@@ -103,6 +107,7 @@ export async function createApp(
   let outboxPublisher: ProfileOutboxPublisherWorker | null = null;
   let aliasExpiryWorker: ProfileAliasExpiryWorker | null = null;
   let pictureImportWorker: ProfilePictureImportWorker | null = null;
+  let evidenceRetentionWorker: ProfileEvidenceRetentionWorker | null = null;
 
   try {
     await container.resolve(DatabaseConnection).initialize();
@@ -129,6 +134,18 @@ export async function createApp(
       fastify.log,
       options?.pictureImportTimer
     );
+    const eventRetention = new ProfileEventRetentionService(
+      container.resolve(DatabaseConnection), config, fastify.log
+    );
+    const pictureRetention = new ProfilePictureRetentionService(
+      container.resolve(DatabaseConnection), container.resolve(ProfilePictureStorage), fastify.log
+    );
+    evidenceRetentionWorker = new ProfileEvidenceRetentionWorker(
+      (now, isStopping) => eventRetention.cleanupExpired(now, isStopping),
+      (now, isStopping) => pictureRetention.cleanupExpired(now, isStopping),
+      fastify.log,
+      options?.evidenceRetentionTimer
+    );
     fastify.connectionsState.connectionsInitialized = true;
     fastify.log.info('All connections initialized successfully');
   } catch (error) {
@@ -140,6 +157,7 @@ export async function createApp(
     fastify.connectionsState.isShuttingDown = true;
     await container.resolve(WallpaperOwnershipConsumer).stop();
     await aliasExpiryWorker?.stop();
+    await evidenceRetentionWorker?.stop();
     await pictureImportWorker?.stop();
     container.resolve(ProfilePictureStorage).close();
     await outboxPublisher?.stop();
@@ -156,6 +174,8 @@ export async function createApp(
   fastify.log.info('Profile alias expiry worker started');
   pictureImportWorker?.start();
   fastify.log.info('Profile picture import worker started');
+  evidenceRetentionWorker?.start();
+  fastify.log.info('Profile evidence retention worker started');
 
   return fastify;
 }

@@ -61,7 +61,7 @@ describe('Profile picture commands', () => {
       credentials: { accessKeyId: minioContainer.getUsername(), secretAccessKey: minioContainer.getPassword() } });
     await storage.send(new CreateBucketCommand({ Bucket: config.profilePictureBucket }));
     container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService(), pictureImportTimer });
+    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService(), pictureImportTimer, evidenceRetentionTimer: new FakeTimerService() });
     container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } });
   });
 

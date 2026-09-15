@@ -12,16 +12,20 @@ echo "Server: $NATS_SERVER"
 echo "================================================"
 echo ""
 
-# Function to create a stream if it doesn't exist
-create_stream_if_not_exists() {
+# Preserve retained events while applying the configured age limit on every setup.
+ensure_stream() {
   local stream_name=$1
   local subjects=$2
-  local max_age=${3:-1y}
+  local max_age=${3:-0}
 
   echo "Checking stream: $stream_name"
 
   if nats stream info "$stream_name" --server "$NATS_SERVER" >/dev/null 2>&1; then
-    echo "  ✓ Stream $stream_name already exists"
+    nats stream edit "$stream_name" \
+      --max-age="$max_age" \
+      --server "$NATS_SERVER" \
+      --force
+    echo "  ✓ Stream $stream_name retention updated"
   else
     echo "  → Creating stream $stream_name with subjects: $subjects"
     nats stream add "$stream_name" \
@@ -42,15 +46,15 @@ create_stream_if_not_exists() {
 
 # Create WALLPAPER stream. Keep publication history for ownership projection rebuilds.
 # Handles: wallpaper.uploaded, wallpaper.processed, wallpaper.deleted, etc.
-create_stream_if_not_exists "WALLPAPER" "wallpaper.>" "0"
+ensure_stream "WALLPAPER" "wallpaper.>" "0"
 
 # Profile state changes are retained independently for read-model rebuilds.
-create_stream_if_not_exists "PROFILE" "profile.>" "0"
+ensure_stream "PROFILE" "profile.>" "0"
 
 # Add more streams here as needed
 # Example:
-# create_stream_if_not_exists "ANALYTICS" "analytics.>"
-# create_stream_if_not_exists "NOTIFICATIONS" "notifications.>"
+# ensure_stream "ANALYTICS" "analytics.>"
+# ensure_stream "NOTIFICATIONS" "notifications.>"
 
 echo "================================================"
 echo "✅ All streams setup complete!"

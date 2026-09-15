@@ -38,6 +38,16 @@ if (args[0] === 'stream' && args[1] === 'info') {
 }
 
 describe('Profile projection stream setup', () => {
+  it('updates existing streams in place without deleting or recreating retained events', () => {
+    const calls = setupStreams('WALLPAPER,PROFILE');
+    for (const name of ['WALLPAPER', 'PROFILE']) {
+      const edit = calls.find((args) => args[1] === 'edit' && args[2] === name);
+      expect(edit).toContain('--max-age=0');
+      expect(edit).toContain('--force');
+    }
+    expect(calls.every((args) => ['info', 'edit'].includes(args[1]))).toBe(true);
+  });
+
   it('creates Wallpaper and Profile streams without age-based event expiry', () => {
     const calls = setupStreams();
     for (const name of ['WALLPAPER', 'PROFILE']) {

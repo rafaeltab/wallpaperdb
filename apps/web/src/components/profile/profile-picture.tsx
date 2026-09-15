@@ -10,10 +10,7 @@ interface ProfilePictureProps {
   className?: string;
 }
 
-export function ProfilePicture({
-  profile,
-  className = 'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
-}: ProfilePictureProps) {
+export function ProfilePicture({ profile, className }: ProfilePictureProps) {
   const { profile: cachedOwner, refreshedAt } = useOwnerProfile(profile.id);
   const owner =
     'pictureAssetId' in profile
@@ -38,7 +35,7 @@ export function ProfilePicture({
   };
   const publicVersion = 'version' in profile ? profile.version : 0;
   return (
-    <Picture
+    <ProfilePictureImage
       key={`${profile.id}:${picture?.url ?? ''}:${refreshedAt}:${publicVersion}`}
       profile={resolved}
       className={className}
@@ -46,9 +43,9 @@ export function ProfilePicture({
   );
 }
 
-function Picture({
+export function ProfilePictureImage({
   profile,
-  className,
+  className = 'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
 }: {
   profile: Pick<Profile, 'id' | 'displayName' | 'picture'>;
   className?: string;

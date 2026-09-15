@@ -58,7 +58,7 @@ export function ProfileOverview({
         {actions && <div className="absolute top-4 right-4">{actions}</div>}
       </div>
       <div className="px-5 pb-7 sm:px-8 sm:pb-9">
-        <div className="-mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-7">
+        <div className="relative -mt-12 flex flex-col gap-5 sm:-mt-14 sm:flex-row sm:items-end sm:gap-7">
           {picture}
           <div className="min-w-0 pb-1">
             <h1 className="break-words text-3xl font-bold tracking-tight text-card-foreground sm:text-4xl">

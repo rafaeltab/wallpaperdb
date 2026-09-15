@@ -5,6 +5,7 @@ import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } f
 import { Dialog } from 'radix-ui';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
+import { ProfilePictureImage } from '@/components/profile/profile-picture';
 import { ProfileOverview, ProfileWallpapers } from '@/components/profile/public-profile-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -420,7 +421,15 @@ export default function ProfileSettingsPrototype({
           <div>
             <ProfileOverview
               profile={{ displayName: value.name, handle: value.handle }}
-              picture={<Avatar value={value} publicPreview />}
+              picture={
+                <ProfilePictureImage
+                  profile={{
+                    id: profile.id,
+                    displayName: value.name,
+                    picture: value.picture ? { id: 'prototype-picture', url: value.picture } : null,
+                  }}
+                />
+              }
               biography={<BiographyMarkdown markdown={value.biography} profileId={profile.id} />}
             />
             <div className="mt-5 flex justify-end">
@@ -729,18 +738,10 @@ function InlineProfileText({
   );
 }
 
-function Avatar({
-  value,
-  large = false,
-  publicPreview = false,
-}: {
-  value: DraftProfile;
-  large?: boolean;
-  publicPreview?: boolean;
-}) {
+function Avatar({ value, large = false }: { value: DraftProfile; large?: boolean }) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 font-semibold text-primary ${publicPreview ? 'size-24 border-4 border-card text-2xl shadow-sm sm:size-28 sm:text-3xl' : large ? 'size-36 text-4xl' : 'size-24 text-3xl'}`}
+      className={`flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 font-semibold text-primary ${large ? 'size-36 text-4xl' : 'size-24 text-3xl'}`}
     >
       {value.picture ? (
         <img className="size-full object-cover" src={value.picture} alt={value.name} />

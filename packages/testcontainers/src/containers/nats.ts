@@ -117,23 +117,12 @@ export async function createNatsContainer(
   }
   command.push(...additionalArgs);
 
-  const healthInterval = 200;
-  const totalDuration = 10000;
-  const retries = totalDuration / healthInterval;
-
-  // Create container builder
+  // Probe NATS directly: Docker can delay its first health check for five seconds
+  // even when the server is ready and the configured check interval is shorter.
   let containerBuilder = new GenericContainer(image)
-    .withExposedPorts(4222)
+    .withExposedPorts(4222, 8222)
     .withCommand(command)
-    .withHealthCheck({
-      test: ['CMD', 'wget', 'http://localhost:8222/healthz', '-q', '-S'],
-      interval: 200,
-      retries: retries,
-      startPeriod: 1000,
-      timeout: 1000,
-    })
-    .withWaitStrategy(Wait.forHealthCheck());
-  // .withWaitStrategy(Wait.forLogMessage('Server is ready').withStartupTimeout(60000));
+    .withWaitStrategy(Wait.forHttp('/healthz', 8222).forStatusCode(200).withStartupTimeout(60000));
 
   // Add network if specified
   if (network) {

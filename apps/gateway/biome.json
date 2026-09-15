@@ -39,7 +39,7 @@
       "bracketSameLine": false
     },
     "parser": {
-      "unsafeParameterDecoratorsEnabled": true
+      "unsafeParameterDecoratorsEnabled": false
     }
   },
   "json": {
@@ -49,6 +49,6 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "*.json"]
+    "includes": ["src/**/*.ts", "test/**/*.ts", "*.json", "*.ts"]
   }
 }

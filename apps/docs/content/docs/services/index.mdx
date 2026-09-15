@@ -67,22 +67,19 @@ Pre-generates common resolution variants for uploaded wallpapers.
 - Publishes: `wallpaper.variant.uploaded`
 
 ### Gateway
-**Status:** ✅ COMPLETE
 
-GraphQL API gateway providing unified access to all wallpaper services.
+The public wallpaper catalogue provides GraphQL discovery from gateway-owned OpenSearch projections.
 
-**Key Features:**
-- GraphQL API using Mercurius
-- OpenSearch integration for fast wallpaper search
-- Variant-based filtering (resolution, aspect ratio, format)
-- Event-driven metadata synchronization
+**Key features:**
 
-**Event-driven:**
-- Consumes: `wallpaper.uploaded`, `wallpaper.variant.available`
+- Wallpaper and contributor Profile reads, color ranking, rendition filters and bidirectional pagination
+- Effect execution with explicit application ports and scoped resource cleanup
+- Replay-safe projection updates, bounded retries and durable quarantine
+- Query security limits, visitor quotas and OpenTelemetry tracing
 
-**API:**
-- GraphQL endpoint for queries and mutations
-- Search wallpapers by variants (width, height, aspect ratio)
+**Consumes:** `wallpaper.uploaded`, `wallpaper.variant.available`, `wallpaper.colors.extracted`, `profile.created`, and `profile.updated`.
+
+[View full documentation](/docs/services/gateway)
 
 ### Web Frontend
 **Status:** ✅ COMPLETE
@@ -178,18 +175,6 @@ Minimal service shell for future tagging work.
 
 [View Full Documentation →](/docs/services/tags)
 
-### Gateway
-**Status:** 📋 Planned
-
-GraphQL API gateway for unified access to all services.
-
-**Planned Features:**
-- GraphQL schema stitching
-- Query optimization and caching
-- Authentication and authorization
-- Rate limiting
-- API analytics
-
 ## Service Architecture
 
 ### Communication Patterns
@@ -221,7 +206,7 @@ Ingestor → wallpaper.uploaded → {
 | Ingestor | 3001 | ✓ | ✓ | ✓ (publish) | ✓ | ✅ Complete |
 | Media | 3002 | ✓ | ✓ | ✓ (consume) | - | ✅ Complete |
 | Variant Gen | 3004 | - | ✓ | ✓ (pub/sub) | - | ✅ Complete |
-| Gateway | 3000 | ✓ | - | ✓ (consume) | ✓ | ✅ Complete |
+| Gateway | 3004 | OpenSearch | - | ✓ (consume/quarantine) | ✓ | ✅ Complete |
 | Web | 3005 | - | - | - | - | ✅ Complete |
 | Thumbnail | 3003 | ✓ | ✓ | ✓ | - | 📋 Planned |
 | Quality | 3006 | ✓ | ✓ | ✓ | - | 📋 Planned |

@@ -16,8 +16,6 @@
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "types": ["vitest/globals"]
   },
   "include": ["src/**/*", "test/**/*", "vitest.config.ts", "esbuild.config.ts"],

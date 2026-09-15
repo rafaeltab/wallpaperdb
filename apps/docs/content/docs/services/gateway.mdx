@@ -1,0 +1,46 @@
+---
+title: Gateway
+description: Public discovery with Effect and explicit application ports
+---
+
+The gateway serves GraphQL wallpaper discovery and public contributor Profiles from its own OpenSearch projections. It never hydrates responses by synchronously querying another service.
+
+## Application structure
+
+The Gateway Catalogue context owns one application hexagon. Four capabilities expose a single public entry each: catalogue reads, projection updates, request admission, and availability. Their implementations use constructor-injected, application-owned interfaces with namespaced symbol tokens; no dependency container or infrastructure client crosses an application port.
+
+Effect 3 composes execution and tracing. Expected failures use discriminated result unions; defects remain defects until a driving adapter converts them to safe transport errors. Effect scopes release resources in reverse acquisition order on shutdown and failed startup. Configuration is parsed once before accepting work; only the adapters that need secrets receive them.
+
+Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, color preferences, nullable contributor batching, and media URLs. HTTP failures outside GraphQL use RFC 9457 Problem Details; GraphQL failures keep `errors` and applicable `data` with safe metadata in `extensions`.
+
+## Projection delivery
+
+Each OpenSearch projection mutation is atomic for one target. Uploads preserve previously received enrichment, duplicate variants do not accumulate, and an incomplete wallpaper remains hidden until its upload arrives. Profile versions never move backward. Complete legacy color/rendition snapshots converge by occurrence time and identity, since their producers do not yet provide entity versions.
+
+Existing color projections lack occurrence metadata, so the first stale event after upgrade can temporarily replace their color data. Deployments requiring preserved historical color ordering must replay the complete retained color history before reopening catalogue traffic.
+
+The broker adapter accepts CloudEvents 1.0 and translates legacy producer envelopes at intake. Replacing other services' contracts and retained events is a separate cross-application migration. Projection failures retry with finite exponential delays. Invalid, rejected, or exhausted deliveries are published to a durable quarantine stream before acknowledgment; quarantine outages keep delivery unacknowledged. Quarantine records preserve the original payload for replay and follow the existing retained-event lifecycle described in the Profile projection ADR and issue #162.
+
+## Verification
+
+```sh
+make gateway-build
+make gateway-check-types
+make gateway-lint
+make gateway-test-coverage
+make gateway-quality
+```
+
+Use `make gateway-test-focused GATEWAY_TEST_ARGS='test/catalogue.test.ts'` for a focused behavioral suite. Capability tests use controlled adapters; transport contracts use Fastify injection; storage and broker contracts use real containers. Integration tests check a representative publication-to-query path and lifecycle behavior.
+
+The search test project owns one OpenSearch server per invocation. Each fixture owns unique wallpaper and Profile indices, its application, and its broker. Cleanup deletes only that fixture's indices, including closed indices; focused tests start only their required infrastructure. NATS readiness uses its health endpoint and bounded protocol requests.
+
+Two worker threads reuse loaded modules while fixtures own mutable application state. The OpenTelemetry bootstrap test runs in an isolated process because SDK shutdown leaves module instrumentation installed. Shuffled file/test runs verify order independence. Use `GATEWAY_TEST_ARGS='--maxWorkers=1'` with the focused or coverage target to reduce worker memory at the cost of elapsed time.
+
+Coverage includes every gateway source file. The measured pre-migration minimums are 89.72% statements and lines, 87.50% branches, and 96.74% functions. The dependency-graph check enforces capability entry points, inward dependencies and acyclicity. The gateway's configured per-function CRAP threshold is 30; its report combines cyclomatic complexity with observed line coverage and supplements behavioral tests.
+
+## Operational notes
+
+Redis outages use a local request window for each replica, so the fallback does not claim a distributed limit. `COLOR_SPREAD_STRATEGY` is validated at startup. Invalid configuration fails before the gateway opens a listener. Broker connection and storage calls have bounded deadlines, and GraphQL and projection spans join the incoming OpenTelemetry trace.
+
+`OPENSEARCH_INDEX` and optional `OPENSEARCH_PROFILE_INDEX` select the wallpaper and Profile indices. Their defaults remain `wallpapers` and `profiles`.

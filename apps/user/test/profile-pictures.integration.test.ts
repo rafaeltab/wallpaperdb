@@ -81,6 +81,35 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('rolls back import completion and manual cancellation when the picture event fails', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
+    initialImageUrl = 'https://img.clerk.com/initial-picture';
+    const pending = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array(image)));
+    await sql.unsafe(`create function reject_picture_event() returns trigger language plpgsql as $$ begin if NEW.payload->'change'->>'type' = 'picture-changed' then raise exception 'picture event rejected'; end if; return NEW; end $$`);
+    await sql.unsafe(`create trigger reject_picture_event before insert on outbox_events for each row execute function reject_picture_event()`);
+    try {
+      expect((await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: pending.version } })).statusCode).toBe(500);
+      expect((await ensure()).json()).toEqual(pending);
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure()).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'retrying' });
+      const [job] = await sql`select source_url, next_attempt_at from profile_picture_imports where profile_id = ${pending.id}`;
+      expect(job.source_url).toBe(initialImageUrl);
+      expect((await sql`select state from profile_picture_assets`)).toEqual([{ state: 'staged' }]);
+      expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(0);
+      await sql.unsafe('drop trigger reject_picture_event on outbox_events');
+      vi.setSystemTime(job.next_attempt_at);
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure()).json()).toMatchObject({ version: pending.version + 1, pictureAssetId: expect.stringMatching(/^pic_/), pictureImportStatus: 'complete' });
+    } finally {
+      await sql.unsafe('drop trigger if exists reject_picture_event on outbox_events');
+      await sql.unsafe('drop function reject_picture_event()');
+      fetcher.mockRestore(); vi.useRealTimers();
+    }
+  });
+
   it('runs queued picture imports from the application timer without blocking ensure', async () => {
     initialImageUrl = 'https://img.clerk.com/scheduled-initial-picture';
     const pending = (await ensure()).json();

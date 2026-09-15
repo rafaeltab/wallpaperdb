@@ -545,7 +545,7 @@ describe('Profile commands', () => {
       expect(reverted.json()).toMatchObject({ handle: before.handle, version: 3, aliases: [{ handle: 'new-handle', claimGeneration: expect.any(Number) }] });
       const events = await sql`select payload from outbox_events where subject = 'profile.updated' order by created_at, id`;
       expect(events[1].payload.profile.claimGeneration).toBeGreaterThan(events[0].payload.profile.claimGeneration);
-      expect(events[1].payload.change).toEqual({ type: 'handle-changed', before: 'new-handle', after: before.handle });
+      expect(events[1].payload.change).toEqual({ type: 'handle-changed', before: 'new-handle', after: before.handle, scheduledAliases: [] });
       expect((await request('user_1')).json()).toEqual(reverted.json());
     } finally {
       vi.useRealTimers();

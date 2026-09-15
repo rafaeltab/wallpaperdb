@@ -171,6 +171,27 @@ describe('Profile commands', () => {
     });
   }
 
+  async function publishBiographyWallpaper(wallpaperId: string, profileId: string, eventId = `evt_${wallpaperId}`) {
+    const now = new Date().toISOString();
+    const event: WallpaperUploadedEvent = {
+      eventId, eventType: 'wallpaper.uploaded', timestamp: now,
+      wallpaper: { id: wallpaperId, userId: profileId, fileType: 'image', mimeType: 'image/png', fileSizeBytes: 100,
+        width: 10, height: 10, aspectRatio: 1, storageKey: `${wallpaperId}.png`, storageBucket: 'wallpapers', originalFilename: 'owned.png', uploadedAt: now },
+    };
+    await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
+  }
+
+  it('rejects another Profile’s published Wallpaper without applying either edited field', async () => {
+    const original = (await request('user_1')).json();
+    await publishBiographyWallpaper('wlpr_foreign', 'other_profile');
+    await vi.waitFor(async () => { expect((await sql`select wallpaper_id from wallpaper_ownership where wallpaper_id = 'wlpr_foreign'`)).toHaveLength(1); }, { timeout: 5000, interval: 25 });
+    const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { displayName: 'Rejected Name', biographyMarkdown: '![Foreign](wallpaper:wlpr_foreign)', expectedVersion: original.version } });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ type: 'https://wallpaperdb.example/problems/unavailable-wallpaper', retryable: false });
+    expect((await request('user_1')).json()).toEqual(original);
+    expect((await sql`select id from outbox_events where subject = 'profile.updated'`)).toHaveLength(0);
+  });
+
   it('allows an owned published Wallpaper embed after the ownership event catches up', async () => {
     const original = (await request('user_1')).json();
     const biographyMarkdown = '![Sunset](wallpaper:wlpr_owned)';

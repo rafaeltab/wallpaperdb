@@ -199,3 +199,17 @@ Final app TypeScript check remains at 71 existing diagnostics, with none in the 
 or new redirect tests. Scoped Biome and whitespace checks pass. Verification browser sessions
 are closed; the user's running development stack is left running. All changes are committed
 locally, with no push or update to PR #208.
+
+
+## Smaller icons and themed action hints
+
+The follow-up scales pencil glyphs with CSS `1ex` (the surrounding font's x-height), while
+keeping a larger click target. Profile icon actions, dialog close, and prototype arrows now
+have concise hover/focus tooltips. Disabled actions keep hover explanations through a wrapper.
+The shared tooltip now uses popover surface/text colors and a matching arrow, so dark mode
+shows a dark surface instead of the previous inverted white surface.
+
+Profile preview no longer includes Wallpapers. The public Profile page still shows them.
+The preview retains its real-profile link and the shared public identity/biography layout.
+Agent-browser confirmed the smaller glyphs, dark tooltip colors, concise labels, cooldown
+expanded date, wallpaper-free preview, and dialog focus return on desktop and 390px mobile.

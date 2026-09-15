@@ -6,6 +6,12 @@ import {
 } from "../src/index.js";
 
 describe("Profile Markdown policy", () => {
+  it("checks only rendered image references against the first case-insensitive definition", () => {
+    const source =
+      "![photo][WALL]\n\n[wall]: wallpaper:first\n\n[wall]: wallpaper:second\n\n[unused]: wallpaper:third";
+    expect(validateProfileMarkdown(source)).toEqual({ valid: true, wallpaperIds: ["first"] });
+  });
+
   it("collects unique Wallpaper IDs from inline and reference images for ownership validation", () => {
     const source =
       "![My photo](wallpaper:wlpr_ABC) ![Again](wallpaper:wlpr_ABC) ![Other][WALL]\n\n[wall]: wallpaper:legacy-photo_2";

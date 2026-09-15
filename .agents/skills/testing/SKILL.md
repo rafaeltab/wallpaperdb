@@ -42,7 +42,7 @@ In Testcontainers, always use `127.0.0.1` for connection strings instead of `loc
 ## Coverage
 
 ```
-make test-coverage      # Run all tests with coverage enabled
+make test-unit test-integration      # Run all tests with coverage enabled
 make coverage-summary   # Print an AI-friendly summary to the terminal
 ```
 

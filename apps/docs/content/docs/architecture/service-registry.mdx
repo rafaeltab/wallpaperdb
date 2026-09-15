@@ -540,15 +540,15 @@ make infra-start
 make nats-setup-streams
 
 # 3. Start core services
-make ingestor-dev           # Terminal 1
-make media-dev              # Terminal 2
-make variant-generator-dev  # Terminal 3
+make dev PACKAGE=ingestor           # Terminal 1
+make dev PACKAGE=media              # Terminal 2
+make dev PACKAGE=variant-generator  # Terminal 3
 
 # 4. Start gateway
-make gateway-dev            # Terminal 4
+make dev PACKAGE=gateway            # Terminal 4
 
 # 5. Start web frontend
-make web-dev                # Terminal 5
+make dev PACKAGE=web                # Terminal 5
 
 # Or start all at once
 make dev

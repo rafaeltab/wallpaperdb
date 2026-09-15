@@ -51,7 +51,7 @@ make crap-check-types
 
 This runs strict TypeScript checking for `scripts/crap.mts` and `crap.config.mts`
 using `scripts/tsconfig.crap.json`. It also runs as part of `make check`,
-`make check-types`, `make check-types-force`, `make ci`, and `make ci-force`.
+`make check-types`, `make check-types FORCE=1`, `make ci`, and `make ci FORCE=1`.
 The reporting and threshold commands execute the TypeScript script with the
 repository's existing `tsx` dependency.
 

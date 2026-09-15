@@ -5,7 +5,7 @@ import path from 'path';
 const coveragePath = path.join(process.cwd(), 'coverage/coverage-summary.json');
 
 if (!fs.existsSync(coveragePath)) {
-  console.log('No coverage found. Run: make test-coverage');
+  console.log('No coverage found. Run: make test-unit test-integration');
   process.exit(1);
 }
 

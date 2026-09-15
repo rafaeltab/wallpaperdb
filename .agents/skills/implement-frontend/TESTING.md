@@ -7,8 +7,8 @@ Frontend tests use **Vitest v3** + **Testing Library** + **jsdom**. All test fil
 ## Run Commands
 
 ```bash
-make web-test           # Single-pass run
-make web-test-watch     # Watch mode
+make test PACKAGE=web           # Single-pass run
+make run PACKAGE=web SCRIPT=test:watch     # Watch mode
 pnpm --filter @wallpaperdb/web test:unit  # With coverage (no Make target yet)
 ```
 

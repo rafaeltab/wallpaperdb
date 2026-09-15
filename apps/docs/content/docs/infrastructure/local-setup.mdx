@@ -227,13 +227,13 @@ make infra-stop
 
 ```bash
 # Just ingestor
-make ingestor-dev
+make dev PACKAGE=ingestor
 
 # Just media
-make media-dev
+make dev PACKAGE=media
 
 # Just docs
-make docs-dev
+make dev PACKAGE=docs
 ```
 
 ### Running Tests
@@ -243,11 +243,11 @@ make docs-dev
 make test
 
 # Specific service
-make ingestor-test
-make media-test
+make test PACKAGE=ingestor
+make test PACKAGE=media
 
 # Watch mode
-make ingestor-test-watch
+make run PACKAGE=ingestor SCRIPT=test:watch
 
 # Storage compatibility (real SeaweedFS container)
 make storage-test

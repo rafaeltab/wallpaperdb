@@ -14,7 +14,7 @@ The Color Extractor Service extracts dominant color palettes from stored wallpap
 make infra-start
 
 # Run color-extractor in development mode
-make color-extractor-dev
+make dev PACKAGE=color-extractor
 
 # The service starts on http://localhost:3007
 ```
@@ -66,8 +66,8 @@ OTEL_SERVICE_NAME=wallpaperdb-color-extractor
 ## Testing
 
 ```bash
-make color-extractor-test          # All tests
-make color-extractor-test-watch    # Watch mode
+make test PACKAGE=color-extractor          # All tests
+make run PACKAGE=color-extractor SCRIPT=test:watch    # Watch mode
 ```
 
 ## API Reference
@@ -101,13 +101,13 @@ Readiness probe for Kubernetes.
 
 ## Deployment
 
-### Docker
+### Local Docker containers
 
 ```bash
-make color-extractor-docker-build  # Build image
-make color-extractor-docker-run    # Run container
-make color-extractor-docker-logs   # View logs
-make color-extractor-docker-stop   # Stop container
+make apps-build SERVICE=color-extractor  # Build image
+make apps-start SERVICE=color-extractor    # Run container
+make apps-logs SERVICE=color-extractor   # View logs
+make apps-stop SERVICE=color-extractor   # Stop container
 ```
 
 ### Caddy Proxy

@@ -54,7 +54,7 @@ describe("buildPullRequestBody", () => {
         {
           title: "feat(web): add wallpaper favorites",
           summary: ["Let signed-in users save wallpapers.", "Synchronize favorite state across gallery views."],
-          testing: ["make web-test", "make ci"],
+          testing: ["make test PACKAGE=web", "make ci"],
         },
       ),
     ).toBe(`## Summary
@@ -64,7 +64,7 @@ describe("buildPullRequestBody", () => {
 
 ## Test plan
 
-- \`make web-test\`
+- \`make test PACKAGE=web\`
 - \`make ci\`
 
 Closes #42`);

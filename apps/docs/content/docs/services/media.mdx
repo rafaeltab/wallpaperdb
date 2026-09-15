@@ -14,7 +14,7 @@ The Media Service handles retrieval and serving of wallpapers from SeaweedFS wit
 make infra-start
 
 # Run media service in development mode
-make media-dev
+make dev PACKAGE=media
 
 # The service starts on http://localhost:3003
 ```
@@ -260,8 +260,8 @@ The media service uses the TesterBuilder pattern for testing.
 
 **Run tests:**
 ```bash
-make media-test          # All tests
-make media-test-watch    # Watch mode
+make test PACKAGE=media          # All tests
+make run PACKAGE=media SCRIPT=test:watch    # Watch mode
 ```
 
 **Test categories (planned):**

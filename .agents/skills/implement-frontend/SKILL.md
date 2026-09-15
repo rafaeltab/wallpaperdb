@@ -17,12 +17,12 @@ All frontend code lives in `apps/web`. The stack is React 19 + Vite + TypeScript
 ## Key Commands
 
 ```bash
-make web-dev          # Start dev server (http://localhost:3005)
-make web-test         # Run tests (single pass)
-make web-test-watch   # Run tests in watch mode
-make web-check        # TypeScript type check
-make web-lint         # Lint
-make web-build        # Production build
+make dev PACKAGE=web          # Start dev server (http://localhost:3005)
+make test PACKAGE=web         # Run tests (single pass)
+make run PACKAGE=web SCRIPT=test:watch   # Run tests in watch mode
+make check-types PACKAGE=web        # TypeScript type check
+make lint PACKAGE=web         # Lint
+make build PACKAGE=web        # Production build
 ```
 
 ## Directory Layout

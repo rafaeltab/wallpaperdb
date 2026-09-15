@@ -329,7 +329,7 @@ const { client, cleanup } = await new TesterBuilder()
 
 **Generate coverage:**
 ```bash
-make test-coverage          # Run all tests with coverage
+make test-unit test-integration          # Run all tests with coverage
 make coverage-summary       # Display AI-friendly summary
 open coverage/index.html    # View HTML report
 ```
@@ -588,7 +588,7 @@ pnpm coverage:merge
 
 **Force no cache:**
 ```bash
-make ci-force
+make ci FORCE=1
 ```
 
 ## Debugging Tests
@@ -609,7 +609,7 @@ pnpm --filter @wallpaperdb/ingestor test upload-flow
 
 **Interactive test runner:**
 ```bash
-make test-ui
+make run PACKAGE=web SCRIPT=test:watch ARGS=--ui
 ```
 
 **Features:**

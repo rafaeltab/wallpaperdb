@@ -2,8 +2,16 @@ import { profileMarkdownSanitizeSchema, remarkProfileMarkdown, validateProfileMa
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
+import { useOwnerProfile } from '@/hooks/use-owner-profile';
+import type { Profile } from '@/lib/graphql/types';
 import { BiographyExternalLink } from './biography-external-link';
 import { BiographyWallpaper } from './biography-wallpaper';
+
+export function ProfileBiography({ profile }: { profile: Pick<Profile, 'id' | 'version' | 'biographyMarkdown'> }) {
+  const { profile: owner } = useOwnerProfile(profile.id);
+  const current = owner?.id === profile.id && owner.version >= (profile.version ?? 0) ? owner : profile;
+  return <BiographyMarkdown markdown={current.biographyMarkdown} profileId={profile.id} />;
+}
 
 export function BiographyMarkdown({ markdown, profileId, maxCharacters = null }: { markdown: string; profileId: string; maxCharacters?: number | null }) {
   if (!markdown.trim()) return <p className="italic text-muted-foreground">No biography yet.</p>;

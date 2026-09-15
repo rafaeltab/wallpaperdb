@@ -1,4 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { profileQueryKey } from '@/components/profile-bootstrap';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { PublicProfilePage } from '@/components/profile/public-profile-page';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
@@ -39,6 +41,22 @@ describe('PublicProfilePage', () => {
       hasNextPage: false,
       fetchNextPage: vi.fn(),
     });
+  });
+
+  it('renders authoritative owner Biography Markdown immediately and accepts a newer public projection', () => {
+    const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: '**Projected Biography**', picture: null, canonicalPath: '/profiles/@ada', version: 1 };
+    const owner = { ...profile, biographyMarkdown: '**Owner Biography**', pictureAssetId: null, version: 2 };
+    const client = new QueryClient();
+    client.setQueryData(profileQueryKey(profile.id), owner);
+    const view = (version: number) => <QueryClientProvider client={client}><PublicProfilePage profile={{ ...profile, version }} /></QueryClientProvider>;
+    const rendered = render(view(1));
+    expect(screen.getByText('Owner Biography').tagName).toBe('STRONG');
+    act(() => client.setQueryData(profileQueryKey(profile.id), { ...owner, biographyMarkdown: '**Saved Biography**', version: 3 }));
+    expect(screen.getByText('Saved Biography').tagName).toBe('STRONG');
+    rendered.rerender(view(4));
+    expect(screen.getByText('Projected Biography').tagName).toBe('STRONG');
+    act(() => client.setQueryData(profileQueryKey(profile.id), { ...owner, id: 'another_user', version: 5 }));
+    expect(screen.queryByText('Owner Biography')).not.toBeInTheDocument();
   });
 
   it('renders the public identity and default Biography with a deterministic picture fallback', () => {

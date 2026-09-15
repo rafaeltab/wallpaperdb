@@ -5,6 +5,7 @@ import { WallpaperGrid } from '@/components/WallpaperGrid';
 import { useWallpaperInfiniteQuery } from '@/hooks/useWallpaperInfiniteQuery';
 import type { Profile } from '@/lib/graphql/types';
 import { ProfilePicture } from './profile-picture';
+import { ProfileBiography } from './profile-biography';
 
 interface PublicProfilePageProps {
   profile: Profile;
@@ -32,13 +33,7 @@ export function PublicProfilePage({ profile }: PublicProfilePageProps) {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Biography
             </h2>
-            {profile.biographyMarkdown.trim() ? (
-              <p className="mt-3 max-w-3xl whitespace-pre-wrap text-base leading-7 text-card-foreground">
-                {profile.biographyMarkdown}
-              </p>
-            ) : (
-              <p className="mt-3 text-base italic text-muted-foreground">No biography yet.</p>
-            )}
+            <div className="mt-3 min-w-0 max-w-3xl"><ProfileBiography profile={profile} /></div>
           </div>
         </div>
       </section>

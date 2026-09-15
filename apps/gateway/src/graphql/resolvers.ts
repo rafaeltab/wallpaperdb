@@ -180,7 +180,12 @@ export class Resolvers {
 
   private async searchProfiles(args: SearchProfilesArgs) {
     const limit = args.first ?? 10;
-    const results = await this.profileRepository.search({ query: args.query, size: limit + 1 });
+    const searchAfter = args.after ? this.cursorService.decode(args.after).slice(2) : undefined;
+    const results = await this.profileRepository.search({
+      query: args.query,
+      size: limit + 1,
+      searchAfter,
+    });
     const page = results.slice(0, limit);
     const cursors = page.map(({ cursorValues }) =>
       this.cursorService.encode(['profiles', args.query, ...cursorValues])
@@ -189,7 +194,7 @@ export class Resolvers {
       edges: page.map(({ profile }) => ({ node: profile })),
       pageInfo: {
         hasNextPage: results.length > limit,
-        hasPreviousPage: false,
+        hasPreviousPage: Boolean(args.after),
         startCursor: cursors[0] ?? null,
         endCursor: cursors.at(-1) ?? null,
       },

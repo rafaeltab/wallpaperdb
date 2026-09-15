@@ -39,6 +39,38 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('paginates equal-rank Profiles by immutable ID without repeats or gaps', async () => {
+    for (const suffix of ['05', '01', '04', '02', '03']) {
+      await project({ id: `user_${suffix}`, handle: `constellation-${suffix}` });
+    }
+    const first = await search('constellation', 2);
+    expect(first.errors).toBeUndefined();
+    expect(first.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_01', 'user_02']);
+    expect(first.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
+
+    // Extra matching Display names alter index statistics, but never existing rank scores.
+    await project({ id: 'user_name', handle: 'night-artist', displayName: 'Constellation Painter' });
+    const second = await search('constellation', 2, first.data.searchProfiles.pageInfo.endCursor);
+    expect(second.errors).toBeUndefined();
+    expect(second.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_03', 'user_04']);
+    expect(second.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: true });
+
+    const third = await search('constellation', 2, second.data.searchProfiles.pageInfo.endCursor);
+    expect(third.errors).toBeUndefined();
+    expect(third.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_05', 'user_name']);
+    expect(third.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: false, hasPreviousPage: true });
+
+    const end = await search('constellation', 2, third.data.searchProfiles.pageInfo.endCursor);
+    expect(end.errors).toBeUndefined();
+    expect(end.data.searchProfiles).toEqual({
+      edges: [],
+      pageInfo: { hasNextPage: false, hasPreviousPage: true, startCursor: null, endCursor: null },
+    });
+  });
+
   it('keeps scheduled aliases searchable until their exact deadline and retained aliases afterward', async () => {
     const deadline = new Date('2030-01-01T00:00:00.000Z');
     await project({

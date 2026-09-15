@@ -339,6 +339,37 @@ describe('Profile commands', () => {
     expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expiry-scheduled'`).toHaveLength(0);
   });
 
+  it('serializes scheduling against a Handle change at capacity with coherent owner reads', async () => {
+    const start = Date.parse('2030-01-01T12:00:00.000Z');
+    const week = 7 * 24 * 60 * 60 * 1000;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(start));
+    try {
+      let owner = (await request('user_1')).json();
+      for (const [index, handle] of ['first', 'second', 'current'].entries()) {
+        vi.setSystemTime(new Date(start + index * week));
+        owner = (await changeHandle('user_1', handle, owner.version)).json();
+      }
+      vi.setSystemTime(new Date(start + 3 * week));
+      const [schedule, change, ...reads] = await Promise.all([
+        scheduleAlias('user_1', owner.aliases[0].handle, owner.version),
+        changeHandle('user_1', 'next', owner.version),
+        ...Array.from({ length: 8 }, () => request('user_1')),
+      ]);
+      expect([schedule.statusCode, change.statusCode].sort()).toEqual([200, 409]);
+      const accepted = (schedule.statusCode === 200 ? schedule : change).json();
+      const stale = (schedule.statusCode === 409 ? schedule : change).json();
+      expect(stale.type).toMatch(/profile-version-conflict$/);
+      expect(accepted.version).toBe(owner.version + 1);
+      expect(accepted.aliases.filter((alias: { expiresAt: string | null }) => alias.expiresAt !== null)).toHaveLength(1);
+      for (const read of reads) expect(read.json()).toEqual(read.json().version === owner.version ? owner : accepted);
+      expect((await request('user_1')).json()).toEqual(accepted);
+      expect(await sql`select * from outbox_events where payload->'profile'->>'version' = ${String(accepted.version)}`).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

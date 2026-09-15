@@ -182,4 +182,22 @@ describe('production inline profile fields', () => {
     expect(screen.getByRole('button', { name: '7 days' })).toHaveFocus();
   });
 
+  it('does not overwrite a new owner session with a response from before logout', async () => {
+    let resolve: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.updateProfile).mockImplementation(() => new Promise((done) => { resolve = done; }));
+    const { client, unmount } = renderField();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit display name' }));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Old session edit' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save display name' }));
+    await flush();
+    unmount();
+    client.removeQueries({ queryKey: profileQueryKey(profile.id) });
+    const newSessionProfile = { ...profile, displayName: 'New session', version: 8 };
+    client.setQueryData(profileQueryKey(profile.id), newSessionProfile);
+    await act(async () => resolve?.({ ...profile, displayName: 'Old session edit', version: 2 }));
+    await flush();
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(newSessionProfile);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
 });

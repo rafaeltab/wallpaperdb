@@ -187,11 +187,17 @@ function InlineField({ field, profile, tokenProvider }: Props) {
     pending.current = true;
     setPhase('saving');
     setError(null);
+    const ownerQuery = queryClient.getQueryCache().find({ queryKey: key, exact: true });
     try {
       const updated = await mutation.mutateAsync(command);
       // Navigation may unmount this editor; keep an existing owner cache current.
-      // Logout removes the query, which must never be recreated by a late response.
-      if (queryClient.getQueryState(key)) queryClient.setQueryData(key, updated);
+      // Logout removes the query; a later session may recreate the same key.
+      if (
+        ownerQuery &&
+        queryClient.getQueryCache().find({ queryKey: key, exact: true }) === ownerQuery
+      ) {
+        queryClient.setQueryData(key, updated);
+      }
       if (!live.current) return;
       setEdit({
         value: updated[field],

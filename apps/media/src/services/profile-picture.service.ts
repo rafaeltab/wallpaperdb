@@ -26,7 +26,6 @@ export class ProfilePictureService {
           Authorization: `Bearer ${this.config.userMediaServiceToken}`,
           'Cache-Control': 'no-store',
         },
-        cache: 'no-store',
         redirect: 'error',
         signal: AbortSignal.timeout(3000),
       }

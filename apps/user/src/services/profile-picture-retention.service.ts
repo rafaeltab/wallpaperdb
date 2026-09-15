@@ -25,27 +25,33 @@ export class ProfilePictureRetentionService {
     const result = { deleted: 0, failed: 0 };
     for (const candidate of candidates) {
       if (isStopping()) break;
-      const deleted = await db.transaction(async (tx) => {
-        // Adoption also locks the Profile before touching picture assets.
-        const [profile] = await tx
-          .select()
-          .from(profiles)
-          .where(eq(profiles.id, candidate.profileId))
-          .for('update', { skipLocked: true });
-        if (!profile || profile.pictureAssetId === candidate.id) return false;
-        const [asset] = await tx
-          .select()
-          .from(profilePictureAssets)
-          .where(eq(profilePictureAssets.id, candidate.id))
-          .for('update', { skipLocked: true });
-        if (!asset || asset.state !== 'retired' || !asset.expiresAt || asset.expiresAt > now) {
-          return false;
-        }
-        await this.storage.delete(asset);
-        await tx.delete(profilePictureAssets).where(eq(profilePictureAssets.id, asset.id));
-        return true;
-      });
-      if (deleted) result.deleted++;
+      try {
+        const deleted = await db.transaction(async (tx) => {
+          // Adoption also locks the Profile before touching picture assets.
+          const [profile] = await tx
+            .select()
+            .from(profiles)
+            .where(eq(profiles.id, candidate.profileId))
+            .for('update', { skipLocked: true });
+          if (!profile || profile.pictureAssetId === candidate.id) return false;
+          const [asset] = await tx
+            .select()
+            .from(profilePictureAssets)
+            .where(eq(profilePictureAssets.id, candidate.id))
+            .for('update', { skipLocked: true });
+          if (!asset || asset.state !== 'retired' || !asset.expiresAt || asset.expiresAt > now) {
+            return false;
+          }
+          await this.storage.delete(asset);
+          await tx.delete(profilePictureAssets).where(eq(profilePictureAssets.id, asset.id));
+          return true;
+        });
+        if (deleted) result.deleted++;
+      } catch {
+        // Keep the row after failed/ambiguous DELETE or database commit.
+        // Deleting an already absent S3 key is safe on the next attempt.
+        result.failed++;
+      }
     }
     return result;
   }

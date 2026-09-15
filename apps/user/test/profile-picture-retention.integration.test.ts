@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CreateBucketCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
@@ -105,5 +105,31 @@ describe('Private Profile picture retention', () => {
       expect(await sql`select id, state from profile_picture_assets`).toEqual([{ id: second.pictureAssetId, state: 'active' }]);
       expect(await retention.cleanupExpired(expiresAt)).toEqual({ deleted: 0, failed: 0 });
     } finally { vi.useRealTimers(); }
+  });
+
+  it('keeps deletion evidence after failed or ambiguous storage replies and retries an already missing object', async () => {
+    const owner = await profiles.ensure('user_picture');
+    const first = await ingestion.upload(owner.id, picture, owner.version);
+    await profiles.adoptPicture(owner.id, null, first.version);
+    const [asset] = await sql`select * from profile_picture_assets where id = ${first.pictureAssetId!}`;
+    const unavailable = vi.spyOn(S3Client.prototype, 'send').mockRejectedValueOnce(new Error('S3 unavailable'));
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 1 });
+    } finally { unavailable.mockRestore(); }
+    expect((await object(asset.id)).ContentType).toBe('image/webp');
+    expect(await sql`select id from profile_picture_assets`).toEqual([{ id: asset.id }]);
+
+    const ambiguous = vi.spyOn(S3Client.prototype, 'send').mockImplementationOnce(async () => {
+      ambiguous.mockRestore();
+      await objectStorage.send(new DeleteObjectCommand({ Bucket: asset.storage_bucket, Key: asset.storage_key }));
+      throw new Error('Reply lost after S3 accepted deletion');
+    });
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 1 });
+    } finally { ambiguous.mockRestore(); }
+    await expect(object(asset.id)).rejects.toMatchObject({ name: 'NoSuchKey' });
+    expect(await sql`select id from profile_picture_assets`).toEqual([{ id: asset.id }]);
+    expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+    expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
   });
 });

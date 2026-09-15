@@ -81,6 +81,20 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('requires owner authentication and keeps picture commands scoped to that Profile', async () => {
+    for (const method of ['PUT', 'DELETE'] as const) {
+      expect((await app.inject({ method, url: '/profile/me/picture', payload: { expectedVersion: 1 } })).statusCode).toBe(401);
+    }
+    const first = (await ensure()).json();
+    const second = (await ensure('other_owner')).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, first.version)).json();
+    const otherCommand = await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(second.id), payload: { expectedVersion: second.version } });
+    expect(otherCommand.statusCode).toBe(200);
+    expect(otherCommand.json().id).toBe(second.id);
+    expect((await ensure()).json()).toEqual(uploaded);
+  });
+
   it('rolls back import completion and manual cancellation when the picture event fails', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

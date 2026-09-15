@@ -80,6 +80,27 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it.each(['upload', 'remove'])('ends Clerk picture ownership atomically on manual %s, including null removal', async (command) => {
+    initialImageUrl = 'https://img.clerk.com/initial-picture';
+    const pending = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const response = command === 'upload' ? await upload(image, pending.version) : await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: pending.version } });
+    expect(response.statusCode).toBe(200);
+    const manual = response.json();
+    expect(manual).toMatchObject({ version: pending.version + 1, pictureImportStatus: 'complete', pictureAssetId: command === 'upload' ? expect.stringMatching(/^pic_/) : null });
+    const [job] = await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
+    expect(job).toMatchObject({ status: 'complete', source_url: null, lease_token: null, lease_until: null });
+    const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'picture-changed'`;
+    expect(event.payload).toMatchObject({ change: { type: 'picture-changed', before: null, after: manual.pictureAssetId, source: command }, profile: { version: manual.version } });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Clerk is no longer authoritative'));
+    try {
+      initialImageUrl = 'https://img.clerk.com/later-picture';
+      await container.resolve(ProfilePictureImportService).importPending();
+      expect((await ensure()).json()).toEqual(manual);
+      expect(fetcher).not.toHaveBeenCalled();
+    } finally { fetcher.mockRestore(); }
+  });
+
   it.each(['invalid-picture', 'source-not-found'])('settles permanent %s import failures on the generated fallback', async (failure) => {
     initialImageUrl = 'https://img.clerk.com/permanently-invalid-picture';
     const pending = (await ensure()).json();

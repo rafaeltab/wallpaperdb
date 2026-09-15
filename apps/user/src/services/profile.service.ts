@@ -741,11 +741,11 @@ export class ProfileService {
     return this.database.getClient().db.transaction(async (tx) => {
       const [current] = await tx.select().from(profiles).where(eq(profiles.id, userId)).for('update');
       if (!current) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
+      const [job] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, userId)).for('update');
       if (importLeaseToken) {
-        const [job] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, userId)).for('update');
         if (!job || job.leaseToken !== importLeaseToken || job.status === 'complete' || current.pictureAssetId !== null) return this.ownerProfile(current, tx);
       } else if (current.version !== expectedVersion) throw new ProfileVersionConflictError('Profile has changed since it was last loaded');
-      if (current.pictureAssetId === assetId) return this.ownerProfile(current, tx);
+      if (current.pictureAssetId === assetId && (!job || job.status === 'complete')) return this.ownerProfile(current, tx);
       const asset = assetId ? await tx.query.profilePictureAssets.findFirst({ where: and(eq(profilePictureAssets.id, assetId), eq(profilePictureAssets.profileId, userId), eq(profilePictureAssets.state, 'staged')) }) : null;
       if (assetId && !asset) throw new Error('Staged Profile picture is missing');
       const now = new Date();
@@ -753,7 +753,7 @@ export class ProfileService {
         await tx.update(profilePictureAssets).set({ state: 'retired', retiredAt: now, expiresAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }).where(eq(profilePictureAssets.id, current.pictureAssetId));
       }
       if (assetId) await tx.update(profilePictureAssets).set({ state: 'active', expiresAt: null }).where(eq(profilePictureAssets.id, assetId));
-      if (importLeaseToken) await tx.update(profilePictureImports).set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null }).where(eq(profilePictureImports.profileId, userId));
+      if (job) await tx.update(profilePictureImports).set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null }).where(eq(profilePictureImports.profileId, userId));
       const [updated] = await tx.update(profiles).set({ pictureAssetId: assetId, version: current.version + 1, updatedAt: now }).where(eq(profiles.id, userId)).returning();
       const claim = await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, updated.handle) });
       if (!claim) throw new Error('Current Profile Handle claim is missing');

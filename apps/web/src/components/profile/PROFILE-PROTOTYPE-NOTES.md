@@ -256,3 +256,19 @@ Final validation: 44 existing Profile settings/public page/account menu tests pa
 Biome formatting and whitespace checks pass. App TypeScript still reports 71 pre-existing
 diagnostics, with none in the changed prototype, tooltip, switcher, or route files. The
 verification browser is closed; the user's development stack remains running.
+
+
+## Baseline alignment and explicit biography action
+
+Identity icons now participate in the actual text baseline instead of centering within a
+button box. Their glyphs remain `1ex`, and their click targets retain the surrounding line
+height. The same rule covers E's Edit/Save/Cancel icons and the other prototypes' text pencils.
+Agent-browser measured the name icon's bottom 3.3125px above its text baseline before the fix;
+afterward it exactly matched the baseline in desktop read/edit states and in mobile name and
+handle rows. Wrapped-name edit height still preserves the following handle position.
+
+The biography entry action is now a regular outlined **Edit biography** button throughout
+the prototypes. E retains its existing biography content origin. Desktop/mobile browser
+checks confirmed entry, Escape/cancel, and focus return; no page errors were reported.
+Independent code review and focused formatting checks passed. Changes remain local; PR #208
+is unchanged.

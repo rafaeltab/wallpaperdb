@@ -6,7 +6,7 @@ import {
   type ProfileUpdatedEvent,
   ProfileUpdatedEventSchema,
 } from '@wallpaperdb/events';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
@@ -260,6 +260,7 @@ export class ProfileService {
               kind: 'profile',
               claimGeneration: sql`excluded.claim_generation`,
               createdAt: now,
+              expiresAt: null,
             },
             setWhere: and(eq(handleClaims.profileId, userId), eq(handleClaims.kind, 'alias')),
           })
@@ -268,14 +269,31 @@ export class ProfileService {
           throw new HandleUnavailableError('This Handle is already in use; choose another name');
         await tx
           .update(handleClaims)
-          .set({ kind: 'alias', createdAt: now })
+          .set({ kind: 'alias', createdAt: now, expiresAt: null })
           .where(eq(handleClaims.handle, current.handle));
+        const retained = await tx.query.handleClaims.findMany({
+          where: and(
+            eq(handleClaims.profileId, userId),
+            eq(handleClaims.kind, 'alias'),
+            isNull(handleClaims.expiresAt)
+          ),
+          orderBy: [handleClaims.createdAt, handleClaims.handle],
+        });
+        const expiresAt = new Date(now.getTime() + ALIAS_EXPIRY_GRACE_MS);
+        const scheduledAliases = retained
+          .slice(0, Math.max(0, retained.length - this.config.profileRetainedAliasLimit))
+          .map((alias) => ({ handle: alias.handle, expiresAt: expiresAt.toISOString() }));
+        if (scheduledAliases.length > 0) {
+          await tx.update(handleClaims).set({ expiresAt }).where(
+            inArray(handleClaims.handle, scheduledAliases.map((alias) => alias.handle))
+          );
+        }
         const owner = await this.ownerProfile(updated, tx);
         const event: ProfileUpdatedEvent = {
           eventId: `evt_${ulid()}`,
           eventType: PROFILE_UPDATED_SUBJECT,
           timestamp: now.toISOString(),
-          change: { type: 'handle-changed', before: current.handle, after: handle },
+          change: { type: 'handle-changed', before: current.handle, after: handle, scheduledAliases },
           profile: {
             id: updated.id,
             displayName: updated.displayName,

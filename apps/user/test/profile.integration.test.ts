@@ -219,6 +219,45 @@ describe('Profile commands', () => {
     }
   });
 
+  it('atomically schedules the deterministic oldest retained alias when changing at capacity', async () => {
+    identities.identities.set('user_1', { displayName: 'Zulu', firstName: null, lastName: null });
+    let owner = (await request('user_1')).json();
+    const week = 7 * 24 * 60 * 60 * 1000;
+    const start = Date.parse('2030-01-01T12:00:00.000Z');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      for (const [index, handle] of ['alpha', 'bravo', 'current'].entries()) {
+        vi.setSystemTime(new Date(start + index * week));
+        const response = await changeHandle('user_1', handle, owner.version);
+        expect(response.statusCode).toBe(200);
+        owner = response.json();
+      }
+      expect(owner.aliases).toHaveLength(3);
+      expect(owner.aliases.every((alias: { expiresAt: string | null }) => alias.expiresAt === null)).toBe(true);
+      // Existing claims can share retention timestamps; Handle breaks that tie.
+      await sql`update handle_claims set created_at = '2030-01-01T12:00:00Z' where handle in ('zulu', 'alpha')`;
+      const now = new Date(start + 3 * week);
+      vi.setSystemTime(now);
+      const response = await changeHandle('user_1', 'next-handle', owner.version);
+      expect(response.statusCode).toBe(200);
+      const updated = response.json();
+      const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+      expect(updated.aliases.filter((alias: { expiresAt: string | null }) => alias.expiresAt !== null)).toEqual([
+        { ...owner.aliases.find((alias: { handle: string }) => alias.handle === 'alpha'), createdAt: new Date(start).toISOString(), expiresAt },
+      ]);
+      expect(updated.aliases.filter((alias: { expiresAt: string | null }) => alias.expiresAt === null)).toHaveLength(3);
+      expect((await request('user_1')).json()).toEqual(updated);
+      const events = await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
+      expect(events).toHaveLength(1);
+      expect(events[0].payload).toMatchObject({
+        change: { type: 'handle-changed', before: 'current', after: 'next-handle', scheduledAliases: [{ handle: 'alpha', expiresAt }] },
+        profile: { version: updated.version, aliases: updated.aliases },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('changes a Handle atomically and preserves the former Handle as an alias', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     const before = (await request('user_1')).json();

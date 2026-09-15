@@ -118,6 +118,21 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("records automatic and immediate alias expiry with the released claim generation", () => {
+      for (const reason of ["scheduled", "immediate"]) {
+        const expired = {
+          ...event,
+          change: {
+            type: "alias-expired", handle: "old-handle", claimGeneration: 2,
+            before: timestamp, after: null, reason,
+          },
+          profile: { ...event.profile, aliases: [] },
+        };
+        expect(ProfileUpdatedEventSchema.parse(expired)).toEqual(expired);
+        expect(ProfileUpdatedEventSchema.safeParse({ ...expired, change: { ...expired.change, claimGeneration: 0 } }).success).toBe(false);
+      }
+    });
+
     it("validates an alias expiry schedule with its authoritative snapshot", () => {
       const expiresAt = "2026-10-01T00:00:00.000Z";
       const scheduled = {

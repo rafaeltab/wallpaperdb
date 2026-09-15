@@ -41,6 +41,16 @@ export const ProfileUpdatedEventSchema = z
           after: z.string().datetime(),
         })
         .strict(),
+      z
+        .object({
+          type: z.literal("alias-expired"),
+          handle: z.string().min(1),
+          claimGeneration: z.number().int().positive(),
+          before: z.string().datetime(),
+          after: z.null(),
+          reason: z.enum(["scheduled", "immediate"]),
+        })
+        .strict(),
     ]),
     profile: PublicProfileSnapshotSchema,
   })

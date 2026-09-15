@@ -25,6 +25,7 @@ make dev PACKAGE=user
 - **Authenticated Profile creation** through an idempotent ensure command
 - **Optimistic Profile editing** with authoritative command responses and conflict detection
 - **Handle changes** with a seven-day cooldown and atomic alias retention for existing Profile links
+- **Alias expiry** with a 24-hour redirect grace, automatic claim release, and confirmed early expiry
 - **Unique Handle allocation** with normalization, reserved-name protection, collision retries, and monotonic claim generations
 - **Transactional Profile events** recorded in an outbox with the authoritative Profile snapshot
 - **Health checks** for database and message queue connectivity
@@ -91,7 +92,19 @@ The command returns `400` for invalid Handles, `409` for collisions or stale ver
 
 Schedules an owned alias for expiry using `{ "expectedVersion": 2 }`. The response includes the complete updated owner Profile and the exact alias `expiresAt`, 24 hours after acceptance. This records a versioned `alias-expiry-scheduled` change with the Handle and before/after expiry values. Repeating the command for an already scheduled alias at the current version returns unchanged state.
 
-Stale versions return `409`, malformed commands return `400`, and a Handle that is not an owned alias returns `404`. Scheduling keeps the alias claim reserved and its redirect available. The later expiry worker releases the claim; scheduling alone does not release it when its timestamp passes. Settings confirms the 24-hour redirect grace before scheduling and displays the authoritative expiry afterward.
+Stale versions return `409`, malformed commands return `400`, and a Handle that is not an owned alias returns `404`. Scheduling keeps the alias claim reserved and its redirect available until the deadline. Settings confirms the 24-hour redirect grace before scheduling and displays the authoritative expiry afterward.
+
+### POST /profile/me/aliases/:handle/expire
+
+Immediately expires an owned, scheduled alias using `{ "expectedVersion": 2 }`. The transaction releases its Handle claim, increments the Profile version, and records an `alias-expired` event with the released claim generation, previous expiry timestamp, reason (`immediate`), and complete post-change public snapshot. The command returns the updated owner Profile.
+
+An alias must already be scheduled: retained aliases return `409` with `alias-not-scheduled`. Unknown or foreign aliases return `404`; stale versions return `409` with `profile-version-conflict`. Retrying a completed command cannot create a second transition. Settings requires confirmation that existing links will stop leading to this Profile and another User can claim the Handle. It updates owner state immediately and explains that public links may take a moment to update.
+
+### Automatic alias expiry
+
+The expiry worker processes bounded batches of due aliases. Each transaction locks the owning Profile and rechecks the alias's owner, kind, claim generation, and deadline before release. Automatic release uses the same state/event transaction as immediate expiry, with reason `scheduled`. Retries and competing workers cannot release a promoted or newly reclaimed Handle.
+
+Public Handle lookup excludes aliases at their expiry timestamp, even if the removal event has not reached the Gateway yet. Legacy events without an expiry timestamp remain compatible. The Gateway applies complete snapshots by Profile version; older events cannot restore a removed alias. If a newly claimed Handle overlaps a stale projected claim, its higher claim generation wins.
 
 ### GET /health
 

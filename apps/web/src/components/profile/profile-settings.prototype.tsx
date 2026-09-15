@@ -252,7 +252,43 @@ export default function ProfileSettingsPrototype({
       {aliases}
     </div>
   );
-  const biography = (
+  const biography = variant === 'E' ? (
+    <section className="min-w-0 max-w-3xl">
+      <div className="relative h-5">
+        <h2 className="sr-only">Biography</h2>
+        {!biographyEdit && (
+          <PrototypeIconButton
+            ref={biographyEditButton}
+            className="absolute top-0 right-0 text-base"
+            buttonClassName="size-5"
+            label="Edit biography"
+            onClick={startBiographyEdit}
+          >
+            <Pencil className="size-[1ex]" />
+          </PrototypeIconButton>
+        )}
+      </div>
+      <div className="mt-3 min-w-0 max-w-3xl">
+        {biographyEdit ? (
+          <BiographyEditor
+            value={value}
+            profile={profile}
+            inline
+            compact
+            edit={biographyEdit}
+            onEdit={setBiographyEdit}
+            update={(patch, message) => {
+              update(patch, message);
+              finishBiographyEdit();
+            }}
+            cancel={finishBiographyEdit}
+          />
+        ) : (
+          <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
+        )}
+      </div>
+    </section>
+  ) : (
     <section className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-sm font-medium">Biography</h3>
@@ -1025,11 +1061,13 @@ function BiographyEditor({
   update,
   cancel,
   inline = false,
+  compact = false,
   edit,
   onEdit,
 }: EditorProps & {
   profile: Profile;
   inline?: boolean;
+  compact?: boolean;
   edit?: BiographyEdit;
   onEdit?: (edit: BiographyEdit) => void;
 }) {
@@ -1047,11 +1085,13 @@ function BiographyEditor({
   const count = [...draft].length;
   const limit = profile.biographyMaxLength ?? 5000;
   return (
-    <div className="space-y-4">
-      <fieldset className="flex gap-1 rounded-lg bg-muted/60 p-1">
+    <div className="relative space-y-4">
+      <fieldset className={compact
+        ? 'absolute -top-8 left-0 flex h-5 gap-1'
+        : 'flex gap-1 rounded-lg bg-muted/60 p-1'}>
         <legend className="sr-only">Biography editor view</legend>
         <Button
-          className="flex-1"
+          className={compact ? 'h-5 px-2 text-xs' : 'flex-1'}
           variant={preview ? 'ghost' : 'secondary'}
           aria-pressed={!preview}
           onClick={() => setEdit({ ...currentEdit, preview: false })}
@@ -1059,7 +1099,7 @@ function BiographyEditor({
           Write
         </Button>
         <Button
-          className="flex-1"
+          className={compact ? 'h-5 px-2 text-xs' : 'flex-1'}
           variant={preview ? 'secondary' : 'ghost'}
           aria-pressed={preview}
           onClick={() => setEdit({ ...currentEdit, preview: true })}
@@ -1068,7 +1108,7 @@ function BiographyEditor({
         </Button>
       </fieldset>
       {preview ? (
-        <div className="min-h-48 rounded-lg border p-4">
+        <div className={compact ? 'min-h-48' : 'min-h-48 rounded-lg border p-4'}>
           <BiographyMarkdown markdown={draft} profileId={profile.id} />
         </div>
       ) : (
@@ -1079,7 +1119,9 @@ function BiographyEditor({
           <Textarea
             ref={textarea}
             id="prototype-biography"
-            className="min-h-48 resize-y text-sm leading-6"
+            className={compact
+              ? 'min-h-48 resize-y rounded-sm border-0 bg-transparent p-0 text-base leading-7 shadow-none md:text-base dark:bg-transparent'
+              : 'min-h-48 resize-y text-sm leading-6'}
             placeholder="A little about you…"
             value={draft}
             onChange={(event) => setEdit({ ...currentEdit, draft: event.target.value })}
@@ -1105,17 +1147,33 @@ function BiographyEditor({
           with <code className="break-all">![Description](wallpaper:wallpaper-id)</code>.
         </p>
       </details>
-      <div className="flex justify-end gap-2 border-t pt-4">
-        <Button variant="outline" onClick={cancel}>
-          Cancel
-        </Button>
-        <Button
-          disabled={count > limit || draft === value.biography}
-          onClick={() => update({ biography: draft }, 'Biography saved')}
-        >
-          Save biography
-        </Button>
-      </div>
+      {compact ? (
+        <div className="absolute -top-8 right-0 flex h-5 gap-1 text-base">
+          <PrototypeIconButton
+            label="Save biography"
+            buttonClassName="size-5"
+            disabled={count > limit || draft === value.biography}
+            onClick={() => update({ biography: draft }, 'Biography saved')}
+          >
+            <Check className="size-[1ex]" />
+          </PrototypeIconButton>
+          <PrototypeIconButton label="Cancel" buttonClassName="size-5" onClick={cancel}>
+            <X className="size-[1ex]" />
+          </PrototypeIconButton>
+        </div>
+      ) : (
+        <div className="flex justify-end gap-2 border-t pt-4">
+          <Button variant="outline" onClick={cancel}>
+            Cancel
+          </Button>
+          <Button
+            disabled={count > limit || draft === value.biography}
+            onClick={() => update({ biography: draft }, 'Biography saved')}
+          >
+            Save biography
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

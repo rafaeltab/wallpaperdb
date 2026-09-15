@@ -3,7 +3,7 @@
 Question: which layout gives a useful profile overview while keeping editing focused?
 
 Run the existing development stack with `make dev` (after `make infra-start`), sign in,
-then open `/web/settings/profile?variant=D` on this worktree's ingress (currently port 8140).
+then open `/web/settings/profile?variant=E` on this worktree's ingress (currently port 8140).
 The normal settings screen is unchanged when `variant` is absent. Prototypes are development-only.
 Existing authentication and profile reads stay in place; prototype edits stay in memory.
 
@@ -13,9 +13,10 @@ Available alternatives:
 - B — Profile preview: a public-profile composition with editing controls on the content.
 - C — Editable details: a compact list with clear labels and section boundaries.
 - D — Inline profile (prototype 4): B’s composition with matching inline text editors and a fixed gradient.
+- E — Edit in place (prototype 5): the public Profile layout with controls at each field.
 
 All alternatives use dialogs for pictures and previous handles. A/B/C retain biography dialogs;
-D edits biography inline. Custom banner editing has been deferred to issue #212.
+D/E edit biography inline. Custom banner editing has been deferred to issue #212.
 Use “Profile handle” in user-facing copy. Show routine refresh only as contextual recovery
 in the eventual implementation. The current biography refresh reloads the profile, preserves
 unsaved text, updates its concurrency version, and retries embedded wallpaper previews.
@@ -46,7 +47,8 @@ this page's current profile snapshot; reloading discards every local edit.
 The picture chooser previews a local file. Replace and Remove sit beside one another.
 Biography editing includes Write/Preview, Markdown help, Save, and Cancel. Previous handles
 have separate headings, bordered rows, status badges, dates, and local redirect actions.
-Display-name editing and a local public-profile preview are also available.
+Display-name editing and a local public-profile preview are also available. The preview
+shows identity and biography without wallpapers, and links to the real saved Profile.
 
 ## Validation and scope
 
@@ -213,3 +215,44 @@ Profile preview no longer includes Wallpapers. The public Profile page still sho
 The preview retains its real-profile link and the shared public identity/biography layout.
 Agent-browser confirmed the smaller glyphs, dark tooltip colors, concise labels, cooldown
 expanded date, wallpaper-free preview, and dialog focus return on desktop and 390px mobile.
+
+
+## Prototype 5 — edit in place
+
+Latest direction: align the editor with the actual public Profile and keep the content in
+place when editing. E is available at `/web/settings/profile?variant=E`; D remains at
+`?variant=D`. The switcher includes A–E and preserves drafts between alternatives.
+
+E reuses the public Profile's exact outer width/padding, gradient, overlapping picture,
+identity alignment, font sizes, line heights, and biography position. “View profile” sits
+at the top right inside the card. Picture rendering uses the real public fallback colors
+and initials. The name and handle become inputs at their existing text origin, without
+visible labels or routine descriptions. The fixed @ prefix stays in place. Save/Cancel
+use icons with concise tooltips; labels remain available to assistive technology. Invalid
+input receives contextual feedback. Enter saves and Escape cancels.
+
+Biography has an edit icon in place of the visible heading, then opens inline at the same
+content origin with Write/Preview, icon Save/Cancel, a character count, and formatting help.
+The previous-handles summary occupies the existing gap below the identity, preserving the
+public page's layout. Its details dialog and the picture dialog remain available.
+
+Browser checks at 1440px and 320px confirmed exact read/edit name and handle origins and
+line heights, local save/cancel and focus return, Markdown preview/save/cancel, alias details,
+cooldown tooltip, icon tooltips (including disabled Save), and preserved drafts across D/E.
+The 320px example alias summary fits on one line and clears the divider. Light and dark
+appearances were inspected, with no page errors reported. Picture/alias dialogs focus their
+title on entry, so the Close tooltip does not intercept the first Escape key.
+
+A wrapped display name initially collapsed to one line when edited. The editor now retains
+the measured read height for that edit cycle: a 108px name keeps its following handle in
+place while using a single-line input at the first line's origin. This throwaway reservation
+is not recalculated for viewport resizing during an active edit. Final production work
+should handle that case, authoritative policy/errors, persistence, and full automated tests.
+
+Independent code review passed. All edits remain in memory and changes are committed locally;
+PR #208 has not been updated. Banner support remains deferred to issue #212.
+
+Final validation: 44 existing Profile settings/public page/account menu tests pass; focused
+Biome formatting and whitespace checks pass. App TypeScript still reports 71 pre-existing
+diagnostics, with none in the changed prototype, tooltip, switcher, or route files. The
+verification browser is closed; the user's development stack remains running.

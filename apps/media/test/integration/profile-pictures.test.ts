@@ -229,4 +229,44 @@ describe('Profile picture delivery', () => {
     expect(recovered.rawPayload).toEqual(bytes);
     expect(recovered.headers['cache-control']).toBe('public, max-age=31536000, immutable');
   });
+
+  it('keeps replacement and removal authoritative through duplicate and older picture events', async () => {
+    const old = await pictureEvent('user_picture_lifecycle', 'pic_before', 2);
+    const current = await pictureEvent('user_picture_lifecycle', 'pic_after', 3);
+    // Permit both at the remote boundary to exercise Media's own version guard.
+    availability.set('pic_before', 204);
+    availability.set('pic_after', 204);
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, current.event);
+    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, old.event);
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...current.event, eventId: 'evt_picture_duplicate' });
+    const marker = {
+      eventId: 'evt_picture_lifecycle_marker', eventType: PROFILE_CREATED_SUBJECT,
+      timestamp: old.event.timestamp, change: { type: 'created' },
+      profile: { ...old.event.profile, id: 'user_picture_lifecycle_marker', version: 1, pictureAssetId: null },
+    };
+    const db = container.resolve(DatabaseConnection).getClient().db;
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, marker);
+    await vi.waitFor(async () => expect(await db.query.profilePictureHeads.findFirst({
+      where: eq(profilePictureHeads.profileId, marker.profile.id),
+    })).toBeDefined(), { timeout: 5000, interval: 25 });
+    expect((await getPicture('pic_before')).statusCode).toBe(404);
+    expect((await getPicture('pic_after')).rawPayload).toEqual(current.bytes);
+
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+      ...current.event, eventId: 'evt_picture_removed',
+      change: { type: 'picture-changed', before: 'pic_after', after: null, source: 'remove', asset: null },
+      profile: { ...current.event.profile, version: 4, pictureAssetId: null },
+    });
+    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(404), { timeout: 5000, interval: 25 });
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...current.event, eventId: 'evt_picture_old_replay' });
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, {
+      ...marker, eventId: 'evt_picture_removal_marker', profile: { ...marker.profile, version: 2 },
+    });
+    await vi.waitFor(async () => expect(await db.query.profilePictureHeads.findFirst({
+      where: eq(profilePictureHeads.profileId, marker.profile.id),
+    })).toMatchObject({ version: 2 }), { timeout: 5000, interval: 25 });
+    expect((await getPicture('pic_after')).statusCode).toBe(404);
+    expect((await getPicture('pic_before')).statusCode).toBe(404);
+  });
 });

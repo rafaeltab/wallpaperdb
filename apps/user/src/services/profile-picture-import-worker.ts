@@ -6,6 +6,7 @@ interface ImportLogger {
 
 export class ProfilePictureImportWorker {
   private interval: NodeJS.Timeout | null = null;
+  private inFlight: Promise<void> | null = null;
 
   constructor(
     private readonly runImportBatch: () => Promise<void>,
@@ -14,6 +15,7 @@ export class ProfilePictureImportWorker {
   ) {}
 
   start(): void {
+    if (this.interval) return;
     void this.importPending();
     this.interval = this.timer.setInterval(() => this.importPending(), 1000);
   }
@@ -23,7 +25,11 @@ export class ProfilePictureImportWorker {
     this.interval = null;
   }
 
-  async importPending(): Promise<void> {
-    await this.runImportBatch();
+  importPending(): Promise<void> {
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.runImportBatch().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
   }
 }

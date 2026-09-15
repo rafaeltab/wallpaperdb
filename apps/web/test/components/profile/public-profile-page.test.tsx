@@ -56,7 +56,7 @@ describe('PublicProfilePage', () => {
     const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada Lovelace', biographyMarkdown: '', picture: null, canonicalPath: '/profiles/@ada' };
     (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: true, userId: 'user_ada' });
     const rendered = render(<PublicProfilePage profile={profile} />);
-    expect(screen.getByRole('link', { name: 'Edit profile' })).toHaveAttribute('href', '/settings/profile?variant=D');
+    expect(screen.getByRole('link', { name: 'Edit profile' })).toHaveAttribute('href', '/settings/profile');
     (useAuth as Mock).mockReturnValue({ isLoaded: true, isSignedIn: true, userId: 'user_other' });
     rendered.rerender(<PublicProfilePage profile={profile} />);
     expect(screen.queryByRole('link', { name: 'Edit profile' })).not.toBeInTheDocument();
@@ -104,6 +104,15 @@ describe('PublicProfilePage', () => {
       client.setQueryData(profileQueryKey(profile.id), { ...owner, id: 'another_user', version: 5 })
     );
     expect(screen.queryByText('Owner Biography')).not.toBeInTheDocument();
+  });
+
+  it('shows the latest saved owner name and handle before the public projection catches up', () => {
+    const profile = { id: 'user_ada', handle: 'ada', displayName: 'Ada', biographyMarkdown: '', picture: null, canonicalPath: '/profiles/@ada', version: 1 };
+    const client = new QueryClient();
+    client.setQueryData(profileQueryKey(profile.id), { ...profile, displayName: 'Updated Ada', handle: 'updated-ada', version: 2 });
+    render(<QueryClientProvider client={client}><PublicProfilePage profile={profile} /></QueryClientProvider>);
+    expect(screen.getByRole('heading', { name: 'Updated Ada' })).toBeInTheDocument();
+    expect(screen.getByText('@updated-ada')).toBeInTheDocument();
   });
 
   it('renders the public identity and default Biography with a deterministic picture fallback', () => {

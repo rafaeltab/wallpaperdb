@@ -7,7 +7,7 @@ import {
 } from '../src/adapters/opensearch/index.js';
 import type { Profile, ReadOutcome } from '../src/catalogue/index.js';
 import { createProjection, type ProjectCatalogue } from '../src/projection/index.js';
-import { createGatewayTester } from './setup.js';
+import { createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 function profile(id: string, overrides: Partial<Profile> = {}): Profile {
@@ -31,21 +31,20 @@ function found<T>(outcome: ReadOutcome<T>): T {
 }
 
 describe('OpenSearch profile projection port contract', () => {
-  const tester = createGatewayTester({ app: false });
+  const searchFixture = createSearchFixture();
   let adapter: OpenSearchGateway;
   let project: ProjectCatalogue;
   let client: Client;
   beforeAll(async () => {
-    await tester.setup();
-    adapter = createOpenSearchGateway({ url: tester.opensearch.config.endpoint.fromHost });
+    adapter = createOpenSearchGateway(searchFixture.options);
     await adapter.start();
     project = createProjection(adapter.projectionStore);
-    client = new Client({ node: tester.opensearch.config.endpoint.fromHost });
+    client = new Client({ node: searchFixture.options.url });
   }, 120_000);
   afterAll(async () => {
     await client?.close();
     await adapter?.stop();
-    await tester.destroy();
+    await searchFixture.destroy();
   });
 
   function publish(snapshot: Profile) {
@@ -157,7 +156,7 @@ describe('OpenSearch profile projection port contract', () => {
 
   it('rejects malformed stored profiles at each read boundary', async () => {
     await client.index({
-      index: 'profiles',
+      index: searchFixture.index('profiles'),
       id: 'malformed-profile',
       body: { id: 'malformed-profile', handle: 'malformed-profile', claimGeneration: 1 },
       refresh: true,

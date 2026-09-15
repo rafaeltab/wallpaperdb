@@ -39,10 +39,11 @@ describe('Gateway bootstrap and deployed artifact', () => {
   function environment(): Record<string, string> {
     return {
       NODE_ENV: 'test',
-      OPENSEARCH_URL: tester.opensearch.config.endpoint.fromHost,
-      OPENSEARCH_USERNAME: tester.opensearch.config.username,
-      OPENSEARCH_PASSWORD: tester.opensearch.config.password,
-      OPENSEARCH_INDEX: 'bootstrap_wallpapers',
+      OPENSEARCH_URL: tester.search.options.url,
+      OPENSEARCH_USERNAME: tester.search.options.username,
+      OPENSEARCH_PASSWORD: tester.search.options.password,
+      OPENSEARCH_INDEX: tester.search.index('bootstrap_wallpapers'),
+      OPENSEARCH_PROFILE_INDEX: tester.search.options.profileIndex,
       NATS_URL: tester.nats.config.endpoints.fromHost,
       NATS_STREAM: 'WALLPAPER',
       REDIS_ENABLED: 'false',

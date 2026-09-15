@@ -8,6 +8,7 @@ import {
 } from '../src/adapters/opensearch/index.js';
 import { createGatewayTester } from './setup.js';
 import { createApp } from '../src/app.js';
+import { createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 
@@ -25,11 +26,8 @@ describe('Gateway composition with real adapters', () => {
   });
 
   function adapter(wallpaperIndex: string, profileIndex: string): OpenSearchGateway {
-    const search = tester.opensearch.config;
     const value = createOpenSearchGateway({
-      url: search.endpoint.fromHost,
-      username: search.username,
-      password: search.password,
+      url: tester.search.options.url,
       wallpaperIndex,
       profileIndex,
     });
@@ -96,17 +94,19 @@ describe('Gateway composition with real adapters', () => {
   });
 
   it('creates named indexes with independent Profile and color-search mappings, and starts idempotently', async () => {
-    const search = adapter('lifecycle_wallpapers', 'lifecycle_profiles');
+    const wallpaperIndex = tester.search.index('lifecycle_wallpapers');
+    const profileIndex = tester.search.index('lifecycle_profiles');
+    const search = adapter(wallpaperIndex, profileIndex);
     await search.start();
     await search.start();
     expect(await search.check()).toBe(true);
-    const client = new Client({ node: tester.opensearch.config.endpoint.fromHost });
+    const client = new Client({ node: tester.search.options.url });
     try {
       const mappings = await client.indices.getMapping({
-        index: 'lifecycle_wallpapers,lifecycle_profiles',
+        index: `${wallpaperIndex},${profileIndex}`,
       });
       expect(mappings.body).toMatchObject({
-        lifecycle_wallpapers: {
+        [wallpaperIndex]: {
           mappings: {
             properties: {
               wallpaperId: { type: 'keyword' },
@@ -115,7 +115,7 @@ describe('Gateway composition with real adapters', () => {
             },
           },
         },
-        lifecycle_profiles: {
+        [profileIndex]: {
           mappings: {
             properties: {
               id: { type: 'keyword' },
@@ -125,9 +125,9 @@ describe('Gateway composition with real adapters', () => {
           },
         },
       });
-      const settings = await client.indices.getSettings({ index: 'lifecycle_wallpapers' });
+      const settings = await client.indices.getSettings({ index: wallpaperIndex });
       expect(settings.body).toMatchObject({
-        lifecycle_wallpapers: { settings: { index: { knn: 'true' } } },
+        [wallpaperIndex]: { settings: { index: { knn: 'true' } } },
       });
     } finally {
       await client.close();
@@ -135,32 +135,128 @@ describe('Gateway composition with real adapters', () => {
   });
 
   it('converges concurrent gateway startup on the same index names', async () => {
-    const first = adapter('concurrent_wallpapers', 'concurrent_profiles');
-    const second = adapter('concurrent_wallpapers', 'concurrent_profiles');
+    const wallpaperIndex = tester.search.index('concurrent_wallpapers');
+    const profileIndex = tester.search.index('concurrent_profiles');
+    const first = adapter(wallpaperIndex, profileIndex);
+    const second = adapter(wallpaperIndex, profileIndex);
     await Promise.all([first.start(), second.start()]);
     expect(await first.check()).toBe(true);
     expect(await second.check()).toBe(true);
   });
 
   it('fails safely after acquiring search resources when broker startup fails', async () => {
+    const wallpaperIndex = tester.search.index('failed_startup_wallpapers');
     await expect(
       createApp(
         {
           ...tester.getGatewayConfig(),
-          opensearchIndex: 'failed_startup_wallpapers',
+          opensearchIndex: wallpaperIndex,
           natsUrl: 'nats://127.0.0.1:1',
         },
         { logger: false, enableOtel: false }
       )
     ).rejects.toThrow('Gateway startup failed');
-    const client = new Client({ node: tester.opensearch.config.endpoint.fromHost });
+    const client = new Client({ node: tester.search.options.url });
     try {
-      expect((await client.indices.exists({ index: 'failed_startup_wallpapers' })).body).toBe(true);
+      expect((await client.indices.exists({ index: wallpaperIndex })).body).toBe(true);
     } finally {
       await client.close();
     }
     // The already-running gateway remains independently owned and healthy.
     expect((await tester.getApp().inject({ method: 'GET', url: '/health' })).statusCode).toBe(200);
+  });
+
+  it('isolates shared-cluster fixtures and deletes only the owning fixture indices', async () => {
+    const firstFixture = createSearchFixture();
+    const secondFixture = createSearchFixture();
+    const first = createOpenSearchGateway(firstFixture.options);
+    const second = createOpenSearchGateway(secondFixture.options);
+    adapters.push(first, second);
+    const client = new Client({ node: firstFixture.options.url });
+    try {
+      await Promise.all([first.start(), second.start()]);
+      for (const [search, name] of [
+        [first, 'first'],
+        [second, 'second'],
+      ] satisfies [OpenSearchGateway, string][]) {
+        expect(
+          await Effect.runPromise(
+            search.projectionStore.apply({
+              _tag: 'PublishWallpaper',
+              wallpaperId: 'shared-wallpaper',
+              profileId: name,
+              uploadedAt: timestamp,
+              occurrence: { source: 'test', id: name, occurredAt: timestamp },
+            })
+          )
+        ).toEqual({ _tag: 'Applied' });
+        expect(
+          await Effect.runPromise(
+            search.projectionStore.apply({
+              _tag: 'PublishProfile',
+              profile: {
+                id: 'shared-profile',
+                displayName: name,
+                handle: name,
+                claimGeneration: 1,
+                biographyMarkdown: '',
+                pictureAssetId: null,
+                version: 1,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              },
+              occurrence: { source: 'test', id: `profile-${name}`, occurredAt: timestamp },
+            })
+          )
+        ).toEqual({ _tag: 'Applied' });
+      }
+      expect(await Effect.runPromise(first.read.wallpaper('shared-wallpaper'))).toMatchObject({
+        _tag: 'Found',
+        value: { profileId: 'first' },
+      });
+      expect(await Effect.runPromise(second.read.wallpaper('shared-wallpaper'))).toMatchObject({
+        _tag: 'Found',
+        value: { profileId: 'second' },
+      });
+      expect(await Effect.runPromise(first.read.profile('shared-profile'))).toMatchObject({
+        _tag: 'Found',
+        value: { displayName: 'first' },
+      });
+      expect(await Effect.runPromise(second.read.profile('shared-profile'))).toMatchObject({
+        _tag: 'Found',
+        value: { displayName: 'second' },
+      });
+      expect(await Effect.runPromise(first.read.profileByHandle('second'))).toEqual({
+        _tag: 'Found',
+        value: null,
+      });
+      expect(await Effect.runPromise(second.read.profileByHandle('first'))).toEqual({
+        _tag: 'Found',
+        value: null,
+      });
+      const closedIndex = firstFixture.index('closed');
+      await client.indices.create({ index: closedIndex });
+      await client.indices.close({ index: closedIndex });
+      await firstFixture.destroy();
+      expect(
+        (await client.indices.exists({ index: firstFixture.options.wallpaperIndex })).body
+      ).toBe(false);
+      expect((await client.indices.exists({ index: firstFixture.options.profileIndex })).body).toBe(
+        false
+      );
+      expect((await client.indices.exists({ index: closedIndex })).body).toBe(false);
+      expect(await Effect.runPromise(second.read.wallpaper('shared-wallpaper'))).toMatchObject({
+        _tag: 'Found',
+        value: { profileId: 'second' },
+      });
+      expect(await Effect.runPromise(second.read.profile('shared-profile'))).toMatchObject({
+        _tag: 'Found',
+        value: { displayName: 'second' },
+      });
+    } finally {
+      await client.close();
+      await Promise.all([firstFixture.destroy(), secondFixture.destroy()]);
+    }
   });
 
   it('translates an unreachable search cluster into unavailable read/write outcomes', async () => {

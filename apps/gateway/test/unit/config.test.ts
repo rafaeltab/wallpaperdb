@@ -11,6 +11,7 @@ describe('startup configuration', () => {
   it('parses defaults once without reading ambient configuration', () => {
     expect(loadConfig(environment)).toMatchObject({
       port: 3004,
+      opensearchProfileIndex: undefined,
       colorSpreadStrategy: 'linear',
       redisEnabled: false,
       graphqlIntrospectionEnabled: true,
@@ -23,6 +24,7 @@ describe('startup configuration', () => {
         ...environment,
         NODE_ENV: 'production',
         PORT: '7000',
+        OPENSEARCH_PROFILE_INDEX: 'custom_profiles',
         COLOR_SPREAD_STRATEGY: 'exact',
         RATE_LIMIT_ENABLED: 'false',
         GRAPHQL_INTROSPECTION_ENABLED: 'true',
@@ -33,6 +35,7 @@ describe('startup configuration', () => {
       })
     ).toMatchObject({
       port: 7000,
+      opensearchProfileIndex: 'custom_profiles',
       colorSpreadStrategy: 'exact',
       rateLimitEnabled: false,
       graphqlIntrospectionEnabled: true,
@@ -44,6 +47,7 @@ describe('startup configuration', () => {
   });
   it.each([
     { PORT: '10garbage' },
+    { OPENSEARCH_PROFILE_INDEX: '' },
     { COLOR_SPREAD_STRATEGY: 'invalid' },
     { CURSOR_SECRET: 'short' },
     { RATE_LIMIT_ENABLED: 'yes' },

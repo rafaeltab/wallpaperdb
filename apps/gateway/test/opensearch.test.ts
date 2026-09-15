@@ -18,7 +18,7 @@ import {
   type ProjectCatalogue,
   type ProjectionChange,
 } from '../src/projection/index.js';
-import { createGatewayTester } from './setup.js';
+import { createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 const variant: Variant = {
@@ -42,21 +42,20 @@ function found<T>(outcome: ReadOutcome<T>): T {
 }
 
 describe('OpenSearch catalogue port contract', () => {
-  const tester = createGatewayTester({ app: false });
+  const searchFixture = createSearchFixture();
   let adapter: OpenSearchGateway;
   let project: ProjectCatalogue;
   let client: Client;
   beforeAll(async () => {
-    await tester.setup();
-    adapter = createOpenSearchGateway({ url: tester.opensearch.config.endpoint.fromHost });
+    adapter = createOpenSearchGateway(searchFixture.options);
     await adapter.start();
     project = createProjection(adapter.projectionStore);
-    client = new Client({ node: tester.opensearch.config.endpoint.fromHost });
+    client = new Client({ node: searchFixture.options.url });
   }, 120_000);
   afterAll(async () => {
     await client?.close();
     await adapter?.stop();
-    await tester.destroy();
+    await searchFixture.destroy();
   });
 
   async function record(change: ProjectionChange) {
@@ -130,14 +129,18 @@ describe('OpenSearch catalogue port contract', () => {
     await addColors('replayed');
     expect(await upload('replayed')).toEqual({ _tag: 'Ignored' });
     expect(await get('replayed')).toMatchObject({ variants: [variant] });
-    const persisted = await client.get({ index: 'wallpapers', id: 'replayed' });
+    const persisted = await client.get({
+      index: searchFixture.index('wallpapers'),
+      id: 'replayed',
+    });
     expect(persisted.body._source.colorHistogram).toEqual(colors);
   });
 
   it('durably retains enrichment arriving before upload and hides unfinished wallpapers from readers', async () => {
     await Promise.all([addVariant('out-of-order'), addColors('out-of-order')]);
     expect(await get('out-of-order')).toBeNull();
-    const before = await search({});
+    const before = await search({ size: 100 });
+    expect(before.entries).toHaveLength(before.total);
     expect(before.entries.some((entry) => entry.wallpaper.wallpaperId === 'out-of-order')).toBe(
       false
     );
@@ -220,7 +223,10 @@ describe('OpenSearch catalogue port contract', () => {
     const current = Array.from({ length: 64 }, (_, index) => (index === 10 ? 1 : 0));
     await addColors('color-order', current, '2026-02-01T00:00:00.000Z');
     expect(await addColors('color-order')).toEqual({ _tag: 'Ignored' });
-    const persisted = await client.get({ index: 'wallpapers', id: 'color-order' });
+    const persisted = await client.get({
+      index: searchFixture.index('wallpapers'),
+      id: 'color-order',
+    });
     expect(persisted.body._source.colorHistogram).toEqual(current);
   });
 
@@ -338,30 +344,42 @@ describe('OpenSearch catalogue port contract', () => {
   });
 
   it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
-    await client.index({
-      index: 'wallpapers',
-      id: 'malformed',
-      body: { wallpaperId: 'malformed', userId: 'malformed' },
-      refresh: true,
-    });
-    expect(await Effect.runPromise(adapter.read.wallpaper('malformed'))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(
-      await Effect.runPromise(
-        adapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
-      )
-    ).toEqual({ _tag: 'Unavailable' });
+    const malformedFixture = createSearchFixture();
+    const malformedAdapter = createOpenSearchGateway(malformedFixture.options);
+    const malformedClient = new Client({ node: malformedFixture.options.url });
+    try {
+      await malformedAdapter.start();
+      await malformedClient.index({
+        index: malformedFixture.options.wallpaperIndex,
+        id: 'malformed',
+        body: { wallpaperId: 'malformed', userId: 'malformed' },
+        refresh: true,
+      });
+      expect(await Effect.runPromise(malformedAdapter.read.wallpaper('malformed'))).toEqual({
+        _tag: 'Unavailable',
+      });
+      expect(
+        await Effect.runPromise(
+          malformedAdapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
+        )
+      ).toEqual({ _tag: 'Unavailable' });
+    } finally {
+      try {
+        await Promise.all([malformedClient.close(), malformedAdapter.stop()]);
+      } finally {
+        await malformedFixture.destroy();
+      }
+    }
   });
 
   it('translates a rejected storage mutation into a permanent application outcome', async () => {
     await client.indices.create({
-      index: 'strict-wallpapers',
+      index: searchFixture.index('strict-wallpapers'),
       body: { mappings: { dynamic: 'strict', properties: {} } },
     });
     const strict = createOpenSearchGateway({
-      url: tester.opensearch.config.endpoint.fromHost,
-      wallpaperIndex: 'strict-wallpapers',
+      ...searchFixture.options,
+      wallpaperIndex: searchFixture.index('strict-wallpapers'),
     });
     try {
       expect(
@@ -382,11 +400,11 @@ describe('OpenSearch catalogue port contract', () => {
 
   it('translates missing storage into retry without exposing technical failures', async () => {
     const missing = createOpenSearchGateway({
-      url: tester.opensearch.config.endpoint.fromHost,
-      wallpaperIndex: 'closed-wallpapers',
+      ...searchFixture.options,
+      wallpaperIndex: searchFixture.index('closed-wallpapers'),
     });
-    await client.indices.create({ index: 'closed-wallpapers' });
-    await client.indices.close({ index: 'closed-wallpapers' });
+    await client.indices.create({ index: searchFixture.index('closed-wallpapers') });
+    await client.indices.close({ index: searchFixture.index('closed-wallpapers') });
     try {
       expect(
         await Effect.runPromise(
@@ -409,9 +427,9 @@ describe('OpenSearch catalogue port contract', () => {
 
   it('distinguishes an unavailable index from an absent catalogue record', async () => {
     const missing = createOpenSearchGateway({
-      url: tester.opensearch.config.endpoint.fromHost,
-      wallpaperIndex: 'absent-wallpapers',
-      profileIndex: 'absent-profiles',
+      ...searchFixture.options,
+      wallpaperIndex: searchFixture.index('absent-wallpapers'),
+      profileIndex: searchFixture.index('absent-profiles'),
     });
     try {
       expect(await Effect.runPromise(missing.read.wallpaper('missing'))).toEqual({
@@ -427,7 +445,7 @@ describe('OpenSearch catalogue port contract', () => {
 
   it('upgrades existing projection mappings while preserving stored wallpapers and variants', async () => {
     await client.indices.create({
-      index: 'legacy-wallpapers',
+      index: searchFixture.index('legacy-wallpapers'),
       body: {
         settings: { index: { knn: true } },
         mappings: {
@@ -452,7 +470,7 @@ describe('OpenSearch catalogue port contract', () => {
       },
     });
     await client.index({
-      index: 'legacy-wallpapers',
+      index: searchFixture.index('legacy-wallpapers'),
       id: 'legacy',
       body: {
         wallpaperId: 'legacy',
@@ -464,13 +482,17 @@ describe('OpenSearch catalogue port contract', () => {
       refresh: true,
     });
     const upgraded = createOpenSearchGateway({
-      url: tester.opensearch.config.endpoint.fromHost,
-      wallpaperIndex: 'legacy-wallpapers',
+      ...searchFixture.options,
+      wallpaperIndex: searchFixture.index('legacy-wallpapers'),
     });
     try {
       await upgraded.start();
-      const mapping = await client.indices.getMapping({ index: 'legacy-wallpapers' });
-      expect(mapping.body['legacy-wallpapers'].mappings.properties).toMatchObject({
+      const mapping = await client.indices.getMapping({
+        index: searchFixture.index('legacy-wallpapers'),
+      });
+      expect(
+        mapping.body[searchFixture.index('legacy-wallpapers')].mappings.properties
+      ).toMatchObject({
         variantOrder: { type: 'object', enabled: false },
         colorOrder: { type: 'keyword', index: false },
       });

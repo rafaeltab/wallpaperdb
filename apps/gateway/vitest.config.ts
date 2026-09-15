@@ -3,6 +3,8 @@ import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 import baseline from './coverage-baseline.json';
 
 const require = createRequire(import.meta.url);
+const searchTests = ['test/{opensearch,profile,integration,server}.test.ts'];
+const instrumentationTests = ['test/unit/otel.test.ts'];
 
 export default defineBaseConfig({
   resolve: {
@@ -12,11 +14,42 @@ export default defineBaseConfig({
   test: {
     name: 'gateway',
     environment: 'node',
-    include: ['test/**/*.test.ts'],
     testTimeout: 60000,
     hookTimeout: 120000,
-    fileParallelism: false,
-    isolate: true,
+    pool: 'threads',
+    fileParallelism: true,
+    maxWorkers: 2,
+    minWorkers: 1,
+    // Fixtures own mutable state; reuse loaded modules within each worker.
+    isolate: false,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'gateway',
+          include: ['test/**/*.test.ts'],
+          exclude: [...searchTests, ...instrumentationTests],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'gateway-search',
+          include: searchTests,
+          globalSetup: ['./test/search-global-setup.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'gateway-instrumentation',
+          include: instrumentationTests,
+          // SDK shutdown closes exporters but leaves process-wide module patches installed.
+          pool: 'forks',
+          isolate: true,
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],

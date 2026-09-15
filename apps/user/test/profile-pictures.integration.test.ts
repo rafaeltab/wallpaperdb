@@ -80,6 +80,35 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it.each(['upload', 'remove'])('prevents a late initial import from overwriting manual %s', async (command) => {
+    initialImageUrl = 'https://img.clerk.com/slow-initial-picture';
+    const pending = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    let release!: (response: Response) => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((resolve) => { started = resolve; });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => { started(); return new Promise<Response>((resolve) => { release = resolve; }); });
+    const importing = container.resolve(ProfilePictureImportService).importPending();
+    try {
+      await waiting;
+      const response = command === 'upload' ? await upload(image, pending.version) : await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: pending.version } });
+      expect(response.statusCode).toBe(200);
+      const manual = response.json();
+      release(new Response(new Uint8Array(image)));
+      await importing;
+      expect((await ensure()).json()).toEqual(manual);
+      expect((await sql`select id from outbox_events where payload->'change'->>'source' = 'clerk-import'`)).toHaveLength(0);
+      const [staged] = await sql`select * from profile_picture_assets where state = 'staged'`;
+      expect(staged).toBeDefined();
+      expect((await app.inject({ method: 'GET', url: `/internal/profile-pictures/${staged.id}/availability`, headers: { authorization: 'Bearer test-media-token' } })).statusCode).toBe(404);
+      expect((await sql`select source_url, status from profile_picture_imports where profile_id = ${pending.id}`)[0]).toEqual({ source_url: null, status: 'complete' });
+    } finally {
+      release?.(new Response(new Uint8Array(image)));
+      await importing;
+      fetcher.mockRestore();
+    }
+  });
+
   it.each(['upload', 'remove'])('ends Clerk picture ownership atomically on manual %s, including null removal', async (command) => {
     initialImageUrl = 'https://img.clerk.com/initial-picture';
     const pending = (await ensure()).json();

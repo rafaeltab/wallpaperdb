@@ -17,6 +17,17 @@ vi.mock('@tanstack/react-router', () => ({
 const profileId = 'user_123';
 
 describe('Biography Markdown', () => {
+  it('supports configured long Biographies and limits only an explicitly bounded preview', () => {
+    const text = 'a'.repeat(5500);
+    const markdown = `**${text}**`;
+    const { rerender } = render(<BiographyMarkdown profileId={profileId} markdown={markdown} maxCharacters={6000} />);
+    expect(screen.getByText(text).tagName).toBe('STRONG');
+    rerender(<BiographyMarkdown profileId={profileId} markdown={markdown} maxCharacters={5000} />);
+    expect(screen.getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();
+    rerender(<BiographyMarkdown profileId={profileId} markdown={markdown} />);
+    expect(screen.getByText(text).tagName).toBe('STRONG');
+  });
+
   it.each([
     'missing',
     'foreign',

@@ -3,6 +3,7 @@
 ## Contexts
 
 - [User](./apps/user/CONTEXT.md) - owns Profiles and their community-facing identity
+- [Gateway Catalogue](./apps/gateway/CONTEXT.md) - owns public wallpaper discovery and its interpretations of contributor Profiles
 
 Additional contexts are documented lazily as their domain language is resolved.
 

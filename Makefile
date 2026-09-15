@@ -13,7 +13,7 @@
         color-extractor-docker-build color-extractor-docker-run color-extractor-docker-stop color-extractor-docker-logs \
         tags-dev tags-build tags-start tags-test tags-test-watch tags-format tags-lint tags-check \
         tags-docker-build tags-docker-run tags-docker-stop tags-docker-logs \
-        gateway-dev gateway-build gateway-start gateway-test gateway-test-watch gateway-format gateway-lint gateway-check \
+        gateway-dev gateway-build gateway-start gateway-test gateway-test-focused gateway-test-coverage gateway-check-types gateway-architecture gateway-quality gateway-tooling-test gateway-test-watch gateway-format gateway-lint gateway-check \
         web-dev web-build web-preview web-format web-lint web-check web-test web-test-watch \
         web-e2e-test web-e2e-test-ui web-e2e-test-unit web-e2e-check-types \
         react-muuri-build react-muuri-test react-muuri-test-watch react-muuri-format react-muuri-lint react-muuri-check react-muuri-storybook react-muuri-storybook-build \
@@ -60,7 +60,7 @@ help:
 	@echo "  make infra-stop     - Stop all infrastructure services"
 	@echo "  make infra-reset    - Reset all infrastructure data (WARNING: deletes all data)"
 	@echo "  make infra-logs     - Tail logs from all infrastructure services"
-	@echo "  make apps-start     - Start all application services"
+	@echo "  make apps-start     - Start application services (optional APPS_SERVICES=gateway)"
 	@echo "  make apps-stop      - Stop all application services"
 	@echo ""
 	@echo "Redis:"
@@ -143,6 +143,12 @@ help:
 	@echo "  make gateway-build      - Build gateway service for production"
 	@echo "  make gateway-start      - Start gateway service in production mode"
 	@echo "  make gateway-test       - Run gateway service tests"
+	@echo "  make gateway-test-focused - Run selected tests (GATEWAY_TEST_ARGS=...)"
+	@echo "  make gateway-test-coverage - Run gateway tests with coverage"
+	@echo "  make gateway-check-types - Type check gateway service"
+	@echo "  make gateway-architecture - Verify gateway capability boundaries and dependency graph"
+	@echo "  make gateway-quality    - Check every gateway function against the CRAP threshold"
+	@echo "  make gateway-tooling-test - Test the gateway architecture and quality checks"
 	@echo "  make gateway-test-watch - Run gateway service tests in watch mode"
 	@echo "  make gateway-format     - Format gateway service code"
 	@echo "  make gateway-lint       - Lint gateway service code"
@@ -278,7 +284,7 @@ infra-logs:
 	@$(INFRA_COMPOSE) logs -f
 
 apps-start:
-	@$(APPS_COMPOSE) up -d --build
+	@$(APPS_COMPOSE) up -d --build $(APPS_SERVICES)
 
 apps-stop:
 	@$(APPS_COMPOSE) down
@@ -531,6 +537,24 @@ gateway-start:
 
 gateway-test:
 	@$(TURBO) run test --filter=@wallpaperdb/gateway
+
+gateway-test-focused:
+	@pnpm --filter @wallpaperdb/gateway exec vitest run $(GATEWAY_TEST_ARGS)
+
+gateway-test-coverage:
+	@pnpm --filter @wallpaperdb/gateway exec vitest run $(GATEWAY_TEST_ARGS) --coverage --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.reporter=lcov
+
+gateway-check-types:
+	@$(TURBO) run check-types --filter=@wallpaperdb/gateway
+
+gateway-architecture:
+	@node scripts/gateway-architecture.mjs
+
+gateway-quality:
+	@node scripts/gateway-quality.mjs
+
+gateway-tooling-test:
+	@node --test scripts/gateway-checks.test.mjs
 
 gateway-test-watch:
 	@$(TURBO) run test:watch --filter=@wallpaperdb/gateway

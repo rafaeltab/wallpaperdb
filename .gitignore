@@ -30,3 +30,7 @@ coverage
 
 .pnpm-store/
 
+# Browser test artifacts
+**/.auth/
+**/test-results/
+**/playwright-report/

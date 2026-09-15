@@ -11,6 +11,9 @@ build
 # Testing
 coverage
 .testcontainers
+**/.auth
+**/test-results
+**/playwright-report
 
 # Development
 .env

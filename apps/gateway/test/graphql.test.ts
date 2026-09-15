@@ -1,1285 +1,450 @@
-import "reflect-metadata";
-import { createTestLogger } from "@wallpaperdb/test-logger";
-import { container } from "tsyringe";
-import { describe, expect, it } from "vitest";
-
-const logger = createTestLogger("graphql.test");
-import type { WallpaperDocument } from "../src/repositories/wallpaper.repository.js";
-import { WallpaperRepository } from "../src/repositories/wallpaper.repository.js";
-import { ColorSortService } from "../src/services/color-sort.service.js";
-import { tester } from "./setup.js";
-
-describe("GraphQL API Integration", () => {
-    describe("searchWallpapers Query", () => {
-        it("should return empty results when no wallpapers exist", async () => {
-            const query = `
-				query {
-					searchWallpapers {
-						edges {
-							node {
-								wallpaperId
-								profileId
-							}
-						}
-						pageInfo {
-							hasNextPage
-							hasPreviousPage
-							startCursor
-							endCursor
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.data.searchWallpapers.edges).toEqual([]);
-            expect(result.data.searchWallpapers.pageInfo.hasNextPage).toBe(false);
-        });
-
-        it("should search wallpapers by profileId", async () => {
-            // Create test data
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_001",
-                userId: "user_gql_001",
-                variants: [],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_002",
-                userId: "user_gql_002",
-                variants: [],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_001" }) {
-						edges {
-							node {
-								wallpaperId
-								profileId
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.data.searchWallpapers.edges).toHaveLength(1);
-            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
-                "wlpr_gql_001",
-            );
-            expect(result.data.searchWallpapers.edges[0].node.profileId).toBe(
-                "user_gql_001",
-            );
-        });
-
-        it("keeps the deprecated userId field and filter working during migration", async () => {
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_legacy_user_id",
-                userId: "user_gql_legacy",
-                variants: [],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: { "content-type": "application/json" },
-                payload: JSON.stringify({
-                    query: `
-                        query {
-                            searchWallpapers(filter: { userId: "user_gql_legacy" }) {
-                                edges { node { wallpaperId userId profileId } }
-                            }
-                        }
-                    `,
-                }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            expect(JSON.parse(response.body).data.searchWallpapers.edges).toEqual([
-                {
-                    node: {
-                        wallpaperId: "wlpr_gql_legacy_user_id",
-                        userId: "user_gql_legacy",
-                        profileId: "user_gql_legacy",
-                    },
-                },
-            ]);
-        });
-
-        it("should search wallpapers by variant width", async () => {
-            // Create wallpaper with specific variant
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_003",
-                userId: "user_gql_003",
-                variants: [
-                    {
-                        width: 1920,
-                        height: 1080,
-                        aspectRatio: 1920 / 1080,
-                        format: "image/jpeg",
-                        fileSizeBytes: 500000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { variants: { width: 1920 } }) {
-						edges {
-							node {
-								wallpaperId
-								variants {
-									width
-									height
-									format
-								}
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.data.searchWallpapers.edges.length).toBeGreaterThan(0);
-            const found = result.data.searchWallpapers.edges.find(
-                (edge: any) => edge.node.wallpaperId === "wlpr_gql_003",
-            );
-            expect(found).toBeDefined();
-            expect(found.node.variants[0].width).toBe(1920);
-        });
-
-        it("should return variant URLs with MEDIA_SERVICE_URL when no public request origin is available", async () => {
-            // Environment variable set in the setup
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_004",
-                userId: "user_gql_004",
-                variants: [
-                    {
-                        width: 2560,
-                        height: 1440,
-                        aspectRatio: 2560 / 1440,
-                        format: "image/webp",
-                        fileSizeBytes: 600000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_004" }) {
-						edges {
-							node {
-								wallpaperId
-								variants {
-									width
-									height
-									format
-									url
-								}
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            const variant = result.data.searchWallpapers.edges[0].node.variants[0];
-            expect(variant.url).toBe(
-                `${process.env.MEDIA_SERVICE_URL}/wallpapers/wlpr_gql_004?w=2560&h=1440&format=image/webp`,
-            );
-        });
-
-        it("should return variant URLs from the browser request origin", async () => {
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_origin_001",
-                userId: "user_gql_origin_001",
-                variants: [
-                    {
-                        width: 3840,
-                        height: 2160,
-                        aspectRatio: 3840 / 2160,
-                        format: "image/webp",
-                        fileSizeBytes: 900000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_origin_001" }) {
-						edges {
-							node {
-								variants {
-									url
-								}
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                    origin: "https://zerotwo.bun-shiner.ts.net",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            const variant = result.data.searchWallpapers.edges[0].node.variants[0];
-            expect(variant.url).toBe(
-                "https://zerotwo.bun-shiner.ts.net/media/wallpapers/wlpr_gql_origin_001?w=3840&h=2160&format=image/webp",
-            );
-        });
-
-        it("should return variant URLs from forwarded proxy headers", async () => {
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_forwarded_001",
-                userId: "user_gql_forwarded_001",
-                variants: [
-                    {
-                        width: 1920,
-                        height: 1080,
-                        aspectRatio: 1920 / 1080,
-                        format: "image/jpeg",
-                        fileSizeBytes: 500000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_forwarded_001" }) {
-						edges {
-							node {
-								variants {
-									url
-								}
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                    "x-forwarded-proto": "http",
-                    "x-forwarded-host": "zerotwo:8000",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            const variant = result.data.searchWallpapers.edges[0].node.variants[0];
-            expect(variant.url).toBe(
-                "http://zerotwo:8000/media/wallpapers/wlpr_gql_forwarded_001?w=1920&h=1080&format=image/jpeg",
-            );
-        });
-
-        it("should support pagination with first/after", async () => {
-            // Create multiple wallpapers
-            for (let i = 0; i < 5; i++) {
-                await container.resolve(WallpaperRepository).upsert({
-                    wallpaperId: `wlpr_gql_page_${i}`,
-                    userId: "user_gql_pagination",
-                    variants: [],
-                    uploadedAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                });
-            }
-
-            // Get first page
-            const query1 = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_pagination" }, first: 2) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-						pageInfo {
-							hasNextPage
-							endCursor
-						}
-					}
-				}
-			`;
-
-            const response1 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query1 }),
-            });
-
-            expect(response1.statusCode).toBe(200);
-            const result1 = JSON.parse(response1.body);
-            expect(result1.data.searchWallpapers.edges).toHaveLength(2);
-            expect(
-                result1.data.searchWallpapers.edges.map(
-                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-                ),
-            ).toEqual(["wlpr_gql_page_0", "wlpr_gql_page_1"]);
-            expect(result1.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
-
-            const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
-
-            // Get second page
-            const query2 = `
-				query {
-					searchWallpapers(
-						filter: { profileId: "user_gql_pagination" }
-						first: 2
-						after: "${cursor}"
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-						pageInfo {
-							hasNextPage
-							hasPreviousPage
-						}
-					}
-				}
-			`;
-
-            const response2 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query2 }),
-            });
-
-            expect(response2.statusCode).toBe(200);
-            const result2 = JSON.parse(response2.body);
-            expect(result2.data.searchWallpapers.edges).toHaveLength(2);
-            expect(
-                result2.data.searchWallpapers.edges.map(
-                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-                ),
-            ).toEqual(["wlpr_gql_page_2", "wlpr_gql_page_3"]);
-            expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
-        });
-
-        it("should support pagination with last/before", async () => {
-            for (let i = 0; i < 5; i++) {
-                await container.resolve(WallpaperRepository).upsert({
-                    wallpaperId: `wlpr_gql_back_${i}`,
-                    userId: "user_gql_backward_pagination",
-                    variants: [],
-                    uploadedAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                });
-            }
-
-            const query1 = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_backward_pagination" }, first: 4) {
-						pageInfo {
-							endCursor
-						}
-					}
-				}
-			`;
-
-            const response1 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query1 }),
-            });
-
-            expect(response1.statusCode).toBe(200);
-            const result1 = JSON.parse(response1.body);
-            const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
-
-            const query2 = `
-				query {
-					searchWallpapers(
-						filter: { profileId: "user_gql_backward_pagination" }
-						last: 2
-						before: "${cursor}"
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-						pageInfo {
-							hasNextPage
-							hasPreviousPage
-						}
-					}
-				}
-			`;
-
-            const response2 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query2 }),
-            });
-
-            expect(response2.statusCode).toBe(200);
-            const result2 = JSON.parse(response2.body);
-            expect(
-                result2.data.searchWallpapers.edges.map(
-                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-                ),
-            ).toEqual(["wlpr_gql_back_1", "wlpr_gql_back_2"]);
-            expect(result2.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
-            expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
-        });
-
-        it("should combine profileId and variant filters", async () => {
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_005",
-                userId: "user_gql_005",
-                variants: [
-                    {
-                        width: 3840,
-                        height: 2160,
-                        aspectRatio: 3840 / 2160,
-                        format: "image/png",
-                        fileSizeBytes: 1200000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(
-						filter: {
-							profileId: "user_gql_005"
-							variants: { width: 3840, format: "image/png" }
-						}
-					) {
-						edges {
-							node {
-								wallpaperId
-								profileId
-								variants {
-									width
-									format
-								}
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            logger.debug({ result });
-            expect(result.data.searchWallpapers.edges).toHaveLength(1);
-            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
-                "wlpr_gql_005",
-            );
-        });
-
-        it("should rank color-sorted results by similarity and exclude wallpapers without color data", async () => {
-            const colorSortService = new ColorSortService();
-            const redVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#FF0000", amount: 1 }],
-            });
-            const blueVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#0000FF", amount: 1 }],
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_red",
-                userId: "user_gql_color_sort",
-                variants: [],
-                colorHistogram: redVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_blue",
-                userId: "user_gql_color_sort",
-                variants: [],
-                colorHistogram: blueVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_none",
-                userId: "user_gql_color_sort",
-                variants: [],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(
-						filter: { profileId: "user_gql_color_sort" }
-						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.errors).toBeUndefined();
-            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
-                "wlpr_gql_color_red",
-            );
-            expect(
-                result.data.searchWallpapers.edges.map(
-                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-                ),
-            ).not.toContain("wlpr_gql_color_none");
-        });
-
-        it("should combine color sort with metadata filters", async () => {
-            const colorSortService = new ColorSortService();
-            const redVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#FF0000", amount: 1 }],
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_filter_match",
-                userId: "user_gql_color_filter",
-                variants: [
-                    {
-                        width: 1920,
-                        height: 1080,
-                        aspectRatio: 1920 / 1080,
-                        format: "image/jpeg",
-                        fileSizeBytes: 500000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                colorHistogram: redVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_filter_wrong_user",
-                userId: "user_gql_color_filter_other",
-                variants: [
-                    {
-                        width: 1920,
-                        height: 1080,
-                        aspectRatio: 1920 / 1080,
-                        format: "image/jpeg",
-                        fileSizeBytes: 500000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                colorHistogram: redVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_filter_wrong_variant",
-                userId: "user_gql_color_filter",
-                variants: [
-                    {
-                        width: 2560,
-                        height: 1440,
-                        aspectRatio: 2560 / 1440,
-                        format: "image/webp",
-                        fileSizeBytes: 600000,
-                        createdAt: new Date().toISOString(),
-                    },
-                ],
-                colorHistogram: redVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(
-						filter: {
-							profileId: "user_gql_color_filter"
-							variants: { width: 1920, format: "image/jpeg" }
-						}
-						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.errors).toBeUndefined();
-            expect(result.data.searchWallpapers.edges).toHaveLength(1);
-            expect(result.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
-                "wlpr_gql_color_filter_match",
-            );
-        });
-
-        it("should paginate across color-sorted pages", async () => {
-            const colorSortService = new ColorSortService();
-            const queryVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#FF0000", amount: 1 }],
-            });
-            const blueVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#0000FF", amount: 1 }],
-            });
-            const greenVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#00FF00", amount: 1 }],
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_page_0",
-                userId: "user_gql_color_page",
-                variants: [],
-                colorHistogram: queryVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_page_1",
-                userId: "user_gql_color_page",
-                variants: [],
-                colorHistogram: blueVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_color_page_2",
-                userId: "user_gql_color_page",
-                variants: [],
-                colorHistogram: greenVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query1 = `
-				query {
-					searchWallpapers(
-						filter: { profileId: "user_gql_color_page" }
-						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
-						first: 2
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-						pageInfo {
-							hasNextPage
-							endCursor
-						}
-					}
-				}
-			`;
-
-            const response1 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query1 }),
-            });
-
-            expect(response1.statusCode).toBe(200);
-            const result1 = JSON.parse(response1.body);
-            expect(result1.errors).toBeUndefined();
-            expect(result1.data.searchWallpapers.edges).toHaveLength(2);
-            expect(result1.data.searchWallpapers.edges[0].node.wallpaperId).toBe(
-                "wlpr_gql_color_page_0",
-            );
-            expect(result1.data.searchWallpapers.pageInfo.hasNextPage).toBe(true);
-
-            const cursor = result1.data.searchWallpapers.pageInfo.endCursor;
-            const firstPageIds = result1.data.searchWallpapers.edges.map(
-                (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-            );
-
-            const query2 = `
-				query {
-					searchWallpapers(
-						filter: { profileId: "user_gql_color_page" }
-						sort: { color: { colors: [{ color: "#FF0000", amount: 1 }] } }
-						first: 2
-						after: "${cursor}"
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-						pageInfo {
-							hasPreviousPage
-						}
-					}
-				}
-			`;
-
-            const response2 = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query: query2 }),
-            });
-
-            expect(response2.statusCode).toBe(200);
-            const result2 = JSON.parse(response2.body);
-            expect(result2.errors).toBeUndefined();
-            expect(result2.data.searchWallpapers.edges).toHaveLength(1);
-            expect(result2.data.searchWallpapers.pageInfo.hasPreviousPage).toBe(true);
-
-            const secondPageIds = result2.data.searchWallpapers.edges.map(
-                (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-            );
-
-            expect([...firstPageIds, ...secondPageIds].sort()).toEqual([
-                "wlpr_gql_color_page_0",
-                "wlpr_gql_color_page_1",
-                "wlpr_gql_color_page_2",
-            ]);
-        });
-
-        it("should still return wallpapers without color data for unsorted queries", async () => {
-            const colorSortService = new ColorSortService();
-            const redVector = colorSortService.buildQueryVector({
-                colors: [{ color: "#FF0000", amount: 1 }],
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_unsorted_color",
-                userId: "user_gql_unsorted_color",
-                variants: [],
-                colorHistogram: redVector,
-                colorSpace: "oklab-query-vector",
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            await container.resolve(WallpaperRepository).upsert({
-                wallpaperId: "wlpr_gql_unsorted_no_color",
-                userId: "user_gql_unsorted_color",
-                variants: [],
-                uploadedAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
-            const query = `
-				query {
-					searchWallpapers(filter: { profileId: "user_gql_unsorted_color" }) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.errors).toBeUndefined();
-            expect(
-                result.data.searchWallpapers.edges.map(
-                    (edge: { node: { wallpaperId: string } }) => edge.node.wallpaperId,
-                ),
-            ).toEqual([
-                "wlpr_gql_unsorted_color",
-                "wlpr_gql_unsorted_no_color",
-            ]);
-        });
-
-        it("should return a clear GraphQL error for invalid color sort input", async () => {
-            const query = `
-				query {
-					searchWallpapers(
-						sort: { color: { colors: [{ color: "not-a-hex", amount: 1 }] } }
-					) {
-						edges {
-							node {
-								wallpaperId
-							}
-						}
-					}
-				}
-			`;
-
-            const response = await tester.getApp().inject({
-                method: "POST",
-                url: "/graphql",
-                headers: {
-                    "content-type": "application/json",
-                },
-                payload: JSON.stringify({ query }),
-            });
-
-            expect(response.statusCode).toBe(200);
-            const result = JSON.parse(response.body);
-            expect(result.errors).toBeDefined();
-            expect(result.errors[0].message).toContain("Invalid hex color");
-        });
+import { Effect } from 'effect';
+import { metrics } from '@opentelemetry/api';
+import {
+  AggregationTemporality,
+  InMemoryMetricExporter,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
+import Fastify from 'fastify';
+import mercurius from 'mercurius';
+import { afterEach, describe, expect, it } from 'vitest';
+import type {
+  Catalogue,
+  Profile,
+  ReadOutcome,
+  SearchOutcome,
+  SearchWallpapers,
+  Wallpaper,
+} from '../src/catalogue/index.js';
+import { createGraphql, type MediaUrls } from '../src/graphql/index.js';
+
+const timestamp = '2026-01-01T00:00:00.000Z';
+const wallpaper: Wallpaper = {
+  wallpaperId: 'wlpr_a',
+  profileId: 'profile_a',
+  variants: [
+    {
+      width: 1920,
+      height: 1080,
+      aspectRatio: 16 / 9,
+      format: 'image/webp',
+      fileSizeBytes: 1234,
+      createdAt: timestamp,
+    },
+  ],
+  uploadedAt: timestamp,
+  updatedAt: timestamp,
+};
+const profile: Profile = {
+  id: 'profile_a',
+  handle: 'artist',
+  displayName: 'Artist',
+  biographyMarkdown: 'A biography',
+  pictureAssetId: 'picture_a',
+  claimGeneration: 1,
+  version: 1,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+const page = {
+  wallpapers: [wallpaper],
+  pageInfo: { hasNextPage: true, hasPreviousPage: false, startCursor: 'start', endCursor: 'end' },
+};
+class Inbound implements Catalogue {
+  calls: Array<{ operation: string; input: unknown }> = [];
+  searchOutcome: SearchOutcome = { _tag: 'Found', value: page };
+  wallpaperOutcome: ReadOutcome<Wallpaper | null> = { _tag: 'Found', value: wallpaper };
+  profileOutcome: ReadOutcome<Profile | null> = { _tag: 'Found', value: profile };
+  batchOutcome: ReadOutcome<Array<Profile | null>> = { _tag: 'Found', value: [profile] };
+  defect = false;
+  search(input: SearchWallpapers) {
+    return this.respond('search', input, this.searchOutcome);
+  }
+  wallpaper(input: string) {
+    return this.respond('wallpaper', input, this.wallpaperOutcome);
+  }
+  profile(input: string) {
+    return this.respond('profile', input, this.profileOutcome);
+  }
+  profileByHandle(input: string) {
+    return this.respond('profileByHandle', input, this.profileOutcome);
+  }
+  profiles(input: string[]) {
+    return this.respond('profiles', input, this.batchOutcome);
+  }
+  private respond<T>(operation: string, input: unknown, value: T) {
+    this.calls.push({ operation, input });
+    return this.defect
+      ? Effect.die(new Error('vendor secret: do not disclose'))
+      : Effect.succeed(value);
+  }
+}
+const applications: Array<ReturnType<typeof Fastify>> = [];
+afterEach(async () => {
+  await Promise.all(applications.splice(0).map((app) => app.close()));
+});
+async function setup(media: Partial<MediaUrls> = {}) {
+  const inbound = new Inbound();
+  const app = Fastify();
+  applications.push(app);
+  const graphql = createGraphql(inbound, {
+    mediaServiceUrl: 'http://media:3000/',
+    mediaPublicPath: '/media',
+    ...media,
+  });
+  await app.register(mercurius, { ...graphql });
+  await app.ready();
+  return {
+    app,
+    inbound,
+    graphql,
+    query: async (query: string, headers: Record<string, string> = {}) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/graphql',
+        headers,
+        payload: { query },
+      });
+      return { status: response.statusCode, body: response.json() };
+    },
+  };
+}
+describe('GraphQL driving adapter contract', () => {
+  it('translates filters, legacy identity, pagination and color preferences into the inbound query', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{ searchWallpapers(filter:{profileId:"profile_a",userId:"ignored",variants:{width:1920,height:1080,aspectRatio:1.77,format:"image/webp"}},sort:{color:{colors:[{color:"#FF0000",amount:2,spread:0.3}]}},first:2,after:"cursor") {edges{node{wallpaperId}}pageInfo{hasNextPage hasPreviousPage startCursor endCursor}} }`
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls).toEqual([
+      {
+        operation: 'search',
+        input: {
+          profileId: 'profile_a',
+          variants: { width: 1920, height: 1080, aspectRatio: 1.77, format: 'image/webp' },
+          colors: [{ color: '#FF0000', amount: 2, spread: 0.3 }],
+          first: 2,
+          after: 'cursor',
+        },
+      },
+    ]);
+    expect(response.body.data.searchWallpapers).toEqual({
+      edges: [{ node: { wallpaperId: 'wlpr_a' } }],
+      pageInfo: page.pageInfo,
     });
-
-    describe("getWallpaper Query", () => {
-        describe("successful retrieval", () => {
-            it("should return wallpaper by ID with all fields", async () => {
-                // Arrange: Create test wallpaper
-                const testWallpaper: WallpaperDocument = {
-                    wallpaperId: "wlpr_01234567890123456789012345",
-                    userId: "user_get_001",
-                    variants: [
-                        {
-                            width: 1920,
-                            height: 1080,
-                            aspectRatio: 1920 / 1080,
-                            format: "image/jpeg",
-                            fileSizeBytes: 500000,
-                            createdAt: new Date().toISOString(),
-                        },
-                    ],
-                    uploadedAt: "2024-01-15T10:30:00.000Z",
-                    updatedAt: "2024-01-15T10:30:00.000Z",
-                };
-
-                await container.resolve(WallpaperRepository).upsert(testWallpaper);
-
-                // Act: Query for the wallpaper
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "wlpr_01234567890123456789012345") {
-							wallpaperId
-							profileId
-							variants {
-								width
-								height
-								aspectRatio
-								format
-								fileSizeBytes
-								createdAt
-								url
-							}
-							uploadedAt
-							updatedAt
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: All fields returned correctly
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-
-                expect(result.errors).toBeUndefined();
-                expect(result.data.getWallpaper).toBeDefined();
-                expect(result.data.getWallpaper).toEqual({
-                    wallpaperId: "wlpr_01234567890123456789012345",
-                    profileId: "user_get_001",
-                    variants: [
-                        {
-                            width: 1920,
-                            height: 1080,
-                            aspectRatio: 1920 / 1080,
-                            format: "image/jpeg",
-                            fileSizeBytes: 500000,
-                            createdAt: testWallpaper.variants[0].createdAt,
-                            url: `${process.env.MEDIA_SERVICE_URL}/wallpapers/wlpr_01234567890123456789012345?w=1920&h=1080&format=image/jpeg`,
-                        },
-                    ],
-                    uploadedAt: "2024-01-15T10:30:00.000Z",
-                    updatedAt: "2024-01-15T10:30:00.000Z",
-                });
-            });
-
-            it("should return wallpaper with multiple variants", async () => {
-                // Arrange: Wallpaper with multiple variants
-                const testWallpaper: WallpaperDocument = {
-                    wallpaperId: "wlpr_multi_variant_001",
-                    userId: "user_get_002",
-                    variants: [
-                        {
-                            width: 1920,
-                            height: 1080,
-                            aspectRatio: 1920 / 1080,
-                            format: "image/jpeg",
-                            fileSizeBytes: 500000,
-                            createdAt: new Date().toISOString(),
-                        },
-                        {
-                            width: 2560,
-                            height: 1440,
-                            aspectRatio: 2560 / 1440,
-                            format: "image/webp",
-                            fileSizeBytes: 400000,
-                            createdAt: new Date().toISOString(),
-                        },
-                        {
-                            width: 3840,
-                            height: 2160,
-                            aspectRatio: 3840 / 2160,
-                            format: "image/png",
-                            fileSizeBytes: 1200000,
-                            createdAt: new Date().toISOString(),
-                        },
-                    ],
-                    uploadedAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                };
-
-                await container.resolve(WallpaperRepository).upsert(testWallpaper);
-
-                // Act
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "wlpr_multi_variant_001") {
-							wallpaperId
-							variants {
-								width
-								height
-								format
-							}
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: All three variants present
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.data.getWallpaper.variants).toHaveLength(3);
-                expect(result.data.getWallpaper.variants).toEqual([
-                    { width: 1920, height: 1080, format: "image/jpeg" },
-                    { width: 2560, height: 1440, format: "image/webp" },
-                    { width: 3840, height: 2160, format: "image/png" },
-                ]);
-            });
-
-            it("should correctly compute variant URLs", async () => {
-                // Arrange
-                const testWallpaper: WallpaperDocument = {
-                    wallpaperId: "wlpr_url_test_001",
-                    userId: "user_get_003",
-                    variants: [
-                        {
-                            width: 2560,
-                            height: 1440,
-                            aspectRatio: 2560 / 1440,
-                            format: "image/webp",
-                            fileSizeBytes: 600000,
-                            createdAt: new Date().toISOString(),
-                        },
-                    ],
-                    uploadedAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                };
-
-                await container.resolve(WallpaperRepository).upsert(testWallpaper);
-
-                // Act
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "wlpr_url_test_001") {
-							variants {
-								url
-							}
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: URL follows correct format
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.data.getWallpaper.variants[0].url).toBe(
-                    `${process.env.MEDIA_SERVICE_URL}/wallpapers/wlpr_url_test_001?w=2560&h=1440&format=image/webp`,
-                );
-            });
-        });
-
-        describe("not found scenarios", () => {
-            it("should return null for non-existent wallpaper ID", async () => {
-                // Act: Query for wallpaper that doesn't exist
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "wlpr_nonexistent_123456789012") {
-							wallpaperId
-							profileId
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: Returns null (not an error)
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.errors).toBeUndefined();
-                expect(result.data.getWallpaper).toBeNull();
-            });
-
-            it("should return null without throwing when querying optional fields on null result", async () => {
-                // Act: Query non-existent wallpaper with nested fields
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "wlpr_does_not_exist") {
-							wallpaperId
-							profileId
-							variants {
-								width
-								url
-							}
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: Gracefully returns null
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.errors).toBeUndefined();
-                expect(result.data.getWallpaper).toBeNull();
-            });
-        });
-
-        describe("input validation", () => {
-            it("should return error for empty wallpaperId", async () => {
-                // Act: Empty string
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "") {
-							wallpaperId
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: GraphQL error returned
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.errors).toBeDefined();
-                expect(result.errors).toHaveLength(1);
-                expect(result.errors[0].message).toContain("empty");
-            });
-
-            it("should return error for wallpaperId not matching expected format", async () => {
-                // Act: Invalid format (doesn't start with wlpr_)
-                const query = `
-					query {
-						getWallpaper(wallpaperId: "invalid-id-format") {
-							wallpaperId
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: GraphQL error about format
-                expect(response.statusCode).toBe(200);
-                const result = JSON.parse(response.body);
-                expect(result.errors).toBeDefined();
-                expect(result.errors).toHaveLength(1);
-                expect(result.errors[0].message).toContain("wlpr_");
-            });
-
-            it("should return error when wallpaperId argument is missing", async () => {
-                // Act: Query without the required argument
-                const query = `
-					query {
-						getWallpaper {
-							wallpaperId
-						}
-					}
-				`;
-
-                const response = await tester.getApp().inject({
-                    method: "POST",
-                    url: "/graphql",
-                    headers: { "content-type": "application/json" },
-                    payload: JSON.stringify({ query }),
-                });
-
-                // Assert: GraphQL schema validation error
-                expect(response.statusCode).toBe(400);
-                const result = JSON.parse(response.body);
-                expect(result.errors).toBeDefined();
-            });
-        });
+  });
+  it('translates omitted and null color spread into the capability default', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      '{searchWallpapers(sort:{color:{colors:[{color:"#FF0000",amount:1},{color:"#0000FF",amount:2,spread:null}]}}){edges{node{wallpaperId}}}}'
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls[0]).toMatchObject({
+      input: {
+        colors: [
+          { color: '#FF0000', amount: 1, spread: undefined },
+          { color: '#0000FF', amount: 2, spread: undefined },
+        ],
+      },
     });
+  });
+  it('maps deprecated userId to the local Profile identifier and translates nullable inputs', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{searchWallpapers(filter:{userId:"legacy",variants:{width:null}},sort:null,first:null,last:3,before:"before",after:null){edges{node{userId profileId}}}}`
+    );
+    expect(response.body.data.searchWallpapers.edges).toEqual([
+      { node: { userId: 'profile_a', profileId: 'profile_a' } },
+    ]);
+    expect(inbound.calls[0]).toMatchObject({
+      input: { profileId: 'legacy', last: 3, before: 'before', variants: { width: undefined } },
+    });
+  });
+  it('returns every public wallpaper and variant field and builds the fallback media URL', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      `{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId profileId userId uploadedAt updatedAt variants{width height aspectRatio format fileSizeBytes createdAt url}}}`
+    );
+    expect(response.body.data.getWallpaper).toEqual({
+      ...wallpaper,
+      userId: 'profile_a',
+      variants: [
+        {
+          ...wallpaper.variants[0],
+          url: 'http://media:3000/wallpapers/wlpr_a?w=1920&h=1080&format=image/webp',
+        },
+      ],
+    });
+    expect(inbound.calls).toEqual([{ operation: 'wallpaper', input: 'wlpr_a' }]);
+  });
+  it.each([
+    [{ origin: 'https://public.example' }, 'https://public.example/media'],
+    [
+      { 'x-forwarded-proto': 'https, http', 'x-forwarded-host': 'proxy.example, internal' },
+      'https://proxy.example/media',
+    ],
+    [{ origin: 'invalid' }, 'http://media:3000'],
+    [{ origin: 'ftp://public.example' }, 'http://media:3000'],
+    [{ origin: 'https://public.example/path' }, 'http://media:3000'],
+    [{ 'x-forwarded-proto': 'https' }, 'http://media:3000'],
+    [{ 'x-forwarded-proto': 'ftp', 'x-forwarded-host': 'proxy.example' }, 'http://media:3000'],
+    [{ 'x-forwarded-proto': ',', 'x-forwarded-host': ',' }, 'http://media:3000'],
+  ])('resolves media URLs from parsed request headers %j', async (headers, base) => {
+    const { query } = await setup();
+    const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', headers);
+    expect(response.body.data.getWallpaper.variants[0].url).toBe(
+      `${base}/wallpapers/wlpr_a?w=1920&h=1080&format=image/webp`
+    );
+  });
+  it('prioritizes configured public media URL and normalizes its trailing slash', async () => {
+    const { query } = await setup({ mediaPublicBaseUrl: 'https://cdn.example/assets///' });
+    const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', {
+      origin: 'https://ignored.example',
+    });
+    expect(response.body.data.getWallpaper.variants[0].url).toContain(
+      'https://cdn.example/assets/wallpapers/'
+    );
+  });
+  it('normalizes a relative public media path', async () => {
+    const { query } = await setup({ mediaPublicPath: 'images/' });
+    const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){variants{url}}}', {
+      origin: 'https://public.example',
+    });
+    expect(response.body.data.getWallpaper.variants[0].url).toContain(
+      'https://public.example/images/wallpapers/'
+    );
+  });
+  it('supports resolver execution without a request context and array header values', async () => {
+    const { graphql } = await setup();
+    const parent = {
+      ...wallpaper.variants[0],
+      wallpaperId: 'wlpr_a',
+      width: 1920,
+      height: 1080,
+      aspectRatio: 16 / 9,
+      format: 'image/webp',
+      fileSizeBytes: 1234,
+      createdAt: timestamp,
+    };
+    expect(graphql.resolvers.Variant.url(parent, {}, {})).toContain(
+      'http://media:3000/wallpapers/'
+    );
+    expect(
+      graphql.resolvers.Variant.url(
+        parent,
+        {},
+        {
+          reply: {
+            request: {
+              headers: {
+                'x-forwarded-proto': 'https',
+                'x-forwarded-host': ['first.example', 'second.example'],
+              },
+            },
+          },
+        }
+      )
+    ).toContain('https://first.example/media/wallpapers/');
+  });
+  it('returns Profiles by ID and Handle, public picture and canonical path', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      '{profile(id:"profile_a"){id handle displayName biographyMarkdown version createdAt updatedAt canonicalPath picture{id url}} profileByHandle(handle:"ARTIST"){id}}'
+    );
+    expect(response.body.data.profile).toEqual({
+      id: 'profile_a',
+      handle: 'artist',
+      displayName: 'Artist',
+      biographyMarkdown: 'A biography',
+      version: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      canonicalPath: '/profiles/@artist',
+      picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+    });
+    expect(response.body.data.profileByHandle).toEqual({ id: 'profile_a' });
+    expect(inbound.calls).toContainEqual({ operation: 'profile', input: 'profile_a' });
+    expect(inbound.calls).toContainEqual({ operation: 'profileByHandle', input: 'ARTIST' });
+  });
+  it('preserves null missing records and absent Profile pictures', async () => {
+    const { query, inbound } = await setup();
+    inbound.wallpaperOutcome = { _tag: 'Found', value: null };
+    inbound.profileOutcome = { _tag: 'Found', value: null };
+    expect(
+      (
+        await query(
+          '{getWallpaper(wallpaperId:"wlpr_missing"){wallpaperId} profile(id:"missing"){id} profileByHandle(handle:"missing"){id}}'
+        )
+      ).body.data
+    ).toEqual({ getWallpaper: null, profile: null, profileByHandle: null });
+    inbound.profileOutcome = { _tag: 'Found', value: { ...profile, pictureAssetId: null } };
+    expect(
+      (await query('{profile(id:"profile_a"){picture{id}}}')).body.data.profile.picture
+    ).toBeNull();
+  });
+  it('scopes nested wallpaper reads to the resolved Profile', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(
+      '{profile(id:"profile_a"){wallpapers(first:2,after:"next"){edges{node{wallpaperId}}}}}'
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls).toContainEqual({
+      operation: 'search',
+      input: { profileId: 'profile_a', first: 2, after: 'next' },
+    });
+  });
+  it('batches contributor reads and preserves missing slots and duplicates', async () => {
+    const { query, inbound } = await setup();
+    inbound.searchOutcome = {
+      _tag: 'Found',
+      value: {
+        ...page,
+        wallpapers: [
+          wallpaper,
+          { ...wallpaper, wallpaperId: 'wlpr_b', profileId: 'missing' },
+          { ...wallpaper, wallpaperId: 'wlpr_c' },
+        ],
+      },
+    };
+    inbound.batchOutcome = { _tag: 'Found', value: [profile, null, profile] };
+    const response = await query('{searchWallpapers{edges{node{wallpaperId profile{id}}}}}');
+    expect(response.body.errors).toBeUndefined();
+    expect(
+      response.body.data.searchWallpapers.edges.map(
+        (edge: { node: { profile: unknown } }) => edge.node.profile
+      )
+    ).toEqual([{ id: 'profile_a' }, null, { id: 'profile_a' }]);
+    expect(inbound.calls.filter((call) => call.operation === 'profiles')).toEqual([
+      { operation: 'profiles', input: ['profile_a', 'missing', 'profile_a'] },
+    ]);
+  });
+  it.each([
+    [{ _tag: 'Unavailable' }, 'SERVICE_UNAVAILABLE', 'The catalogue is temporarily unavailable'],
+    [{ _tag: 'InvalidCursor' }, 'INVALID_CURSOR', 'Invalid or expired cursor'],
+    [
+      { _tag: 'InvalidSearch', reason: 'Page size must be a positive integer' },
+      'BAD_USER_INPUT',
+      'Page size must be a positive integer',
+    ],
+  ] as const)('translates search outcome %j into GraphQL extensions', async (outcome, code, message) => {
+    const { query, inbound } = await setup();
+    inbound.searchOutcome = outcome;
+    const response = await query('{searchWallpapers{edges{node{wallpaperId}}}}');
+    expect(response.status).toBe(200);
+    expect(response.body.data).toBeNull();
+    expect(response.body.errors).toEqual([
+      expect.objectContaining({ message, extensions: { code } }),
+    ]);
+  });
+  it.each([
+    'getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}',
+    'profile(id:"profile_a"){id}',
+    'profileByHandle(handle:"artist"){id}',
+    'searchWallpapers{edges{node{profile{id}}}}',
+  ])('translates read unavailability for %s', async (field) => {
+    const { query, inbound } = await setup();
+    inbound.wallpaperOutcome = { _tag: 'Unavailable' };
+    inbound.profileOutcome = { _tag: 'Unavailable' };
+    inbound.batchOutcome = { _tag: 'Unavailable' };
+    const response = await query(`{${field}}`);
+    expect(response.body.errors[0]).toMatchObject({
+      message: 'The catalogue is temporarily unavailable',
+      extensions: { code: 'SERVICE_UNAVAILABLE' },
+    });
+  });
+  it('hides unexpected Effect defects', async () => {
+    const { query, inbound } = await setup();
+    inbound.defect = true;
+    const response = await query('{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}');
+    expect(response.body.errors[0]).toMatchObject({
+      message: 'An unexpected error occurred',
+      extensions: { code: 'INTERNAL_SERVER_ERROR' },
+    });
+    expect(JSON.stringify(response)).not.toContain('vendor secret');
+  });
+  it.each([
+    'getWallpaper(wallpaperId:""){wallpaperId}',
+    'getWallpaper(wallpaperId:"invalid"){wallpaperId}',
+    'profile(id:""){id}',
+    'profileByHandle(handle:""){id}',
+  ])('rejects invalid external identity before invoking the capability: %s', async (field) => {
+    const { query, inbound } = await setup();
+    const response = await query(`{${field}}`);
+    expect(response.body.errors[0].extensions.code).toBe('BAD_USER_INPUT');
+    expect(inbound.calls).toEqual([]);
+  });
+  it.each([
+    '{getWallpaper{wallpaperId}}',
+    '{unknownField}',
+    '{',
+  ])('retains GraphQL syntax/validation errors: %s', async (queryText) => {
+    const { query, inbound } = await setup();
+    const response = await query(queryText);
+    expect(response.status).toBe(400);
+    expect(response.body.errors.length).toBeGreaterThan(0);
+    expect(inbound.calls).toEqual([]);
+  });
+  it('rejects structurally invalid resolver arguments without leaking library details', async () => {
+    const { graphql, inbound } = await setup();
+    await expect(
+      graphql.resolvers.Query.searchWallpapers(
+        {},
+        { sort: { color: { colors: [{ color: '#FF0000', amount: 'secret' }] } } }
+      )
+    ).rejects.toMatchObject({
+      message: 'Invalid query arguments',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(inbound.calls).toEqual([]);
+  });
+  it('preserves the query throughput, duration and result count dashboard metrics', async () => {
+    const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    const reader = new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 });
+    const provider = new MeterProvider({ readers: [reader] });
+    metrics.setGlobalMeterProvider(provider);
+    try {
+      const { query } = await setup();
+      await query(
+        '{searchWallpapers{edges{node{wallpaperId}}} getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}'
+      );
+      await provider.forceFlush();
+      const observed = exporter
+        .getMetrics()
+        .flatMap((resource) => resource.scopeMetrics.flatMap((scope) => scope.metrics));
+      expect(observed.map((metric) => metric.descriptor.name).sort()).toEqual([
+        'graphql.query.duration_ms',
+        'graphql.query.result_count',
+        'graphql.query.total',
+      ]);
+      const counter = observed.find((metric) => metric.descriptor.name === 'graphql.query.total');
+      expect(
+        counter?.dataPoints.map((point) => ({ attributes: point.attributes, value: point.value }))
+      ).toEqual(
+        expect.arrayContaining([
+          { attributes: { operation: 'searchWallpapers' }, value: 1 },
+          { attributes: { operation: 'getWallpaper', found: 'true' }, value: 1 },
+        ])
+      );
+    } finally {
+      metrics.disable();
+      await provider.shutdown();
+    }
+  });
+  it('preserves query success when metric recording fails', async () => {
+    metrics.setGlobalMeterProvider({
+      getMeter() {
+        throw new Error('metric exporter failed');
+      },
+    });
+    try {
+      const { query } = await setup();
+      const response = await query('{searchWallpapers{edges{node{wallpaperId}}}}');
+      expect(response.body.errors).toBeUndefined();
+      expect(response.body.data.searchWallpapers.edges).toHaveLength(1);
+    } finally {
+      metrics.disable();
+    }
+  });
 });

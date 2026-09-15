@@ -1,21 +1,19 @@
 # Gateway
 
-The read-optimized query layer for WallpaperDB. Exposes a GraphQL API for browsing and searching wallpapers by building and maintaining its own read model from domain events — it has no write path from clients.
+The public discovery layer for WallpaperDB. It lets visitors browse wallpapers and contributor Profiles using a catalogue built from facts published by their owning services.
 
-## Key Capabilities
+## Key capabilities
 
-- **GraphQL search and retrieval** — provides `searchWallpapers` (with optional Profile and variant filtering, plus bidirectional cursor-based pagination) and `getWallpaper` queries
-- **Public contributor Profiles** — resolves nullable wallpaper contributors in batches, serves Profiles by ID or Handle, and exposes each Profile's paginated wallpapers without copying Profile fields into wallpaper documents
-- **Event-driven read model** — consumes wallpaper and Profile events from NATS JetStream and projects them into independent OpenSearch indexes, keeping the query layer in sync without polling or direct database access
-- **Public Profile reads** — projects versioned Profile events into a dedicated OpenSearch index and resolves exact Profiles by immutable ID or current Handle
-- **Nested variant filtering** — wallpaper documents in OpenSearch use a nested type for variants, enabling precise filtering by variant dimensions, aspect ratio, and format independently of the parent document
-- **Computed variant URLs** — the `url` field on each `Variant` is resolved at query time by constructing a request to the Media service, so variant URLs are never stale in the index
-- **Layered GraphQL security** — enforces query depth limits, a weighted complexity budget, breadth and alias caps, batch request rejection, introspection control, and IP-based rate limiting with Redis
-- **Tamper-resistant pagination cursors** — cursors are HMAC-SHA256 signed and carry an expiration timestamp; invalid or expired cursors are rejected before any search is executed
+- Search wallpapers by contributor, rendition dimensions and format, with color preference ranking and bidirectional pagination.
+- Retrieve wallpapers and public Profiles, batch contributor lookups, and present media URLs.
+- Keep the catalogue up to date through replay-safe projection updates and durable handling of failed deliveries.
+- Bound query depth, breadth, complexity, batching and visitor request rates.
+- Report availability and trace requests through catalogue reads and projection updates.
 
 ## Technology
 
-- **Mercurius** — GraphQL server plugin for Fastify; chosen over Apollo for its tighter Fastify integration, built-in depth limiting, and lighter weight
-- **OpenSearch** — the sole persistent store for this service; wallpaper documents are indexed with a `nested` mapping for variant objects to support independent nested queries
-- **Redis** — backs the rate limiter with an atomic Lua script to prevent race conditions across replicas; falls back to an in-memory store when Redis is unavailable
-- **TSyringe** — decorator-based dependency injection wiring all services, repositories, and connections as singletons
+- **Effect** composes application execution, typed outcomes, clocks, tracing and resource lifetimes.
+- **Mercurius** provides GraphQL over Fastify.
+- **OpenSearch** serves the catalogue and nested rendition search.
+- **Redis** coordinates request quotas, with an instance-local fallback during outages.
+- **NATS JetStream** retains incoming facts and quarantined deliveries.

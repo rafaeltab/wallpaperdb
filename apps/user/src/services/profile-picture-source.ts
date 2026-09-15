@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 export class PermanentPictureImportError extends Error {}
 
 export interface InitialPictureDownloadOptions {
@@ -25,12 +27,25 @@ export async function downloadInitialPicture(
   options: InitialPictureDownloadOptions,
   fetcher: typeof fetch = fetch
 ): Promise<Buffer> {
-  trustedSource(url, options.allowedHosts);
-  const response = await fetcher(url, {
-    redirect: 'manual',
-    headers: { Accept: 'image/jpeg, image/png, image/webp' },
-    signal: AbortSignal.timeout(options.timeoutMs),
-  });
-  return Buffer.from(await response.arrayBuffer());
+  let source = trustedSource(url, options.allowedHosts);
+  const signal = AbortSignal.timeout(options.timeoutMs);
+  while (true) {
+    const response = await fetcher(source.href, {
+      redirect: 'manual',
+      headers: { Accept: 'image/jpeg, image/png, image/webp' },
+      signal,
+    });
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      await response.body?.cancel();
+      const location = response.headers.get('location');
+      if (!location) throw new PermanentPictureImportError('Initial picture redirect is invalid');
+      try {
+        source = trustedSource(new URL(location, source).href, options.allowedHosts);
+      } catch {
+        throw new PermanentPictureImportError('Initial picture redirect is not allowed');
+      }
+      continue;
+    }
+    return Buffer.from(await response.arrayBuffer());
+  }
 }
-import { isIP } from 'node:net';

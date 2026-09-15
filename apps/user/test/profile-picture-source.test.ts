@@ -25,4 +25,20 @@ describe('Initial Profile picture download', () => {
     }
     expect(fetcher).not.toHaveBeenCalled();
   });
+
+  it('validates every redirect destination before following it', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: 'https://images.clerk.dev/next' } }))
+      .mockResolvedValueOnce(new Response(null, { status: 307, headers: { Location: '/final' } }))
+      .mockResolvedValueOnce(new Response('redirected bytes'));
+    expect(await downloadInitialPicture('https://img.clerk.com/start', options, fetcher)).toEqual(Buffer.from('redirected bytes'));
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
+      'https://img.clerk.com/start', 'https://images.clerk.dev/next', 'https://images.clerk.dev/final',
+    ]);
+    for (const destination of ['http://img.clerk.com/picture', 'https://127.0.0.1/private', 'https://untrusted.example/picture']) {
+      const malicious = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 302, headers: { Location: destination } }));
+      await expect(downloadInitialPicture('https://img.clerk.com/start', options, malicious)).rejects.toBeInstanceOf(PermanentPictureImportError);
+      expect(malicious).toHaveBeenCalledTimes(1);
+    }
+  });
 });

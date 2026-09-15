@@ -60,8 +60,18 @@ describe('Biography settings', () => {
   it('keeps an unchanged Biography unsavable and adopts fresh text while the editor is pristine', async () => {
     const { client } = renderPage();
     expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
-    act(() => client.setQueryData(profileQueryKey(profile.id), { ...profile, biographyMarkdown: 'Fresh Biography', version: 2 }));
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Biography Markdown' })).toHaveValue('Fresh Biography'));
+    act(() =>
+      client.setQueryData(profileQueryKey(profile.id), {
+        ...profile,
+        biographyMarkdown: 'Fresh Biography',
+        version: 2,
+      })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Biography Markdown' })).toHaveValue(
+        'Fresh Biography'
+      )
+    );
     expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
     expect(userApi.updateProfile).not.toHaveBeenCalled();
   });

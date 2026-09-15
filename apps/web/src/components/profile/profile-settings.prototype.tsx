@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import type { Profile } from '@/lib/api/user';
 
 type Variant = 'A' | 'B' | 'C' | 'D';
+type BiographyEdit = { draft: string; preview: boolean };
 type Editor = 'picture' | 'banner' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
   handle: string;
@@ -77,6 +78,8 @@ export default function ProfileSettingsPrototype({
     handle: null,
   });
   const [editor, setEditor] = useState<Editor>(null);
+  const [biographyEdit, setBiographyEdit] = useState<BiographyEdit | null>(null);
+  const biographyEditButton = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState('');
   const opener = useRef<HTMLElement | null>(null);
   function openEditor(next: Editor) {
@@ -88,6 +91,16 @@ export default function ProfileSettingsPrototype({
     setValue((current) => ({ ...current, ...patch }));
     setNotice(message);
     setEditor(null);
+  }
+  function startBiographyEdit() {
+    if (variant === 'D') {
+      setBiographyEdit({ draft: value.biography, preview: false });
+      setNotice('');
+    } else openEditor('biography');
+  }
+  function finishBiographyEdit() {
+    setBiographyEdit(null);
+    requestAnimationFrame(() => biographyEditButton.current?.focus());
   }
   const retained = value.aliases.filter((alias) => alias.status === 'retained').length;
   const expiring = value.aliases.filter((alias) => alias.status === 'expiring').length;
@@ -206,23 +219,39 @@ export default function ProfileSettingsPrototype({
     <section className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-sm font-medium">Biography</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
-          onClick={() => openEditor('biography')}
-        >
-          <Pencil className="size-3.5" />
-          Edit<span className="sr-only"> biography</span>
-        </Button>
+        {!(variant === 'D' && biographyEdit) && (
+          <Button
+            ref={biographyEditButton}
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={startBiographyEdit}
+          >
+            <Pencil className="size-3.5" />
+            Edit<span className="sr-only"> biography</span>
+          </Button>
+        )}
       </div>
-      {value.biography.trim() ? (
+      {variant === 'D' && biographyEdit ? (
+        <BiographyEditor
+          value={value}
+          profile={profile}
+          inline
+          edit={biographyEdit}
+          onEdit={setBiographyEdit}
+          update={(patch, message) => {
+            update(patch, message);
+            finishBiographyEdit();
+          }}
+          cancel={finishBiographyEdit}
+        />
+      ) : value.biography.trim() ? (
         <BiographyMarkdown markdown={value.biography} profileId={profile.id} />
       ) : (
         <button
           className="w-full rounded-lg border border-dashed p-5 text-left text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground"
           type="button"
-          onClick={() => openEditor('biography')}
+          onClick={startBiographyEdit}
         >
           A little about you, and the wallpapers you love.
           <span className="mt-2 block font-medium text-foreground">
@@ -364,6 +393,7 @@ export default function ProfileSettingsPrototype({
           setValue(fresh);
           setHandle(fresh.handle);
           setInlineDrafts({ name: null, handle: null });
+          setBiographyEdit(null);
           setNotice('');
         }}
         onExample={() => {
@@ -393,6 +423,7 @@ export default function ProfileSettingsPrototype({
           banner: value.banner ? 'Custom banner set' : 'Default gradient',
           handleDraft: handle,
           inlineDrafts,
+          biographyEdit,
           editor,
         }}
       />
@@ -487,7 +518,7 @@ export function VariantD({
         <div className="relative -mt-12 mb-6 w-fit rounded-3xl border-4 border-card bg-card">
           {avatar}
         </div>
-        <div className="grid items-start gap-x-8 gap-y-5 sm:grid-cols-2">
+        <div className="max-w-xl space-y-3">
           {name}
           {handleField}
         </div>
@@ -831,9 +862,31 @@ function PictureEditor({ value, update, cancel }: EditorProps) {
     </div>
   );
 }
-function BiographyEditor({ value, profile, update, cancel }: EditorProps & { profile: Profile }) {
-  const [draft, setDraft] = useState(value.biography);
-  const [preview, setPreview] = useState(false);
+function BiographyEditor({
+  value,
+  profile,
+  update,
+  cancel,
+  inline = false,
+  edit,
+  onEdit,
+}: EditorProps & {
+  profile: Profile;
+  inline?: boolean;
+  edit?: BiographyEdit;
+  onEdit?: (edit: BiographyEdit) => void;
+}) {
+  const [localEdit, setLocalEdit] = useState<BiographyEdit>({
+    draft: value.biography,
+    preview: false,
+  });
+  const currentEdit = edit ?? localEdit;
+  const setEdit = onEdit ?? setLocalEdit;
+  const { draft, preview } = currentEdit;
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (inline) textarea.current?.focus();
+  }, [inline]);
   const count = [...draft].length;
   const limit = profile.biographyMaxLength ?? 5000;
   return (
@@ -844,7 +897,7 @@ function BiographyEditor({ value, profile, update, cancel }: EditorProps & { pro
           className="flex-1"
           variant={preview ? 'ghost' : 'secondary'}
           aria-pressed={!preview}
-          onClick={() => setPreview(false)}
+          onClick={() => setEdit({ ...currentEdit, preview: false })}
         >
           Write
         </Button>
@@ -852,7 +905,7 @@ function BiographyEditor({ value, profile, update, cancel }: EditorProps & { pro
           className="flex-1"
           variant={preview ? 'secondary' : 'ghost'}
           aria-pressed={preview}
-          onClick={() => setPreview(true)}
+          onClick={() => setEdit({ ...currentEdit, preview: true })}
         >
           Preview
         </Button>
@@ -867,11 +920,19 @@ function BiographyEditor({ value, profile, update, cancel }: EditorProps & { pro
             Biography
           </label>
           <Textarea
+            ref={textarea}
             id="prototype-biography"
             className="min-h-48 resize-y text-sm leading-6"
             placeholder="A little about you…"
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => setEdit({ ...currentEdit, draft: event.target.value })}
+            onKeyDown={(event) => {
+              if (inline && event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                cancel();
+              }
+            }}
           />
         </>
       )}

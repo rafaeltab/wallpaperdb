@@ -12,6 +12,21 @@ import {
 } from '@/lib/browse-filters';
 
 describe('browse filters', () => {
+  it('preserves an exact Profile ID in the URL and combines it with wallpaper variant filters', () => {
+    const state = parseBrowseSearch({ profileId: 'user_Ada', profile: 'Ada Lovelace' });
+
+    expect(state).toMatchObject({ profileId: 'user_Ada' });
+    expect(buildWallpaperFilter(undefined, undefined, state.profileId)).toEqual({
+      profileId: 'user_Ada',
+    });
+    expect(buildWallpaperFilter('png', 16 / 9, state.profileId)).toEqual({
+      profileId: 'user_Ada',
+      variants: { format: 'image/png', aspectRatio: 16 / 9 },
+    });
+    expect(parseBrowseSearch({ profileId: '' }).profileId).toBeUndefined();
+    expect(parseBrowseSearch({ profileId: ['user_Ada'] }).profileId).toBeUndefined();
+  });
+
   it('keeps only supported format values from route search', () => {
     expect(parseBrowseSearch({ after: 'cursor_123', color: '#ff0000', format: 'png', aspectRatio: '16-9' })).toEqual({
       after: 'cursor_123',

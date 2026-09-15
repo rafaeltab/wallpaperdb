@@ -26,6 +26,7 @@ export type BrowseAspectRatioValue = Exclude<
 export type BrowseAspectRatioPresetValue = Exclude<BrowseAspectRatioValue, 'device'>;
 
 export interface BrowseSearchState {
+  profileId?: string;
   after?: string;
   format?: BrowseFormatValue;
   aspectRatio?: BrowseAspectRatioValue;
@@ -34,6 +35,7 @@ export interface BrowseSearchState {
 
 export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearchState {
   return {
+    profileId: typeof search.profileId === 'string' && search.profileId ? search.profileId : undefined,
     after: typeof search.after === 'string' ? search.after : undefined,
     color: normalizeBrowseColorValue(search.color),
     format: isBrowseFormatValue(search.format) ? search.format : undefined,
@@ -44,6 +46,7 @@ export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearch
 export function buildWallpaperFilter(
   format?: BrowseFormatValue,
   aspectRatio?: number,
+  profileId?: string,
 ): WallpaperFilter | undefined {
   const selectedFormat = BROWSE_FORMAT_OPTIONS.find((option) => option.value === format);
   const variants: NonNullable<WallpaperFilter['variants']> = {};
@@ -56,13 +59,10 @@ export function buildWallpaperFilter(
     variants.aspectRatio = aspectRatio;
   }
 
-  if (Object.keys(variants).length === 0) {
-    return undefined;
-  }
-
-  return {
-    variants,
-  };
+  const filter: WallpaperFilter = {};
+  if (Object.keys(variants).length > 0) filter.variants = variants;
+  if (profileId) filter.profileId = profileId;
+  return Object.keys(filter).length > 0 ? filter : undefined;
 }
 
 export function buildAspectRatioFilter(

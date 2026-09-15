@@ -27,15 +27,40 @@ export async function downloadInitialPicture(
   options: InitialPictureDownloadOptions,
   fetcher: typeof fetch = fetch
 ): Promise<Buffer> {
-  let source = trustedSource(url, options.allowedHosts);
-  const signal = AbortSignal.timeout(options.timeoutMs);
+  const source = trustedSource(url, options.allowedHosts);
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Initial picture download timed out'));
+    }, options.timeoutMs);
+  });
+  try {
+    return await Promise.race([readSource(source, options, fetcher, controller.signal), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readSource(
+  source: URL,
+  options: InitialPictureDownloadOptions,
+  fetcher: typeof fetch,
+  signal: AbortSignal
+): Promise<Buffer> {
   let redirects = 0;
   while (true) {
+    signal.throwIfAborted();
     const response = await fetcher(source.href, {
       redirect: 'manual',
       headers: { Accept: 'image/jpeg, image/png, image/webp' },
       signal,
     });
+    if (signal.aborted) {
+      void response.body?.cancel().catch(() => {});
+      signal.throwIfAborted();
+    }
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
       if (redirects++ >= 3) throw new PermanentPictureImportError('Initial picture has too many redirects');
@@ -56,9 +81,13 @@ export async function downloadInitialPicture(
     let length = 0;
     const reader = response.body?.getReader();
     if (!reader) return Buffer.alloc(0);
+    const cancelBody = () => { void reader.cancel().catch(() => {}); };
+    signal.addEventListener('abort', cancelBody, { once: true });
     try {
       while (true) {
+        signal.throwIfAborted();
         const chunk = await reader.read();
+        signal.throwIfAborted();
         if (chunk.done) break;
         length += chunk.value.byteLength;
         if (length > options.maxBytes) {
@@ -69,6 +98,7 @@ export async function downloadInitialPicture(
       }
       return Buffer.concat(chunks, length);
     } finally {
+      signal.removeEventListener('abort', cancelBody);
       reader.releaseLock();
     }
   }

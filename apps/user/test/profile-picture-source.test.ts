@@ -84,4 +84,30 @@ describe('Initial Profile picture download', () => {
     await expect(downloadInitialPicture('https://img.clerk.com/picture', { ...options, maxBytes: 5 }, fetcher))
       .resolves.toEqual(Buffer.from([1, 2, 3, 4, 5]));
   });
+
+  it.each(['headers', 'body', 'redirects'])('bounds hanging %s with one shared download deadline', async (stage) => {
+    vi.useFakeTimers();
+    try {
+      const cancel = vi.fn();
+      const fetcher = vi.fn<typeof fetch>();
+      if (stage === 'headers') fetcher.mockImplementation(() => new Promise(() => {}));
+      else if (stage === 'body') fetcher.mockResolvedValue(new Response(new ReadableStream({ cancel })));
+      else {
+        fetcher.mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response(null, {
+          status: 302, headers: { Location: '/next' },
+        })), 60)));
+        fetcher.mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response('late bytes')), 60)));
+      }
+      let failure: unknown;
+      void downloadInitialPicture('https://img.clerk.com/picture', { ...options, timeoutMs: 100 }, fetcher)
+        .catch((error: unknown) => { failure = error; });
+      await vi.advanceTimersByTimeAsync(100);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(PermanentPictureImportError);
+      expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+      if (stage === 'body') expect(cancel).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

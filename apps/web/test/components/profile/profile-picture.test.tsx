@@ -18,13 +18,42 @@ describe('ProfilePicture', () => {
     vi.unstubAllEnvs();
   });
 
+  it('recovers a signed-out same-version picture when the window regains focus after an outage', async () => {
+    vi.useFakeTimers();
+    render(<ProfilePicture profile={profile} />);
+    fireEvent.error(screen.getByAltText("Ada Lovelace's profile picture"));
+    for (const delay of [1000, 2000, 4000]) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+      fireEvent.error(screen.getByAltText("Ada Lovelace's profile picture"));
+    }
+    await act(async () => vi.advanceTimersByTimeAsync(60000));
+    expect(screen.queryByAltText("Ada Lovelace's profile picture")).not.toBeInTheDocument();
+    fireEvent(window, new Event('focus'));
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
+      'src',
+      profile.picture.url
+    );
+  });
+
   it('retries an exhausted same-asset picture after an owner refresh or public projection convergence', async () => {
     vi.useFakeTimers();
     vi.stubEnv('VITE_MEDIA_URL', '/media');
     const client = new QueryClient();
-    const owner: Profile = { ...profile, handle: 'ada', biographyMarkdown: '', pictureAssetId: profile.picture.id, version: 2, createdAt: '', updatedAt: '' };
+    const owner: Profile = {
+      ...profile,
+      handle: 'ada',
+      biographyMarkdown: '',
+      pictureAssetId: profile.picture.id,
+      version: 2,
+      createdAt: '',
+      updatedAt: '',
+    };
     client.setQueryData(profileQueryKey(profile.id), owner);
-    const view = (version: number) => <QueryClientProvider client={client}><ProfilePicture profile={{ ...profile, version }} /></QueryClientProvider>;
+    const view = (version: number) => (
+      <QueryClientProvider client={client}>
+        <ProfilePicture profile={{ ...profile, version }} />
+      </QueryClientProvider>
+    );
     const rendered = render(view(1));
     async function exhaust() {
       fireEvent.error(screen.getByAltText("Ada Lovelace's profile picture"));
@@ -35,11 +64,23 @@ describe('ProfilePicture', () => {
       expect(screen.queryByAltText("Ada Lovelace's profile picture")).not.toBeInTheDocument();
     }
     await exhaust();
-    await act(async () => { await client.fetchQuery({ queryKey: profileQueryKey(profile.id), queryFn: async () => owner, staleTime: 0 }); });
-    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', profile.picture.url);
+    await act(async () => {
+      await client.fetchQuery({
+        queryKey: profileQueryKey(profile.id),
+        queryFn: async () => owner,
+        staleTime: 0,
+      });
+    });
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
+      'src',
+      profile.picture.url
+    );
     await exhaust();
     rendered.rerender(view(2));
-    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute('src', profile.picture.url);
+    expect(screen.getByAltText("Ada Lovelace's profile picture")).toHaveAttribute(
+      'src',
+      profile.picture.url
+    );
   });
 
   it('adopts matching owner pictures and removals immediately while allowing newer public versions to win', () => {

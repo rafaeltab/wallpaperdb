@@ -38,7 +38,11 @@ export function ProfilePicture({
   };
   const publicVersion = 'version' in profile ? profile.version : 0;
   return (
-    <Picture key={`${profile.id}:${picture?.url ?? ''}:${refreshedAt}:${publicVersion}`} profile={resolved} className={className} />
+    <Picture
+      key={`${profile.id}:${picture?.url ?? ''}:${refreshedAt}:${publicVersion}`}
+      profile={resolved}
+      className={className}
+    />
   );
 }
 
@@ -63,6 +67,25 @@ function Picture({
       1000 * 2 ** retries
     );
     return () => window.clearTimeout(timeout);
+  }, [failed, retries]);
+
+  useEffect(() => {
+    if (!failed || retries < 3) return;
+    const retry = () => {
+      setRetries(0);
+      setFailed(false);
+    };
+    const visible = () => {
+      if (document.visibilityState === 'visible') retry();
+    };
+    window.addEventListener('focus', retry);
+    window.addEventListener('online', retry);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      window.removeEventListener('focus', retry);
+      window.removeEventListener('online', retry);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, [failed, retries]);
 
   if (profile.picture && !failed) {

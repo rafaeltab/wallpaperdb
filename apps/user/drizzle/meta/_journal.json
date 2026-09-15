@@ -64,6 +64,13 @@
       "when": 1789439517198,
       "tag": "0008_reflective_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789444428025,
+      "tag": "0009_lyrical_deadpool",
+      "breakpoints": true
     }
   ]
 }

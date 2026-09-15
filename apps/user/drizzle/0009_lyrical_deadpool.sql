@@ -1,0 +1,3 @@
+DROP INDEX "profile_picture_assets_cleanup_idx";--> statement-breakpoint
+CREATE INDEX "outbox_events_profile_cleanup_idx" ON "outbox_events" USING btree ("created_at","id") WHERE "outbox_events"."published_at" is not null and "outbox_events"."subject" in ('profile.created', 'profile.updated');--> statement-breakpoint
+CREATE INDEX "profile_picture_assets_cleanup_idx" ON "profile_picture_assets" USING btree ("expires_at","id");

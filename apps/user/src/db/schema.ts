@@ -63,6 +63,9 @@ export const outboxEvents = pgTable(
   (table) => [
     index('outbox_events_unpublished_idx').on(table.publishedAt),
     index('outbox_events_profile_history_idx').on(table.aggregateId, table.createdAt),
+    index('outbox_events_profile_cleanup_idx')
+      .on(table.createdAt, table.id)
+      .where(sql`${table.publishedAt} is not null and ${table.subject} in ('profile.created', 'profile.updated')`),
   ]
 );
 
@@ -88,7 +91,7 @@ export const profilePictureAssets = pgTable(
     retiredAt: timestamp('retired_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
   },
-  (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt)]
+  (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt, table.id)]
 );
 export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
 export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;

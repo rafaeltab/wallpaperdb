@@ -20,6 +20,27 @@ describe('Biography Markdown', () => {
   beforeEach(() => vi.mocked(request).mockReset());
   afterEach(() => vi.useRealTimers());
 
+  it('keeps an external-link warning open across unrelated parent renders', async () => {
+    const user = userEvent.setup();
+    const biography = () => (
+      <BiographyMarkdown profileId={profileId} markdown="[My website](https://example.com)" />
+    );
+    const { rerender } = render(biography());
+    await user.click(screen.getByRole('button', { name: /my website.*example.com/i }));
+    expect(screen.getByRole('alertdialog', { name: 'Leave WallpaperDB?' })).toBeInTheDocument();
+    rerender(biography());
+    const dialog = screen.getByRole('alertdialog', { name: 'Leave WallpaperDB?' });
+    expect(within(dialog).getByRole('link', { name: 'Continue to example.com' })).toHaveAttribute(
+      'href',
+      'https://example.com/'
+    );
+    const cancel = within(dialog).getByRole('button', { name: 'Cancel' });
+    expect(cancel).toHaveFocus();
+    await user.click(cancel);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /my website.*example.com/i })).toHaveFocus();
+  });
+
   it('preserves an exhausted or ready embed across unrelated parent renders', async () => {
     vi.useFakeTimers();
     vi.mocked(request).mockResolvedValue({ getWallpaper: null });

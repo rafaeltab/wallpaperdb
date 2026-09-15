@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT } from "@wallpaperdb/events";
+import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from "@wallpaperdb/events";
 import { container } from "tsyringe";
 import { describe, expect, it, vi } from "vitest";
 import { OpenSearchConnection } from "../src/connections/opensearch.js";
@@ -74,6 +74,72 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("projects picture imports, replacements, and removal without reviving a replayed asset", async () => {
+        const timestamp = "2026-09-15T00:00:00.000Z";
+        const profile = {
+            id: "user_picture_lifecycle",
+            displayName: "Picture Owner",
+            handle: "picture-lifecycle",
+            claimGeneration: 1,
+            aliases: [],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 1,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const event = (
+            pictureId: string | null,
+            version: number,
+            before: string | null,
+            source: "clerk-import" | "upload" | "remove",
+        ): ProfileUpdatedEvent => ({
+            eventId: `evt_picture_lifecycle_${version}`,
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: {
+                type: "picture-changed", before, after: pictureId, source,
+                asset: pictureId ? {
+                    id: pictureId,
+                    storageBucket: "private-profile-pictures",
+                    storageKey: `${profile.id}/${pictureId}.webp`,
+                    mimeType: "image/webp", width: 128, height: 128, fileSizeBytes: 1024,
+                } : null,
+            },
+            profile: { ...profile, pictureAssetId: pictureId, version },
+        });
+        const read = () => query(`query {
+            profile(id: "${profile.id}") { id version picture { id url } }
+        }`);
+        const imported = event("pic_imported", 2, null, "clerk-import");
+        const uploaded = event("pic_replaced", 3, "pic_imported", "upload");
+
+        for (const update of [imported, uploaded]) {
+            await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, update);
+            const result = await eventually(read, (value) => value.data.profile?.version === update.profile.version);
+            expect(result.errors).toBeUndefined();
+            expect(result.data.profile.picture).toEqual({
+                id: update.profile.pictureAssetId,
+                url: `${process.env.MEDIA_SERVICE_URL}/profile-pictures/${update.profile.pictureAssetId}`,
+            });
+            expect(JSON.stringify(result)).not.toContain("private-profile-pictures");
+            const projected = await container.resolve(ProfileRepository).findById(profile.id);
+            expect(projected).not.toHaveProperty("change");
+            expect(projected).not.toHaveProperty("storageKey");
+        }
+
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event(null, 4, "pic_replaced", "remove"));
+        await eventually(read, (value) => value.data.profile?.version === 4);
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...uploaded, eventId: "evt_picture_stale_replay" });
+        const marker = { ...profile, id: "user_picture_marker", handle: "picture-marker" };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_picture_marker", "Earlier Name"));
+        await eventually(
+            () => container.resolve(ProfileRepository).findById(marker.id),
+            (value) => value !== null,
+        );
+        expect((await read()).data.profile).toEqual({ id: profile.id, version: 4, picture: null });
+    });
+
     it("keeps a reactivated scheduled alias routing past its canceled deadline without exposing owner history", async () => {
         const timestamp = "2030-01-01T12:00:00.000Z";
         const expiresAt = "2030-01-02T12:00:00.000Z";

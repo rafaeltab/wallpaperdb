@@ -41,4 +41,18 @@ describe('Initial Profile picture download', () => {
       expect(malicious).toHaveBeenCalledTimes(1);
     }
   });
+
+  it('allows at most three redirect hops', async () => {
+    for (const hops of [3, 4]) {
+      const fetcher = vi.fn<typeof fetch>();
+      for (let index = 0; index < hops; index++) {
+        fetcher.mockResolvedValueOnce(new Response(null, { status: 302, headers: { Location: `/hop-${index}` } }));
+      }
+      fetcher.mockResolvedValueOnce(new Response('picture bytes'));
+      const result = downloadInitialPicture('https://img.clerk.com/start', options, fetcher);
+      if (hops === 3) await expect(result).resolves.toEqual(Buffer.from('picture bytes'));
+      else await expect(result).rejects.toBeInstanceOf(PermanentPictureImportError);
+      expect(fetcher).toHaveBeenCalledTimes(4);
+    }
+  });
 });

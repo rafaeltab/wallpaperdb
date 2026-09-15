@@ -29,6 +29,7 @@ export async function downloadInitialPicture(
 ): Promise<Buffer> {
   let source = trustedSource(url, options.allowedHosts);
   const signal = AbortSignal.timeout(options.timeoutMs);
+  let redirects = 0;
   while (true) {
     const response = await fetcher(source.href, {
       redirect: 'manual',
@@ -37,6 +38,7 @@ export async function downloadInitialPicture(
     });
     if ([301, 302, 303, 307, 308].includes(response.status)) {
       await response.body?.cancel();
+      if (redirects++ >= 3) throw new PermanentPictureImportError('Initial picture has too many redirects');
       const location = response.headers.get('location');
       if (!location) throw new PermanentPictureImportError('Initial picture redirect is invalid');
       try {

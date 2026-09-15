@@ -65,6 +65,7 @@ handleClaims {
   kind: text
   claimGeneration: bigserial // Monotonic projection conflict tiebreaker
   createdAt: timestamp
+  expiresAt: timestamp | null // Scheduled aliases keep their claim during the grace period
 }
 ```
 
@@ -82,7 +83,15 @@ Updates the signed-in User's Display name. The request supplies `displayName` an
 
 Changes the signed-in User's Handle using `{ "handle": "new-name", "expectedVersion": 2 }`. Normalization produces lowercase ASCII letters, digits, and single hyphens; configured length bounds apply afterward and technical names are reserved. A successful transaction claims the new Handle, retains the former Handle as an alias, increments the Profile version, and records the complete public snapshot. Owners may promote their own retained aliases back to the current Handle after cooldown.
 
-The command returns `400` for invalid Handles, `409` for collisions or stale versions, and `429` with `nextHandleChangeAt` during the seven-day cooldown. Repeating the unchanged normalized Handle at the current version returns unchanged state. Authenticated Profile responses include `aliases` and `lastHandleChangedAt`; GraphQL resolves aliases without enumerating them publicly. Former addresses redirect to the current canonical Handle after projection catches up.
+The command returns `400` for invalid Handles, `409` for collisions or stale versions, and `429` with `nextHandleChangeAt` during the seven-day cooldown. Repeating the unchanged normalized Handle at the current version returns unchanged state. Authenticated Profile responses include `aliases`, `retainedAliasLimit`, and `lastHandleChangedAt`; GraphQL resolves aliases without enumerating them publicly. Each alias includes its Handle, claim generation, retention start (`createdAt`), and nullable `expiresAt`. Former addresses redirect to the current canonical Handle after projection catches up.
+
+`PROFILE_RETAINED_ALIAS_LIMIT` defaults to three and accepts non-negative integers. A Handle change that exceeds this limit schedules the oldest retained aliases for expiry 24 hours later, ordered by `createdAt` and then Handle. Scheduled aliases immediately stop counting toward the limit. Promoting an owned alias back to the current Handle clears its expiry and frees that alias slot before capacity is checked. The Handle change, scheduling, version increment, and complete event snapshot are atomic.
+
+### DELETE /profile/me/aliases/:handle
+
+Schedules an owned alias for expiry using `{ "expectedVersion": 2 }`. The response includes the complete updated owner Profile and the exact alias `expiresAt`, 24 hours after acceptance. This records a versioned `alias-expiry-scheduled` change with the Handle and before/after expiry values. Repeating the command for an already scheduled alias at the current version returns unchanged state.
+
+Stale versions return `409`, malformed commands return `400`, and a Handle that is not an owned alias returns `404`. Scheduling keeps the alias claim reserved and its redirect available. The later expiry worker releases the claim; scheduling alone does not release it when its timestamp passes. Settings confirms the 24-hour redirect grace before scheduling and displays the authoritative expiry afterward.
 
 ### GET /health
 
@@ -139,6 +148,7 @@ CLERK_PUBLISHABLE_KEY=pk_test_...
 PROFILE_HANDLE_MIN_LENGTH=1
 PROFILE_HANDLE_MAX_LENGTH=30
 PROFILE_DISPLAY_NAME_MAX_LENGTH=80
+PROFILE_RETAINED_ALIAS_LIMIT=3
 ```
 
 ## Testing

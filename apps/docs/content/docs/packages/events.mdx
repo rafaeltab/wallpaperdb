@@ -87,8 +87,13 @@ version-aware projections without reading the command database.
   change.
 - `ProfileUpdatedEventSchema` uses the `profile.updated` subject. Display-name updates record the
   previous and authoritative new value in a `display-name-changed` change.
+- Handle changes record `handle-changed` with before/after Handles and any `scheduledAliases`,
+  including exact expiry timestamps. Explicit scheduling records `alias-expiry-scheduled` with
+  the Handle and before/after expiry values.
 - Both contracts include the stable event ID, event timestamp, Profile version, Handle claim
   generation, and the complete post-change public snapshot. They contain no Clerk-private fields.
+- Alias snapshots carry their creation time and nullable expiry time. These fields and the alias
+  list remain optional when parsing retained events written before alias lifetime support.
 
 ```typescript
 import {

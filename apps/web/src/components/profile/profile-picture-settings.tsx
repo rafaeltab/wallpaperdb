@@ -36,6 +36,8 @@ export function ProfilePictureSettings({
 }) {
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
+  const dialogContent = useRef<HTMLDivElement>(null);
+  const removeOpener = useRef<HTMLButtonElement>(null);
   const refreshing = useIsFetching({ queryKey: profileQueryKey(profile.id) }) > 0;
   const writing = useIsMutating({ mutationKey: profileQueryKey(profile.id) }) > 0;
   const [selected, setSelected] = useState<{ picture: File; expectedVersion: number } | null>(null);
@@ -128,6 +130,7 @@ export function ProfilePictureSettings({
     <div className="relative w-fit shrink-0">
       <ProfilePicture profile={profile} />
       <ProfileDialog
+        ref={dialogContent}
         open={open}
         onOpenChange={(next) => {
           setOpen(next);
@@ -249,7 +252,8 @@ export function ProfilePictureSettings({
                   type="button"
                   variant="outline"
                   disabled={refreshing || writing}
-                  onClick={() => {
+                  onClick={(event) => {
+                    removeOpener.current = event.currentTarget;
                     mutation.reset();
                     setRemoveVersion(profile.version);
                     setDialogOpen(true);
@@ -261,7 +265,15 @@ export function ProfilePictureSettings({
             </div>
           </form>
           <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <AlertDialogContent>
+            <AlertDialogContent
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                if (!open) return;
+                const opener = removeOpener.current;
+                if (opener?.isConnected && !opener.disabled) opener.focus();
+                else dialogContent.current?.focus();
+              }}
+            >
               <AlertDialogHeader>
                 <AlertDialogTitle>Use a generated avatar?</AlertDialogTitle>
                 <AlertDialogDescription>

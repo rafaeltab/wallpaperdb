@@ -83,6 +83,19 @@ describe('Profile picture settings', () => {
     expect(edit).toHaveFocus();
   });
 
+  it.each(['cancel', 'escape'])('returns focus to Remove picture after dismissing its confirmation with %s', async (dismissal) => {
+    await renderPage({ ...profile, pictureAssetId: 'original-picture' });
+    const user = userEvent.setup();
+    const remove = screen.getByRole('button', { name: 'Remove picture' });
+    await user.click(remove);
+    const confirmation = screen.getByRole('alertdialog');
+    if (dismissal === 'cancel') await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+    else await user.keyboard('{Escape}');
+    await waitFor(() => expect(remove).toHaveFocus());
+    expect(screen.getByRole('dialog', { name: 'Profile picture' })).toBeInTheDocument();
+    expect(userApi.removePicture).not.toHaveBeenCalled();
+  });
+
   it('keeps the selected picture after failure and closes the dialog after a successful retry', async () => {
     const updated = { ...profile, pictureAssetId: 'saved-picture', version: 2 };
     vi.mocked(userApi.uploadPicture)

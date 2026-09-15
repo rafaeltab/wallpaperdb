@@ -1,10 +1,11 @@
 import { X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
-import { type ReactNode, useRef } from 'react';
+import { type ReactNode, type Ref, useRef } from 'react';
 import { ProfileActionButton } from '@/components/profile/profile-action-button';
 import { cn } from '@/lib/utils';
 
 export function ProfileDialog({
+  ref,
   open,
   onOpenChange,
   trigger,
@@ -14,6 +15,7 @@ export function ProfileDialog({
   busy = false,
   className,
 }: {
+  ref?: Ref<HTMLDivElement>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trigger: ReactNode;
@@ -35,6 +37,8 @@ export function ProfileDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <Dialog.Content
+          ref={ref}
+          tabIndex={-1}
           className={cn(
             'fixed top-1/2 left-1/2 z-50 max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-background p-5 shadow-2xl outline-none sm:p-6',
             className

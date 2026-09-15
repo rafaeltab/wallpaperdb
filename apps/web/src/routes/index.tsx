@@ -52,7 +52,7 @@ export function HomePage() {
       filter: buildWallpaperFilter(
         format,
         getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset),
-        profileId,
+        profileId
       ),
       sort: buildWallpaperSort(color),
     });
@@ -61,16 +61,19 @@ export function HomePage() {
     fetchNextPage();
   }, [fetchNextPage]);
 
-  const handleProfileChange = useCallback((nextProfileId?: string) => {
-    void navigate({
-      to: '/',
-      search: (previous: BrowseSearchState) => ({
-        ...previous,
-        after: undefined,
-        profileId: nextProfileId,
-      }),
-    });
-  }, [navigate]);
+  const handleProfileChange = useCallback(
+    (nextProfileId?: string) => {
+      void navigate({
+        to: '/',
+        search: (previous: BrowseSearchState) => ({
+          ...previous,
+          after: undefined,
+          profileId: nextProfileId,
+        }),
+      });
+    },
+    [navigate]
+  );
 
   const handleFormatChange = useCallback(
     (nextFormat?: BrowseFormatValue) => {
@@ -234,7 +237,11 @@ function BrowseFilterPanel({
     <section className="border-b bg-muted/20 px-4 py-3">
       <div className="mx-auto flex max-w-6xl flex-col gap-3">
         {isOpen || selectedProfileId ? (
-          <ProfileFilter profileId={selectedProfileId} onChange={onProfileChange} collapsed={!isOpen} />
+          <ProfileFilter
+            profileId={selectedProfileId}
+            onChange={onProfileChange}
+            collapsed={!isOpen}
+          />
         ) : null}
         {isOpen ? (
           <div className="flex flex-col gap-4">
@@ -362,9 +369,8 @@ function BrowseFilterPanel({
 }
 
 function useDeviceAspectRatioPreset(): BrowseAspectRatioPresetValue {
-  const [deviceAspectRatioPreset, setDeviceAspectRatioPreset] = useState<BrowseAspectRatioPresetValue>(
-    () => getDeviceAspectRatioPreset(),
-  );
+  const [deviceAspectRatioPreset, setDeviceAspectRatioPreset] =
+    useState<BrowseAspectRatioPresetValue>(() => getDeviceAspectRatioPreset());
 
   useEffect(() => {
     const syncDeviceAspectRatioPreset = () => {
@@ -429,7 +435,7 @@ function EmptyState({ hasCursor, hasFilters }: { hasCursor: boolean; hasFilters:
             <>
               <p className="text-muted-foreground mb-4">No wallpapers found from this point</p>
               <Button asChild>
-                <Link to="/" search={{}}>
+                <Link to="/" search={(previous) => ({ ...previous, after: undefined })}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Go to beginning
                 </Link>
@@ -438,7 +444,9 @@ function EmptyState({ hasCursor, hasFilters }: { hasCursor: boolean; hasFilters:
           ) : hasFilters ? (
             <>
               <p className="mb-2 font-medium">No wallpapers match these filters.</p>
-              <p className="text-sm text-muted-foreground">Try another Profile or clear a filter to see more wallpapers.</p>
+              <p className="text-sm text-muted-foreground">
+                Try another Profile or clear a filter to see more wallpapers.
+              </p>
             </>
           ) : (
             <>

@@ -41,6 +41,19 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('accepts the displayed @Handle syntax and shares its cursor with the plain Handle query', async () => {
+    await project({ id: 'user_at_a', handle: 'aurora' });
+    await project({ id: 'user_at_b', handle: 'aurora-night' });
+    const first = await search(' @AURORA ', 1);
+    expect(first.errors).toBeUndefined();
+    expect(first.data.searchProfiles.edges[0]?.node.id).toBe('user_at_a');
+    const second = await search('aurora', 1, first.data.searchProfiles.pageInfo.endCursor);
+    expect(second.errors).toBeUndefined();
+    expect(second.data.searchProfiles.edges[0]?.node.id).toBe('user_at_b');
+    const empty = await search('@', 1);
+    expect(empty.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
+  });
+
   it('accepts only unexpired signed Profile cursors bound to the normalized search query', async () => {
     await project({ id: 'user_cursor_a', handle: 'aurora' });
     await project({ id: 'user_cursor_b', handle: 'aurora-night' });

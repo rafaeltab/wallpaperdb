@@ -181,7 +181,7 @@ export class Resolvers {
   }
 
   private async searchProfiles(args: SearchProfilesArgs) {
-    const query = args.query.trim().toLowerCase();
+    const query = args.query.trim().replace(/^@/, '').trim().toLowerCase();
     const limit = args.first ?? 10;
     if (query.length === 0 || [...query].length > 100) {
       throw new GraphQLError('Profile search query must contain 1 to 100 characters', {

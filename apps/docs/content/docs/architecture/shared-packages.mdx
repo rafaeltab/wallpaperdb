@@ -221,6 +221,14 @@ export class HealthService {
 
 ## Other Packages
 
+### @wallpaperdb/profile-markdown
+
+Shared Biography parsing and validation for User-service commands and Web rendering. The package owns the supported CommonMark/GFM syntax, Unicode character counting, HTTPS destination normalization, and `wallpaper:` image references.
+
+User applies the configured authoring limit and checks the returned wallpaper IDs against its local ownership projection. Web uses the same policy and remark plugin with React Markdown and sanitization, rendering wallpaper references through a dedicated component. Public rendering validates syntax without reapplying the current authoring limit, so a changed limit cannot hide already published Biographies.
+
+Authored Markdown remains the stored and event-published representation. See the [shared Biography policy decision](/docs/architecture/decisions/profile-markdown) for the service responsibilities.
+
 ### @wallpaperdb/test-utils
 
 **See full documentation:** [Package: Test Utils](/docs/packages/test-utils)

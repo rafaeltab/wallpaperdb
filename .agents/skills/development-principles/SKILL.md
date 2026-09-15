@@ -21,7 +21,7 @@ description: Core development principles for this repository: TDD, incremental c
 
 When architecture or significant decisions change:
 
-- Update `apps/docs/content/docs/` (rendered via `make docs-dev`)
+- Update `apps/docs/content/docs/` (rendered via `make dev PACKAGE=docs`)
 - Create ADRs in `apps/docs/content/docs/architecture/decisions/`
 - Update `plans/` when decisions are made or plans evolve
 
@@ -37,7 +37,9 @@ When changing existing structure:
 
 - **Always use Make** — run `make help` to discover available commands
 - **Never use raw `pnpm` or `turbo` commands** directly in terminal
-- If a command is needed frequently and not in the Makefile, add it:
-  1. Edit `Makefile` following existing patterns
-  2. Add to `.PHONY` and to `make help` output
-  3. Test with `make <new-command>`
+- Use shared targets with `PACKAGE=<workspace>` for workspace tasks.
+- Use `make run PACKAGE=<workspace> SCRIPT=<script>` for package-specific scripts.
+- Add a Make target only for a new repository-wide workflow:
+  1. Edit `Makefile` following existing patterns.
+  2. Declare it `.PHONY` and add a `##` description for generated help.
+  3. Test with `make <new-command>`.

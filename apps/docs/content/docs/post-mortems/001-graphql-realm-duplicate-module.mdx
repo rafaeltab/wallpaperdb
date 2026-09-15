@@ -28,7 +28,7 @@ The tests had been passing. The failure was triggered by running `pnpm store pru
 | ~19:30 | `make clean` target added to Makefile; included `pnpm store prune` |
 | ~20:18 | `make clean` run to test the new target; `pnpm store prune` executed and removed esbuild entries from the global pnpm store |
 | ~20:20 | `pnpm install --force` run to recover; esbuild postinstall scripts re-patched their binaries, leaving `pnpm store status` reporting them as "modified" |
-| ~20:22 | `make gateway-test` run; 26/46 tests failing with the graphql realm error |
+| ~20:22 | `make test PACKAGE=gateway` run; 26/46 tests failing with the graphql realm error |
 | ~20:27 | `ssr.noExternal: ['mercurius']` removed from `vitest.config.ts` as a suspected cause — no effect |
 | ~20:30 | Root cause identified: `graphql` has no `exports` map; `"module": "index.mjs"` picked by Vitest's ESM pipeline while CJS packages load `"main": "index.js"` |
 | ~20:35 | Fix applied: `resolve.alias: { graphql: graphqlPath }` added to `vitest.config.ts`; failures drop from 26 to 1 |

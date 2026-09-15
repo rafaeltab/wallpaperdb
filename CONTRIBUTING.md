@@ -98,7 +98,7 @@ make storage-test      # S3 storage contract against a real SeaweedFS container
 make test-unit         # Fast, no Docker needed (~5s)
 make test-integration  # Integration tests with real infra containers (~30s)
 make test-e2e          # Full E2E tests, sequential (~2min)
-make test              # All of the above
+make test              # Workspace test scripts (use the tiers above for full coverage)
 make ci                # Full CI pipeline — use this before opening a PR
 ```
 
@@ -189,12 +189,16 @@ If a worktree directory was deleted without running `make worktree-remove`, the 
 
 ```bash
 make help              # Full list of available commands
-make psql-ingestor     # Open a psql shell on the ingestor database
-make psql-media        # Open a psql shell on the media database
+make psql DB=ingestor     # Open a psql shell on the ingestor database
+make psql DB=media        # Open a psql shell on the media database
 make redis-cli         # Open a Redis CLI session
 make nats-stream-list  # List NATS JetStream streams
 make check-types       # Type-check all packages
 make lint              # Lint all packages
 make format            # Format all packages
-make docs-dev          # Start the documentation site (http://localhost:3002)
+make dev PACKAGE=docs          # Start the documentation site (http://localhost:3002)
 ```
+
+### Workspace commands
+
+Use shared targets with a workspace selector: `make build PACKAGE=web`, `make test PACKAGE=ingestor`, or `make dev PACKAGE=docs`. For less frequent scripts, use `make run PACKAGE=web SCRIPT=test:watch`. App containers use `SERVICE`, for example `make apps-logs SERVICE=ingestor`. See the [command guide](apps/docs/content/docs/guides/makefile-commands.mdx) for selectors and migration examples.

@@ -32,20 +32,18 @@ import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 await registerOpenAPI(app);
 ```
 
-### 4. Add Make Targets
+### 4. Use Shared Make Commands
 
-Add the following targets to the root `Makefile` (follow patterns from existing services):
+Define standard scripts in the service's `package.json`. Shared commands discover workspaces automatically:
 
-- `<service>-dev` — start with hot-reload
-- `<service>-build` — TypeScript compilation
-- `<service>-start` — run production build
-- `<service>-test` — run all tests
-- `<service>-test-watch` — run tests in watch mode
-- `<service>-format`, `<service>-lint`, `<service>-check` — code quality
-- `<service>-docker-build`, `<service>-docker-run`, `<service>-docker-stop`, `<service>-docker-logs` — Docker lifecycle
-- `<service>-e2e-test`, `<service>-e2e-test-watch`, `<service>-e2e-verify` — E2E testing (If there will be any e2e tests)
+- `make dev PACKAGE=<service>`
+- `make build PACKAGE=<service>`
+- `make test PACKAGE=<service>` (or `test-unit`, `test-integration`, `test-e2e` where supported)
+- `make format PACKAGE=<service>`, `make lint PACKAGE=<service>`, `make check-types PACKAGE=<service>`
+- `make apps-start SERVICE=<service>` and `make apps-logs SERVICE=<service>` for Compose containers
+- `make run PACKAGE=<service> SCRIPT=<script>` for less frequent scripts
 
-Add all new targets to `.PHONY` and to the `make help` output.
+Do not add per-service aliases. Add a target only for a new repository-wide workflow; declare it `.PHONY` and add a `##` description for generated help.
 
 ### 5. Add to CI/CD Workflows
 
@@ -147,9 +145,9 @@ Follow the `package.json` conventions from an existing package (e.g. `packages/c
 
 All shared packages have unit tests. No containers required — keep them fast. Place tests alongside source or in a `test/` subdirectory following the pattern of the package being created.
 
-### 3. Add Make Targets (if needed)
+### 3. Use Shared Make Commands
 
-If the package has commands that will be run frequently, add Make targets following the same pattern as service targets.
+Use `make build PACKAGE=<name>`, `make test-unit PACKAGE=<name>`, and the other shared targets. For a package-specific script, use `make run PACKAGE=<name> SCRIPT=<script>`; no per-package Make targets are needed.
 
 ### 4. Write the README
 

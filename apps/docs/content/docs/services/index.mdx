@@ -274,10 +274,10 @@ See [Packages](/docs/packages) for complete package documentation.
 make infra-start
 
 # Run ingestor service
-make ingestor-dev
+make dev PACKAGE=ingestor
 
 # Run media service
-make media-dev
+make dev PACKAGE=media
 
 # Run all services
 make dev
@@ -287,8 +287,8 @@ make dev
 
 ```bash
 # Test specific service
-make ingestor-test
-make media-test
+make test PACKAGE=ingestor
+make test PACKAGE=media
 
 # Test all services
 make test
@@ -298,8 +298,8 @@ make test
 
 ```bash
 # Build specific service
-make ingestor-build
-make media-build
+make build PACKAGE=ingestor
+make build PACKAGE=media
 
 # Build all services
 make build

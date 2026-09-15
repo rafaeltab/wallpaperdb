@@ -71,7 +71,7 @@ jobs:
             artifacts/web-e2e
 
       - name: Verify E2E test isolation
-        run: make ingestor-e2e-verify
+        run: make run PACKAGE=ingestor-e2e SCRIPT=verify-no-imports
 
       - name: Stop application stack
         if: always()

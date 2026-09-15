@@ -14,7 +14,7 @@ The Ingestor Service is the entry point for wallpapers into WallpaperDB. It hand
 make infra-start
 
 # Run ingestor in development mode
-make ingestor-dev
+make dev PACKAGE=ingestor
 
 # The service starts on http://localhost:3001
 ```
@@ -379,8 +379,8 @@ The ingestor has comprehensive test coverage using the TesterBuilder pattern.
 
 **Run tests:**
 ```bash
-make ingestor-test          # All tests
-make ingestor-test-watch    # Watch mode
+make test PACKAGE=ingestor          # All tests
+make run PACKAGE=ingestor SCRIPT=test:watch    # Watch mode
 ```
 
 **Test categories:**
@@ -455,22 +455,22 @@ Access Grafana: http://localhost:3000 (admin/admin)
 
 ## Deployment
 
-### Docker
+### Local Docker containers
 
-Build and run in Docker:
+Build and run development containers through Compose:
 
 ```bash
-make ingestor-docker-build  # Build image
-make ingestor-docker-run    # Run container
-make ingestor-docker-logs   # View logs
-make ingestor-docker-stop   # Stop container
+make apps-build SERVICE=ingestor  # Build image
+make apps-start SERVICE=ingestor    # Run container
+make apps-logs SERVICE=ingestor   # View logs
+make apps-stop SERVICE=ingestor   # Stop container
 ```
 
 ### Production Build
 
 ```bash
-make ingestor-build  # TypeScript compilation
-make ingestor-start  # Run production build
+make build PACKAGE=ingestor  # TypeScript compilation
+make run PACKAGE=ingestor SCRIPT=start  # Run production build
 ```
 
 Output: `apps/ingestor/dist/`

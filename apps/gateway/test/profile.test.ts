@@ -74,6 +74,55 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("publishes authored Biography Markdown unchanged and never restores an older edit", async () => {
+        const timestamp = "2026-09-15T02:30:00.000Z";
+        const authored = "## My work\n\n**Night skies** & mountains 🌌\n\n![Aurora](wallpaper:wlpr_01ARZ3NDEKTSV4RRFFQ69G5FAV)\n\n[Portfolio](https://EXAMPLE.com/work?q=one&view=two)\n\n`<em>literal code</em>`";
+        const profile = {
+            id: "user_biography_projection",
+            displayName: "Biography Author",
+            handle: "biography-author",
+            claimGeneration: 1,
+            aliases: [],
+            biographyMarkdown: authored,
+            pictureAssetId: null,
+            version: 2,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const event = {
+            eventId: "evt_biography_authored",
+            eventType: PROFILE_UPDATED_SUBJECT,
+            timestamp,
+            change: { type: "biography-changed", before: "", after: authored },
+            profile,
+        };
+        const read = () => query(`query {
+            profile(id: "${profile.id}") { id version biographyMarkdown }
+            profileByHandle(handle: "${profile.handle}") { profile { biographyMarkdown } }
+        }`);
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
+        const result = await eventually(read, (value) => value.data.profile?.version === 2);
+        expect(result.errors).toBeUndefined();
+        expect(result.data.profile.biographyMarkdown).toBe(authored);
+        expect(result.data.profileByHandle.profile.biographyMarkdown).toBe(authored);
+
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+            ...event,
+            eventId: "evt_biography_cleared",
+            change: { type: "biography-changed", before: authored, after: "" },
+            profile: { ...profile, biographyMarkdown: "", version: 3 },
+        });
+        await eventually(read, (value) => value.data.profile?.version === 3);
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...event, eventId: "evt_biography_replayed" });
+        const marker = { ...profile, id: "user_biography_marker", handle: "biography-marker" };
+        await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, profileUpdated(marker, "evt_biography_marker", "Old Name"));
+        await eventually(
+            () => container.resolve(ProfileRepository).findById(marker.id),
+            (value) => value !== null,
+        );
+        expect((await read()).data.profile).toEqual({ id: profile.id, version: 3, biographyMarkdown: "" });
+    });
+
     it("projects picture imports, replacements, and removal without reviving a replayed asset", async () => {
         const timestamp = "2026-09-15T00:00:00.000Z";
         const profile = {

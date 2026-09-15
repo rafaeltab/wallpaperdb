@@ -64,6 +64,35 @@ describe('Profile picture settings', () => {
     vi.mocked(userApi.removePicture).mockReset();
   });
 
+  it('keeps owner refreshes from racing a picture write and reports a failed refresh', async () => {
+    let finishUpload: ((value: Profile) => void) | undefined;
+    vi.mocked(userApi.uploadPicture).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        })
+    );
+    vi.mocked(userApi.ensureProfile).mockRejectedValue(new Error('Offline'));
+    const { client } = renderPage();
+    const user = userEvent.setup();
+    await user.upload(
+      screen.getByLabelText('Choose picture'),
+      new File(['png'], 'portrait.png', { type: 'image/png' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Upload picture' }));
+    expect(screen.getByRole('button', { name: 'Refresh Profile' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refresh aliases' })).toBeDisabled();
+    expect(screen.getByLabelText('Choose picture')).toBeDisabled();
+    expect(userApi.ensureProfile).not.toHaveBeenCalled();
+    const updated = { ...profile, pictureAssetId: 'picture_new', version: 2 };
+    await act(async () => finishUpload?.(updated));
+    await user.click(screen.getByRole('button', { name: 'Refresh Profile' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Unable to refresh your Profile. Try again.'
+    );
+    expect(client.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+  });
+
   it('explains stale picture commands and refreshes the owner before selecting another upload', async () => {
     vi.mocked(userApi.uploadPicture).mockRejectedValue(
       new UserApiError('Conflict', 409, {

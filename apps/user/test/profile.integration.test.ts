@@ -181,6 +181,22 @@ describe('Profile commands', () => {
     await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
 
+  it('projects publication before lazy Profile creation and preserves ownership across replay', async () => {
+    await publishBiographyWallpaper('wlpr_before_profile', 'user_1');
+    await vi.waitFor(async () => { expect((await sql`select wallpaper_id from wallpaper_ownership where wallpaper_id = 'wlpr_before_profile'`)).toHaveLength(1); }, { timeout: 5000, interval: 25 });
+    expect((await sql`select id from profiles`)).toHaveLength(0);
+    await publishBiographyWallpaper('wlpr_before_profile', 'user_1');
+    await publishBiographyWallpaper('wlpr_before_profile', 'other_profile', 'evt_conflicting_replay');
+    await publishBiographyWallpaper('wlpr_replay_barrier', 'other_profile');
+    await vi.waitFor(async () => { expect((await sql`select wallpaper_id from wallpaper_ownership where wallpaper_id = 'wlpr_replay_barrier'`)).toHaveLength(1); }, { timeout: 5000, interval: 25 });
+    expect((await sql`select * from wallpaper_ownership where wallpaper_id = 'wlpr_before_profile'`)).toEqual([{ wallpaper_id: 'wlpr_before_profile', profile_id: 'user_1' }]);
+    const owner = (await request('user_1')).json();
+    const biographyMarkdown = '![Published](wallpaper:wlpr_before_profile)';
+    const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: owner.id })).toString('base64')}` }, payload: { biographyMarkdown, expectedVersion: owner.version } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().biographyMarkdown).toBe(biographyMarkdown);
+  });
+
   it('rejects another Profile’s published Wallpaper without applying either edited field', async () => {
     const original = (await request('user_1')).json();
     await publishBiographyWallpaper('wlpr_foreign', 'other_profile');

@@ -39,6 +39,23 @@ async function search(query: string, first?: number, after?: string) {
 }
 
 describe('Profile search integration', () => {
+  it('normalizes Profile search text and rejects unbounded or empty requests', async () => {
+    await project({ id: 'user_normalized', handle: 'aurora' });
+    const normalized = await search('  AuRoRa  ', 1);
+    expect(normalized.errors).toBeUndefined();
+    expect(normalized.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
+      .toEqual(['user_normalized']);
+
+    for (const query of ['', '   ', 'a'.repeat(101)]) {
+      const result = await search(query, 1);
+      expect(result.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
+    }
+    for (const first of [0, -1, 51]) {
+      const result = await search('aurora', first);
+      expect(result.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
+    }
+  });
+
   it('paginates equal-rank Profiles by immutable ID without repeats or gaps', async () => {
     for (const suffix of ['05', '01', '04', '02', '03']) {
       await project({ id: `user_${suffix}`, handle: `constellation-${suffix}` });

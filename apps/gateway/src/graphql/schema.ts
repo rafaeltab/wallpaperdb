@@ -264,6 +264,7 @@ export const schema = `#graphql
 
 		"""
 		Discover Profiles by Handle, active alias, or Display name
+		Query accepts 1–100 characters after trimming. First defaults to 10, with a maximum of 50.
 		"""
 		searchProfiles(query: String!, first: Int, after: String): ProfileConnection!
 

@@ -1,5 +1,6 @@
 import type { IncomingHttpHeaders } from 'node:http';
 import { Attributes, recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
+import { GraphQLError } from 'graphql';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
 import { type ProfileDocument, ProfileRepository } from '../repositories/profile.repository.js';
@@ -179,16 +180,27 @@ export class Resolvers {
   }
 
   private async searchProfiles(args: SearchProfilesArgs) {
+    const query = args.query.trim().toLowerCase();
     const limit = args.first ?? 10;
+    if (query.length === 0 || [...query].length > 100) {
+      throw new GraphQLError('Profile search query must contain 1 to 100 characters', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+      throw new GraphQLError('Profile search first must be between 1 and 50', {
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    }
     const searchAfter = args.after ? this.cursorService.decode(args.after).slice(2) : undefined;
     const results = await this.profileRepository.search({
-      query: args.query,
+      query,
       size: limit + 1,
       searchAfter,
     });
     const page = results.slice(0, limit);
     const cursors = page.map(({ cursorValues }) =>
-      this.cursorService.encode(['profiles', args.query, ...cursorValues])
+      this.cursorService.encode(['profiles', query, ...cursorValues])
     );
     return {
       edges: page.map(({ profile }) => ({ node: profile })),

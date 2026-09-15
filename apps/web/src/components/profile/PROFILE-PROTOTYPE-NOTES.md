@@ -98,7 +98,7 @@ and the previously accepted previous-handles details dialog.
 - Biography keeps Write/Preview, character count, Markdown help, Save/Cancel and Escape.
   Unsaved draft and preview mode survive variant switches. Enter inserts a newline.
 - Cooldown now derives from the owner's `lastHandleChangedAt` plus seven days, disables the
-  handle pencil, and shows the exact next-change date/time and explanation. Saving a handle
+  handle pencil, and shows a relative availability message beside it. Saving a handle
   starts a local seven-day cooldown and focuses that explanation. Availability is checked
   every minute. **Cooldown** in the prototype bar toggles this local scenario; Reset restores
   the loaded profile. This toolbar override never affects backend policy.
@@ -136,3 +136,13 @@ Implementation seams inspected:
 - `apps/media/src/services/profile-picture.service.ts`
 - `packages/events/src/schemas/profile-updated.ts`
 - `apps/web/src/components/profile/public-profile-page.tsx`
+
+
+## Relative cooldown follow-up
+
+Replaced the timestamp and policy paragraph with **“Available for change in 7 days”** after
+the disabled pencil. The message wraps below the handle on narrow screens, uses hours and
+minutes near expiry, and retains a machine-readable deadline and programmatic focus target.
+The demo now starts at seven days, using the same clock value for the deadline and rendering.
+agent-browser confirmed the text and pencil share a row at 1440px, wrap without horizontal
+overflow at 320px, and the pencil stays disabled. Independent review passed; Biome passed.

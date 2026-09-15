@@ -311,40 +311,40 @@ export class NatsTesterBuilder extends BaseTesterBuilder<
 
           // Create JetStream stream if specified
           if (jetStream && desiredStreams.length > 0) {
-            // Wait a bit for NATS to fully initialize network interfaces
-            // This is especially important when using Docker networks
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
+            // The direct health endpoint, NATS handshake, and JetStream API response
+            // establish readiness without an additional fixed startup delay.
             const nc = await connect({
               servers: endpoints.fromHost,
               timeout: 30000,
             });
-            const jsm = await nc.jetstreamManager();
+            try {
+              const jsm = await nc.jetstreamManager({ timeout: 5000 });
 
-            for (const stream of desiredStreams) {
-              const streamConfig: Partial<StreamConfig> = {
-                name: stream,
-                subjects: [
-                  `${stream.toLowerCase()}.*`,
-                  `${stream.toLowerCase()}.*.*`,
-                  `${stream.toLowerCase()}.*.*.*`,
-                  `${stream.toLowerCase()}.*.*.*.*`,
-                  `${stream.toLowerCase()}.*.*.*.*.*`,
-                ],
-              };
+              for (const stream of desiredStreams) {
+                const streamConfig: Partial<StreamConfig> = {
+                  name: stream,
+                  subjects: [
+                    `${stream.toLowerCase()}.*`,
+                    `${stream.toLowerCase()}.*.*`,
+                    `${stream.toLowerCase()}.*.*.*`,
+                    `${stream.toLowerCase()}.*.*.*.*`,
+                    `${stream.toLowerCase()}.*.*.*.*.*`,
+                  ],
+                };
 
-              try {
-                await jsm.streams.add(streamConfig);
-                this._natsConfig?.streams.push(stream);
-                logger.debug({ stream }, 'Created NATS stream');
-              } catch (error) {
-                if (!(error as Error).message.includes('already exists')) {
-                  throw error;
+                try {
+                  await jsm.streams.add(streamConfig);
+                  this._natsConfig?.streams.push(stream);
+                  logger.debug({ stream }, 'Created NATS stream');
+                } catch (error) {
+                  if (!(error as Error).message.includes('already exists')) {
+                    throw error;
+                  }
                 }
               }
+            } finally {
+              await nc.close();
             }
-
-            await nc.close();
           }
 
           logger.debug(

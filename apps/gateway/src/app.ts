@@ -33,6 +33,7 @@ export async function createApp(
     username: config.opensearchUsername,
     password: config.opensearchPassword,
     wallpaperIndex: config.opensearchIndex,
+    profileIndex: config.opensearchProfileIndex,
   });
   const consumers = createNatsProjectionConsumer(
     { url: config.natsUrl, wallpaperStream: config.natsStream },

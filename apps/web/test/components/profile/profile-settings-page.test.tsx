@@ -338,6 +338,29 @@ describe('ProfileSettingsPage', () => {
     expect(userApi.updateHandle).not.toHaveBeenCalled();
   });
 
+  it('submits a normalized current Handle without a capacity warning', async () => {
+    const initial = {
+      ...profile,
+      aliases: ['oldest', 'middle', 'newest'].map((handle) => ({
+        handle,
+        claimGeneration: 1,
+        createdAt: profile.createdAt,
+        expiresAt: null,
+      })),
+    };
+    vi.mocked(userApi.updateHandle).mockResolvedValue(initial);
+    renderPage(initial);
+    const user = userEvent.setup();
+    const input = screen.getByRole('textbox', { name: /^handle$/i });
+    await user.clear(input);
+    await user.type(input, 'Wallpaper Fan');
+    await user.click(screen.getByRole('button', { name: 'Change Handle' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Handle unchanged.');
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(userApi.updateHandle).toHaveBeenCalledOnce();
+  });
+
   it('validates the 80-character limit before sending', async () => {
     renderPage();
     const user = userEvent.setup();

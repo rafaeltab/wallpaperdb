@@ -110,4 +110,14 @@ describe('Initial Profile picture download', () => {
       vi.useRealTimers();
     }
   });
+
+  it('distinguishes permanent HTTP rejection from retryable service failures', async () => {
+    for (const status of [400, 401, 403, 404, 410, 422, 408, 429, 500, 502, 503]) {
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response('not picture bytes', { status }));
+      const failure = await downloadInitialPicture('https://img.clerk.com/private-source', options, fetcher).catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(Error);
+      if (status < 500 && status !== 408 && status !== 429) expect(failure).toBeInstanceOf(PermanentPictureImportError);
+      else expect(failure).not.toBeInstanceOf(PermanentPictureImportError);
+    }
+  });
 });

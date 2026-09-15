@@ -73,6 +73,13 @@ async function readSource(
       }
       continue;
     }
+    if (!response.ok) {
+      await response.body?.cancel();
+      if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) {
+        throw new PermanentPictureImportError('Initial picture source rejected the request');
+      }
+      throw new Error('Initial picture source is temporarily unavailable');
+    }
     if (Number(response.headers.get('content-length')) > options.maxBytes) {
       await response.body?.cancel();
       throw new PermanentPictureImportError('Initial picture exceeds the byte limit');

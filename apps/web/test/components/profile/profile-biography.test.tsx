@@ -4,10 +4,27 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
+import { request } from '@/lib/graphql/client';
+import type { Wallpaper } from '@/lib/graphql/types';
+
+vi.mock('@/lib/graphql/client', () => ({ request: vi.fn() }));
+vi.mock('@tanstack/react-router', () => ({ Link: ({ children, params }: { children: React.ReactNode; params: { wallpaperId: string } }) => <a href={`/wallpapers/${params.wallpaperId}`}>{children}</a> }));
 
 const profileId = 'user_123';
 
 describe('Biography Markdown', () => {
+  it('renders a published own-Wallpaper shorthand through the shared plugin and verified Wallpaper data', async () => {
+    const wallpaper: Wallpaper = { wallpaperId: 'wlpr_own', profileId, uploadedAt: '', updatedAt: '', variants: [{ width: 800, height: 600, aspectRatio: 4 / 3, format: 'image/webp', fileSizeBytes: 100, createdAt: '', url: '/media/wallpapers/wlpr_own.webp' }] };
+    vi.mocked(request).mockResolvedValueOnce({ getWallpaper: wallpaper });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(<QueryClientProvider client={client}><BiographyMarkdown profileId={profileId} markdown="My favorite: ![Forest at dawn](wallpaper:wlpr_own)" /></QueryClientProvider>);
+    const picture = await screen.findByRole('img', { name: 'Forest at dawn' });
+    expect(picture).toHaveAttribute('src', '/media/wallpapers/wlpr_own.webp');
+    expect(picture.closest('a')).toHaveAttribute('href', '/wallpapers/wlpr_own');
+    expect(container.querySelector('p div, p figure')).toBeNull();
+    expect(request).toHaveBeenCalledWith(expect.any(String), { wallpaperId: 'wlpr_own' });
+  });
+
   it('shows the normalized external destination and requires a keyboard-accessible warning before navigation', async () => {
     const user = userEvent.setup();
     const { container } = render(<BiographyMarkdown profileId={profileId} markdown="[My website](https://EXAMPLE.com:443/path?q=one#about)" />);

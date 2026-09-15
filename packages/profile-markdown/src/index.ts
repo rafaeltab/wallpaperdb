@@ -4,7 +4,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 
 export interface ProfileMarkdownIssue {
-  code: "unsupported-syntax";
+  code: "unsupported-syntax" | "too-long";
   message: string;
 }
 
@@ -31,7 +31,23 @@ function flatten(root: Root): Nodes[] {
   return nodes;
 }
 
-export function validateProfileMarkdown(source: string): ProfileMarkdownValidation {
+export interface ProfileMarkdownOptions {
+  /** null validates syntax without imposing an authoring limit on published content. */
+  maxCharacters?: number | null;
+}
+
+export function countProfileMarkdownCharacters(source: string): number {
+  return Array.from(source).length;
+}
+
+export function validateProfileMarkdown(
+  source: string,
+  options: ProfileMarkdownOptions = {},
+): ProfileMarkdownValidation {
+  const maxCharacters = options.maxCharacters === undefined ? 5000 : options.maxCharacters;
+  if (maxCharacters !== null && countProfileMarkdownCharacters(source) > maxCharacters) {
+    return { valid: false, errors: [{ code: "too-long", message: `Biography must be ${maxCharacters} characters or fewer.` }] };
+  }
   const errors: ProfileMarkdownIssue[] = [];
   for (const node of flatten(parser.parse(source))) {
     if (!allowedNodes.has(node.type)) {

@@ -1,9 +1,9 @@
-// THROWAWAY: three minimal Profile settings layouts on /settings/profile?variant=A|B|C.
+// THROWAWAY: four Profile settings layouts on /settings/profile?variant=A|B|C|D.
 // All edits stay in React state. Delete after the design decision; do not promote as-is.
 import { useNavigate } from '@tanstack/react-router';
 import { ArrowUpRight, Check, ChevronRight, Clock3, Link2, Pencil, Upload, X } from 'lucide-react';
 import { Dialog } from 'radix-ui';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BiographyMarkdown } from '@/components/profile/profile-biography';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { PrototypeSwitcher } from '@/components/ui/prototype-switcher';
 import { Textarea } from '@/components/ui/textarea';
 import type { Profile } from '@/lib/api/user';
 
-type Variant = 'A' | 'B' | 'C';
+type Variant = 'A' | 'B' | 'C' | 'D';
 type Editor = 'picture' | 'biography' | 'name' | 'aliases' | 'public' | null;
 type PreviousHandle = {
   handle: string;
@@ -70,6 +70,10 @@ export default function ProfileSettingsPrototype({
   const navigate = useNavigate({ from: '/settings/profile' });
   const [value, setValue] = useState(() => initialProfile(profile));
   const [handle, setHandle] = useState(value.handle);
+  const [inlineDrafts, setInlineDrafts] = useState<{ name: string | null; handle: string | null }>({
+    name: null,
+    handle: null,
+  });
   const [editor, setEditor] = useState<Editor>(null);
   const [notice, setNotice] = useState('');
   const opener = useRef<HTMLElement | null>(null);
@@ -227,10 +231,47 @@ export default function ProfileSettingsPrototype({
     </section>
   );
   const parts = { avatar, name, handleField, biography, aliases };
+  const inlineName = (
+    <InlineProfileText
+      kind="name"
+      value={value.name}
+      draft={inlineDrafts.name}
+      onDraft={(draft) => setInlineDrafts((current) => ({ ...current, name: draft }))}
+      onSave={(name) => {
+        update({ name }, 'Display name updated');
+        setInlineDrafts((current) => ({ ...current, name: null }));
+      }}
+    />
+  );
+  const inlineHandle = (
+    <div className="min-w-0 space-y-3">
+      <InlineProfileText
+        kind="handle"
+        value={value.handle}
+        draft={inlineDrafts.handle}
+        onDraft={(draft) => setInlineDrafts((current) => ({ ...current, handle: draft }))}
+        onSave={(handle) => {
+          update(
+            {
+              handle,
+              aliases: [
+                { handle: value.handle, status: 'retained' },
+                ...value.aliases.filter((alias) => alias.handle !== handle),
+              ],
+            },
+            'Profile handle updated'
+          );
+          setHandle(handle);
+          setInlineDrafts((current) => ({ ...current, handle: null }));
+        }}
+      />
+      {aliases}
+    </div>
+  );
   return (
     <>
       <div
-        className={`mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' ? 'max-w-4xl' : 'max-w-3xl'}`}
+        className={`mx-auto px-4 pt-8 pb-48 sm:px-8 sm:pt-12 ${variant === 'B' || variant === 'D' ? 'max-w-4xl' : 'max-w-3xl'}`}
       >
         <header className="mb-7 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -246,8 +287,10 @@ export default function ProfileSettingsPrototype({
           <VariantA {...parts} />
         ) : variant === 'B' ? (
           <VariantB {...parts} />
-        ) : (
+        ) : variant === 'C' ? (
           <VariantC {...parts} />
+        ) : (
+          <VariantD {...parts} name={inlineName} handleField={inlineHandle} />
         )}
         <output className="mt-4 flex min-h-6 items-center gap-2 text-sm text-muted-foreground">
           {notice && (
@@ -302,6 +345,7 @@ export default function ProfileSettingsPrototype({
           const fresh = initialProfile(profile);
           setValue(fresh);
           setHandle(fresh.handle);
+          setInlineDrafts({ name: null, handle: null });
           setNotice('');
         }}
         onExample={() => {
@@ -329,6 +373,7 @@ export default function ProfileSettingsPrototype({
           ...value,
           picture: value.picture ? 'Picture set' : 'Generated initials',
           handleDraft: handle,
+          inlineDrafts,
           editor,
         }}
       />
@@ -394,6 +439,146 @@ export function VariantC({ avatar, name, handleField, biography }: Parts) {
       </div>
       <div className="py-5">{biography}</div>
     </div>
+  );
+}
+
+export function VariantD({ avatar, name, handleField, biography }: Parts) {
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card">
+      <div className="h-28 bg-gradient-to-br from-primary/20 via-primary/5 to-muted sm:h-36" />
+      <div className="px-5 pb-7 sm:px-9 sm:pb-9">
+        <div className="relative -mt-12 mb-6 w-fit rounded-3xl border-4 border-card bg-card">
+          {avatar}
+        </div>
+        <div className="grid items-start gap-x-8 gap-y-5 sm:grid-cols-2">
+          {name}
+          {handleField}
+        </div>
+        <div className="mt-8 border-t pt-5">{biography}</div>
+      </div>
+    </div>
+  );
+}
+
+function InlineProfileText({
+  kind,
+  value,
+  draft,
+  onDraft,
+  onSave,
+}: {
+  kind: 'name' | 'handle';
+  value: string;
+  draft: string | null;
+  onDraft: (draft: string | null) => void;
+  onSave: (value: string) => void;
+}) {
+  const editing = draft !== null;
+  const label = kind === 'name' ? 'Display name' : 'Profile handle';
+  const input = useRef<HTMLInputElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (editing) input.current?.focus();
+    else if (wasEditing.current) button.current?.focus();
+    wasEditing.current = editing;
+  }, [editing]);
+  const valid =
+    draft !== null &&
+    (kind === 'name' ? Boolean(draft.trim()) : /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(draft));
+  if (!editing)
+    return (
+      <div className="flex min-w-0 items-center gap-2">
+        {kind === 'name' ? (
+          <h2 className="min-w-0 break-words text-2xl font-semibold tracking-tight sm:text-3xl">
+            {value}
+          </h2>
+        ) : (
+          <p className="min-w-0 break-all text-xl font-medium text-muted-foreground sm:text-2xl">
+            @{value}
+          </p>
+        )}
+        <Button
+          ref={button}
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          aria-label={`Edit ${label.toLowerCase()}`}
+          onClick={() => onDraft(value)}
+        >
+          <Pencil className="size-4" />
+        </Button>
+      </div>
+    );
+  return (
+    <form
+      className="min-w-0 space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valid && draft.trim() !== value) onSave(draft.trim());
+      }}
+    >
+      <label htmlFor={`prototype-inline-${kind}`} className="block text-sm font-medium">
+        {label}
+      </label>
+      <div className="relative">
+        {kind === 'handle' && (
+          <span className="pointer-events-none absolute top-2.5 left-3 text-sm text-muted-foreground">
+            @
+          </span>
+        )}
+        <Input
+          ref={input}
+          id={`prototype-inline-${kind}`}
+          className={`h-10 ${kind === 'handle' ? 'pl-8' : ''}`}
+          value={draft}
+          maxLength={kind === 'name' ? 80 : undefined}
+          autoComplete="off"
+          spellCheck={kind === 'name'}
+          aria-invalid={!valid}
+          aria-describedby={`prototype-inline-${kind}-help`}
+          onChange={(event) => onDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              onDraft(null);
+            }
+          }}
+        />
+      </div>
+      <p
+        id={`prototype-inline-${kind}-help`}
+        className={`text-xs leading-5 ${valid ? 'text-muted-foreground' : 'text-destructive'}`}
+      >
+        {!valid
+          ? kind === 'name'
+            ? 'Enter a display name.'
+            : 'Use lowercase letters, numbers, and single hyphens.'
+          : kind === 'name'
+            ? 'The name shown beside your contributions.'
+            : `You can change your handle once every seven days. @${value} will redirect to your new handle.`}
+      </p>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          type="submit"
+          disabled={!valid || draft.trim() === value}
+          aria-label={`Save ${label.toLowerCase()}`}
+        >
+          Save
+        </Button>
+        <Button
+          size="sm"
+          type="button"
+          variant="outline"
+          aria-label={`Cancel ${label.toLowerCase()} edit`}
+          onClick={() => onDraft(null)}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 

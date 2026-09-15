@@ -33,7 +33,7 @@ const DISPLAY_NAME_MAX_LENGTH = positiveIntegerEnv(
 // Throwaway exploration: rendered only with an explicit development-only variant.
 const ProfileSettingsPrototype = lazy(() => import('./profile-settings.prototype'));
 
-export function ProfileSettingsPage({ variant }: { variant?: 'A' | 'B' | 'C' } = {}) {
+export function ProfileSettingsPage({ variant }: { variant?: 'A' | 'B' | 'C' | 'D' } = {}) {
   const { getToken, isLoaded, isSignedIn, userId } = useAuth();
   const activeUserId = isLoaded && isSignedIn ? userId : null;
   const profileQuery = useQuery({

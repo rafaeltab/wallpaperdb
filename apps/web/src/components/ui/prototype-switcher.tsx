@@ -2,16 +2,17 @@ import { ArrowLeft, ArrowRight, RotateCcw, Sparkles } from 'lucide-react';
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
-type PrototypeVariant = 'A' | 'B' | 'C';
+type PrototypeVariant = 'A' | 'B' | 'C' | 'D';
 
 const names: Record<PrototypeVariant, string> = {
   A: 'Profile card',
   B: 'Profile preview',
   C: 'Editable details',
+  D: 'Inline profile',
 };
 
-const previous: Record<PrototypeVariant, PrototypeVariant> = { A: 'C', B: 'A', C: 'B' };
-const next: Record<PrototypeVariant, PrototypeVariant> = { A: 'B', B: 'C', C: 'A' };
+const previous: Record<PrototypeVariant, PrototypeVariant> = { A: 'D', B: 'A', C: 'B', D: 'C' };
+const next: Record<PrototypeVariant, PrototypeVariant> = { A: 'B', B: 'C', C: 'D', D: 'A' };
 
 // Throwaway controls for comparing local UI variations; remove after choosing a design.
 export function PrototypeSwitcher({

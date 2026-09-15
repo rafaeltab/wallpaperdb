@@ -33,6 +33,23 @@ describe('Biography settings', () => {
     vi.mocked(userApi.updateProfile).mockReset();
   });
 
+  it('counts Unicode characters and enforces the owner-configured Biography limit', async () => {
+    const initial = { ...profile, biographyMarkdown: '', biographyMaxLength: 2 };
+    vi.mocked(userApi.updateProfile).mockResolvedValue({ ...initial, biographyMarkdown: '🙂🙂', version: 2 });
+    renderPage(initial);
+    const user = userEvent.setup();
+    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.type(editor, '🙂🙂a');
+    expect(screen.getByText('3 / 2 characters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(userApi.updateProfile).not.toHaveBeenCalled();
+    await user.clear(editor);
+    await user.type(editor, '🙂🙂');
+    expect(screen.getByText('2 / 2 characters')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save Biography' }));
+    await waitFor(() => expect(userApi.updateProfile).toHaveBeenCalledWith(expect.objectContaining({ biographyMarkdown: '🙂🙂' })));
+  });
+
   it('saves authored Markdown with the last-seen version and adopts the authoritative owner', async () => {
     const biographyMarkdown = '**Hello** 👋\n\nMy wallpaper collection.';
     const updated = { ...profile, biographyMarkdown, version: 2 };

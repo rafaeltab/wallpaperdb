@@ -1,4 +1,4 @@
-import { render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MuuriGrid } from '../../src/MuuriGrid.js';
 import { MuuriItem } from '../../src/MuuriItem.js';
@@ -45,12 +45,12 @@ describe('useItem', () => {
         </MuuriGrid>
       );
 
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
-        },
-        { timeout: 3000 }
-      );
+      // Muuri loads asynchronously; flush its initialization and React context updates.
+      await act(async () => {
+        await import('muuri');
+      });
+
+      expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
     });
 
     it('should initially show isVisible as true for visible items', async () => {
@@ -62,20 +62,15 @@ describe('useItem', () => {
         </MuuriGrid>
       );
 
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
-        },
-        { timeout: 1000 }
-      );
+      // Muuri loads asynchronously; flush its initialization and React context updates.
+      await act(async () => {
+        await import('muuri');
+      });
 
-      // Items are visible by default - wait for state to update
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('item1-visible')).toHaveTextContent('yes');
-        },
-        { timeout: 1000 }
-      );
+      expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
+
+      // Items are visible by default.
+      expect(screen.getByTestId('item1-visible')).toHaveTextContent('yes');
     });
 
     it('should return isDragging as false initially', async () => {
@@ -87,12 +82,12 @@ describe('useItem', () => {
         </MuuriGrid>
       );
 
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
-        },
-        { timeout: 1000 }
-      );
+      // Muuri loads asynchronously; flush its initialization and React context updates.
+      await act(async () => {
+        await import('muuri');
+      });
+
+      expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
 
       expect(screen.getByTestId('item1-dragging')).toHaveTextContent('no');
     });
@@ -120,13 +115,13 @@ describe('useItem', () => {
         </MuuriGrid>
       );
 
-      await waitFor(
-        () => {
-          expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
-          expect(screen.getByTestId('item2-has-item')).toHaveTextContent('yes');
-        },
-        { timeout: 1000 }
-      );
+      // Muuri loads asynchronously; flush its initialization and React context updates.
+      await act(async () => {
+        await import('muuri');
+      });
+
+      expect(screen.getByTestId('item1-has-item')).toHaveTextContent('yes');
+      expect(screen.getByTestId('item2-has-item')).toHaveTextContent('yes');
     });
   });
 

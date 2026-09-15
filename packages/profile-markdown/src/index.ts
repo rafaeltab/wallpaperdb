@@ -1,10 +1,10 @@
-import type { Nodes, Root } from "mdast";
+import type { Definition, Nodes, Root } from "mdast";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 
 export interface ProfileMarkdownIssue {
-  code: "unsupported-syntax" | "too-long" | "invalid-link";
+  code: "unsupported-syntax" | "too-long" | "invalid-link" | "invalid-image";
   message: string;
 }
 
@@ -48,16 +48,52 @@ export function validateProfileMarkdown(
   if (maxCharacters !== null && countProfileMarkdownCharacters(source) > maxCharacters) {
     return { valid: false, errors: [{ code: "too-long", message: `Biography must be ${maxCharacters} characters or fewer.` }] };
   }
-  const errors: ProfileMarkdownIssue[] = [];
-  for (const node of flatten(parser.parse(source))) {
-    if ((node.type === "link" || node.type === "definition") && !normalizeProfileLink(node.url)) {
-      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+  return validateTree(parser.parse(source));
+}
+
+const wallpaperIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
+
+function wallpaperTarget(target: string): string | null {
+  if (!target.startsWith("wallpaper:")) return null;
+  const id = target.slice("wallpaper:".length);
+  return wallpaperIdPattern.test(id) ? id : null;
+}
+
+function definitionsIn(nodes: Nodes[]): Map<string, Definition> {
+  const definitions = new Map<string, Definition>();
+  for (const node of nodes) {
+    if (node.type === "definition" && !definitions.has(node.identifier.toUpperCase())) {
+      definitions.set(node.identifier.toUpperCase(), node);
     }
+  }
+  return definitions;
+}
+
+function validateTree(root: Root): ProfileMarkdownValidation {
+  const errors: ProfileMarkdownIssue[] = [];
+  const wallpaperIds = new Set<string>();
+  const nodes = flatten(root);
+  const definitions = definitionsIn(nodes);
+  for (const node of nodes) {
     if (!allowedNodes.has(node.type)) {
       errors.push({ code: "unsupported-syntax", message: "This Markdown syntax is not supported." });
     }
+    const definition = node.type === "linkReference" || node.type === "imageReference"
+      ? definitions.get(node.identifier.toUpperCase()) : undefined;
+    const target = "url" in node ? node.url : definition?.url;
+    if ((node.type === "link" || node.type === "linkReference") && (!target || !normalizeProfileLink(target))) {
+      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+    }
+    if (node.type === "definition" && !normalizeProfileLink(node.url) && !wallpaperTarget(node.url)) {
+      errors.push({ code: "invalid-link", message: "Links must use absolute HTTPS URLs without credentials." });
+    }
+    if (node.type === "image" || node.type === "imageReference") {
+      const id = target ? wallpaperTarget(target) : null;
+      if (id) wallpaperIds.add(id);
+      else errors.push({ code: "invalid-image", message: "Images must reference your published wallpapers using wallpaper:<wallpaper-id>." });
+    }
   }
-  return errors.length > 0 ? { valid: false, errors } : { valid: true, wallpaperIds: [] };
+  return errors.length > 0 ? { valid: false, errors } : { valid: true, wallpaperIds: [...wallpaperIds] };
 }
 
 export interface ProfileLinkDestination {

@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { countProfileMarkdownCharacters, normalizeProfileLink, validateProfileMarkdown } from "../src/index.js";
 
 describe("Profile Markdown policy", () => {
+  it("collects unique Wallpaper IDs from inline and reference images for ownership validation", () => {
+    const source = "![My photo](wallpaper:wlpr_ABC) ![Again](wallpaper:wlpr_ABC) ![Other][WALL]\n\n[wall]: wallpaper:legacy-photo_2";
+    expect(validateProfileMarkdown(source)).toEqual({valid: true, wallpaperIds: ["wlpr_ABC", "legacy-photo_2"]});
+  });
   it.each([
     "[x](javascript:alert(1))", "[x](JaVaScRiPt:alert(1))", "[x](javascript&#58;alert(1))",
     "[x](java&#x09;script:alert(1))", "[x](data:text/html;base64,abc)", "[x](mailto:a@example.com)",

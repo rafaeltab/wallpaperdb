@@ -68,6 +68,7 @@ export interface ProfilePicture {
 
 export interface Profile {
   id: string;
+  version?: number;
   handle: string;
   displayName: string;
   biographyMarkdown: string;

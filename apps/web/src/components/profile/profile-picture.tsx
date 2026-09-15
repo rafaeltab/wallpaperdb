@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useOwnerProfile } from '@/hooks/use-owner-profile';
+import type { Profile as OwnerProfile } from '@/lib/api/user';
 import type { Profile } from '@/lib/graphql/types';
 
 interface ProfilePictureProps {
-  profile: Pick<Profile, 'id' | 'displayName' | 'picture'>;
+  profile:
+    | Pick<Profile, 'id' | 'displayName' | 'picture' | 'version'>
+    | Pick<OwnerProfile, 'id' | 'displayName' | 'pictureAssetId'>;
   className?: string;
 }
 
@@ -10,16 +14,40 @@ export function ProfilePicture({
   profile,
   className = 'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
 }: ProfilePictureProps) {
+  const cachedOwner = useOwnerProfile(profile.id);
+  const owner =
+    'pictureAssetId' in profile
+      ? profile
+      : cachedOwner && cachedOwner.version >= (profile.version ?? 0)
+        ? cachedOwner
+        : null;
+  const picture = owner
+    ? owner.pictureAssetId
+      ? {
+          id: owner.pictureAssetId,
+          url: `${(import.meta.env.VITE_MEDIA_URL || '/media').replace(/\/+$/, '')}/profile-pictures/${encodeURIComponent(owner.pictureAssetId)}`,
+        }
+      : null
+    : 'picture' in profile
+      ? profile.picture
+      : null;
+  const resolved = {
+    id: profile.id,
+    displayName: owner?.displayName ?? profile.displayName,
+    picture,
+  };
   return (
-    <Picture
-      key={`${profile.id}:${profile.picture?.url ?? ''}`}
-      profile={profile}
-      className={className}
-    />
+    <Picture key={`${profile.id}:${picture?.url ?? ''}`} profile={resolved} className={className} />
   );
 }
 
-function Picture({ profile, className }: ProfilePictureProps) {
+function Picture({
+  profile,
+  className,
+}: {
+  profile: Pick<Profile, 'id' | 'displayName' | 'picture'>;
+  className?: string;
+}) {
   const [failed, setFailed] = useState(false);
   const [retries, setRetries] = useState(0);
   const accessibleName = `${profile.displayName}'s profile picture`;

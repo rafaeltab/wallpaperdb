@@ -1,4 +1,8 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { profileQueryKey } from '@/components/profile-bootstrap';
+import type { Profile } from '@/lib/api/user';
+import { GET_PROFILE, GET_PROFILE_BY_HANDLE, GET_WALLPAPER } from '@/lib/graphql/queries';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePicture } from '@/components/profile/profile-picture';
 
@@ -9,7 +13,46 @@ const profile = {
 };
 
 describe('ProfilePicture', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it('adopts matching owner pictures and removals immediately while allowing newer public versions to win', () => {
+    vi.stubEnv('VITE_MEDIA_URL', '/media');
+    const client = new QueryClient();
+    const owner: Profile = {
+      ...profile,
+      handle: 'ada',
+      biographyMarkdown: '',
+      pictureAssetId: 'owner_picture',
+      version: 2,
+      createdAt: '',
+      updatedAt: '',
+    };
+    client.setQueryData(profileQueryKey(profile.id), owner);
+    const view = (version: number, id = profile.id) => (
+      <QueryClientProvider client={client}>
+        <ProfilePicture profile={{ ...profile, id, version }} />
+      </QueryClientProvider>
+    );
+    const rendered = render(view(1));
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/media/profile-pictures/owner_picture');
+    act(() =>
+      client.setQueryData(profileQueryKey(profile.id), {
+        ...owner,
+        version: 3,
+        pictureAssetId: null,
+      })
+    );
+    expect(screen.getByRole('img')).toHaveTextContent('AL');
+    rendered.rerender(view(4));
+    expect(screen.getByRole('img')).toHaveAttribute('src', profile.picture.url);
+    rendered.rerender(view(1, 'another_user'));
+    expect(screen.getByRole('img')).toHaveAttribute('src', profile.picture.url);
+    for (const query of [GET_PROFILE, GET_PROFILE_BY_HANDLE, GET_WALLPAPER])
+      expect(query).toMatch(/\bversion\b/);
+  });
 
   it('shows its deterministic avatar after an image error and bounds retries until the asset changes', async () => {
     vi.useFakeTimers();

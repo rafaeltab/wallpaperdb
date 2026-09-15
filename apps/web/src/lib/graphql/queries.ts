@@ -42,6 +42,7 @@ export const GET_WALLPAPER = gql`
       profileId
       profile {
         id
+        version
         handle
         displayName
         picture {
@@ -69,6 +70,7 @@ export const GET_PROFILE = gql`
   query GetProfile($id: ID!) {
     profile(id: $id) {
       id
+      version
       handle
       displayName
       biographyMarkdown
@@ -89,6 +91,7 @@ export const GET_PROFILE_BY_HANDLE = gql`
       canonicalHandle
       profile {
         id
+        version
         handle
         displayName
         biographyMarkdown

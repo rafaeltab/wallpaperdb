@@ -1,7 +1,10 @@
 import { useIsFetching, useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
-import { ProfileHistoricalHandles } from '@/components/profile/profile-historical-handles';
+import {
+  historicalHandleUnavailableMessage,
+  ProfileHistoricalHandles,
+} from '@/components/profile/profile-historical-handles';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,12 +21,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
 interface AliasCommand {
-  action: 'schedule' | 'expire' | 'reactivate';
+  action: 'schedule' | 'expire' | 'reactivate' | 'keep';
   handle: string;
   expectedVersion: number;
 }
 
-const actionVerbs = { schedule: 'scheduling', expire: 'expiring', reactivate: 'reactivating' };
+const actionVerbs = {
+  schedule: 'scheduling',
+  expire: 'expiring',
+  reactivate: 'reactivating',
+  keep: 'canceling removal',
+};
 
 export function ProfileAliasSettings({
   profile,
@@ -43,7 +51,7 @@ export function ProfileAliasSettings({
     mutationKey: profileQueryKey(profile.id),
     mutationFn: ({ action, ...command }: AliasCommand) => {
       const options = { ...command, expectedProfileId: profile.id, tokenProvider };
-      if (action === 'reactivate') return userApi.reactivateAlias(options);
+      if (action === 'reactivate' || action === 'keep') return userApi.reactivateAlias(options);
       return action === 'expire'
         ? userApi.expireAlias(options)
         : userApi.scheduleAliasRemoval(options);
@@ -107,11 +115,13 @@ export function ProfileAliasSettings({
         {completed && (
           <Alert role="status">
             <AlertDescription>
-              {completed.action === 'reactivate'
-                ? `@${completed.handle} is now a retained alias. Public links may take a moment to update.`
-                : completed.action === 'expire'
-                  ? `@${completed.handle} has expired and no longer redirects to your Profile. Public links may take a moment to update.`
-                  : `Removal scheduled for @${completed.handle}.`}
+              {completed.action === 'keep'
+                ? `Scheduled removal canceled for @${completed.handle}. It is now a retained alias.`
+                : completed.action === 'reactivate'
+                  ? `@${completed.handle} is now a retained alias. Public links may take a moment to update.`
+                  : completed.action === 'expire'
+                    ? `@${completed.handle} has expired and no longer redirects to your Profile. Public links may take a moment to update.`
+                    : `Removal scheduled for @${completed.handle}.`}
             </AlertDescription>
           </Alert>
         )}
@@ -165,44 +175,92 @@ export function ProfileAliasSettings({
           </h2>
           {expiring.length ? (
             <ul aria-labelledby="expiring-aliases-heading" className="mt-3 divide-y">
-              {expiring.map((alias) => (
-                <li
-                  key={alias.handle}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
-                >
-                  <div>
-                    <p className="break-all font-medium">@{alias.handle}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Redirect expires at{' '}
-                      <time
-                        dateTime={alias.expiresAt ?? undefined}
-                        title={alias.expiresAt ?? undefined}
-                      >
-                        {new Date(alias.expiresAt ?? '').toLocaleString()}
-                      </time>
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    aria-label={`Expire @${alias.handle} now`}
-                    disabled={mutation.isPending || refreshing}
-                    onClick={() => {
-                      mutation.reset();
-                      setRefreshError(null);
-                      setCompleted(null);
-                      setPending({
-                        action: 'expire',
-                        handle: alias.handle,
-                        expectedVersion: profile.version,
-                      });
-                      setDialogOpen(true);
-                    }}
+              {expiring.map((alias) => {
+                const history = profile.historicalHandles?.find(
+                  (entry) => entry.handle === alias.handle
+                );
+                const unavailable = history ? historicalHandleUnavailableMessage(history) : null;
+                return (
+                  <li
+                    key={alias.handle}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3"
                   >
-                    Expire now
-                  </Button>
-                </li>
-              ))}
+                    <div>
+                      <p className="break-all font-medium">@{alias.handle}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Redirect expires at{' '}
+                        <time
+                          dateTime={alias.expiresAt ?? undefined}
+                          title={alias.expiresAt ?? undefined}
+                        >
+                          {new Date(alias.expiresAt ?? '').toLocaleString()}
+                        </time>
+                      </p>
+                      {history && (
+                        <p className="text-sm text-muted-foreground">
+                          Can cancel removal until{' '}
+                          <time dateTime={history.eligibleUntil} title={history.eligibleUntil}>
+                            {new Date(history.eligibleUntil).toLocaleString()}
+                          </time>
+                        </p>
+                      )}
+                      {unavailable && (
+                        <p
+                          id={`keep-${alias.handle}-unavailable`}
+                          className="mt-1 text-sm text-muted-foreground"
+                        >
+                          {unavailable}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {history && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`Keep alias @${alias.handle}`}
+                          aria-describedby={
+                            unavailable ? `keep-${alias.handle}-unavailable` : undefined
+                          }
+                          disabled={mutation.isPending || refreshing || Boolean(unavailable)}
+                          onClick={() => {
+                            mutation.reset();
+                            setRefreshError(null);
+                            setCompleted(null);
+                            setPending({
+                              action: 'keep',
+                              handle: alias.handle,
+                              expectedVersion: profile.version,
+                            });
+                            setDialogOpen(true);
+                          }}
+                        >
+                          Keep alias
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Expire @${alias.handle} now`}
+                        disabled={mutation.isPending || refreshing}
+                        onClick={() => {
+                          mutation.reset();
+                          setRefreshError(null);
+                          setCompleted(null);
+                          setPending({
+                            action: 'expire',
+                            handle: alias.handle,
+                            expectedVersion: profile.version,
+                          });
+                          setDialogOpen(true);
+                        }}
+                      >
+                        Expire now
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="mt-3 text-sm text-muted-foreground">No expiring aliases.</p>
@@ -247,6 +305,12 @@ export function ProfileAliasSettings({
 function aliasDialog(command: AliasCommand | null, currentHandle: string) {
   const handle = command?.handle ?? '';
   switch (command?.action) {
+    case 'keep':
+      return {
+        title: 'Keep this alias?',
+        description: `Cancel the scheduled removal of @${handle}. It will keep redirecting and use one retained alias slot. Your current Handle will stay @${currentHandle}, and its change cooldown will stay the same.`,
+        button: 'Keep alias',
+      };
     case 'reactivate':
       return {
         title: 'Reactivate historical Handle?',

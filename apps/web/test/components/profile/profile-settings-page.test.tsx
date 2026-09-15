@@ -201,6 +201,65 @@ describe('ProfileSettingsPage', () => {
     );
   });
 
+  it('keeps an eligible expiring alias by confirming cancellation of its scheduled removal', async () => {
+    const alias = {
+      handle: 'old-handle',
+      claimGeneration: 2,
+      createdAt: profile.createdAt,
+      expiresAt: '2099-09-16T12:00:00.000Z',
+    };
+    const eligibleUntil = '2099-10-15T12:00:00.000Z';
+    const initial: Profile = {
+      ...profile,
+      lastHandleChangedAt: '2099-09-14T12:00:00.000Z',
+      aliases: [alias],
+      historicalHandles: [{ handle: alias.handle, eligibleUntil, unavailableReason: null }],
+    };
+    const updated = {
+      ...initial,
+      version: 2,
+      aliases: [{ ...alias, expiresAt: null }],
+      historicalHandles: [],
+    };
+    vi.mocked(userApi.reactivateAlias).mockResolvedValue(updated);
+    const { queryClient } = renderPage(initial);
+    const user = userEvent.setup();
+    const expiring = screen.getByRole('list', { name: 'Expiring aliases' });
+    expect(within(expiring).getByText(new Date(eligibleUntil).toLocaleString())).toHaveAttribute(
+      'dateTime',
+      eligibleUntil
+    );
+    expect(screen.getAllByText('@old-handle')).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Historical Handles' })).not.toBeInTheDocument();
+    await user.click(within(expiring).getByRole('button', { name: 'Keep alias @old-handle' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('Cancel the scheduled removal of @old-handle');
+    expect(dialog).toHaveTextContent('keep redirecting');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(userApi.reactivateAlias).not.toHaveBeenCalled();
+    await user.click(within(expiring).getByRole('button', { name: 'Keep alias @old-handle' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Keep alias' })
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Scheduled removal canceled for @old-handle.'
+    );
+    expect(userApi.reactivateAlias).toHaveBeenCalledWith({
+      handle: alias.handle,
+      expectedVersion: 1,
+      expectedProfileId: profile.id,
+      tokenProvider: expect.any(Function),
+    });
+    expect(queryClient.getQueryData(profileQueryKey(profile.id))).toEqual(updated);
+    expect(screen.queryByRole('list', { name: 'Expiring aliases' })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole('list', { name: 'Retained aliases' })).getByText('@old-handle')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Handle' })).toHaveValue(profile.handle);
+  });
+
   it('requires confirmation before scheduling an alias and adopts the server expiry immediately', async () => {
     const alias = {
       handle: 'old-handle',

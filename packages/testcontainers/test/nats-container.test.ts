@@ -6,7 +6,14 @@ import {
     type StartedNatsContainer,
 } from "../src/containers/nats.js";
 
-describe("NATS Container", () => {
+// Readiness must hold when startup resolves; retries would conceal an early return.
+const connectionOptions = {
+    timeout: 5000,
+    reconnect: false,
+    waitOnFirstConnect: false,
+};
+
+describe("NATS Container", { timeout: 10000 }, () => {
     let container: StartedNatsContainer;
     let natsClient: NatsConnection;
 
@@ -14,6 +21,14 @@ describe("NATS Container", () => {
         container = await createNatsContainer({
             enableJetStream: true,
         });
+
+        // Startup may be slow on CI. Validate readiness, not elapsed startup time.
+        natsClient = await connect({
+            servers: container.getConnectionUrl(),
+            ...connectionOptions,
+        });
+        const jsm = await natsClient.jetstreamManager({ timeout: 5000 });
+        await jsm.getAccountInfo();
     }, 60000);
 
     afterAll(async () => {
@@ -38,12 +53,7 @@ describe("NATS Container", () => {
         expect(urlObj.port).toBeDefined();
     });
 
-    it("should allow connecting to NATS server", async () => {
-        const url = container.getConnectionUrl();
-
-        // Attempt to connect
-        natsClient = await connect({ servers: url });
-
+    it("should be connected to NATS immediately after startup", () => {
         expect(natsClient).toBeDefined();
         expect(natsClient.isClosed()).toBe(false);
 
@@ -84,8 +94,8 @@ describe("NATS Container", () => {
             })();
         });
 
-        // Give subscriber time to set up
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Wait for the server to process the subscription before publishing.
+        await natsClient.flush();
 
         // Publish message
         natsClient.publish(subject, new TextEncoder().encode(testMessage));
@@ -121,7 +131,7 @@ describe("NATS Container", () => {
         const consumer = await js.consumers.get(streamName);
         const messages = await consumer.consume({ max_messages: 1 });
 
-        let receivedData: any = null;
+        let receivedData: unknown = null;
         for await (const msg of messages) {
             receivedData = JSON.parse(new TextDecoder().decode(msg.data));
             msg.ack();
@@ -153,6 +163,23 @@ describe("NATS Container", () => {
 });
 
 describe("NATS Container Configuration", () => {
+    it("should reject a running server whose health check never becomes ready", async () => {
+        let container: StartedNatsContainer | undefined;
+        try {
+            const start = async () => {
+                container = await createNatsContainer({
+                    // NATS still accepts connections on 4222, but the health check
+                    // on 8222 must fail. An open port alone is not readiness.
+                    additionalArgs: ["-m", "8223"],
+                });
+            };
+
+            await expect(start()).rejects.toThrow(/Health check (failed|not healthy)/);
+        } finally {
+            await container?.stop();
+        }
+    }, 60000);
+
     it("should work with custom image", async () => {
         const container = await createNatsContainer({
             image: "nats:2.10-alpine",
@@ -171,7 +198,7 @@ describe("NATS Container Configuration", () => {
         });
 
         const url = container.getConnectionUrl();
-        const client = await connect({ servers: url });
+        const client = await connect({ servers: url, ...connectionOptions });
 
         expect(client.isClosed()).toBe(false);
 
@@ -186,7 +213,7 @@ describe("NATS Container Configuration", () => {
         });
 
         const url = container.getConnectionUrl();
-        const client = await connect({ servers: url });
+        const client = await connect({ servers: url, ...connectionOptions });
 
         expect(client.isClosed()).toBe(false);
 
@@ -194,36 +221,3 @@ describe("NATS Container Configuration", () => {
         await container.stop();
     }, 60000);
 });
-
-// describe.skip("NATS Container reliability", () => {
-//     it.each(Array.from({ length: 100 }, (_, i) => i))(
-//         "should work with custom image",
-//         async () => {
-//             let container: StartedNatsContainer | undefined;
-//             let natsClient: NatsConnection | undefined;
-//             try {
-//                 container = await createNatsContainer({
-//                     image: "nats:2.10-alpine",
-//                     enableJetStream: true,
-//                 });
-//
-//                 const url = container.getConnectionUrl();
-//
-//                 // Attempt to connect
-//                 natsClient = await connect({ servers: url });
-//
-//                 expect(natsClient).toBeDefined();
-//                 expect(natsClient.isClosed()).toBe(false);
-//
-//                 // Verify server info
-//                 const info = natsClient.info;
-//                 expect(info).toBeDefined();
-//                 expect(info?.version).toBeDefined();
-//             } finally {
-//                 await natsClient?.close();
-//                 await container?.stop();
-//             }
-//         },
-//         { concurrent: true },
-//     );
-// });

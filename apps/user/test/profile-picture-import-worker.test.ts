@@ -74,4 +74,18 @@ describe('Profile picture import worker', () => {
     await timer.tickAsync(1000);
     expect(run).toHaveBeenCalledOnce();
   });
+
+  it('retries on the next polling tick after a failed pass', async () => {
+    const timer = new FakeTimerService();
+    const failure = new Error('temporary import failure');
+    const run = vi.fn<() => Promise<void>>().mockRejectedValueOnce(failure).mockResolvedValue();
+    const logger = { error: vi.fn() };
+    const worker = new ProfilePictureImportWorker(run, logger, timer);
+    worker.start();
+    await expect(worker.importPending()).rejects.toBe(failure);
+    await timer.tickAsync(1000);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(logger.error).toHaveBeenCalledOnce();
+    await worker.stop();
+  });
 });

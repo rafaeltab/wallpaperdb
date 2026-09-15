@@ -175,4 +175,33 @@ describe('Private Profile picture retention', () => {
       expect(await profiles.ensure(owner.id)).toEqual(owner);
     } finally { vi.useRealTimers(); }
   });
+
+  it('skips an expired candidate while its PUT is in flight and cleans it after the write settles', async () => {
+    const owner = await profiles.ensure('user_picture');
+    let started!: () => void;
+    let release!: () => void;
+    const writing = new Promise<void>((resolve) => { started = resolve; });
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const stalled = vi.spyOn(S3Client.prototype, 'send').mockImplementationOnce(async (command) => {
+      stalled.mockRestore();
+      started();
+      await blocked;
+      return objectStorage.send(command);
+    });
+    const staging = ingestion.stage(owner.id, picture);
+    try {
+      await writing;
+      const [asset] = await sql`select * from profile_picture_assets where profile_id = ${owner.id}`;
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 0 });
+      release();
+      expect(await staging).toBe(asset.id);
+      expect((await object(asset.id)).ContentType).toBe('image/webp');
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+      await expect(object(asset.id)).rejects.toMatchObject({ name: 'NoSuchKey' });
+    } finally {
+      release();
+      await staging;
+      stalled.mockRestore();
+    }
+  });
 });

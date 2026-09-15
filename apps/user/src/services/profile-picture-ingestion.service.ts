@@ -1,8 +1,9 @@
+import { eq } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { ulid } from 'ulid';
 import type { Config } from '../config.js';
 import { DatabaseConnection } from '../connections/database.js';
-import { profilePictureAssets } from '../db/schema.js';
+import { profilePictureAssets, profiles } from '../db/schema.js';
 import { processProfilePicture } from './profile-picture-processing.js';
 import { ProfilePictureStorage } from './profile-picture-storage.js';
 import { profileEvidenceRetentionMs } from './profile-retention-policy.js';
@@ -49,7 +50,30 @@ export class ProfilePictureIngestionService {
         expiresAt: new Date(now.getTime() + profileEvidenceRetentionMs(this.config)),
       })
       .returning();
-    await this.storage.put(asset, picture.bytes);
+    await this.database.getClient().db.transaction(async (tx) => {
+      // Keep the committed candidate for ambiguous PUT failures. Cleanup and
+      // adoption take these locks in the same order and cannot race this write.
+      const [profile] = await tx
+        .select()
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .for('update');
+      const [candidate] = await tx
+        .select()
+        .from(profilePictureAssets)
+        .where(eq(profilePictureAssets.id, asset.id))
+        .for('update');
+      if (
+        !profile ||
+        !candidate ||
+        candidate.state !== 'staged' ||
+        !candidate.expiresAt ||
+        candidate.expiresAt.getTime() <= Date.now()
+      ) {
+        throw new Error('Staged Profile picture expired before its upload could start');
+      }
+      await this.storage.put(candidate, picture.bytes);
+    });
     return id;
   }
 }

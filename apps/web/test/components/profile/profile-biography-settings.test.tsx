@@ -1,6 +1,6 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { profileQueryKey } from '@/components/profile-bootstrap';
@@ -55,6 +55,21 @@ describe('Biography settings', () => {
     });
     vi.mocked(userApi.ensureProfile).mockReset();
     vi.mocked(userApi.updateProfile).mockReset();
+  });
+
+  it('previews the draft through the shared safe renderer and shows an empty Biography state', async () => {
+    renderPage({ ...profile, biographyMarkdown: '', biographyMaxLength: 6000 });
+    const user = userEvent.setup();
+    const preview = screen.getByRole('region', { name: 'Biography preview' });
+    expect(within(preview).getByText('No biography yet.')).toBeInTheDocument();
+    const editor = screen.getByRole('textbox', { name: 'Biography Markdown' });
+    await user.type(editor, '**Wallpaper collector**');
+    expect(within(preview).getByText('Wallpaper collector').tagName).toBe('STRONG');
+    await user.clear(editor);
+    await user.type(editor, '<script>alert(1)</script>');
+    expect(within(preview).getByText('This Biography cannot be displayed safely.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Biography' })).toBeDisabled();
+    expect(userApi.updateProfile).not.toHaveBeenCalled();
   });
 
   it('keeps an unchanged Biography unsavable and adopts fresh text while the editor is pristine', async () => {

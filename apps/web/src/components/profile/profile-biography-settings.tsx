@@ -5,10 +5,11 @@ import {
 } from '@wallpaperdb/profile-markdown';
 import { useEffect, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
+import { BiographyMarkdown } from '@/components/profile/profile-biography';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Textarea } from '@/components/ui/textarea';
 import { userApi, UserApiError, type Profile } from '@/lib/api/user';
 
@@ -116,6 +117,7 @@ export function ProfileBiographySettings({
               id="biography-markdown"
               value={draft}
               rows={7}
+              className="max-h-96 min-h-40 font-mono text-sm"
               disabled={writing || refreshing}
               onChange={(event) => {
                 setEdit((current) => ({ ...current, value: event.target.value }));
@@ -126,6 +128,11 @@ export function ProfileBiographySettings({
             <p className="text-sm text-muted-foreground">
               {countProfileMarkdownCharacters(draft)} / {maxCharacters} characters
             </p>
+            <FieldDescription>
+              Use headings, lists, emphasis, tables, and HTTPS links. Embed a published wallpaper
+              you own with <code className="break-all">![Alt text](wallpaper:wallpaper-id)</code>.
+              New uploads may take a moment to become available.
+            </FieldDescription>
           </Field>
           {!validation.valid && (
             <Alert variant="destructive">
@@ -147,6 +154,7 @@ export function ProfileBiographySettings({
               </AlertDescription>
             </Alert>
           )}
+          <div className="flex flex-wrap gap-2">
           <Button
             type="submit"
             disabled={
@@ -163,7 +171,12 @@ export function ProfileBiographySettings({
           >
             Refresh Biography
           </Button>
+          </div>
         </form>
+        <section aria-labelledby="biography-preview-title" className="mt-6 min-w-0 border-t pt-5">
+          <h3 id="biography-preview-title" className="mb-3 text-sm font-semibold text-muted-foreground">Biography preview</h3>
+          <BiographyMarkdown markdown={draft} profileId={profile.id} maxCharacters={maxCharacters} />
+        </section>
       </CardContent>
     </Card>
   );

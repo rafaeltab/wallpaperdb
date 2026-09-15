@@ -6,6 +6,7 @@ import { BiographyExternalLink } from './biography-external-link';
 import { BiographyWallpaper } from './biography-wallpaper';
 
 export function BiographyMarkdown({ markdown, profileId, maxCharacters = null }: { markdown: string; profileId: string; maxCharacters?: number | null }) {
+  if (!markdown.trim()) return <p className="italic text-muted-foreground">No biography yet.</p>;
   if (!validateProfileMarkdown(markdown, { maxCharacters }).valid) {
     return <p className="text-sm text-muted-foreground">This Biography cannot be displayed safely.</p>;
   }

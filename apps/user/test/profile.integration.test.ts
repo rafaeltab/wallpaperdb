@@ -155,6 +155,32 @@ describe('Profile commands', () => {
     });
   }
 
+  async function reactivateAlias(userId: string, handle: string, expectedVersion: number) {
+    const token = Buffer.from(JSON.stringify({ id: userId })).toString('base64');
+    return app.inject({
+      method: 'PUT', url: `/profile/me/aliases/${encodeURIComponent(handle)}`,
+      headers: { authorization: `Bearer ${token}` }, payload: { expectedVersion },
+    });
+  }
+
+  it('reactivates a released historical Handle with a new claim and authoritative event', async () => {
+    const original = (await request('user_1')).json();
+    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+    const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
+    const response = await reactivateAlias('user_1', original.handle.toUpperCase(), released.version);
+    expect(response.statusCode).toBe(200);
+    const reactivated = response.json();
+    expect(reactivated).toMatchObject({ handle: changed.handle, version: released.version + 1, lastHandleChangedAt: changed.lastHandleChangedAt, historicalHandles: [] });
+    expect(reactivated.aliases).toEqual([{ handle: original.handle, claimGeneration: expect.any(Number), createdAt: reactivated.updatedAt, expiresAt: null }]);
+    expect(reactivated.aliases[0].claimGeneration).toBeGreaterThan(scheduled.aliases[0].claimGeneration);
+    expect((await request('user_1')).json()).toEqual(reactivated);
+    const [event] = await sql`select payload, created_at from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`;
+    expect(event.created_at.toISOString()).toBe(event.payload.timestamp);
+    expect(event.payload).toMatchObject({ change: { type: 'alias-reactivated', handle: original.handle, claimGeneration: reactivated.aliases[0].claimGeneration, before: null, after: null }, profile: { handle: changed.handle, version: reactivated.version, aliases: reactivated.aliases } });
+    expect(event.payload.profile).not.toHaveProperty('historicalHandles');
+  });
+
   it('returns recent typed Handle history after scheduling and expiry events commit', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));

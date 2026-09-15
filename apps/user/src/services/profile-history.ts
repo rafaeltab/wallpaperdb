@@ -2,6 +2,7 @@ import {
   PROFILE_CREATED_SUBJECT,
   PROFILE_UPDATED_SUBJECT,
   type ProfileUpdatedEvent,
+  type ProfileCreatedEvent,
 } from '@wallpaperdb/events';
 import { and, eq, gt, lte, or, sql } from 'drizzle-orm';
 import type { DatabaseConnection } from '../connections/database.js';
@@ -21,7 +22,9 @@ export async function recentHistoricalHandles(reader: ProfileReader, profileId: 
       createdHandle: sql<
         string | null
       >`case when ${outboxEvents.subject} = ${PROFILE_CREATED_SUBJECT} then ${outboxEvents.payload}->'profile'->>'handle' else null end`,
-      change: sql<ProfileUpdatedEvent['change'] | null>`${outboxEvents.payload}->'change'`,
+      change: sql<
+        ProfileUpdatedEvent['change'] | ProfileCreatedEvent['change'] | null
+      >`${outboxEvents.payload}->'change'`,
     })
     .from(outboxEvents)
     .where(

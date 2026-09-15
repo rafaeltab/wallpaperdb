@@ -28,6 +28,7 @@ import {
 } from './clerk-identity.service.js';
 
 import { type ProfileReader, recentHistoricalHandles } from './profile-history.js';
+import { profileEvidenceRetentionMs } from './profile-retention-policy.js';
 
 const RESERVED_HANDLES = new Set([
   'admin',
@@ -405,9 +406,9 @@ export class ProfileService {
       if (current.handle === handle)
         throw new InvalidAliasCommandError('Your current Handle cannot also be an alias');
       const now = new Date();
-      const history = await recentHistoricalHandles(tx, userId, now);
+      const history = await recentHistoricalHandles(tx, userId, now, profileEvidenceRetentionMs(this.config));
       if (!history.some((entry) => entry.handle === handle)) {
-        throw new IneligibleHandleError('This Handle is not in your recent 30-day Profile history');
+        throw new IneligibleHandleError('This Handle is outside your retained Profile history');
       }
       const existing = await tx.query.handleClaims.findFirst({
         where: eq(handleClaims.handle, handle),
@@ -728,7 +729,7 @@ export class ProfileService {
     const retained = new Set(
       activeAliases.filter((alias) => alias.expiresAt === null).map((alias) => alias.handle)
     );
-    const history = await recentHistoricalHandles(reader, profile.id, now);
+    const history = await recentHistoricalHandles(reader, profile.id, now, profileEvidenceRetentionMs(this.config));
     const historicalHandles = history.filter(
       ({ handle }) => handle !== profile.handle && !retained.has(handle)
     );

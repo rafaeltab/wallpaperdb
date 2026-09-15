@@ -12,10 +12,9 @@ export type ProfileReader = Pick<
   ReturnType<DatabaseConnection['getClient']>['db'],
   'query' | 'select'
 >;
-const HISTORY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Read typed Handle references without loading the full public snapshots. */
-export async function recentHistoricalHandles(reader: ProfileReader, profileId: string, now: Date) {
+export async function recentHistoricalHandles(reader: ProfileReader, profileId: string, now: Date, retentionMs: number) {
   const events = await reader
     .select({
       createdAt: outboxEvents.createdAt,
@@ -30,7 +29,7 @@ export async function recentHistoricalHandles(reader: ProfileReader, profileId: 
     .where(
       and(
         eq(outboxEvents.aggregateId, profileId),
-        gt(outboxEvents.createdAt, new Date(now.getTime() - HISTORY_WINDOW_MS)),
+        gt(outboxEvents.createdAt, new Date(now.getTime() - retentionMs)),
         lte(outboxEvents.createdAt, now),
         or(
           eq(outboxEvents.subject, PROFILE_CREATED_SUBJECT),
@@ -55,7 +54,7 @@ export async function recentHistoricalHandles(reader: ProfileReader, profileId: 
     } else if (change && 'handle' in change) {
       handles.push(change.handle);
     }
-    const deadline = event.createdAt.getTime() + HISTORY_WINDOW_MS;
+    const deadline = event.createdAt.getTime() + retentionMs;
     for (const handle of handles)
       deadlines.set(handle, Math.max(deadlines.get(handle) ?? 0, deadline));
   }

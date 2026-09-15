@@ -22,7 +22,7 @@ export function UserMenu() {
   const { isSignedIn, isLoaded, userId } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
-  const owner = useOwnerProfile(isSignedIn ? (userId ?? '') : '');
+  const { profile: owner } = useOwnerProfile(isSignedIn ? (userId ?? '') : '');
 
   if (!isLoaded) {
     return null;

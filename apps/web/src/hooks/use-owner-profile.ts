@@ -11,8 +11,9 @@ export function useOwnerProfile(profileId: string) {
     [client]
   );
   const snapshot = useCallback(
-    () => client?.getQueryData<Profile>(profileQueryKey(profileId)),
+    () => client?.getQueryState<Profile>(profileQueryKey(profileId)),
     [client, profileId]
   );
-  return useSyncExternalStore(subscribe, snapshot, snapshot);
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
+  return { profile: state?.data, refreshedAt: state?.dataUpdatedAt ?? 0 };
 }

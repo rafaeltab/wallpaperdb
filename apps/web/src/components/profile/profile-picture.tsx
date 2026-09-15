@@ -14,7 +14,7 @@ export function ProfilePicture({
   profile,
   className = 'flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-card object-cover text-2xl font-bold text-white shadow-sm sm:size-28 sm:text-3xl',
 }: ProfilePictureProps) {
-  const cachedOwner = useOwnerProfile(profile.id);
+  const { profile: cachedOwner, refreshedAt } = useOwnerProfile(profile.id);
   const owner =
     'pictureAssetId' in profile
       ? profile
@@ -36,8 +36,9 @@ export function ProfilePicture({
     displayName: owner?.displayName ?? profile.displayName,
     picture,
   };
+  const publicVersion = 'version' in profile ? profile.version : 0;
   return (
-    <Picture key={`${profile.id}:${picture?.url ?? ''}`} profile={resolved} className={className} />
+    <Picture key={`${profile.id}:${picture?.url ?? ''}:${refreshedAt}:${publicVersion}`} profile={resolved} className={className} />
   );
 }
 

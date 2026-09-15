@@ -35,7 +35,8 @@ export interface BrowseSearchState {
 
 export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearchState {
   return {
-    profileId: typeof search.profileId === 'string' && search.profileId ? search.profileId : undefined,
+    profileId:
+      typeof search.profileId === 'string' && search.profileId ? search.profileId : undefined,
     after: typeof search.after === 'string' ? search.after : undefined,
     color: normalizeBrowseColorValue(search.color),
     format: isBrowseFormatValue(search.format) ? search.format : undefined,
@@ -46,7 +47,7 @@ export function parseBrowseSearch(search: Record<string, unknown>): BrowseSearch
 export function buildWallpaperFilter(
   format?: BrowseFormatValue,
   aspectRatio?: number,
-  profileId?: string,
+  profileId?: string
 ): WallpaperFilter | undefined {
   const selectedFormat = BROWSE_FORMAT_OPTIONS.find((option) => option.value === format);
   const variants: NonNullable<WallpaperFilter['variants']> = {};
@@ -67,7 +68,7 @@ export function buildWallpaperFilter(
 
 export function buildAspectRatioFilter(
   aspectRatio: BrowseAspectRatioValue | undefined,
-  deviceAspectRatioPreset: BrowseAspectRatioPresetValue,
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue
 ): WallpaperFilter | undefined {
   const resolvedAspectRatio = getAspectRatioFilterValue(aspectRatio, deviceAspectRatioPreset);
 
@@ -106,7 +107,7 @@ export function getFormatBadgeLabel(format: BrowseFormatValue): string {
 
 export function getAspectRatioBadgeLabel(
   aspectRatio: BrowseAspectRatioValue,
-  deviceAspectRatioPreset: BrowseAspectRatioPresetValue,
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue
 ): string {
   return `Aspect ratio: ${getAspectRatioLabel(aspectRatio, deviceAspectRatioPreset)}`;
 }
@@ -117,17 +118,19 @@ export function getFormatLabel(format: BrowseFormatValue): string {
 
 export function getAspectRatioLabel(
   aspectRatio: BrowseAspectRatioValue,
-  deviceAspectRatioPreset: BrowseAspectRatioPresetValue,
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue
 ): string {
   if (aspectRatio === 'device') {
     return getDeviceAspectRatioOptionLabel(deviceAspectRatioPreset);
   }
 
-  return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === aspectRatio)?.label ?? aspectRatio;
+  return (
+    BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === aspectRatio)?.label ?? aspectRatio
+  );
 }
 
 export function getDeviceAspectRatioOptionLabel(
-  deviceAspectRatioPreset: BrowseAspectRatioPresetValue,
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue
 ): string {
   return `Device ${getAspectRatioPresetLabel(deviceAspectRatioPreset)}`;
 }
@@ -153,14 +156,15 @@ export function resolveClosestAspectRatioPreset(ratio: number): BrowseAspectRati
 
 export function getAspectRatioFilterValue(
   aspectRatio: BrowseAspectRatioValue | undefined,
-  deviceAspectRatioPreset: BrowseAspectRatioPresetValue,
+  deviceAspectRatioPreset: BrowseAspectRatioPresetValue
 ): number | undefined {
   if (!aspectRatio) {
     return undefined;
   }
 
   const preset = aspectRatio === 'device' ? deviceAspectRatioPreset : aspectRatio;
-  return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === preset && 'ratio' in option)?.ratio;
+  return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === preset && 'ratio' in option)
+    ?.ratio;
 }
 
 function isBrowseFormatValue(value: unknown): value is BrowseFormatValue {
@@ -180,7 +184,9 @@ function isBrowseAspectRatioValue(value: unknown): value is BrowseAspectRatioVal
 }
 
 function getAspectRatioPresetLabel(aspectRatio: BrowseAspectRatioPresetValue): string {
-  return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === aspectRatio)?.label ?? aspectRatio;
+  return (
+    BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === aspectRatio)?.label ?? aspectRatio
+  );
 }
 
 function normalizeBrowseColorValue(value: unknown): string | undefined {

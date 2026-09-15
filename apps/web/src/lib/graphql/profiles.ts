@@ -20,7 +20,10 @@ export async function fetchProfileByHandle(handle: string): Promise<HandleResolu
   return data.profileByHandle;
 }
 
-export async function searchProfiles(query: string, after: string | null = null): Promise<ProfileConnection> {
+export async function searchProfiles(
+  query: string,
+  after: string | null = null
+): Promise<ProfileConnection> {
   const data = await request<{ searchProfiles: ProfileConnection }>(SEARCH_PROFILES, {
     query,
     first: 10,

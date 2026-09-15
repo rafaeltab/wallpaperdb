@@ -1,8 +1,8 @@
 import { useAuth } from '@clerk/react';
 import { useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useSearch } from '@tanstack/react-router';
 import { Loader2, UserRound } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { profileQueryKey } from '@/components/profile-bootstrap';
 import { ProfileAliasSettings } from '@/components/profile/profile-alias-settings';
 import { ProfileBiographySettings } from '@/components/profile/profile-biography-settings';
@@ -30,7 +30,11 @@ const DISPLAY_NAME_MAX_LENGTH = positiveIntegerEnv(
   80
 );
 
+// Throwaway exploration: rendered only with an explicit development-only variant.
+const ProfileSettingsPrototype = lazy(() => import('./profile-settings.prototype'));
+
 export function ProfileSettingsPage() {
+  const { variant } = useSearch({ from: '/settings/profile' });
   const { getToken, isLoaded, isSignedIn, userId } = useAuth();
   const activeUserId = isLoaded && isSignedIn ? userId : null;
   const profileQuery = useQuery({
@@ -84,6 +88,14 @@ export function ProfileSettingsPage() {
       <output className="flex min-h-48 items-center justify-center" aria-label="Loading Profile">
         <Loader2 className="size-5 animate-spin text-muted-foreground" />
       </output>
+    );
+  }
+
+  if (import.meta.env.DEV && variant) {
+    return (
+      <Suspense fallback={<p className="p-8">Loading prototype…</p>}>
+        <ProfileSettingsPrototype key={profileQuery.data.id} profile={profileQuery.data} variant={variant} />
+      </Suspense>
     );
   }
 

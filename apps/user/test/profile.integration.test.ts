@@ -145,6 +145,41 @@ describe('Profile commands', () => {
     });
   }
 
+  it('releases a due alias at its exact expiry and permits a newer claim generation', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    try {
+      const original = (await request('user_1')).json();
+      const other = (await request('user_2')).json();
+      const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
+      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
+      const alias = scheduled.aliases[0];
+      const candidate = { profileId: original.id, handle: alias.handle, claimGeneration: alias.claimGeneration };
+      const deadline = new Date(alias.expiresAt);
+      expect(await service().expireDueAlias(candidate, new Date(deadline.getTime() - 1))).toBe(false);
+      expect((await request('user_1')).json()).toEqual(scheduled);
+      expect((await changeHandle('user_2', alias.handle, other.version)).statusCode).toBe(409);
+      vi.setSystemTime(deadline);
+      expect(await service().expireDueAlias(candidate, deadline)).toBe(true);
+      const expired = (await request('user_1')).json();
+      expect(expired).toMatchObject({ handle: changed.handle, aliases: [], version: scheduled.version + 1 });
+      const [event] = await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
+      expect(event.payload).toMatchObject({
+        timestamp: deadline.toISOString(),
+        change: { type: 'alias-expired', handle: alias.handle, claimGeneration: alias.claimGeneration, before: alias.expiresAt, after: null, reason: 'scheduled' },
+        profile: { aliases: [], version: expired.version },
+      });
+      expect(await service().expireDueAlias(candidate, deadline)).toBe(false);
+      const reclaimed = await changeHandle('user_2', alias.handle, other.version);
+      expect(reclaimed.statusCode).toBe(200);
+      const [claimEvent] = await sql`select payload from outbox_events where aggregate_id = 'user_2' and subject = 'profile.updated'`;
+      expect(claimEvent.payload.profile.claimGeneration).toBeGreaterThan(alias.claimGeneration);
+      expect((await request('user_1')).json()).toEqual(expired);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('schedules a retained alias for exactly 24 hours and records its complete versioned snapshot', async () => {
     const before = (await request('user_1')).json();
     const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();

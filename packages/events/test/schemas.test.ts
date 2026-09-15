@@ -118,6 +118,31 @@ describe("Event Schemas", () => {
       expect(ProfileUpdatedEventSchema.safeParse(event).success).toBe(true);
     });
 
+    it("records uploaded, imported, and removed Profile pictures with delivery metadata", () => {
+      const asset = {
+        id: "pic_new", storageBucket: "profile-pictures", storageKey: "user_123/pic_new.webp",
+        mimeType: "image/webp", width: 128, height: 128, fileSizeBytes: 512,
+      };
+      for (const source of ["upload", "clerk-import", "remove"]) {
+        const picture = source === "remove" ? null : asset;
+        const changed = {
+          ...event,
+          change: { type: "picture-changed", before: "pic_old", after: picture?.id ?? null, source, asset: picture },
+          profile: { ...event.profile, pictureAssetId: picture?.id ?? null },
+        };
+        expect(ProfileUpdatedEventSchema.parse(changed)).toEqual(changed);
+      }
+      const changed = {
+        ...event,
+        change: { type: "picture-changed", before: null, after: asset.id, source: "upload", asset },
+        profile: { ...event.profile, pictureAssetId: asset.id },
+      };
+      for (const invalidAsset of [{ ...asset, mimeType: "image/svg+xml" }, { ...asset, width: 0 }, { ...asset, fileSizeBytes: -1 }]) {
+        expect(ProfileUpdatedEventSchema.safeParse({ ...changed, change: { ...changed.change, asset: invalidAsset } }).success).toBe(false);
+      }
+      expect(ProfileUpdatedEventSchema.safeParse({ ...changed, profile: { ...changed.profile, storageKey: asset.storageKey } }).success).toBe(false);
+    });
+
     it("records released alias reactivation and scheduled expiry cancellation", () => {
       for (const before of [null, timestamp]) {
         const reactivated = {

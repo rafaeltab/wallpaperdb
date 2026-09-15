@@ -11,6 +11,23 @@ export const ProfileUpdatedEventSchema = z
     change: z.discriminatedUnion("type", [
       z
         .object({
+          type: z.literal("picture-changed"),
+          before: z.string().min(1).nullable(),
+          after: z.string().min(1).nullable(),
+          source: z.enum(["upload", "clerk-import", "remove"]),
+          asset: z.object({
+            id: z.string().min(1),
+            storageBucket: z.string().min(1),
+            storageKey: z.string().min(1),
+            mimeType: z.literal("image/webp"),
+            width: z.number().int().positive(),
+            height: z.number().int().positive(),
+            fileSizeBytes: z.number().int().positive(),
+          }).strict().nullable(),
+        })
+        .strict(),
+      z
+        .object({
           type: z.literal("display-name-changed"),
           before: z.string().min(1),
           after: z.string().min(1),

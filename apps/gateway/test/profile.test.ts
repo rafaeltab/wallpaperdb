@@ -74,6 +74,46 @@ async function eventually<T>(read: () => Promise<T>, predicate: (value: T) => bo
 }
 
 describe("Profile projection integration", () => {
+    it("routes a reclaimed Handle to its newer generation while the old alias snapshot still appears active", async () => {
+        const timestamp = "2030-01-01T12:00:00.000Z";
+        const original = {
+            id: "user_reclaimed_original",
+            displayName: "Original Owner",
+            handle: "original-owner",
+            claimGeneration: 4,
+            aliases: [{ handle: "reclaimed-handle", claimGeneration: 1, expiresAt: "2030-01-02T12:00:00.000Z" }],
+            biographyMarkdown: "",
+            pictureAssetId: null,
+            version: 3,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+        };
+        const repository = container.resolve(ProfileRepository);
+        await repository.project(original);
+        const read = () => query(`query {
+            profileByHandle(handle: "reclaimed-handle") { isAlias canonicalHandle profile { id } }
+        }`);
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date(timestamp));
+        try {
+            expect((await read()).data.profileByHandle).toEqual({
+                isAlias: true, canonicalHandle: original.handle, profile: { id: original.id },
+            });
+            // Immediate release and reclamation reached the new owner projection first.
+            await repository.project({
+                ...original, id: "user_reclaimed_new", displayName: "New Owner",
+                handle: "reclaimed-handle", claimGeneration: 5, aliases: [], version: 1,
+            });
+            const result = await read();
+            expect(result.errors).toBeUndefined();
+            expect(result.data.profileByHandle).toEqual({
+                isAlias: false, canonicalHandle: "reclaimed-handle", profile: { id: "user_reclaimed_new" },
+            });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it.each(["scheduled", "immediate"])("projects %s alias expiry without letting stale events restore routing", async (reason) => {
         const timestamp = "2030-01-01T12:00:00.000Z";
         const expiresAt = "2030-01-02T12:00:00.000Z";

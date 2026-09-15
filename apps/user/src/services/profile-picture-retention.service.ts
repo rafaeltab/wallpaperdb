@@ -1,11 +1,13 @@
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, lte, sql } from 'drizzle-orm';
 import { inject, singleton } from 'tsyringe';
 import { DatabaseConnection } from '../connections/database.js';
-import { profilePictureAssets, profiles } from '../db/schema.js';
+import { type ProfilePictureAsset, profilePictureAssets, profiles } from '../db/schema.js';
 import { ProfilePictureStorage } from './profile-picture-storage.js';
 
 @singleton()
 export class ProfilePictureRetentionService {
+  private cursor: Pick<ProfilePictureAsset, 'expiresAt' | 'id'> | undefined;
+
   constructor(
     @inject(DatabaseConnection) private readonly database: DatabaseConnection,
     @inject(ProfilePictureStorage) private readonly storage: ProfilePictureStorage
@@ -19,12 +21,23 @@ export class ProfilePictureRetentionService {
     const candidates = await db
       .select()
       .from(profilePictureAssets)
-      .where(and(eq(profilePictureAssets.state, 'retired'), lte(profilePictureAssets.expiresAt, now)))
+      .where(
+        and(
+          eq(profilePictureAssets.state, 'retired'),
+          lte(profilePictureAssets.expiresAt, now),
+          this.cursor?.expiresAt
+            ? sql`(${profilePictureAssets.expiresAt}, ${profilePictureAssets.id}) > (${this.cursor.expiresAt.toISOString()}, ${this.cursor.id})`
+            : undefined
+        )
+      )
       .orderBy(profilePictureAssets.expiresAt, profilePictureAssets.id)
       .limit(100);
     const result = { deleted: 0, failed: 0 };
     for (const candidate of candidates) {
       if (isStopping()) break;
+      // Advance even after failure or a lock skip, so old poison records cannot
+      // starve later expired pictures. Wrap after reaching the end of the scan.
+      this.cursor = candidate;
       try {
         const deleted = await db.transaction(async (tx) => {
           // Adoption also locks the Profile before touching picture assets.
@@ -53,6 +66,7 @@ export class ProfilePictureRetentionService {
         result.failed++;
       }
     }
+    if (candidates.length < 100 && !isStopping()) this.cursor = undefined;
     return result;
   }
 }

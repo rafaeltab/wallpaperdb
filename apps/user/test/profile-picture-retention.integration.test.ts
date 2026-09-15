@@ -132,4 +132,28 @@ describe('Private Profile picture retention', () => {
     expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
     expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
   });
+
+  it('bounds each scan and advances beyond a full failed batch before retrying older objects', async () => {
+    const owner = await profiles.ensure('user_picture');
+    const first = await ingestion.upload(owner.id, picture, owner.version);
+    await profiles.adoptPicture(owner.id, null, first.version);
+    const [asset] = await sql`select * from profile_picture_assets where id = ${first.pictureAssetId!}`;
+    await sql`
+      insert into profile_picture_assets
+        (id, profile_id, storage_bucket, storage_key, mime_type, width, height, file_size_bytes, state, expires_at)
+      select 'a_failed_' || lpad(i::text, 3, '0'), ${owner.id}, ${asset.storage_bucket},
+        'failed-' || i, 'image/webp', 2, 2, 1, 'retired', ${asset.expires_at}
+      from generate_series(1, 100) i
+    `;
+    const unavailable = vi.spyOn(S3Client.prototype, 'send').mockRejectedValue(new Error('S3 unavailable'));
+    try {
+      expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 100 });
+      expect(unavailable).toHaveBeenCalledTimes(100);
+    } finally { unavailable.mockRestore(); }
+    expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 1, failed: 0 });
+    await expect(object(asset.id)).rejects.toMatchObject({ name: 'NoSuchKey' });
+    expect(await sql`select id from profile_picture_assets`).toHaveLength(100);
+    expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 100, failed: 0 });
+    expect(await sql`select id from profile_picture_assets`).toHaveLength(0);
+  });
 });

@@ -81,6 +81,9 @@ describe('UploadQueueToastManager', () => {
     const stack = within(notifications).getByRole('list');
     expect(stack).toHaveAttribute('data-y-position', 'bottom');
     expect(stack).toHaveAttribute('data-x-position', 'right');
+    for (const notification of within(stack).getAllByRole('listitem')) {
+      expect(notification).toHaveAttribute('data-expanded', 'true');
+    }
   });
 
   it('keeps a new upload when the previous completion toast is dismissed', async () => {

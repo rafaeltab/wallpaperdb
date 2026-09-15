@@ -20,6 +20,27 @@ function createQueuedFile(
 }
 
 describe('UploadQueueToast', () => {
+  it('reports expansion so the notification stack can measure its new size', () => {
+    const onExpandedChange = vi.fn();
+    render(
+      <UploadQueueToast
+        files={[createQueuedFile('1', 'uploading')]}
+        counts={{ total: 1, pending: 0, uploading: 1, success: 0, failed: 0, duplicate: 0 }}
+        progress={0}
+        isPaused={false}
+        pausedUntil={null}
+        isExpanded={false}
+        onExpandedChange={onExpandedChange}
+        onRetryFailed={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onNavigateToUpload={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show upload details' }));
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+  });
+
   it('shows uploading header when files are uploading', () => {
     const files: QueuedFile[] = [
       createQueuedFile('1', 'uploading'),

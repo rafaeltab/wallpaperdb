@@ -22,6 +22,7 @@ export function UploadQueueToastManager() {
   const toastGeneration = useRef(0);
   const toastId = useRef<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const hasFiles = state.files.length > 0;
@@ -31,6 +32,7 @@ export function UploadQueueToastManager() {
 
   const handleDismiss = useCallback(() => {
     setIsVisible(false);
+    setIsExpanded(false);
     // Sonner owns the exit animation. Clear now so a later upload cannot be cancelled.
     clearCompleted();
     if (!state.files.some((f) => f.status !== 'success' && f.status !== 'duplicate')) {
@@ -91,6 +93,8 @@ export function UploadQueueToastManager() {
           isPaused={state.isPaused}
           isStopped={state.isStopped}
           pausedUntil={state.pausedUntil}
+          isExpanded={isExpanded}
+          onExpandedChange={setIsExpanded}
           onStopQueue={stopQueue}
           onResumeQueue={resumeQueue}
           onRetryFailed={retryFailed}
@@ -107,6 +111,7 @@ export function UploadQueueToastManager() {
     );
   }, [
     isVisible,
+    isExpanded,
     hasFiles,
     toastPrefix,
     state.files,

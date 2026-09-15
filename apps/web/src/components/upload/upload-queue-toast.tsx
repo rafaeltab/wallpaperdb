@@ -31,6 +31,8 @@ export interface UploadQueueToastProps {
   isPaused: boolean;
   isStopped?: boolean;
   pausedUntil: number | null;
+  isExpanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
   onStopQueue?: () => void;
   onResumeQueue?: () => void;
   onRetryFailed: () => void;
@@ -62,13 +64,17 @@ export function UploadQueueToast({
   isPaused,
   isStopped = false,
   pausedUntil,
+  isExpanded: controlledExpanded,
+  onExpandedChange,
   onStopQueue,
   onResumeQueue,
   onRetryFailed,
   onClearCompleted,
   onNavigateToUpload,
 }: UploadQueueToastProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [localExpanded, setLocalExpanded] = useState(false);
+  const isExpanded = controlledExpanded ?? localExpanded;
+  const setIsExpanded = onExpandedChange ?? setLocalExpanded;
   const timeRemaining = useCountdown(pausedUntil);
 
   const isUploading = counts.uploading > 0 || counts.pending > 0;
@@ -127,6 +133,8 @@ export function UploadQueueToast({
         <button
           type="button"
           data-testid="expand-button"
+          aria-label={isExpanded ? 'Hide upload details' : 'Show upload details'}
+          aria-expanded={isExpanded}
           onClick={(e) => {
             e.stopPropagation();
             setIsExpanded(!isExpanded);

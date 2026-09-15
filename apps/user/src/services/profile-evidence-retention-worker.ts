@@ -40,10 +40,19 @@ export class ProfileEvidenceRetentionWorker {
 
   private async cleanupBatch(): Promise<void> {
     const now = new Date();
-    const events = await this.cleanupEvents(now, () => this.stopping);
-    const pictures = await this.cleanupPictures(now, () => this.stopping);
+    const events = await this.runCleanup(this.cleanupEvents, 'profile-event-retention', now);
+    const pictures = await this.runCleanup(this.cleanupPictures, 'profile-picture-retention', now);
     if (events.deleted || pictures.deleted || events.failed || pictures.failed) {
       this.logger.info({ eventsDeleted: events.deleted, picturesDeleted: pictures.deleted, failed: events.failed + pictures.failed }, 'Profile evidence cleanup completed');
+    }
+  }
+
+  private async runCleanup(cleanup: CleanupBatch, category: string, now: Date): Promise<{ deleted: number; failed: number }> {
+    try {
+      return await cleanup(now, () => this.stopping);
+    } catch {
+      this.logger.error({ category }, 'Profile evidence cleanup scan failed; will retry');
+      return { deleted: 0, failed: 1 };
     }
   }
 }

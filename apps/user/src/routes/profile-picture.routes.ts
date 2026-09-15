@@ -6,12 +6,18 @@ import multipart from '@fastify/multipart';
 import { type IAuthService, IAuthServiceToken } from '@wallpaperdb/auth';
 import type { FastifyInstance } from 'fastify';
 import { container } from 'tsyringe';
-import { ProfileService } from '../services/profile.service.js';
+import { ProfileService, ProfileVersionConflictError } from '../services/profile.service.js';
 import type { Config } from '../config.js';
 import { ProfilePictureIngestionService } from '../services/profile-picture-ingestion.service.js';
 
 export default async function profilePictureRoutes(fastify: FastifyInstance): Promise<void> {
   const config = container.resolve<Config>('config');
+  fastify.setErrorHandler((error, request, reply) => {
+    if (error instanceof ProfileVersionConflictError) return reply.code(409).type('application/problem+json').send({
+      type: 'https://wallpaperdb.example/problems/profile-version-conflict', title: 'Profile version conflict', status: 409, detail: error.message, instance: request.url,
+    });
+    return reply.send(error);
+  });
   await fastify.register(multipart, { limits: { fileSize: config.profilePictureMaxBytes, files: 1, fields: 1, parts: 2, fieldSize: 32 } });
   fastify.get<{ Params: { pictureId: string } }>('/internal/profile-pictures/:pictureId/availability', { config: { skipAuth: true } }, async (request, reply) => {
     reply.header('Cache-Control', 'no-store');

@@ -78,6 +78,19 @@ describe('Profile picture commands', () => {
     return app.inject({ method: 'PUT', url: '/profile/me/picture', headers: { ...auth(userId), 'content-type': `multipart/form-data; boundary=${boundary}` }, payload });
   }
 
+  it('rejects stale picture commands with version conflicts without changing public state', async () => {
+    const original = (await ensure()).json();
+    const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
+    const uploaded = (await upload(image, original.version)).json();
+    const staleUpload = await upload(image, original.version);
+    expect(staleUpload.statusCode).toBe(409);
+    expect(staleUpload.json().type).toContain('profile-version-conflict');
+    const staleDelete = await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: original.version } });
+    expect(staleDelete.statusCode).toBe(409);
+    expect((await ensure()).json()).toEqual(uploaded);
+    expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(1);
+  });
+
   it('removes the picture with an authoritative null snapshot and preserves its private bytes', async () => {
     const original = (await ensure()).json();
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();

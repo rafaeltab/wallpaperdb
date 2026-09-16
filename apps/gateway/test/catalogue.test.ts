@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { setup, wallpaper } from './helpers/catalogue.js';
 describe('Catalogue capability', () => {
   it('returns an empty default page', async () => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     expect(await Effect.runPromise(catalogue.search({}))).toEqual({
       _tag: 'Found',
       value: {
@@ -19,7 +19,7 @@ describe('Catalogue capability', () => {
     expect(read.selections).toEqual([{ size: 11, sortOrder: 'asc' }]);
   });
   it('selects an extra result and signs only displayed forward page boundaries', async () => {
-    const { read, catalogue, cursors } = setup();
+    const { read, catalogue, cursors } = await setup();
     read.response = {
       _tag: 'Found',
       value: {
@@ -48,14 +48,14 @@ describe('Catalogue capability', () => {
     expect(cursors.values.size).toBe(2);
   });
   it('resumes a forward page at the signed position', async () => {
-    const { read, catalogue, cursors } = setup();
+    const { read, catalogue, cursors } = await setup();
     const after = await Effect.runPromise(cursors.encode(['a']));
     const result = await Effect.runPromise(catalogue.search({ first: 2, after }));
     expect(read.selections[0]).toMatchObject({ searchAfter: ['a'], sortOrder: 'asc' });
     expect(result).toMatchObject({ value: { pageInfo: { hasPreviousPage: true } } });
   });
   it('reverses backward results and preserves cursors and page flags', async () => {
-    const { read, catalogue, cursors } = setup();
+    const { read, catalogue, cursors } = await setup();
     const before = await Effect.runPromise(cursors.encode(['d']));
     read.response = {
       _tag: 'Found',
@@ -79,38 +79,45 @@ describe('Catalogue capability', () => {
     expect(read.selections[0]).toMatchObject({ searchAfter: ['d'], sortOrder: 'desc', size: 3 });
   });
   it('preserves the legacy last-without-before behavior', async () => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     await Effect.runPromise(catalogue.search({ last: 2 }));
     expect(read.selections[0]).toMatchObject({ size: 3, sortOrder: 'asc' });
   });
   it('does not claim a following page when a backward search is empty', async () => {
-    const { catalogue, cursors } = setup();
+    const { catalogue, cursors } = await setup();
     const before = await Effect.runPromise(cursors.encode(['a']));
     expect(await Effect.runPromise(catalogue.search({ last: 2, before }))).toMatchObject({
       value: { pageInfo: { hasNextPage: false, hasPreviousPage: false } },
     });
   });
   it('rejects invalid cursors before reading the catalogue', async () => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     expect(await Effect.runPromise(catalogue.search({ after: 'tampered' }))).toEqual({
       _tag: 'InvalidCursor',
     });
     expect(read.selections).toEqual([]);
   });
-  it('preserves unavailable outcomes', async () => {
-    const { read, catalogue } = setup();
-    read.response = { _tag: 'Unavailable' };
+  it('propagates typed catalogue unavailability', async () => {
+    const { read, catalogue } = await setup();
     read.unavailable = true;
-    expect(await Effect.runPromise(catalogue.search({}))).toEqual({ _tag: 'Unavailable' });
-    expect(await Effect.runPromise(catalogue.wallpaper('wlpr_a'))).toEqual({ _tag: 'Unavailable' });
-    expect(await Effect.runPromise(catalogue.profile('p'))).toEqual({ _tag: 'Unavailable' });
-    expect(await Effect.runPromise(catalogue.profileByHandle('h'))).toEqual({
-      _tag: 'Unavailable',
+    expect(await Effect.runPromise(Effect.flip(catalogue.search({})))).toMatchObject({
+      _tag: 'CatalogueUnavailable',
     });
-    expect(await Effect.runPromise(catalogue.profiles(['p']))).toEqual({ _tag: 'Unavailable' });
+    expect(await Effect.runPromise(Effect.flip(catalogue.wallpaper('wlpr_a')))).toMatchObject({
+      _tag: 'CatalogueUnavailable',
+    });
+    expect(await Effect.runPromise(Effect.flip(catalogue.profile('p')))).toMatchObject({
+      _tag: 'CatalogueUnavailable',
+    });
+    expect(await Effect.runPromise(Effect.flip(catalogue.profileByHandle('h')))).toMatchObject({
+      _tag: 'CatalogueUnavailable',
+    });
+    expect(await Effect.runPromise(Effect.flip(catalogue.profiles(['p'])))).toMatchObject({
+      _tag: 'CatalogueUnavailable',
+    });
   });
   it('reads wallpapers and missing public records', async () => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     read.wallpapers.set('wlpr_a', wallpaper('wlpr_a'));
     expect(await Effect.runPromise(catalogue.wallpaper('wlpr_a'))).toEqual({
       _tag: 'Found',
@@ -137,14 +144,14 @@ describe('Catalogue capability', () => {
     Number.NaN,
     Number.POSITIVE_INFINITY,
   ])('rejects invalid page size %s without reading', async (first) => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     expect(await Effect.runPromise(catalogue.search({ first }))).toMatchObject({
       _tag: 'InvalidSearch',
     });
     expect(read.selections).toEqual([]);
   });
   it('resolves case-insensitive Handles and preserves Profile batch order and duplicate slots', async () => {
-    const { read, catalogue } = setup();
+    const { read, catalogue } = await setup();
     const profile = {
       id: 'p',
       handle: 'artist',
@@ -172,7 +179,7 @@ describe('Catalogue capability', () => {
     expect(await Effect.runPromise(catalogue.profiles([]))).toEqual({ _tag: 'Found', value: [] });
   });
   it('returns a backward boundary page without claiming earlier results', async () => {
-    const { catalogue, read, cursors } = setup();
+    const { catalogue, read, cursors } = await setup();
     const before = await Effect.runPromise(cursors.encode(['b']));
     read.response = {
       _tag: 'Found',

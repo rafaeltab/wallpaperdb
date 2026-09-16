@@ -1,12 +1,24 @@
-import { Effect, Fiber, TestClock, TestContext } from 'effect';
+import { Effect, Fiber, Layer } from 'effect';
+import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
-import { createAvailability } from '../../src/availability/index.js';
+import {
+  Availability,
+  AvailabilityProbe,
+  availabilityLayer,
+} from '../../src/availability/index.js';
 
 describe('gateway availability', () => {
   it('reports unhealthy when every dependency is unavailable', async () => {
-    const availability = createAvailability({
+    const probe = {
       inspect: () => Effect.succeed({ opensearch: false, nats: false, otel: false }),
-    });
+    };
+    const availability = await Effect.runPromise(
+      Effect.service(Availability).pipe(
+        Effect.provide(
+          availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, probe)))
+        )
+      )
+    );
     expect(await Effect.runPromise(availability.health(false))).toMatchObject({
       status: 'unhealthy',
       checks: { opensearch: false, nats: false, otel: false },
@@ -14,11 +26,18 @@ describe('gateway availability', () => {
   });
 
   it('returns shutdown immediately without probing dependencies or reporting a duration', async () => {
-    const availability = createAvailability({
+    const probe = {
       inspect: () => Effect.die('Shutdown must not probe infrastructure'),
-    });
+    };
+    const availability = await Effect.runPromise(
+      Effect.service(Availability).pipe(
+        Effect.provide(
+          availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, probe)))
+        )
+      )
+    );
     const result = await Effect.runPromise(
-      availability.health(true).pipe(Effect.provide(TestContext.TestContext))
+      availability.health(true).pipe(Effect.provide(TestClock.layer()))
     );
     expect(result).toEqual({
       status: 'shutting_down',
@@ -30,13 +49,18 @@ describe('gateway availability', () => {
   it('measures probe duration using the application clock', async () => {
     await Effect.runPromise(
       Effect.gen(function* () {
-        const availability = createAvailability({
+        const probe = {
           inspect: () =>
             Effect.sleep('250 millis').pipe(
               Effect.as({ opensearch: true, nats: true, otel: true })
             ),
-        });
-        const pending = yield* Effect.fork(availability.health(false));
+        };
+        const availability = yield* Effect.service(Availability).pipe(
+          Effect.provide(
+            availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, probe)))
+          )
+        );
+        const pending = yield* Effect.forkChild(availability.health(false));
         yield* TestClock.adjust('250 millis');
         const result = yield* Fiber.join(pending);
         expect(result).toEqual({
@@ -45,14 +69,21 @@ describe('gateway availability', () => {
           timestamp: '1970-01-01T00:00:00.250Z',
           totalDurationMs: 250,
         });
-      }).pipe(Effect.provide(TestContext.TestContext))
+      }).pipe(Effect.provide(TestClock.layer()))
     );
   });
 
   it('reports dependency health and readiness independently', async () => {
-    const availability = createAvailability({
+    const probe = {
       inspect: () => Effect.succeed({ opensearch: true, nats: true, otel: true }),
-    });
+    };
+    const availability = await Effect.runPromise(
+      Effect.service(Availability).pipe(
+        Effect.provide(
+          availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, probe)))
+        )
+      )
+    );
     expect(await Effect.runPromise(availability.health(false))).toMatchObject({
       status: 'healthy',
     });
@@ -67,9 +98,16 @@ describe('gateway availability', () => {
     });
   });
   it('reports unhealthy dependencies and shutdown without mutable shared probe state', async () => {
-    const availability = createAvailability({
+    const probe = {
       inspect: () => Effect.succeed({ opensearch: false, nats: true, otel: false }),
-    });
+    };
+    const availability = await Effect.runPromise(
+      Effect.service(Availability).pipe(
+        Effect.provide(
+          availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, probe)))
+        )
+      )
+    );
     const results = await Effect.runPromise(
       Effect.all([availability.health(true), availability.health(false)], {
         concurrency: 'unbounded',

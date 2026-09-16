@@ -1,3 +1,4 @@
+import { Schema } from 'effect';
 interface ColorPreference {
   color: string;
   amount: number;
@@ -157,16 +158,17 @@ function findNearestBin(color: OkLabColor): number {
   return minIdx;
 }
 
+const validColor = Schema.is(Schema.String.check(Schema.isPattern(/^#[0-9a-fA-F]{6}$/)));
+const validAmount = Schema.is(Schema.Finite.check(Schema.isGreaterThan(0)));
+const validSpread = Schema.is(Schema.Finite.check(Schema.isBetween({ minimum: 0, maximum: 1 })));
+const nonEmptyColors = Schema.is(Schema.Array(Schema.Unknown).check(Schema.isMinLength(1)));
+
 export function validateColors(colors: ColorPreference[]): string | undefined {
-  if (colors.length === 0) return 'Colors array must not be empty';
+  if (!nonEmptyColors(colors)) return 'Colors array must not be empty';
   for (const preference of colors) {
-    if (!/^#[0-9a-fA-F]{6}$/.test(preference.color)) return 'Invalid hex color: expected #RRGGBB';
-    if (!Number.isFinite(preference.amount) || preference.amount <= 0)
-      return 'Amount must be positive and finite';
-    if (
-      preference.spread !== undefined &&
-      (!Number.isFinite(preference.spread) || preference.spread < 0 || preference.spread > 1)
-    )
+    if (!validColor(preference.color)) return 'Invalid hex color: expected #RRGGBB';
+    if (!validAmount(preference.amount)) return 'Amount must be positive and finite';
+    if (preference.spread !== undefined && !validSpread(preference.spread))
       return 'Spread must be in [0, 1]';
   }
   return undefined;

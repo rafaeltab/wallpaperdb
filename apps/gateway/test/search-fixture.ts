@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from '@opensearch-project/opensearch';
 import { inject } from 'vitest';
+import { Layer, ManagedRuntime } from 'effect';
+import {
+  OpenSearchGateway,
+  openSearchLayer,
+  type OpenSearchGatewayOptions,
+} from '../src/adapters/opensearch/index.js';
+import { ProjectCatalogue, projectionLayer } from '../src/projection/index.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {
@@ -34,4 +41,18 @@ export function createSearchFixture() {
       }
     },
   };
+}
+
+export async function acquireSearchFixture(options: OpenSearchGatewayOptions) {
+  const runtime = ManagedRuntime.make(
+    projectionLayer.pipe(Layer.provideMerge(openSearchLayer(options)))
+  );
+  try {
+    const adapter = await runtime.runPromise(OpenSearchGateway);
+    const project = await runtime.runPromise(ProjectCatalogue);
+    return { adapter, project, dispose: () => runtime.dispose() };
+  } catch (error) {
+    await runtime.dispose();
+    throw error;
+  }
 }

@@ -144,7 +144,7 @@ test('architecture rejects container injection even in adapters', (t) => {
   project.source('adapters/search/index.ts', "import { container } from 'tsyringe';\nexport const resolve = container.resolve;\n");
   const result = project.run('gateway-architecture.mjs');
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /gateway uses constructor injection; remove tsyringe/);
+  assert.match(result.stderr, /gateway uses Effect service layers; remove tsyringe/);
 });
 
 for (const [name, directory, specifier] of [

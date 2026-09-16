@@ -12,8 +12,8 @@ The public discovery layer for WallpaperDB. It lets visitors browse wallpapers a
 
 ## Technology
 
-- **Effect** composes application execution, typed outcomes, clocks, tracing and resource lifetimes.
+- **Effect 4** provides typed services and layers, execution, technical errors, clocks, tracing, and scoped connection and task lifetimes.
 - **Mercurius** provides GraphQL over Fastify.
 - **OpenSearch** serves the catalogue and nested rendition search.
-- **Redis** coordinates request quotas, with an instance-local fallback during outages.
+- **Redis** coordinates request quotas. Outages allow requests, report lost enforcement, and reconnect automatically.
 - **NATS JetStream** retains incoming facts and quarantined deliveries.

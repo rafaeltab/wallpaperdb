@@ -1,10 +1,11 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { deliverProjection } from '../src/adapters/events/index.js';
-import type {
+import {
   ProjectCatalogue,
-  ProjectionChange,
-  ProjectionOutcome,
+  ProjectionUnavailable,
+  type ProjectionChange,
+  type ProjectionOutcome,
 } from '../src/projection/index.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
@@ -73,20 +74,25 @@ const updated = {
 
 class ControlledProjection implements ProjectCatalogue {
   readonly changes: ProjectionChange[] = [];
-  constructor(private readonly outcome: ProjectionOutcome = { _tag: 'Completed' }) {}
-  record(change: ProjectionChange): Effect.Effect<ProjectionOutcome> {
-    return Effect.sync(() => {
+  constructor(
+    private readonly outcome: ProjectionOutcome | ProjectionUnavailable = { _tag: 'Completed' }
+  ) {}
+  record(change: ProjectionChange): Effect.Effect<ProjectionOutcome, ProjectionUnavailable> {
+    return Effect.suspend(() => {
       this.changes.push(change);
-      return this.outcome;
+      return this.outcome instanceof ProjectionUnavailable
+        ? Effect.fail(this.outcome)
+        : Effect.succeed(this.outcome);
     });
   }
 }
 function deliver(subject: string, data: unknown, project: ProjectCatalogue, attempt = 1) {
   return Effect.runPromise(
-    deliverProjection(
-      { subject, payload: new TextEncoder().encode(JSON.stringify(data)), attempt },
-      project
-    )
+    deliverProjection({
+      subject,
+      payload: new TextEncoder().encode(JSON.stringify(data)),
+      attempt,
+    }).pipe(Effect.provideService(ProjectCatalogue, project))
   );
 }
 
@@ -215,10 +221,11 @@ describe('Projection event driving adapter contract', () => {
     const project = new ControlledProjection();
     expect(
       await Effect.runPromise(
-        deliverProjection(
-          { subject: upload.eventType, payload: new TextEncoder().encode('{'), attempt: 1 },
-          project
-        )
+        deliverProjection({
+          subject: upload.eventType,
+          payload: new TextEncoder().encode('{'),
+          attempt: 1,
+        }).pipe(Effect.provideService(ProjectCatalogue, project))
       )
     ).toEqual({ _tag: 'Invalid' });
     expect(project.changes).toEqual([]);
@@ -233,7 +240,6 @@ describe('Projection event driving adapter contract', () => {
   it.each<ProjectionOutcome>([
     { _tag: 'Completed' },
     { _tag: 'Ignored' },
-    { _tag: 'Retry' },
     { _tag: 'Rejected', reason: 'invalid-projection' },
   ])('preserves application outcome classification for broker acknowledgement', async (outcome) => {
     expect(await deliver(upload.eventType, upload, new ControlledProjection(outcome))).toEqual(
@@ -241,14 +247,26 @@ describe('Projection event driving adapter contract', () => {
     );
   });
 
+  it('translates a technical projection failure into a broker retry', async () => {
+    const project = new ControlledProjection(
+      new ProjectionUnavailable({ cause: new Error('store unavailable') })
+    );
+    expect(await deliver(upload.eventType, upload, project)).toEqual({ _tag: 'Retry' });
+    expect(project.changes).toHaveLength(1);
+  });
+
   it('exhausts transient processing on the fourth delivery', async () => {
-    const project = new ControlledProjection({ _tag: 'Retry' });
+    const project = new ControlledProjection(
+      new ProjectionUnavailable({ cause: new Error('store unavailable') })
+    );
     expect(await deliver(upload.eventType, upload, project, 4)).toEqual({ _tag: 'Exhausted' });
     expect(project.changes).toHaveLength(1);
   });
 
   it('does not repeat application work when quarantine must be retried after exhaustion', async () => {
-    const project = new ControlledProjection({ _tag: 'Retry' });
+    const project = new ControlledProjection(
+      new ProjectionUnavailable({ cause: new Error('store unavailable') })
+    );
     expect(await deliver(upload.eventType, upload, project, 5)).toEqual({ _tag: 'Exhausted' });
     expect(project.changes).toEqual([]);
   });

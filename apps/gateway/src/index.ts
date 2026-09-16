@@ -1,9 +1,19 @@
+import * as NodeRuntime from '@effect/platform-node-shared/NodeRuntime';
 import { config as loadEnv } from 'dotenv';
-import { loadConfig } from './config.js';
-import { initializeOtel } from './otel-init.js';
+import { Cause, ConfigProvider, Effect, Exit } from 'effect';
+import { gatewayProgram } from './bootstrap.js';
 
 loadEnv();
-const config = loadConfig();
-const sdk = initializeOtel(config);
-const { startGateway } = await import('./server.js');
-await startGateway(config, sdk);
+NodeRuntime.runMain(
+  gatewayProgram.pipe(
+    Effect.provideService(
+      ConfigProvider.ConfigProvider,
+      ConfigProvider.fromEnv({ preserveEmptyStrings: true })
+    )
+  ),
+  {
+    disableErrorReporting: true,
+    teardown: (exit, onExit) =>
+      onExit(Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause) ? 0 : 1),
+  }
+);

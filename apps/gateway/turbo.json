@@ -1,0 +1,33 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "check-types": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vitest.config.ts",
+        "esbuild.config.ts",
+        "package.json",
+        "tsconfig.json"
+      ]
+    },
+    "lint": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/gateway-architecture.mjs",
+        "$TURBO_ROOT$/scripts/gateway-checks.test.mjs"
+      ]
+    },
+    "test:integration": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vitest.config.ts",
+        "package.json",
+        "coverage-baseline.json",
+        "quality.config.json",
+        "$TURBO_ROOT$/scripts/gateway-quality.mjs"
+      ]
+    }
+  }
+}

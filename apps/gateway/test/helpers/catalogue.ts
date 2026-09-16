@@ -1,14 +1,17 @@
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import {
-  type CatalogueRead,
-  type CatalogueCursors,
+  Catalogue,
+  CatalogueRead,
+  CatalogueUnavailable,
+  CatalogueCursors,
   type CursorValue,
   type Profile,
   type ReadOutcome,
   type SearchBatch,
   type SearchSelection,
   type Wallpaper,
-  createCatalogue,
+  catalogueLayer,
+  type CatalogueConfig,
 } from '../../src/catalogue/index.js';
 const timestamp = '2026-01-01T00:00:00.000Z';
 export function wallpaper(id: string): Wallpaper {
@@ -28,7 +31,9 @@ export class ReadAdapter implements CatalogueRead {
   unavailable = false;
   search(selection: SearchSelection) {
     this.selections.push(selection);
-    return Effect.succeed(this.response);
+    return this.unavailable
+      ? Effect.fail(new CatalogueUnavailable({ cause: 'controlled outage' }))
+      : Effect.succeed(this.response);
   }
   wallpaper(id: string) {
     return this.read(this.wallpapers.get(id) ?? null);
@@ -44,8 +49,10 @@ export class ReadAdapter implements CatalogueRead {
   profiles(ids: string[]) {
     return this.read(ids.map((id) => this.profileSnapshots.get(id) ?? null));
   }
-  private read<T>(value: T): Effect.Effect<ReadOutcome<T>> {
-    return Effect.succeed(this.unavailable ? { _tag: 'Unavailable' } : { _tag: 'Found', value });
+  private read<T>(value: T): Effect.Effect<ReadOutcome<T>, CatalogueUnavailable> {
+    return this.unavailable
+      ? Effect.fail(new CatalogueUnavailable({ cause: 'controlled outage' }))
+      : Effect.succeed({ _tag: 'Found', value });
   }
 }
 export class Cursors implements CatalogueCursors {
@@ -62,12 +69,17 @@ export class Cursors implements CatalogueCursors {
     );
   }
 }
-export function setup() {
+export async function setup(config: CatalogueConfig = { colorSpreadStrategy: 'linear' }) {
   const read = new ReadAdapter();
   const cursors = new Cursors();
+  const layer = catalogueLayer(config).pipe(
+    Layer.provide(
+      Layer.mergeAll(Layer.succeed(CatalogueRead, read), Layer.succeed(CatalogueCursors, cursors))
+    )
+  );
   return {
     read,
     cursors,
-    catalogue: createCatalogue(read, cursors, { colorSpreadStrategy: 'linear' }),
+    catalogue: await Effect.runPromise(Effect.service(Catalogue).pipe(Effect.provide(layer))),
   };
 }

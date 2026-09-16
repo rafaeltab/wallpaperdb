@@ -1,5 +1,7 @@
 # Effect execution with explicit application ports
 
+Superseded for dependency construction, execution, lifecycle, and quota outages by [ADR 0002](0002-effect-services-and-owned-lifetimes.md). Projection compatibility and historical replay constraints below remain applicable.
+
 The gateway adopts Effect 3 for composable execution, typed outcomes, tracing, controlled clocks, and scoped resource release while retaining Fastify, Mercurius, OpenSearch, Redis, and NATS as adapters. Application ports remain constructor-injected TypeScript interfaces with colocated namespaced `Symbol.for` tokens; factories hide their implementing classes, and expected failures are discriminated outcomes carried by Effects. This keeps the coding standards intact and permits evaluating Effect without rewriting the gateway's public protocols or introducing a second dependency container.
 
 The gateway is one application hexagon in the Gateway Catalogue context. Catalogue reads, projection updates, request admission, and availability use language-only DDD; no entity/aggregate machinery is needed. Composition alone selects adapters and resource lifetimes. The OpenTelemetry bridge is pinned to the release compatible with the repository's OpenTelemetry 1.x SDK.

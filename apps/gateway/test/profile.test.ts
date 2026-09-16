@@ -1,13 +1,10 @@
 import { Client } from '@opensearch-project/opensearch';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  createOpenSearchGateway,
-  type OpenSearchGateway,
-} from '../src/adapters/opensearch/index.js';
+import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
 import type { Profile, ReadOutcome } from '../src/catalogue/index.js';
-import { createProjection, type ProjectCatalogue } from '../src/projection/index.js';
-import { createSearchFixture } from './search-fixture.js';
+import type { ProjectCatalogue } from '../src/projection/index.js';
+import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 function profile(id: string, overrides: Partial<Profile> = {}): Profile {
@@ -35,15 +32,16 @@ describe('OpenSearch profile projection port contract', () => {
   let adapter: OpenSearchGateway;
   let project: ProjectCatalogue;
   let client: Client;
+  let fixture: Awaited<ReturnType<typeof acquireSearchFixture>>;
   beforeAll(async () => {
-    adapter = createOpenSearchGateway(searchFixture.options);
-    await adapter.start();
-    project = createProjection(adapter.projectionStore);
+    fixture = await acquireSearchFixture(searchFixture.options);
+    adapter = fixture.adapter;
+    project = fixture.project;
     client = new Client({ node: searchFixture.options.url });
   }, 120_000);
   afterAll(async () => {
     await client?.close();
-    await adapter?.stop();
+    await fixture?.dispose();
     await searchFixture.destroy();
   });
 
@@ -161,14 +159,14 @@ describe('OpenSearch profile projection port contract', () => {
       body: { id: 'malformed-profile', handle: 'malformed-profile', claimGeneration: 1 },
       refresh: true,
     });
-    expect(await Effect.runPromise(adapter.read.profile('malformed-profile'))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(await Effect.runPromise(adapter.read.profileByHandle('malformed-profile'))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(await Effect.runPromise(adapter.read.profiles(['malformed-profile']))).toEqual({
-      _tag: 'Unavailable',
-    });
+    expect(
+      await Effect.runPromise(Effect.flip(adapter.read.profile('malformed-profile')))
+    ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+    expect(
+      await Effect.runPromise(Effect.flip(adapter.read.profileByHandle('malformed-profile')))
+    ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+    expect(
+      await Effect.runPromise(Effect.flip(adapter.read.profiles(['malformed-profile'])))
+    ).toMatchObject({ _tag: 'CatalogueUnavailable' });
   });
 });

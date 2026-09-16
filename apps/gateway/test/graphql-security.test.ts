@@ -2,26 +2,13 @@ import { Effect } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createAdmission } from '../src/admission/index.js';
-import { createMemoryQuota } from '../src/adapters/redis/index.js';
-import { createAvailability } from '../src/availability/index.js';
-import { createHttpApp, type HttpConfig, type HttpPorts } from '../src/http/index.js';
-import { EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
+import type { HttpConfig } from '../src/http/index.js';
+import type { HttpTestServices } from './unit/http-fixture.js';
+import { createTestHttpApp, EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
 const apps: FastifyInstance[] = [];
-async function build(overrides: Partial<HttpConfig> = {}, ports: Partial<HttpPorts> = {}) {
+async function build(overrides: Partial<HttpConfig> = {}, ports: Partial<HttpTestServices> = {}) {
   const config = { ...httpConfig, ...overrides };
-  const app = await createHttpApp(config, {
-    catalogue: new EmptyCatalogue(),
-    admission: createAdmission(createMemoryQuota(), {
-      enabled: true,
-      limit: config.rateLimitMaxAnonymous,
-      windowMs: 60000,
-    }),
-    availability: createAvailability({
-      inspect: () => Effect.succeed({ opensearch: true, nats: true, otel: true }),
-    }),
-    ...ports,
-  });
+  const app = await createTestHttpApp(config, ports);
   apps.push(app);
   return app;
 }
@@ -84,12 +71,15 @@ describe('GraphQL security driving contract', () => {
       (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).json().errors
     ).toBeUndefined();
   });
-  it('limits all GraphQL URLs and separates user agents', async () => {
+  it.each([
+    '/graphql?operationName=test',
+    '/%67raphql',
+  ])('limits GraphQL URL %s and separates user agents', async (url) => {
     const app = await build({ rateLimitMaxAnonymous: 1 });
     expect((await execute(app)).statusCode).toBe(200);
     const limited = await app.inject({
       method: 'POST',
-      url: '/graphql?operationName=test',
+      url,
       payload: { query },
     });
     expect(limited.statusCode).toBe(429);

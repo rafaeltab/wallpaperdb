@@ -1,18 +1,17 @@
 import { Client } from '@opensearch-project/opensearch';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
-import { Effect } from 'effect';
-import type {
+import { Clock, Context, Effect, Exit, Layer, Schema } from 'effect';
+import {
   CatalogueRead,
-  Profile,
-  ReadOutcome,
-  SearchBatch,
-  SearchSelection,
-  Wallpaper,
+  CatalogueUnavailable,
+  type ReadOutcome,
+  type SearchSelection,
 } from '../../catalogue/index.js';
-import type {
-  ProjectionMutation,
+import {
+  type ProjectionMutation,
   ProjectionStore,
-  ProjectionWrite,
+  ProjectionUnavailable,
+  type ProjectionWrite,
 } from '../../projection/index.js';
 import {
   partialWallpaperResponse,
@@ -20,6 +19,7 @@ import {
   profileResponse,
   profileSearchResponse,
   storageError,
+  toWallpaper,
   updateResponse,
   wallpaperResponse,
   wallpaperSearchResponse,
@@ -35,225 +35,294 @@ export interface OpenSearchGatewayOptions {
   readonly wallpaperIndex?: string;
   readonly profileIndex?: string;
 }
-
 export interface OpenSearchGateway {
   readonly read: CatalogueRead;
   readonly projectionStore: ProjectionStore;
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  check(): Promise<boolean>;
+  check(): Effect.Effect<boolean>;
 }
+export const OpenSearchGateway = Context.Service<OpenSearchGateway>(
+  'wallpaperdb/gateway/adapters/OpenSearchGateway'
+);
+export class OpenSearchStartupError extends Schema.TaggedError<OpenSearchStartupError>()(
+  'OpenSearchStartupError',
+  { cause: Schema.Defect() }
+) {}
+class SearchRequestError extends Schema.TaggedError<SearchRequestError>()('SearchRequestError', {
+  cause: Schema.Defect(),
+}) {}
 
 class SearchProjection implements CatalogueRead, ProjectionStore {
   constructor(
     private readonly client: Client,
+    private readonly active: Set<{ abort(): void }>,
     private readonly wallpapers: string,
     private readonly profilesIndex: string
   ) {}
 
-  wallpaper(id: string): Effect.Effect<ReadOutcome<Wallpaper | null>> {
-    return read('wallpaper', async () => {
-      const result = await this.get(this.wallpapers, id);
-      if (result === null) return null;
-      const partial = partialWallpaperResponse.parse(result);
-      if (partial._source.userId === undefined) return null;
-      return wallpaperResponse.parse(result)._source;
-    });
-  }
-
-  profile(id: string): Effect.Effect<ReadOutcome<Profile | null>> {
-    return read('profile', async () => {
-      const result = await this.get(this.profilesIndex, id);
-      return result === null ? null : profileResponse.parse(result)._source;
-    });
-  }
-
-  profileByHandle(handle: string): Effect.Effect<ReadOutcome<Profile | null>> {
-    return read('profile-by-handle', async () => {
-      const result = await this.client.search({
-        index: this.profilesIndex,
-        body: {
-          query: { term: { handle: handle.toLowerCase() } },
-          sort: [{ claimGeneration: 'desc' }],
-          size: 1,
-        },
-      });
-      return profileSearchResponse.parse(result.body).hits.hits[0]?._source ?? null;
-    });
-  }
-
-  profiles(ids: string[]): Effect.Effect<ReadOutcome<Array<Profile | null>>> {
-    return read('profiles', async () => {
-      if (ids.length === 0) return [];
-      const result = await this.client.mget({ index: this.profilesIndex, body: { ids } });
-      const documents = profileBatchResponse.parse(result.body).docs;
-      if (documents.length !== ids.length) throw new Error('Invalid profile batch response');
-      return documents;
-    });
-  }
-
-  search(selection: SearchSelection): Effect.Effect<ReadOutcome<SearchBatch>> {
-    return read('search', async () => {
-      const result = await this.client.search({
-        index: this.wallpapers,
-        body: searchBody(selection),
-      });
-      const { hits } = wallpaperSearchResponse.parse(result.body);
-      recordTelemetry(() =>
-        recordHistogram('opensearch.search.results', hits.total.value, {
-          'opensearch.index': this.wallpapers,
-        })
-      );
-      return {
-        entries: hits.hits.map((hit) => ({ wallpaper: hit._source, cursor: hit.sort })),
-        total: hits.total.value,
-      };
-    });
-  }
-
-  apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite> {
-    return Effect.tryPromise({
-      try: (): Promise<ProjectionWrite> =>
-        measure(
-          {
-            PublishWallpaper: 'upsert',
-            PublishVariant: 'add_variant',
-            PublishColors: 'add_color_data',
-            PublishProfile: 'profile_project',
-          }[mutation._tag],
-          async () => {
-            const result = await this.client.update({
-              index: mutation._tag === 'PublishProfile' ? this.profilesIndex : this.wallpapers,
-              id: mutation._tag === 'PublishProfile' ? mutation.profile.id : mutation.wallpaperId,
-              body: projectionUpdate(mutation),
-              refresh: true,
-              retry_on_conflict: 5,
-            });
-            return updateResponse.parse(result.body).result === 'noop'
-              ? { _tag: 'Unchanged' }
-              : { _tag: 'Applied' };
-          }
-        ),
-      catch: (error): ProjectionWrite => {
-        const parsed = storageError.safeParse(error);
-        const type = parsed.success ? parsed.data.meta.body?.error?.type : undefined;
-        return type === 'mapper_parsing_exception' || type === 'strict_dynamic_mapping_exception'
-          ? { _tag: 'Rejected' }
-          : { _tag: 'Unavailable' };
+  readonly request = <T>(send: () => Promise<T> & { abort(): void }) =>
+    Effect.tryPromise({
+      try: (signal) => {
+        const request = send();
+        this.active.add(request);
+        const abort = () => {
+          request.abort();
+        };
+        signal.addEventListener('abort', abort, { once: true });
+        if (signal.aborted) abort();
+        return request.finally(() => {
+          signal.removeEventListener('abort', abort);
+          this.active.delete(request);
+        });
       },
-    }).pipe(Effect.catchAll(Effect.succeed), Effect.withSpan('catalogue.storage.project'));
-  }
-
-  private async get(index: string, id: string): Promise<unknown> {
-    try {
-      const result = await this.client.get({ index, id });
-      return result.body;
-    } catch (error) {
-      const parsed = storageError.safeParse(error);
-      if (
-        parsed.success &&
-        parsed.data.meta.statusCode === 404 &&
-        parsed.data.meta.body?.error === undefined
-      )
-        return null;
-      throw error;
-    }
-  }
-}
-
-function read<T>(
-  operation: 'wallpaper' | 'profile' | 'profile-by-handle' | 'profiles' | 'search',
-  request: () => Promise<T>
-): Effect.Effect<ReadOutcome<T>> {
-  const metricOperation = {
-    wallpaper: 'get',
-    profile: 'get',
-    'profile-by-handle': 'search',
-    profiles: 'mget',
-    search: 'search',
-  }[operation];
-  return Effect.tryPromise({
-    try: async (): Promise<ReadOutcome<T>> => ({
-      _tag: 'Found',
-      value: await measure(metricOperation, request),
-    }),
-    catch: (): ReadOutcome<T> => ({ _tag: 'Unavailable' }),
-  }).pipe(Effect.catchAll(Effect.succeed), Effect.withSpan(`catalogue.storage.${operation}`));
-}
-
-async function measure<T>(operation: string, request: () => Promise<T>): Promise<T> {
-  const start = performance.now();
-  let success = false;
-  try {
-    const result = await request();
-    success = true;
-    return result;
-  } finally {
-    const attributes = { 'opensearch.operation': operation, 'operation.success': success };
-    recordTelemetry(() => {
-      recordCounter('opensearch.operation.total', 1, attributes);
-      recordHistogram('opensearch.operation.duration_ms', performance.now() - start, attributes);
+      catch: (cause) => new SearchRequestError({ cause }),
     });
-  }
-}
 
-function recordTelemetry(record: () => void): void {
-  try {
-    record();
-  } catch {
-    /* Observability cannot change a committed projection or a read outcome. */
-  }
-}
-
-export function createOpenSearchGateway(options: OpenSearchGatewayOptions): OpenSearchGateway {
-  const client = new Client({
-    node: options.url,
-    requestTimeout: 10_000,
-    ...(options.username && options.password
-      ? { auth: { username: options.username, password: options.password } }
-      : {}),
+  readonly wallpaper = Effect.fn('catalogue.storage.wallpaper')((id: string) =>
+    read(
+      'get',
+      Effect.gen({ self: this }, function* () {
+        const result = yield* this.get(this.wallpapers, id);
+        if (result === null) return null;
+        const partial = yield* partialWallpaperResponse(result);
+        if (partial._source.userId === undefined) return null;
+        return toWallpaper((yield* wallpaperResponse(result))._source);
+      })
+    )
+  );
+  readonly profile = Effect.fn('catalogue.storage.profile')((id: string) =>
+    read(
+      'get',
+      Effect.gen({ self: this }, function* () {
+        const result = yield* this.get(this.profilesIndex, id);
+        return result === null ? null : (yield* profileResponse(result))._source;
+      })
+    )
+  );
+  readonly profileByHandle = Effect.fn('catalogue.storage.profile-by-handle')((handle: string) =>
+    read(
+      'search',
+      Effect.gen({ self: this }, function* () {
+        const result = yield* this.request(() =>
+          this.client.search({
+            index: this.profilesIndex,
+            body: {
+              query: { term: { handle: handle.toLowerCase() } },
+              sort: [{ claimGeneration: 'desc' }],
+              size: 1,
+            },
+          })
+        );
+        return (yield* profileSearchResponse(result.body)).hits.hits[0]?._source ?? null;
+      })
+    )
+  );
+  readonly profiles = Effect.fn('catalogue.storage.profiles')((ids: string[]) =>
+    read(
+      'mget',
+      Effect.gen({ self: this }, function* () {
+        if (ids.length === 0) return [];
+        const result = yield* this.request(() =>
+          this.client.mget({ index: this.profilesIndex, body: { ids } })
+        );
+        const { docs } = yield* profileBatchResponse(result.body);
+        if (docs.length !== ids.length)
+          return yield* new SearchRequestError({
+            cause: new Error('Invalid profile batch response'),
+          });
+        return docs.map((document) => (document.found ? document._source : null));
+      })
+    )
+  );
+  readonly search = Effect.fn('catalogue.storage.search')((selection: SearchSelection) =>
+    read(
+      'search',
+      Effect.gen({ self: this }, function* () {
+        const result = yield* this.request(() =>
+          this.client.search({ index: this.wallpapers, body: searchBody(selection) })
+        );
+        const { hits } = yield* wallpaperSearchResponse(result.body);
+        yield* recordTelemetry(() =>
+          recordHistogram('opensearch.search.results', hits.total.value, {
+            'opensearch.index': this.wallpapers,
+          })
+        );
+        return {
+          entries: hits.hits.map((hit) => ({
+            wallpaper: toWallpaper(hit._source),
+            cursor: [...hit.sort],
+          })),
+          total: hits.total.value,
+        };
+      })
+    )
+  );
+  readonly apply = Effect.fn('catalogue.storage.project')((mutation: ProjectionMutation) => {
+    const operation = {
+      PublishWallpaper: 'upsert',
+      PublishVariant: 'add_variant',
+      PublishColors: 'add_color_data',
+      PublishProfile: 'profile_project',
+    }[mutation._tag];
+    return measure(
+      operation,
+      Effect.gen({ self: this }, function* (): Effect.fn.Return<
+        ProjectionWrite,
+        SearchRequestError | Schema.SchemaError
+      > {
+        const result = yield* this.request(() =>
+          this.client.update({
+            index: mutation._tag === 'PublishProfile' ? this.profilesIndex : this.wallpapers,
+            id: mutation._tag === 'PublishProfile' ? mutation.profile.id : mutation.wallpaperId,
+            body: projectionUpdate(mutation),
+            refresh: true,
+            retry_on_conflict: 5,
+          })
+        );
+        return (yield* updateResponse(result.body)).result === 'noop'
+          ? { _tag: 'Unchanged' }
+          : { _tag: 'Applied' };
+      })
+    ).pipe(
+      Effect.catch((error) => {
+        const parsed = storageError(error._tag === 'SearchRequestError' ? error.cause : error);
+        const type = parsed._tag === 'Some' ? parsed.value.meta.body?.error?.type : undefined;
+        return type === 'mapper_parsing_exception' || type === 'strict_dynamic_mapping_exception'
+          ? Effect.succeed<ProjectionWrite>({ _tag: 'Rejected' })
+          : Effect.fail(new ProjectionUnavailable({ cause: error }));
+      })
+    );
   });
-  const wallpapers = options.wallpaperIndex ?? 'wallpapers';
-  const profiles = options.profileIndex ?? 'profiles';
-  const adapter = new SearchProjection(client, wallpapers, profiles);
-  return {
-    read: adapter,
-    projectionStore: adapter,
-    async start() {
-      await ensureIndex(client, wallpapers, wallpapersIndexMapping);
-      await ensureIndex(client, profiles, profilesIndexMapping);
-    },
-    async stop() {
-      await client.close();
-    },
-    async check() {
-      try {
-        await client.ping();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-  };
+  private readonly get = Effect.fnUntraced(function* (
+    this: SearchProjection,
+    index: string,
+    id: string
+  ) {
+    return yield* this.request(() => this.client.get({ index, id })).pipe(
+      Effect.map((result): unknown => result.body),
+      Effect.catch((error) => {
+        const parsed = storageError(error.cause);
+        return parsed._tag === 'Some' &&
+          parsed.value.meta.statusCode === 404 &&
+          parsed.value.meta.body?.error === undefined
+          ? Effect.succeed(null)
+          : Effect.fail(error);
+      })
+    );
+  });
 }
-
-async function ensureIndex(
-  client: Client,
-  name: string,
-  mapping: { settings?: Record<string, unknown>; properties: Record<string, unknown> }
-): Promise<void> {
-  const exists = await client.indices.exists({ index: name });
-  if (exists.body) {
-    await client.indices.putMapping({ index: name, body: { properties: mapping.properties } });
-    return;
-  }
-  try {
-    await client.indices.create({
-      index: name,
-      body: { settings: mapping.settings, mappings: { properties: mapping.properties } },
-    });
-  } catch (error) {
-    // Concurrent gateway instances may create the same index during startup.
-    if (!(await client.indices.exists({ index: name })).body) throw error;
-  }
+function read<T, E>(
+  operation: string,
+  request: Effect.Effect<T, E>
+): Effect.Effect<ReadOutcome<T>, CatalogueUnavailable> {
+  return measure(operation, request).pipe(
+    Effect.map((value): ReadOutcome<T> => ({ _tag: 'Found', value })),
+    Effect.mapError((cause) => new CatalogueUnavailable({ cause }))
+  );
 }
+const measure = Effect.fnUntraced(function* <T, E>(
+  operation: string,
+  request: Effect.Effect<T, E>
+) {
+  const start = yield* Clock.currentTimeMillis;
+  return yield* request.pipe(
+    Effect.onExit((exit) =>
+      Clock.currentTimeMillis.pipe(
+        Effect.flatMap((end) =>
+          recordTelemetry(() => {
+            const attributes = {
+              'opensearch.operation': operation,
+              'operation.success': Exit.isSuccess(exit),
+            };
+            recordCounter('opensearch.operation.total', 1, attributes);
+            recordHistogram('opensearch.operation.duration_ms', end - start, attributes);
+          })
+        )
+      )
+    )
+  );
+});
+function recordTelemetry(record: () => void): Effect.Effect<void> {
+  return Effect.try(record).pipe(Effect.ignore);
+}
+export function openSearchLayer(
+  options: OpenSearchGatewayOptions
+): Layer.Layer<OpenSearchGateway | CatalogueRead | ProjectionStore, OpenSearchStartupError> {
+  return Layer.effectContext(
+    Effect.gen(function* () {
+      const active = new Set<{ abort(): void }>();
+      const client = yield* Effect.acquireRelease(
+        Effect.try({
+          try: () =>
+            new Client({
+              node: options.url,
+              requestTimeout: 10_000,
+              maxRetries: 0,
+              ...(options.username && options.password
+                ? { auth: { username: options.username, password: options.password } }
+                : {}),
+            }),
+          catch: (cause) => new OpenSearchStartupError({ cause }),
+        }),
+        (client) =>
+          Effect.gen(function* () {
+            for (const request of active) request.abort();
+            yield* Effect.tryPromise(() => client.close()).pipe(
+              Effect.catch((error) => Effect.logError('OpenSearch shutdown failed', error))
+            );
+          })
+      );
+      const wallpapers = options.wallpaperIndex ?? 'wallpapers';
+      const profiles = options.profileIndex ?? 'profiles';
+      const adapter = new SearchProjection(client, active, wallpapers, profiles);
+      yield* ensureIndex(adapter, client, wallpapers, wallpapersIndexMapping);
+      yield* ensureIndex(adapter, client, profiles, profilesIndexMapping);
+      const gateway: OpenSearchGateway = {
+        read: adapter,
+        projectionStore: adapter,
+        check: Effect.fn('catalogue.storage.check')(() =>
+          adapter
+            .request(() => client.ping())
+            .pipe(
+              Effect.as(true),
+              Effect.catch(() => Effect.succeed(false))
+            )
+        ),
+      };
+      return Context.make(OpenSearchGateway, gateway).pipe(
+        Context.add(CatalogueRead, adapter),
+        Context.add(ProjectionStore, adapter)
+      );
+    })
+  );
+}
+const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(
+  function* (
+    adapter: SearchProjection,
+    client: Client,
+    name: string,
+    mapping: { settings?: Record<string, unknown>; properties: Record<string, unknown> }
+  ) {
+    const exists = yield* adapter.request(() => client.indices.exists({ index: name }));
+    if (exists.body) {
+      yield* adapter.request(() =>
+        client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
+      );
+      return;
+    }
+    yield* adapter
+      .request(() =>
+        client.indices.create({
+          index: name,
+          body: { settings: mapping.settings, mappings: { properties: mapping.properties } },
+        })
+      )
+      .pipe(
+        Effect.catch((error) =>
+          adapter
+            .request(() => client.indices.exists({ index: name }))
+            .pipe(Effect.flatMap((result) => (result.body ? Effect.void : Effect.fail(error))))
+        )
+      );
+  },
+  Effect.mapError((cause) => new OpenSearchStartupError({ cause }))
+);

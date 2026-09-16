@@ -1,36 +1,76 @@
 import {
+  BaseEventSchema,
   ProfileUpdatedEventSchema,
   PublicProfileSnapshotSchema,
   WallpaperColorsExtractedEventSchema,
   WallpaperUploadedEventSchema,
   WallpaperVariantAvailableEventSchema,
+  type ProfileUpdatedEvent,
+  type PublicProfileSnapshot,
+  type WallpaperColorsExtractedEvent,
+  type WallpaperUploadedEvent,
+  type WallpaperVariantAvailableEvent,
 } from '@wallpaperdb/events';
-import { z } from 'zod';
+import { DateTime, Option, Predicate, Schema } from 'effect';
 import type { Occurrence, ProjectionChange } from '../../projection/index.js';
 
-const created = z.object({
-  eventId: z.string().min(1),
-  eventType: z.literal('profile.created'),
-  timestamp: z.string().datetime(),
-  profile: PublicProfileSnapshotSchema.strip(),
-});
-const legacy = z.discriminatedUnion('eventType', [
-  WallpaperUploadedEventSchema,
-  WallpaperVariantAvailableEventSchema,
-  WallpaperColorsExtractedEventSchema,
-  created,
-  ProfileUpdatedEventSchema,
-]);
-const cloud = z.object({
-  specversion: z.literal('1.0'),
-  id: z.string().min(1),
-  source: z.string().min(1),
-  type: z.string().min(1),
-  time: z.string().datetime(),
-  data: z.record(z.unknown()),
-  correlationid: z.string().optional(),
-  causationid: z.string().optional(),
-});
+const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+const decodeCreated = Schema.decodeUnknownOption(
+  Schema.Struct({
+    eventType: Schema.Literal('profile.created'),
+    profile: Schema.Unknown,
+  })
+);
+const decodeCloud = Schema.decodeUnknownOption(
+  Schema.Struct({
+    specversion: Schema.Literal('1.0'),
+    id: Schema.NonEmptyString,
+    source: Schema.NonEmptyString,
+    type: Schema.NonEmptyString,
+    time: Schema.String,
+    data: Schema.Record(Schema.String, Schema.Unknown),
+    correlationid: Schema.optionalKey(Schema.String),
+    causationid: Schema.optionalKey(Schema.String),
+  })
+);
+const historicalProfile = PublicProfileSnapshotSchema.strip();
+type LegacyEvent =
+  | WallpaperUploadedEvent
+  | WallpaperVariantAvailableEvent
+  | WallpaperColorsExtractedEvent
+  | ProfileUpdatedEvent
+  | {
+      eventId: string;
+      eventType: 'profile.created';
+      timestamp: string;
+      profile: PublicProfileSnapshot;
+    };
+
+// These payload schemas are shared producer contracts owned by @wallpaperdb/events.
+function parseLegacy(value: unknown): LegacyEvent | undefined {
+  const base = BaseEventSchema.safeParse(value);
+  if (!base.success) return undefined;
+  switch (base.data.eventType) {
+    case 'wallpaper.uploaded':
+      return WallpaperUploadedEventSchema.safeParse(value).data;
+    case 'wallpaper.variant.available':
+      return WallpaperVariantAvailableEventSchema.safeParse(value).data;
+    case 'wallpaper.colors.extracted':
+      return WallpaperColorsExtractedEventSchema.safeParse(value).data;
+    case 'profile.updated':
+      return ProfileUpdatedEventSchema.safeParse(value).data;
+    case 'profile.created': {
+      const created = decodeCreated(value);
+      if (Option.isNone(created)) return undefined;
+      const profile = historicalProfile.safeParse(created.value.profile);
+      return profile.success
+        ? { ...base.data, eventType: 'profile.created', profile: profile.data }
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
 
 export type TranslatedEvent =
   | {
@@ -42,44 +82,40 @@ export type TranslatedEvent =
   | { readonly _tag: 'Invalid' };
 
 export function translate(subject: string, payload: Uint8Array): TranslatedEvent {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(new TextDecoder().decode(payload));
-  } catch {
+  const raw = decodeJson(new TextDecoder().decode(payload));
+  if (Option.isNone(raw)) return { _tag: 'Invalid' };
+  const envelope = decodeCloud(raw.value);
+  if (Predicate.hasProperty(raw.value, 'specversion') && Option.isNone(envelope))
     return { _tag: 'Invalid' };
-  }
-  const envelope = cloud.safeParse(raw);
-  if (typeof raw === 'object' && raw !== null && 'specversion' in raw && !envelope.success)
-    return { _tag: 'Invalid' };
-  const event = legacy.safeParse(
-    envelope.success
+  const event = parseLegacy(
+    Option.isSome(envelope)
       ? {
-          ...envelope.data.data,
-          eventId: envelope.data.id,
-          eventType: envelope.data.type,
-          timestamp: envelope.data.time,
+          ...envelope.value.data,
+          eventId: envelope.value.id,
+          eventType: envelope.value.type,
+          timestamp: envelope.value.time,
         }
-      : raw
+      : raw.value
   );
-  if (!event.success || event.data.eventType !== subject) return { _tag: 'Invalid' };
+  if (!event || event.eventType !== subject) return { _tag: 'Invalid' };
   const occurrence: Occurrence = {
-    source: envelope.success ? envelope.data.source : legacySource(event.data.eventType),
-    id: event.data.eventId,
-    occurredAt: new Date(event.data.timestamp).toISOString(),
+    source: Option.isSome(envelope) ? envelope.value.source : legacySource(event.eventType),
+    id: event.eventId,
+    occurredAt: DateTime.formatIso(DateTime.makeUnsafe(event.timestamp)),
   };
   return {
     _tag: 'Translated',
-    change: toChange(event.data, occurrence),
-    ...(envelope.success && envelope.data.correlationid
-      ? { correlationId: envelope.data.correlationid }
+    change: toChange(event, occurrence),
+    ...(Option.isSome(envelope) && envelope.value.correlationid
+      ? { correlationId: envelope.value.correlationid }
       : {}),
-    ...(envelope.success && envelope.data.causationid
-      ? { causationId: envelope.data.causationid }
+    ...(Option.isSome(envelope) && envelope.value.causationid
+      ? { causationId: envelope.value.causationid }
       : {}),
   };
 }
 
-function legacySource(eventType: z.infer<typeof legacy>['eventType']): string {
+function legacySource(eventType: LegacyEvent['eventType']): string {
   switch (eventType) {
     case 'wallpaper.uploaded':
       return 'wallpaperdb/ingestor';
@@ -93,7 +129,7 @@ function legacySource(eventType: z.infer<typeof legacy>['eventType']): string {
   }
 }
 
-function toChange(event: z.infer<typeof legacy>, occurrence: Occurrence): ProjectionChange {
+function toChange(event: LegacyEvent, occurrence: Occurrence): ProjectionChange {
   switch (event.eventType) {
     case 'wallpaper.uploaded':
       return {
@@ -101,7 +137,7 @@ function toChange(event: z.infer<typeof legacy>, occurrence: Occurrence): Projec
         occurrence,
         wallpaperId: event.wallpaper.id,
         profileId: event.wallpaper.userId,
-        uploadedAt: new Date(event.wallpaper.uploadedAt).toISOString(),
+        uploadedAt: DateTime.formatIso(DateTime.makeUnsafe(event.wallpaper.uploadedAt)),
       };
     case 'wallpaper.variant.available': {
       const { wallpaperId, ...variant } = event.variant;
@@ -109,7 +145,10 @@ function toChange(event: z.infer<typeof legacy>, occurrence: Occurrence): Projec
         _tag: 'VariantAvailable',
         occurrence,
         wallpaperId,
-        variant: { ...variant, createdAt: new Date(variant.createdAt).toISOString() },
+        variant: {
+          ...variant,
+          createdAt: DateTime.formatIso(DateTime.makeUnsafe(variant.createdAt)),
+        },
       };
     }
     case 'wallpaper.colors.extracted':

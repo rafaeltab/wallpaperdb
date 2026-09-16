@@ -1,6 +1,7 @@
 .turbo
 node_modules
 .pnpm-store
+.repos/
 
 # Local OpenCode/Sandcastle auth state
 .sandcastle/.opencode/auth.json

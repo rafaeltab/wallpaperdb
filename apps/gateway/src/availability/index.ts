@@ -1,4 +1,4 @@
-import { Clock, Effect } from 'effect';
+import { Context, DateTime, Effect, Layer } from 'effect';
 
 export interface DependencyHealth {
   readonly opensearch: boolean;
@@ -10,7 +10,9 @@ export interface DependencyHealth {
 export interface AvailabilityProbe {
   inspect(): Effect.Effect<DependencyHealth>;
 }
-export const AvailabilityProbe = Symbol.for('wallpaperdb.gateway.availability.AvailabilityProbe');
+export const AvailabilityProbe = Context.Service<AvailabilityProbe>(
+  'wallpaperdb.gateway.availability.AvailabilityProbe'
+);
 export type Health =
   | {
       readonly status: 'shutting_down';
@@ -33,45 +35,44 @@ export interface Availability {
   health(shuttingDown: boolean): Effect.Effect<Health>;
   ready(shuttingDown: boolean, initialized: boolean): Effect.Effect<Readiness>;
 }
-export const Availability = Symbol.for('wallpaperdb.gateway.availability.Availability');
-class GatewayAvailability implements Availability {
-  constructor(private readonly probe: AvailabilityProbe) {}
-  health(shuttingDown: boolean): Effect.Effect<Health> {
-    return Effect.gen(this, function* () {
-      const startedAt = yield* Clock.currentTimeMillis;
-      if (shuttingDown) {
-        return {
-          status: 'shutting_down',
-          checks: {},
-          timestamp: new Date(startedAt).toISOString(),
-        } satisfies Health;
-      }
-      const checks = yield* this.probe.inspect();
-      const finishedAt = yield* Clock.currentTimeMillis;
+export const Availability = Context.Service<Availability>(
+  'wallpaperdb.gateway.availability.Availability'
+);
+export const availabilityLayer: Layer.Layer<Availability, never, AvailabilityProbe> = Layer.effect(
+  Availability,
+  Effect.gen(function* () {
+    const probe = yield* AvailabilityProbe;
+    const health = Effect.fn('availability.health')(function* (
+      shuttingDown: boolean
+    ): Effect.fn.Return<Health> {
+      const startedAt = yield* DateTime.now;
+      if (shuttingDown)
+        return { status: 'shutting_down', checks: {}, timestamp: DateTime.formatIso(startedAt) };
+      const checks = yield* probe.inspect();
+      const finishedAt = yield* DateTime.now;
       const values = Object.values(checks);
       return {
         status: values.every(Boolean) ? 'healthy' : values.some(Boolean) ? 'degraded' : 'unhealthy',
         checks,
-        timestamp: new Date(finishedAt).toISOString(),
-        totalDurationMs: finishedAt - startedAt,
-      } satisfies Health;
-    }).pipe(Effect.withSpan('availability.health'));
-  }
-  ready(shuttingDown: boolean, initialized: boolean): Effect.Effect<Readiness> {
-    return Clock.currentTimeMillis.pipe(
-      Effect.map((now) => ({
+        timestamp: DateTime.formatIso(finishedAt),
+        totalDurationMs: DateTime.toEpochMillis(finishedAt) - DateTime.toEpochMillis(startedAt),
+      };
+    });
+    const ready = Effect.fn('availability.ready')(function* (
+      shuttingDown: boolean,
+      initialized: boolean
+    ): Effect.fn.Return<Readiness> {
+      const now = yield* DateTime.now;
+      return {
         ready: !shuttingDown && initialized,
-        timestamp: new Date(now).toISOString(),
+        timestamp: DateTime.formatIso(now),
         ...(shuttingDown
           ? { reason: 'Service is shutting down' }
           : !initialized
             ? { reason: 'Service is not yet initialized' }
             : {}),
-      })),
-      Effect.withSpan('availability.ready')
-    );
-  }
-}
-export function createAvailability(probe: AvailabilityProbe): Availability {
-  return new GatewayAvailability(probe);
-}
+      };
+    });
+    return Availability.of({ health, ready });
+  })
+);

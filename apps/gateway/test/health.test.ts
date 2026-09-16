@@ -1,8 +1,10 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { createAvailability } from '../src/availability/index.js';
-import { createHttpApp } from '../src/http/index.js';
-import { EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
+import {
+  createTestHttpApp as createHttpApp,
+  EmptyCatalogue,
+  httpConfig,
+} from './unit/http-fixture.js';
 
 describe('health HTTP contract', () => {
   it('preserves an unhealthy probe result and elapsed duration in Problem Details', async () => {
@@ -39,9 +41,6 @@ describe('health HTTP contract', () => {
     const app = await createHttpApp(httpConfig, {
       catalogue: new EmptyCatalogue(),
       admission: { admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 100, reset: 1000 }) },
-      availability: createAvailability({
-        inspect: () => Effect.succeed({ nats: true, opensearch: true, otel: true }),
-      }),
     });
     try {
       const response = await app.inject({ url: '/documentation/json' });
@@ -130,9 +129,6 @@ describe('health HTTP contract', () => {
     const app = await createHttpApp(httpConfig, {
       catalogue: new EmptyCatalogue(),
       admission: { admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 100, reset: 1000 }) },
-      availability: createAvailability({
-        inspect: () => Effect.succeed({ nats: true, opensearch: true, otel: true }),
-      }),
     });
     try {
       expect((await app.inject({ url: '/health' })).json()).toMatchObject({

@@ -1,4 +1,4 @@
-import { Effect } from 'effect';
+import { Context, Effect, Layer, Schema } from 'effect';
 import type { Profile, Variant } from '../catalogue/index.js';
 
 export interface Occurrence {
@@ -57,10 +57,14 @@ export type ProjectionMutation =
     }
   | { readonly _tag: 'PublishProfile'; readonly occurrence: Occurrence; readonly profile: Profile };
 
+export class ProjectionUnavailable extends Schema.TaggedError<ProjectionUnavailable>()(
+  'ProjectionUnavailable',
+  { cause: Schema.Defect() }
+) {}
+
 export type ProjectionWrite =
   | { readonly _tag: 'Applied' }
   | { readonly _tag: 'Unchanged' }
-  | { readonly _tag: 'Unavailable' }
   | { readonly _tag: 'Rejected' };
 
 /** Each mutation is atomic for its target. Replays do not duplicate variants or reset
@@ -69,51 +73,57 @@ export type ProjectionWrite =
  * Complete color snapshots and variants with the same dimensions and format converge by occurrence time
  * and identity while legacy producers lack an entity version. Reads see completed writes. */
 export interface ProjectionStore {
-  apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite>;
+  apply(mutation: ProjectionMutation): Effect.Effect<ProjectionWrite, ProjectionUnavailable>;
 }
-export const ProjectionStore = Symbol.for('wallpaperdb.gateway.projection.store');
+export const ProjectionStore = Context.Service<ProjectionStore>(
+  'wallpaperdb.gateway.projection.store'
+);
 
 export type ProjectionOutcome =
   | { readonly _tag: 'Completed' }
   | { readonly _tag: 'Ignored' }
-  | { readonly _tag: 'Retry' }
   | {
       readonly _tag: 'Rejected';
       readonly reason: 'invalid-color-histogram' | 'invalid-projection';
     };
 
 export interface ProjectCatalogue {
-  record(change: ProjectionChange): Effect.Effect<ProjectionOutcome>;
+  record(change: ProjectionChange): Effect.Effect<ProjectionOutcome, ProjectionUnavailable>;
 }
-export const ProjectCatalogue = Symbol.for('wallpaperdb.gateway.projection.project');
+export const ProjectCatalogue = Context.Service<ProjectCatalogue>(
+  'wallpaperdb.gateway.projection.project'
+);
 
-class CatalogueProjection implements ProjectCatalogue {
-  constructor(private readonly store: ProjectionStore) {}
+const validHistogram = Schema.is(
+  Schema.Array(Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0))).check(
+    Schema.isLengthBetween(64, 64),
+    Schema.makeFilter((values) => values.some((value) => value > 0))
+  )
+);
 
-  record(change: ProjectionChange): Effect.Effect<ProjectionOutcome> {
-    return Effect.gen(this, function* () {
-      if (
-        change._tag === 'ColorsExtracted' &&
-        (change.colorHistogram.length !== 64 ||
-          change.colorHistogram.some((value) => !Number.isFinite(value) || value < 0) ||
-          !change.colorHistogram.some((value) => value > 0))
-      ) {
+export const projectionLayer: Layer.Layer<ProjectCatalogue, never, ProjectionStore> = Layer.effect(
+  ProjectCatalogue,
+  Effect.gen(function* () {
+    const store = yield* ProjectionStore;
+    const record = Effect.fn('catalogue.project')(function* (
+      change: ProjectionChange
+    ): Effect.fn.Return<ProjectionOutcome, ProjectionUnavailable> {
+      if (change._tag === 'ColorsExtracted' && !validHistogram(change.colorHistogram)) {
         return { _tag: 'Rejected', reason: 'invalid-color-histogram' } satisfies ProjectionOutcome;
       }
-      const outcome = yield* this.store.apply(toMutation(change));
+      const outcome = yield* store.apply(toMutation(change));
       switch (outcome._tag) {
         case 'Applied':
           return { _tag: 'Completed' } satisfies ProjectionOutcome;
         case 'Unchanged':
           return { _tag: 'Ignored' } satisfies ProjectionOutcome;
-        case 'Unavailable':
-          return { _tag: 'Retry' } satisfies ProjectionOutcome;
         case 'Rejected':
           return { _tag: 'Rejected', reason: 'invalid-projection' } satisfies ProjectionOutcome;
       }
-    }).pipe(Effect.withSpan('catalogue.project'));
-  }
-}
+    });
+    return ProjectCatalogue.of({ record });
+  })
+);
 
 function toMutation(change: ProjectionChange): ProjectionMutation {
   switch (change._tag) {
@@ -126,8 +136,4 @@ function toMutation(change: ProjectionChange): ProjectionMutation {
     case 'ProfilePublished':
       return { ...change, _tag: 'PublishProfile' };
   }
-}
-
-export function createProjection(store: ProjectionStore): ProjectCatalogue {
-  return new CatalogueProjection(store);
 }

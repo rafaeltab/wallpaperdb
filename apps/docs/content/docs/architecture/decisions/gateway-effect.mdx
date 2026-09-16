@@ -1,8 +1,10 @@
 ---
 title: Effect in the Gateway
-description: Effect execution with explicit application interfaces
+description: Effect services, dependency inversion, and scoped execution
 ---
 
-The gateway uses Effect 3 for execution, typed outcomes, tracing and scoped resource release while retaining its existing transports and stores. Constructor-injected TypeScript ports and namespaced symbol tokens keep application interfaces explicit; the composition root chooses adapters without a global dependency container.
+The gateway uses Effect 4 services and layers for dependency inversion, execution, validation, tracing, and resource ownership. Application-owned port interfaces have typed `Context.Service` keys; layers yield their dependencies and keep implementations private. Composition selects adapters and shares their lifetimes. Normal decisions are result values; technical failures use tagged Effect errors, translated safely at transport boundaries.
 
-This is a gateway-scoped adoption. The detailed decision, trade-offs and compatibility behavior are recorded in `apps/gateway/docs/adr/0001-effect-execution-with-explicit-ports.md`; the bounded-context language is recorded in `apps/gateway/CONTEXT.md`.
+The HTTP adapter bridges Fastify and Mercurius into one managed runtime with supervised request fibers. NATS consumers remain scoped Effect streams. Closing the application bounds draining and releases tasks and connections, including after partial startup. The executable owns signals and process exit through `NodeRuntime`.
+
+This is a gateway-specific convention replacing its constructor-only injection and `Symbol.for` token convention. The detailed decision and operational trade-offs are recorded in `apps/gateway/docs/adr/0002-effect-services-and-owned-lifetimes.md`. Projection compatibility and replay requirements from ADR 0001 remain applicable; bounded-context language stays in `apps/gateway/CONTEXT.md`.

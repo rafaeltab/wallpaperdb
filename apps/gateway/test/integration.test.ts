@@ -2,37 +2,34 @@ import { Client } from '@opensearch-project/opensearch';
 import type { WallpaperUploadedEvent } from '@wallpaperdb/events';
 import { Effect } from 'effect';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import {
-  createOpenSearchGateway,
-  type OpenSearchGateway,
-} from '../src/adapters/opensearch/index.js';
+import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
 import { createGatewayTester } from './setup.js';
 import { createApp } from '../src/app.js';
-import { createSearchFixture } from './search-fixture.js';
+import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 
 describe('Gateway composition with real adapters', () => {
   const tester = createGatewayTester();
-  const adapters: OpenSearchGateway[] = [];
+  const adapters: Array<Awaited<ReturnType<typeof acquireSearchFixture>>> = [];
   beforeAll(async () => {
     await tester.setup();
   });
   afterEach(async () => {
-    await Promise.all(adapters.splice(0).map((adapter) => adapter.stop()));
+    await Promise.all(adapters.splice(0).map((adapter) => adapter.dispose()));
   });
   afterAll(async () => {
     await tester.destroy();
   });
 
-  function adapter(wallpaperIndex: string, profileIndex: string): OpenSearchGateway {
-    const value = createOpenSearchGateway({
+  async function adapter(wallpaperIndex: string, profileIndex: string) {
+    const value = await acquireSearchFixture({
       url: tester.search.options.url,
       wallpaperIndex,
       profileIndex,
     });
     adapters.push(value);
-    return value;
+    return value.adapter;
   }
 
   it('projects a published upload and serves it through GraphQL with healthy readiness', async () => {
@@ -96,10 +93,10 @@ describe('Gateway composition with real adapters', () => {
   it('creates named indexes with independent Profile and color-search mappings, and starts idempotently', async () => {
     const wallpaperIndex = tester.search.index('lifecycle_wallpapers');
     const profileIndex = tester.search.index('lifecycle_profiles');
-    const search = adapter(wallpaperIndex, profileIndex);
-    await search.start();
-    await search.start();
-    expect(await search.check()).toBe(true);
+    const search = await adapter(wallpaperIndex, profileIndex);
+    const repeated = await adapter(wallpaperIndex, profileIndex);
+    expect(await Effect.runPromise(search.check())).toBe(true);
+    expect(await Effect.runPromise(repeated.check())).toBe(true);
     const client = new Client({ node: tester.search.options.url });
     try {
       const mappings = await client.indices.getMapping({
@@ -137,11 +134,12 @@ describe('Gateway composition with real adapters', () => {
   it('converges concurrent gateway startup on the same index names', async () => {
     const wallpaperIndex = tester.search.index('concurrent_wallpapers');
     const profileIndex = tester.search.index('concurrent_profiles');
-    const first = adapter(wallpaperIndex, profileIndex);
-    const second = adapter(wallpaperIndex, profileIndex);
-    await Promise.all([first.start(), second.start()]);
-    expect(await first.check()).toBe(true);
-    expect(await second.check()).toBe(true);
+    const [first, second] = await Promise.all([
+      adapter(wallpaperIndex, profileIndex),
+      adapter(wallpaperIndex, profileIndex),
+    ]);
+    expect(await Effect.runPromise(first.check())).toBe(true);
+    expect(await Effect.runPromise(second.check())).toBe(true);
   });
 
   it('fails safely after acquiring search resources when broker startup fails', async () => {
@@ -155,7 +153,7 @@ describe('Gateway composition with real adapters', () => {
         },
         { logger: false, enableOtel: false }
       )
-    ).rejects.toThrow('Gateway startup failed');
+    ).rejects.toMatchObject({ _tag: 'NatsProjectionStartupError' });
     const client = new Client({ node: tester.search.options.url });
     try {
       expect((await client.indices.exists({ index: wallpaperIndex })).body).toBe(true);
@@ -169,12 +167,15 @@ describe('Gateway composition with real adapters', () => {
   it('isolates shared-cluster fixtures and deletes only the owning fixture indices', async () => {
     const firstFixture = createSearchFixture();
     const secondFixture = createSearchFixture();
-    const first = createOpenSearchGateway(firstFixture.options);
-    const second = createOpenSearchGateway(secondFixture.options);
-    adapters.push(first, second);
+    const [firstResource, secondResource] = await Promise.all([
+      acquireSearchFixture(firstFixture.options),
+      acquireSearchFixture(secondFixture.options),
+    ]);
+    adapters.push(firstResource, secondResource);
+    const first = firstResource.adapter;
+    const second = secondResource.adapter;
     const client = new Client({ node: firstFixture.options.url });
     try {
-      await Promise.all([first.start(), second.start()]);
       for (const [search, name] of [
         [first, 'first'],
         [second, 'second'],
@@ -259,36 +260,9 @@ describe('Gateway composition with real adapters', () => {
     }
   });
 
-  it('translates an unreachable search cluster into unavailable read/write outcomes', async () => {
-    const search = createOpenSearchGateway({ url: 'http://127.0.0.1:1' });
-    adapters.push(search);
-    await expect(search.start()).rejects.toThrow();
-    expect(await search.check()).toBe(false);
-    expect(await Effect.runPromise(search.read.wallpaper('missing'))).toEqual({
-      _tag: 'Unavailable',
+  it('fails layer acquisition with a typed startup error when the search cluster is unreachable', async () => {
+    await expect(acquireSearchFixture({ url: 'http://127.0.0.1:1' })).rejects.toMatchObject({
+      _tag: 'OpenSearchStartupError',
     });
-    expect(await Effect.runPromise(search.read.profile('missing'))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(await Effect.runPromise(search.read.profileByHandle('missing'))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(await Effect.runPromise(search.read.profiles(['missing']))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(await Effect.runPromise(search.read.search({ size: 1, sortOrder: 'asc' }))).toEqual({
-      _tag: 'Unavailable',
-    });
-    expect(
-      await Effect.runPromise(
-        search.projectionStore.apply({
-          _tag: 'PublishWallpaper',
-          wallpaperId: 'missing',
-          profileId: 'owner',
-          uploadedAt: timestamp,
-          occurrence: { source: 'test', id: 'missing', occurredAt: timestamp },
-        })
-      )
-    ).toEqual({ _tag: 'Unavailable' });
   });
 });

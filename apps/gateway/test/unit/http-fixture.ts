@@ -1,6 +1,19 @@
-import { Effect } from 'effect';
-import type { Catalogue } from '../../src/catalogue/index.js';
-import type { HttpConfig } from '../../src/http/index.js';
+import { Effect, Layer } from 'effect';
+import { Admission, admissionLayer } from '../../src/admission/index.js';
+import {
+  Availability,
+  AvailabilityProbe,
+  availabilityLayer,
+} from '../../src/availability/index.js';
+import { memoryQuotaLayer } from '../helpers/quota.js';
+import { Catalogue } from '../../src/catalogue/index.js';
+import { createHttpApp, type HttpConfig } from '../../src/http/index.js';
+
+export interface HttpTestServices {
+  readonly catalogue: Catalogue;
+  readonly admission: Admission;
+  readonly availability: Availability;
+}
 export const httpConfig: HttpConfig = {
   port: 3004,
   nodeEnv: 'test',
@@ -27,10 +40,10 @@ export class EmptyCatalogue implements Catalogue {
           endCursor: null,
         },
       },
-    } satisfies Awaited<Effect.Effect.Success<ReturnType<Catalogue['search']>>>);
+    } satisfies Awaited<Effect.Success<ReturnType<Catalogue['search']>>>);
   }
   wallpaper() {
-    return Effect.succeed({ _tag: 'Found', value: null } satisfies Effect.Effect.Success<
+    return Effect.succeed({ _tag: 'Found', value: null } satisfies Effect.Success<
       ReturnType<Catalogue['wallpaper']>
     >);
   }
@@ -44,6 +57,37 @@ export class EmptyCatalogue implements Catalogue {
     return Effect.succeed({
       _tag: 'Found',
       value: ids.map(() => null),
-    } satisfies Effect.Effect.Success<ReturnType<Catalogue['profiles']>>);
+    } satisfies Effect.Success<ReturnType<Catalogue['profiles']>>);
   }
+}
+
+export function httpTestLayer(
+  config: HttpConfig = httpConfig,
+  ports: Partial<HttpTestServices> = {}
+) {
+  return Layer.mergeAll(
+    Layer.succeed(Catalogue, ports.catalogue ?? new EmptyCatalogue()),
+    ports.admission
+      ? Layer.succeed(Admission, ports.admission)
+      : admissionLayer({
+          enabled: true,
+          limit: config.rateLimitMaxAnonymous,
+          windowMs: 60000,
+        }).pipe(Layer.provide(memoryQuotaLayer)),
+    ports.availability
+      ? Layer.succeed(Availability, ports.availability)
+      : availabilityLayer.pipe(
+          Layer.provide(
+            Layer.succeed(AvailabilityProbe, {
+              inspect: () => Effect.succeed({ nats: true, opensearch: true, otel: true }),
+            })
+          )
+        )
+  );
+}
+export function createTestHttpApp(
+  config: HttpConfig = httpConfig,
+  ports: Partial<HttpTestServices> = {}
+) {
+  return createHttpApp(config, httpTestLayer(config, ports));
 }

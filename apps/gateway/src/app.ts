@@ -1,102 +1,93 @@
-import { Effect, Exit, Scope } from 'effect';
+import { Effect, Layer, Redacted } from 'effect';
 import type { FastifyInstance } from 'fastify';
-import { createAvailabilityProbe } from './adapters/availability/index.js';
-import { createNatsProjectionConsumer } from './adapters/events/index.js';
-import { createOpenSearchGateway } from './adapters/opensearch/index.js';
-import { createRedisQuota } from './adapters/redis/index.js';
-import { createAdmission } from './admission/index.js';
-import { createAvailability } from './availability/index.js';
-import { createCatalogue } from './catalogue/index.js';
+import { availabilityProbeLayer } from './adapters/availability/index.js';
+import { NatsProjectionConsumer, natsProjectionLayer } from './adapters/events/index.js';
+import { OpenSearchGateway, openSearchLayer } from './adapters/opensearch/index.js';
+import { redisQuotaLayer } from './adapters/redis/index.js';
+import { admissionLayer } from './admission/index.js';
+import { availabilityLayer } from './availability/index.js';
+import { catalogueLayer } from './catalogue/index.js';
 import type { Config } from './config.js';
-import { createSignedCursors } from './cursors/index.js';
+import { signedCursorsLayer } from './cursors/index.js';
 import { createHttpApp } from './http/index.js';
-import { createProjection } from './projection/index.js';
-import { runGatewayEffect } from './runtime.js';
+import { projectionLayer } from './projection/index.js';
+import { gatewayTracingLayer } from './runtime.js';
 
-interface Resource {
-  start(): Promise<void>;
-  stop(): Promise<void>;
+interface AppOptions {
+  readonly logger?: boolean;
+  readonly enableOtel?: boolean;
+  readonly otelHealthy?: boolean;
+  readonly shutdownTimeoutMs?: number;
 }
-function acquire(resource: Resource) {
-  // Register disposal before start, so partially acquired adapters are also closed.
-  return Effect.acquireRelease(Effect.succeed(resource), (value) =>
-    Effect.promise(() => value.stop())
-  ).pipe(Effect.tap((value) => Effect.tryPromise(() => value.start())));
-}
-export async function createApp(
-  config: Config,
-  options: { logger?: boolean; enableOtel?: boolean; otelHealthy?: boolean } = {}
-): Promise<FastifyInstance> {
-  const scope = await Effect.runPromise(Scope.make());
-  const search = createOpenSearchGateway({
+
+/** The one production graph selects implementations and owns shared lifetimes. */
+export function gatewayLayer(config: Config, options: AppOptions = {}) {
+  const search = openSearchLayer({
     url: config.opensearchUrl,
     username: config.opensearchUsername,
-    password: config.opensearchPassword,
+    password:
+      config.opensearchPassword === undefined
+        ? undefined
+        : Redacted.value(config.opensearchPassword),
     wallpaperIndex: config.opensearchIndex,
     profileIndex: config.opensearchProfileIndex,
   });
-  const consumers = createNatsProjectionConsumer(
-    { url: config.natsUrl, wallpaperStream: config.natsStream },
-    createProjection(search.projectionStore)
+  const projection = projectionLayer.pipe(Layer.provide(search));
+  const consumers = natsProjectionLayer({
+    url: config.natsUrl,
+    wallpaperStream: config.natsStream,
+    shutdownTimeoutMs: options.shutdownTimeoutMs,
+  }).pipe(Layer.provide(projection));
+  const catalogue = catalogueLayer({ colorSpreadStrategy: config.colorSpreadStrategy }).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        search,
+        signedCursorsLayer({
+          secret: Redacted.value(config.cursorSecret),
+          expirationMs: config.cursorExpirationMs,
+        })
+      )
+    )
   );
-  const quota = createRedisQuota({
-    redisEnabled: config.redisEnabled,
-    redisHost: config.redisHost,
-    redisPort: config.redisPort,
-    redisPassword: config.redisPassword,
-  });
-  const availability = createAvailability(
-    createAvailabilityProbe({
-      opensearch: () => search.check(),
-      nats: () => consumers.check(),
-      otel: async () =>
-        options.enableOtel === false || !config.otelEndpoint || options.otelHealthy === true,
-    })
-  );
-  const catalogue = createCatalogue(
-    search.read,
-    createSignedCursors({ secret: config.cursorSecret, expirationMs: config.cursorExpirationMs }),
-    { colorSpreadStrategy: config.colorSpreadStrategy }
-  );
-  const admission = createAdmission(quota, {
+  const admission = admissionLayer({
     enabled: config.rateLimitEnabled,
     limit: config.rateLimitMaxAnonymous,
     windowMs: config.rateLimitWindowMs,
-  });
-  try {
-    await runGatewayEffect(
-      Effect.gen(function* () {
-        yield* acquire(quota);
-        yield* acquire(search);
-        yield* acquire(consumers);
-      }).pipe(Scope.extend(scope))
-    );
-    const app = await createHttpApp(
-      {
-        port: config.port,
-        nodeEnv: config.nodeEnv,
-        mediaServiceUrl: config.mediaServiceUrl,
-        mediaPublicBaseUrl: config.mediaPublicBaseUrl,
-        mediaPublicPath: config.mediaPublicPath,
-        graphqlMaxDepth: config.graphqlMaxDepth,
-        graphqlMaxComplexity: config.graphqlMaxComplexity,
-        graphqlMaxUniqueFields: config.graphqlMaxUniqueFields,
-        graphqlMaxAliases: config.graphqlMaxAliases,
-        graphqlMaxBatchSize: config.graphqlMaxBatchSize,
-        graphqlIntrospectionEnabled: config.graphqlIntrospectionEnabled,
-        rateLimitMaxAnonymous: config.rateLimitMaxAnonymous,
-      },
-      { catalogue, admission, availability },
-      { logger: options.logger }
-    );
-    app.connectionsState.connectionsInitialized = true;
-    app.addHook('onClose', async () => {
-      app.connectionsState.isShuttingDown = true;
-      await Effect.runPromise(Scope.close(scope, Exit.void));
-    });
-    return app;
-  } catch (error) {
-    await Effect.runPromise(Scope.close(scope, Exit.fail(error)));
-    throw new Error('Gateway startup failed');
-  }
+  }).pipe(
+    Layer.provide(
+      redisQuotaLayer({
+        redisEnabled: config.redisEnabled,
+        redisHost: config.redisHost,
+        redisPort: config.redisPort,
+        redisPassword:
+          config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
+      })
+    )
+  );
+  const probe = Layer.unwrap(
+    Effect.gen(function* () {
+      const search = yield* OpenSearchGateway;
+      const consumers = yield* NatsProjectionConsumer;
+      return availabilityProbeLayer({
+        opensearch: () => search.check(),
+        nats: () => consumers.check(),
+        otel: () =>
+          Effect.succeed(
+            options.enableOtel === false || !config.otelEndpoint || options.otelHealthy === true
+          ),
+      });
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(search, consumers)));
+  return Layer.mergeAll(catalogue, admission, availabilityLayer.pipe(Layer.provide(probe))).pipe(
+    Layer.provide(gatewayTracingLayer)
+  );
+}
+
+export async function createApp(
+  config: Config,
+  options: AppOptions = {}
+): Promise<FastifyInstance> {
+  const app = await createHttpApp(config, gatewayLayer(config, options), options);
+  app.connectionsState.connectionsInitialized = true;
+  return app;
 }

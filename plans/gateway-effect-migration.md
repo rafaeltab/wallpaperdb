@@ -70,3 +70,19 @@ Continuation validation covers 271 tests across 22 files, including real adapter
 - `GITHUB_ACTIONS=true make ci` passes all 67 main tasks, all nine E2E-stage tasks, and coverage merging. One completed run took 217 seconds including rebuilding service images and fresh browser authentication, login, and upload tests. The final refresh after HTTP cleanup passed in 104 seconds, reusing the passing browser result. An earlier attempt correctly stopped when the local stack was offline; starting the worktree's stack resolved that environment prerequisite.
 - `make format` and whitespace checks pass. Unrelated formatter changes were removed, and existing untracked prototype/review artifacts remain outside this migration.
 - The quota-loss alert is provisioned and its YAML is validated; notification delivery has not been exercised.
+
+## Effect test adapter follow-up
+
+The gateway now uses `@effect/vitest@4.0.0-rc.115` with Vitest, coverage, and UI pinned to `5.0.1`. That Effect release requires Vitest 5. Other workspaces remain on Vitest 3; the shared config package provides plain defaults for composition through each runner's own config helpers.
+
+- [x] Migrate capability tests to `it.effect`, share the immutable cursor service through `layer`, and keep quota state fresh per test.
+- [x] Migrate real listener/bootstrap tests to `it.live`, preserving clock behavior and scope-owned cleanup.
+- [x] Validate all 25 converted capability scenarios with shuffled execution (seed 426).
+- [x] Reproduce Vitest 4 migration blockers separately on 4.1.11 for issue #201: removed third-argument options, constructor mock semantics, and removed worker configuration.
+- [x] Retain all coverage thresholds and source inclusion; add real adapter tests for failure paths exposed by the newer remapper.
+
+All 276 tests across 22 files pass. Vitest 5 coverage is 97.95% statements, 91.53% branches, 98.46% functions, and 98.60% lines; every one of the 325 maintained functions meets the CRAP threshold of 30. These numbers use the newer AST remapper and are not directly comparable to Vitest 3's earlier reports. No production code changed in this follow-up.
+
+`GITHUB_ACTIONS=true make ci` passed all 67 main tasks, all nine E2E-stage tasks, and coverage merging in 250 seconds. Browser authentication, login, and upload ran fresh. `make format`, an uncached gateway typecheck, and independent review passed; unrelated formatter output was removed.
+
+Compatibility findings, reproduced Vitest 4 failures, and validation results are recorded in [issue #201](https://github.com/rafaeltab/wallpaperdb/issues/201#issuecomment-5706196989). The repository-wide Vitest upgrade remains tracked there.

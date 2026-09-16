@@ -1,3 +1,5 @@
+import { once } from 'node:events';
+import { connect, createServer, type Socket } from 'node:net';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -5,7 +7,7 @@ import {
 } from '@wallpaperdb/test-utils';
 import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
 import { metrics } from '@opentelemetry/api';
-import { DiscardPolicy, StorageType } from 'nats';
+import { DiscardPolicy, headers, StorageType } from 'nats';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   natsProjectionLayer,
@@ -67,6 +69,45 @@ class ControlledProjection implements ProjectCatalogue {
         : Effect.succeed(outcome);
     });
   }
+}
+
+async function brokerProxy(url: string) {
+  const target = new URL(url);
+  const sockets = new Set<Socket>();
+  let forwardsReplies = true;
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    const upstream = connect(Number(target.port), target.hostname);
+    socket.pipe(upstream);
+    upstream.on('data', (chunk) => {
+      if (forwardsReplies) socket.write(chunk);
+    });
+    upstream.on('error', () => socket.destroy());
+    socket.on('error', () => upstream.destroy());
+    socket.on('close', () => {
+      sockets.delete(socket);
+      upstream.destroy();
+    });
+    upstream.on('close', () => socket.destroy());
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Expected TCP listener');
+  return {
+    url: `nats://127.0.0.1:${address.port}`,
+    get connections() {
+      return sockets.size;
+    },
+    stallReplies() {
+      forwardsReplies = false;
+    },
+    async close() {
+      for (const socket of sockets) socket.destroy();
+      server.close();
+      await once(server, 'close');
+    },
+  };
 }
 
 describe('NATS projection adapter contract', () => {
@@ -167,6 +208,57 @@ describe('NATS projection adapter contract', () => {
     expect(await Effect.runPromise(adapter.check())).toBe(false);
     const restarted = await consumer(new ControlledProjection());
     expect(await Effect.runPromise(restarted.adapter.check())).toBe(true);
+  });
+
+  it('closes the broker socket within the shutdown deadline when drain cannot receive replies', async () => {
+    const proxy = await brokerProxy(tester.nats.config.endpoints.fromHost);
+    try {
+      const { runtime, adapter } = await consumer(new ControlledProjection(), {
+        url: proxy.url,
+        shutdownTimeoutMs: 30,
+      });
+      expect(proxy.connections).toBe(1);
+      proxy.stallReplies();
+      const started = performance.now();
+      await runtime.dispose();
+      expect(performance.now() - started).toBeLessThan(1000);
+      expect(await Effect.runPromise(adapter.check())).toBe(false);
+      await expect.poll(() => proxy.connections, { timeout: 1000 }).toBe(0);
+    } finally {
+      await proxy.close();
+    }
+  });
+
+  it('reports a terminated subscription as unhealthy and retains its work for a replacement consumer', async () => {
+    const connection = await tester.nats.getConnection();
+    const rejection = connection.subscribe(
+      '$JS.API.CONSUMER.MSG.NEXT.WALLPAPER.gateway-wallpaper-uploaded',
+      {
+        callback: (error, message) => {
+          if (!error) message.respond(undefined, { headers: headers(400, 'Bad Request') });
+        },
+      }
+    );
+    await connection.flush();
+    const project = new ControlledProjection();
+    try {
+      const { runtime, adapter } = await consumer(project);
+      await expect
+        .poll(() => Effect.runPromise(adapter.check()), { timeout: 10000, interval: 20 })
+        .toBe(false);
+      await publish(upload('evt_terminated_subscription'));
+      expect(project.changes).toEqual([]);
+      await runtime.dispose();
+      rejection.unsubscribe();
+      await connection.flush();
+      const restarted = await consumer(project);
+      await expect.poll(() => project.changes.length, { timeout: 10000, interval: 20 }).toBe(1);
+      await acknowledged();
+      expect(project.changes[0]?.occurrence.id).toBe('evt_terminated_subscription');
+      expect(await Effect.runPromise(restarted.adapter.check())).toBe(true);
+    } finally {
+      rejection.unsubscribe();
+    }
   });
 
   it('allows an active delivery to finish before releasing the broker connection', async () => {

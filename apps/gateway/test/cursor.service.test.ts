@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
+import { expect, layer } from '@effect/vitest';
 import { Effect } from 'effect';
 import { TestClock } from 'effect/testing';
 import { CatalogueCursors } from '../src/catalogue/index.js';
-import { describe, expect, it } from 'vitest';
 import { signedCursorsLayer } from '../src/cursors/index.js';
 const config = { secret: 'test-secret-that-is-definitely-long-enough', expirationMs: 60_000 };
 function signed(payload: unknown) {
@@ -10,36 +10,31 @@ function signed(payload: unknown) {
   const signature = crypto.createHmac('sha256', config.secret).update(text).digest('hex');
   return Buffer.from(JSON.stringify({ payload: text, signature })).toString('base64url');
 }
-describe('Signed pagination cursor adapter', () => {
-  it('preserves mixed score/identity positions and retains the pre-migration envelope', async () => {
-    const result = await Effect.runPromise(
-      Effect.gen(function* () {
-        const cursors = yield* CatalogueCursors;
-        yield* TestClock.setTime(1_000);
-        const cursor = yield* cursors.encode([42, 'wlpr_a']);
-        expect(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))).toEqual({
-          payload: JSON.stringify({ values: [42, 'wlpr_a'], timestamp: 1000 }),
-          signature: expect.stringMatching(/^[0-9a-f]{64}$/),
-        });
-        return yield* cursors.decode(cursor);
-      }).pipe(Effect.provide(signedCursorsLayer(config)), Effect.provide(TestClock.layer()))
-    );
-    expect(result).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });
-  });
-  it('accepts the expiration boundary and rejects the next millisecond', async () => {
-    await Effect.runPromise(
-      Effect.gen(function* () {
-        const cursors = yield* CatalogueCursors;
-        yield* TestClock.setTime(0);
-        const cursor = yield* cursors.encode(['wlpr_a']);
-        yield* TestClock.setTime(config.expirationMs);
-        expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: ['wlpr_a'] });
-        yield* TestClock.setTime(config.expirationMs + 1);
-        expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'InvalidCursor' });
-      }).pipe(Effect.provide(signedCursorsLayer(config)), Effect.provide(TestClock.layer()))
-    );
-  });
-  it.each([
+layer(signedCursorsLayer(config))('Signed pagination cursor adapter', (it) => {
+  it.effect('preserves mixed score/identity positions and retains the pre-migration envelope', () =>
+    Effect.gen(function* () {
+      const cursors = yield* CatalogueCursors;
+      yield* TestClock.setTime(1_000);
+      const cursor = yield* cursors.encode([42, 'wlpr_a']);
+      expect(JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'))).toEqual({
+        payload: JSON.stringify({ values: [42, 'wlpr_a'], timestamp: 1000 }),
+        signature: expect.stringMatching(/^[0-9a-f]{64}$/),
+      });
+      expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });
+    })
+  );
+  it.effect('accepts the expiration boundary and rejects the next millisecond', () =>
+    Effect.gen(function* () {
+      const cursors = yield* CatalogueCursors;
+      yield* TestClock.setTime(0);
+      const cursor = yield* cursors.encode(['wlpr_a']);
+      yield* TestClock.setTime(config.expirationMs);
+      expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: ['wlpr_a'] });
+      yield* TestClock.setTime(config.expirationMs + 1);
+      expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'InvalidCursor' });
+    })
+  );
+  it.effect.each([
     '',
     'not-base64',
     Buffer.from('null').toString('base64url'),
@@ -52,30 +47,24 @@ describe('Signed pagination cursor adapter', () => {
     signed({ values: { id: 'wlpr_a' }, timestamp: 0 }),
     signed({ values: [null], timestamp: 0 }),
     signed({ values: ['wlpr_a'], timestamp: 1001 }),
-  ])('rejects malformed, tampered, and future cursors without exposing a parser error: %s', async (cursor) => {
-    const result = await Effect.runPromise(
+  ])(
+    'rejects malformed, tampered, and future cursors without exposing a parser error: %s',
+    (cursor) =>
       Effect.gen(function* () {
         const cursors = yield* CatalogueCursors;
         yield* TestClock.setTime(1000);
-        return yield* cursors.decode(cursor);
-      }).pipe(Effect.provide(signedCursorsLayer(config)), Effect.provide(TestClock.layer()))
-    );
-    expect(result).toEqual({ _tag: 'InvalidCursor' });
-  });
-  it('rejects a valid cursor signed by a different key', async () => {
-    const encoded = await Effect.runPromise(
-      CatalogueCursors.use((cursors) => cursors.encode(['wlpr_a'])).pipe(
+        expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'InvalidCursor' });
+      })
+  );
+  it.effect('rejects a valid cursor signed by a different key', () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(0);
+      const encoded = yield* CatalogueCursors.use((cursors) => cursors.encode(['wlpr_a'])).pipe(
         Effect.provide(signedCursorsLayer({ ...config, secret: 'another-signing-key' }))
-      )
-    );
-    expect(
-      await Effect.runPromise(
-        CatalogueCursors.use((cursors) => cursors.decode(encoded)).pipe(
-          Effect.provide(signedCursorsLayer(config))
-        )
-      )
-    ).toEqual({
-      _tag: 'InvalidCursor',
-    });
-  });
+      );
+      expect(yield* CatalogueCursors.use((cursors) => cursors.decode(encoded))).toEqual({
+        _tag: 'InvalidCursor',
+      });
+    })
+  );
 });

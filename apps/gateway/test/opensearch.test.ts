@@ -1,10 +1,11 @@
 import { once } from 'node:events';
 import { createServer, request } from 'node:http';
+import { it as effectIt } from '@effect/vitest';
 import { Client } from '@opensearch-project/opensearch';
 import { metrics } from '@opentelemetry/api';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
+import { type OpenSearchGateway, openSearchLayer } from '../src/adapters/opensearch/index.js';
 import type {
   ReadOutcome,
   SearchBatch,
@@ -92,10 +93,23 @@ describe('OpenSearch catalogue port contract', () => {
     );
   }
 
+  effectIt.live('reports invalid connection configuration as a startup failure', () =>
+    Effect.gen(function* () {
+      const error = yield* Layer.build(openSearchLayer({ url: 'not-a-url' })).pipe(Effect.flip);
+      expect(error._tag).toBe('OpenSearchStartupError');
+    })
+  );
+
   it('aborts interrupted requests and closes in-flight transport work with the layer scope', async () => {
     let stalledRequests = 0;
     let activeRequests = 0;
+    let unavailable = false;
     const server = createServer((incoming, outgoing) => {
+      if (unavailable) {
+        outgoing.writeHead(503);
+        outgoing.end();
+        return;
+      }
       if (incoming.url?.includes('/_doc/stalled')) {
         stalledRequests++;
         activeRequests++;
@@ -127,6 +141,11 @@ describe('OpenSearch catalogue port contract', () => {
       url: `http://127.0.0.1:${address.port}`,
     });
     try {
+      expect(await Effect.runPromise(pending.adapter.check())).toBe(true);
+      unavailable = true;
+      expect(await Effect.runPromise(pending.adapter.check())).toBe(false);
+      unavailable = false;
+      expect(await Effect.runPromise(pending.adapter.check())).toBe(true);
       const aborted = Effect.runPromise(
         pending.adapter.read
           .wallpaper('stalled-timeout')

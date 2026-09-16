@@ -7,4 +7,6 @@ The gateway uses Effect 4 services and layers for dependency inversion, executio
 
 The HTTP adapter bridges Fastify and Mercurius into one managed runtime with supervised request fibers. NATS consumers remain scoped Effect streams. Closing the application bounds draining and releases tasks and connections, including after partial startup. The executable owns signals and process exit through `NodeRuntime`.
 
+Gateway tests use the matching `@effect/vitest` adapter on Vitest 5. Capability tests use its controlled clock and scoped execution; network lifecycle tests use `it.live` with real time. Shared layers contain immutable services, and mutable test state is independently owned. Other workspaces retain their existing Vitest versions through a shared configuration entry point that exports plain defaults.
+
 This is a gateway-specific convention replacing its constructor-only injection and `Symbol.for` token convention. The detailed decision and operational trade-offs are recorded in `apps/gateway/docs/adr/0002-effect-services-and-owned-lifetimes.md`. Projection compatibility and replay requirements from ADR 0001 remain applicable; bounded-context language stays in `apps/gateway/CONTEXT.md`.

@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { Effect } from 'effect';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../../src/otel-init.js';
 
 describe('Gateway telemetry bootstrap', () => {
@@ -22,16 +22,55 @@ describe('Gateway telemetry bootstrap', () => {
     ).toEqual({ _tag: 'Unavailable' });
   });
 
+  it('reports a partially initialized SDK as unavailable when the log exporter configuration fails', async () => {
+    const collector = createServer((request, response) => {
+      request.resume();
+      response.writeHead(200);
+      response.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      collector.once('error', reject);
+      collector.listen(0, '127.0.0.1', resolve);
+    });
+    vi.stubEnv('OTEL_LOGS_EXPORTER', 'otlp');
+    vi.stubEnv('OTEL_EXPORTER_OTLP_LOGS_PROTOCOL', 'grpc');
+    vi.stubEnv('OTEL_EXPORTER_OTLP_LOGS_HEADERS', 'invalid header=private-collector-token');
+    try {
+      const address = collector.address();
+      if (!address || typeof address === 'string')
+        throw new Error('Expected a TCP collector address');
+      expect(
+        await Effect.runPromise(
+          initializeOtel({
+            otelServiceName: 'gateway-contract',
+            otelEndpoint: `http://127.0.0.1:${address.port}`,
+          }).pipe(Effect.scoped)
+        )
+      ).toEqual({ _tag: 'Unavailable' });
+    } finally {
+      vi.unstubAllEnvs();
+      logs.disable();
+      trace.disable();
+      metrics.disable();
+      context.disable();
+      propagation.disable();
+      await new Promise<void>((resolve, reject) =>
+        collector.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
   it.each([
     'success',
     'import-failure',
     'cleanup-failure',
-  ])('flushes telemetry when the bootstrap scope exits: %s', async (outcome) => {
+    'collector-unavailable',
+  ])('finishes telemetry cleanup when the bootstrap scope exits: %s', async (outcome) => {
     const requests: string[] = [];
     const collector = createServer((request, response) => {
       requests.push(request.url ?? '');
       request.resume();
-      response.writeHead(200);
+      response.writeHead(outcome === 'collector-unavailable' ? 503 : 200);
       response.end();
     });
     await new Promise<void>((resolve, reject) => {
@@ -60,7 +99,9 @@ describe('Gateway telemetry bootstrap', () => {
           })
         )
       );
-      expect(finished._tag).toBe(outcome === 'success' ? 'Success' : 'Failure');
+      expect(finished._tag).toBe(
+        outcome === 'success' || outcome === 'collector-unavailable' ? 'Success' : 'Failure'
+      );
       expect(requests).toContain('/v1/traces');
     } finally {
       logs.disable();

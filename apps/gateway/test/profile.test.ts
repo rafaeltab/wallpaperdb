@@ -98,10 +98,13 @@ describe("Profile projection integration", () => {
         };
         const read = () => query(`query {
             profile(id: "${profile.id}") { id version biographyMarkdown }
-            profileByHandle(handle: "${profile.handle}") { profile { biographyMarkdown } }
+            profileByHandle(handle: "${profile.handle}") { profile { version biographyMarkdown } }
         }`);
         await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
-        const result = await eventually(read, (value) => value.data.profile?.version === 2);
+        // ID reads are realtime; Handle search becomes visible after the index refresh.
+        const result = await eventually(read, (value) =>
+            value.data.profile?.version === 2 && value.data.profileByHandle?.profile.version === 2,
+        );
         expect(result.errors).toBeUndefined();
         expect(result.data.profile.biographyMarkdown).toBe(authored);
         expect(result.data.profileByHandle.profile.biographyMarkdown).toBe(authored);

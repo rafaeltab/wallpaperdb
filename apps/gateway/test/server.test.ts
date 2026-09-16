@@ -8,7 +8,7 @@ import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { Cause, ConfigProvider, Effect, Exit, Fiber, Scope } from 'effect';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest';
 import { loadConfig } from '../src/config.js';
 import { startGateway } from '../src/server.js';
 import { gatewayProgram } from '../src/bootstrap.js';
@@ -59,143 +59,165 @@ describe('Gateway bootstrap and deployed artifact', () => {
     };
   }
 
-  it('keeps a real listener running until its owner closes the scope', async () => {
-    const scope = await Effect.runPromise(Scope.make());
-    let address = '';
-    try {
-      const running = await Effect.runPromise(
-        startGateway({ ...loadConfig(environment()), port: 0 }).pipe(Scope.provide(scope))
+  it.live('keeps a real listener running until its owner closes the scope', () =>
+    Effect.gen(function* () {
+      const scope = yield* Scope.fork(yield* Effect.scope);
+      const running = yield* startGateway({ ...loadConfig(environment()), port: 0 }).pipe(
+        Scope.provide(scope)
       );
-      address = running.address.replace('0.0.0.0', '127.0.0.1');
-      const response = await fetch(`${address}/ready`);
+      const address = running.address.replace('0.0.0.0', '127.0.0.1');
+      const response = yield* Effect.promise((signal) => fetch(`${address}/ready`, { signal }));
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ ready: true });
-    } finally {
-      await Effect.runPromise(Scope.close(scope, Exit.void));
-      await Effect.runPromise(Scope.close(scope, Exit.void));
-    }
-    await expect(fetch(`${address}/ready`)).rejects.toThrow();
-  });
+      expect(yield* Effect.promise(() => response.json())).toMatchObject({ ready: true });
+      yield* Scope.close(scope, Exit.void);
+      yield* Scope.close(scope, Exit.void);
+      yield* Effect.promise((signal) =>
+        expect(fetch(`${address}/ready`, { signal })).rejects.toThrow()
+      );
+    })
+  );
 
-  it('does not change embedding process signal handlers or exit policy', async () => {
-    const sigterm = process.listeners('SIGTERM');
-    const sigint = process.listeners('SIGINT');
-    const exitCode = process.exitCode;
-    await Effect.runPromise(
-      Effect.scoped(
+  it.live('does not change embedding process signal handlers or exit policy', () =>
+    Effect.gen(function* () {
+      const sigterm = process.listeners('SIGTERM');
+      const sigint = process.listeners('SIGINT');
+      const exitCode = process.exitCode;
+      yield* Effect.scoped(
         Effect.gen(function* () {
           yield* startGateway({ ...loadConfig(environment()), port: 0 });
           expect(process.listeners('SIGTERM')).toEqual(sigterm);
           expect(process.listeners('SIGINT')).toEqual(sigint);
           expect(process.exitCode).toBe(exitCode);
         })
-      )
-    );
-    expect(process.listeners('SIGTERM')).toEqual(sigterm);
-    expect(process.listeners('SIGINT')).toEqual(sigint);
-    expect(process.exitCode).toBe(exitCode);
-  });
+      );
+      expect(process.listeners('SIGTERM')).toEqual(sigterm);
+      expect(process.listeners('SIGINT')).toEqual(sigint);
+      expect(process.exitCode).toBe(exitCode);
+    })
+  );
 
-  it('returns a typed startup failure and releases partially acquired resources', async () => {
-    const exitCode = process.exitCode;
-    const result = await Effect.runPromise(
-      gatewayProgram.pipe(
+  it.live('returns a typed startup failure and releases partially acquired resources', () =>
+    Effect.gen(function* () {
+      const exitCode = process.exitCode;
+      const result = yield* gatewayProgram.pipe(
         Effect.provideService(
           ConfigProvider.ConfigProvider,
           ConfigProvider.fromUnknown({ ...environment(), NATS_URL: 'nats://127.0.0.1:1' })
         ),
         Effect.flip
-      )
-    );
-    expect(result).toMatchObject({ _tag: 'GatewayStartupError', stage: 'application' });
-    expect(process.exitCode).toBe(exitCode);
-    await Effect.runPromise(
-      startGateway({ ...loadConfig(environment()), port: 0 }).pipe(Effect.scoped)
-    );
-  });
-
-  it('releases a failed listener startup without disturbing the process that owns the port', async () => {
-    const reservation = createHttpServer((_request, response) => response.end('reserved'));
-    await new Promise<void>((resolve, reject) => {
-      reservation.once('error', reject);
-      reservation.listen(0, '127.0.0.1', resolve);
-    });
-    const address = reservation.address();
-    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
-    const config = { ...loadConfig(environment()), port: address.port };
-    const url = `http://127.0.0.1:${address.port}`;
-    try {
-      const failure = await Effect.runPromise(
-        startGateway(config).pipe(Effect.scoped, Effect.flip)
       );
-      expect(failure).toMatchObject({ _tag: 'GatewayStartupError', stage: 'listener' });
-      expect(await (await fetch(url)).text()).toBe('reserved');
-    } finally {
-      await new Promise<void>((resolve, reject) =>
-        reservation.close((error) => (error ? reject(error) : resolve()))
+      expect(result).toMatchObject({ _tag: 'GatewayStartupError', stage: 'application' });
+      expect(process.exitCode).toBe(exitCode);
+      yield* startGateway({ ...loadConfig(environment()), port: 0 });
+    })
+  );
+
+  it.live(
+    'releases a failed listener startup without disturbing the process that owns the port',
+    () =>
+      Effect.gen(function* () {
+        const config = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const reservation = yield* Effect.acquireRelease(
+              Effect.sync(() => createHttpServer((_request, response) => response.end('reserved'))),
+              (server) =>
+                Effect.promise(
+                  () =>
+                    new Promise<void>((resolve, reject) => {
+                      if (!server.listening) return resolve();
+                      server.close((error) => (error ? reject(error) : resolve()));
+                    })
+                )
+            );
+            yield* Effect.promise(
+              () =>
+                new Promise<void>((resolve, reject) => {
+                  reservation.once('error', reject);
+                  reservation.listen(0, '127.0.0.1', resolve);
+                })
+            );
+            const address = reservation.address();
+            if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+            const config = { ...loadConfig(environment()), port: address.port };
+            const failure = yield* startGateway(config).pipe(Effect.scoped, Effect.flip);
+            expect(failure).toMatchObject({ _tag: 'GatewayStartupError', stage: 'listener' });
+            const response = yield* Effect.promise((signal) =>
+              fetch(`http://127.0.0.1:${address.port}`, { signal })
+            );
+            expect(yield* Effect.promise(() => response.text())).toBe('reserved');
+            return config;
+          })
+        );
+        const url = `http://127.0.0.1:${config.port}`;
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            yield* startGateway(config);
+            const response = yield* Effect.promise((signal) => fetch(`${url}/ready`, { signal }));
+            expect(response.status).toBe(200);
+          })
+        );
+        yield* Effect.promise((signal) =>
+          expect(fetch(`${url}/ready`, { signal })).rejects.toThrow()
+        );
+      })
+  );
+
+  it.live('runs the source bootstrap until interruption and releases its real listener', () =>
+    Effect.gen(function* () {
+      const port = yield* Effect.promise(availablePort);
+      const pending = yield* Effect.forkScoped(
+        gatewayProgram.pipe(
+          Effect.provideService(
+            ConfigProvider.ConfigProvider,
+            ConfigProvider.fromUnknown({ ...environment(), PORT: String(port) })
+          )
+        )
       );
-    }
-    await Effect.runPromise(
-      Effect.scoped(
-        Effect.gen(function* () {
-          yield* startGateway(config);
-          const response = yield* Effect.tryPromise(() => fetch(`${url}/ready`));
-          expect(response.status).toBe(200);
-        })
-      )
-    );
-    await expect(fetch(`${url}/ready`)).rejects.toThrow();
-  });
+      const address = `http://127.0.0.1:${port}`;
+      yield* Effect.promise((signal) =>
+        expect
+          .poll(
+            async () => {
+              try {
+                return (await fetch(`${address}/ready`, { signal })).status;
+              } catch {
+                return 0;
+              }
+            },
+            { timeout: 15000, interval: 50 }
+          )
+          .toBe(200)
+      );
+      const response = yield* Effect.promise((signal) => fetch(`${address}/health`, { signal }));
+      expect(response.status).toBe(200);
+      yield* Fiber.interrupt(pending);
+      const result = yield* Fiber.await(pending);
+      if (!Exit.isFailure(result))
+        throw new Error('Interrupted bootstrap should return interruption');
+      expect(Cause.hasInterruptsOnly(result.cause)).toBe(true);
+      yield* Effect.promise((signal) =>
+        expect(fetch(`${address}/ready`, { signal })).rejects.toThrow()
+      );
+    })
+  );
 
-  it('runs the source bootstrap until interruption and releases its real listener', async () => {
-    const port = await availablePort();
-    const pending = Effect.runFork(
-      gatewayProgram.pipe(
-        Effect.provideService(
-          ConfigProvider.ConfigProvider,
-          ConfigProvider.fromUnknown({ ...environment(), PORT: String(port) })
-        )
-      )
-    );
-    const address = `http://127.0.0.1:${port}`;
-    try {
-      await expect
-        .poll(
-          async () => {
-            try {
-              return (await fetch(`${address}/ready`)).status;
-            } catch {
-              return 0;
-            }
-          },
-          { timeout: 15000, interval: 50 }
-        )
-        .toBe(200);
-      expect((await fetch(`${address}/health`)).status).toBe(200);
-    } finally {
-      await Effect.runPromise(Fiber.interrupt(pending));
-    }
-    const result = await Effect.runPromise(Fiber.await(pending));
-    if (!Exit.isFailure(result))
-      throw new Error('Interrupted bootstrap should return interruption');
-    expect(Cause.hasInterruptsOnly(result.cause)).toBe(true);
-    await expect(fetch(`${address}/ready`)).rejects.toThrow();
-  });
-
-  it('fails source bootstrap with safe typed configuration diagnostics', async () => {
-    const suppliedSecret = 'private-short-secret';
-    const result = await Effect.runPromise(
-      gatewayProgram.pipe(
+  it.live('fails source bootstrap with safe typed configuration diagnostics', () =>
+    Effect.gen(function* () {
+      const suppliedSecret = 'private-short-secret';
+      const result = yield* gatewayProgram.pipe(
         Effect.provideService(
           ConfigProvider.ConfigProvider,
           ConfigProvider.fromUnknown({ ...environment(), CURSOR_SECRET: suppliedSecret })
         ),
         Effect.flip
-      )
-    );
-    expect(result).toMatchObject({ _tag: 'GatewayConfigurationError', fields: ['CURSOR_SECRET'] });
-    expect(JSON.stringify(result)).not.toContain(suppliedSecret);
-  });
+      );
+      expect(result).toMatchObject({
+        _tag: 'GatewayConfigurationError',
+        fields: ['CURSOR_SECRET'],
+      });
+      expect(JSON.stringify(result)).not.toContain(suppliedSecret);
+    })
+  );
 
   it.each([
     'environment',

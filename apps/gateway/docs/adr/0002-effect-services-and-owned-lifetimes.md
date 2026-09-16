@@ -20,6 +20,8 @@ The executable owns process signals and exit policy through `NodeRuntime`. It im
 
 ## Compatibility and validation
 
-Public GraphQL and health protocols, projection semantics, and the legacy color replay constraints from ADR 0001 remain. Producer-owned event payload schemas remain owned by the shared events package; gateway envelope, cursor, storage, and configuration validation use Effect Schema. Tests provide controlled services through layers and test resource cleanup and cancellation through public boundaries. The existing Vitest version remains; Effect's testing clock is used directly rather than upgrading the entire monorepo to satisfy the optional Effect Vitest adapter.
+Public GraphQL and health protocols, projection semantics, and the legacy color replay constraints from ADR 0001 remain. Producer-owned event payload schemas remain owned by the shared events package; gateway envelope, cursor, storage, and configuration validation use Effect Schema. Tests provide controlled services through layers and test resource cleanup and cancellation through public boundaries.
+
+The gateway uses `@effect/vitest` at the matching Effect release with Vitest, coverage, and UI packages pinned to `5.0.1`. This adapter requires Vitest 5. Other workspaces retain their existing runners; the shared configuration exposes plain defaults so the gateway composes configuration with its own runner. Capability tests use `it.effect` and its test clock; real network lifecycle tests use `it.live`. Shared test layers contain immutable services, while mutable quota state is recreated per test. Foreign-framework and subprocess tests can retain conventional async boundaries. Coverage includes every production source file and retains the original thresholds despite the newer engine's changed remapping.
 
 Migration API mappings follow the upstream Effect v3-to-v4 skill and installed source. No v3 compatibility layer is retained.

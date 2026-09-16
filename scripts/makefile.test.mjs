@@ -35,6 +35,13 @@ test('test tiers preserve sequential container execution', () => {
   }
 });
 
+test('focused tests select one workspace and serialize dependency builds and tests', () => {
+  assert.notEqual(make('test-focused').status, 0);
+  const focused = output('test-focused', 'PACKAGE=web', 'ARGS=test/components/profile/public-profile-page.test.tsx');
+  assert.match(focused, /run build --filter="@wallpaperdb\/web\^\.\.\." --concurrency=1/);
+  assert.match(focused, /vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism test\/components\/profile\/public-profile-page.test.tsx/);
+});
+
 test('dev defaults to Compose and scopes workspace dev through Turbo', () => {
   assert.match(output('dev'), /docker compose .* watch/);
   assert.match(output('dev', 'PACKAGE=docs'), /run dev .*--filter=@wallpaperdb\/docs/);
@@ -59,6 +66,7 @@ test('force applies to both CI phases and type checks', () => {
   const ci = output('ci', 'FORCE=1');
   assert.match(ci, /run build lint check-types test:unit test:integration .*--force/);
   assert.match(ci, /run test:e2e .*--force/);
+  assert.match(ci, /run build lint check-types test:unit test:integration .*--concurrency=1/);
   assert.doesNotMatch(output('ci', 'PACKAGE=web'), /--filter=/);
   assert.match(output('check-types', 'FORCE=1'), /run check-types .*--force/);
 });

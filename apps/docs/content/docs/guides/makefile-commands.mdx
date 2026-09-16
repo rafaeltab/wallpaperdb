@@ -40,6 +40,8 @@ make migrate PACKAGE=user
 
 Use `FORCE=1` to bypass Turbo's cache, for example `make build PACKAGE=web FORCE=1` or `make ci FORCE=1`. CI always checks the entire repository, regardless of `PACKAGE`.
 
+For selected Vitest files, `make test-focused PACKAGE=web ARGS='test/components/profile/public-profile-page.test.tsx'` builds that workspace's dependencies and runs the tests with one worker. `PACKAGE` is required. CI also defaults to serial execution; `CI_CONCURRENCY` can adjust its build, lint, type-check, unit, and integration phase while E2E tasks remain serial.
+
 ## Less frequent package scripts
 
 Use `run` for scripts that don't need their own shared target. Both `PACKAGE` and `SCRIPT` are required. `ARGS` passes arguments to the script. This runs the package script directly, without Turbo's dependency builds or cache; build dependencies first when needed.
@@ -106,6 +108,8 @@ Per-workspace aliases have been removed. Use these replacements:
 | `make ingestor-docker-run` | `make apps-start SERVICE=ingestor` (development Compose container) |
 | `make psql-media` | `make psql DB=media` |
 | `make db-studio-media` | `make run PACKAGE=media SCRIPT=db:studio` |
+| `make db-generate WORKSPACE=@wallpaperdb/user` | `make run PACKAGE=user SCRIPT=db:generate` |
+| `make test-focused WORKSPACE=@wallpaperdb/web TEST_ARGS='test/example.test.ts'` | `make test-focused PACKAGE=web ARGS='test/example.test.ts'` |
 | `make ci-force` | `make ci FORCE=1` |
 | `make check-types-force` | `make check-types FORCE=1` |
 

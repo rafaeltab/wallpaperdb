@@ -11,9 +11,9 @@ SeaweedFS provides S3-compatible object storage for storing wallpaper files (ori
 - **Host S3 API**: http://localhost:8002 for worktree slot 0; other slots use `8002 + 10 × slot`
 - **Docker S3 API**: `http://seaweedfs:9000`
 - **Access key / secret key**: `storageadmin` / `storageadmin` (local development defaults)
-- **Buckets**: `wallpapers`, `example-bucket`
+- **Buckets**: `wallpapers`, `example-bucket`, `profile-pictures`
 
-The Compose service runs SeaweedFS `mini`, which starts its storage components together and creates both buckets through `S3_BUCKET`. The S3 API is the published interface; administer objects through an S3 client such as the AWS CLI.
+The Compose service runs SeaweedFS `mini`, which starts its storage components together and creates all three buckets through `S3_BUCKET`. Readiness checks authenticated access to each bucket. The S3 API is the published interface; administer objects through an S3 client such as the AWS CLI.
 
 ## Configuration
 
@@ -51,7 +51,11 @@ const client = s3.getClient();
 **example-bucket** - Testing/examples
 - Public download access (local dev only)
 
-Anonymous reads are scoped to these two buckets. Listing and writes require credentials. The `mini` options disable automatic bucket creation on upload and deletion of nonempty buckets.
+Anonymous reads are scoped to these two public buckets. Listing and writes require credentials. The `mini` options disable automatic bucket creation on upload and deletion of nonempty buckets.
+
+**profile-pictures** - Private Profile picture assets
+
+User writes immutable Profile pictures here. All direct access requires credentials; anonymous reads, writes, and listing are denied. Media serves current pictures through its public endpoint after checking User's authoritative state. Replaced and removed assets stay private until evidence retention expires. If `PROFILE_PICTURE_BUCKET` is customized, provision that bucket privately and keep it out of the anonymous identity's permissions.
 
 ## File Organization
 

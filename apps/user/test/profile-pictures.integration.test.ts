@@ -2,8 +2,8 @@ import 'reflect-metadata';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CreateBucketCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
+import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { createDefaultTesterBuilder, DockerTesterBuilder, S3TesterBuilder } from '@wallpaperdb/test-utils';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { FakeTimerService } from '@wallpaperdb/core/timer';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
@@ -11,7 +11,6 @@ import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
 import { connect } from 'nats';
 import sharp from 'sharp';
-import { Wait } from 'testcontainers';
 import { container } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../src/app.js';
@@ -26,7 +25,11 @@ const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 describe('Profile picture commands', () => {
   let postgresContainer: StartedPostgreSqlContainer;
   let natsContainer: StartedNatsContainer;
-  let minioContainer: StartedMinioContainer;
+  const StorageTester = createDefaultTesterBuilder()
+    .with(DockerTesterBuilder)
+    .with(S3TesterBuilder)
+    .build();
+  const storageTester = new StorageTester().withS3().withS3Bucket('profile-pictures');
   let sql: ReturnType<typeof postgres>;
   let storage: S3Client;
   let app: FastifyInstance;
@@ -35,9 +38,10 @@ describe('Profile picture commands', () => {
   const pictureImportTimer = new FakeTimerService();
 
   beforeAll(async () => {
-    [postgresContainer, natsContainer, minioContainer] = await Promise.all([
+    await storageTester.setup();
+    const s3 = storageTester.s3.config;
+    [postgresContainer, natsContainer] = await Promise.all([
       new PostgreSqlContainer('postgres:16-alpine').start(), createNatsContainer(),
-      new MinioContainer('minio/minio:latest').withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000)).start(),
     ]);
     const streamConnection = await connect({ servers: natsContainer.getConnectionUrl() });
     await (await streamConnection.jetstreamManager()).streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
@@ -51,15 +55,13 @@ describe('Profile picture commands', () => {
       natsUrl: natsContainer.getConnectionUrl(), natsStream: 'WALLPAPER', otelServiceName: 'user-picture-test',
       profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80, profileBiographyMaxLength: 5000, profileRetainedAliasLimit: 3,
       profileEvidenceRetentionDays: 30,
-      s3Endpoint: minioContainer.getConnectionUrl(), s3AccessKeyId: minioContainer.getUsername(),
-      s3SecretAccessKey: minioContainer.getPassword(), s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
+      s3Endpoint: s3.endpoints.fromHost, s3AccessKeyId: s3.options.accessKey,
+      s3SecretAccessKey: s3.options.secretKey, s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'], userMediaServiceToken: 'test-media-token',
     };
-    storage = new S3Client({ endpoint: config.s3Endpoint, region: config.s3Region, forcePathStyle: true,
-      credentials: { accessKeyId: minioContainer.getUsername(), secretAccessKey: minioContainer.getPassword() } });
-    await storage.send(new CreateBucketCommand({ Bucket: config.profilePictureBucket }));
+    storage = storageTester.s3.getS3Client();
     container.clearInstances();
     app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService(), pictureImportTimer, evidenceRetentionTimer: new FakeTimerService() });
     container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } });
@@ -70,7 +72,7 @@ describe('Profile picture commands', () => {
     await app?.close();
     await sql?.end();
     storage?.destroy();
-    await Promise.all([postgresContainer?.stop(), natsContainer?.stop(), minioContainer?.stop()]);
+    await Promise.all([postgresContainer?.stop(), natsContainer?.stop(), storageTester.destroy()]);
   });
 
   function auth(userId = 'user_picture') {

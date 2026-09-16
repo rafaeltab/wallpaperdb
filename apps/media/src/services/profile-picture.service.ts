@@ -1,14 +1,14 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { inject, singleton } from 'tsyringe';
 import type { Config } from '../config.js';
-import { MinioConnection } from '../connections/minio.js';
+import { S3Connection } from '../connections/s3.js';
 import { ProfilePictureRepository } from '../repositories/profile-picture.repository.js';
 
 @singleton()
 export class ProfilePictureService {
   constructor(
     @inject(ProfilePictureRepository) private readonly repository: ProfilePictureRepository,
-    @inject(MinioConnection) private readonly minio: MinioConnection,
+    @inject(S3Connection) private readonly s3: S3Connection,
     @inject('config') private readonly config: Config
   ) {}
 
@@ -35,7 +35,7 @@ export class ProfilePictureService {
     if (availability.status !== 204)
       throw new Error('Profile picture availability could not be verified');
 
-    const object = await this.minio.getClient().send(
+    const object = await this.s3.getClient().send(
       new GetObjectCommand({
         Bucket: asset.storageBucket,
         Key: asset.storageKey,

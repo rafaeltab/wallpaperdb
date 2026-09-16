@@ -7,6 +7,7 @@ const templatePaths = [
   "infra/.env.example",
   "apps/ingestor/.env.example",
   "apps/media/.env.example",
+  "apps/user/.env.example",
   "apps/color-extractor/.env.example",
   "apps/variant-generator/.env.example",
 ];
@@ -54,4 +55,11 @@ test("ingestor environment generation preserves a custom S3 cleanup interval", (
   const generated = parseEnvValues(applyOverrides(template, applicable, {}));
 
   assert.equal(generated.S3_CLEANUP_INTERVAL_MS, "60000");
+});
+
+test("User picture storage and infrastructure share default S3 credentials", () => {
+  const infrastructure = parseEnvValues(readFileSync(new URL("../../infra/.env.example", import.meta.url), "utf8"));
+  const user = parseEnvValues(readFileSync(new URL("../../apps/user/.env.example", import.meta.url), "utf8"));
+  assert.equal(user.S3_ACCESS_KEY_ID, infrastructure.S3_ACCESS_KEY_ID);
+  assert.equal(user.S3_SECRET_ACCESS_KEY, infrastructure.S3_SECRET_ACCESS_KEY);
 });

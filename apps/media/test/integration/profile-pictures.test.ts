@@ -7,7 +7,7 @@ import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEv
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
-  MinioTesterBuilder,
+  S3TesterBuilder,
   NatsTesterBuilder,
   PostgresTesterBuilder,
 } from '@wallpaperdb/test-utils';
@@ -38,15 +38,15 @@ describe('Profile picture delivery', () => {
     const Tester = createDefaultTesterBuilder()
       .with(DockerTesterBuilder)
       .with(PostgresTesterBuilder)
-      .with(MinioTesterBuilder)
+      .with(S3TesterBuilder)
       .with(NatsTesterBuilder)
       .with(MediaMigrationsTesterBuilder)
       .with(InProcessMediaTesterBuilder)
       .build();
     return new Tester()
       .withPostgres((builder) => builder.withDatabase('test_profile_pictures'))
-      .withMinio()
-      .withMinioBucket('profile-pictures')
+      .withS3()
+      .withS3Bucket('profile-pictures')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()
@@ -87,7 +87,7 @@ describe('Profile picture delivery', () => {
       id: pictureId, storageBucket: 'profile-pictures', storageKey: `${profileId}/${pictureId}.webp`,
       mimeType: 'image/webp' as const, width: 32, height: 32, fileSizeBytes: bytes.length,
     };
-    await tester.minio.uploadObject(asset.storageBucket, asset.storageKey, bytes);
+    await tester.s3.uploadObject(asset.storageBucket, asset.storageKey, bytes);
     const timestamp = new Date().toISOString();
     return {
       bytes,
@@ -192,11 +192,11 @@ describe('Profile picture delivery', () => {
       expect(response.rawPayload).not.toEqual(bytes);
     }
     expect(authorityRequests).toHaveLength(requestsBefore + 2);
-    const stored = await tester.minio.getS3Client().send(new GetObjectCommand({
+    const stored = await tester.s3.getS3Client().send(new GetObjectCommand({
       Bucket: 'profile-pictures', Key: 'user_picture_retired/pic_retired.webp',
     }));
     expect(Buffer.from(await stored.Body?.transformToByteArray() ?? [])).toEqual(bytes);
-    const anonymous = await fetch(`${tester.minio.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`);
+    const anonymous = await fetch(`${tester.s3.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`);
     expect(anonymous.status).toBe(403);
     await anonymous.body?.cancel();
   });
@@ -218,12 +218,12 @@ describe('Profile picture delivery', () => {
     }
     availability.set('pic_retry', 204);
     const key = 'user_picture_retry/pic_retry.webp';
-    await tester.minio.getS3Client().send(new DeleteObjectCommand({ Bucket: 'profile-pictures', Key: key }));
+    await tester.s3.getS3Client().send(new DeleteObjectCommand({ Bucket: 'profile-pictures', Key: key }));
     const missingObject = await getPicture('pic_retry');
     expect(missingObject.statusCode).toBe(503);
     expect(missingObject.headers['cache-control']).toBe('no-store');
     expect(missingObject.body).not.toContain(key);
-    await tester.minio.uploadObject('profile-pictures', key, bytes);
+    await tester.s3.uploadObject('profile-pictures', key, bytes);
     const recovered = await getPicture('pic_retry');
     expect(recovered.statusCode).toBe(200);
     expect(recovered.rawPayload).toEqual(bytes);

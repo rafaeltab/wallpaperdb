@@ -62,6 +62,18 @@ try {
     Bucket: "missing-bucket", Key: key, Body: body,
   })), { name: "NoSuchBucket" }, "uploads cannot implicitly create buckets");
 
+  // Profile pictures must be provisioned at startup without anonymous access.
+  const pictureKey = "profile-storage-smoke/picture.webp";
+  await client.send(new PutObjectCommand({
+    Bucket: "profile-pictures", Key: pictureKey, Body: "private picture bytes", ContentType: "image/webp",
+  }));
+  for (const method of ["GET", "HEAD", "PUT", "DELETE"]) {
+    assert.equal((await fetch(`${endpoint}/profile-pictures/${pictureKey}`, { method })).status, 403,
+      `Profile pictures reject anonymous ${method}`);
+  }
+  assert.equal((await fetch(`${endpoint}/profile-pictures?list-type=2`)).status, 403,
+    "Profile pictures reject anonymous listing");
+
   compose("restart", "seaweedfs");
   compose("up", "-d", "--wait", "--wait-timeout", "120", "seaweedfs");
   // Docker may allocate a new ephemeral host port on restart.
@@ -75,6 +87,11 @@ try {
     assert.equal(object.Metadata["wallpaper-id"], "storage-smoke");
     assert.equal((await fetch(`${endpoint}/${bucket}/${key}`)).status, 200);
   }
+  const picture = await client.send(new GetObjectCommand({ Bucket: "profile-pictures", Key: pictureKey }));
+  assert.equal(await picture.Body.transformToString(), "private picture bytes");
+  assert.equal(picture.ContentType, "image/webp");
+  assert.equal((await fetch(`${endpoint}/profile-pictures/${pictureKey}`)).status, 403,
+    "Profile pictures remain private after restart");
   console.log("Compose storage checks passed: bucket bootstrap, scoped public reads, authenticated writes, and persistence.");
 } catch (error) {
   console.error(compose("logs", "--no-color", "--tail", "100", "seaweedfs"));

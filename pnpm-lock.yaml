@@ -859,9 +859,6 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.10
-      '@testcontainers/minio':
-        specifier: ^11.9.0
-        version: 11.11.0
       '@testcontainers/postgresql':
         specifier: ^11.9.0
         version: 11.11.0

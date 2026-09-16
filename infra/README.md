@@ -75,7 +75,7 @@ Example initialization scripts are provided in:
 - `opensearch/init/` - Index creation scripts
 - `nats/init/` - Stream creation scripts
 
-SeaweedFS `mini` creates `wallpapers` and `example-bucket` automatically from `S3_BUCKET`. The pinned image is `chrislusf/seaweedfs:4.47`; no separate bucket initializer or separate storage client is required.
+SeaweedFS `mini` creates `wallpapers`, `example-bucket`, and `profile-pictures` automatically from `S3_BUCKET`. The pinned image is `chrislusf/seaweedfs:4.47`; no separate bucket initializer or separate storage client is required. Readiness checks authenticated access to all three buckets.
 
 Profile pictures use the separate `profile-pictures` bucket, with anonymous access explicitly disabled. Keep this bucket private: User writes pictures and Media delivers them only after checking current public availability with User. The existing public wallpaper buckets must not hold Profile pictures. If `PROFILE_PICTURE_BUCKET` is customized, provision that bucket with the same private policy.
 

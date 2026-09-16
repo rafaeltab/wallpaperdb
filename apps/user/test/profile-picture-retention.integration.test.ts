@@ -2,12 +2,11 @@ import 'reflect-metadata';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { MinioContainer, type StartedMinioContainer } from '@testcontainers/minio';
+import { DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { createDefaultTesterBuilder, DockerTesterBuilder, S3TesterBuilder } from '@wallpaperdb/test-utils';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
 import sharp from 'sharp';
-import { Wait } from 'testcontainers';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../src/config.js';
 import { DatabaseConnection } from '../src/connections/database.js';
@@ -21,7 +20,11 @@ const day = 24 * 60 * 60 * 1000;
 
 describe('Private Profile picture retention', () => {
   let postgresContainer: StartedPostgreSqlContainer;
-  let minioContainer: StartedMinioContainer;
+  const StorageTester = createDefaultTesterBuilder()
+    .with(DockerTesterBuilder)
+    .with(S3TesterBuilder)
+    .build();
+  const storageTester = new StorageTester().withS3().withS3Bucket('profile-pictures');
   let sql: ReturnType<typeof postgres>;
   let database: DatabaseConnection;
   let objectStorage: S3Client;
@@ -35,11 +38,9 @@ describe('Private Profile picture retention', () => {
   const logger = { error: (bindings: object, message: string) => { errors.push({ bindings, message }); } };
 
   beforeAll(async () => {
-    [postgresContainer, minioContainer] = await Promise.all([
-      new PostgreSqlContainer('postgres:16-alpine').start(),
-      new MinioContainer('minio/minio:latest')
-        .withWaitStrategy(Wait.forHttp('/minio/health/ready', 9000)).start(),
-    ]);
+    await storageTester.setup();
+    const s3 = storageTester.s3.config;
+    postgresContainer = await new PostgreSqlContainer('postgres:16-alpine').start();
     sql = postgres(postgresContainer.getConnectionUri(), { max: 10 });
     for (const path of readdirSync(migrations).filter((path) => path.endsWith('.sql')).sort()) {
       await sql.unsafe(readFileSync(join(migrations, path), 'utf8'));
@@ -49,19 +50,15 @@ describe('Private Profile picture retention', () => {
       natsUrl: 'nats://127.0.0.1:4222', natsStream: 'WALLPAPER', otelServiceName: 'picture-retention-test',
       profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80,
       profileBiographyMaxLength: 5000, profileRetainedAliasLimit: 3, profileEvidenceRetentionDays: 30,
-      s3Endpoint: minioContainer.getConnectionUrl(), s3AccessKeyId: minioContainer.getUsername(),
-      s3SecretAccessKey: minioContainer.getPassword(), s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
+      s3Endpoint: s3.endpoints.fromHost, s3AccessKeyId: s3.options.accessKey,
+      s3SecretAccessKey: s3.options.secretKey, s3Region: 'us-east-1', profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024, profilePictureMaxPixels: 16_000_000,
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com'],
     };
     database = new DatabaseConnection(config);
     await database.initialize();
-    objectStorage = new S3Client({
-      endpoint: config.s3Endpoint, region: config.s3Region, forcePathStyle: true,
-      credentials: { accessKeyId: minioContainer.getUsername(), secretAccessKey: minioContainer.getPassword() },
-    });
-    await objectStorage.send(new CreateBucketCommand({ Bucket: config.profilePictureBucket }));
+    objectStorage = storageTester.s3.getS3Client();
     storage = new ProfilePictureStorage(config);
     profiles = new ProfileService(database, {
       getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null }),
@@ -82,7 +79,7 @@ describe('Private Profile picture retention', () => {
     objectStorage?.destroy();
     await database?.close();
     await sql?.end();
-    await Promise.all([postgresContainer?.stop(), minioContainer?.stop()]);
+    await Promise.all([postgresContainer?.stop(), storageTester.destroy()]);
   });
 
   async function object(assetId: string, profileId = 'user_picture') {

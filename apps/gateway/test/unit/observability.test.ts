@@ -1,29 +1,26 @@
 import { context, propagation, trace } from '@opentelemetry/api';
 import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { Effect } from 'effect';
+import { Layer, ManagedRuntime } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { createAdmission } from '../../src/admission/index.js';
-import { createAvailability } from '../../src/availability/index.js';
-import { runGatewayEffect } from '../../src/runtime.js';
+import { Admission } from '../../src/admission/index.js';
+import { Availability } from '../../src/availability/index.js';
+import { HttpExecution, httpExecutionLayer } from '../../src/runtime.js';
+import { httpTestLayer } from './http-fixture.js';
 
 describe('Effect OpenTelemetry bridge', () => {
-  it('parents readiness and disabled-admission spans to the active transport span', async () => {
+  it('parents application spans to the active transport span', async () => {
     const exporter = new InMemorySpanExporter();
-    const provider = new NodeTracerProvider();
-    provider.addSpanProcessor(new SimpleSpanProcessor(exporter));
+    const provider = new NodeTracerProvider({
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+    });
     provider.register();
+    const runtime = ManagedRuntime.make(httpExecutionLayer.pipe(Layer.provide(httpTestLayer())));
     try {
-      const admission = createAdmission(
-        { take: () => Effect.die('Disabled admission must not consume quota') },
-        { enabled: false, limit: 10, windowMs: 1000 }
-      );
-      const availability = createAvailability({
-        inspect: () => Effect.succeed({ nats: true, opensearch: true, otel: true }),
-      });
+      const execution = await runtime.runPromise(HttpExecution);
       await trace.getTracer('gateway-contract').startActiveSpan('http.request', async (span) => {
-        await runGatewayEffect(admission.admit('visitor'));
-        await runGatewayEffect(availability.ready(false, true));
+        await execution.run(Admission.use((admission) => admission.admit('visitor')));
+        await execution.run(Availability.use((availability) => availability.ready(false, true)));
         span.end();
       });
       await provider.forceFlush();
@@ -33,10 +30,11 @@ describe('Effect OpenTelemetry bridge', () => {
       for (const name of ['admission.admit', 'availability.ready']) {
         const span = spans.find((span) => span.name === name);
         expect(span).toBeDefined();
-        expect(span?.parentSpanId).toBe(parent?.spanContext().spanId);
+        expect(span?.parentSpanContext?.spanId).toBe(parent?.spanContext().spanId);
         expect(span?.spanContext().traceId).toBe(parent?.spanContext().traceId);
       }
     } finally {
+      await runtime.dispose();
       trace.disable();
       context.disable();
       propagation.disable();

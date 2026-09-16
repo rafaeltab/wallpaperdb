@@ -1,136 +1,119 @@
 import {
-  NatsConfigSchema,
-  OpenSearchConfigSchema,
-  OtelConfigSchema,
-  RedisConfigSchema,
-  ServerConfigSchema,
-} from '@wallpaperdb/core/config';
-import { z } from 'zod';
+  Config as Configuration,
+  ConfigProvider,
+  Effect,
+  Option,
+  Schema,
+  SchemaIssue,
+} from 'effect';
 
-// Gateway-specific OpenSearch config (extends shared schema with index field)
-const GatewayOpenSearchConfigSchema = OpenSearchConfigSchema.extend({
-  opensearchIndex: z.string().min(1),
-  opensearchProfileIndex: z.string().min(1).optional(),
-});
+const urlString = Schema.String.check(
+  Schema.makeFilter((value) => URL.canParse(value), { expected: 'an absolute URL' })
+);
+const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
+const boundedPort = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 }));
+const positive = (name: string, fallback: number) =>
+  Configuration.schema(positiveInteger, name).pipe(Configuration.withDefault(fallback));
+const boolean = (name: string, fallback: boolean) =>
+  Configuration.Literals(['true', 'false'], name).pipe(
+    Configuration.map((value) => value === 'true'),
+    Configuration.withDefault(fallback)
+  );
+const optional = <A>(config: Configuration.Config<A>) =>
+  config.pipe(Configuration.option, Configuration.map(Option.getOrUndefined));
 
-// Compose full config from shared schemas + gateway-specific fields
-const configSchema = z.object({
-  // Server config
-  ...ServerConfigSchema.shape,
-  // OpenSearch config (with gateway-specific index field)
-  ...GatewayOpenSearchConfigSchema.shape,
-  // NATS config
-  ...NatsConfigSchema.shape,
-  // Redis config
-  ...RedisConfigSchema.shape,
-  // OTEL config
-  ...OtelConfigSchema.shape,
-  mediaServiceUrl: z.string().url(),
-  mediaPublicBaseUrl: z.string().url().optional(),
-  mediaPublicPath: z.string().min(1).default('/media'),
+export class GatewayConfigurationError extends Schema.TaggedError<GatewayConfigurationError>()(
+  'GatewayConfigurationError',
+  { message: Schema.String, fields: Schema.Array(Schema.String) }
+) {}
 
-  colorSpreadStrategy: z.enum(['linear', 'exponential', 'exact']).default('linear'),
+const configurationIssues = SchemaIssue.makeFormatterStandardSchemaV1();
 
-  // GraphQL Security
-  graphqlMaxDepth: z.number().int().positive().default(5),
-  graphqlMaxComplexity: z.number().int().positive().default(1000),
-  graphqlMaxUniqueFields: z.number().int().positive().default(50),
-  graphqlMaxAliases: z.number().int().positive().default(20),
-  graphqlMaxBatchSize: z.number().int().positive().default(10),
-  graphqlIntrospectionEnabled: z.boolean().default(true),
+function configurationError(error: Configuration.ConfigError): GatewayConfigurationError {
+  const fields =
+    error.cause._tag === 'SchemaError'
+      ? configurationIssues(error.cause.issue).issues.map((issue) =>
+          (issue.path ?? [])
+            .map((part) => String(typeof part === 'object' ? part.key : part))
+            .join('.')
+        )
+      : [];
+  return new GatewayConfigurationError({
+    message: 'Invalid gateway configuration',
+    fields: [...new Set(fields)],
+  });
+}
 
-  // Rate Limiting
-  rateLimitEnabled: z.boolean().default(true),
-  rateLimitMaxAnonymous: z.number().int().positive().default(100),
-  rateLimitWindowMs: z.number().int().positive().default(60000),
+/** Configuration and defaults are resolved once, before constructing the service graph. */
+export const gatewayConfig = Effect.gen(function* () {
+  const nodeEnv = yield* Configuration.Literals(
+    ['development', 'production', 'test'],
+    'NODE_ENV'
+  ).pipe(Configuration.withDefault('development'));
+  return yield* Configuration.all({
+    nodeEnv: Configuration.succeed(nodeEnv),
+    port: Configuration.schema(boundedPort, 'PORT').pipe(Configuration.withDefault(3004)),
+    opensearchUrl: Configuration.schema(urlString, 'OPENSEARCH_URL'),
+    opensearchIndex: Configuration.NonEmptyString('OPENSEARCH_INDEX').pipe(
+      Configuration.withDefault('wallpapers')
+    ),
+    opensearchProfileIndex: optional(Configuration.NonEmptyString('OPENSEARCH_PROFILE_INDEX')),
+    opensearchUsername: optional(Configuration.String('OPENSEARCH_USERNAME')),
+    opensearchPassword: optional(Configuration.Redacted('OPENSEARCH_PASSWORD')),
+    natsUrl: Configuration.schema(urlString, 'NATS_URL'),
+    natsStream: Configuration.String('NATS_STREAM').pipe(Configuration.withDefault('WALLPAPER')),
+    redisHost: Configuration.NonEmptyString('REDIS_HOST').pipe(
+      Configuration.withDefault('localhost')
+    ),
+    redisPort: Configuration.schema(boundedPort, 'REDIS_PORT').pipe(
+      Configuration.withDefault(6379)
+    ),
+    redisPassword: optional(Configuration.Redacted('REDIS_PASSWORD')),
+    redisEnabled: boolean('REDIS_ENABLED', true),
+    otelEndpoint: optional(Configuration.schema(urlString, 'OTEL_EXPORTER_OTLP_ENDPOINT')),
+    otelServiceName: Configuration.NonEmptyString('OTEL_SERVICE_NAME').pipe(
+      Configuration.withDefault('gateway')
+    ),
+    mediaServiceUrl: Configuration.schema(urlString, 'MEDIA_SERVICE_URL'),
+    mediaPublicBaseUrl: optional(
+      Configuration.schema(Schema.Union([Schema.Literal(''), urlString]), 'MEDIA_PUBLIC_BASE_URL')
+    ).pipe(Configuration.map((value) => value || undefined)),
+    mediaPublicPath: Configuration.NonEmptyString('MEDIA_PUBLIC_PATH').pipe(
+      Configuration.withDefault('/media')
+    ),
+    colorSpreadStrategy: Configuration.Literals(
+      ['linear', 'exponential', 'exact'],
+      'COLOR_SPREAD_STRATEGY'
+    ).pipe(Configuration.withDefault('linear')),
+    graphqlMaxDepth: positive('GRAPHQL_MAX_DEPTH', 5),
+    graphqlMaxComplexity: positive('GRAPHQL_MAX_COMPLEXITY', 1000),
+    graphqlMaxUniqueFields: positive('GRAPHQL_MAX_UNIQUE_FIELDS', 50),
+    graphqlMaxAliases: positive('GRAPHQL_MAX_ALIASES', 20),
+    graphqlMaxBatchSize: positive('GRAPHQL_MAX_BATCH_SIZE', 10),
+    graphqlIntrospectionEnabled: boolean('GRAPHQL_INTROSPECTION_ENABLED', nodeEnv !== 'production'),
+    rateLimitEnabled: boolean('RATE_LIMIT_ENABLED', true),
+    rateLimitMaxAnonymous: positive('RATE_LIMIT_MAX_ANONYMOUS', 100),
+    rateLimitWindowMs: positive('RATE_LIMIT_WINDOW_MS', 60000),
+    cursorSecret: Configuration.schema(
+      Schema.Redacted(Schema.String.check(Schema.isMinLength(32))),
+      'CURSOR_SECRET'
+    ),
+    cursorExpirationMs: positive('CURSOR_EXPIRATION_MS', 7 * 24 * 60 * 60 * 1000),
+  });
+}).pipe(Effect.mapError(configurationError));
 
-  // Cursor Security
-  cursorSecret: z.string().min(32),
-  cursorExpirationMs: z
-    .number()
-    .int()
-    .positive()
-    .default(7 * 24 * 60 * 60 * 1000), // 7 days
-});
+export type Config = Effect.Success<typeof gatewayConfig>;
 
-export type Config = z.infer<typeof configSchema>;
-
+/** Synchronous embedding boundary; production bootstrap evaluates gatewayConfig directly. */
 export function loadConfig(
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): Config {
-  const getEnv = (key: string, fallback?: string) => environment[key] ?? fallback;
-  const parseIntEnv = (value: string | undefined, fallback?: number) =>
-    value === undefined ? fallback : Number(value);
-  const booleanEnv = (key: string, fallback: boolean): boolean => {
-    const value = environment[key];
-    if (value === undefined) return fallback;
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    throw new Error(`Invalid gateway configuration: ${key} must be true or false`);
-  };
-  const nodeEnv = getEnv('NODE_ENV', 'development');
-
-  const raw = {
-    // Server
-    port: parseIntEnv(environment.PORT, 3004),
-    nodeEnv,
-
-    // OpenSearch
-    opensearchUrl: environment.OPENSEARCH_URL,
-    opensearchIndex: getEnv('OPENSEARCH_INDEX', 'wallpapers'),
-    opensearchProfileIndex: environment.OPENSEARCH_PROFILE_INDEX,
-    opensearchPassword: getEnv('OPENSEARCH_PASSWORD'),
-    opensearchUsername: getEnv('OPENSEARCH_USERNAME'),
-
-    // NATS
-    natsUrl: environment.NATS_URL,
-    natsStream: getEnv('NATS_STREAM', 'WALLPAPER'),
-
-    // Redis
-    redisHost: environment.REDIS_HOST,
-    redisPort: parseIntEnv(environment.REDIS_PORT),
-    redisPassword: environment.REDIS_PASSWORD,
-    redisEnabled: booleanEnv('REDIS_ENABLED', true),
-
-    // OTEL
-    otelEndpoint: environment.OTEL_EXPORTER_OTLP_ENDPOINT,
-    otelServiceName: getEnv('OTEL_SERVICE_NAME', 'gateway'),
-
-    mediaServiceUrl: getEnv('MEDIA_SERVICE_URL'),
-    mediaPublicBaseUrl: environment.MEDIA_PUBLIC_BASE_URL || undefined,
-    mediaPublicPath: getEnv('MEDIA_PUBLIC_PATH', '/media'),
-
-    colorSpreadStrategy: getEnv('COLOR_SPREAD_STRATEGY', 'linear'),
-
-    // GraphQL Security
-    graphqlMaxDepth: parseIntEnv(environment.GRAPHQL_MAX_DEPTH, 5),
-    graphqlMaxComplexity: parseIntEnv(environment.GRAPHQL_MAX_COMPLEXITY, 1000),
-    graphqlMaxUniqueFields: parseIntEnv(environment.GRAPHQL_MAX_UNIQUE_FIELDS, 50),
-    graphqlMaxAliases: parseIntEnv(environment.GRAPHQL_MAX_ALIASES, 20),
-    graphqlMaxBatchSize: parseIntEnv(environment.GRAPHQL_MAX_BATCH_SIZE, 10),
-    graphqlIntrospectionEnabled: booleanEnv(
-      'GRAPHQL_INTROSPECTION_ENABLED',
-      nodeEnv !== 'production'
-    ),
-
-    // Rate Limiting
-    rateLimitEnabled: booleanEnv('RATE_LIMIT_ENABLED', true),
-    rateLimitMaxAnonymous: parseIntEnv(environment.RATE_LIMIT_MAX_ANONYMOUS, 100),
-    rateLimitWindowMs: parseIntEnv(environment.RATE_LIMIT_WINDOW_MS, 60000),
-
-    // Cursor Security
-    cursorSecret: getEnv('CURSOR_SECRET'),
-    cursorExpirationMs: parseIntEnv(
-      environment.CURSOR_EXPIRATION_MS,
-      7 * 24 * 60 * 60 * 1000 // 7 days
-    ),
-  };
-
-  const result = configSchema.safeParse(raw);
-  if (!result.success) {
-    throw new Error(
-      `Invalid gateway configuration: ${result.error.issues.map((issue) => issue.path.join('.')).join(', ')}`
-    );
-  }
-  return result.data;
+  return Effect.runSync(
+    gatewayConfig.pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown(environment, { preserveEmptyStrings: true })
+      )
+    )
+  );
 }

@@ -1,18 +1,14 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { Schema } from 'effect';
-import {
-  type CatalogueConfig,
-  type ColorPreference,
-  createCatalogue,
-} from '../src/catalogue/index.js';
+import type { CatalogueConfig, ColorPreference } from '../src/catalogue/index.js';
 import fixture from './fixtures/color-vectors.json';
-import { Cursors, ReadAdapter } from './helpers/catalogue.js';
+import { setup } from './helpers/catalogue.js';
 
 const fixtures = Schema.decodeUnknownSync(
   Schema.Array(
     Schema.Struct({
-      strategy: Schema.Literal('linear', 'exponential', 'exact'),
+      strategy: Schema.Literals(['linear', 'exponential', 'exact']),
       color: Schema.String,
       vector: Schema.Array(Schema.Number),
     })
@@ -22,8 +18,7 @@ async function vector(
   colors: ColorPreference[],
   strategy: CatalogueConfig['colorSpreadStrategy'] = 'linear'
 ) {
-  const read = new ReadAdapter();
-  const catalogue = createCatalogue(read, new Cursors(), { colorSpreadStrategy: strategy });
+  const { read, catalogue } = await setup({ colorSpreadStrategy: strategy });
   const outcome = await Effect.runPromise(catalogue.search({ colors }));
   expect(outcome._tag).toBe('Found');
   const result = read.selections[0]?.colorVector;
@@ -99,17 +94,14 @@ describe('Catalogue color ranking policy', () => {
       [{ color: '#FF0000', amount: 1, spread: Number.NaN }],
     ].map((colors) => ({ colors }))
   )('rejects invalid color preferences before the read adapter runs: %j', async ({ colors }) => {
-    const read = new ReadAdapter();
-    const catalogue = createCatalogue(read, new Cursors(), { colorSpreadStrategy: 'linear' });
+    const { read, catalogue } = await setup();
     expect(await Effect.runPromise(catalogue.search({ colors }))).toMatchObject({
       _tag: 'InvalidSearch',
     });
     expect(read.selections).toEqual([]);
   });
   it('reverses score ordering for backward pagination while retaining all sort values', async () => {
-    const read = new ReadAdapter();
-    const cursors = new Cursors();
-    const catalogue = createCatalogue(read, cursors, { colorSpreadStrategy: 'linear' });
+    const { read, cursors, catalogue } = await setup();
     const before = await Effect.runPromise(cursors.encode([0.7, 'wlpr_b']));
     await Effect.runPromise(
       catalogue.search({ colors: [{ color: '#FF0000', amount: 1 }], last: 2, before })

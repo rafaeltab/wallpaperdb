@@ -1,10 +1,10 @@
 import type { IncomingHttpHeaders } from 'node:http';
-import { Effect, Either, Exit, Schema } from 'effect';
+import { Clock, Effect, Exit, Result, Schema } from 'effect';
 import { GraphQLError } from 'graphql';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
-import { traceGatewayEffect } from '../runtime.js';
+import type { HttpExecution } from '../runtime.js';
+import { Catalogue, type CatalogueUnavailable } from '../catalogue/index.js';
 import type {
-  Catalogue,
   Profile,
   ReadOutcome,
   SearchOutcome,
@@ -18,7 +18,7 @@ export interface MediaUrls {
   mediaPublicPath: string;
 }
 interface GraphqlContext {
-  reply?: { request?: { headers: IncomingHttpHeaders } };
+  reply?: { request?: { headers: IncomingHttpHeaders; gatewaySignal?: AbortSignal } };
 }
 interface VariantView {
   width: number;
@@ -46,7 +46,7 @@ interface ProfileView {
   createdAt: string;
   updatedAt: string;
 }
-const nullableOptional = <A, I>(schema: Schema.Schema<A, I>) =>
+const nullableOptional = <S extends Schema.Constraint>(schema: S) =>
   Schema.optional(Schema.NullOr(schema));
 const searchArguments = Schema.Struct({
   first: nullableOptional(Schema.Number),
@@ -83,11 +83,11 @@ const searchArguments = Schema.Struct({
     })
   ),
 });
-function parse<A, I>(schema: Schema.Schema<A, I>, input: unknown): A {
-  const result = Schema.decodeUnknownEither(schema)(input);
-  if (Either.isLeft(result))
+function parse<A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A {
+  const result = Schema.decodeUnknownExit(schema)(input);
+  if (Exit.isFailure(result))
     throw new GraphQLError('Invalid query arguments', { extensions: { code: 'BAD_USER_INPUT' } });
-  return result.right;
+  return result.value;
 }
 function searchInput(input: unknown): SearchWallpapers {
   const args = parse(searchArguments, input);
@@ -142,23 +142,8 @@ function profileView(profile: Profile): ProfileView {
     updatedAt: profile.updatedAt,
   };
 }
-async function run<A>(effect: Effect.Effect<A>): Promise<A> {
-  const exit = await Effect.runPromiseExit(traceGatewayEffect(effect));
-  if (Exit.isFailure(exit))
-    throw new GraphQLError('An unexpected error occurred', {
-      extensions: { code: 'INTERNAL_SERVER_ERROR' },
-    });
-  return exit.value;
-}
 function readValue<A>(result: ReadOutcome<A>): A {
-  switch (result._tag) {
-    case 'Found':
-      return result.value;
-    case 'Unavailable':
-      throw new GraphQLError('The catalogue is temporarily unavailable', {
-        extensions: { code: 'SERVICE_UNAVAILABLE' },
-      });
-  }
+  return result.value;
 }
 function searchValue(result: SearchOutcome) {
   switch (result._tag) {
@@ -167,10 +152,6 @@ function searchValue(result: SearchOutcome) {
         edges: result.value.wallpapers.map((wallpaper) => ({ node: wallpaperView(wallpaper) })),
         pageInfo: { ...result.value.pageInfo },
       };
-    case 'Unavailable':
-      throw new GraphQLError('The catalogue is temporarily unavailable', {
-        extensions: { code: 'SERVICE_UNAVAILABLE' },
-      });
     case 'InvalidCursor':
       throw new GraphQLError('Invalid or expired cursor', {
         extensions: { code: 'INVALID_CURSOR' },
@@ -179,16 +160,34 @@ function searchValue(result: SearchOutcome) {
       throw new GraphQLError(result.reason, { extensions: { code: 'BAD_USER_INPUT' } });
   }
 }
+const wallpaperQuery = Effect.fn('graphql.getWallpaper')(function* (id: string) {
+  const started = yield* Clock.currentTimeMillis;
+  const catalogue = yield* Catalogue;
+  const value = readValue(yield* catalogue.wallpaper(id));
+  const finished = yield* Clock.currentTimeMillis;
+  recordQuery('getWallpaper', finished - started, value ? 1 : 0, Boolean(value));
+  return value ? wallpaperView(value) : null;
+});
+const searchQuery = Effect.fn('graphql.searchWallpapers')(function* (input: SearchWallpapers) {
+  const started = yield* Clock.currentTimeMillis;
+  const catalogue = yield* Catalogue;
+  const outcome = yield* catalogue.search(input);
+  const finished = yield* Clock.currentTimeMillis;
+  if (outcome._tag === 'Found')
+    recordQuery('searchWallpapers', finished - started, outcome.value.wallpapers.length);
+  return outcome;
+});
 export class GraphqlAdapter {
   constructor(
-    private readonly catalogue: Catalogue,
+    private readonly execution: HttpExecution['Service'],
     private readonly media: MediaUrls
   ) {}
   resolvers() {
     return {
       Query: {
-        searchWallpapers: async (_parent: unknown, args: unknown) => this.search(searchInput(args)),
-        getWallpaper: async (_parent: unknown, args: unknown) => {
+        searchWallpapers: async (_parent: unknown, args: unknown, context?: GraphqlContext) =>
+          this.search(searchInput(args), context),
+        getWallpaper: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
           const { wallpaperId } = parse(Schema.Struct({ wallpaperId: Schema.String }), args);
           if (!wallpaperId.trim())
             throw new GraphQLError('wallpaperId cannot be empty', {
@@ -198,19 +197,26 @@ export class GraphqlAdapter {
             throw new GraphQLError('wallpaperId must start with "wlpr_"', {
               extensions: { code: 'BAD_USER_INPUT' },
             });
-          const started = Date.now();
-          const value = readValue(await run(this.catalogue.wallpaper(wallpaperId)));
-          recordQuery('getWallpaper', started, value ? 1 : 0, Boolean(value));
-          return value ? wallpaperView(value) : null;
+          return this.run(wallpaperQuery(wallpaperId), context);
         },
-        profile: async (_parent: unknown, args: unknown) => {
+        profile: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
           const { id } = parse(Schema.Struct({ id: Schema.NonEmptyString }), args);
-          const value = readValue(await run(this.catalogue.profile(id)));
+          const value = readValue(
+            await this.run(
+              Catalogue.use((catalogue) => catalogue.profile(id)),
+              context
+            )
+          );
           return value ? profileView(value) : null;
         },
-        profileByHandle: async (_parent: unknown, args: unknown) => {
+        profileByHandle: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
           const { handle } = parse(Schema.Struct({ handle: Schema.NonEmptyString }), args);
-          const value = readValue(await run(this.catalogue.profileByHandle(handle)));
+          const value = readValue(
+            await this.run(
+              Catalogue.use((catalogue) => catalogue.profileByHandle(handle)),
+              context
+            )
+          );
           return value ? profileView(value) : null;
         },
       },
@@ -223,8 +229,8 @@ export class GraphqlAdapter {
                 url: `${this.mediaBase(context)}/profile-pictures/${profile.pictureAssetId}`,
               }
             : null,
-        wallpapers: async (profile: ProfileView, args: unknown) =>
-          this.search({ ...searchInput(args), profileId: profile.id }),
+        wallpapers: async (profile: ProfileView, args: unknown, context: GraphqlContext) =>
+          this.search({ ...searchInput(args), profileId: profile.id }, context),
       },
       Wallpaper: { userId: (wallpaper: WallpaperView) => wallpaper.profileId },
       Variant: {
@@ -236,18 +242,40 @@ export class GraphqlAdapter {
   loaders() {
     return {
       Wallpaper: {
-        profile: async (queries: Array<{ obj: WallpaperView }>) =>
+        profile: async (queries: Array<{ obj: WallpaperView }>, context: GraphqlContext) =>
           readValue(
-            await run(this.catalogue.profiles(queries.map(({ obj }) => obj.profileId)))
+            await this.run(
+              Catalogue.use((catalogue) =>
+                catalogue.profiles(queries.map(({ obj }) => obj.profileId))
+              ),
+              context
+            )
           ).map((profile) => (profile ? profileView(profile) : null)),
       },
     };
   }
-  private async search(input: SearchWallpapers) {
-    const started = Date.now();
-    const result = searchValue(await run(this.catalogue.search(input)));
-    recordQuery('searchWallpapers', started, result.edges.length);
-    return result;
+  private async run<A>(
+    effect: Effect.Effect<A, CatalogueUnavailable, Catalogue>,
+    context?: GraphqlContext
+  ): Promise<A> {
+    const result = await this.execution
+      .run(Effect.result(effect), {
+        signal: context?.reply?.request?.gatewaySignal,
+      })
+      .catch(() => {
+        throw new GraphQLError('An unexpected error occurred', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        });
+      });
+    if (Result.isFailure(result)) {
+      throw new GraphQLError('The catalogue is temporarily unavailable', {
+        extensions: { code: 'SERVICE_UNAVAILABLE' },
+      });
+    }
+    return result.success;
+  }
+  private search(input: SearchWallpapers, context?: GraphqlContext) {
+    return this.run(searchQuery(input), context).then(searchValue);
   }
   private mediaBase(context?: GraphqlContext): string {
     if (this.media.mediaPublicBaseUrl) return trimTrailingSlash(this.media.mediaPublicBaseUrl);
@@ -274,25 +302,23 @@ function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 function isHttpOrigin(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (url.protocol === 'http:' || url.protocol === 'https:') && url.pathname === '/';
-  } catch {
-    return false;
-  }
+  const decoded = Schema.decodeUnknownExit(Schema.URLFromString)(value);
+  if (Exit.isFailure(decoded)) return false;
+  const url = decoded.value;
+  return (url.protocol === 'http:' || url.protocol === 'https:') && url.pathname === '/';
 }
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
 /** Metrics remain at the GraphQL operation boundary and cannot change query results. */
-function recordQuery(operation: string, started: number, count: number, found?: boolean): void {
+function recordQuery(operation: string, durationMs: number, count: number, found?: boolean): void {
   try {
     recordCounter('graphql.query.total', 1, {
       operation,
       ...(found === undefined ? {} : { found: String(found) }),
     });
-    recordHistogram('graphql.query.duration_ms', Date.now() - started, { operation });
+    recordHistogram('graphql.query.duration_ms', durationMs, { operation });
     recordHistogram('graphql.query.result_count', count, { operation });
   } catch {
     // Telemetry is best effort; the catalogue outcome remains authoritative.

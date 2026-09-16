@@ -1,69 +1,96 @@
-import { z } from 'zod';
+import { DateTime, Option, Schema } from 'effect';
 
-const variant = z.object({
-  width: z.number().int().positive(),
-  height: z.number().int().positive(),
-  aspectRatio: z.number().positive(),
-  format: z.string().min(1),
-  fileSizeBytes: z.number().int().nonnegative(),
-  createdAt: z.string().datetime(),
+const timestamp = Schema.String.check(
+  Schema.isPattern(/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/),
+  Schema.makeFilter(
+    (value) => {
+      const parsed = DateTime.make(value);
+      return (
+        Option.isSome(parsed) &&
+        DateTime.formatIso(parsed.value).slice(0, 10) === value.slice(0, 10)
+      );
+    },
+    { expected: 'a valid UTC calendar timestamp' }
+  )
+);
+const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
+const nonnegativeInteger = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const variant = Schema.Struct({
+  width: positiveInteger,
+  height: positiveInteger,
+  aspectRatio: Schema.Finite.check(Schema.isGreaterThan(0)),
+  format: Schema.NonEmptyString,
+  fileSizeBytes: nonnegativeInteger,
+  createdAt: timestamp,
 });
-
-export const wallpaperDocument = z
-  .object({
-    wallpaperId: z.string().min(1),
-    userId: z.string().min(1),
-    variants: z.array(variant),
-    uploadedAt: z.string().datetime(),
-    updatedAt: z.string().datetime(),
-  })
-  .transform(({ userId, ...wallpaper }) => ({ ...wallpaper, profileId: userId }));
-
-export const profileDocument = z.object({
-  id: z.string().min(1),
-  displayName: z.string().min(1),
-  handle: z.string().min(1),
-  claimGeneration: z.number().int().positive(),
-  biographyMarkdown: z.string(),
-  pictureAssetId: z.string().min(1).nullable(),
-  version: z.number().int().positive(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+const wallpaperDocument = Schema.Struct({
+  wallpaperId: Schema.NonEmptyString,
+  userId: Schema.NonEmptyString,
+  variants: Schema.Array(variant),
+  uploadedAt: timestamp,
+  updatedAt: timestamp,
 });
-
-export const wallpaperResponse = z.object({ _source: wallpaperDocument });
-export const profileResponse = z.object({ _source: profileDocument });
-export const partialWallpaperResponse = z.object({
-  _source: z.object({ userId: z.unknown().optional() }),
+const profileDocument = Schema.Struct({
+  id: Schema.NonEmptyString,
+  displayName: Schema.NonEmptyString,
+  handle: Schema.NonEmptyString,
+  claimGeneration: positiveInteger,
+  biographyMarkdown: Schema.String,
+  pictureAssetId: Schema.NullOr(Schema.NonEmptyString),
+  version: positiveInteger,
+  createdAt: timestamp,
+  updatedAt: timestamp,
 });
-export const profileBatchResponse = z.object({
-  docs: z.array(
-    z.union([
-      z.object({ found: z.literal(false) }).transform(() => null),
-      z
-        .object({ found: z.literal(true), _source: profileDocument })
-        .transform((document) => document._source),
-    ])
-  ),
-});
-export const profileSearchResponse = z.object({
-  hits: z.object({ hits: z.array(z.object({ _source: profileDocument })) }),
-});
-export const wallpaperSearchResponse = z.object({
-  hits: z.object({
-    hits: z.array(
-      z.object({
-        _source: wallpaperDocument,
-        sort: z.array(z.union([z.string(), z.number().finite()])),
-      })
+export const wallpaperResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ _source: wallpaperDocument })
+);
+export const profileResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ _source: profileDocument })
+);
+export const partialWallpaperResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ _source: Schema.Struct({ userId: Schema.optional(Schema.Unknown) }) })
+);
+export const profileBatchResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    docs: Schema.Array(
+      Schema.Union([
+        Schema.Struct({ found: Schema.Literal(false) }),
+        Schema.Struct({ found: Schema.Literal(true), _source: profileDocument }),
+      ])
     ),
-    total: z.object({ value: z.number().int().nonnegative() }),
-  }),
-});
-export const updateResponse = z.object({ result: z.enum(['created', 'updated', 'noop']) });
-export const storageError = z.object({
-  meta: z.object({
-    statusCode: z.number(),
-    body: z.object({ error: z.object({ type: z.string() }).optional() }).optional(),
-  }),
-});
+  })
+);
+export const profileSearchResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    hits: Schema.Struct({ hits: Schema.Array(Schema.Struct({ _source: profileDocument })) }),
+  })
+);
+export const wallpaperSearchResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    hits: Schema.Struct({
+      hits: Schema.Array(
+        Schema.Struct({
+          _source: wallpaperDocument,
+          sort: Schema.Array(Schema.Union([Schema.String, Schema.Finite])),
+        })
+      ),
+      total: Schema.Struct({ value: nonnegativeInteger }),
+    }),
+  })
+);
+export const updateResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({ result: Schema.Literals(['created', 'updated', 'noop']) })
+);
+export const storageError = Schema.decodeUnknownOption(
+  Schema.Struct({
+    meta: Schema.Struct({
+      statusCode: Schema.Number,
+      body: Schema.optional(
+        Schema.Struct({ error: Schema.optional(Schema.Struct({ type: Schema.String })) })
+      ),
+    }),
+  })
+);
+export function toWallpaper({ userId, variants, ...wallpaper }: typeof wallpaperDocument.Type) {
+  return { ...wallpaper, profileId: userId, variants: [...variants] };
+}

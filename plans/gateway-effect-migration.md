@@ -47,3 +47,26 @@ The initial migration increased median full coverage runtime from 37.37 seconds 
 - [x] Run repository CI, format and review the follow-up for PR #215.
 
 The [performance report](../apps/gateway/docs/test-performance.md) records a full coverage median of 12.50 seconds versus 37.37 seconds on main and 77.87 seconds before optimization. All six measured runs passed 239 tests. Docker CPU improved; host CPU remains above main and worker/module reuse increases host memory. Repository CI passed all 67 main tasks, all nine E2E-stage tasks and coverage merging in 192 seconds.
+
+## Effect 4 continuation
+
+The 2026-09-16 continuation follows the installed Effect guide and the upstream v3-to-v4 migration skill. [ADR 0002](../apps/gateway/docs/adr/0002-effect-services-and-owned-lifetimes.md) supersedes the earlier dependency construction decision for the gateway.
+
+- [x] Upgrade the gateway to Effect 4 and matching OpenTelemetry/platform packages.
+- [x] Express application dependencies as `Context.Service` requirements and assemble memoized layers at the composition root.
+- [x] Use typed technical errors, Effect configuration and Schema decoding at local boundaries.
+- [x] Own HTTP requests, broker streams and vendor clients with scopes and bounded shutdown.
+- [x] Preserve Redis fail-open behavior while recovering connections and bounding queued work; add loss-of-protection telemetry and alerting.
+- [x] Separate reusable startup from executable signal and exit policy; release telemetry after partial startup failures.
+- [x] Validate full gateway coverage, quality thresholds and repository CI.
+- [x] Complete independent review, formatting and final evidence.
+
+Immediately before this continuation, the unchanged gateway passed 239 tests in 11.84 seconds with statements/lines 99.39%, branches 97.18% and functions 99.31%. The configured pre-migration coverage baseline and source inclusion policy remain unchanged.
+
+Continuation validation covers 271 tests across 22 files, including real adapter recovery and cancellation, whole-response HTTP draining, listener conflicts, `.env` startup, typed configuration failures, redacted credentials, and persisted timestamp compatibility. Coverage remains above the original baseline with every source file included. Independent reviews found and resolved dotenv timing, timestamp rollover/precision, and delivery-log identity issues.
+
+- Coverage: statements/lines 98.48%, branches 96.03%, functions 96.87%; the original thresholds are unchanged.
+- Architecture enforcement and all 16 tooling tests pass; all 325 maintained functions meet the CRAP threshold of 30.
+- `GITHUB_ACTIONS=true make ci` passes all 67 main tasks, all nine E2E-stage tasks, and coverage merging. One completed run took 217 seconds including rebuilding service images and fresh browser authentication, login, and upload tests. The final refresh after HTTP cleanup passed in 104 seconds, reusing the passing browser result. An earlier attempt correctly stopped when the local stack was offline; starting the worktree's stack resolved that environment prerequisite.
+- `make format` and whitespace checks pass. Unrelated formatter changes were removed, and existing untracked prototype/review artifacts remain outside this migration.
+- The quota-loss alert is provisioned and its YAML is validated; notification delivery has not been exercised.

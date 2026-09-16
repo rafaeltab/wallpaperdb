@@ -1,7 +1,20 @@
 import { createHash } from 'node:crypto';
-import { context, propagation } from '@opentelemetry/api';
-import { recordCounter, recordHistogram, withSpan } from '@wallpaperdb/core/telemetry';
-import { Effect } from 'effect';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { context, propagation, trace } from '@opentelemetry/api';
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+import {
+  Cause,
+  Clock,
+  Context,
+  DateTime,
+  Effect,
+  Fiber,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+  Stream,
+} from 'effect';
 import {
   AckPolicy,
   connect,
@@ -10,13 +23,12 @@ import {
   StorageType,
   type ConsumerMessages,
   type JetStreamClient,
+  type JetStreamManager,
   type JsMsg,
   type NatsConnection,
 } from 'nats';
-import { z } from 'zod';
-import type { ProjectCatalogue, ProjectionOutcome } from '../../projection/index.js';
-import { translate } from './translation.js';
-import { runGatewayEffect } from '../../runtime.js';
+import { ProjectCatalogue, type ProjectionOutcome } from '../../projection/index.js';
+import { translate, type TranslatedEvent } from './translation.js';
 
 export interface ProjectionDelivery {
   readonly subject: string;
@@ -25,37 +37,50 @@ export interface ProjectionDelivery {
 }
 export type DeliveryDecision =
   | ProjectionOutcome
+  | { readonly _tag: 'Retry' }
   | { readonly _tag: 'Invalid' }
   | { readonly _tag: 'Exhausted' };
 
-/** Parses and translates the broker contract before calling the application port.
- * The broker owner must durably quarantine Invalid, Rejected and Exhausted outcomes. */
-export function deliverProjection(
-  delivery: ProjectionDelivery,
-  project: ProjectCatalogue
-): Effect.Effect<DeliveryDecision> {
+/** The broker owner durably quarantines Invalid, Rejected and Exhausted outcomes. */
+export const deliverProjection = Effect.fn('catalogue.delivery')(function* (
+  delivery: ProjectionDelivery
+): Effect.fn.Return<DeliveryDecision, never, ProjectCatalogue> {
   const translated = translate(delivery.subject, delivery.payload);
-  if (translated._tag === 'Invalid') return Effect.succeed({ _tag: 'Invalid' });
-  if (delivery.attempt > 4) return Effect.succeed({ _tag: 'Exhausted' });
-  return project.record(translated.change).pipe(
-    Effect.map(
-      (outcome): DeliveryDecision =>
-        outcome._tag === 'Retry' && delivery.attempt >= 4 ? { _tag: 'Exhausted' } : outcome
+  if (translated._tag === 'Invalid') return { _tag: 'Invalid' };
+  if (delivery.attempt > 4) return { _tag: 'Exhausted' };
+  const attributes = {
+    ...projectionAttributes(translated),
+    'event.subject': delivery.subject,
+    'event.delivery_attempt': delivery.attempt,
+  };
+  yield* Effect.annotateCurrentSpan(attributes);
+  const project = yield* ProjectCatalogue;
+  return yield* project.record(translated.change).pipe(
+    Effect.catchTag('ProjectionUnavailable', (error) =>
+      Effect.gen(function* () {
+        const outcome: DeliveryDecision = { _tag: delivery.attempt >= 4 ? 'Exhausted' : 'Retry' };
+        yield* Effect.logWarning('Projection unavailable', {
+          error: error._tag,
+          outcome: outcome._tag,
+          attempt: delivery.attempt,
+        });
+        return outcome;
+      })
     ),
-    Effect.withSpan('catalogue.delivery', {
-      attributes: {
-        'event.source': translated.change.occurrence.source,
-        'event.id': translated.change.occurrence.id,
-        'event.correlation_id': translated.correlationId ?? '',
-        'event.causation_id': translated.causationId ?? '',
-        'event.delivery_attempt': delivery.attempt,
-        'catalogue.subject_id':
-          translated.change._tag === 'ProfilePublished'
-            ? translated.change.profile.id
-            : translated.change.wallpaperId,
-      },
-    })
+    Effect.annotateLogs(attributes)
   );
+});
+
+function projectionAttributes(event: TranslatedEvent) {
+  if (event._tag === 'Invalid') return {};
+  return {
+    'event.source': event.change.occurrence.source,
+    'event.id': event.change.occurrence.id,
+    ...(event.correlationId ? { 'event.correlation_id': event.correlationId } : {}),
+    ...(event.causationId ? { 'event.causation_id': event.causationId } : {}),
+    'catalogue.subject_id':
+      event.change._tag === 'ProfilePublished' ? event.change.profile.id : event.change.wallpaperId,
+  };
 }
 
 export interface NatsProjectionOptions {
@@ -65,12 +90,24 @@ export interface NatsProjectionOptions {
   readonly quarantineStream?: string;
   readonly quarantineSubject?: string;
   readonly retryDelayMs?: number;
+  readonly shutdownTimeoutMs?: number;
 }
 export interface NatsProjectionConsumer {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  check(): Promise<boolean>;
+  check(): Effect.Effect<boolean>;
 }
+export const NatsProjectionConsumer = Context.Service<NatsProjectionConsumer>(
+  'wallpaperdb/gateway/adapters/events/NatsProjectionConsumer'
+);
+
+export class NatsProjectionStartupError extends Schema.TaggedError<NatsProjectionStartupError>()(
+  'NatsProjectionStartupError',
+  { cause: Schema.Defect() }
+) {}
+
+class BrokerError extends Schema.TaggedError<BrokerError>()('BrokerError', {
+  operation: Schema.String,
+  cause: Schema.Defect(),
+}) {}
 
 const subscriptions = [
   { stream: 'WALLPAPER', subject: 'wallpaper.uploaded', durable: 'gateway-wallpaper-uploaded' },
@@ -87,194 +124,100 @@ const subscriptions = [
   { stream: 'PROFILE', subject: 'profile.created', durable: 'gateway-profile-created' },
   { stream: 'PROFILE', subject: 'profile.updated', durable: 'gateway-profile-updated' },
 ];
-const notFound = z.object({ code: z.literal('404') });
+const notFound = Schema.is(Schema.Struct({ code: Schema.Literal('404') }));
 
-class BrokerProjection implements NatsProjectionConsumer {
-  private connection: NatsConnection | undefined;
-  private readonly messages: ConsumerMessages[] = [];
-  private readonly processing: Promise<void>[] = [];
-  private running = false;
-  private healthy = false;
+function broker<A>(operation: string, run: () => Promise<A>): Effect.Effect<A, BrokerError> {
+  return Effect.tryPromise({ try: run, catch: (cause) => new BrokerError({ operation, cause }) });
+}
 
-  constructor(
-    private readonly options: NatsProjectionOptions,
-    private readonly project: ProjectCatalogue
-  ) {}
+const ensureQuarantine = Effect.fn('catalogue.events.ensureQuarantine')(function* (
+  manager: JetStreamManager,
+  options: NatsProjectionOptions
+) {
+  const name = options.quarantineStream ?? 'GATEWAY_QUARANTINE';
+  yield* broker('inspect quarantine', () => manager.streams.info(name)).pipe(
+    Effect.catchIf(
+      (error) => notFound(error.cause),
+      () =>
+        broker('create quarantine', () =>
+          manager.streams.add({
+            name,
+            subjects: [options.quarantineSubject ?? 'gateway.quarantine'],
+            storage: StorageType.File,
+            discard: DiscardPolicy.New,
+          })
+        )
+    )
+  );
+});
 
-  async start(): Promise<void> {
-    if (this.running) throw new Error('Projection consumer already started');
-    this.connection = await connect({
-      servers: this.options.url,
-      name: this.options.serviceName ?? 'gateway',
-      timeout: 5000,
-    });
-    try {
-      const manager = await this.connection.jetstreamManager({ timeout: 5000 });
-      const quarantineStream = this.options.quarantineStream ?? 'GATEWAY_QUARANTINE';
-      try {
-        await manager.streams.info(quarantineStream);
-      } catch (error) {
-        if (!notFound.safeParse(error).success) throw error;
-        await manager.streams.add({
-          name: quarantineStream,
-          subjects: [this.options.quarantineSubject ?? 'gateway.quarantine'],
-          storage: StorageType.File,
-          discard: DiscardPolicy.New,
-        });
-      }
-      const js = this.connection.jetstream({ timeout: 5000 });
-      this.running = true;
-      for (const subscription of subscriptions) {
-        const stream =
-          subscription.stream === 'WALLPAPER'
-            ? (this.options.wallpaperStream ?? 'WALLPAPER')
-            : subscription.stream;
-        const config = {
-          durable_name: subscription.durable,
-          ack_policy: AckPolicy.Explicit,
-          ack_wait: 30_000_000_000,
-          max_deliver: -1,
-          filter_subject: subscription.subject,
-          max_ack_pending: 1,
-        };
-        try {
-          await manager.consumers.info(stream, subscription.durable);
-          await manager.consumers.update(stream, subscription.durable, config);
-        } catch (error) {
-          if (!notFound.safeParse(error).success) throw error;
-          await manager.consumers.add(stream, config);
-        }
-        const consumer = await js.consumers.get(stream, subscription.durable);
-        const messages = await consumer.consume({ max_messages: 1 });
-        this.messages.push(messages);
-        this.processing.push(this.consume(messages, js));
-      }
-      this.healthy = true;
-    } catch (error) {
-      await this.stop();
-      throw error;
-    }
-  }
-
-  async stop(): Promise<void> {
-    this.running = false;
-    this.healthy = false;
-    for (const messages of this.messages) messages.stop();
-    await Promise.all(this.processing);
-    this.messages.length = 0;
-    this.processing.length = 0;
-    await this.connection?.drain();
-    this.connection = undefined;
-  }
-
-  async check(): Promise<boolean> {
-    return this.healthy && this.connection !== undefined && !this.connection.isClosed();
-  }
-
-  private async consume(messages: ConsumerMessages, js: JetStreamClient): Promise<void> {
-    try {
-      for await (const message of messages) {
-        if (!this.running) break;
-        await this.process(message, js);
-      }
-    } catch {
-      this.healthy = false;
-    }
-  }
-
-  private async process(message: JsMsg, js: JetStreamClient): Promise<void> {
-    const carrier: Record<string, string> = {};
-    for (const key of message.headers?.keys() ?? []) carrier[key] = message.headers?.get(key) ?? '';
-    const parent = propagation.extract(context.active(), carrier);
-    const attempt = message.info.deliveryCount;
-    const translated = translate(message.subject, message.data);
-    await context.with(parent, () =>
-      withSpan(
-        'catalogue.events.consume',
-        {
-          'event.subject': message.subject,
-          'event.consumer': message.info.consumer,
-          'event.delivery_attempt': attempt,
-          ...(translated._tag === 'Translated'
-            ? {
-                'event.source': translated.change.occurrence.source,
-                'event.id': translated.change.occurrence.id,
-                'event.correlation_id': translated.correlationId ?? '',
-                'event.causation_id': translated.causationId ?? '',
-                'catalogue.subject_id':
-                  translated.change._tag === 'ProfilePublished'
-                    ? translated.change.profile.id
-                    : translated.change.wallpaperId,
-              }
-            : {}),
-        },
-        async (span) => {
-          const started = performance.now();
-          let status = 'error';
-          try {
-            const outcome = await runGatewayEffect(
-              deliverProjection(
-                { subject: message.subject, payload: message.data, attempt },
-                this.project
-              )
-            );
-            span.setAttribute('event.outcome', outcome._tag);
-            switch (outcome._tag) {
-              case 'Completed':
-              case 'Ignored':
-                status = 'success';
-                message.ack();
-                return;
-              case 'Retry':
-                message.nak(this.retryDelay(attempt));
-                return;
-              case 'Invalid':
-              case 'Rejected':
-              case 'Exhausted':
-                await this.quarantine(js, message, outcome._tag);
-                message.ack();
-                return;
-            }
-          } catch {
-            // A defect or unavailable quarantine never acknowledges uncompleted work.
-            span.setAttribute('event.outcome', 'Retry');
-            message.nak(this.retryDelay(attempt));
-          } finally {
-            const duration = performance.now() - started;
-            span.setAttribute('event.duration_ms', duration);
-            recordTelemetry(() => {
-              recordCounter('events.consumed.total', 1, { 'event.type': message.subject, status });
-              recordHistogram('events.consume_duration_ms', duration, {
-                'event.type': message.subject,
-              });
-            });
-          }
-        }
+const subscribe = Effect.fn('catalogue.events.subscribe')(function* (
+  manager: JetStreamManager,
+  js: JetStreamClient,
+  subscription: (typeof subscriptions)[number],
+  options: NatsProjectionOptions
+) {
+  const stream =
+    subscription.stream === 'WALLPAPER'
+      ? (options.wallpaperStream ?? 'WALLPAPER')
+      : subscription.stream;
+  const config = {
+    durable_name: subscription.durable,
+    ack_policy: AckPolicy.Explicit,
+    ack_wait: 30_000_000_000,
+    max_deliver: -1,
+    filter_subject: subscription.subject,
+    max_ack_pending: 1,
+  };
+  yield* broker('inspect subscription', () =>
+    manager.consumers.info(stream, subscription.durable)
+  ).pipe(
+    Effect.andThen(() =>
+      broker('update subscription', () =>
+        manager.consumers.update(stream, subscription.durable, config)
       )
-    );
-  }
+    ),
+    Effect.catchIf(
+      (error) => notFound(error.cause),
+      () => broker('create subscription', () => manager.consumers.add(stream, config))
+    )
+  );
+  const consumer = yield* broker('get subscription', () =>
+    js.consumers.get(stream, subscription.durable)
+  );
+  return yield* Effect.acquireRelease(
+    broker('consume subscription', () => consumer.consume({ max_messages: 1 })),
+    (messages) => Effect.sync(() => messages.stop())
+  );
+});
 
-  private retryDelay(attempt: number): number {
-    return Math.min(30_000, (this.options.retryDelayMs ?? 1000) * 2 ** Math.min(attempt - 1, 5));
-  }
-
-  private async quarantine(js: JetStreamClient, message: JsMsg, outcome: string): Promise<void> {
-    const identity = createHash('sha256')
-      .update(`${message.info.stream}/${message.seq}/${message.info.consumer}`)
-      .digest('hex');
-    const original = translate(message.subject, message.data);
-    const traceCarrier: Record<string, string> = {};
-    propagation.inject(context.active(), traceCarrier);
-    const traceHeaders = headers();
-    for (const [key, value] of Object.entries(traceCarrier)) traceHeaders.set(key, value);
-    await js.publish(
-      this.options.quarantineSubject ?? 'gateway.quarantine',
+const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
+  js: JetStreamClient,
+  message: JsMsg,
+  outcome: string,
+  options: NatsProjectionOptions
+) {
+  const identity = createHash('sha256')
+    .update(`${message.info.stream}/${message.seq}/${message.info.consumer}`)
+    .digest('hex');
+  const original = translate(message.subject, message.data);
+  const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);
+  const traceCarrier: Record<string, string> = {};
+  propagation.inject(
+    Option.isSome(span) ? trace.setSpan(context.active(), span.value) : context.active(),
+    traceCarrier
+  );
+  const traceHeaders = headers();
+  for (const [key, value] of Object.entries(traceCarrier)) traceHeaders.set(key, value);
+  yield* broker('publish quarantine', () =>
+    js.publish(
+      options.quarantineSubject ?? 'gateway.quarantine',
       JSON.stringify({
         specversion: '1.0',
         source: 'wallpaperdb/gateway/projection',
         id: identity,
         type: 'gateway.projection.quarantined',
-        time: new Date(message.info.timestampNanos / 1_000_000).toISOString(),
+        time: DateTime.formatIso(DateTime.makeUnsafe(message.info.timestampNanos / 1_000_000)),
         ...(original._tag === 'Translated'
           ? {
               causationid: original.change.occurrence.id,
@@ -290,21 +233,166 @@ class BrokerProjection implements NatsProjectionConsumer {
         },
       }),
       { msgID: identity, headers: traceHeaders }
-    );
-  }
+    )
+  );
+});
+
+function retryDelay(attempt: number, options: NatsProjectionOptions): number {
+  return Math.min(30_000, (options.retryDelayMs ?? 1000) * 2 ** Math.min(attempt - 1, 5));
 }
 
-function recordTelemetry(record: () => void): void {
-  try {
-    record();
-  } catch {
-    /* Observability cannot stop a subscription or alter acknowledgement. */
-  }
+const processMessage = Effect.fn('catalogue.events.consume')(function* (
+  message: JsMsg,
+  js: JetStreamClient,
+  options: NatsProjectionOptions
+) {
+  const attempt = message.info.deliveryCount;
+  const started = yield* Clock.currentTimeMillis;
+  let status = 'error';
+  const attributes = {
+    ...projectionAttributes(translate(message.subject, message.data)),
+    'event.subject': message.subject,
+    'event.consumer': message.info.consumer,
+    'event.delivery_attempt': attempt,
+  };
+  yield* Effect.annotateCurrentSpan(attributes);
+  yield* Effect.gen(function* () {
+    const outcome = yield* deliverProjection({
+      subject: message.subject,
+      payload: message.data,
+      attempt,
+    });
+    yield* Effect.annotateCurrentSpan('event.outcome', outcome._tag);
+    switch (outcome._tag) {
+      case 'Completed':
+      case 'Ignored':
+        message.ack();
+        status = 'success';
+        return;
+      case 'Retry':
+        message.nak(retryDelay(attempt, options));
+        return;
+      case 'Invalid':
+      case 'Rejected':
+      case 'Exhausted':
+        yield* quarantine(js, message, outcome._tag, options);
+        message.ack();
+        return;
+    }
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.gen(function* () {
+        if (Cause.hasInterrupts(cause)) return yield* Effect.failCause(cause);
+        message.nak(retryDelay(attempt, options));
+        yield* Effect.logError('Projection delivery failed', cause);
+        yield* Effect.annotateCurrentSpan('event.outcome', 'Retry');
+      })
+    ),
+    Effect.onInterrupt(() => Effect.sync(() => message.nak(retryDelay(attempt, options)))),
+    Effect.ensuring(
+      Effect.gen(function* () {
+        const duration = (yield* Clock.currentTimeMillis) - started;
+        yield* Effect.annotateCurrentSpan('event.duration_ms', duration);
+        yield* Effect.sync(() => {
+          recordCounter('events.consumed.total', 1, { 'event.type': message.subject, status });
+          recordHistogram('events.consume_duration_ms', duration, {
+            'event.type': message.subject,
+          });
+        }).pipe(Effect.catchCause(() => Effect.void));
+      })
+    ),
+    Effect.annotateLogs(attributes)
+  );
+});
+
+function consumeMessage(message: JsMsg, js: JetStreamClient, options: NatsProjectionOptions) {
+  const carrier: Record<string, string> = {};
+  for (const key of message.headers?.keys() ?? []) carrier[key] = message.headers?.get(key) ?? '';
+  const parent = trace.getSpanContext(propagation.extract(context.active(), carrier));
+  const effect = processMessage(message, js, options);
+  return parent ? effect.pipe(OtelTracer.withSpanContext(parent)) : effect;
 }
 
-export function createNatsProjectionConsumer(
-  options: NatsProjectionOptions,
-  project: ProjectCatalogue
-): NatsProjectionConsumer {
-  return new BrokerProjection(options, project);
+const closeConnection = Effect.fn('catalogue.events.close')(function* (
+  connection: NatsConnection,
+  timeout: number
+) {
+  yield* broker('drain connection', () => connection.drain()).pipe(
+    Effect.interruptible,
+    Effect.timeout(timeout),
+    Effect.catchCause((cause) =>
+      Effect.gen(function* () {
+        yield* Effect.logWarning('Projection connection drain failed; closing connection', cause);
+        yield* Effect.promise(() => connection.close());
+      })
+    )
+  );
+});
+
+export function natsProjectionLayer(
+  options: NatsProjectionOptions
+): Layer.Layer<NatsProjectionConsumer, NatsProjectionStartupError, ProjectCatalogue> {
+  return Layer.effect(
+    NatsProjectionConsumer,
+    Effect.gen(function* () {
+      const timeout = options.shutdownTimeoutMs ?? 5000;
+      const connection = yield* Effect.acquireRelease(
+        broker('connect', () =>
+          connect({ servers: options.url, name: options.serviceName ?? 'gateway', timeout: 5000 })
+        ),
+        (connection) => closeConnection(connection, timeout)
+      );
+      const manager = yield* broker('get manager', () =>
+        connection.jetstreamManager({ timeout: 5000 })
+      );
+      yield* ensureQuarantine(manager, options);
+      const js = connection.jetstream({ timeout: 5000 });
+      const healthy = yield* Ref.make(true);
+      const accepting = yield* Ref.make(true);
+      const messages: ConsumerMessages[] = [];
+      const workers: Fiber.Fiber<void, never>[] = [];
+      for (const subscription of subscriptions) {
+        const subscriptionMessages = yield* subscribe(manager, js, subscription, options);
+        messages.push(subscriptionMessages);
+        const worker = yield* Stream.fromAsyncIterable(
+          subscriptionMessages,
+          (cause) => new BrokerError({ operation: 'read subscription', cause })
+        ).pipe(
+          Stream.runForEach((message) =>
+            Effect.gen(function* () {
+              if (yield* Ref.get(accepting)) yield* consumeMessage(message, js, options);
+            })
+          ),
+          Effect.catchCause((cause) =>
+            Effect.gen(function* () {
+              yield* Ref.set(healthy, false);
+              if (!Cause.hasInterrupts(cause))
+                yield* Effect.logError('Projection subscription stopped', cause);
+            })
+          ),
+          Effect.forkScoped
+        );
+        workers.push(worker);
+        // Async-iterator teardown waits for stop; unblock it before forkScoped joins the fiber,
+        // including when a later subscription fails during layer acquisition.
+        yield* Effect.addFinalizer(() => Effect.sync(() => subscriptionMessages.stop()));
+      }
+      // This finalizer runs before the scoped fibers and subscriptions are released.
+      yield* Effect.addFinalizer(() =>
+        Effect.gen(function* () {
+          yield* Ref.set(healthy, false);
+          yield* Ref.set(accepting, false);
+          for (const subscription of messages) subscription.stop();
+          yield* Fiber.awaitAll(workers).pipe(
+            Effect.interruptible,
+            Effect.timeoutOrElse({ duration: timeout, orElse: () => Fiber.interruptAll(workers) })
+          );
+        })
+      );
+      return NatsProjectionConsumer.of({
+        check: () =>
+          Ref.get(healthy).pipe(Effect.map((healthy) => healthy && !connection.isClosed())),
+      });
+    }).pipe(Effect.mapError((cause) => new NatsProjectionStartupError({ cause })))
+  );
 }

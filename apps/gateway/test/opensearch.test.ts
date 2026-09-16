@@ -1,11 +1,10 @@
+import { once } from 'node:events';
+import { createServer, request } from 'node:http';
 import { Client } from '@opensearch-project/opensearch';
 import { metrics } from '@opentelemetry/api';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  createOpenSearchGateway,
-  type OpenSearchGateway,
-} from '../src/adapters/opensearch/index.js';
+import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
 import type {
   ReadOutcome,
   SearchBatch,
@@ -13,12 +12,8 @@ import type {
   Variant,
   Wallpaper,
 } from '../src/catalogue/index.js';
-import {
-  createProjection,
-  type ProjectCatalogue,
-  type ProjectionChange,
-} from '../src/projection/index.js';
-import { createSearchFixture } from './search-fixture.js';
+import type { ProjectCatalogue, ProjectionChange } from '../src/projection/index.js';
+import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 const variant: Variant = {
@@ -46,15 +41,16 @@ describe('OpenSearch catalogue port contract', () => {
   let adapter: OpenSearchGateway;
   let project: ProjectCatalogue;
   let client: Client;
+  let fixture: Awaited<ReturnType<typeof acquireSearchFixture>>;
   beforeAll(async () => {
-    adapter = createOpenSearchGateway(searchFixture.options);
-    await adapter.start();
-    project = createProjection(adapter.projectionStore);
+    fixture = await acquireSearchFixture(searchFixture.options);
+    adapter = fixture.adapter;
+    project = fixture.project;
     client = new Client({ node: searchFixture.options.url });
   }, 120_000);
   afterAll(async () => {
     await client?.close();
-    await adapter?.stop();
+    await fixture?.dispose();
     await searchFixture.destroy();
   });
 
@@ -95,6 +91,66 @@ describe('OpenSearch catalogue port contract', () => {
       await Effect.runPromise(adapter.read.search({ size: 10, sortOrder: 'asc', ...selection }))
     );
   }
+
+  it('aborts interrupted requests and closes in-flight transport work with the layer scope', async () => {
+    let stalledRequests = 0;
+    let activeRequests = 0;
+    const server = createServer((incoming, outgoing) => {
+      if (incoming.url?.includes('/_doc/stalled')) {
+        stalledRequests++;
+        activeRequests++;
+        outgoing.once('close', () => {
+          activeRequests--;
+        });
+        return;
+      }
+      const forwarded = request(
+        new URL(incoming.url ?? '/', searchFixture.options.url),
+        {
+          method: incoming.method,
+          headers: incoming.headers,
+        },
+        (response) => {
+          outgoing.writeHead(response.statusCode ?? 500, response.headers);
+          response.pipe(outgoing);
+        }
+      );
+      forwarded.on('error', () => outgoing.destroy());
+      incoming.pipe(forwarded);
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP listener');
+    const pending = await acquireSearchFixture({
+      ...searchFixture.options,
+      url: `http://127.0.0.1:${address.port}`,
+    });
+    try {
+      const aborted = Effect.runPromise(
+        pending.adapter.read
+          .wallpaper('stalled-timeout')
+          .pipe(Effect.timeout('200 millis'), Effect.result)
+      );
+      await expect.poll(() => stalledRequests).toBe(1);
+      expect((await aborted)._tag).toBe('Failure');
+      await expect.poll(() => activeRequests).toBe(0);
+      const closing = Effect.runPromise(
+        pending.adapter.read.wallpaper('stalled-shutdown').pipe(Effect.result)
+      );
+      await expect.poll(() => stalledRequests).toBe(2);
+      await Effect.runPromise(
+        Effect.tryPromise(() => pending.dispose()).pipe(Effect.timeout('2 seconds'))
+      );
+      expect((await closing)._tag).toBe('Failure');
+      expect(activeRequests).toBe(0);
+    } finally {
+      await pending.dispose();
+      server.closeAllConnections();
+      server.close();
+      await once(server, 'close');
+    }
+  });
 
   it('publishes a wallpaper and makes the completed write immediately readable', async () => {
     expect(await upload('published')).toEqual({ _tag: 'Completed' });
@@ -345,46 +401,104 @@ describe('OpenSearch catalogue port contract', () => {
 
   it('treats malformed persisted data as unavailable rather than asserting it is a wallpaper', async () => {
     const malformedFixture = createSearchFixture();
-    const malformedAdapter = createOpenSearchGateway(malformedFixture.options);
+    const malformed = await acquireSearchFixture(malformedFixture.options);
+    const malformedAdapter = malformed.adapter;
     const malformedClient = new Client({ node: malformedFixture.options.url });
     try {
-      await malformedAdapter.start();
       await malformedClient.index({
         index: malformedFixture.options.wallpaperIndex,
         id: 'malformed',
         body: { wallpaperId: 'malformed', userId: 'malformed' },
         refresh: true,
       });
-      expect(await Effect.runPromise(malformedAdapter.read.wallpaper('malformed'))).toEqual({
-        _tag: 'Unavailable',
-      });
+      expect(
+        await Effect.runPromise(Effect.flip(malformedAdapter.read.wallpaper('malformed')))
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
       expect(
         await Effect.runPromise(
-          malformedAdapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
+          Effect.flip(
+            malformedAdapter.read.search({ profileId: 'malformed', size: 10, sortOrder: 'asc' })
+          )
         )
-      ).toEqual({ _tag: 'Unavailable' });
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
       try {
-        await Promise.all([malformedClient.close(), malformedAdapter.stop()]);
+        await Promise.all([malformedClient.close(), malformed.dispose()]);
       } finally {
         await malformedFixture.destroy();
       }
     }
   });
 
+  it('rejects impossible calendar dates in stored timestamps', async () => {
+    const malformedFixture = createSearchFixture();
+    const malformed = await acquireSearchFixture(malformedFixture.options);
+    try {
+      await client.indices.putMapping({
+        index: malformedFixture.options.wallpaperIndex,
+        body: { properties: { uploadedAt: { type: 'date', ignore_malformed: true } } },
+      });
+      for (const uploadedAt of [
+        '2026-02-30T00:00:00.000Z',
+        '1900-02-29T00:00:00Z',
+        '2026-04-31T00:00:00Z',
+      ]) {
+        await client.index({
+          index: malformedFixture.options.wallpaperIndex,
+          id: 'invalid-calendar',
+          body: {
+            wallpaperId: 'invalid-calendar',
+            userId: 'owner',
+            variants: [],
+            uploadedAt,
+            updatedAt: timestamp,
+          },
+        });
+        expect(
+          await Effect.runPromise(Effect.flip(malformed.adapter.read.wallpaper('invalid-calendar')))
+        ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+      }
+    } finally {
+      await malformed.dispose();
+      await malformedFixture.destroy();
+    }
+  });
+
+  it('preserves valid stored timestamp representations and fractional precision', async () => {
+    for (const uploadedAt of [
+      '2024-02-29T12:34:56.123456Z',
+      '2000-02-29T12:34Z',
+      '2026-01-01T00:00:00Z',
+    ]) {
+      await client.index({
+        index: searchFixture.options.wallpaperIndex,
+        id: 'timestamp-representation',
+        body: {
+          wallpaperId: 'timestamp-representation',
+          userId: 'owner',
+          variants: [],
+          uploadedAt,
+          updatedAt: timestamp,
+        },
+      });
+      expect((await get('timestamp-representation'))?.uploadedAt).toBe(uploadedAt);
+    }
+  });
+
   it('translates a rejected storage mutation into a permanent application outcome', async () => {
+    const strict = await acquireSearchFixture({
+      ...searchFixture.options,
+      wallpaperIndex: searchFixture.index('strict-wallpapers'),
+    });
+    await client.indices.delete({ index: searchFixture.index('strict-wallpapers') });
     await client.indices.create({
       index: searchFixture.index('strict-wallpapers'),
       body: { mappings: { dynamic: 'strict', properties: {} } },
     });
-    const strict = createOpenSearchGateway({
-      ...searchFixture.options,
-      wallpaperIndex: searchFixture.index('strict-wallpapers'),
-    });
     try {
       expect(
         await Effect.runPromise(
-          createProjection(strict.projectionStore).record({
+          strict.project.record({
             _tag: 'WallpaperUploaded',
             wallpaperId: 'rejected',
             profileId: 'profile',
@@ -394,52 +508,56 @@ describe('OpenSearch catalogue port contract', () => {
         )
       ).toEqual({ _tag: 'Rejected', reason: 'invalid-projection' });
     } finally {
-      await strict.stop();
+      await strict.dispose();
     }
   });
 
-  it('translates missing storage into retry without exposing technical failures', async () => {
-    const missing = createOpenSearchGateway({
+  it('retains typed projection and catalogue failures for unavailable storage', async () => {
+    const missing = await acquireSearchFixture({
       ...searchFixture.options,
       wallpaperIndex: searchFixture.index('closed-wallpapers'),
     });
-    await client.indices.create({ index: searchFixture.index('closed-wallpapers') });
     await client.indices.close({ index: searchFixture.index('closed-wallpapers') });
     try {
       expect(
         await Effect.runPromise(
-          createProjection(missing.projectionStore).record({
-            _tag: 'WallpaperUploaded',
-            wallpaperId: 'retry',
-            profileId: 'profile',
-            uploadedAt: timestamp,
-            occurrence: occurrence('retry'),
-          })
+          Effect.flip(
+            missing.project.record({
+              _tag: 'WallpaperUploaded',
+              wallpaperId: 'retry',
+              profileId: 'profile',
+              uploadedAt: timestamp,
+              occurrence: occurrence('retry'),
+            })
+          )
         )
-      ).toEqual({ _tag: 'Retry' });
-      expect(await Effect.runPromise(missing.read.wallpaper('retry'))).toEqual({
-        _tag: 'Unavailable',
-      });
+      ).toMatchObject({ _tag: 'ProjectionUnavailable' });
+      expect(
+        await Effect.runPromise(Effect.flip(missing.adapter.read.wallpaper('retry')))
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
-      await missing.stop();
+      await missing.dispose();
     }
   });
 
   it('distinguishes an unavailable index from an absent catalogue record', async () => {
-    const missing = createOpenSearchGateway({
+    const missing = await acquireSearchFixture({
       ...searchFixture.options,
       wallpaperIndex: searchFixture.index('absent-wallpapers'),
       profileIndex: searchFixture.index('absent-profiles'),
     });
+    await client.indices.delete({
+      index: [searchFixture.index('absent-wallpapers'), searchFixture.index('absent-profiles')],
+    });
     try {
-      expect(await Effect.runPromise(missing.read.wallpaper('missing'))).toEqual({
-        _tag: 'Unavailable',
-      });
-      expect(await Effect.runPromise(missing.read.profile('missing'))).toEqual({
-        _tag: 'Unavailable',
-      });
+      expect(
+        await Effect.runPromise(Effect.flip(missing.adapter.read.wallpaper('missing')))
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
+      expect(
+        await Effect.runPromise(Effect.flip(missing.adapter.read.profile('missing')))
+      ).toMatchObject({ _tag: 'CatalogueUnavailable' });
     } finally {
-      await missing.stop();
+      await missing.dispose();
     }
   });
 
@@ -481,12 +599,11 @@ describe('OpenSearch catalogue port contract', () => {
       },
       refresh: true,
     });
-    const upgraded = createOpenSearchGateway({
+    const upgraded = await acquireSearchFixture({
       ...searchFixture.options,
       wallpaperIndex: searchFixture.index('legacy-wallpapers'),
     });
     try {
-      await upgraded.start();
       const mapping = await client.indices.getMapping({
         index: searchFixture.index('legacy-wallpapers'),
       });
@@ -496,11 +613,11 @@ describe('OpenSearch catalogue port contract', () => {
         variantOrder: { type: 'object', enabled: false },
         colorOrder: { type: 'keyword', index: false },
       });
-      expect(found(await Effect.runPromise(upgraded.read.wallpaper('legacy')))?.variants).toEqual([
-        variant,
-      ]);
+      expect(
+        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
+      ).toEqual([variant]);
       const stale = await Effect.runPromise(
-        createProjection(upgraded.projectionStore).record({
+        upgraded.project.record({
           _tag: 'VariantAvailable',
           wallpaperId: 'legacy',
           variant: { ...variant, fileSizeBytes: 1, createdAt: '2025-01-01T00:00:00Z' },
@@ -508,11 +625,11 @@ describe('OpenSearch catalogue port contract', () => {
         })
       );
       expect(stale).toEqual({ _tag: 'Ignored' });
-      expect(found(await Effect.runPromise(upgraded.read.wallpaper('legacy')))?.variants).toEqual([
-        variant,
-      ]);
+      expect(
+        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
+      ).toEqual([variant]);
       await Effect.runPromise(
-        createProjection(upgraded.projectionStore).record({
+        upgraded.project.record({
           _tag: 'VariantAvailable',
           wallpaperId: 'legacy',
           variant: { ...variant, format: 'image/png' },
@@ -520,10 +637,10 @@ describe('OpenSearch catalogue port contract', () => {
         })
       );
       expect(
-        found(await Effect.runPromise(upgraded.read.wallpaper('legacy')))?.variants
+        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
       ).toHaveLength(2);
     } finally {
-      await upgraded.stop();
+      await upgraded.dispose();
     }
   });
 });

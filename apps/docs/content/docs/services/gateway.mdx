@@ -7,9 +7,11 @@ The gateway serves GraphQL wallpaper discovery and public contributor Profiles f
 
 ## Application structure
 
-The Gateway Catalogue context owns one application hexagon. Four capabilities expose a single public entry each: catalogue reads, projection updates, request admission, and availability. Their implementations use constructor-injected, application-owned interfaces with namespaced symbol tokens; no dependency container or infrastructure client crosses an application port.
+The Gateway Catalogue context owns one application hexagon. Four capabilities expose a single public entry each: catalogue reads, projection updates, request admission, and availability. Application-owned interfaces and typed `Context.Service` keys declare their dependencies. Capability layers yield these services; the composition root selects implementations and shares scoped resources. Infrastructure clients remain inside adapters.
 
-Effect 3 composes execution and tracing. Expected failures use discriminated result unions; defects remain defects until a driving adapter converts them to safe transport errors. Effect scopes release resources in reverse acquisition order on shutdown and failed startup. Configuration is parsed once before accepting work; only the adapters that need secrets receive them.
+Effect 4 composes execution, dependency construction, validation, and tracing. Normal decisions remain discriminated results; catalogue and projection unavailability use tagged technical errors. Driving adapters translate them into safe GraphQL responses or broker retry decisions. Defects remain distinct from expected failures. Effect scopes release resources and running fibers on shutdown and failed startup. Effect Config and Schema resolve configuration once before accepting work; only the adapters that need secrets receive them.
+
+Fastify callbacks enter a single managed runtime. A scoped fiber set supervises request work and propagates client cancellation. NATS consumes async iterables through Effect streams, stops intake before bounded draining, and leaves incomplete processing available for redelivery. OpenSearch bridges interruption into the SDK request abort operation. The executable starts telemetry before importing instrumented adapters, and owns signal handling and process exit through `NodeRuntime`.
 
 Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, color preferences, nullable contributor batching, and media URLs. HTTP failures outside GraphQL use RFC 9457 Problem Details; GraphQL failures keep `errors` and applicable `data` with safe metadata in `extensions`.
 
@@ -41,6 +43,6 @@ Coverage includes every gateway source file. The measured pre-migration minimums
 
 ## Operational notes
 
-Redis outages use a local request window for each replica, so the fallback does not claim a distributed limit. `COLOR_SPREAD_STRATEGY` is validated at startup. Invalid configuration fails before the gateway opens a listener. Broker connection and storage calls have bounded deadlines, and GraphQL and projection spans join the incoming OpenTelemetry trace.
+Redis outages allow requests without quota enforcement. The client reconnects; recovered storage resumes distributed limits. An unenforced-request metric and provisioned alert expose loss of this protective control. Commands have bounded concurrency and client deadlines, offline queuing and automatic resend are disabled, and stalled connections are closed. A timed-out quota mutation may already have committed; it is never retried within the request or charged to a second quota store. `COLOR_SPREAD_STRATEGY` is validated at startup. Invalid configuration fails before the gateway opens a listener. Broker connection and storage calls have bounded deadlines, and GraphQL and projection spans join the incoming OpenTelemetry trace. Transport cancellation cannot undo a committed projection; redelivery retains the original replay identity.
 
 `OPENSEARCH_INDEX` and optional `OPENSEARCH_PROFILE_INDEX` select the wallpaper and Profile indices. Their defaults remain `wallpapers` and `profiles`.

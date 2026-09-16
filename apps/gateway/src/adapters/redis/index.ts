@@ -1,28 +1,7 @@
+import { recordCounter } from '@wallpaperdb/core/telemetry';
+import { Clock, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
 import Redis from 'ioredis';
-import { Clock, Effect } from 'effect';
-import { z } from 'zod';
-import type { AdmissionResult, Quota } from '../../admission/index.js';
-
-class MemoryQuota implements Quota {
-  private readonly windows = new Map<string, { count: number; reset: number }>();
-  take(visitor: string, limit: number, windowMs: number): Effect.Effect<AdmissionResult> {
-    return Clock.currentTimeMillis.pipe(
-      Effect.map((now): AdmissionResult => {
-        for (const [key, window] of this.windows) {
-          if (window.reset <= now) this.windows.delete(key);
-        }
-        const window = this.windows.get(visitor) ?? { count: 0, reset: now + windowMs };
-        if (window.count >= limit) return { _tag: 'Limited', retryAfter: window.reset - now };
-        window.count++;
-        this.windows.set(visitor, window);
-        return { _tag: 'Allowed', remaining: limit - window.count, reset: window.reset };
-      })
-    );
-  }
-}
-export function createMemoryQuota(): Quota {
-  return new MemoryQuota();
-}
+import { type AdmissionResult, Quota } from '../../admission/index.js';
 
 const consume = `
 local count = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -31,8 +10,9 @@ count = redis.call('INCR', KEYS[1])
 if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
 return {count, redis.call('PTTL', KEYS[1])}
 `;
-const response = z.tuple([z.number().int(), z.number().int().nonnegative()]);
-
+const decodeResponse = Schema.decodeUnknownEffect(
+  Schema.Tuple([Schema.Int, Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))])
+);
 export interface RedisQuotaConfig {
   readonly redisEnabled: boolean;
   readonly redisHost: string;
@@ -40,60 +20,129 @@ export interface RedisQuotaConfig {
   readonly redisPassword?: string;
 }
 class RedisQuota implements Quota {
-  private client: Redis | undefined;
+  private available = false;
   constructor(
-    private readonly config: RedisQuotaConfig,
-    private readonly fallback: Quota
+    private readonly client: Redis | undefined,
+    private readonly permits: Semaphore.Semaphore,
+    private readonly health: Queue.Queue<boolean>
   ) {}
-  async start(): Promise<void> {
-    if (!this.config.redisEnabled) return;
-    const client = new Redis({
-      host: this.config.redisHost,
-      port: this.config.redisPort,
-      password: this.config.redisPassword,
-      lazyConnect: true,
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null,
-      connectTimeout: 2000,
-    });
-    client.on('error', () => {
-      /* A failed quota read uses the local window. */
-    });
-    try {
-      await client.connect();
-      this.client = client;
-    } catch {
-      client.disconnect();
-    }
-  }
-  async stop(): Promise<void> {
-    if (this.client) this.client.disconnect();
-    this.client = undefined;
-  }
-  take(visitor: string, limit: number, windowMs: number): Effect.Effect<AdmissionResult> {
-    return Effect.gen(this, function* () {
-      const client = this.client;
-      if (!client) return yield* this.fallback.take(visitor, limit, windowMs);
-      const reply = yield* Effect.tryPromise(() =>
-        client.eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs)
-      ).pipe(Effect.timeout('2 seconds'), Effect.option);
-      if (reply._tag === 'None') return yield* this.fallback.take(visitor, limit, windowMs);
-      const decoded = response.safeParse(reply.value);
-      if (!decoded.success) return yield* this.fallback.take(visitor, limit, windowMs);
-      const [count, ttl] = decoded.data;
-      if (count === -1) return { _tag: 'Limited', retryAfter: ttl } satisfies AdmissionResult;
-      const now = yield* Clock.currentTimeMillis;
-      return {
-        _tag: 'Allowed',
-        remaining: Math.max(0, limit - count),
-        reset: now + ttl,
-      } satisfies AdmissionResult;
-    }).pipe(Effect.withSpan('admission.consume_quota'));
-  }
+  readonly setAvailable = (available: boolean): void => {
+    if (this.available === available) return;
+    this.available = available;
+    Queue.offerUnsafe(this.health, available);
+  };
+  private readonly disconnect = (): void => {
+    if (!this.available) return;
+    this.setAvailable(false);
+    this.client?.disconnect(true);
+  };
+  readonly take = Effect.fn('admission.consume_quota')(function* (
+    this: RedisQuota,
+    visitor: string,
+    limit: number,
+    windowMs: number
+  ): Effect.fn.Return<AdmissionResult> {
+    if (!this.available || !this.client) return yield* allowWithoutQuota(limit, windowMs);
+    const client = this.client;
+    const reply = yield* this.permits.withPermitsIfAvailable(1)(
+      Effect.tryPromise({
+        try: (signal) => {
+          signal.addEventListener('abort', this.disconnect, { once: true });
+          return client
+            .eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs)
+            .finally(() => signal.removeEventListener('abort', this.disconnect));
+        },
+        catch: (cause) => cause,
+      }).pipe(
+        Effect.flatMap(decodeResponse),
+        Effect.catch(() =>
+          Effect.sync(() => {
+            this.disconnect();
+            return undefined;
+          })
+        )
+      )
+    );
+    if (reply._tag === 'None' || reply.value === undefined)
+      return yield* allowWithoutQuota(limit, windowMs);
+    const [count, ttl] = reply.value;
+    if (count === -1) return { _tag: 'Limited', retryAfter: ttl };
+    const now = yield* Clock.currentTimeMillis;
+    return { _tag: 'Allowed', remaining: Math.max(0, limit - count), reset: now + ttl };
+  });
 }
-export function createRedisQuota(
-  config: RedisQuotaConfig
-): Quota & { start(): Promise<void>; stop(): Promise<void> } {
-  return new RedisQuota(config, createMemoryQuota());
+const allowWithoutQuota = Effect.fnUntraced(function* (
+  limit: number,
+  windowMs: number
+): Effect.fn.Return<AdmissionResult> {
+  yield* Effect.try(() => recordCounter('admission.quota.unenforced', 1)).pipe(Effect.ignore);
+  const now = yield* Clock.currentTimeMillis;
+  return { _tag: 'Allowed', remaining: limit, reset: now + windowMs };
+});
+export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
+  return Layer.effect(
+    Quota,
+    Effect.gen(function* () {
+      const health = yield* Queue.make<boolean>({ capacity: 1, strategy: 'sliding' });
+      yield* Stream.fromQueue(health).pipe(
+        Stream.runForEach((available) =>
+          (available
+            ? Effect.logInfo('Distributed quota enforcement restored')
+            : Effect.logWarning('Distributed quota unavailable; allowing requests')
+          ).pipe(Effect.annotateLogs({ 'admission.quota.available': available }))
+        ),
+        Effect.forkScoped
+      );
+      const permits = yield* Semaphore.make(64);
+      if (!config.redisEnabled) {
+        yield* Effect.logInfo('Distributed quota enforcement disabled');
+        return new RedisQuota(undefined, permits, health);
+      }
+      const client = yield* Effect.acquireRelease(
+        Effect.sync(
+          () =>
+            new Redis({
+              host: config.redisHost,
+              port: config.redisPort,
+              password: config.redisPassword,
+              lazyConnect: true,
+              enableOfflineQueue: false,
+              autoResendUnfulfilledCommands: false,
+              maxRetriesPerRequest: 0,
+              retryStrategy: (attempt) => Math.min(100 * attempt, 2000),
+              connectTimeout: 1000,
+              commandTimeout: 1000,
+              socketTimeout: 1000,
+              disconnectTimeout: 100,
+            })
+        ),
+        (client) =>
+          Effect.callback<void>((resume) => {
+            if (
+              client.status === 'end' ||
+              client.status === 'reconnecting' ||
+              client.status === 'wait'
+            ) {
+              client.disconnect();
+              resume(Effect.void);
+              return;
+            }
+            const closed = () => resume(Effect.void);
+            client.once('end', closed);
+            client.disconnect();
+            return Effect.sync(() => client.removeListener('end', closed));
+          })
+      );
+      const quota = new RedisQuota(client, permits, health);
+      client.on('ready', () => quota.setAvailable(true));
+      client.on('error', () => quota.setAvailable(false));
+      client.on('close', () => quota.setAvailable(false));
+      yield* Effect.tryPromise(() => client.connect()).pipe(
+        Effect.catch(() =>
+          Effect.logWarning('Distributed quota unavailable at startup; allowing requests')
+        )
+      );
+      return quota;
+    })
+  );
 }

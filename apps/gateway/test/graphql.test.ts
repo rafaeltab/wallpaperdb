@@ -1,4 +1,7 @@
-import { Effect } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import { CatalogueUnavailable } from '../src/catalogue/index.js';
+import { HttpExecution, httpExecutionLayer } from '../src/runtime.js';
+import { httpTestLayer } from './unit/http-fixture.js';
 import { metrics } from '@opentelemetry/api';
 import {
   AggregationTemporality,
@@ -53,10 +56,19 @@ const page = {
 };
 class Inbound implements Catalogue {
   calls: Array<{ operation: string; input: unknown }> = [];
-  searchOutcome: SearchOutcome = { _tag: 'Found', value: page };
-  wallpaperOutcome: ReadOutcome<Wallpaper | null> = { _tag: 'Found', value: wallpaper };
-  profileOutcome: ReadOutcome<Profile | null> = { _tag: 'Found', value: profile };
-  batchOutcome: ReadOutcome<Array<Profile | null>> = { _tag: 'Found', value: [profile] };
+  searchOutcome: SearchOutcome | CatalogueUnavailable = { _tag: 'Found', value: page };
+  wallpaperOutcome: ReadOutcome<Wallpaper | null> | CatalogueUnavailable = {
+    _tag: 'Found',
+    value: wallpaper,
+  };
+  profileOutcome: ReadOutcome<Profile | null> | CatalogueUnavailable = {
+    _tag: 'Found',
+    value: profile,
+  };
+  batchOutcome: ReadOutcome<Array<Profile | null>> | CatalogueUnavailable = {
+    _tag: 'Found',
+    value: [profile],
+  };
   defect = false;
   search(input: SearchWallpapers) {
     return this.respond('search', input, this.searchOutcome);
@@ -73,11 +85,13 @@ class Inbound implements Catalogue {
   profiles(input: string[]) {
     return this.respond('profiles', input, this.batchOutcome);
   }
-  private respond<T>(operation: string, input: unknown, value: T) {
+  private respond<T>(operation: string, input: unknown, value: T | CatalogueUnavailable) {
     this.calls.push({ operation, input });
     return this.defect
       ? Effect.die(new Error('vendor secret: do not disclose'))
-      : Effect.succeed(value);
+      : value instanceof CatalogueUnavailable
+        ? Effect.fail(value)
+        : Effect.succeed(value);
   }
 }
 const applications: Array<ReturnType<typeof Fastify>> = [];
@@ -88,7 +102,12 @@ async function setup(media: Partial<MediaUrls> = {}) {
   const inbound = new Inbound();
   const app = Fastify();
   applications.push(app);
-  const graphql = createGraphql(inbound, {
+  const runtime = ManagedRuntime.make(
+    httpExecutionLayer.pipe(Layer.provide(httpTestLayer(undefined, { catalogue: inbound })))
+  );
+  app.addHook('onClose', () => runtime.dispose());
+  const execution = await runtime.runPromise(HttpExecution);
+  const graphql = createGraphql(execution, {
     mediaServiceUrl: 'http://media:3000/',
     mediaPublicPath: '/media',
     ...media,
@@ -321,7 +340,11 @@ describe('GraphQL driving adapter contract', () => {
     ]);
   });
   it.each([
-    [{ _tag: 'Unavailable' }, 'SERVICE_UNAVAILABLE', 'The catalogue is temporarily unavailable'],
+    [
+      new CatalogueUnavailable({ cause: new Error('private storage failure') }),
+      'SERVICE_UNAVAILABLE',
+      'The catalogue is temporarily unavailable',
+    ],
     [{ _tag: 'InvalidCursor' }, 'INVALID_CURSOR', 'Invalid or expired cursor'],
     [
       { _tag: 'InvalidSearch', reason: 'Page size must be a positive integer' },
@@ -345,9 +368,15 @@ describe('GraphQL driving adapter contract', () => {
     'searchWallpapers{edges{node{profile{id}}}}',
   ])('translates read unavailability for %s', async (field) => {
     const { query, inbound } = await setup();
-    inbound.wallpaperOutcome = { _tag: 'Unavailable' };
-    inbound.profileOutcome = { _tag: 'Unavailable' };
-    inbound.batchOutcome = { _tag: 'Unavailable' };
+    inbound.wallpaperOutcome = new CatalogueUnavailable({
+      cause: new Error('private storage failure'),
+    });
+    inbound.profileOutcome = new CatalogueUnavailable({
+      cause: new Error('private storage failure'),
+    });
+    inbound.batchOutcome = new CatalogueUnavailable({
+      cause: new Error('private storage failure'),
+    });
     const response = await query(`{${field}}`);
     expect(response.body.errors[0]).toMatchObject({
       message: 'The catalogue is temporarily unavailable',

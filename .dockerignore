@@ -23,6 +23,7 @@ coverage
 # Agent / local sandbox artifacts (can contain nested worktrees and gigabytes of data)
 .sandcastle
 .agents
+.repos
 
 # IDE
 .vscode

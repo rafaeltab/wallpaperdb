@@ -52,7 +52,7 @@ for (const filename of [...sourceFiles, ...files(path.join(gateway, 'test'))]) {
     const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
     const location = `${path.relative(repo, filename)}:${line}`;
     const resolved = ts.resolveModuleName(specifier, filename, { moduleResolution: ts.ModuleResolutionKind.Bundler }, ts.sys).resolvedModule?.resolvedFileName;
-    if (specifier === 'tsyringe' || specifier === 'reflect-metadata') errors.push(`${location}: gateway uses constructor injection; remove ${specifier}`);
+    if (specifier === 'tsyringe' || specifier === 'reflect-metadata') errors.push(`${location}: gateway uses Effect service layers; remove ${specifier}`);
     if (owner && !specifier.startsWith('.') && specifier !== 'effect') errors.push(`${location}: ${owner} depends on external technology ${specifier}`);
     if (!resolved || !resolved.startsWith(`${src}${path.sep}`)) continue;
     if (graph.has(filename)) graph.get(filename).push(resolved);

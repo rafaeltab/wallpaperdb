@@ -9,3 +9,11 @@ The public discovery layer for WallpaperDB. It lets visitors browse wallpapers a
 - Keep the catalogue up to date through replay-safe projection updates and durable handling of failed deliveries.
 - Bound query depth, breadth, complexity, batching and visitor request rates.
 - Report availability and trace requests through catalogue reads and projection updates.
+
+## Technology
+
+- **Effect 4** provides typed services and layers, execution, technical errors, clocks, tracing, and scoped connection and task lifetimes.
+- **Mercurius** provides GraphQL over Fastify.
+- **OpenSearch** serves the catalogue and nested rendition search.
+- **Redis** coordinates request quotas. Outages allow requests, report lost enforcement, and reconnect automatically.
+- **NATS JetStream** retains incoming facts and quarantined deliveries.

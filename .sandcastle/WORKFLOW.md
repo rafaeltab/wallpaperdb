@@ -1,6 +1,6 @@
 # WallpaperDB Sandcastle Workflow
 
-Read [CODING_STANDARDS.md](../CODING_STANDARDS.md) for the repository's coding and testing requirements. This file covers Sandcastle execution.
+Use the [coding guidelines index](../CODING_STANDARDS.md) to select the repository's requirements relevant to the work. This file covers Sandcastle execution.
 
 ## Change scope
 

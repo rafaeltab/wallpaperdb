@@ -1,6 +1,6 @@
 # @wallpaperdb/docs
 
-The primary documentation site for WallpaperDB, covering development workflows and the monorepo's architecture and operations. Coding standards live in [CODING_STANDARDS.md](../../CODING_STANDARDS.md).
+The primary documentation site for WallpaperDB, covering development workflows and the monorepo's architecture and operations. Coding guidelines are indexed in [CODING_STANDARDS.md](../../CODING_STANDARDS.md).
 
 ## Key Capabilities
 

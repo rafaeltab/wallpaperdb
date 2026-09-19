@@ -2,7 +2,7 @@
 
 This repo is configured to run Sandcastle with Docker sandboxes and OpenCode.
 
-Coding and testing requirements live in the repository's [CODING_STANDARDS.md](../CODING_STANDARDS.md). Sandcastle execution instructions live in [WORKFLOW.md](WORKFLOW.md).
+Coding and testing requirements are indexed in the repository's [CODING_STANDARDS.md](../CODING_STANDARDS.md). Sandcastle execution instructions live in [WORKFLOW.md](WORKFLOW.md).
 
 ## One-time/local setup
 

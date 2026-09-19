@@ -1,11 +1,11 @@
 ---
 name: testing
-description: WallpaperDB test commands, infrastructure, coverage reports, and debugging. Use when running tests or working with repository test tooling; read CODING_STANDARDS.md to choose behavioral test boundaries.
+description: WallpaperDB test commands, infrastructure, coverage reports, and debugging. Use when running tests or working with repository test tooling; use the coding guidelines index to find the testing guidance relevant to the subject under test.
 ---
 
 # Testing
 
-Choose test boundaries and required behavioral coverage using [CODING_STANDARDS.md — Testing](../../../CODING_STANDARDS.md#testing).
+Use [shared testing principles](../../../docs/coding-standards/project-organization.md#shared-testing-principles) and select subject-specific testing requirements through the [coding guidelines index](../../../CODING_STANDARDS.md).
 
 ## Existing command groups
 

@@ -6,7 +6,7 @@ Pull in the issue using `gh issue view`, with comments. If it has a parent PRD, 
 
 Only work on the issue specified.
 
-Read @CODING_STANDARDS.md for coding and testing requirements and @.sandcastle/WORKFLOW.md for execution instructions.
+Use @CODING_STANDARDS.md to select relevant coding and testing guidelines and @.sandcastle/WORKFLOW.md for execution instructions.
 
 Work on branch {{BRANCH}}. Make commits, run tests, and close the issue when done.
 

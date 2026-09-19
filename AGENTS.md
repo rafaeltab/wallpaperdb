@@ -1,6 +1,6 @@
 ## Coding standards
 
-Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for the authoritative coding and testing requirements. Skills and contribution guides govern their respective workflows; implementation examples do not add coding standards.
+Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritative guidelines relevant to the work. Skills and contribution guides govern their respective workflows; implementation examples do not add coding standards.
 
 ## Agent skills
 

@@ -3,7 +3,7 @@ title: Error Handling
 description: Reference for existing Problem Details helpers and HTTP adapter examples
 ---
 
-This page documents existing `ProblemDetailsError` helpers and HTTP adapter examples. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) defines the required application failure model, HTTP error format, problem-type URLs, and safe-detail rules, including the GraphQL response exception. The examples below describe existing implementations that may still need migration to those standards.
+This page documents existing `ProblemDetailsError` helpers and HTTP adapter examples. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) indexes the required guidelines; consult [application outcomes and failures](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/application-and-domain.md#outcomes-and-failures) and [public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/adapters.md#public-http-apis) for the failure model, HTTP error format, problem-type URLs, and safe-detail rules, including the GraphQL response exception. The examples below describe existing implementations that may still need migration to those standards.
 
 ## Quick Reference
 
@@ -26,7 +26,7 @@ This page documents existing `ProblemDetailsError` helpers and HTTP adapter exam
 
 ## Existing Problem Details Shape
 
-The existing helpers were written against [RFC 7807](https://tools.ietf.org/html/rfc7807). Current requirements are in [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#public-http-apis).
+The existing helpers were written against [RFC 7807](https://tools.ietf.org/html/rfc7807). Current requirements are in [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/adapters.md#public-http-apis).
 
 **Fields in the helper's output:**
 - `type` - URI identifying the problem type (permanent, dereferenceable documentation URL)
@@ -376,7 +376,7 @@ export class EventPublishingFailedError extends ProblemDetailsError {
 
 ## Error Documentation URLs
 
-The placeholder URLs in the existing examples predate the accepted problem-type URI scheme. Use [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#public-http-apis) for the required URLs.
+The placeholder URLs in the existing examples predate the accepted problem-type URI scheme. Use [Coding Standards — Public HTTP APIs](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/adapters.md#public-http-apis) for the required URLs.
 
 ## Client-Side Error Handling
 

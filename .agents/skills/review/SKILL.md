@@ -33,7 +33,7 @@ Look for the originating spec, in this order:
 
 ### 3. Read the coding standards
 
-Use the repository root's [CODING_STANDARDS.md](../../../CODING_STANDARDS.md) as the authoritative coding and testing standard. Skills and contribution guides govern their respective workflows; existing implementation examples and historical plans do not add coding standards.
+Use the repository root’s [coding guidelines index](../../../CODING_STANDARDS.md) to select all guidelines applicable to the changes under review. Follow contextual links when the change touches their stated scope. Skills and contribution guides govern their respective workflows; existing implementation examples and historical plans do not add coding standards.
 
 ### 4. Spawn both sub-agents in parallel
 

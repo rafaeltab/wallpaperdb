@@ -129,12 +129,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(gateway_consumer_document_created_total[$__rate_interval]))",
-          "legendFormat": "Documents Created",
+          "expr": "sum(rate(events_consumed_total{service_name=\"gateway\",event_type=\"wallpaper.uploaded\",status=\"success\"}[$__rate_interval]))",
+          "legendFormat": "Upload Deliveries Handled",
           "refId": "A"
         }
       ],
-      "title": "Documents Created Rate",
+      "description": "Successfully handled upload deliveries, including applied projections and intentional no-ops such as replays. Excludes retries and quarantined deliveries; this is not a count of unique documents created.",
+      "title": "Upload Deliveries Handled Rate",
       "type": "stat"
     },
     {
@@ -169,12 +170,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(gateway_consumer_variant_added_total[$__rate_interval]))",
-          "legendFormat": "Variants Added",
+          "expr": "sum(rate(events_consumed_total{service_name=\"gateway\",event_type=\"wallpaper.variant.available\",status=\"success\"}[$__rate_interval]))",
+          "legendFormat": "Variant Deliveries Handled",
           "refId": "A"
         }
       ],
-      "title": "Variants Added Rate",
+      "description": "Successfully handled variant deliveries, including applied projections and intentional no-ops such as replays or stale events. Excludes retries and quarantined deliveries; this is not a count of unique variants added.",
+      "title": "Variant Deliveries Handled Rate",
       "type": "stat"
     },
     {
@@ -517,18 +519,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(gateway_consumer_document_created_total[$__rate_interval]))",
-          "legendFormat": "Documents Created",
+          "expr": "sum(rate(events_consumed_total{service_name=\"gateway\",event_type=\"wallpaper.uploaded\",status=\"success\"}[$__rate_interval]))",
+          "legendFormat": "Upload Deliveries Handled",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sum(rate(gateway_consumer_variant_added_total[$__rate_interval]))",
-          "legendFormat": "Variants Added",
+          "expr": "sum(rate(events_consumed_total{service_name=\"gateway\",event_type=\"wallpaper.variant.available\",status=\"success\"}[$__rate_interval]))",
+          "legendFormat": "Variant Deliveries Handled",
           "refId": "B"
         }
       ],
-      "title": "Consumer Operations Rate",
+      "description": "Gateway deliveries handled successfully: completed projections and intentional no-ops, including replayed or stale events. Retries and quarantined deliveries are excluded. Rates count deliveries, not unique documents or variants.",
+      "title": "Projection Deliveries Handled Rate",
       "type": "timeseries"
     },
     {
@@ -573,18 +576,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_consumer_document_upsert_duration_ms_bucket[$__rate_interval])) by (le))",
-          "legendFormat": "Document Upsert p95",
+          "expr": "histogram_quantile(0.95, sum(rate(events_consume_duration_ms_bucket{service_name=\"gateway\",event_type=\"wallpaper.uploaded\"}[$__rate_interval])) by (le))",
+          "legendFormat": "Upload Delivery Attempt p95",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_consumer_variant_add_duration_ms_bucket[$__rate_interval])) by (le))",
-          "legendFormat": "Variant Add p95",
+          "expr": "histogram_quantile(0.95, sum(rate(events_consume_duration_ms_bucket{service_name=\"gateway\",event_type=\"wallpaper.variant.available\"}[$__rate_interval])) by (le))",
+          "legendFormat": "Variant Delivery Attempt p95",
           "refId": "B"
         }
       ],
-      "title": "Consumer Processing Duration (p95)",
+      "description": "Gateway processing time per delivery attempt across all outcomes: completed, ignored, retrying, quarantined, and interrupted. Includes quarantine work when attempted; excludes time waiting for broker redelivery. This is not end-to-end event latency.",
+      "title": "Projection Delivery Attempt Duration (p95)",
       "type": "timeseries"
     }
   ],

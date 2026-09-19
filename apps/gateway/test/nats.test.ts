@@ -206,8 +206,63 @@ describe('NATS projection adapter contract', () => {
     expect(await Effect.runPromise(adapter.check())).toBe(true);
     await runtime.dispose();
     expect(await Effect.runPromise(adapter.check())).toBe(false);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await manager.consumers.update('WALLPAPER', 'gateway-wallpaper-uploaded', {
+      max_ack_pending: 1,
+    });
     const restarted = await consumer(new ControlledProjection());
     expect(await Effect.runPromise(restarted.adapter.check())).toBe(true);
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'gateway-wallpaper-uploaded')).config
+        .max_ack_pending
+    ).toBe(1000);
+  });
+
+  it('allows replicas to project independently while each takes only its current delivery', async () => {
+    const first = new ControlledProjection();
+    const second = new ControlledProjection();
+    const releaseFirst = Effect.runSync(Deferred.make<void>());
+    const releaseSecond = Effect.runSync(Deferred.make<void>());
+    first.nextEffect = Deferred.await(releaseFirst).pipe(
+      Effect.as({ _tag: 'Completed' } satisfies ProjectionOutcome)
+    );
+    second.nextEffect = Deferred.await(releaseSecond).pipe(
+      Effect.as({ _tag: 'Completed' } satisfies ProjectionOutcome)
+    );
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const pending = async () => {
+      const info = await manager.consumers.info('WALLPAPER', 'gateway-wallpaper-uploaded');
+      return { waiting: info.num_pending, unacknowledged: info.num_ack_pending };
+    };
+    const laterIds = Array.from({ length: 16 }, (_, index) => `evt_parallel_${index}`);
+    try {
+      await consumer(first);
+      await publish(upload('evt_held'));
+      await expect.poll(() => first.changes.length, { timeout: 5000, interval: 20 }).toBe(1);
+      await Promise.all(laterIds.map((id) => publish(upload(id))));
+      await consumer(second);
+      await expect.poll(() => second.changes.length, { timeout: 5000, interval: 20 }).toBe(1);
+      await expect.poll(pending, { timeout: 5000, interval: 20 }).toEqual({
+        waiting: 15,
+        unacknowledged: 2,
+      });
+      expect(first.changes).toHaveLength(1);
+
+      await Effect.runPromise(Deferred.succeed(releaseSecond, undefined));
+      await expect.poll(() => second.changes.length, { timeout: 5000, interval: 20 }).toBe(16);
+      await expect.poll(pending, { timeout: 5000, interval: 20 }).toEqual({
+        waiting: 0,
+        unacknowledged: 1,
+      });
+      expect(second.changes.map((change) => change.occurrence.id).sort()).toEqual(
+        [...laterIds].sort()
+      );
+      expect(first.changes.map((change) => change.occurrence.id)).toEqual(['evt_held']);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(releaseFirst, undefined));
+      await Effect.runPromise(Deferred.succeed(releaseSecond, undefined));
+    }
+    await acknowledged();
   });
 
   it('closes the broker socket within the shutdown deadline when drain cannot receive replies', async () => {

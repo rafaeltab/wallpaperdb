@@ -167,7 +167,8 @@ const subscribe = Effect.fn('catalogue.events.subscribe')(function* (
     ack_wait: 30_000_000_000,
     max_deliver: -1,
     filter_subject: subscription.subject,
-    max_ack_pending: 1,
+    // Shared across replicas; retain NATS's default budget while each iterator handles one at a time.
+    max_ack_pending: 1000,
   };
   yield* broker('inspect subscription', () =>
     manager.consumers.info(stream, subscription.durable)

@@ -5,7 +5,7 @@ description: Step-by-step guide for creating a new microservice in apps/ or a ne
 
 # Create Service
 
-Use [CODING_STANDARDS.md](../../../CODING_STANDARDS.md) for architecture and testing requirements. This skill covers the work needed to integrate a workspace into the repository.
+Use the [coding guidelines index](../../../CODING_STANDARDS.md) to select architecture and testing requirements relevant to the workspace. This skill covers the work needed to integrate a workspace into the repository.
 
 ## Creating a New Microservice (`apps/`)
 
@@ -145,7 +145,7 @@ Follow the `package.json` conventions from an existing package (e.g. `packages/c
 
 ### 2. Add Tests with Vitest
 
-Choose test boundaries using [CODING_STANDARDS.md — Testing](../../../CODING_STANDARDS.md#testing). Use existing workspace Vitest configurations and Make targets as references for wiring the selected tests into the repository.
+Use [shared testing principles](../../../docs/coding-standards/project-organization.md#shared-testing-principles) and select subject-specific testing guidance through the [coding guidelines index](../../../CODING_STANDARDS.md). Use existing workspace Vitest configurations and Make targets as references for wiring the selected tests into the repository.
 
 ### 3. Add Make Targets (if needed)
 

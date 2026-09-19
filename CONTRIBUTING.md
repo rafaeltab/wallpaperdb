@@ -1,6 +1,6 @@
 # Contributing to WallpaperDB
 
-Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for coding and testing requirements. This guide covers setup and contribution workflows.
+Use the [coding guidelines index](CODING_STANDARDS.md) to select the coding and testing requirements relevant to the contribution. This guide covers setup and contribution workflows.
 
 ## Prerequisites
 

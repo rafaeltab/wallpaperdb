@@ -3,7 +3,7 @@ title: Creating a New Service
 description: Workspace setup, infrastructure references, and delivery workflow for a new service
 ---
 
-This guide covers workspace setup and tooling integration for a new WallpaperDB service. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) defines application architecture, ports, dependency injection, failures, and test boundaries. The infrastructure snippets below illustrate existing package APIs and wiring that may still need migration to those standards.
+This guide covers workspace setup and tooling integration for a new WallpaperDB service. [CODING_STANDARDS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) indexes guidance on application architecture, ports, dependency injection, failures, and test boundaries; select the sections relevant to the new service. The infrastructure snippets below illustrate existing package APIs and wiring that may still need migration to those standards.
 
 ## Prerequisites
 
@@ -251,7 +251,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
 
 ## Step 8: Business Logic
 
-Use [Coding Standards — Architecture](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#architecture), [Ports and transactions](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#ports-and-transactions), and [Application programming model](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#application-programming-model) to design the service's capabilities and their public interfaces.
+Use [Coding Standards — Architecture](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/project-organization.md#backend-architecture), [Ports and transactions](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/application-and-domain.md#ports-and-transactions), and [Effect and dependencies](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/application-and-domain.md#effect-and-dependencies) to design the service's capabilities and their public interfaces.
 
 ## Step 9: Fastify App
 
@@ -444,7 +444,7 @@ make my-service-test
 
 ## Existing Shared Package APIs
 
-These snippets illustrate current package APIs. [Coding Standards — Cross-application interactions and contracts](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#cross-application-interactions-and-contracts) and [Delivery reliability](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md#delivery-reliability) define the event contracts and guarantees required of an application using them.
+These snippets illustrate current package APIs. [Coding Standards — Cross-application interactions and contracts](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/distributed-interactions.md#contracts) and [Delivery reliability](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/coding-standards/distributed-interactions.md#delivery-reliability) define the event contracts and guarantees required of an application using them.
 
 ### @wallpaperdb/core
 

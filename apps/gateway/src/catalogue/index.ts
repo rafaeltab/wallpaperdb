@@ -174,18 +174,12 @@ export function catalogueLayer(
       });
       return Catalogue.of({
         search,
-        wallpaper: Effect.fn('catalogue.wallpaper')(function* (id: string) {
-          return yield* read.wallpaper(id);
-        }),
-        profile: Effect.fn('catalogue.profile')(function* (id: string) {
-          return yield* read.profile(id);
-        }),
-        profileByHandle: Effect.fn('catalogue.profileByHandle')(function* (handle: string) {
-          return yield* read.profileByHandle(handle.toLowerCase());
-        }),
-        profiles: Effect.fn('catalogue.profiles')(function* (ids: string[]) {
-          return yield* read.profiles(ids);
-        }),
+        wallpaper: Effect.fn('catalogue.wallpaper')((id: string) => read.wallpaper(id)),
+        profile: Effect.fn('catalogue.profile')((id: string) => read.profile(id)),
+        profileByHandle: Effect.fn('catalogue.profileByHandle')((handle: string) =>
+          read.profileByHandle(handle.toLowerCase())
+        ),
+        profiles: Effect.fn('catalogue.profiles')((ids: string[]) => read.profiles(ids)),
       });
     })
   );

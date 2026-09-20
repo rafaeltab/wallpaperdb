@@ -21,11 +21,8 @@ describe('Catalogue capability', () => {
   it('selects an extra result and signs only displayed forward page boundaries', async () => {
     const { read, catalogue, cursors } = await setup();
     read.response = {
-      _tag: 'Found',
-      value: {
-        entries: ['a', 'b', 'c'].map((id) => ({ wallpaper: wallpaper(id), cursor: [id] })),
-        total: 3,
-      },
+      entries: ['a', 'b', 'c'].map((id) => ({ wallpaper: wallpaper(id), cursor: [id] })),
+      total: 3,
     };
     const result = await Effect.runPromise(
       catalogue.search({ first: 2, profileId: 'profile_one', variants: { width: 1920 } })
@@ -58,11 +55,8 @@ describe('Catalogue capability', () => {
     const { read, catalogue, cursors } = await setup();
     const before = await Effect.runPromise(cursors.encode(['d']));
     read.response = {
-      _tag: 'Found',
-      value: {
-        entries: ['c', 'b', 'a'].map((id) => ({ wallpaper: wallpaper(id), cursor: [id] })),
-        total: 4,
-      },
+      entries: ['c', 'b', 'a'].map((id) => ({ wallpaper: wallpaper(id), cursor: [id] })),
+      total: 4,
     };
     expect(await Effect.runPromise(catalogue.search({ last: 2, before }))).toEqual({
       _tag: 'Found',
@@ -119,23 +113,11 @@ describe('Catalogue capability', () => {
   it('reads wallpapers and missing public records', async () => {
     const { read, catalogue } = await setup();
     read.wallpapers.set('wlpr_a', wallpaper('wlpr_a'));
-    expect(await Effect.runPromise(catalogue.wallpaper('wlpr_a'))).toEqual({
-      _tag: 'Found',
-      value: wallpaper('wlpr_a'),
-    });
-    expect(await Effect.runPromise(catalogue.wallpaper('wlpr_missing'))).toEqual({
-      _tag: 'Found',
-      value: null,
-    });
-    expect(await Effect.runPromise(catalogue.profile('p'))).toEqual({ _tag: 'Found', value: null });
-    expect(await Effect.runPromise(catalogue.profileByHandle('h'))).toEqual({
-      _tag: 'Found',
-      value: null,
-    });
-    expect(await Effect.runPromise(catalogue.profiles(['p', 'p']))).toEqual({
-      _tag: 'Found',
-      value: [null, null],
-    });
+    expect(await Effect.runPromise(catalogue.wallpaper('wlpr_a'))).toEqual(wallpaper('wlpr_a'));
+    expect(await Effect.runPromise(catalogue.wallpaper('wlpr_missing'))).toBeNull();
+    expect(await Effect.runPromise(catalogue.profile('p'))).toBeNull();
+    expect(await Effect.runPromise(catalogue.profileByHandle('h'))).toBeNull();
+    expect(await Effect.runPromise(catalogue.profiles(['p', 'p']))).toEqual([null, null]);
   });
   it.each([
     0,
@@ -164,26 +146,21 @@ describe('Catalogue capability', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
     read.profileSnapshots.set('p', profile);
-    expect(await Effect.runPromise(catalogue.profile('p'))).toEqual({
-      _tag: 'Found',
-      value: profile,
-    });
-    expect(await Effect.runPromise(catalogue.profileByHandle('ARTIST'))).toEqual({
-      _tag: 'Found',
-      value: profile,
-    });
-    expect(await Effect.runPromise(catalogue.profiles(['p', 'missing', 'p']))).toEqual({
-      _tag: 'Found',
-      value: [profile, null, profile],
-    });
-    expect(await Effect.runPromise(catalogue.profiles([]))).toEqual({ _tag: 'Found', value: [] });
+    expect(await Effect.runPromise(catalogue.profile('p'))).toEqual(profile);
+    expect(await Effect.runPromise(catalogue.profileByHandle('ARTIST'))).toEqual(profile);
+    expect(await Effect.runPromise(catalogue.profiles(['p', 'missing', 'p']))).toEqual([
+      profile,
+      null,
+      profile,
+    ]);
+    expect(await Effect.runPromise(catalogue.profiles([]))).toEqual([]);
   });
   it('returns a backward boundary page without claiming earlier results', async () => {
     const { catalogue, read, cursors } = await setup();
     const before = await Effect.runPromise(cursors.encode(['b']));
     read.response = {
-      _tag: 'Found',
-      value: { entries: [{ wallpaper: wallpaper('a'), cursor: ['a'] }], total: 2 },
+      entries: [{ wallpaper: wallpaper('a'), cursor: ['a'] }],
+      total: 2,
     };
     expect(await Effect.runPromise(catalogue.search({ last: 2, before }))).toMatchObject({
       value: { pageInfo: { hasNextPage: true, hasPreviousPage: false } },

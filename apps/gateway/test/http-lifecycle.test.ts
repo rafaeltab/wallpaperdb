@@ -1,7 +1,7 @@
 import { Deferred, Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Catalogue, type Profile, type ReadOutcome } from '../src/catalogue/index.js';
+import { Catalogue, type Profile } from '../src/catalogue/index.js';
 import { createHttpApp } from '../src/http/index.js';
 import { EmptyCatalogue, httpConfig, httpTestLayer } from './unit/http-fixture.js';
 
@@ -21,10 +21,7 @@ afterEach(async () => {
   await Promise.all(applications.splice(0).map((app) => app.close()));
 });
 
-function controlledCatalogue(
-  read: Effect.Effect<ReadOutcome<Profile | null>>,
-  onSearch = () => {}
-) {
+function controlledCatalogue(read: Effect.Effect<Profile | null>, onSearch = () => {}) {
   const empty = new EmptyCatalogue();
   return Catalogue.of({
     wallpaper: () => empty.wallpaper(),
@@ -61,10 +58,7 @@ describe('HTTP request lifecycle', () => {
     let searched = false;
     const read = Effect.sync(() => {
       entered = true;
-    }).pipe(
-      Effect.andThen(Deferred.await(release)),
-      Effect.as({ _tag: 'Found', value: profile } satisfies ReadOutcome<Profile>)
-    );
+    }).pipe(Effect.andThen(Deferred.await(release)), Effect.as(profile));
     const { app, address } = await serve(
       controlledCatalogue(read, () => {
         searched = true;

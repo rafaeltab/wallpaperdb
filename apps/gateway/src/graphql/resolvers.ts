@@ -4,13 +4,7 @@ import { GraphQLError } from 'graphql';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import type { HttpExecution } from '../runtime.js';
 import { Catalogue, type CatalogueUnavailable } from '../catalogue/index.js';
-import type {
-  Profile,
-  ReadOutcome,
-  SearchOutcome,
-  SearchWallpapers,
-  Wallpaper,
-} from '../catalogue/index.js';
+import type { Profile, SearchOutcome, SearchWallpapers, Wallpaper } from '../catalogue/index.js';
 
 export interface MediaUrls {
   mediaServiceUrl: string;
@@ -142,9 +136,6 @@ function profileView(profile: Profile): ProfileView {
     updatedAt: profile.updatedAt,
   };
 }
-function readValue<A>(result: ReadOutcome<A>): A {
-  return result.value;
-}
 function searchValue(result: SearchOutcome) {
   switch (result._tag) {
     case 'Found':
@@ -163,7 +154,7 @@ function searchValue(result: SearchOutcome) {
 const wallpaperQuery = Effect.fn('graphql.getWallpaper')(function* (id: string) {
   const started = yield* Clock.currentTimeMillis;
   const catalogue = yield* Catalogue;
-  const value = readValue(yield* catalogue.wallpaper(id));
+  const value = yield* catalogue.wallpaper(id);
   const finished = yield* Clock.currentTimeMillis;
   recordQuery('getWallpaper', finished - started, value ? 1 : 0, Boolean(value));
   return value ? wallpaperView(value) : null;
@@ -201,21 +192,17 @@ export class GraphqlAdapter {
         },
         profile: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
           const { id } = parse(Schema.Struct({ id: Schema.NonEmptyString }), args);
-          const value = readValue(
-            await this.run(
-              Catalogue.use((catalogue) => catalogue.profile(id)),
-              context
-            )
+          const value = await this.run(
+            Catalogue.use((catalogue) => catalogue.profile(id)),
+            context
           );
           return value ? profileView(value) : null;
         },
         profileByHandle: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
           const { handle } = parse(Schema.Struct({ handle: Schema.NonEmptyString }), args);
-          const value = readValue(
-            await this.run(
-              Catalogue.use((catalogue) => catalogue.profileByHandle(handle)),
-              context
-            )
+          const value = await this.run(
+            Catalogue.use((catalogue) => catalogue.profileByHandle(handle)),
+            context
           );
           return value ? profileView(value) : null;
         },
@@ -243,7 +230,7 @@ export class GraphqlAdapter {
     return {
       Wallpaper: {
         profile: async (queries: Array<{ obj: WallpaperView }>, context: GraphqlContext) =>
-          readValue(
+          (
             await this.run(
               Catalogue.use((catalogue) =>
                 catalogue.profiles(queries.map(({ obj }) => obj.profileId))

@@ -6,7 +6,6 @@ import {
   CatalogueCursors,
   type CursorValue,
   type Profile,
-  type ReadOutcome,
   type SearchBatch,
   type SearchSelection,
   type Wallpaper,
@@ -25,7 +24,7 @@ export function wallpaper(id: string): Wallpaper {
 }
 export class ReadAdapter implements CatalogueRead {
   selections: SearchSelection[] = [];
-  response: ReadOutcome<SearchBatch> = { _tag: 'Found', value: { entries: [], total: 0 } };
+  response: SearchBatch = { entries: [], total: 0 };
   wallpapers = new Map<string, Wallpaper>();
   profileSnapshots = new Map<string, Profile>();
   unavailable = false;
@@ -49,10 +48,10 @@ export class ReadAdapter implements CatalogueRead {
   profiles(ids: string[]) {
     return this.read(ids.map((id) => this.profileSnapshots.get(id) ?? null));
   }
-  private read<T>(value: T): Effect.Effect<ReadOutcome<T>, CatalogueUnavailable> {
+  private read<T>(value: T): Effect.Effect<T, CatalogueUnavailable> {
     return this.unavailable
       ? Effect.fail(new CatalogueUnavailable({ cause: 'controlled outage' }))
-      : Effect.succeed({ _tag: 'Found', value });
+      : Effect.succeed(value);
   }
 }
 export class Cursors implements CatalogueCursors {

@@ -58,14 +58,16 @@ export interface WallpaperPage {
   };
 }
 export type CursorValue = string | number;
-export type ReadOutcome<T> = { readonly _tag: 'Found'; readonly value: T };
 export class CatalogueUnavailable extends Schema.TaggedError<CatalogueUnavailable>()(
   'CatalogueUnavailable',
   { cause: Schema.Defect() }
 ) {}
 export type InvalidSearch = { readonly _tag: 'InvalidSearch'; readonly reason: string };
 export type InvalidCursor = { readonly _tag: 'InvalidCursor' };
-export type SearchOutcome = ReadOutcome<WallpaperPage> | InvalidSearch | InvalidCursor;
+export type SearchOutcome =
+  | { readonly _tag: 'Found'; readonly value: WallpaperPage }
+  | InvalidSearch
+  | InvalidCursor;
 export interface SearchSelection {
   profileId?: string;
   variantFilters?: VariantSelection;
@@ -85,11 +87,11 @@ export interface SearchBatch {
  * Unavailability includes malformed persisted data and never exposes vendor errors.
  */
 export interface CatalogueRead {
-  search(selection: SearchSelection): Effect.Effect<ReadOutcome<SearchBatch>, CatalogueUnavailable>;
-  wallpaper(id: string): Effect.Effect<ReadOutcome<Wallpaper | null>, CatalogueUnavailable>;
-  profile(id: string): Effect.Effect<ReadOutcome<Profile | null>, CatalogueUnavailable>;
-  profileByHandle(handle: string): Effect.Effect<ReadOutcome<Profile | null>, CatalogueUnavailable>;
-  profiles(ids: string[]): Effect.Effect<ReadOutcome<Array<Profile | null>>, CatalogueUnavailable>;
+  search(selection: SearchSelection): Effect.Effect<SearchBatch, CatalogueUnavailable>;
+  wallpaper(id: string): Effect.Effect<Wallpaper | null, CatalogueUnavailable>;
+  profile(id: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
+  profileByHandle(handle: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
+  profiles(ids: string[]): Effect.Effect<Array<Profile | null>, CatalogueUnavailable>;
 }
 export const CatalogueRead = Context.Service<CatalogueRead>('wallpaperdb.gateway.catalogue.read');
 /** Opaque cursor encoding preserves values; decoding rejects tampering and expiration. */
@@ -105,10 +107,10 @@ export const CatalogueCursors = Context.Service<CatalogueCursors>(
 /** All catalogue reads are public. This capability exposes no protected writes. */
 export interface Catalogue {
   search(query: SearchWallpapers): Effect.Effect<SearchOutcome, CatalogueUnavailable>;
-  wallpaper(id: string): Effect.Effect<ReadOutcome<Wallpaper | null>, CatalogueUnavailable>;
-  profile(id: string): Effect.Effect<ReadOutcome<Profile | null>, CatalogueUnavailable>;
-  profileByHandle(handle: string): Effect.Effect<ReadOutcome<Profile | null>, CatalogueUnavailable>;
-  profiles(ids: string[]): Effect.Effect<ReadOutcome<Array<Profile | null>>, CatalogueUnavailable>;
+  wallpaper(id: string): Effect.Effect<Wallpaper | null, CatalogueUnavailable>;
+  profile(id: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
+  profileByHandle(handle: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
+  profiles(ids: string[]): Effect.Effect<Array<Profile | null>, CatalogueUnavailable>;
 }
 export const Catalogue = Context.Service<Catalogue>('wallpaperdb.gateway.catalogue');
 export interface CatalogueConfig {
@@ -150,8 +152,8 @@ export function catalogueLayer(
           ...(colorVector ? { colorVector } : {}),
           ...(position ? { searchAfter: position.values } : {}),
         });
-        const hasMore = result.value.entries.length > limit;
-        const entries = result.value.entries.slice(0, limit);
+        const hasMore = result.entries.length > limit;
+        const entries = result.entries.slice(0, limit);
         if (backward) entries.reverse();
         const first = entries[0];
         const last = entries.at(-1);

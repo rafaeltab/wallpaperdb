@@ -4,7 +4,6 @@ import { Clock, Context, Effect, Exit, Layer, Schema } from 'effect';
 import {
   CatalogueRead,
   CatalogueUnavailable,
-  type ReadOutcome,
   type SearchSelection,
 } from '../../catalogue/index.js';
 import {
@@ -213,9 +212,8 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
 function read<T, E>(
   operation: string,
   request: Effect.Effect<T, E>
-): Effect.Effect<ReadOutcome<T>, CatalogueUnavailable> {
+): Effect.Effect<T, CatalogueUnavailable> {
   return measure(operation, request).pipe(
-    Effect.map((value): ReadOutcome<T> => ({ _tag: 'Found', value })),
     Effect.mapError((cause) => new CatalogueUnavailable({ cause }))
   );
 }

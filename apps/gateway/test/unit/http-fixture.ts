@@ -43,9 +43,7 @@ export class EmptyCatalogue implements Catalogue {
     } satisfies Awaited<Effect.Success<ReturnType<Catalogue['search']>>>);
   }
   wallpaper() {
-    return Effect.succeed({ _tag: 'Found', value: null } satisfies Effect.Success<
-      ReturnType<Catalogue['wallpaper']>
-    >);
+    return Effect.succeed(null);
   }
   profile() {
     return this.wallpaper();
@@ -54,10 +52,7 @@ export class EmptyCatalogue implements Catalogue {
     return this.wallpaper();
   }
   profiles(ids: string[]) {
-    return Effect.succeed({
-      _tag: 'Found',
-      value: ids.map(() => null),
-    } satisfies Effect.Success<ReturnType<Catalogue['profiles']>>);
+    return Effect.succeed(ids.map(() => null));
   }
 }
 

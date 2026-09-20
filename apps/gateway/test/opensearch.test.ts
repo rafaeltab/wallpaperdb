@@ -6,13 +6,7 @@ import { metrics } from '@opentelemetry/api';
 import { Effect, Layer } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type OpenSearchGateway, openSearchLayer } from '../src/adapters/opensearch/index.js';
-import type {
-  ReadOutcome,
-  SearchBatch,
-  SearchSelection,
-  Variant,
-  Wallpaper,
-} from '../src/catalogue/index.js';
+import type { SearchBatch, SearchSelection, Variant, Wallpaper } from '../src/catalogue/index.js';
 import type { ProjectCatalogue, ProjectionChange } from '../src/projection/index.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
@@ -31,11 +25,6 @@ const occurrence = (id: string, time = timestamp) => ({
   occurredAt: time,
 });
 const colors = Array.from({ length: 64 }, (_, index) => (index === 0 ? 1 : 0));
-function found<T>(outcome: ReadOutcome<T>): T {
-  expect(outcome._tag).toBe('Found');
-  if (outcome._tag !== 'Found') throw new Error('Catalogue unavailable');
-  return outcome.value;
-}
 
 describe('OpenSearch catalogue port contract', () => {
   const searchFixture = createSearchFixture();
@@ -85,12 +74,10 @@ describe('OpenSearch catalogue port contract', () => {
     });
   }
   async function get(id: string): Promise<Wallpaper | null> {
-    return found(await Effect.runPromise(adapter.read.wallpaper(id)));
+    return Effect.runPromise(adapter.read.wallpaper(id));
   }
   async function search(selection: Partial<SearchSelection>): Promise<SearchBatch> {
-    return found(
-      await Effect.runPromise(adapter.read.search({ size: 10, sortOrder: 'asc', ...selection }))
-    );
+    return Effect.runPromise(adapter.read.search({ size: 10, sortOrder: 'asc', ...selection }));
   }
 
   effectIt.live('reports invalid connection configuration as a startup failure', () =>
@@ -633,7 +620,7 @@ describe('OpenSearch catalogue port contract', () => {
         colorOrder: { type: 'keyword', index: false },
       });
       expect(
-        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
+        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
       ).toEqual([variant]);
       const stale = await Effect.runPromise(
         upgraded.project.record({
@@ -645,7 +632,7 @@ describe('OpenSearch catalogue port contract', () => {
       );
       expect(stale).toEqual({ _tag: 'Ignored' });
       expect(
-        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
+        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
       ).toEqual([variant]);
       await Effect.runPromise(
         upgraded.project.record({
@@ -656,7 +643,7 @@ describe('OpenSearch catalogue port contract', () => {
         })
       );
       expect(
-        found(await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
+        (await Effect.runPromise(upgraded.adapter.read.wallpaper('legacy')))?.variants
       ).toHaveLength(2);
     } finally {
       await upgraded.dispose();

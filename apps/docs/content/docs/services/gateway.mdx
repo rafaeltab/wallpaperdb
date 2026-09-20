@@ -15,6 +15,8 @@ Fastify callbacks enter a single managed runtime. A scoped fiber set supervises 
 
 Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, color preferences, nullable contributor batching, and media URLs. HTTP failures outside GraphQL use RFC 9457 Problem Details; GraphQL failures keep `errors` and applicable `data` with safe metadata in `extensions`.
 
+Successful `/health` and `/ready` responses and their HTTP status codes are unchanged. Failed probes return HTTP 503 with `application/problem+json`. Failed `/health` bodies use numeric `status: 503` and report the health state (`degraded`, `unhealthy`, or `shutting_down`) in `healthStatus`, alongside dependency checks and timing. Failed `/ready` bodies retain `ready: false`, `reason`, and `timestamp` within the problem envelope. Consumers of the former failed-health string `status` must read `healthStatus`; probes that only inspect HTTP status remain compatible.
+
 ## Projection delivery
 
 Each OpenSearch projection mutation is atomic for one target. Uploads preserve previously received enrichment, duplicate variants do not accumulate, and an incomplete wallpaper remains hidden until its upload arrives. Profile versions never move backward. Complete legacy color/rendition snapshots converge by occurrence time and identity, since their producers do not yet provide entity versions.

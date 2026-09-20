@@ -7,15 +7,19 @@ import {
 } from './unit/http-fixture.js';
 
 describe('health HTTP contract', () => {
-  it('preserves an unhealthy probe result and elapsed duration in Problem Details', async () => {
+  it.each([
+    'degraded',
+    'unhealthy',
+  ] as const)('represents %s health as Problem Details', async (status) => {
+    const checks = { opensearch: status === 'degraded', nats: false, otel: false };
     const app = await createHttpApp(httpConfig, {
       catalogue: new EmptyCatalogue(),
       admission: { admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 100, reset: 1000 }) },
       availability: {
         health: () =>
           Effect.succeed({
-            status: 'unhealthy',
-            checks: { opensearch: false, nats: false, otel: false },
+            status,
+            checks,
             timestamp: '2026-09-15T12:00:00.000Z',
             totalDurationMs: 25,
           }),
@@ -27,10 +31,13 @@ describe('health HTTP contract', () => {
       expect(response.statusCode).toBe(503);
       expect(response.headers['content-type']).toContain('application/problem+json');
       expect(response.json()).toMatchObject({
+        type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+        title: 'Service unavailable',
         status: 503,
-        healthStatus: 'unhealthy',
+        healthStatus: status,
+        timestamp: '2026-09-15T12:00:00.000Z',
         totalDurationMs: 25,
-        checks: { opensearch: false, nats: false, otel: false },
+        checks,
       });
     } finally {
       await app.close();
@@ -137,6 +144,7 @@ describe('health HTTP contract', () => {
       });
       const notReady = await app.inject({ url: '/ready' });
       expect(notReady.statusCode).toBe(503);
+      expect(notReady.headers['content-type']).toContain('application/problem+json');
       expect(notReady.json()).toMatchObject({
         type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
         status: 503,
@@ -156,6 +164,16 @@ describe('health HTTP contract', () => {
         checks: {},
       });
       expect(health.json()).not.toHaveProperty('totalDurationMs');
+      const stopping = await app.inject({ url: '/ready' });
+      expect(stopping.statusCode).toBe(503);
+      expect(stopping.headers['content-type']).toContain('application/problem+json');
+      expect(stopping.json()).toMatchObject({
+        type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+        status: 503,
+        ready: false,
+        reason: 'Service is shutting down',
+        timestamp: expect.any(String),
+      });
       const missing = await app.inject({ url: '/unknown' });
       expect(missing.json()).toMatchObject({
         status: 404,

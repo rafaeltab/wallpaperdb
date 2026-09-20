@@ -269,7 +269,7 @@ groups:
         for: 1m
         annotations:
           summary: Gateway admitted requests without enforcing the configured quota
-          description: "Requests bypassed distributed quota enforcement in the last 5 minutes. Check Redis connectivity, command timeouts or saturation, and REDIS_ENABLED. The counter is emitted only when the admission policy is enabled."
+          description: "Requests bypassed distributed quota enforcement in the last 5 minutes. Inspect admission_quota_unenforced_total by reason: disabled, unavailable, saturated, or command_failure. Saturated means all 64 local command slots are occupied; bypasses can occur even with healthy Redis. Check REDIS_ENABLED, connectivity, and command failures or timeouts. The counter is emitted only when the admission policy is enabled."
         labels:
           severity: critical
           service: gateway

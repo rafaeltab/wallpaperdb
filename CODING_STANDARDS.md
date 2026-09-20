@@ -8,6 +8,7 @@
 | Backend capabilities, domain policy, ports, dependency injection, or failures | [Application and domain](docs/coding-standards/application-and-domain.md) |
 | Backend request/message handlers, external clients, or persistence | [Adapters](docs/coding-standards/adapters.md) |
 | Cross-application contracts, events, or delivery guarantees | [Distributed interactions](docs/coding-standards/distributed-interactions.md) |
+| Backend NATS publishers, consumers, subject partitioning, or stream retention | [NATS and JetStream](docs/coding-standards/nats.md) |
 | Backend startup, configuration, resource lifetimes, or telemetry | [Composition and operations](docs/coding-standards/composition-and-operations.md) |
 | Test design and isolation in any workspace | [Shared testing principles](docs/coding-standards/project-organization.md#shared-testing-principles) |
 | Backend capability or domain tests | [Application and domain testing](docs/coding-standards/application-and-domain.md#testing) |

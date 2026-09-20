@@ -15,7 +15,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type {
   Catalogue,
   Profile,
-  ReadOutcome,
   SearchOutcome,
   SearchWallpapers,
   Wallpaper,
@@ -57,18 +56,9 @@ const page = {
 class Inbound implements Catalogue {
   calls: Array<{ operation: string; input: unknown }> = [];
   searchOutcome: SearchOutcome | CatalogueUnavailable = { _tag: 'Found', value: page };
-  wallpaperOutcome: ReadOutcome<Wallpaper | null> | CatalogueUnavailable = {
-    _tag: 'Found',
-    value: wallpaper,
-  };
-  profileOutcome: ReadOutcome<Profile | null> | CatalogueUnavailable = {
-    _tag: 'Found',
-    value: profile,
-  };
-  batchOutcome: ReadOutcome<Array<Profile | null>> | CatalogueUnavailable = {
-    _tag: 'Found',
-    value: [profile],
-  };
+  wallpaperOutcome: Wallpaper | null | CatalogueUnavailable = wallpaper;
+  profileOutcome: Profile | null | CatalogueUnavailable = profile;
+  batchOutcome: Array<Profile | null> | CatalogueUnavailable = [profile];
   defect = false;
   search(input: SearchWallpapers) {
     return this.respond('search', input, this.searchOutcome);
@@ -289,8 +279,8 @@ describe('GraphQL driving adapter contract', () => {
   });
   it('preserves null missing records and absent Profile pictures', async () => {
     const { query, inbound } = await setup();
-    inbound.wallpaperOutcome = { _tag: 'Found', value: null };
-    inbound.profileOutcome = { _tag: 'Found', value: null };
+    inbound.wallpaperOutcome = null;
+    inbound.profileOutcome = null;
     expect(
       (
         await query(
@@ -298,7 +288,7 @@ describe('GraphQL driving adapter contract', () => {
         )
       ).body.data
     ).toEqual({ getWallpaper: null, profile: null, profileByHandle: null });
-    inbound.profileOutcome = { _tag: 'Found', value: { ...profile, pictureAssetId: null } };
+    inbound.profileOutcome = { ...profile, pictureAssetId: null };
     expect(
       (await query('{profile(id:"profile_a"){picture{id}}}')).body.data.profile.picture
     ).toBeNull();
@@ -327,7 +317,7 @@ describe('GraphQL driving adapter contract', () => {
         ],
       },
     };
-    inbound.batchOutcome = { _tag: 'Found', value: [profile, null, profile] };
+    inbound.batchOutcome = [profile, null, profile];
     const response = await query('{searchWallpapers{edges{node{wallpaperId profile{id}}}}}');
     expect(response.body.errors).toBeUndefined();
     expect(

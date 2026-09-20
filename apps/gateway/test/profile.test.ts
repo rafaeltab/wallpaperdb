@@ -2,7 +2,7 @@ import { Client } from '@opensearch-project/opensearch';
 import { Effect } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
-import type { Profile, ReadOutcome } from '../src/catalogue/index.js';
+import type { Profile } from '../src/catalogue/index.js';
 import type { ProjectCatalogue } from '../src/projection/index.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
@@ -20,11 +20,6 @@ function profile(id: string, overrides: Partial<Profile> = {}): Profile {
     updatedAt: timestamp,
     ...overrides,
   };
-}
-function found<T>(outcome: ReadOutcome<T>): T {
-  expect(outcome._tag).toBe('Found');
-  if (outcome._tag !== 'Found') throw new Error('Catalogue unavailable');
-  return outcome.value;
 }
 
 describe('OpenSearch profile projection port contract', () => {
@@ -59,10 +54,10 @@ describe('OpenSearch profile projection port contract', () => {
     );
   }
   async function byId(id: string) {
-    return found(await Effect.runPromise(adapter.read.profile(id)));
+    return Effect.runPromise(adapter.read.profile(id));
   }
   async function byHandle(handle: string) {
-    return found(await Effect.runPromise(adapter.read.profileByHandle(handle)));
+    return Effect.runPromise(adapter.read.profileByHandle(handle));
   }
 
   it('stores and reads the gateway-owned profile snapshot', async () => {
@@ -143,13 +138,11 @@ describe('OpenSearch profile projection port contract', () => {
     await publish(first);
     await publish(second);
     expect(
-      found(
-        await Effect.runPromise(
-          adapter.read.profiles([second.id, first.id, 'missing-batch', second.id])
-        )
+      await Effect.runPromise(
+        adapter.read.profiles([second.id, first.id, 'missing-batch', second.id])
       )
     ).toEqual([second, first, null, second]);
-    expect(found(await Effect.runPromise(adapter.read.profiles([])))).toEqual([]);
+    expect(await Effect.runPromise(adapter.read.profiles([]))).toEqual([]);
   });
 
   it('rejects malformed stored profiles at each read boundary', async () => {

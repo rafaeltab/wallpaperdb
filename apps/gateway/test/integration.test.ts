@@ -212,29 +212,19 @@ describe('Gateway composition with real adapters', () => {
         ).toEqual({ _tag: 'Applied' });
       }
       expect(await Effect.runPromise(first.read.wallpaper('shared-wallpaper'))).toMatchObject({
-        _tag: 'Found',
-        value: { profileId: 'first' },
+        profileId: 'first',
       });
       expect(await Effect.runPromise(second.read.wallpaper('shared-wallpaper'))).toMatchObject({
-        _tag: 'Found',
-        value: { profileId: 'second' },
+        profileId: 'second',
       });
       expect(await Effect.runPromise(first.read.profile('shared-profile'))).toMatchObject({
-        _tag: 'Found',
-        value: { displayName: 'first' },
+        displayName: 'first',
       });
       expect(await Effect.runPromise(second.read.profile('shared-profile'))).toMatchObject({
-        _tag: 'Found',
-        value: { displayName: 'second' },
+        displayName: 'second',
       });
-      expect(await Effect.runPromise(first.read.profileByHandle('second'))).toEqual({
-        _tag: 'Found',
-        value: null,
-      });
-      expect(await Effect.runPromise(second.read.profileByHandle('first'))).toEqual({
-        _tag: 'Found',
-        value: null,
-      });
+      expect(await Effect.runPromise(first.read.profileByHandle('second'))).toBeNull();
+      expect(await Effect.runPromise(second.read.profileByHandle('first'))).toBeNull();
       const closedIndex = firstFixture.index('closed');
       await client.indices.create({ index: closedIndex });
       await client.indices.close({ index: closedIndex });
@@ -247,12 +237,10 @@ describe('Gateway composition with real adapters', () => {
       );
       expect((await client.indices.exists({ index: closedIndex })).body).toBe(false);
       expect(await Effect.runPromise(second.read.wallpaper('shared-wallpaper'))).toMatchObject({
-        _tag: 'Found',
-        value: { profileId: 'second' },
+        profileId: 'second',
       });
       expect(await Effect.runPromise(second.read.profile('shared-profile'))).toMatchObject({
-        _tag: 'Found',
-        value: { displayName: 'second' },
+        displayName: 'second',
       });
     } finally {
       await client.close();

@@ -20,6 +20,7 @@ For ambiguous effects spanning independent resources, follow [delivery reliabili
 - Application code and adapters emit telemetry through that mechanism; the telemetry library controls enablement, sampling, and export. Disabled telemetry does not require an alternative recording path.
 - Event logs and traces include event identity, correlation and causation, relevant domain identity, consumer identity, delivery attempt, outcome, and duration without recording secrets or personally identifiable information.
 - Configure alerts for unavailability of services or dependencies whose failure prevents important operations or disables protective controls, including when requests continue to succeed.
+- When changing metrics consumed by dashboards or alerts, preserve compatibility or update those consumers together. Changes to what a metric measures must also be reflected in affected queries, descriptions, and alert conditions.
 
 For opaque diagnostic causes and application decisions, follow [outcomes and failures](application-and-domain.md#outcomes-and-failures). Public responses follow [adapter disclosure rules](adapters.md#public-http-apis).
 

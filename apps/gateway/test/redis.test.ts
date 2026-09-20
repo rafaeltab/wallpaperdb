@@ -1,11 +1,18 @@
 import { once } from 'node:events';
 import { connect, createServer, type Socket } from 'node:net';
+import { metrics } from '@opentelemetry/api';
+import {
+  AggregationTemporality,
+  InMemoryMetricExporter,
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 import { Effect, ManagedRuntime } from 'effect';
 import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { redisQuotaLayer } from '../src/adapters/redis/index.js';
-import { Quota } from '../src/admission/index.js';
+import { type AdmissionResult, Quota } from '../src/admission/index.js';
 
 let container: StartedTestContainer;
 beforeAll(async () => {
@@ -21,8 +28,37 @@ async function distributed(port = container.getMappedPort(6379), enabled = true)
   const quota = await runtime.runPromise(Quota);
   return { quota, dispose: () => runtime.dispose() };
 }
+function observeQuotaMetrics() {
+  const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+  const reader = new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 });
+  const provider = new MeterProvider({ readers: [reader] });
+  metrics.setGlobalMeterProvider(provider);
+  return {
+    async read() {
+      await provider.forceFlush();
+      return exporter.getMetrics().flatMap((resource) =>
+        resource.scopeMetrics.flatMap((scope) =>
+          scope.metrics
+            .filter((metric) => metric.descriptor.name === 'admission.quota.unenforced')
+            .flatMap((metric) =>
+              metric.dataPoints.map((point) => ({
+                attributes: point.attributes,
+                value: point.value,
+              }))
+            )
+        )
+      );
+    },
+    async close() {
+      metrics.disable();
+      await provider.shutdown();
+    },
+  };
+}
 async function proxy() {
   let forwardsReplies = true;
+  let holdsReplies = false;
+  const heldReplies: Array<{ socket: Socket; chunk: Buffer }> = [];
   let acceptsConnections = true;
   let evals = 0;
   const sockets = new Set<Socket>();
@@ -38,7 +74,8 @@ async function proxy() {
       upstream.write(chunk);
     });
     upstream.on('data', (chunk) => {
-      if (forwardsReplies) socket.write(chunk);
+      if (holdsReplies) heldReplies.push({ socket, chunk });
+      else if (forwardsReplies) socket.write(chunk);
     });
     upstream.on('error', () => socket.destroy());
     socket.on('error', () => upstream.destroy());
@@ -62,6 +99,13 @@ async function proxy() {
     },
     stall() {
       forwardsReplies = false;
+    },
+    holdReplies() {
+      holdsReplies = true;
+    },
+    releaseReplies() {
+      holdsReplies = false;
+      for (const { socket, chunk } of heldReplies.splice(0)) socket.write(chunk);
     },
     disconnect() {
       acceptsConnections = false;
@@ -102,17 +146,86 @@ describe('quota storage contract', () => {
     }
   });
   it('allows every request without local quota windows when Redis is disabled or unreachable', async () => {
-    for (const enabled of [false, true]) {
-      const adapter = await distributed(1, enabled);
-      try {
-        for (let i = 0; i < 3; i++) {
-          expect(
-            await Effect.runPromise(adapter.quota.take('unavailable', 1, 60000))
-          ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
+    const observed = observeQuotaMetrics();
+    try {
+      for (const enabled of [false, true]) {
+        const adapter = await distributed(1, enabled);
+        try {
+          for (let i = 0; i < 3; i++) {
+            expect(
+              await Effect.runPromise(adapter.quota.take('unavailable', 1, 60000))
+            ).toMatchObject({ _tag: 'Allowed', remaining: 1 });
+          }
+        } finally {
+          await adapter.dispose();
         }
-      } finally {
-        await adapter.dispose();
       }
+      expect(await observed.read()).toEqual(
+        expect.arrayContaining([
+          { attributes: { reason: 'disabled' }, value: 3 },
+          { attributes: { reason: 'unavailable' }, value: 3 },
+        ])
+      );
+    } finally {
+      await observed.close();
+    }
+  });
+  it('reports local saturation while Redis remains healthy and completes held commands normally', async () => {
+    const bridge = await proxy();
+    const adapter = await distributed(bridge.port);
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const observed = observeQuotaMetrics();
+    let pending: Promise<AdmissionResult[]> | undefined;
+    try {
+      await control.ping();
+      bridge.holdReplies();
+      pending = Effect.runPromise(
+        Effect.all(
+          Array.from({ length: 64 }, () => adapter.quota.take('healthy-saturation', 100, 60000)),
+          { concurrency: 'unbounded' }
+        )
+      );
+      await expect
+        .poll(() => control.get('graphql:ratelimit:healthy-saturation'), { interval: 5 })
+        .toBe('64');
+      expect(await control.ping()).toBe('PONG');
+      expect(
+        await Effect.runPromise(adapter.quota.take('healthy-saturation', 100, 60000))
+      ).toMatchObject({ _tag: 'Allowed', remaining: 100 });
+      expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
+      bridge.releaseReplies();
+      const decisions = await pending;
+      expect(
+        decisions.every((decision) => decision._tag === 'Allowed' && decision.remaining < 100)
+      ).toBe(true);
+      expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
+      expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
+    } finally {
+      bridge.releaseReplies();
+      await Promise.allSettled([pending]);
+      control.disconnect();
+      await adapter.dispose();
+      await bridge.close();
+      await observed.close();
+    }
+  });
+  it('distinguishes a failed Redis command from unavailable storage', async () => {
+    const adapter = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const observed = observeQuotaMetrics();
+    try {
+      await control.lpush('graphql:ratelimit:wrong-type', 'invalid-quota-storage');
+      expect(await Effect.runPromise(adapter.quota.take('wrong-type', 1, 60000))).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 1,
+      });
+      expect(await observed.read()).toEqual([
+        { attributes: { reason: 'command_failure' }, value: 1 },
+      ]);
+    } finally {
+      control.disconnect();
+      await adapter.dispose();
+      await observed.close();
     }
   });
   it('leaves denied windows unchanged and resets after expiry', async () => {

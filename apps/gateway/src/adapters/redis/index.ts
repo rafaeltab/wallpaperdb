@@ -42,7 +42,8 @@ class RedisQuota implements Quota {
     limit: number,
     windowMs: number
   ): Effect.fn.Return<AdmissionResult> {
-    if (!this.available || !this.client) return yield* allowWithoutQuota(limit, windowMs);
+    if (!this.client) return yield* allowWithoutQuota(limit, windowMs, 'disabled');
+    if (!this.available) return yield* allowWithoutQuota(limit, windowMs, 'unavailable');
     const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
       Effect.tryPromise({
@@ -63,8 +64,9 @@ class RedisQuota implements Quota {
         )
       )
     );
-    if (reply._tag === 'None' || reply.value === undefined)
-      return yield* allowWithoutQuota(limit, windowMs);
+    if (reply._tag === 'None') return yield* allowWithoutQuota(limit, windowMs, 'saturated');
+    if (reply.value === undefined)
+      return yield* allowWithoutQuota(limit, windowMs, 'command_failure');
     const [count, ttl] = reply.value;
     if (count === -1) return { _tag: 'Limited', retryAfter: ttl };
     const now = yield* Clock.currentTimeMillis;
@@ -73,9 +75,12 @@ class RedisQuota implements Quota {
 }
 const allowWithoutQuota = Effect.fnUntraced(function* (
   limit: number,
-  windowMs: number
+  windowMs: number,
+  reason: 'disabled' | 'unavailable' | 'saturated' | 'command_failure'
 ): Effect.fn.Return<AdmissionResult> {
-  yield* Effect.try(() => recordCounter('admission.quota.unenforced', 1)).pipe(Effect.ignore);
+  yield* Effect.try(() => recordCounter('admission.quota.unenforced', 1, { reason })).pipe(
+    Effect.ignore
+  );
   const now = yield* Clock.currentTimeMillis;
   return { _tag: 'Allowed', remaining: limit, reset: now + windowMs };
 });

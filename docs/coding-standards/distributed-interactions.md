@@ -25,7 +25,7 @@ For translation into local models and ownership of persistence/assets, follow [b
 - Consumers classify delivery as completed or durably accepted, intentional no-op, transient retry, or permanent failure. Retries are finite and backed off; permanent and exhausted failures are durably quarantined, and replay preserves the original event identity.
 - Broker deduplication is supplementary. Do not claim exactly-once behavior unless the complete observable effect is protected by one genuine transactional boundary.
 
-For event diagnostic fields, follow [observability](composition-and-operations.md#observability). For timeouts, in-flight work, and shutdown, follow [resource lifecycle](composition-and-operations.md#configuration-and-lifecycle).
+For event diagnostic fields, follow [observability](composition-and-operations.md#observability). For timeouts, in-flight work, and shutdown, follow [resource lifecycle](composition-and-operations.md#configuration-and-lifecycle). For NATS consumer selection, partitioning, acknowledgements, and retention, follow [NATS and JetStream](nats.md).
 
 ## Testing
 

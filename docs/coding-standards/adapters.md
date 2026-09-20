@@ -18,7 +18,7 @@ When input interpretation affects admission or execution, follow [ownership of d
 - Exhaustively translate declared outcomes and typed failures into transport behavior. Do not expose diagnostic causes in public responses.
 - Apply security and admission controls to the operation identified by the driving adapter. Alternative external representations that resolve to the same operation must receive the same controls.
 
-For broker consumers, also follow [distributed contracts and delivery reliability](distributed-interactions.md).
+For broker consumers, also follow [distributed contracts and delivery reliability](distributed-interactions.md). For NATS publishers and consumers, follow [NATS and JetStream](nats.md).
 
 ## Public HTTP APIs
 

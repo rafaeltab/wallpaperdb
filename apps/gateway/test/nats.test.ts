@@ -8,6 +8,7 @@ import {
 import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import { DiscardPolicy, headers, StorageType } from 'nats';
+import { GenericContainer, Wait } from 'testcontainers';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   natsProjectionLayer,
@@ -426,6 +427,196 @@ describe('NATS projection adapter contract', () => {
     expect(await quarantine()).toMatchObject({ data: { outcome: 'Invalid' } });
     expect(project.changes).toEqual([]);
     await acknowledged();
+  });
+
+  it('reserves quarantine capacity for the largest admitted arbitrary payload', async () => {
+    const project = new ControlledProjection();
+    await consumer(project);
+    const js = await tester.nats.getJsClient();
+    const original = Buffer.alloc(64 * 1024, 0xff);
+    await js.publish('wallpaper.uploaded', original);
+    expect((await quarantine()).data.original).toBe(original.toString('base64'));
+    await acknowledged();
+    expect(project.changes).toEqual([]);
+    await expect(
+      js.publish('wallpaper.uploaded', Buffer.alloc(64 * 1024 + 1, 0xff))
+    ).rejects.toThrow(/message size exceeds maximum/i);
+    await expect(js.publish('profile.created', Buffer.alloc(64 * 1024 + 1, 0xff))).rejects.toThrow(
+      /message size exceeds maximum/i
+    );
+  });
+
+  it('retains large event identities alongside the largest admitted event', async () => {
+    const project = new ControlledProjection();
+    project.outcomes = [{ _tag: 'Rejected', reason: 'invalid-projection' }];
+    await consumer(project);
+    const event = {
+      specversion: '1.0',
+      id: 'evt_large_metadata',
+      source: 'wallpaperdb/test',
+      type: 'wallpaper.uploaded',
+      time: timestamp,
+      correlationid: '',
+      data: JSON.parse(upload('evt_large_metadata')),
+    };
+    event.correlationid = 'x'.repeat(64 * 1024 - Buffer.byteLength(JSON.stringify(event)));
+    const original = JSON.stringify(event);
+    expect(Buffer.byteLength(original)).toBe(64 * 1024);
+    await publish(original);
+    expect(await quarantine()).toMatchObject({
+      causationid: event.id,
+      correlationid: event.correlationid,
+      data: { original: Buffer.from(original).toString('base64'), outcome: 'Rejected' },
+    });
+    await acknowledged();
+  });
+
+  it('quarantines malformed UTF-8 without expanding invalid event metadata', async () => {
+    const project = new ControlledProjection();
+    project.outcomes = [{ _tag: 'Rejected', reason: 'invalid-projection' }];
+    await consumer(project);
+    const marker = '_invalid_utf8_';
+    const event = Buffer.from(
+      JSON.stringify({
+        specversion: '1.0',
+        id: 'evt_invalid_utf8',
+        source: 'wallpaperdb/test',
+        type: 'wallpaper.uploaded',
+        time: timestamp,
+        correlationid: marker,
+        data: JSON.parse(upload('evt_invalid_utf8')),
+      })
+    );
+    const position = event.indexOf(marker);
+    const prefix = event.subarray(0, position);
+    const suffix = event.subarray(position + marker.length);
+    const original = Buffer.concat([
+      prefix,
+      Buffer.alloc(64 * 1024 - prefix.length - suffix.length, 0xff),
+      suffix,
+    ]);
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', original);
+    expect(await quarantine()).toMatchObject({
+      data: { original: original.toString('base64'), outcome: 'Invalid' },
+    });
+    expect(project.changes).toEqual([]);
+    await acknowledged();
+  });
+
+  it('audits retained history once while preserving an existing stricter publisher limit', async () => {
+    const connection = await tester.nats.getConnection();
+    const manager = await connection.jetstreamManager();
+    await manager.streams.update('WALLPAPER', { max_msg_size: 4096, metadata: { owner: 'test' } });
+    await publish(upload('evt_existing_history'));
+    const js = await tester.nats.getJsClient();
+    const deleted = await js.publish('wallpaper.uploaded', upload('evt_deleted_history'));
+    await publish(upload('evt_existing_later_history'));
+    await manager.streams.deleteMessage('WALLPAPER', deleted.seq);
+    let historyReads = 0;
+    const inspection = connection.subscribe('$JS.API.STREAM.MSG.GET.WALLPAPER', {
+      callback: () => {
+        historyReads++;
+      },
+    });
+    await connection.flush();
+    try {
+      const first = await consumer(new ControlledProjection());
+      await acknowledged();
+      await connection.flush();
+      expect(historyReads).toBe(2);
+      const initialReads = historyReads;
+      expect((await manager.streams.info('WALLPAPER')).config).toMatchObject({
+        max_msg_size: 4096,
+        metadata: { owner: 'test' },
+      });
+      await first.runtime.dispose();
+      const second = await consumer(new ControlledProjection());
+      expect(await Effect.runPromise(second.adapter.check())).toBe(true);
+      await connection.flush();
+      expect(historyReads).toBe(initialReads);
+    } finally {
+      inspection.unsubscribe();
+      await manager.streams.update('WALLPAPER', { max_msg_size: 64 * 1024 });
+    }
+  });
+
+  it.each([
+    false,
+    true,
+  ])('preserves oversized historical messages and refuses startup (recreated stream: %s)', async (recreated) => {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const first = await consumer(new ControlledProjection());
+    await first.runtime.dispose();
+    const { config } = await manager.streams.info('WALLPAPER');
+    if (recreated) {
+      await manager.streams.delete('WALLPAPER');
+      await manager.streams.add({ ...config, max_msg_size: -1 });
+    } else {
+      await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+    }
+    const original = Buffer.alloc(800000, 0xff);
+    const published = await (await tester.nats.getJsClient()).publish(
+      'wallpaper.uploaded',
+      original
+    );
+    await manager.streams.update('WALLPAPER', { max_msg_size: 64 * 1024 });
+    await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
+      _tag: 'NatsProjectionStartupError',
+      cause: {
+        _tag: 'MessageBudgetError',
+        message: expect.stringContaining(`WALLPAPER sequence ${published.seq}`),
+      },
+    });
+    expect(
+      Buffer.from(
+        (await manager.streams.getMessage('WALLPAPER', { seq: published.seq })).data
+      ).equals(original)
+    ).toBe(true);
+    expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+  });
+
+  it('rejects a quarantine stream whose message limit cannot retain admitted originals', async () => {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const first = await consumer(new ControlledProjection());
+    await first.runtime.dispose();
+    await manager.streams.update('GATEWAY_QUARANTINE', { max_msg_size: 64 * 1024 });
+    try {
+      await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
+        _tag: 'NatsProjectionStartupError',
+        cause: {
+          _tag: 'MessageBudgetError',
+          message: expect.stringContaining('GATEWAY_QUARANTINE'),
+        },
+      });
+    } finally {
+      await manager.streams.update('GATEWAY_QUARANTINE', { max_msg_size: 256 * 1024 });
+    }
+  });
+
+  it('rejects a broker payload limit that leaves insufficient quarantine capacity', async () => {
+    const broker = await new GenericContainer('nats:2.10-alpine')
+      .withCopyContentToContainer([
+        {
+          content: 'port:4222\nhttp_port:8222\nmax_payload:131072\njetstream {}\n',
+          target: '/tmp/nats.conf',
+        },
+      ])
+      .withCommand(['-c', '/tmp/nats.conf'])
+      .withExposedPorts(4222, 8222)
+      .withWaitStrategy(Wait.forHttp('/healthz', 8222).forStatusCode(200))
+      .start();
+    try {
+      await expect(
+        consumer(new ControlledProjection(), {
+          url: `nats://127.0.0.1:${broker.getMappedPort(4222)}`,
+        })
+      ).rejects.toMatchObject({
+        _tag: 'NatsProjectionStartupError',
+        cause: { _tag: 'MessageBudgetError', message: expect.stringContaining('max_payload') },
+      });
+    } finally {
+      await broker.stop();
+    }
   });
 
   it.each([

@@ -198,8 +198,21 @@ const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
   outcome: string,
   options: NatsProjectionOptions
 ) {
+  const info = message.info;
   const identity = createHash('sha256')
-    .update(`${message.info.stream}/${message.seq}/${message.info.consumer}`)
+    .update(
+      JSON.stringify([
+        'gateway-quarantine-v2',
+        info.domain,
+        info.account_hash,
+        info.stream,
+        info.consumer,
+        message.subject,
+        info.streamSequence,
+        info.timestampNanos,
+      ])
+    )
+    .update(message.data)
     .digest('hex');
   const original = translate(message.subject, message.data);
   const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);

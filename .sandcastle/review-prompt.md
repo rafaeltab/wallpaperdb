@@ -30,7 +30,7 @@ Here are the last 10 commits:
 
 1. **Understand the change**: Read the issue and compare its requirements with the branch diff.
 
-2. **Apply project standards**: Review correctness and compliance with @CODING_STANDARDS.md. Follow @.sandcastle/WORKFLOW.md for execution instructions.
+2. **Apply project standards**: Review correctness and compliance with the applicable guidelines indexed by @CODING_STANDARDS.md. Follow @.sandcastle/WORKFLOW.md for execution instructions.
 
 3. **Preserve functionality**: Never change what the code does - only how it does it. All original features, outputs, and behaviors must remain intact.
 

@@ -21,7 +21,7 @@ create_stream_if_not_exists() {
   echo "Checking stream: $stream_name"
 
   if nats stream info "$stream_name" --server "$NATS_SERVER" >/dev/null 2>&1; then
-    echo "  ✓ Stream $stream_name already exists"
+    echo "  ✓ Stream $stream_name already exists; gateway startup reconciles its message budget and retained history"
   else
     echo "  → Creating stream $stream_name with subjects: $subjects"
     nats stream add "$stream_name" \
@@ -31,7 +31,7 @@ create_stream_if_not_exists() {
       --max-msgs=-1 \
       --max-bytes=-1 \
       --max-age="$max_age" \
-      --max-msg-size=-1 \
+      --max-msg-size=65536 \
       --discard old \
       --server "$NATS_SERVER" \
       --defaults

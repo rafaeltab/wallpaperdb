@@ -28,6 +28,7 @@ import {
   type NatsConnection,
 } from 'nats';
 import { ProjectCatalogue, type ProjectionOutcome } from '../../projection/index.js';
+import { ensureMessageBudgets, quarantineMessageBytes } from './message-budget.js';
 import { translate, type TranslatedEvent } from './translation.js';
 
 export interface ProjectionDelivery {
@@ -145,6 +146,7 @@ const ensureQuarantine = Effect.fn('catalogue.events.ensureQuarantine')(function
             subjects: [options.quarantineSubject ?? 'gateway.quarantine'],
             storage: StorageType.File,
             discard: DiscardPolicy.New,
+            max_msg_size: quarantineMessageBytes,
           })
         )
     )
@@ -360,6 +362,12 @@ export function natsProjectionLayer(
         connection.jetstreamManager({ timeout: 5000 })
       );
       yield* ensureQuarantine(manager, options);
+      yield* ensureMessageBudgets(
+        manager,
+        connection.info?.max_payload,
+        [options.wallpaperStream ?? 'WALLPAPER', 'PROFILE'],
+        options.quarantineStream ?? 'GATEWAY_QUARANTINE'
+      );
       const js = connection.jetstream({ timeout: 5000 });
       const healthy = yield* Ref.make(true);
       const accepting = yield* Ref.make(true);

@@ -15,6 +15,9 @@ import { DateTime, Option, Predicate, Schema } from 'effect';
 import type { Occurrence, ProjectionChange } from '../../projection/index.js';
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
+const decodeUtf8 = Option.liftThrowable((payload: Uint8Array) =>
+  new TextDecoder('utf-8', { fatal: true }).decode(payload)
+);
 const decodeCreated = Schema.decodeUnknownOption(
   Schema.Struct({
     eventType: Schema.Literal('profile.created'),
@@ -82,7 +85,7 @@ export type TranslatedEvent =
   | { readonly _tag: 'Invalid' };
 
 export function translate(subject: string, payload: Uint8Array): TranslatedEvent {
-  const raw = decodeJson(new TextDecoder().decode(payload));
+  const raw = Option.flatMap(decodeUtf8(payload), decodeJson);
   if (Option.isNone(raw)) return { _tag: 'Invalid' };
   const envelope = decodeCloud(raw.value);
   if (Predicate.hasProperty(raw.value, 'specversion') && Option.isNone(envelope))

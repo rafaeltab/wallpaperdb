@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
 import { expect, layer } from '@effect/vitest';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
 import { CatalogueCursors } from '../src/catalogue/index.js';
 import { signedCursorsLayer } from '../src/cursors/index.js';
+import { Cursors } from './helpers/catalogue.js';
 const config = { secret: 'test-secret-that-is-definitely-long-enough', expirationMs: 60_000 };
 function signed(payload: unknown) {
   const text = JSON.stringify(payload);
@@ -21,17 +22,6 @@ layer(signedCursorsLayer(config))('Signed pagination cursor adapter', (it) => {
         signature: expect.stringMatching(/^[0-9a-f]{64}$/),
       });
       expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });
-    })
-  );
-  it.effect('accepts the expiration boundary and rejects the next millisecond', () =>
-    Effect.gen(function* () {
-      const cursors = yield* CatalogueCursors;
-      yield* TestClock.setTime(0);
-      const cursor = yield* cursors.encode(['wlpr_a']);
-      yield* TestClock.setTime(config.expirationMs);
-      expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: ['wlpr_a'] });
-      yield* TestClock.setTime(config.expirationMs + 1);
-      expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'InvalidCursor' });
     })
   );
   it.effect.each([
@@ -68,3 +58,34 @@ layer(signedCursorsLayer(config))('Signed pagination cursor adapter', (it) => {
     })
   );
 });
+
+for (const [name, adapter] of [
+  ['Signed', signedCursorsLayer(config)],
+  ['Controlled', Layer.sync(CatalogueCursors, () => new Cursors())],
+] as const) {
+  layer(adapter)(`${name} cursor lifetime contract`, (it) => {
+    it.effect('accepts the expiration boundary and rejects the next millisecond', () =>
+      Effect.gen(function* () {
+        const cursors = yield* CatalogueCursors;
+        yield* TestClock.setTime(0);
+        const cursor = yield* cursors.encode([42, 'wlpr_a']);
+        yield* TestClock.setTime(config.expirationMs);
+        expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'Decoded', values: [42, 'wlpr_a'] });
+        yield* TestClock.setTime(config.expirationMs + 1);
+        expect(yield* cursors.decode(cursor)).toEqual({ _tag: 'InvalidCursor' });
+      })
+    );
+    it.effect('issuing the same position again does not extend an earlier cursor lifetime', () =>
+      Effect.gen(function* () {
+        const cursors = yield* CatalogueCursors;
+        yield* TestClock.setTime(0);
+        const original = yield* cursors.encode(['wlpr_a']);
+        yield* TestClock.setTime(100);
+        const later = yield* cursors.encode(['wlpr_a']);
+        yield* TestClock.setTime(config.expirationMs + 1);
+        expect(yield* cursors.decode(original)).toEqual({ _tag: 'InvalidCursor' });
+        expect(yield* cursors.decode(later)).toEqual({ _tag: 'Decoded', values: ['wlpr_a'] });
+      })
+    );
+  });
+}

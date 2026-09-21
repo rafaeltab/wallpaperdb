@@ -91,6 +91,46 @@ describe('Catalogue capability', () => {
     });
     expect(read.selections).toEqual([]);
   });
+  it.each([
+    { first: 101, after: 'tampered' },
+    { last: 101, before: 'tampered' },
+    { first: 50_000, after: 'tampered' },
+    { last: 50_000, before: 'tampered' },
+  ])('rejects oversized pagination %j before cursor and catalogue access', async (query) => {
+    const { read, catalogue } = await setup();
+    expect(await Effect.runPromise(catalogue.search(query))).toEqual({
+      _tag: 'InvalidSearch',
+      reason: 'Page size must be an integer between 1 and 100',
+    });
+    expect(read.selections).toEqual([]);
+  });
+  it.each([
+    'first',
+    'last',
+  ] as const)('accepts a maximum %s page with one lookahead result', async (direction) => {
+    const { read, catalogue, cursors } = await setup();
+    const cursor = await Effect.runPromise(cursors.encode(['boundary']));
+    const query =
+      direction === 'first' ? { first: 100, after: cursor } : { last: 100, before: cursor };
+    expect(await Effect.runPromise(catalogue.search(query))).toMatchObject({ _tag: 'Found' });
+    expect(read.selections).toEqual([
+      { size: 101, sortOrder: direction === 'first' ? 'asc' : 'desc', searchAfter: ['boundary'] },
+    ]);
+  });
+  it('preserves first precedence when both page sizes are valid', async () => {
+    const { read, catalogue } = await setup();
+    expect(await Effect.runPromise(catalogue.search({ first: 2, last: 100 }))).toMatchObject({
+      _tag: 'Found',
+    });
+    expect(read.selections).toEqual([{ size: 3, sortOrder: 'asc' }]);
+  });
+  it('rejects an oversized last even when first selects a smaller page', async () => {
+    const { read, catalogue } = await setup();
+    expect(await Effect.runPromise(catalogue.search({ first: 2, last: 101 }))).toMatchObject({
+      _tag: 'InvalidSearch',
+    });
+    expect(read.selections).toEqual([]);
+  });
   it('propagates typed catalogue unavailability', async () => {
     const { read, catalogue } = await setup();
     read.unavailable = true;

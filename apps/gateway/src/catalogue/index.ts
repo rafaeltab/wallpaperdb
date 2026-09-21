@@ -117,7 +117,19 @@ export interface CatalogueConfig {
   colorSpreadStrategy: 'linear' | 'exponential' | 'exact';
 }
 
-const pageSizeSchema = Schema.Int.check(Schema.isGreaterThan(0));
+const pageSizeSchema = Schema.Int.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100));
+const validPageSizes = Schema.is(
+  Schema.Struct({ first: Schema.optional(pageSizeSchema), last: Schema.optional(pageSizeSchema) })
+);
+
+/** Catalogue pagination defaults to 10 and accepts at most 100 results per page. */
+export function resolvePageSize(
+  query: Pick<SearchWallpapers, 'first' | 'last'>
+): number | InvalidSearch {
+  return validPageSizes(query)
+    ? (query.first ?? query.last ?? 10)
+    : { _tag: 'InvalidSearch', reason: 'Page size must be an integer between 1 and 100' };
+}
 
 export function catalogueLayer(
   config: CatalogueConfig
@@ -130,9 +142,8 @@ export function catalogueLayer(
       const search = Effect.fn('catalogue.search')(function* (
         query: SearchWallpapers
       ): Effect.fn.Return<SearchOutcome, CatalogueUnavailable> {
-        const limit = query.first ?? query.last ?? 10;
-        if (!Schema.is(pageSizeSchema)(limit))
-          return { _tag: 'InvalidSearch', reason: 'Page size must be a positive integer' };
+        const limit = resolvePageSize(query);
+        if (typeof limit !== 'number') return limit;
         if (query.colors) {
           const invalid = validateColors(query.colors);
           if (invalid) return { _tag: 'InvalidSearch', reason: invalid };

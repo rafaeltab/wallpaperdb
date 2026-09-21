@@ -167,14 +167,14 @@ describe('NATS projection adapter contract', () => {
       .toEqual({ waiting: 0, unacknowledged: 0 });
   }
 
-  async function quarantine() {
+  async function quarantine(count = 1) {
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
     await expect
       .poll(async () => (await manager.streams.info('GATEWAY_QUARANTINE')).state.messages, {
         timeout: 10000,
         interval: 20,
       })
-      .toBe(1);
+      .toBe(count);
     const message = await manager.streams.getMessage('GATEWAY_QUARANTINE', {
       last_by_subj: 'gateway.quarantine',
     });
@@ -426,6 +426,45 @@ describe('NATS projection adapter contract', () => {
     expect(await quarantine()).toMatchObject({ data: { outcome: 'Invalid' } });
     expect(project.changes).toEqual([]);
     await acknowledged();
+  });
+
+  it.each([
+    '{different invalid json',
+    '{invalid json',
+  ])('preserves a new quarantine occurrence after recreating its source stream: %s', async (replacement) => {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const { config } = await manager.streams.info('WALLPAPER');
+    await manager.streams.delete('WALLPAPER');
+    await manager.streams.add(config);
+    const first = await consumer(new ControlledProjection());
+    await publish('{invalid json');
+    const original = await quarantine();
+    await acknowledged();
+    await first.runtime.dispose();
+
+    await manager.streams.delete('WALLPAPER');
+    await manager.streams.add(config);
+    await consumer(new ControlledProjection());
+    await publish(replacement);
+    await acknowledged();
+
+    const recreated = await quarantine(2);
+    expect(recreated.id).not.toBe(original.id);
+    expect(recreated.data.original).toBe(Buffer.from(replacement).toString('base64'));
+  });
+
+  it('reuses the quarantine occurrence when a recreated consumer replays retained input', async () => {
+    const first = await consumer(new ControlledProjection());
+    await publish('{invalid json');
+    const original = await quarantine();
+    await acknowledged();
+    await first.runtime.dispose();
+
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await manager.consumers.delete('WALLPAPER', 'gateway-wallpaper-uploaded');
+    await consumer(new ControlledProjection());
+    await acknowledged();
+    expect(await quarantine()).toEqual(original);
   });
 
   it('quarantines permanent application rejections without retrying', async () => {

@@ -17,6 +17,8 @@ Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, 
 
 Catalogue pages default to 10 results. Both `first` and `last` must be integers between 1 and 100 when supplied; `first` selects the page size if both are present. The capability rejects unsupported sizes before cursor decoding or catalogue storage access.
 
+GraphQL complexity admission uses the selected operation and its referenced fragments, GraphQL-coerced arguments and variable defaults, and the catalogue's resolved page size. Equivalent pagination expressed as literals, supplied variables, or variable defaults receives the same cost estimate; omitted and null page sizes use the catalogue default.
+
 Successful `/health` and `/ready` responses and their HTTP status codes are unchanged. Failed probes return HTTP 503 with `application/problem+json`. Failed `/health` bodies use numeric `status: 503` and report the health state (`degraded`, `unhealthy`, or `shutting_down`) in `healthStatus`, alongside dependency checks and timing. Failed `/ready` bodies retain `ready: false`, `reason`, and `timestamp` within the problem envelope. Consumers of the former failed-health string `status` must read `healthStatus`; probes that only inspect HTTP status remain compatible.
 
 ## Projection delivery

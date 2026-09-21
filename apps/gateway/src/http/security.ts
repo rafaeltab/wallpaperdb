@@ -1,5 +1,17 @@
-import type { DocumentNode, FieldNode, GraphQLSchema, ValueNode } from 'graphql';
-import { GraphQLError, TypeInfo, visit, visitWithTypeInfo } from 'graphql';
+import { Schema } from 'effect';
+import type { DocumentNode, FieldNode, GraphQLField, GraphQLSchema } from 'graphql';
+import {
+  BREAK,
+  getArgumentValues,
+  getOperationAST,
+  getVariableValues,
+  GraphQLError,
+  separateOperations,
+  TypeInfo,
+  visit,
+  visitWithTypeInfo,
+} from 'graphql';
+import { resolvePageSize } from '../catalogue/index.js';
 
 export interface QueryLimits {
   readonly graphqlMaxUniqueFields: number;
@@ -13,43 +25,67 @@ const fieldCosts: Record<string, number> = {
   'Profile.wallpapers': 10,
   'Variant.url': 1,
 };
-function argumentValue(value: ValueNode, variables: Record<string, unknown>): number | undefined {
-  if (value.kind === 'IntValue') return Number.parseInt(value.value, 10);
-  if (value.kind !== 'Variable') return undefined;
-  const variable = variables[value.name.value];
-  return typeof variable === 'number' ? variable : undefined;
-}
-function listMultiplier(node: FieldNode, variables: Record<string, unknown>): number {
-  const argument =
-    node.arguments?.find((arg) => arg.name.value === 'first') ??
-    node.arguments?.find((arg) => arg.name.value === 'last');
-  return argument ? Math.max(1, Math.min(argumentValue(argument.value, variables) ?? 10, 100)) : 1;
+const paginationArguments = Schema.is(
+  Schema.Struct({
+    first: Schema.optional(Schema.NullOr(Schema.Number)),
+    last: Schema.optional(Schema.NullOr(Schema.Number)),
+  })
+);
+function listMultiplier(
+  field: GraphQLField<unknown, unknown>,
+  node: FieldNode,
+  variables: Record<string, unknown>
+): number | GraphQLError {
+  const args = getArgumentValues(field, node, variables);
+  if (!paginationArguments(args))
+    return new GraphQLError('Invalid query arguments', { extensions: { code: 'BAD_USER_INPUT' } });
+  const size = resolvePageSize({ first: args.first ?? undefined, last: args.last ?? undefined });
+  return typeof size === 'number'
+    ? size
+    : new GraphQLError(size.reason, { extensions: { code: 'BAD_USER_INPUT' } });
 }
 export function inspectQuery(
   schema: GraphQLSchema,
   document: DocumentNode,
   variables: Record<string, unknown>,
-  limits: QueryLimits
+  limits: QueryLimits,
+  operationName?: string
 ): { complexity: number; error?: GraphQLError } {
+  const operation = getOperationAST(document, operationName);
+  const selectedDocument = operation && separateOperations(document)[operation.name?.value ?? ''];
+  if (!operation || !selectedDocument)
+    return { complexity: 0, error: new GraphQLError('Unable to select a GraphQL operation') };
+  const resolved = getVariableValues(schema, operation.variableDefinitions ?? [], variables);
+  if (resolved.errors) return { complexity: 0, error: resolved.errors[0] };
   const fields = new Set<string>();
   let aliases = 0;
   let complexity = 0;
+  let error: GraphQLError | undefined;
   const typeInfo = new TypeInfo(schema);
   visit(
-    document,
+    selectedDocument,
     visitWithTypeInfo(typeInfo, {
       Field(node) {
         fields.add(node.name.value);
         if (node.alias) aliases++;
         const parent = typeInfo.getParentType();
         const name = parent ? `${parent.name}.${node.name.value}` : node.name.value;
+        const field = typeInfo.getFieldDef();
+        const multiplier =
+          field && (name === 'Query.searchWallpapers' || name === 'Profile.wallpapers')
+            ? listMultiplier(field, node, resolved.coerced)
+            : 1;
+        if (typeof multiplier !== 'number') {
+          error = multiplier;
+          return BREAK;
+        }
         complexity +=
-          (fieldCosts[name] ?? 1) *
-          listMultiplier(node, variables) *
-          (name === 'Wallpaper.variants' ? 5 : 1);
+          (fieldCosts[name] ?? 1) * multiplier * (name === 'Wallpaper.variants' ? 5 : 1);
+        return undefined;
       },
     })
   );
+  if (error) return { complexity, error };
   if (fields.size > limits.graphqlMaxUniqueFields) {
     return {
       complexity,

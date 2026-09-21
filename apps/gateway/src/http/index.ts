@@ -3,7 +3,7 @@ import type { Socket } from 'node:net';
 import cors from '@fastify/cors';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
-import { Cause, Effect, Exit, Latch, Layer, ManagedRuntime, Option } from 'effect';
+import { Cause, Effect, Exit, Latch, Layer, ManagedRuntime, Option, Schema } from 'effect';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { GraphQLError, NoSchemaIntrospectionCustomRule } from 'graphql';
 import mercurius from 'mercurius';
@@ -54,6 +54,15 @@ function fingerprint(ip: string, userAgent?: string) {
     .createHash('sha256')
     .update(`${ip}\u0000${userAgent ?? ''}`)
     .digest('hex');
+}
+const operationRequest = Schema.is(
+  Schema.Struct({
+    operationName: Schema.optional(Schema.NullOr(Schema.String)),
+  })
+);
+function requestOperationName(request: FastifyRequest): string | undefined {
+  const input = request.method === 'GET' ? request.query : request.body;
+  return operationRequest(input) ? (input.operationName ?? undefined) : undefined;
 }
 function installErrors(app: FastifyInstance) {
   app.setNotFoundHandler((_request, reply) =>
@@ -330,11 +339,17 @@ export async function createHttpApp<E>(
         return { statusCode, response: { data: execution.data ?? null, errors } };
       },
     });
-    app.graphql.addHook('preExecution', async (schema, document, _context, variables) => {
+    app.graphql.addHook('preExecution', async (schema, document, context, variables) => {
       const result = await execution.run(
-        Effect.sync(() => inspectQuery(schema, document, variables ?? {}, config)).pipe(
-          Effect.withSpan('admission.inspect_query')
-        )
+        Effect.sync(() =>
+          inspectQuery(
+            schema,
+            document,
+            variables ?? {},
+            config,
+            requestOperationName(context.reply.request)
+          )
+        ).pipe(Effect.withSpan('admission.inspect_query'))
       );
       recordTelemetry(() => recordHistogram('graphql.query.complexity', result.complexity));
       if (result.error) {
@@ -346,7 +361,7 @@ export async function createHttpApp<E>(
               threshold: config.graphqlMaxComplexity,
             })
           );
-        } else {
+        } else if (extensions.code === 'BREADTH_LIMIT_EXCEEDED') {
           const aliases = typeof extensions.aliases === 'number';
           recordTelemetry(() =>
             recordCounter('graphql.security.breadth_exceeded', 1, {

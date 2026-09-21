@@ -6,6 +6,17 @@ import type { HttpConfig } from '../src/http/index.js';
 import type { HttpTestServices } from './unit/http-fixture.js';
 import { createTestHttpApp, EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
 const apps: FastifyInstance[] = [];
+class ObservedCatalogue extends EmptyCatalogue {
+  calls: string[] = [];
+  override search() {
+    this.calls.push('search');
+    return super.search();
+  }
+  override profile() {
+    this.calls.push('profile');
+    return super.profile();
+  }
+}
 async function build(overrides: Partial<HttpConfig> = {}, ports: Partial<HttpTestServices> = {}) {
   const config = { ...httpConfig, ...overrides };
   const app = await createTestHttpApp(config, ports);
@@ -13,8 +24,17 @@ async function build(overrides: Partial<HttpConfig> = {}, ports: Partial<HttpTes
   return app;
 }
 const query = '{ searchWallpapers(first:10) { edges { node { wallpaperId variants { url } } } } }';
-async function execute(app: FastifyInstance, text = query, variables?: Record<string, unknown>) {
-  return app.inject({ method: 'POST', url: '/graphql', payload: { query: text, variables } });
+async function execute(
+  app: FastifyInstance,
+  text = query,
+  variables?: Record<string, unknown>,
+  operationName?: string
+) {
+  return app.inject({
+    method: 'POST',
+    url: '/graphql',
+    payload: { query: text, variables, operationName },
+  });
 }
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
@@ -70,6 +90,150 @@ describe('GraphQL security driving contract', () => {
     expect(
       (await execute(app, '{getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}}')).json().errors
     ).toBeUndefined();
+  });
+  describe.each([
+    'searchWallpapers',
+    'Profile.wallpapers',
+  ])('effective pagination for %s', (field) => {
+    it.each([
+      { label: 'literal first', args: '(first:80)', size: 80 },
+      { label: 'literal last', args: '(last:80)', size: 80 },
+      {
+        label: 'supplied first variable',
+        definition: '($size:Int)',
+        args: '(first:$size)',
+        variables: { size: 80 },
+        size: 80,
+      },
+      {
+        label: 'default first variable',
+        definition: '($size:Int=80)',
+        args: '(first:$size)',
+        size: 80,
+      },
+      {
+        label: 'supplied last variable',
+        definition: '($size:Int)',
+        args: '(last:$size)',
+        variables: { size: 80 },
+        size: 80,
+      },
+      {
+        label: 'default last variable',
+        definition: '($size:Int=80)',
+        args: '(last:$size)',
+        size: 80,
+      },
+      { label: 'null first with last', args: '(first:null,last:80)', size: 80 },
+      {
+        label: 'omitted first variable with last',
+        definition: '($first:Int)',
+        args: '(first:$first,last:80)',
+        size: 80,
+      },
+      { label: 'omitted pagination', args: '', size: 10 },
+      { label: 'null pagination', args: '(first:null,last:null)', size: 10 },
+      { label: 'first precedence', args: '(first:2,last:80)', size: 2 },
+    ])('prices $label before allowing catalogue work', async ({
+      definition = '',
+      args,
+      variables,
+      size,
+    }) => {
+      const catalogue = new ObservedCatalogue();
+      const app = await build({ graphqlMaxComplexity: size * 5 }, { catalogue });
+      const selection =
+        field === 'searchWallpapers'
+          ? `searchWallpapers${args}{edges{node{wallpaperId}}}`
+          : `profile(id:"profile_a"){wallpapers${args}{edges{node{wallpaperId}}}}`;
+      const response = await execute(app, `query${definition}{${selection}}`, variables);
+      expect(response.json().errors?.[0].extensions).toMatchObject({
+        code: 'COMPLEXITY_LIMIT_EXCEEDED',
+        complexity: size * 10 + (field === 'searchWallpapers' ? 3 : 4),
+      });
+      expect(catalogue.calls).toEqual([]);
+    });
+  });
+  it('prices only the selected named operation and its referenced fragments', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: 500 }, { catalogue });
+    const text = `
+      query Small($size:Int=2){searchWallpapers(first:$size){...Page}}
+      query Large($size:Int=80){profile(id:"profile_a"){...LargePage}}
+      fragment Page on WallpaperConnection {edges{node{wallpaperId}}}
+      fragment LargePage on Profile {wallpapers(first:$size){...Page}}
+    `;
+    const allowed = await execute(app, text, undefined, 'Small');
+    expect(allowed.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['search']);
+    catalogue.calls.length = 0;
+    const rejected = await execute(app, text, undefined, 'Large');
+    expect(rejected.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('uses the selected operation and its variable defaults for GraphQL GET', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: 500 }, { catalogue });
+    const query =
+      'query Small($size:Int=2){searchWallpapers(first:$size){edges{node{wallpaperId}}}} query Large($size:Int=80){searchWallpapers(first:$size){edges{node{wallpaperId}}}}';
+    const allowed = await app.inject({
+      url: `/graphql?${new URLSearchParams({ query, operationName: 'Small' })}`,
+    });
+    expect(allowed.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['search']);
+    catalogue.calls.length = 0;
+    const rejected = await app.inject({
+      url: `/graphql?${new URLSearchParams({ query, operationName: 'Large' })}`,
+    });
+    expect(rejected.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    undefined,
+    { size: '80' },
+    { size: 1.5 },
+    { size: null },
+  ])('preserves invalid variable errors without execution: %j', async (variables) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const response = await execute(
+      app,
+      'query($size:Int!){searchWallpapers(first:$size){edges{node{wallpaperId}}}}',
+      variables
+    );
+    expect(response.json().errors?.[0].message).toContain('Variable "$size"');
+    expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([101, 50_000])('rejects an unsupported page size %i before execution', async (size) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const response = await execute(
+      app,
+      'query($size:Int!){searchWallpapers(first:$size){edges{node{wallpaperId}}}}',
+      { size }
+    );
+    expect(response.json().errors?.[0]).toMatchObject({
+      message: 'Page size must be an integer between 1 and 100',
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    undefined,
+    'Missing',
+  ])('rejects ambiguous or unknown operation names without execution: %s', async (operationName) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const response = await execute(
+      app,
+      'query First{searchWallpapers{edges{node{wallpaperId}}}} query Second{profile(id:"profile_a"){id}}',
+      undefined,
+      operationName
+    );
+    expect(response.json().errors).toHaveLength(1);
+    expect(response.body).not.toContain('INTERNAL_SERVER_ERROR');
+    expect(catalogue.calls).toEqual([]);
   });
   it.each([
     '/graphql?operationName=test',

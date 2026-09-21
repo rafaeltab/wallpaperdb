@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { DateTime, Effect, Layer } from 'effect';
 import {
   Catalogue,
   CatalogueRead,
@@ -55,18 +55,22 @@ export class ReadAdapter implements CatalogueRead {
   }
 }
 export class Cursors implements CatalogueCursors {
-  values = new Map<string, CursorValue[]>();
-  encode(values: CursorValue[]) {
-    const cursor = JSON.stringify(values);
-    this.values.set(cursor, values);
-    return Effect.succeed(cursor);
-  }
-  decode(cursor: string) {
-    const values = this.values.get(cursor);
-    return Effect.succeed(
-      values ? { _tag: 'Decoded' as const, values } : { _tag: 'InvalidCursor' as const }
-    );
-  }
+  values = new Map<string, { values: CursorValue[]; issuedAt: number }>();
+  private nextCursor = 0;
+  constructor(private readonly expirationMs = 60_000) {}
+  readonly encode = Effect.fnUntraced(function* (this: Cursors, values: CursorValue[]) {
+    const issuedAt = DateTime.toEpochMillis(yield* DateTime.now);
+    const cursor = `cursor_${++this.nextCursor}`;
+    this.values.set(cursor, { values: [...values], issuedAt });
+    return cursor;
+  });
+  readonly decode = Effect.fnUntraced(function* (this: Cursors, cursor: string) {
+    const entry = this.values.get(cursor);
+    const now = DateTime.toEpochMillis(yield* DateTime.now);
+    if (!entry || entry.issuedAt > now || now - entry.issuedAt > this.expirationMs)
+      return { _tag: 'InvalidCursor' as const };
+    return { _tag: 'Decoded' as const, values: [...entry.values] };
+  });
 }
 export async function setup(config: CatalogueConfig = { colorSpreadStrategy: 'linear' }) {
   const read = new ReadAdapter();

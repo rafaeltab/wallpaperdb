@@ -34,8 +34,8 @@ describe('Catalogue capability', () => {
         pageInfo: {
           hasNextPage: true,
           hasPreviousPage: false,
-          startCursor: '["a"]',
-          endCursor: '["b"]',
+          startCursor: expect.any(String),
+          endCursor: expect.any(String),
         },
       },
     });
@@ -43,6 +43,17 @@ describe('Catalogue capability', () => {
       { size: 3, sortOrder: 'asc', profileId: 'profile_one', variantFilters: { width: 1920 } },
     ]);
     expect(cursors.values.size).toBe(2);
+    if (result._tag !== 'Found') throw new Error('Expected a catalogue page');
+    expect(
+      await Effect.runPromise(cursors.decode(result.value.pageInfo.startCursor ?? ''))
+    ).toEqual({
+      _tag: 'Decoded',
+      values: ['a'],
+    });
+    expect(await Effect.runPromise(cursors.decode(result.value.pageInfo.endCursor ?? ''))).toEqual({
+      _tag: 'Decoded',
+      values: ['b'],
+    });
   });
   it('resumes a forward page at the signed position', async () => {
     const { read, catalogue, cursors } = await setup();
@@ -58,19 +69,31 @@ describe('Catalogue capability', () => {
       entries: ['c', 'b', 'a'].map((id) => ({ wallpaper: wallpaper(id), cursor: [id] })),
       total: 4,
     };
-    expect(await Effect.runPromise(catalogue.search({ last: 2, before }))).toEqual({
+    const result = await Effect.runPromise(catalogue.search({ last: 2, before }));
+    expect(result).toEqual({
       _tag: 'Found',
       value: {
         wallpapers: [wallpaper('b'), wallpaper('c')],
         pageInfo: {
           hasNextPage: true,
           hasPreviousPage: true,
-          startCursor: '["b"]',
-          endCursor: '["c"]',
+          startCursor: expect.any(String),
+          endCursor: expect.any(String),
         },
       },
     });
     expect(read.selections[0]).toMatchObject({ searchAfter: ['d'], sortOrder: 'desc', size: 3 });
+    if (result._tag !== 'Found') throw new Error('Expected a catalogue page');
+    expect(
+      await Effect.runPromise(cursors.decode(result.value.pageInfo.startCursor ?? ''))
+    ).toEqual({
+      _tag: 'Decoded',
+      values: ['b'],
+    });
+    expect(await Effect.runPromise(cursors.decode(result.value.pageInfo.endCursor ?? ''))).toEqual({
+      _tag: 'Decoded',
+      values: ['c'],
+    });
   });
   it('preserves the legacy last-without-before behavior', async () => {
     const { read, catalogue } = await setup();

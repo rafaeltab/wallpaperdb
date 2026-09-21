@@ -25,7 +25,7 @@ ensure_stream() {
       --max-age="$max_age" \
       --server "$NATS_SERVER" \
       --force
-    echo "  ✓ Stream $stream_name retention updated"
+    echo "  ✓ Stream $stream_name retention updated; gateway startup reconciles its message budget and retained history"
   else
     echo "  → Creating stream $stream_name with subjects: $subjects"
     nats stream add "$stream_name" \
@@ -35,7 +35,7 @@ ensure_stream() {
       --max-msgs=-1 \
       --max-bytes=-1 \
       --max-age="$max_age" \
-      --max-msg-size=-1 \
+      --max-msg-size=65536 \
       --discard old \
       --server "$NATS_SERVER" \
       --defaults

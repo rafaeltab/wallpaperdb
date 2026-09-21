@@ -35,7 +35,7 @@ NATS_SERVER=nats://other-host:4222 ./infra/nats/init/setup-streams.sh
 ## Stream Definitions
 
 ### WALLPAPER Stream
-- **Subjects**: `wallpaper.>` (e.g., `wallpaper.uploaded`, `wallpaper.processed`)
+- **Subjects**: `wallpaper.>` (e.g., `wallpaper.uploaded`, `wallpaper.variant.available`)
 - **Storage**: File-based persistence
 - **Retention**: Limits-based (no automatic deletion)
 - **Max Age**: Unlimited pending the cross-application retention review in issue #162
@@ -130,9 +130,11 @@ All streams use the following default configuration:
 - **Max Messages**: Unlimited (-1)
 - **Max Bytes**: Unlimited (-1)
 - **Max Age**: Unlimited (0)
-- **Max Message Size**: Unlimited (-1)
+- **Max Message Size**: 64 KiB (65536 bytes), including headers
 - **Discard Policy**: Old (discard oldest when limits reached)
 - **Acknowledgments**: Enabled
 - **Duplicate Window**: 2 minutes
 
 These defaults can be customized per-stream in `setup-streams.sh`.
+
+Existing streams are reconciled by gateway startup, which preserves stricter message limits and audits retained history before certifying that it fits the quarantine budget. See the [gateway projection delivery documentation](../../../apps/docs/content/docs/services/gateway.mdx#projection-delivery) before changing these limits or resolving oversized historical messages.

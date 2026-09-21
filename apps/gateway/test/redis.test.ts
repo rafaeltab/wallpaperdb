@@ -228,6 +228,38 @@ describe('quota storage contract', () => {
       await observed.close();
     }
   });
+  it('allows requests when a successful command returns an invalid quota window and recovers', async () => {
+    const adapter = await distributed();
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const observed = observeQuotaMetrics();
+    try {
+      // An existing counter without an expiry makes the successful Lua reply [-1, -1].
+      await control.set('graphql:ratelimit:missing-expiry', '1');
+      expect(await control.pttl('graphql:ratelimit:missing-expiry')).toBe(-1);
+      expect(await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000))).toMatchObject(
+        {
+          _tag: 'Allowed',
+          remaining: 1,
+        }
+      );
+      expect(await observed.read()).toEqual([
+        { attributes: { reason: 'command_failure' }, value: 1 },
+      ]);
+      await control.del('graphql:ratelimit:missing-expiry');
+      await expect
+        .poll(() => Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000)))
+        .toMatchObject({ _tag: 'Allowed', remaining: 0 });
+      expect(await Effect.runPromise(adapter.quota.take('missing-expiry', 1, 60000))).toMatchObject(
+        {
+          _tag: 'Limited',
+        }
+      );
+    } finally {
+      control.disconnect();
+      await adapter.dispose();
+      await observed.close();
+    }
+  });
   it('leaves denied windows unchanged and resets after expiry', async () => {
     const adapter = await distributed();
     const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });

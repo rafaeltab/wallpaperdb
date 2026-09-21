@@ -11,7 +11,8 @@ if count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[2]) end
 return {count, redis.call('PTTL', KEYS[1])}
 `;
 const decodeResponse = Schema.decodeUnknownEffect(
-  Schema.Tuple([Schema.Int, Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))])
+  Schema.Tuple([Schema.Int, Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))]),
+  { reportInput: false }
 );
 export interface RedisQuotaConfig {
   readonly redisEnabled: boolean;
@@ -55,7 +56,16 @@ class RedisQuota implements Quota {
         },
         catch: (cause) => cause,
       }).pipe(
-        Effect.flatMap(decodeResponse),
+        Effect.flatMap((response) =>
+          decodeResponse(response).pipe(
+            Effect.tapError((error) =>
+              Effect.logWarning('Invalid distributed quota response', {
+                operation: 'decode_quota_response',
+                detail: error.message,
+              })
+            )
+          )
+        ),
         Effect.catch(() =>
           Effect.sync(() => {
             this.disconnect();

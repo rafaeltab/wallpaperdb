@@ -15,6 +15,14 @@ const limits: ValidationLimits = {
 };
 
 describe('image inspection', () => {
+  it.effect('rejects a truncated image signature as invalid content', () =>
+    Effect.gen(function* () {
+      const inspector = yield* ContentInspection;
+      const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+      expect(yield* inspector.inspect(bytes, 'image/png', limits))
+        .toEqual({ _tag: 'InvalidFormat', mimeType: 'image/png' });
+    }).pipe(Effect.provide(imageInspectionLayer))
+  );
   it.effect('rejects corrupt images and formats excluded by policy', () =>
     Effect.gen(function* () {
       const inspector = yield* ContentInspection;

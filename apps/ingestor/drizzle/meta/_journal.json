@@ -15,6 +15,13 @@
       "when": 1790204460931,
       "tag": "0001_jazzy_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790205252254,
+      "tag": "0002_naive_shockwave",
+      "breakpoints": true
     }
   ]
 }

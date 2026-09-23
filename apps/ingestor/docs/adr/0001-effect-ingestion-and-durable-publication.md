@@ -13,3 +13,9 @@ Recovery claims at most 100 records per cycle using expiring row leases and runs
 The event adapter emits CloudEvents 1.0 metadata while retaining the shared legacy wallpaper payload fields used by existing enrichment consumers. The local capability uses logical asset identities; the adapter translates them to the legacy bucket/key contract. Replacing that cross-service payload requires coordinated producer, consumer, and retained-event migration and is outside this service's architectural change.
 
 Capability tests exercise the full decision matrix using controlled adapters and a controlled Effect clock. PostgreSQL contract tests verify reservations, atomic outbox commits, concurrency, leases, and quarantine against one real database per suite. Only a small representative composed path needs the complete infrastructure stack.
+
+## Deployment and existing records
+
+Drain and stop all old ingestor replicas before running `make migrate PACKAGE=ingestor`, then start the new deployment. The migration entry prepares existing data, runs the generated Drizzle schema migrations, and adopts complete legacy records in batches. It preserves committed originals, deterministically resolves duplicate unfinished reservations, and marks metadata-incomplete interrupted uploads failed so clients can retry. Existing stored records gain one deterministic upload occurrence and outbox row atomically. Completed and processing records retain their state. Re-running migration preserves occurrence identity and does not add announcements for already processing uploads.
+
+Use the package migration entry rather than invoking Drizzle Kit directly on a populated database: preparation must precede the broadened uniqueness constraint. Migration operations are serialized with a session advisory lock. Failed preparations or backfills can be rerun after fixing their cause; schema changes remain generated from the Drizzle schema.

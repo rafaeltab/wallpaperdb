@@ -1,10 +1,14 @@
 {
   "extends": ["//"],
   "tasks": {
+    "db:migrate": {
+      "passThroughEnv": ["DATABASE_URL"]
+    },
     "check-types": {
       "inputs": [
         "src/**",
         "test/**",
+        "scripts/**",
         "vitest.config.ts",
         "esbuild.config.ts",
         "package.json",

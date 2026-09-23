@@ -86,7 +86,12 @@ class NatsUploadEvents implements UploadEvents {
     const started = yield* Clock.currentTimeMillis;
     const metadata = headers();
     const carrier: Record<string, string> = {};
-    propagation.inject(context.active(), carrier);
+    if (event.traceContext) {
+      carrier.traceparent = event.traceContext.traceparent;
+      if (event.traceContext.tracestate) carrier.tracestate = event.traceContext.tracestate;
+    } else {
+      propagation.inject(context.active(), carrier);
+    }
     for (const [key, value] of Object.entries(carrier)) metadata.set(key, value);
     metadata.set('content-type', 'application/cloudevents+json');
     metadata.set('event-id', event.id);

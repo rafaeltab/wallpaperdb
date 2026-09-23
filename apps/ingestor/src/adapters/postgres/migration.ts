@@ -69,7 +69,7 @@ async function prepareLegacy(client: pg.PoolClient): Promise<void> {
 async function validateCommitted(client: pg.PoolClient): Promise<void> {
   let after: string | null = null;
   while (true) {
-    const rows = await client.query(
+    const rows: pg.QueryResult<Record<string, unknown>> = await client.query(
       "SELECT * FROM wallpapers WHERE upload_state IN ('stored', 'processing', 'completed') AND ($1::text IS NULL OR id > $1) ORDER BY id LIMIT 100",
       [after]
     );

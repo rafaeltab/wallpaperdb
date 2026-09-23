@@ -1,10 +1,11 @@
 import { Cause, Effect, Schema } from 'effect';
 import { gatewayConfig } from './config.js';
 import { initializeOtel } from './otel-init.js';
+import { nativeFailureCode, StartupDiagnostic, startupDiagnostics } from './startup-diagnostics.js';
 
 export class GatewayBootstrapError extends Schema.TaggedError<GatewayBootstrapError>()(
   'GatewayBootstrapError',
-  { cause: Schema.Defect() }
+  { diagnostic: StartupDiagnostic, cause: Schema.Defect() }
 ) {}
 
 /** The ConfigProvider supplied by the owner resolves configuration before any resource is acquired. */
@@ -13,7 +14,15 @@ export const gatewayProgram = Effect.gen(function* () {
   const telemetry = yield* initializeOtel(config);
   const { startGateway } = yield* Effect.tryPromise({
     try: () => import('./server.js'),
-    catch: (cause) => new GatewayBootstrapError({ cause }),
+    catch: (cause) =>
+      new GatewayBootstrapError({
+        diagnostic: {
+          dependency: 'gateway',
+          operation: 'load-server',
+          code: nativeFailureCode(cause),
+        },
+        cause,
+      }),
   });
   yield* startGateway(config, { otelHealthy: telemetry._tag !== 'Unavailable' });
   yield* Effect.never;
@@ -25,13 +34,19 @@ export const gatewayProgram = Effect.gen(function* () {
       : Effect.logError('Gateway failed to start or stop').pipe(
           Effect.annotateLogs({
             failures: cause.reasons.map((reason) => {
-              if (reason._tag !== 'Fail') return { kind: reason._tag };
+              if (reason._tag === 'Interrupt') return { kind: reason._tag };
+              if (reason._tag === 'Die')
+                return { kind: reason._tag, diagnostics: startupDiagnostics(reason.defect) };
               const error = reason.error;
               if (error._tag === 'GatewayConfigurationError')
                 return { kind: error._tag, fields: error.fields };
               if (error._tag === 'GatewayStartupError')
-                return { kind: error._tag, stage: error.stage };
-              return { kind: error._tag };
+                return {
+                  kind: error._tag,
+                  stage: error.stage,
+                  diagnostics: startupDiagnostics(error),
+                };
+              return { kind: error._tag, diagnostics: startupDiagnostics(error) };
             }),
           })
         )

@@ -59,6 +59,172 @@ describe('Gateway bootstrap and deployed artifact', () => {
     };
   }
 
+  async function failedExecutable(overrides: Record<string, string>) {
+    const directory = await mkdtemp(join(tmpdir(), 'gateway-startup-failure-'));
+    const child = spawn(
+      process.execPath,
+      [fileURLToPath(new URL('../dist/index.mjs', import.meta.url))],
+      { cwd: directory, env: { ...environment(), ...overrides }, stdio: ['ignore', 'pipe', 'pipe'] }
+    );
+    let output = '';
+    child.stdout.on('data', (chunk) => {
+      output += String(chunk);
+    });
+    child.stderr.on('data', (chunk) => {
+      output += String(chunk);
+    });
+    const closed = once(child, 'close');
+    try {
+      await expect.poll(() => child.exitCode, { timeout: 15000, interval: 25 }).toBe(1);
+      await closed;
+      const records = output.split('\n').flatMap((line) => {
+        try {
+          return [JSON.parse(line)];
+        } catch {
+          return [];
+        }
+      });
+      const failure = records.find(
+        (record) => record.message === 'Gateway failed to start or stop'
+      );
+      expect(failure, output).toBeDefined();
+      return { output, failures: failure.annotations.failures };
+    } finally {
+      if (child.exitCode === null) child.kill('SIGKILL');
+      await closed;
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+
+  it('reports safe dependency context from the failed executable without a telemetry collector', async () => {
+    const password = 'startup-private-opensearch-password';
+    const cursorSecret = 'startup-private-cursor-secret-over-thirty-two-characters';
+    const port = await availablePort();
+    const { output, failures } = await failedExecutable({
+      OPENSEARCH_URL: `http://private-user:${password}@127.0.0.1:${port}`,
+      OPENSEARCH_USERNAME: 'private-user',
+      OPENSEARCH_PASSWORD: password,
+      CURSOR_SECRET: cursorSecret,
+    });
+    expect(failures).toContainEqual(
+      expect.objectContaining({
+        kind: 'GatewayStartupError',
+        stage: 'application',
+        diagnostics: [
+          expect.objectContaining({
+            dependency: 'opensearch',
+            operation: 'inspect-index',
+            code: 'ConnectionError',
+            index: environment().OPENSEARCH_INDEX,
+          }),
+        ],
+      })
+    );
+    for (const secret of [
+      password,
+      cursorSecret,
+      'private-user',
+      Buffer.from(`private-user:${password}`).toString('base64'),
+    ])
+      expect(output).not.toContain(secret);
+  });
+
+  it.each([
+    'inspect-index',
+    'update-index-mapping',
+    'create-index',
+    'recheck-index',
+  ])('reports %s failures without logging upstream response or authentication metadata', async (operation) => {
+    const secret = 'startup-private-upstream-response';
+    const password = 'startup-private-http-password';
+    let inspections = 0;
+    const dependency = createHttpServer((request, response) => {
+      if (request.method === 'HEAD') {
+        inspections++;
+        const status =
+          operation === 'inspect-index' || (operation === 'recheck-index' && inspections > 1)
+            ? 403
+            : operation === 'update-index-mapping'
+              ? 200
+              : 404;
+        response.writeHead(status);
+        response.end();
+        return;
+      }
+      response.writeHead(403, { 'Content-Type': 'application/json', 'X-Private': secret });
+      response.end(JSON.stringify({ error: { type: secret, reason: secret }, status: 403 }));
+    });
+    dependency.listen(0, '127.0.0.1');
+    await once(dependency, 'listening');
+    const address = dependency.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+    try {
+      const { output, failures } = await failedExecutable({
+        OPENSEARCH_URL: `http://127.0.0.1:${address.port}`,
+        OPENSEARCH_USERNAME: 'private-http-user',
+        OPENSEARCH_PASSWORD: password,
+      });
+      expect(failures).toContainEqual(
+        expect.objectContaining({
+          diagnostics: [
+            expect.objectContaining({
+              dependency: 'opensearch',
+              operation,
+              code: 'ResponseError',
+              statusCode: 403,
+            }),
+          ],
+        })
+      );
+      expect(output).not.toContain(secret);
+      expect(output).not.toContain(password);
+      expect(output).not.toContain(Buffer.from(`private-http-user:${password}`).toString('base64'));
+    } finally {
+      dependency.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        dependency.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
+  it('reports configuration field names from the executable while redacting invalid values', async () => {
+    const secret = 'invalid-private-secret';
+    const { output, failures } = await failedExecutable({ CURSOR_SECRET: secret });
+    expect(failures).toEqual([{ kind: 'GatewayConfigurationError', fields: ['CURSOR_SECRET'] }]);
+    expect(output).not.toContain(secret);
+  });
+
+  it('reports the listener operation, port and native error code from the executable', async () => {
+    const reservation = createHttpServer((_request, response) => response.end('reserved'));
+    reservation.listen(0, '0.0.0.0');
+    await once(reservation, 'listening');
+    const address = reservation.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+    try {
+      const { failures } = await failedExecutable({ PORT: String(address.port) });
+      expect(failures).toContainEqual(
+        expect.objectContaining({
+          kind: 'GatewayStartupError',
+          stage: 'listener',
+          diagnostics: [
+            {
+              dependency: 'http',
+              operation: 'listen',
+              code: 'EADDRINUSE',
+              port: address.port,
+            },
+          ],
+        })
+      );
+      expect(await (await fetch(`http://127.0.0.1:${address.port}`)).text()).toBe('reserved');
+    } finally {
+      reservation.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        reservation.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
   it.live('keeps a real listener running until its owner closes the scope', () =>
     Effect.gen(function* () {
       const scope = yield* Scope.fork(yield* Effect.scope);

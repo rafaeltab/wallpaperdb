@@ -541,6 +541,125 @@ describe('NATS projection adapter contract', () => {
   });
 
   it.each([
+    { bytes: 64 * 1024, certificateVersion: undefined, accepted: true },
+    { bytes: 64 * 1024, certificateVersion: 1, accepted: true },
+    { bytes: 64 * 1024 + 1, certificateVersion: undefined, accepted: false },
+    { bytes: 64 * 1024 + 1, certificateVersion: 1, accepted: false },
+  ])('audits the complete retained message budget: $bytes bytes, certificate $certificateVersion', async ({
+    bytes,
+    certificateVersion,
+    accepted,
+  }) => {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+    const original = Buffer.alloc(8192, 0xff);
+    const messageHeaders = headers();
+    const headerOverhead = Buffer.byteLength('NATS/1.0\r\nX-Audit: \r\n\r\n');
+    messageHeaders.set('X-Audit', 'x'.repeat(bytes - original.byteLength - headerOverhead));
+    const published = await (await tester.nats.getJsClient()).publish(
+      'wallpaper.uploaded',
+      original,
+      { headers: messageHeaders }
+    );
+    const snapshot = await manager.streams.info('WALLPAPER');
+    await manager.streams.update('WALLPAPER', {
+      max_msg_size: 64 * 1024,
+      metadata:
+        certificateVersion === undefined
+          ? {}
+          : {
+              'wallpaperdb.gateway.quarantine-budget': JSON.stringify({
+                version: certificateVersion,
+                created: snapshot.created,
+                maxMessageBytes: 64 * 1024,
+                auditedThrough: snapshot.state.last_seq,
+              }),
+            },
+    });
+    const project = new ControlledProjection();
+    if (accepted) {
+      await consumer(project);
+      expect(await quarantine()).toMatchObject({ data: { original: original.toString('base64') } });
+      await acknowledged();
+      expect(
+        JSON.parse(
+          (await manager.streams.info('WALLPAPER')).config.metadata?.[
+            'wallpaperdb.gateway.quarantine-budget'
+          ] ?? '{}'
+        )
+      ).toMatchObject({ version: 2 });
+    } else {
+      await expect(consumer(project)).rejects.toMatchObject({
+        _tag: 'NatsProjectionStartupError',
+        cause: {
+          _tag: 'MessageBudgetError',
+          message: expect.stringContaining(`retains ${bytes} bytes`),
+        },
+      });
+      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+    }
+    const retained = await manager.streams.getMessage('WALLPAPER', { seq: published.seq });
+    expect(Buffer.from(retained.data).equals(original)).toBe(true);
+    expect(retained.header.get('X-Audit')).toBe(messageHeaders.get('X-Audit'));
+    expect(project.changes).toEqual([]);
+  });
+
+  it('counts original header whitespace when auditing historical messages', async () => {
+    const connection = await tester.nats.getConnection();
+    const manager = await connection.jetstreamManager();
+    await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+    const original = Buffer.alloc(8192, 0xff);
+    const headerPrefix = 'NATS/1.0\r\nX-Audit: ';
+    const headerSuffix = 'x\r\n\r\n';
+    const wireHeaders = Buffer.from(
+      headerPrefix +
+        ' '.repeat(65537 - original.byteLength - Buffer.byteLength(headerPrefix + headerSuffix)) +
+        headerSuffix
+    );
+    const url = new URL(tester.nats.config.endpoints.fromHost);
+    const socket = connect(Number(url.port), url.hostname);
+    try {
+      await once(socket, 'connect');
+      socket.write(
+        Buffer.concat([
+          Buffer.from(
+            `CONNECT {"verbose":false,"headers":true}\r\nHPUB wallpaper.uploaded ${wireHeaders.byteLength} 65537\r\n`
+          ),
+          wireHeaders,
+          original,
+          Buffer.from('\r\n'),
+        ])
+      );
+      await expect
+        .poll(async () => (await manager.streams.info('WALLPAPER')).state.messages)
+        .toBe(1);
+    } finally {
+      socket.destroy();
+    }
+    const snapshot = await manager.streams.update('WALLPAPER', { max_msg_size: 65536 });
+    await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
+      _tag: 'NatsProjectionStartupError',
+      cause: {
+        _tag: 'MessageBudgetError',
+        message: expect.stringContaining('retains 65537 bytes'),
+      },
+    });
+    const retained = await manager.streams.getMessage('WALLPAPER', {
+      seq: snapshot.state.last_seq,
+    });
+    expect(retained.header.get('X-Audit')).toBe('x');
+    expect(Buffer.from(retained.data).equals(original)).toBe(true);
+    const reply = await connection.request(
+      '$JS.API.STREAM.MSG.GET.WALLPAPER',
+      JSON.stringify({ seq: snapshot.state.last_seq })
+    );
+    expect(Buffer.from(JSON.parse(reply.string()).message.hdrs, 'base64').equals(wireHeaders)).toBe(
+      true
+    );
+    expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+  });
+
+  it.each([
     false,
     true,
   ])('preserves oversized historical messages and refuses startup (recreated stream: %s)', async (recreated) => {

@@ -363,6 +363,7 @@ export function natsProjectionLayer(
       );
       yield* ensureQuarantine(manager, options);
       yield* ensureMessageBudgets(
+        connection,
         manager,
         connection.info?.max_payload,
         [options.wallpaperStream ?? 'WALLPAPER', 'PROFILE'],

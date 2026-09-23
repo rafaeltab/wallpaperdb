@@ -273,3 +273,57 @@ groups:
         labels:
           severity: critical
           service: gateway
+
+      - uid: ingestor-quota-local-fallback
+        title: Ingestor Distributed Quota Degraded
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(increase(ingestion_quota_local_fallback_total[5m])) or vector(0)
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: Ingestor is enforcing upload quotas independently on each instance
+          description: "Uploads used local quota windows instead of the shared Redis quota in the last 5 minutes. Inspect ingestion_quota_local_fallback_total by reason: unavailable, saturated, or command_failure. Local windows remain bounded, but uploads distributed across instances can consume more than the shared Profile limit. Check Redis connectivity, command deadlines, and concurrent command saturation (64 per instance)."
+        labels:
+          severity: critical
+          service: ingestor

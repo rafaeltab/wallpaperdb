@@ -112,6 +112,47 @@ describe('Gateway bootstrap and deployed artifact', () => {
     })
   );
 
+  it('cancels blocked dependency initialization and closes its transport before startup exits', async () => {
+    let requests = 0;
+    let activeConnections = 0;
+    const dependency = createHttpServer(() => {
+      requests++;
+    });
+    dependency.on('connection', (socket) => {
+      activeConnections++;
+      socket.once('close', () => {
+        activeConnections--;
+      });
+    });
+    dependency.listen(0, '127.0.0.1');
+    await once(dependency, 'listening');
+    const address = dependency.address();
+    if (!address || typeof address === 'string') throw new Error('Expected a TCP address');
+    const pending = Effect.runFork(
+      startGateway({
+        ...loadConfig(environment()),
+        opensearchUrl: `http://127.0.0.1:${address.port}`,
+        port: 0,
+      }).pipe(Effect.scoped)
+    );
+    try {
+      await expect.poll(() => requests).toBe(1);
+      pending.interruptUnsafe();
+      await expect.poll(() => activeConnections).toBe(0);
+      await expect.poll(() => pending.pollUnsafe(), { timeout: 2000 }).toBeDefined();
+      const result = await Effect.runPromise(Fiber.await(pending));
+      if (!Exit.isFailure(result)) throw new Error('Cancelled startup should be interrupted');
+      expect(Cause.hasInterruptsOnly(result.cause)).toBe(true);
+      expect(requests).toBe(1);
+    } finally {
+      dependency.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        dependency.close((error) => (error ? reject(error) : resolve()))
+      );
+      await Effect.runPromise(Fiber.interrupt(pending));
+    }
+  });
+
   it.live(
     'releases a failed listener startup without disturbing the process that owns the port',
     () =>

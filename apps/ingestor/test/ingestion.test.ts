@@ -4,6 +4,18 @@ import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
 
 describe('Wallpaper ingestion', () => {
+  it('cleans orphaned assets across pages while retaining active uploads', async () => {
+    const test = fixture({ storage: { list: (cursor) => Effect.succeed(cursor ? { assets: [{ wallpaperId: 'orphan-two', extension: 'webp' }] } : { assets: [{ wallpaperId: 'wlpr_1', extension: 'png' }, { wallpaperId: 'orphan-one', extension: 'png' }], cursor: 'next' }) } });
+    test.objects.push({ wallpaperId: 'orphan-one', extension: 'png' }, { wallpaperId: 'orphan-two', extension: 'webp' });
+    await Effect.runPromise(Ingestion.use((ingestion) => Effect.gen(function* () { yield* ingestion.upload(uploadInput); yield* ingestion.cleanup(); })).pipe(Effect.provide(test.layer)));
+    expect(test.objects).toEqual([{ wallpaperId: 'wlpr_1', extension: 'png' }]);
+  });
+  it('rejects an absent authenticated owner before inspecting or reserving the upload', async () => {
+    const test = fixture();
+    const result = await Effect.runPromise(Ingestion.use((ingestion) => ingestion.upload({ ...uploadInput, principal: { profileId: '' } })).pipe(Effect.provide(test.layer)));
+    expect(result).toEqual({ _tag: 'Unauthorized' });
+    expect(test.store.records.size).toBe(0);
+  });
   it('bounds missing-object recovery and never publishes an upload whose object is absent', async () => {
     const test = fixture({ storage: { put: () => Effect.fail(new IngestionUnavailable({ operation: 'put', cause: 'offline' })) } });
     await Effect.runPromise(Ingestion.use((ingestion) => Effect.gen(function* () {

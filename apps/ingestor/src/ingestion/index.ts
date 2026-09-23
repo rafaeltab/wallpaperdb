@@ -130,9 +130,17 @@ export interface Ingestion {
 }
 export const Ingestion = Context.Service<Ingestion>('wallpaperdb.ingestor.ingestion');
 export interface IngestionIdentity {
-  next(): Effect.Effect<{ readonly wallpaperId: string; readonly eventId: string; readonly correlationId: string; readonly causationId: string; readonly leaseToken: string }>;
+  next(): Effect.Effect<{
+    readonly wallpaperId: string;
+    readonly eventId: string;
+    readonly correlationId: string;
+    readonly causationId: string;
+    readonly leaseToken: string;
+  }>;
 }
-export const IngestionIdentity = Context.Service<IngestionIdentity>('wallpaperdb.ingestor.ingestion.identity');
+export const IngestionIdentity = Context.Service<IngestionIdentity>(
+  'wallpaperdb.ingestor.ingestion.identity'
+);
 
 export interface UploadRecord {
   readonly wallpaper: UploadedWallpaper;
@@ -188,19 +196,23 @@ export function ingestionLayer(): Layer.Layer<
       const events = yield* UploadEvents;
       const store = yield* IngestionStore;
       const identity = yield* IngestionIdentity;
+      let cleanupCursor: string | undefined;
       const publish = Effect.fn('ingestion.publish')(function* (record: UploadRecord) {
         yield* events.publish(record.event);
         yield* store.published(record);
       });
-      const defer = (record: UploadRecord, maximum: number) => Clock.currentTimeMillis.pipe(
-        Effect.flatMap((now) => store.defer(record, new Date(now), maximum))
-      );
-      const publishOrDefer = (record: UploadRecord) => publish(record).pipe(
-        Effect.catchTag('IngestionUnavailable', () => defer(record, 10))
-      );
+      const defer = (record: UploadRecord, maximum: number) =>
+        Clock.currentTimeMillis.pipe(
+          Effect.flatMap((now) => store.defer(record, new Date(now), maximum))
+        );
+      const publishOrDefer = (record: UploadRecord) =>
+        publish(record).pipe(Effect.catchTag('IngestionUnavailable', () => defer(record, 10)));
       const recover = Effect.fn('ingestion.recover')(function* (record: UploadRecord) {
         if (record.state === 'uploading') {
-          const exists = yield* assets.exists({ wallpaperId: record.wallpaper.id, extension: record.wallpaper.metadata.extension });
+          const exists = yield* assets.exists({
+            wallpaperId: record.wallpaper.id,
+            extension: record.wallpaper.metadata.extension,
+          });
           if (!exists) return yield* defer(record, 3);
           const committed = yield* store.stored(record);
           if (!committed) return;
@@ -210,6 +222,7 @@ export function ingestionLayer(): Layer.Layer<
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
       ): Effect.fn.Return<UploadOutcome, IngestionUnavailable> {
+        if (!input.principal.profileId.trim()) return { _tag: 'Unauthorized' };
         const inspected = yield* inspection.inspect(
           input.bytes,
           input.declaredMimeType,
@@ -251,7 +264,7 @@ export function ingestionLayer(): Layer.Layer<
           bytes: input.bytes,
           metadata: wallpaper.metadata,
         });
-        yield* store.stored(record);
+        if (!(yield* store.stored(record))) return { _tag: 'InProgress' };
         yield* publishOrDefer({ ...record, state: 'stored' });
         return { _tag: 'Accepted', upload: receipt(record.wallpaper) };
       });
@@ -259,11 +272,36 @@ export function ingestionLayer(): Layer.Layer<
         upload,
         reconcile: Effect.fn('ingestion.reconcile')(function* () {
           const now = yield* Clock.currentTimeMillis;
-          const records = yield* store.claim(new Date(now), new Date(now - 10 * 60 * 1000), new Date(now + 60_000), 100);
-          yield* Effect.forEach(records, (record) => recover(record).pipe(Effect.catchTag('IngestionUnavailable', () => Effect.void)), { concurrency: 5, discard: true });
+          const records = yield* store.claim(
+            new Date(now),
+            new Date(now - 10 * 60 * 1000),
+            new Date(now + 60_000),
+            100
+          );
+          yield* Effect.forEach(
+            records,
+            (record) =>
+              recover(record).pipe(Effect.catchTag('IngestionUnavailable', () => Effect.void)),
+            { concurrency: 5, discard: true }
+          );
           yield* store.expireIntents(new Date(now - 60 * 60 * 1000));
         }),
-        cleanup: () => Effect.void,
+        cleanup: Effect.fn('ingestion.cleanup')(function* () {
+          for (let page = 0; page < 10; page++) {
+            const batch = yield* assets.list(cleanupCursor);
+            yield* Effect.forEach(
+              batch.assets,
+              (asset) =>
+                Effect.gen(function* () {
+                  if ((yield* store.assetDisposition(asset.wallpaperId)) === 'remove')
+                    yield* assets.remove(asset);
+                }),
+              { concurrency: 5, discard: true }
+            );
+            cleanupCursor = batch.cursor;
+            if (!cleanupCursor) break;
+          }
+        }),
       });
     })
   );

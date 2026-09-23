@@ -1,0 +1,27 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "check-types": {
+      "inputs": [
+        "src/**",
+        "test/**",
+        "vitest.config.ts",
+        "esbuild.config.ts",
+        "package.json",
+        "tsconfig.json"
+      ]
+    },
+    "lint": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/ingestor-architecture.mjs",
+        "$TURBO_ROOT$/scripts/ingestor-architecture.test.mjs",
+        "$TURBO_ROOT$/apps/*/src/**",
+        "$TURBO_ROOT$/packages/*/src/**"
+      ]
+    },
+    "test:integration": {
+      "inputs": ["src/**", "test/**", "vitest.config.ts", "package.json", "drizzle/**"]
+    }
+  }
+}

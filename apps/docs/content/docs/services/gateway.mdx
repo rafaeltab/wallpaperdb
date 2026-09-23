@@ -13,6 +13,8 @@ Effect 4 composes execution, dependency construction, validation, and tracing. N
 
 Fastify callbacks enter a single managed runtime. A scoped fiber set supervises request work and propagates client cancellation. NATS consumes async iterables through Effect streams, stops intake before bounded draining, and leaves incomplete processing available for redelivery. OpenSearch bridges interruption into the SDK request abort operation. The executable starts telemetry before importing instrumented adapters, and owns signal handling and process exit through `NodeRuntime`.
 
+When a collector is configured, traces, metrics, and SDK logs use explicitly owned OTLP HTTP exporters at that collector's `/v1/traces`, `/v1/metrics`, and `/v1/logs` endpoints. SDK log-exporter environment settings, including `OTEL_LOGS_EXPORTER`, do not override this configuration. Exports and connections have one-second deadlines, including collectors that keep sending an unfinished response. Cleanup gives SDK shutdown four seconds, then closes and awaits owned connections; it also runs after startup failure.
+
 Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, color preferences, nullable contributor batching, and media URLs. HTTP failures outside GraphQL use RFC 9457 Problem Details; GraphQL failures keep `errors` and applicable `data` with safe metadata in `extensions`.
 
 Catalogue pages default to 10 results. Both `first` and `last` must be integers between 1 and 100 when supplied; `first` selects the page size if both are present. The capability rejects unsupported sizes before cursor decoding or catalogue storage access.

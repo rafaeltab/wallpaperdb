@@ -195,7 +195,7 @@ describe('Catalogue capability', () => {
     });
     expect(read.selections).toEqual([]);
   });
-  it('resolves case-insensitive Handles and preserves Profile batch order and duplicate slots', async () => {
+  it('normalizes Handles and forwards single and batch Profile reads', async () => {
     const { read, catalogue } = await setup();
     const profile = {
       id: 'p',

@@ -84,7 +84,7 @@ test: ## Run workspace test scripts (optional PACKAGE)
 test-focused: ## Build dependencies and run selected tests serially (requires PACKAGE; optional ARGS)
 	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
 	@$(TURBO) run build --filter="@wallpaperdb/$(PACKAGE)^..." --concurrency=1
-	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism $(ARGS)
+	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
 	@$(TURBO) run test:unit $(TURBO_FLAGS)

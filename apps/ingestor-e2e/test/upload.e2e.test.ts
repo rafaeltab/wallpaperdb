@@ -1,597 +1,133 @@
-import { randomInt } from "node:crypto";
 import {
-    createDefaultTesterBuilder,
-    DockerTesterBuilder,
-    S3TesterBuilder,
-    NatsTesterBuilder,
-    PostgresTesterBuilder,
-    RedisTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import sharp from "sharp";
-import { request } from "undici";
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  S3TesterBuilder,
+  NatsTesterBuilder,
+  PostgresTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import sharp from 'sharp';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-    ContainerizedIngestorTesterBuilder,
-    IngestorMigrationsTesterBuilder,
-} from "./builders/index.js";
+  ContainerizedIngestorTesterBuilder,
+  IngestorMigrationsTesterBuilder,
+} from './builders/index.js';
 
-// Helper to create a test JPEG image with minimum required dimensions (1280x720)
-async function createTestJpeg(): Promise<Buffer> {
-    return sharp({
-        create: {
-            width: 1280,
-            height: 720,
-            channels: 3,
-            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
-        },
+const Tester = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(PostgresTesterBuilder)
+  .with(S3TesterBuilder)
+  .with(NatsTesterBuilder)
+  .with(IngestorMigrationsTesterBuilder)
+  .with(ContainerizedIngestorTesterBuilder)
+  .build();
+
+/** The suite exercises the Docker artifact; capability decision tables live with their owning ports. */
+describe('deployed ingestor', () => {
+  const tester = new Tester();
+  let baseUrl: string;
+  beforeAll(async () => {
+    tester
+      .withNetwork()
+      .withPostgres()
+      .withS3()
+      .withS3Bucket('wallpapers')
+      .withNats((builder) => builder.withJetstream())
+      .withStream('WALLPAPER')
+      .withMigrations()
+      .withContainerizedApp();
+    await tester.setup();
+    baseUrl = tester.getBaseUrl();
+  }, 120000);
+  afterAll(async () => {
+    await tester.destroy();
+  });
+
+  const upload = (bytes: Uint8Array, authenticated = true) => {
+    const form = new FormData();
+    form.append('file', new Blob([Buffer.from(bytes)], { type: 'image/png' }), 'wallpaper.png');
+    return fetch(`${baseUrl}/upload`, {
+      method: 'POST',
+      body: form,
+      headers: authenticated
+        ? {
+            authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_deployed' })).toString('base64')}`,
+          }
+        : {},
+    });
+  };
+
+  it('serves health, readiness, and the deployed OpenAPI documentation', async () => {
+    const health = await fetch(`${baseUrl}/health`);
+    expect(health.status).toBe(200);
+    expect(await health.json()).toMatchObject({
+      status: 'healthy',
+      checks: { database: true, s3: true, nats: true, otel: true },
+    });
+    const ready = await fetch(`${baseUrl}/ready`);
+    expect(ready.status).toBe(200);
+    expect(await ready.json()).toMatchObject({ ready: true });
+    const documentation = await fetch(`${baseUrl}/documentation/json`);
+    expect(documentation.status).toBe(200);
+    expect(await documentation.json()).toMatchObject({ paths: { '/upload': expect.any(Object) } });
+  });
+
+  it('authenticates uploads and returns safe problem details for invalid content', async () => {
+    const unauthorized = await upload(new Uint8Array([1]), false);
+    expect(unauthorized.status).toBe(401);
+    const invalid = await upload(new Uint8Array([1]));
+    expect(invalid.status).toBe(400);
+    expect(invalid.headers.get('content-type')).toContain('application/problem+json');
+    expect(await invalid.json()).toMatchObject({
+      status: 400,
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-file-format.md',
+    });
+  });
+
+  it('stores an upload, publishes its CloudEvent, and returns the same identity for a duplicate', async () => {
+    const image = await sharp({
+      create: { width: 1280, height: 720, channels: 3, background: '#123456' },
     })
-        .jpeg()
-        .toBuffer();
-}
-
-// Helper to create a test PNG image with minimum required dimensions (1280x720)
-async function createTestPng(): Promise<Buffer> {
-    return sharp({
-        create: {
-            width: 1280,
-            height: 720,
-            channels: 3,
-            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
-        },
-    })
-        .png()
-        .toBuffer();
-}
-
-// Helper to create a test WebP image with minimum required dimensions (1280x720)
-async function createTestWebP(): Promise<Buffer> {
-    return sharp({
-        create: {
-            width: 1280,
-            height: 720,
-            channels: 3,
-            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
-        },
-    })
-        .webp()
-        .toBuffer();
-}
-
-// Helper to create a small test JPEG image below minimum dimensions (640x480)
-async function createSmallTestJpeg(): Promise<Buffer> {
-    return sharp({
-        create: {
-            width: 640,
-            height: 480,
-            channels: 3,
-            background: { r: randomInt(255), g: randomInt(255), b: randomInt(255) },
-        },
-    })
-        .jpeg()
-        .toBuffer();
-}
-
-// Generate random user ID
-function generateTestUserId(): string {
-    return `user_e2e_${Math.random().toString(36).substring(7)}`;
-}
-
-function mockAuthHeader(userId: string): Record<string, string> {
-    const encoded = Buffer.from(JSON.stringify({ id: userId })).toString("base64");
-    return { authorization: `Bearer ${encoded}` };
-}
-
-describe("Upload E2E", () => {
-    const setup = () => {
-        // Build test environment with builder composition
-        const TesterClass = createDefaultTesterBuilder()
-            .with(DockerTesterBuilder)
-            .with(PostgresTesterBuilder)
-            .with(S3TesterBuilder)
-            .with(NatsTesterBuilder)
-            .with(RedisTesterBuilder)
-            .with(IngestorMigrationsTesterBuilder)
-            .with(ContainerizedIngestorTesterBuilder)
-            .build();
-
-        const tester = new TesterClass();
-
-        // Configure infrastructure WITH network - containers communicate via network
-        tester
-            .withPostgres((builder) =>
-                builder.withDatabase(`test_e2e_upload_${Date.now()}`),
-            )
-            .withPostgresAutoCleanup(["wallpapers"])
-            .withS3()
-            .withS3Bucket("wallpapers")
-            .withS3AutoCleanup() // Enable automatic S3 cleanup
-            .withNats()
-            .withStream("WALLPAPER")
-            .withNatsAutoCleanup()
-            .withMigrations()
-            .withContainerizedApp();
-        return tester;
-    };
-    let tester: ReturnType<typeof setup>;
-    let baseUrl: string;
-
-    beforeAll(async () => {
-        tester = setup();
-
-        await tester.setup();
-        baseUrl = tester.getBaseUrl();
-    }, 180000); // 3 minute timeout for full E2E setup
-
-    afterAll(async () => {
-        await tester.destroy();
+      .png()
+      .toBuffer();
+    const response = await upload(image);
+    expect(response.status).toBe(200);
+    const receipt: unknown = await response.json();
+    expect(receipt).toMatchObject({
+      id: expect.stringMatching(/^wlpr_/),
+      status: 'processing',
+      fileType: 'image',
+      width: 1280,
+      height: 720,
     });
-
-    afterEach(async () => {
-        await tester.cleanup();
+    if (
+      typeof receipt !== 'object' ||
+      receipt === null ||
+      !('id' in receipt) ||
+      typeof receipt.id !== 'string'
+    )
+      throw new Error('Upload response has no wallpaper identity');
+    const id = receipt.id;
+    expect(await tester.s3.listObjects('wallpapers')).toContain(`${id}/original.png`);
+    const duplicate = await upload(image);
+    expect(duplicate.status).toBe(200);
+    expect(await duplicate.json()).toMatchObject({ id, status: 'already_uploaded' });
+    const connection = await tester.nats.getConnection();
+    const manager = await connection.jetstreamManager();
+    await vi.waitFor(
+      async () => {
+        expect((await manager.streams.info('WALLPAPER')).state.messages).toBe(1);
+      },
+      { timeout: 5000, interval: 50 }
+    );
+    const stored = await manager.streams.getMessage('WALLPAPER', {
+      last_by_subj: 'wallpaper.uploaded',
     });
-
-    test("upload JPEG wallpaper creates S3 object and database record", async () => {
-        const testImage = await createTestJpeg();
-        const userId = generateTestUserId();
-        const filename = `test-wallpaper-${Date.now()}.jpg`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([testImage], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Verify: HTTP response
-        const body = await response.body.json();
-        expect(body).toMatchObject({
-            id: expect.stringMatching(/^wlpr_/),
-            status: expect.stringMatching(/^(stored|processing|completed)$/),
-        });
-
-        expect(response.statusCode).toBe(200);
-
-        const wallpaperId = (body as { id: string }).id;
-
-        // Verify: Side effect in S3 - object was created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBeGreaterThan(0);
-        expect(s3Objects[0]).toContain(wallpaperId);
-
-        // Verify: Side effect in database - record was created
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            user_id: string;
-            upload_state: string;
-            file_type: string;
-            storage_key: string;
-        }>(
-            "SELECT id, user_id, upload_state, file_type, storage_key FROM wallpapers WHERE id = $1",
-            [wallpaperId],
-        );
-        expect(dbResult).toHaveLength(1);
-        expect(dbResult[0]).toMatchObject({
-            id: wallpaperId,
-            user_id: userId,
-            file_type: "image",
-        });
-        // Upload should be in a successful state (stored, processing, or completed)
-        expect(["stored", "processing", "completed"]).toContain(
-            dbResult[0].upload_state,
-        );
-        expect(dbResult[0].storage_key).toBeTruthy();
+    expect(JSON.parse(new TextDecoder().decode(stored.data))).toMatchObject({
+      specversion: '1.0',
+      source: 'urn:wallpaperdb:ingestor',
+      type: 'wallpaper.uploaded',
+      id: expect.any(String),
+      data: { wallpaper: { id, userId: 'user_deployed', storageKey: `${id}/original.png` } },
     });
-
-    test("upload invalid file returns 400 error without creating side effects", async () => {
-        const invalidFile = Buffer.from("This is not an image");
-        const userId = generateTestUserId();
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([invalidFile], { type: "text/plain" }),
-            "invalid.txt",
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Verify: HTTP error response
-        expect(response.statusCode).toBe(400);
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No database record created (or only in 'initiated' state)
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            upload_state: string;
-        }>("SELECT id, upload_state FROM wallpapers WHERE user_id = $1", [userId]);
-        // Should be empty or only have 'initiated' records (which is fine)
-        const completedOrStored = dbResult.filter(
-            (row) =>
-                row.upload_state === "completed" || row.upload_state === "stored",
-        );
-        expect(completedOrStored).toHaveLength(0);
-    });
-
-    test("uploading duplicate file returns already_uploaded status without creating duplicate records", async () => {
-        const testImage = await createTestJpeg();
-        const userId = generateTestUserId();
-        const filename = `duplicate-test-${Date.now()}.jpg`;
-
-        const formData1 = new FormData();
-        formData1.append(
-            "file",
-            new Blob([testImage], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response1 = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData1,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Verify first upload succeeded
-        expect(response1.statusCode).toBe(200);
-        const body1 = await response1.body.json();
-        const wallpaperId = (body1 as { id: string }).id;
-
-        // Wait a moment to ensure first upload is fully committed to database
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        // Upload the same file again with the same user
-        const formData2 = new FormData();
-        formData2.append(
-            "file",
-            new Blob([testImage], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response2 = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData2,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: Second upload returns 200 with already_uploaded status (idempotency)
-        const body2 = await response2.body.json();
-        expect(body2).toMatchObject({
-            id: wallpaperId, // Same ID as first upload
-            status: "already_uploaded",
-        });
-        expect(response2.statusCode).toBe(200);
-
-        // Verify: Only one S3 object exists
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(1);
-        expect(s3Objects[0]).toContain(wallpaperId);
-
-        // Verify: Only one database record exists in successful state
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            upload_state: string;
-        }>(
-            "SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)",
-            [userId, "stored", "processing", "completed"],
-        );
-        expect(dbResult).toHaveLength(1);
-        expect(dbResult[0].id).toBe(wallpaperId);
-    });
-
-    test("upload PNG wallpaper creates S3 object and database record", async () => {
-        const testImage = await createTestPng();
-        const userId = generateTestUserId();
-        const filename = `test-wallpaper-${Date.now()}.png`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([testImage], { type: "image/png" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP response
-        const body = await response.body.json();
-        expect(body).toMatchObject({
-            id: expect.stringMatching(/^wlpr_/),
-            status: expect.stringMatching(/^(stored|processing|completed)$/),
-        });
-        expect(response.statusCode).toBe(200);
-
-        const wallpaperId = (body as { id: string }).id;
-
-        // Verify: S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBeGreaterThan(0);
-        expect(s3Objects[0]).toContain(wallpaperId);
-
-        // Verify: Database record created with correct MIME type
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            user_id: string;
-            upload_state: string;
-            file_type: string;
-            mime_type: string;
-            storage_key: string;
-        }>(
-            "SELECT id, user_id, upload_state, file_type, mime_type, storage_key FROM wallpapers WHERE id = $1",
-            [wallpaperId],
-        );
-        expect(dbResult).toHaveLength(1);
-        expect(dbResult[0]).toMatchObject({
-            id: wallpaperId,
-            user_id: userId,
-            file_type: "image",
-            mime_type: "image/png",
-        });
-        expect(["stored", "processing", "completed"]).toContain(
-            dbResult[0].upload_state,
-        );
-    });
-
-    test("upload WebP wallpaper creates S3 object and database record", async () => {
-        const testImage = await createTestWebP();
-        const userId = generateTestUserId();
-        const filename = `test-wallpaper-${Date.now()}.webp`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([testImage], { type: "image/webp" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP response
-        expect(response.statusCode).toBe(200);
-        const body = await response.body.json();
-        expect(body).toMatchObject({
-            id: expect.stringMatching(/^wlpr_/),
-            status: expect.stringMatching(/^(stored|processing|completed)$/),
-        });
-
-        const wallpaperId = (body as { id: string }).id;
-
-        // Verify: S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBeGreaterThan(0);
-        expect(s3Objects[0]).toContain(wallpaperId);
-
-        // Verify: Database record created with correct MIME type
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            user_id: string;
-            upload_state: string;
-            file_type: string;
-            mime_type: string;
-            storage_key: string;
-        }>(
-            "SELECT id, user_id, upload_state, file_type, mime_type, storage_key FROM wallpapers WHERE id = $1",
-            [wallpaperId],
-        );
-        expect(dbResult).toHaveLength(1);
-        expect(dbResult[0]).toMatchObject({
-            id: wallpaperId,
-            user_id: userId,
-            file_type: "image",
-            mime_type: "image/webp",
-        });
-        expect(["stored", "processing", "completed"]).toContain(
-            dbResult[0].upload_state,
-        );
-    });
-
-    test("upload image below minimum dimensions returns 400 error", async () => {
-        const smallImage = await createSmallTestJpeg();
-        const userId = generateTestUserId();
-        const filename = `small-wallpaper-${Date.now()}.jpg`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([smallImage], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP error response
-        expect(response.statusCode).toBe(400);
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No database record in successful state
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            upload_state: string;
-        }>(
-            "SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)",
-            [userId, "stored", "processing", "completed"],
-        );
-        expect(dbResult).toHaveLength(0);
-    });
-
-    test("upload without auth returns 401 error", async () => {
-        const testImage = await createTestJpeg();
-        const filename = `test-wallpaper-${Date.now()}.jpg`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([testImage], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-        });
-
-        expect(response.statusCode).toBe(401);
-        const body = (await response.body.json()) as object;
-        expect(body).toHaveProperty("type");
-        expect((body as { type: unknown }).type).toMatch(/unauthorized/);
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No database record created
-        const dbResult = await tester.postgres.query("SELECT id FROM wallpapers");
-        expect(dbResult).toHaveLength(0);
-    });
-
-    test("upload empty file returns 400 error", async () => {
-        const emptyFile = Buffer.alloc(0);
-        const userId = generateTestUserId();
-        const filename = `empty-file-${Date.now()}.jpg`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([emptyFile], { type: "image/jpeg" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP error response
-        expect(response.statusCode).toBe(400);
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No successful database record created
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            upload_state: string;
-        }>(
-            "SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)",
-            [userId, "stored", "processing", "completed"],
-        );
-        expect(dbResult).toHaveLength(0);
-    });
-
-    test("upload with no file field returns 400 error", async () => {
-        const userId = generateTestUserId();
-
-        const formData = new FormData();
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP error response
-        expect(response.statusCode).toBe(400);
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No database record created
-        const dbResult = await tester.postgres.query<{ id: string }>(
-            "SELECT id FROM wallpapers WHERE user_id = $1",
-            [userId],
-        );
-        expect(dbResult).toHaveLength(0);
-    });
-
-    test("upload video file returns 400 error (format not supported)", async () => {
-        const mp4Header = Buffer.from([
-            0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
-            0x6d, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00,
-            0x6d, 0x70, 0x34, 0x32, 0x69, 0x73, 0x6f, 0x6d,
-        ]);
-        const userId = generateTestUserId();
-        const filename = `test-video-${Date.now()}.mp4`;
-
-        const formData = new FormData();
-        formData.append(
-            "file",
-            new Blob([mp4Header], { type: "video/mp4" }),
-            filename,
-        );
-
-        const response = await request(`${baseUrl}/upload`, {
-            method: "POST",
-            body: formData,
-            headers: mockAuthHeader(userId),
-        });
-
-        // Assert: HTTP error response (video not supported)
-        expect(response.statusCode).toBe(400);
-        const body = await response.body.json();
-        expect(body).toHaveProperty("type");
-        // Should fail format validation since video/mp4 is not in allowedFormats
-
-        // Verify: No S3 object created
-        const s3Objects = await tester.s3.listObjects(
-            tester.s3.config.buckets[0],
-        );
-        expect(s3Objects.length).toBe(0);
-
-        // Verify: No successful database record created
-        const dbResult = await tester.postgres.query<{
-            id: string;
-            upload_state: string;
-        }>(
-            "SELECT id, upload_state FROM wallpapers WHERE user_id = $1 AND upload_state IN ($2, $3, $4)",
-            [userId, "stored", "processing", "completed"],
-        );
-        expect(dbResult).toHaveLength(0);
-    });
+  });
 });

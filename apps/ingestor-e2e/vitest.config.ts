@@ -1,17 +1,12 @@
-import { defineBaseConfig } from "@wallpaperdb/vitest-config";
+import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
 export default defineBaseConfig({
-    test: {
-        name: "ingestor-e2e",
-        testTimeout: 60000,
-        hookTimeout: 60000,
-        fileParallelism: true,
-        maxConcurrency: 5,
-        coverage: {
-            provider: 'v8',
-            include: ['test/**/*.ts'],
-            exclude: ['test/**/*.d.ts'],
-            reportsDirectory: './coverage',
-        },
-    },
+  test: {
+    name: 'ingestor-e2e',
+    testTimeout: 15000,
+    hookTimeout: 120000,
+    fileParallelism: false,
+    maxWorkers: 1,
+    include: ['test/**/*.e2e.test.ts'],
+  },
 });

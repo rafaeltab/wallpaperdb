@@ -1,100 +1,44 @@
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath } from 'node:url';
 import {
-    type AddMethodsType,
-    BaseTesterBuilder,
-    type PostgresTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import { Pool } from "pg";
-import { createTestLogger } from "@wallpaperdb/test-logger";
+  type AddMethodsType,
+  BaseTesterBuilder,
+  type PostgresTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Pool } from 'pg';
 
-const logger = createTestLogger("IngestorMigrationsTesterBuilder");
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Options for IngestorMigrationsMixin
- */
 export interface IngestorMigrationsOptions {
-    /** Path to migration SQL file (relative to workspace root) */
-    migrationPath?: string;
+  readonly migrationsFolder?: string;
 }
 
-/**
- * Mixin that applies Ingestor database migrations to PostgreSQL (E2E version).
- *
- * @example
- * ```typescript
- * const tester = await createDefaultTesterBuilder()
- *   .with(DockerTesterBuilder)
- *   .with(PostgresTesterBuilder)
- *   .with(IngestorMigrationsTesterBuilder)
- *   .build();
- * ```
- */
+/** Applies every checked-in SQL migration without importing application code. */
 export class IngestorMigrationsTesterBuilder extends BaseTesterBuilder<
-    "IngestorMigrations",
-    [PostgresTesterBuilder]
+  'IngestorMigrations',
+  [PostgresTesterBuilder]
 > {
-    readonly name = "IngestorMigrations" as const;
-    private options: IngestorMigrationsOptions;
-
-    constructor(options: IngestorMigrationsOptions = {}) {
-        super();
-        this.options = options;
-    }
-
-    addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(
-        Base: TBase,
-    ) {
-        const migrationPath =
-            this.options.migrationPath ??
-            join(__dirname, "../../../ingestor/drizzle/0000_left_starjammers.sql");
-
-        return class extends Base {
-            private _migrationsApplied = false;
-
-            /**
-             * Enable automatic database migration during setup.
-             * Migrations are idempotent and safe to call multiple times.
-             */
-            withMigrations() {
-                if (this._migrationsApplied) {
-                    return this; // Already registered
-                }
-                this._migrationsApplied = true;
-
-                this.addSetupHook(async () => {
-                    logger.debug("[IngestorMigrations] Running migration hook");
-                    const postgres = this.getPostgres();
-
-                    if (!postgres) {
-                        throw new Error(
-                            "PostgresTesterBuilder must be applied before IngestorMigrationsTesterBuilder",
-                        );
-                    }
-
-                    logger.debug("Applying ingestor database migrations...");
-
-                    // Use externalConnectionString for host-to-container communication
-                    // postgres.connectionString uses network alias which isn't accessible from host
-                    const pool = new Pool({
-                        connectionString: postgres.connectionStrings.fromHost,
-                    });
-
-                    try {
-                        const migrationSql = readFileSync(migrationPath, "utf-8");
-                        logger.debug("Read migrations, applying...");
-                        await pool.query(migrationSql);
-                        logger.debug("Database migrations applied successfully");
-                    } finally {
-                        await pool.end();
-                    }
-                });
-
-                return this;
-            }
-        };
-    }
+  readonly name = 'IngestorMigrations';
+  constructor(private readonly options: IngestorMigrationsOptions = {}) {
+    super();
+  }
+  addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+    const migrationsFolder =
+      this.options.migrationsFolder ??
+      fileURLToPath(new URL('../../../ingestor/drizzle', import.meta.url));
+    return class extends Base {
+      withMigrations() {
+        this.addSetupHook(async () => {
+          const postgres = this.getPostgres();
+          if (!postgres) throw new Error('PostgreSQL must start before migrations');
+          const pool = new Pool({ connectionString: postgres.connectionStrings.fromHost });
+          try {
+            await migrate(drizzle(pool), { migrationsFolder });
+          } finally {
+            await pool.end();
+          }
+        });
+        return this;
+      }
+    };
+  }
 }

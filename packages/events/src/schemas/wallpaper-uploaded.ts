@@ -4,7 +4,7 @@ import { z } from "zod";
  * Schema for the wallpaper.uploaded event.
  * Published when a wallpaper is successfully uploaded and stored.
  */
-export const WallpaperUploadedEventSchema = z.object({
+const LegacyWallpaperUploadedEventSchema = z.object({
   eventId: z.string().min(1),
   eventType: z.literal("wallpaper.uploaded"),
   timestamp: z.string().datetime(),
@@ -23,6 +23,30 @@ export const WallpaperUploadedEventSchema = z.object({
     uploadedAt: z.string().datetime(),
   }),
 });
+
+/** Canonical producer envelope; the payload remains compatible across the replay horizon. */
+export const WallpaperUploadedCloudEventSchema = z.object({
+  specversion: z.literal("1.0"),
+  id: z.string().min(1),
+  source: z.string().url(),
+  type: z.literal("wallpaper.uploaded"),
+  time: z.string().datetime(),
+  datacontenttype: z.literal("application/json"),
+  correlationid: z.string().min(1).optional(),
+  causationid: z.string().min(1).optional(),
+  data: z.object({ wallpaper: LegacyWallpaperUploadedEventSchema.shape.wallpaper }),
+});
+
+/** Retained legacy events and new CloudEvents share one consumer-facing interpretation. */
+export const WallpaperUploadedEventSchema = z.union([
+  LegacyWallpaperUploadedEventSchema,
+  WallpaperUploadedCloudEventSchema.transform((event) => ({
+    eventId: event.id,
+    eventType: event.type,
+    timestamp: event.time,
+    wallpaper: event.data.wallpaper,
+  })),
+]);
 
 export type WallpaperUploadedEvent = z.infer<typeof WallpaperUploadedEventSchema>;
 

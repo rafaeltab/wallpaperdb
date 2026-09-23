@@ -6,6 +6,7 @@ export {
 
 export {
   WallpaperUploadedEventSchema,
+  WallpaperUploadedCloudEventSchema,
   type WallpaperUploadedEvent,
   WALLPAPER_UPLOADED_SUBJECT,
 } from "./wallpaper-uploaded.js";

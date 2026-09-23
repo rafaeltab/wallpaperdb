@@ -4,7 +4,13 @@ import { GraphQLError } from 'graphql';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import type { HttpExecution } from '../runtime.js';
 import { Catalogue, type CatalogueUnavailable } from '../catalogue/index.js';
-import type { Profile, SearchOutcome, SearchWallpapers, Wallpaper } from '../catalogue/index.js';
+import type {
+  Profile,
+  ProfileSearchOutcome,
+  SearchOutcome,
+  SearchWallpapers,
+  Wallpaper,
+} from '../catalogue/index.js';
 
 export interface MediaUrls {
   mediaServiceUrl: string;
@@ -76,6 +82,11 @@ const searchArguments = Schema.Struct({
       ),
     })
   ),
+});
+const profileSearchArguments = Schema.Struct({
+  query: Schema.String,
+  first: nullableOptional(Schema.Number),
+  after: nullableOptional(Schema.String),
 });
 function parse<A>(schema: Schema.ConstraintDecoder<A>, input: unknown): A {
   const result = Schema.decodeUnknownExit(schema)(input);
@@ -151,6 +162,21 @@ function searchValue(result: SearchOutcome) {
       throw new GraphQLError(result.reason, { extensions: { code: 'BAD_USER_INPUT' } });
   }
 }
+function profileSearchValue(result: ProfileSearchOutcome) {
+  switch (result._tag) {
+    case 'Found':
+      return {
+        edges: result.value.profiles.map((profile) => ({ node: profileView(profile) })),
+        pageInfo: { ...result.value.pageInfo },
+      };
+    case 'InvalidCursor':
+      throw new GraphQLError('Invalid or expired cursor', {
+        extensions: { code: 'INVALID_CURSOR' },
+      });
+    case 'InvalidSearch':
+      throw new GraphQLError(result.reason, { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+}
 const wallpaperQuery = Effect.fn('graphql.getWallpaper')(function* (id: string) {
   const started = yield* Clock.currentTimeMillis;
   const catalogue = yield* Catalogue;
@@ -176,6 +202,20 @@ export class GraphqlAdapter {
   resolvers() {
     return {
       Query: {
+        searchProfiles: async (_parent: unknown, args: unknown, context?: GraphqlContext) => {
+          const input = parse(profileSearchArguments, args);
+          const result = await this.run(
+            Catalogue.use((catalogue) =>
+              catalogue.searchProfiles({
+                query: input.query,
+                first: input.first ?? undefined,
+                after: input.after ?? undefined,
+              })
+            ),
+            context
+          );
+          return profileSearchValue(result);
+        },
         searchWallpapers: async (_parent: unknown, args: unknown, context?: GraphqlContext) =>
           this.search(searchInput(args), context),
         getWallpaper: async (_parent: unknown, args: unknown, context: GraphqlContext) => {
@@ -204,7 +244,7 @@ export class GraphqlAdapter {
             Catalogue.use((catalogue) => catalogue.profileByHandle(handle)),
             context
           );
-          return value ? profileView(value) : null;
+          return value ? { ...value, profile: profileView(value.profile) } : null;
         },
       },
       Profile: {

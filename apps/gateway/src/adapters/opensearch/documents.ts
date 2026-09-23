@@ -35,6 +35,16 @@ const profileDocument = Schema.Struct({
   displayName: Schema.NonEmptyString,
   handle: Schema.NonEmptyString,
   claimGeneration: positiveInteger,
+  aliases: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        handle: Schema.NonEmptyString,
+        claimGeneration: positiveInteger,
+        createdAt: Schema.optionalKey(timestamp),
+        expiresAt: Schema.optionalKey(Schema.NullOr(timestamp)),
+      })
+    )
+  ),
   biographyMarkdown: Schema.String,
   pictureAssetId: Schema.NullOr(Schema.NonEmptyString),
   version: positiveInteger,
@@ -62,7 +72,29 @@ export const profileBatchResponse = Schema.decodeUnknownEffect(
 );
 export const profileSearchResponse = Schema.decodeUnknownEffect(
   Schema.Struct({
-    hits: Schema.Struct({ hits: Schema.Array(Schema.Struct({ _source: profileDocument })) }),
+    hits: Schema.Struct({
+      hits: Schema.Array(
+        Schema.Struct({
+          _source: profileDocument,
+          sort: Schema.Tuple([positiveInteger]),
+        })
+      ),
+    }),
+  })
+);
+export const profileDiscoveryResponse = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    hits: Schema.Struct({
+      hits: Schema.Array(
+        Schema.Struct({
+          _source: profileDocument,
+          sort: Schema.Tuple([
+            positiveInteger.check(Schema.isLessThanOrEqualTo(6)),
+            Schema.NonEmptyString,
+          ]),
+        })
+      ),
+    }),
   })
 );
 export const wallpaperSearchResponse = Schema.decodeUnknownEffect(

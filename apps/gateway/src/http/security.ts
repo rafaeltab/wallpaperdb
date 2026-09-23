@@ -27,7 +27,7 @@ import {
   TypeMetaFieldDef,
   TypeNameMetaFieldDef,
 } from 'graphql';
-import { resolvePageSize } from '../catalogue/index.js';
+import { resolvePageSize, resolveProfilePageSize } from '../catalogue/index.js';
 
 export interface QueryLimits {
   readonly graphqlMaxDepth: number;
@@ -37,6 +37,7 @@ export interface QueryLimits {
 }
 const fieldCosts: Record<string, number> = {
   'Query.searchWallpapers': 10,
+  'Query.searchProfiles': 10,
   'Query.getWallpaper': 5,
   'Wallpaper.variants': 5,
   'Profile.wallpapers': 10,
@@ -54,12 +55,15 @@ const paginationArguments = Schema.is(
 function listMultiplier(
   field: GraphQLField<unknown, unknown>,
   node: FieldNode,
-  variables: Record<string, unknown>
+  variables: Record<string, unknown>,
+  profiles: boolean
 ): number | GraphQLError {
   const args = getArgumentValues(field, node, variables);
   if (!paginationArguments(args))
     return new GraphQLError('Invalid query arguments', { extensions: { code: 'BAD_USER_INPUT' } });
-  const size = resolvePageSize({ first: args.first ?? undefined, last: args.last ?? undefined });
+  const size = profiles
+    ? resolveProfilePageSize({ first: args.first ?? undefined })
+    : resolvePageSize({ first: args.first ?? undefined, last: args.last ?? undefined });
   return typeof size === 'number'
     ? size
     : new GraphQLError(size.reason, { extensions: { code: 'BAD_USER_INPUT' } });
@@ -163,8 +167,10 @@ class QueryInspection {
     if (!field) return;
     const name = `${parent.name}.${node.name.value}`;
     const pageSize =
-      name === 'Query.searchWallpapers' || name === 'Profile.wallpapers'
-        ? listMultiplier(field, node, this.variables)
+      name === 'Query.searchWallpapers' ||
+      name === 'Query.searchProfiles' ||
+      name === 'Profile.wallpapers'
+        ? listMultiplier(field, node, this.variables, name === 'Query.searchProfiles')
         : undefined;
     if (pageSize instanceof GraphQLError) {
       this.error = pageSize;
@@ -181,7 +187,7 @@ class QueryInspection {
     const type = getNamedType(field.type);
     if (!isCompositeType(type)) return;
     const childMultiplicity =
-      name === 'WallpaperConnection.edges'
+      name === 'WallpaperConnection.edges' || name === 'ProfileConnection.edges'
         ? (connectionSize ?? 1)
         : name === 'Wallpaper.variants'
           ? 5

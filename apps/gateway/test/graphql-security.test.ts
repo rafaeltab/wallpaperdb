@@ -13,6 +13,14 @@ class ObservedCatalogue extends EmptyCatalogue {
     this.calls.push('search');
     return super.search();
   }
+  override searchProfiles() {
+    this.calls.push('searchProfiles');
+    return super.searchProfiles();
+  }
+  override profileByHandle() {
+    this.calls.push('profileByHandle');
+    return super.profileByHandle();
+  }
   override profile() {
     this.calls.push('profile');
     return super.profile();
@@ -64,6 +72,95 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 describe('GraphQL security driving contract', () => {
+  it.each([
+    { args: 'first:20', definition: '', variables: undefined, size: 20 },
+    { args: 'first:$size', definition: '($size:Int=20)', variables: undefined, size: 20 },
+    { args: 'first:$size', definition: '($size:Int)', variables: { size: 20 }, size: 20 },
+    { args: 'first:null', definition: '', variables: undefined, size: 10 },
+    { args: '', definition: '', variables: undefined, size: 10 },
+  ])('prices resolved Profile discovery page sizes before catalogue access: $args', async ({
+    args,
+    definition,
+    variables,
+    size,
+  }) => {
+    const catalogue = new ObservedCatalogue();
+    const complexity = size * 12 + 1;
+    const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
+    const text = `query${definition}{searchProfiles(query:"sky"${args ? `,${args}` : ''}){edges{node{id}}}}`;
+    expect((await execute(app, text, variables)).json().errors?.[0].extensions).toMatchObject({
+      code: 'COMPLEXITY_LIMIT_EXCEEDED',
+      complexity,
+    });
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    0, -1, 51,
+  ])('rejects unsupported Profile discovery page size %i before catalogue access', async (first) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    expect(
+      (
+        await execute(
+          app,
+          `query($first:Int){searchProfiles(query:"sky",first:$first){edges{node{id}}}}`,
+          { first }
+        )
+      ).json().errors?.[0].extensions.code
+    ).toBe('BAD_USER_INPUT');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    '',
+    ',first:null',
+    ',first:10',
+  ])('rejects nested Profile discovery amplification: %s', async (args) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxDepth: 10, graphqlMaxComplexity: 1000 }, { catalogue });
+    const response = await execute(
+      app,
+      `{
+      searchProfiles(query:"sky"${args}) {edges{node{...Contributions}}}
+    } fragment Contributions on Profile {wallpapers{edges{node{wallpaperId}}}}`
+    );
+    expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    10, 50,
+  ])('admits the shipped Profile discovery selection with %i results', async (first) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const response = await execute(
+      app,
+      `
+      query SearchProfiles($query:String!,$first:Int,$after:String) {
+        searchProfiles(query:$query,first:$first,after:$after) {
+          edges {node{id version handle displayName picture{id url} canonicalPath}}
+          pageInfo {hasNextPage hasPreviousPage startCursor endCursor}
+        }
+      }
+    `,
+      { query: 'sky', first }
+    );
+    expect(response.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['searchProfiles']);
+  });
+  it('admits the shipped Handle resolution selection under the default depth budget', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const response = await execute(
+      app,
+      `query GetProfileByHandle($handle:String!){
+      profileByHandle(handle:$handle){requestedHandle isAlias canonicalHandle profile{
+        id version handle displayName biographyMarkdown picture{id url} canonicalPath
+      }}
+    }`,
+      { handle: 'sky' }
+    );
+    expect(response.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['profileByHandle']);
+  });
   it('accepts depth-limit queries and returns rate headers', async () => {
     const app = await build();
     const result = await execute(app);

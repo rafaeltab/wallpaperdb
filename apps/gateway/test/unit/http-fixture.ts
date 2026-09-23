@@ -28,6 +28,20 @@ export const httpConfig: HttpConfig = {
   rateLimitMaxAnonymous: 100,
 };
 export class EmptyCatalogue implements Catalogue {
+  searchProfiles() {
+    return Effect.succeed({
+      _tag: 'Found',
+      value: {
+        profiles: [],
+        pageInfo: {
+          hasNextPage: false,
+          hasPreviousPage: false,
+          startCursor: null,
+          endCursor: null,
+        },
+      },
+    } satisfies Effect.Success<ReturnType<Catalogue['searchProfiles']>>);
+  }
   search() {
     return Effect.succeed({
       _tag: 'Found',

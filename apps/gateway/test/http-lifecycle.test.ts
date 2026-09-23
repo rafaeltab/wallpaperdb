@@ -26,9 +26,10 @@ function controlledCatalogue(read: Effect.Effect<Profile | null>, onSearch = () 
   return Catalogue.of({
     wallpaper: () => empty.wallpaper(),
     profile: () => read,
-    profileByHandle: () => read,
+    profileByHandle: () => empty.profileByHandle(),
     profiles: (ids) => empty.profiles(ids),
     search: () => Effect.sync(onSearch).pipe(Effect.andThen(empty.search())),
+    searchProfiles: () => empty.searchProfiles(),
   });
 }
 async function serve(catalogue: Catalogue, shutdownTimeoutMs = 1000) {

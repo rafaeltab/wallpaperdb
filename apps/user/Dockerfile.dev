@@ -13,6 +13,8 @@ COPY . .
 RUN pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
 
+RUN pnpm exec turbo run build --filter='@wallpaperdb/user^...' --concurrency=1
+
 RUN cp scripts/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
 
 WORKDIR /app/apps/user

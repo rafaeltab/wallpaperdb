@@ -23,6 +23,8 @@ GraphQL complexity admission uses the selected operation and its referenced frag
 
 Depth and cost follow executable field positions through fragments and honor `@skip` and `@include`. Repeated fields with the same response key merge their selections; aliases and different parent positions are charged separately. Nested list sizes multiply descendant costs, while connection metadata is counted once per connection. Analysis stops when a configured budget is exceeded, before catalogue work begins.
 
+`GRAPHQL_MAX_COMPLEXITY` defaults to 2,000. The web application's 20-wallpaper browse query costs 1,506 with descendant work included, so it remains admitted under the default. The depth limit remains 5, and nested page expansion remains rejected. Explicit complexity settings continue to take precedence; deployments retaining the earlier setting of 1,000 must increase it to admit this browse query.
+
 Successful `/health` and `/ready` responses and their HTTP status codes are unchanged. Failed probes return HTTP 503 with `application/problem+json`. Failed `/health` bodies use numeric `status: 503` and report the health state (`degraded`, `unhealthy`, or `shutting_down`) in `healthStatus`, alongside dependency checks and timing. Failed `/ready` bodies retain `ready: false`, `reason`, and `timestamp` within the problem envelope. Consumers of the former failed-health string `status` must read `healthStatus`; probes that only inspect HTTP status remain compatible.
 
 ## Projection delivery

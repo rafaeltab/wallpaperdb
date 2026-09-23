@@ -20,7 +20,7 @@ export const httpConfig: HttpConfig = {
   mediaServiceUrl: 'http://media.example.com',
   mediaPublicPath: '/media',
   graphqlMaxDepth: 5,
-  graphqlMaxComplexity: 1000,
+  graphqlMaxComplexity: 2000,
   graphqlMaxUniqueFields: 50,
   graphqlMaxAliases: 20,
   graphqlMaxBatchSize: 10,

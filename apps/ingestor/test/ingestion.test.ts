@@ -1,9 +1,24 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Ingestion } from '../src/ingestion/index.js';
+import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
 
 describe('Wallpaper ingestion', () => {
+  it('retains a committed outbox occurrence when publication fails and replays that same occurrence', async () => {
+    let available = false;
+    const attempts: string[] = [];
+    const test = fixture({ events: { publish: (event) => Effect.gen(function* () { attempts.push(event.id); if (!available) return yield* new IngestionUnavailable({ operation: 'publish', cause: 'offline' }); }) } });
+    await Effect.runPromise(Ingestion.use((ingestion) => Effect.gen(function* () {
+      const result = yield* ingestion.upload(uploadInput);
+      expect(result._tag).toBe('Accepted');
+      expect(test.store.outbox.size).toBe(1);
+      available = true;
+      yield* ingestion.reconcile();
+    })).pipe(Effect.provide(test.layer)));
+    expect(attempts).toHaveLength(2);
+    expect(new Set(attempts).size).toBe(1);
+    expect(test.store.outbox.size).toBe(0);
+  });
   it('reuses an owner’s committed content without storing or publishing it twice', async () => {
     const test = fixture();
     const results = await Effect.runPromise(Ingestion.use((ingestion) => Effect.all([ingestion.upload(uploadInput), ingestion.upload(uploadInput)])).pipe(Effect.provide(test.layer)));

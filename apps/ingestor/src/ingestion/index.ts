@@ -188,6 +188,16 @@ export function ingestionLayer(): Layer.Layer<
       const events = yield* UploadEvents;
       const store = yield* IngestionStore;
       const identity = yield* IngestionIdentity;
+      const publish = Effect.fn('ingestion.publish')(function* (record: UploadRecord) {
+        yield* events.publish(record.event);
+        yield* store.published(record);
+      });
+      const defer = (record: UploadRecord, maximum: number) => Clock.currentTimeMillis.pipe(
+        Effect.flatMap((now) => store.defer(record, new Date(now), maximum))
+      );
+      const publishOrDefer = (record: UploadRecord) => publish(record).pipe(
+        Effect.catchTag('IngestionUnavailable', () => defer(record, 10))
+      );
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
       ): Effect.fn.Return<UploadOutcome, IngestionUnavailable> {
@@ -233,13 +243,17 @@ export function ingestionLayer(): Layer.Layer<
           metadata: wallpaper.metadata,
         });
         yield* store.stored(record);
-        yield* events.publish(record.event);
-        yield* store.published(record);
+        yield* publishOrDefer({ ...record, state: 'stored' });
         return { _tag: 'Accepted', upload: receipt(record.wallpaper) };
       });
       return Ingestion.of({
         upload,
-        reconcile: () => Effect.void,
+        reconcile: Effect.fn('ingestion.reconcile')(function* () {
+          const now = yield* Clock.currentTimeMillis;
+          const records = yield* store.claim(new Date(now), new Date(now - 10 * 60 * 1000), new Date(now + 60_000), 100);
+          yield* Effect.forEach(records, (record) => publishOrDefer(record), { concurrency: 5, discard: true });
+          yield* store.expireIntents(new Date(now - 60 * 60 * 1000));
+        }),
         cleanup: () => Effect.void,
       });
     })

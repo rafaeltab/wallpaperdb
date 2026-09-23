@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module';
 import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import { defineConfig, mergeConfig } from 'vitest/config';
-import baseline from './coverage-baseline.json';
 
 const require = createRequire(import.meta.url);
 const searchTests = ['test/{opensearch,profile,profile-search,integration,server}.test.ts'];
@@ -58,10 +57,10 @@ export default mergeConfig(
         exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
         reportsDirectory: './coverage/integration',
         thresholds: {
-          statements: baseline.statements.pct,
-          branches: baseline.branches.pct,
-          functions: baseline.functions.pct,
-          lines: baseline.lines.pct,
+          statements: 89.72,
+          branches: 87.5,
+          functions: 96.74,
+          lines: 89.72,
         },
       },
     },

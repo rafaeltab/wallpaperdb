@@ -8,6 +8,8 @@ import {
   index,
   uniqueIndex,
   decimal,
+  jsonb,
+  check,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -38,6 +40,9 @@ export const wallpapers = pgTable(
     stateChangedAt: timestamp('state_changed_at', { withTimezone: true }).notNull().defaultNow(),
     uploadAttempts: integer('upload_attempts').notNull().default(0),
     processingError: text('processing_error'), // Error message if upload_state = 'failed'
+    ingestionSnapshot: jsonb('ingestion_snapshot'),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
 
     // File information (nullable until 'stored' state)
     fileType: fileTypeEnum('file_type'), // ENUM: 'image' or 'video'
@@ -70,10 +75,26 @@ export const wallpapers = pgTable(
     // Only enforce uniqueness for successfully stored/processing/completed uploads
     uniqueIndex('idx_wallpapers_content_hash')
       .on(table.userId, table.contentHash)
-      .where(
-        sql`${table.contentHash} IS NOT NULL AND ${table.uploadState} IN ('stored', 'processing', 'completed')`
-      ),
+      .where(sql`${table.contentHash} IS NOT NULL AND ${table.uploadState} <> 'failed'`),
+    check(
+      'wallpaper_stored_metadata',
+      sql`${table.uploadState} NOT IN ('stored', 'processing', 'completed') OR (${table.fileType} IS NOT NULL AND ${table.mimeType} IS NOT NULL AND ${table.width} > 0 AND ${table.height} > 0 AND ${table.fileSizeBytes} > 0 AND ${table.originalFilename} IS NOT NULL)`
+    ),
   ]
+);
+
+export const uploadOutbox = pgTable(
+  'upload_outbox',
+  {
+    eventId: text('event_id').primaryKey(),
+    wallpaperId: text('wallpaper_id')
+      .notNull()
+      .references(() => wallpapers.id),
+    event: jsonb('event').notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    quarantinedAt: timestamp('quarantined_at', { withTimezone: true }),
+  },
+  (table) => [uniqueIndex('upload_outbox_wallpaper').on(table.wallpaperId)]
 );
 
 // Type exports for TypeScript

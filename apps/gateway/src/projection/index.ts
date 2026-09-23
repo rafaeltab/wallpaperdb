@@ -4,6 +4,7 @@ import type { Profile, Variant } from '../catalogue/index.js';
 export interface Occurrence {
   readonly source: string;
   readonly id: string;
+  /** Canonical UTC instant: preserve fractional precision, pad to three places, trim further trailing zeros. */
   readonly occurredAt: string;
 }
 

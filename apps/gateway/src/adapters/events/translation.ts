@@ -11,7 +11,7 @@ import {
   type WallpaperUploadedEvent,
   type WallpaperVariantAvailableEvent,
 } from '@wallpaperdb/events';
-import { DateTime, Option, Predicate, Schema } from 'effect';
+import { DateTime, Option, Predicate, Schema, SchemaGetter } from 'effect';
 import type { Occurrence, ProjectionChange } from '../../projection/index.js';
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
@@ -24,13 +24,28 @@ const decodeCreated = Schema.decodeUnknownOption(
     profile: Schema.Unknown,
   })
 );
+const calendarDate = [
+  /\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|02-(?:0[1-9]|1\d|2[0-8]))/
+    .source,
+  /(?:\d{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29/.source,
+].join('|');
+const clockTime = /(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?/.source;
+const offset = /(?:[zZ]|[+-](?:[01]\d|2[0-3]):[0-5]\d)/.source;
+const cloudTime = Schema.String.check(
+  Schema.isPattern(new RegExp(`^(?:${calendarDate})[tT]${clockTime}${offset}$`))
+).pipe(
+  Schema.decodeTo(Schema.DateTimeUtcFromString, {
+    decode: SchemaGetter.toUpperCase(),
+    encode: SchemaGetter.passthrough(),
+  })
+);
 const decodeCloud = Schema.decodeUnknownOption(
   Schema.Struct({
     specversion: Schema.Literal('1.0'),
     id: Schema.NonEmptyString,
     source: Schema.NonEmptyString,
     type: Schema.NonEmptyString,
-    time: Schema.String,
+    time: cloudTime,
     data: Schema.Record(Schema.String, Schema.Unknown),
     correlationid: Schema.optionalKey(Schema.String),
     causationid: Schema.optionalKey(Schema.String),
@@ -96,7 +111,7 @@ export function translate(subject: string, payload: Uint8Array): TranslatedEvent
           ...envelope.value.data,
           eventId: envelope.value.id,
           eventType: envelope.value.type,
-          timestamp: envelope.value.time,
+          timestamp: DateTime.formatIso(envelope.value.time),
         }
       : raw.value
   );

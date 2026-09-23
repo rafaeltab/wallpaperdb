@@ -14,6 +14,7 @@ import { projectionLayer } from './projection/index.js';
 import { gatewayTracingLayer } from './runtime.js';
 
 interface AppOptions {
+  readonly signal?: AbortSignal;
   readonly logger?: boolean;
   readonly enableOtel?: boolean;
   readonly otelHealthy?: boolean;

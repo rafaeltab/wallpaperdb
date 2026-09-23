@@ -1,67 +1,84 @@
-import "reflect-metadata";
-import { afterEach, describe, expect, it } from "vitest";
-import { getOtelSdk, initializeOtel, shutdownOtel } from "../src/otel-init.js";
-import type { OtelConfig } from "@wallpaperdb/core/config";
+import { createServer } from 'node:http';
+import type { Socket } from 'node:net';
+import { context, metrics, propagation, trace } from '@opentelemetry/api';
+import { logs } from '@opentelemetry/api-logs';
+import { Effect } from 'effect';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { initializeOtel } from '../src/otel-init.js';
 
-describe("OTEL Initialization", () => {
-    afterEach(async () => {
-        await shutdownOtel();
+afterEach(() => {
+  logs.disable();
+  trace.disable();
+  metrics.disable();
+  context.disable();
+  propagation.disable();
+});
+
+describe('ingestor telemetry ownership', () => {
+  it('reports disabled or unavailable telemetry without preventing application startup', async () => {
+    expect(await Effect.runPromise(initializeOtel({ otelServiceName: 'ingestor' }).pipe(Effect.scoped)))
+      .toEqual({ _tag: 'Disabled' });
+    expect(await Effect.runPromise(initializeOtel({ otelServiceName: 'ingestor', otelEndpoint: 'invalid URL' })
+      .pipe(Effect.scoped))).toEqual({ _tag: 'Unavailable' });
+  });
+  it('closes stalled collector sockets after a failed application startup', async () => {
+    const sockets = new Set<Socket>();
+    const collector = createServer((request, response) => {
+      request.resume();
+      response.writeHead(200);
+      response.write(' ');
+      const interval = setInterval(() => response.write(' '), 100);
+      response.once('close', () => clearInterval(interval));
     });
-
-    it("should initialize SDK when endpoint is configured", () => {
-        const config: OtelConfig = {
-            otelEndpoint: "http://localhost:4318",
-            otelServiceName: "ingestor",
-        };
-        const sdk = initializeOtel(config);
-
-        // If endpoint is set in .env, SDK should be initialized
-        if (config.otelEndpoint) {
-            expect(sdk).toBeDefined();
-            expect(sdk).not.toBeNull();
-            expect(getOtelSdk()).toBe(sdk);
-        } else {
-            // If no endpoint, should return null
-            expect(sdk).toBeNull();
-            expect(getOtelSdk()).toBeNull();
-        }
+    collector.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
     });
-
-    it("should return null when no endpoint is provided", () => {
-        // When otelEndpoint is empty string (Zod requires url), createOtelSdk returns null
-        const config: OtelConfig = {
-            otelEndpoint: "" as unknown as string, // bypass TS to test runtime behavior
-            otelServiceName: "ingestor",
-        };
-        const sdk = initializeOtel(config as any);
-        // initializeOtel checks for falsy otelEndpoint
-        expect(sdk).toBeNull();
-        expect(getOtelSdk()).toBeNull();
+    await new Promise<void>((resolve) => collector.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = collector.address();
+      if (!address || typeof address === 'string') throw new Error('Expected collector TCP address');
+      const started = performance.now();
+      const exit = await Effect.runPromiseExit(Effect.gen(function* () {
+        yield* initializeOtel({ otelServiceName: 'ingestor-stalled',
+          otelEndpoint: `http://127.0.0.1:${address.port}` });
+        trace.getTracer('ingestor-contract').startSpan('shutdown.contract').end();
+        metrics.getMeter('ingestor-contract').createCounter('shutdown.contract').add(1);
+        logs.getLogger('ingestor-contract').emit({ body: 'shutdown contract' });
+        return yield* Effect.fail('application startup failed');
+      }).pipe(Effect.scoped));
+      expect(exit._tag).toBe('Failure');
+      expect(performance.now() - started).toBeLessThan(6000);
+      await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 500 });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise<void>((resolve, reject) => collector.close((error) => error ? reject(error) : resolve()));
+    }
+  });
+  it('exports logs, traces, and metrics before its owning scope finishes', async () => {
+    const requests = new Set<string>();
+    const collector = createServer((request, response) => {
+      requests.add(request.url ?? '');
+      request.resume();
+      response.writeHead(200);
+      response.end();
     });
-
-    it("should be idempotent (safe to call multiple times)", () => {
-        const config: OtelConfig = {
-            otelEndpoint: "http://localhost:4318",
-            otelServiceName: "ingestor",
-        };
-        const sdk1 = initializeOtel(config);
-        const sdk2 = initializeOtel(config);
-        expect(sdk1).toBe(sdk2); // Same instance
-    });
-
-    it("should shutdown gracefully", async () => {
-        const config: OtelConfig = {
-            otelEndpoint: "http://localhost:4318",
-            otelServiceName: "ingestor",
-        };
-        initializeOtel(config);
-        await expect(shutdownOtel()).resolves.not.toThrow();
-        expect(getOtelSdk()).toBeNull();
-    });
-
-    it("should shutdown gracefully even if not initialized", async () => {
-        // Shutdown without initializing
-        await expect(shutdownOtel()).resolves.not.toThrow();
-        expect(getOtelSdk()).toBeNull();
-    });
+    await new Promise<void>((resolve) => collector.listen(0, '127.0.0.1', resolve));
+    try {
+      const address = collector.address();
+      if (!address || typeof address === 'string') throw new Error('Expected collector TCP address');
+      const status = await Effect.runPromise(Effect.gen(function* () {
+        const status = yield* initializeOtel({ otelServiceName: 'ingestor-contract',
+          otelEndpoint: `http://127.0.0.1:${address.port}/` });
+        trace.getTracer('ingestor-contract').startSpan('telemetry.contract').end();
+        metrics.getMeter('ingestor-contract').createCounter('telemetry.contract').add(1);
+        logs.getLogger('ingestor-contract').emit({ body: 'telemetry contract' });
+        return status;
+      }).pipe(Effect.scoped));
+      expect(status).toEqual({ _tag: 'Started' });
+      expect(requests).toEqual(new Set(['/v1/logs', '/v1/traces', '/v1/metrics']));
+    } finally {
+      await new Promise<void>((resolve, reject) => collector.close((error) => error ? reject(error) : resolve()));
+    }
+  });
 });

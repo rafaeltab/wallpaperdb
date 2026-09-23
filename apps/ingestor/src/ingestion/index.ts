@@ -198,6 +198,15 @@ export function ingestionLayer(): Layer.Layer<
       const publishOrDefer = (record: UploadRecord) => publish(record).pipe(
         Effect.catchTag('IngestionUnavailable', () => defer(record, 10))
       );
+      const recover = Effect.fn('ingestion.recover')(function* (record: UploadRecord) {
+        if (record.state === 'uploading') {
+          const exists = yield* assets.exists({ wallpaperId: record.wallpaper.id, extension: record.wallpaper.metadata.extension });
+          if (!exists) return yield* defer(record, 3);
+          const committed = yield* store.stored(record);
+          if (!committed) return;
+        }
+        yield* publishOrDefer({ ...record, state: 'stored' });
+      });
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
       ): Effect.fn.Return<UploadOutcome, IngestionUnavailable> {
@@ -251,7 +260,7 @@ export function ingestionLayer(): Layer.Layer<
         reconcile: Effect.fn('ingestion.reconcile')(function* () {
           const now = yield* Clock.currentTimeMillis;
           const records = yield* store.claim(new Date(now), new Date(now - 10 * 60 * 1000), new Date(now + 60_000), 100);
-          yield* Effect.forEach(records, (record) => publishOrDefer(record), { concurrency: 5, discard: true });
+          yield* Effect.forEach(records, (record) => recover(record).pipe(Effect.catchTag('IngestionUnavailable', () => Effect.void)), { concurrency: 5, discard: true });
           yield* store.expireIntents(new Date(now - 60 * 60 * 1000));
         }),
         cleanup: () => Effect.void,

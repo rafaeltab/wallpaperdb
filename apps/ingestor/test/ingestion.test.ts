@@ -4,6 +4,17 @@ import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
 
 describe('Wallpaper ingestion', () => {
+  it('bounds missing-object recovery and never publishes an upload whose object is absent', async () => {
+    const test = fixture({ storage: { put: () => Effect.fail(new IngestionUnavailable({ operation: 'put', cause: 'offline' })) } });
+    await Effect.runPromise(Ingestion.use((ingestion) => Effect.gen(function* () {
+      yield* ingestion.upload(uploadInput).pipe(Effect.ignore);
+      yield* ingestion.reconcile();
+      yield* ingestion.reconcile();
+      yield* ingestion.reconcile();
+    })).pipe(Effect.provide(test.layer)));
+    expect([...test.store.records.values()][0]?.state).toBe('failed');
+    expect(test.published).toEqual([]);
+  });
   it('retains a committed outbox occurrence when publication fails and replays that same occurrence', async () => {
     let available = false;
     const attempts: string[] = [];

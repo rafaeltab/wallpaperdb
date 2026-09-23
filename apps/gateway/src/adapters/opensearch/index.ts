@@ -1,9 +1,10 @@
 import { Client } from '@opensearch-project/opensearch';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
-import { Clock, Context, Effect, Exit, Layer, Schema } from 'effect';
+import { Clock, Context, DateTime, Effect, Exit, Layer, Schema } from 'effect';
 import {
   CatalogueRead,
   CatalogueUnavailable,
+  type ProfileSearchSelection,
   type SearchSelection,
 } from '../../catalogue/index.js';
 import {
@@ -15,6 +16,7 @@ import {
 import {
   partialWallpaperResponse,
   profileBatchResponse,
+  profileDiscoveryResponse,
   profileResponse,
   profileSearchResponse,
   storageError,
@@ -24,6 +26,7 @@ import {
   wallpaperSearchResponse,
 } from './documents.js';
 import { profilesIndexMapping, wallpapersIndexMapping } from './mappings.js';
+import { aliasClaimSearch, profileSearchBody } from './profiles.js';
 import { searchBody } from './query.js';
 import { projectionUpdate } from './scripts.js';
 
@@ -101,19 +104,60 @@ class SearchProjection implements CatalogueRead, ProjectionStore {
     read(
       'search',
       Effect.gen({ self: this }, function* () {
-        const result = yield* this.request(() =>
-          this.client.search({
-            index: this.profilesIndex,
-            body: {
-              query: { term: { handle: handle.toLowerCase() } },
-              sort: [{ claimGeneration: 'desc' }],
-              size: 1,
-            },
-          })
+        const normalized = handle.toLowerCase();
+        const now = DateTime.formatIso(yield* DateTime.now);
+        const [currentResult, aliasResult] = yield* Effect.all(
+          [
+            this.request(() =>
+              this.client.search({
+                index: this.profilesIndex,
+                body: {
+                  query: { term: { handle: normalized } },
+                  sort: [{ claimGeneration: 'desc' }],
+                  size: 1,
+                },
+              })
+            ),
+            this.request(() =>
+              this.client.search({
+                index: this.profilesIndex,
+                body: aliasClaimSearch(normalized, now),
+              })
+            ),
+          ],
+          { concurrency: 2 }
         );
-        return (yield* profileSearchResponse(result.body)).hits.hits[0]?._source ?? null;
+        const current = (yield* profileSearchResponse(currentResult.body)).hits.hits[0];
+        const alias = (yield* profileSearchResponse(aliasResult.body)).hits.hits[0];
+        return alias && (!current || alias.sort[0] > current.sort[0])
+          ? alias._source
+          : (current?._source ?? null);
       })
     )
+  );
+  readonly searchProfiles = Effect.fn('catalogue.storage.search-profiles')(
+    (selection: ProfileSearchSelection) =>
+      read(
+        'search',
+        Effect.gen({ self: this }, function* () {
+          const now = DateTime.formatIso(yield* DateTime.now);
+          const result = yield* this.request(() =>
+            this.client.search({
+              index: this.profilesIndex,
+              body: profileSearchBody(selection, now),
+            })
+          );
+          const { hits } = yield* profileDiscoveryResponse(result.body);
+          yield* recordTelemetry(() =>
+            recordHistogram('opensearch.search.results', hits.hits.length, {
+              'opensearch.index': this.profilesIndex,
+            })
+          );
+          return {
+            entries: hits.hits.map((hit) => ({ profile: hit._source, cursor: [...hit.sort] })),
+          };
+        })
+      )
   );
   readonly profiles = Effect.fn('catalogue.storage.profiles')((ids: string[]) =>
     read(

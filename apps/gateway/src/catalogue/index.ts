@@ -25,8 +25,20 @@ export interface Profile {
   pictureAssetId: string | null;
   version: number;
   claimGeneration: number;
+  readonly aliases?: ReadonlyArray<{
+    readonly handle: string;
+    readonly claimGeneration: number;
+    readonly createdAt?: string;
+    readonly expiresAt?: string | null;
+  }>;
   createdAt: string;
   updatedAt: string;
+}
+export interface HandleResolution {
+  profile: Profile;
+  requestedHandle: string;
+  isAlias: boolean;
+  canonicalHandle: string;
 }
 export interface ColorPreference {
   color: string;
@@ -48,14 +60,24 @@ export interface SearchWallpapers {
   last?: number;
   before?: string;
 }
+export interface SearchProfiles {
+  query: string;
+  first?: number;
+  after?: string;
+}
+export interface PageInfo {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  startCursor: string | null;
+  endCursor: string | null;
+}
 export interface WallpaperPage {
   wallpapers: Wallpaper[];
-  pageInfo: {
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-    startCursor: string | null;
-    endCursor: string | null;
-  };
+  pageInfo: PageInfo;
+}
+export interface ProfilePage {
+  profiles: Profile[];
+  pageInfo: PageInfo;
 }
 export type CursorValue = string | number;
 export class CatalogueUnavailable extends Schema.TaggedError<CatalogueUnavailable>()(
@@ -66,6 +88,10 @@ export type InvalidSearch = { readonly _tag: 'InvalidSearch'; readonly reason: s
 export type InvalidCursor = { readonly _tag: 'InvalidCursor' };
 export type SearchOutcome =
   | { readonly _tag: 'Found'; readonly value: WallpaperPage }
+  | InvalidSearch
+  | InvalidCursor;
+export type ProfileSearchOutcome =
+  | { readonly _tag: 'Found'; readonly value: ProfilePage }
   | InvalidSearch
   | InvalidCursor;
 export interface SearchSelection {
@@ -80,14 +106,31 @@ export interface SearchBatch {
   entries: Array<{ wallpaper: Wallpaper; cursor: CursorValue[] }>;
   total: number;
 }
+export interface ProfileSearchSelection {
+  query: string;
+  size: number;
+  searchAfter?: CursorValue[];
+}
+export interface ProfileSearchBatch {
+  entries: Array<{ profile: Profile; cursor: CursorValue[] }>;
+}
 /**
  * Read-only projected catalogue. Search entries are ordered by the requested order,
  * with stable cursor values for every entry. Variant predicates match one variant.
  * Missing records are null; batches preserve input order, duplicates and null slots.
  * Unavailability includes malformed persisted data and never exposes vendor errors.
+ * Profile discovery orders exact current Handles, current prefixes, exact active
+ * aliases, alias prefixes, Display name phrase/prefix matches, then fuzzy names.
+ * Fixed ranks 6 through 1 use Profile ID ascending to break ties. Biography is excluded.
+ * Exact Handle lookup selects the highest generation of that matching claim;
+ * current claims win ties. Aliases are active until their exact expiry, or indefinitely
+ * without one. Each operation evaluates activity at its read time.
  */
 export interface CatalogueRead {
   search(selection: SearchSelection): Effect.Effect<SearchBatch, CatalogueUnavailable>;
+  searchProfiles(
+    selection: ProfileSearchSelection
+  ): Effect.Effect<ProfileSearchBatch, CatalogueUnavailable>;
   wallpaper(id: string): Effect.Effect<Wallpaper | null, CatalogueUnavailable>;
   profile(id: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
   profileByHandle(handle: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
@@ -107,9 +150,10 @@ export const CatalogueCursors = Context.Service<CatalogueCursors>(
 /** All catalogue reads are public. This capability exposes no protected writes. */
 export interface Catalogue {
   search(query: SearchWallpapers): Effect.Effect<SearchOutcome, CatalogueUnavailable>;
+  searchProfiles(query: SearchProfiles): Effect.Effect<ProfileSearchOutcome, CatalogueUnavailable>;
   wallpaper(id: string): Effect.Effect<Wallpaper | null, CatalogueUnavailable>;
   profile(id: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
-  profileByHandle(handle: string): Effect.Effect<Profile | null, CatalogueUnavailable>;
+  profileByHandle(handle: string): Effect.Effect<HandleResolution | null, CatalogueUnavailable>;
   profiles(ids: string[]): Effect.Effect<Array<Profile | null>, CatalogueUnavailable>;
 }
 export const Catalogue = Context.Service<Catalogue>('wallpaperdb.gateway.catalogue');
@@ -129,6 +173,37 @@ export function resolvePageSize(
   return validPageSizes(query)
     ? (query.first ?? query.last ?? 10)
     : { _tag: 'InvalidSearch', reason: 'Page size must be an integer between 1 and 100' };
+}
+
+const validProfilePageSize = Schema.is(
+  Schema.Struct({
+    first: Schema.optional(Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 50 }))),
+  })
+);
+const validProfileQuery = Schema.is(
+  Schema.NonEmptyString.check(
+    Schema.makeFilter((value) => [...value].length <= 100, {
+      expected: 'at most 100 Unicode characters',
+    })
+  )
+);
+const validProfileCursorInput = Schema.is(Schema.NonEmptyString.check(Schema.isMaxLength(2048)));
+const validProfileCursor = Schema.is(
+  Schema.Tuple([
+    Schema.Literal('profiles'),
+    Schema.String,
+    Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 6 })),
+    Schema.NonEmptyString,
+  ])
+);
+
+/** Profile discovery defaults to 10 results and accepts at most 50 per page. */
+export function resolveProfilePageSize(
+  query: Pick<SearchProfiles, 'first'>
+): number | InvalidSearch {
+  return validProfilePageSize(query)
+    ? (query.first ?? 10)
+    : { _tag: 'InvalidSearch', reason: 'Profile search first must be between 1 and 50' };
 }
 
 export function catalogueLayer(
@@ -183,13 +258,64 @@ export function catalogueLayer(
           },
         };
       });
+      const searchProfiles = Effect.fn('catalogue.searchProfiles')(function* (
+        input: SearchProfiles
+      ): Effect.fn.Return<ProfileSearchOutcome, CatalogueUnavailable> {
+        const query = input.query.trim().replace(/^@/, '').trim().toLowerCase();
+        if (!validProfileQuery(query))
+          return {
+            _tag: 'InvalidSearch',
+            reason: 'Profile search query must contain 1 to 100 characters',
+          };
+        const limit = resolveProfilePageSize(input);
+        if (typeof limit !== 'number') return limit;
+        if (input.after !== undefined && !validProfileCursorInput(input.after))
+          return { _tag: 'InvalidCursor' };
+        const position = input.after !== undefined ? yield* cursors.decode(input.after) : undefined;
+        if (position?._tag === 'InvalidCursor') return position;
+        if (position && (!validProfileCursor(position.values) || position.values[1] !== query))
+          return { _tag: 'InvalidCursor' };
+        const result = yield* read.searchProfiles({
+          query,
+          size: limit + 1,
+          ...(position ? { searchAfter: position.values.slice(2) } : {}),
+        });
+        const entries = result.entries.slice(0, limit);
+        const first = entries[0];
+        const last = entries.at(-1);
+        const startCursor = first
+          ? yield* cursors.encode(['profiles', query, ...first.cursor])
+          : null;
+        const endCursor = last ? yield* cursors.encode(['profiles', query, ...last.cursor]) : null;
+        return {
+          _tag: 'Found',
+          value: {
+            profiles: entries.map((entry) => entry.profile),
+            pageInfo: {
+              hasNextPage: result.entries.length > limit,
+              hasPreviousPage: input.after !== undefined,
+              startCursor,
+              endCursor,
+            },
+          },
+        };
+      });
       return Catalogue.of({
         search,
+        searchProfiles,
         wallpaper: Effect.fn('catalogue.wallpaper')((id: string) => read.wallpaper(id)),
         profile: Effect.fn('catalogue.profile')((id: string) => read.profile(id)),
-        profileByHandle: Effect.fn('catalogue.profileByHandle')((handle: string) =>
-          read.profileByHandle(handle.toLowerCase())
-        ),
+        profileByHandle: Effect.fn('catalogue.profileByHandle')(function* (handle: string) {
+          const profile = yield* read.profileByHandle(handle.toLowerCase());
+          return profile
+            ? {
+                profile,
+                requestedHandle: handle,
+                isAlias: profile.handle !== handle.toLowerCase(),
+                canonicalHandle: profile.handle,
+              }
+            : null;
+        }),
         profiles: Effect.fn('catalogue.profiles')((ids: string[]) => read.profiles(ids)),
       });
     })

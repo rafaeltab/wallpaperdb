@@ -1,270 +1,69 @@
-import 'reflect-metadata';
-import { container } from 'tsyringe';
-import { describe, expect, it, vi } from 'vitest';
-import type { Config } from '../src/config.js';
-import {
-  type ProfileDocument,
-  ProfileRepository,
-} from '../src/repositories/profile.repository.js';
-import { WallpaperRepository } from '../src/repositories/wallpaper.repository.js';
-import { CursorService } from '../src/services/cursor.service.js';
-import { tester } from './setup.js';
+import { it as effectIt } from '@effect/vitest';
+import { Client } from '@opensearch-project/opensearch';
+import { DateTime, Effect } from 'effect';
+import { TestClock } from 'effect/testing';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
+import type { Profile, ProfileSearchSelection } from '../src/catalogue/index.js';
+import type { ProjectCatalogue } from '../src/projection/index.js';
+import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
-async function project(overrides: Partial<ProfileDocument> & Pick<ProfileDocument, 'id' | 'handle'>) {
-  await container.resolve(ProfileRepository).project({
-    displayName: 'Contributor',
-    claimGeneration: 1,
-    aliases: [],
-    biographyMarkdown: '',
-    pictureAssetId: null,
-    version: 1,
-    createdAt: '2026-09-15T00:00:00.000Z',
-    updatedAt: '2026-09-15T00:00:00.000Z',
-    ...overrides,
-  });
-}
+const timestamp = '2026-01-01T00:00:00.000Z';
 
-async function search(query: string, first?: number, after?: string) {
-  const response = await tester.getApp().inject({
-    method: 'POST',
-    url: '/graphql',
-    payload: {
-      query: `query SearchProfiles($query: String!, $first: Int, $after: String) {
-        searchProfiles(query: $query, first: $first, after: $after) {
-          edges { node { id handle displayName canonicalPath picture { id url } } }
-          pageInfo { hasNextPage hasPreviousPage startCursor endCursor }
-        }
-      }`,
-      variables: { query, first, after },
-    },
-  });
-  return response.json();
-}
-
-describe('Profile search integration', () => {
-  it('filters wallpapers by the selected immutable Profile ID after a Handle rename', async () => {
-    await project({ id: 'user_selected', handle: 'sky-artist', displayName: 'Blue Skies' });
-    await project({ id: 'user_other', handle: 'other-artist', displayName: 'Blue Skies' });
-    const wallpapers = container.resolve(WallpaperRepository);
-    const documents = [
-      { wallpaperId: 'wlpr_selected', userId: 'user_selected' },
-      { wallpaperId: 'wlpr_same_name', userId: 'user_other' },
-      { wallpaperId: 'wlpr_id_prefix', userId: 'user_selected_extra' },
-    ].map((identity) => ({
-      ...identity, variants: [],
-      uploadedAt: '2026-09-15T00:00:00.000Z', updatedAt: '2026-09-15T00:00:00.000Z',
-    }));
-    for (const document of documents) await wallpapers.upsert(document);
-    const discovery = await search('sky-artis');
-    expect(discovery.errors).toBeUndefined();
-    const selectedId = discovery.data.searchProfiles.edges[0].node.id;
-    await project({ id: selectedId, handle: 'evening-artist', displayName: 'Blue Skies', version: 2 });
-
-    const response = await tester.getApp().inject({
-      method: 'POST', url: '/graphql',
-      payload: {
-        query: `query SelectedWallpapers($profileId: ID!) {
-          searchWallpapers(filter: { profileId: $profileId }, first: 10) {
-            edges { node { wallpaperId profileId profile { id handle displayName } } }
-          }
-        }`,
-        variables: { profileId: selectedId },
-      },
-    });
-    expect(response.json().errors).toBeUndefined();
-    expect(response.json().data.searchWallpapers.edges).toEqual([{ node: {
-      wallpaperId: 'wlpr_selected', profileId: 'user_selected',
-      profile: { id: 'user_selected', handle: 'evening-artist', displayName: 'Blue Skies' },
-    } }]);
-    // Profile presentation resolves from its own index; wallpaper documents retain only ownership.
-    expect(await wallpapers.findById('wlpr_selected')).toEqual(documents[0]);
+describe('OpenSearch Profile discovery port contract', () => {
+  const searchFixture = createSearchFixture();
+  let adapter: OpenSearchGateway;
+  let project: ProjectCatalogue;
+  let client: Client;
+  let fixture: Awaited<ReturnType<typeof acquireSearchFixture>>;
+  beforeAll(async () => {
+    fixture = await acquireSearchFixture(searchFixture.options);
+    adapter = fixture.adapter;
+    project = fixture.project;
+    client = new Client({ node: searchFixture.options.url });
+  }, 120_000);
+  afterAll(async () => {
+    await client?.close();
+    await fixture?.dispose();
+    await searchFixture.destroy();
   });
 
-  it('keeps current Handles first in discovery while exact resolution honors the newest matching claim', async () => {
-    await project({ id: 'user_old_current', handle: 'reclaimed', claimGeneration: 10 });
-    await project({
-      id: 'user_new_alias', handle: 'new-owner', claimGeneration: 20,
-      aliases: [{ handle: 'reclaimed', claimGeneration: 11 }],
-    });
-    await project({
-      id: 'user_stale_alias', handle: 'unrelated-current', claimGeneration: 100,
-      aliases: [
-        { handle: 'reclaimed', claimGeneration: 9 },
-        { handle: 'unrelated-alias', claimGeneration: 99 },
-      ],
-    });
-    const discovery = await search('reclaimed');
-    expect(discovery.errors).toBeUndefined();
-    expect(discovery.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_old_current', 'user_new_alias', 'user_stale_alias']);
-    const exact = await tester.getApp().inject({
-      method: 'POST', url: '/graphql',
-      payload: { query: '{ profileByHandle(handle: "reclaimed") { profile { id } isAlias canonicalHandle } }' },
-    });
-    expect(exact.json().errors).toBeUndefined();
-    expect(exact.json().data.profileByHandle).toEqual({
-      profile: { id: 'user_new_alias' }, isAlias: true, canonicalHandle: 'new-owner',
-    });
-  });
+  async function publish(overrides: Partial<Profile> & Pick<Profile, 'id' | 'handle'>) {
+    const profile: Profile = {
+      displayName: 'Contributor',
+      claimGeneration: 1,
+      aliases: [],
+      biographyMarkdown: '',
+      pictureAssetId: null,
+      version: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      ...overrides,
+    };
+    await Effect.runPromise(
+      project.record({
+        _tag: 'ProfilePublished',
+        profile,
+        occurrence: {
+          source: 'wallpaperdb/profile',
+          id: `${profile.id}-${profile.version}`,
+          occurredAt: timestamp,
+        },
+      })
+    );
+    return profile;
+  }
+  function search(query: string, selection: Partial<ProfileSearchSelection> = {}) {
+    return Effect.runPromise(adapter.read.searchProfiles({ query, size: 50, ...selection }));
+  }
 
-  it('searches active aliases without searching Biography or publicly enumerating aliases', async () => {
-    await project({
-      id: 'user_private_aliases', handle: 'current-name',
-      aliases: [{ handle: 'former-discovery-name', claimGeneration: 2 }],
-      biographyMarkdown: 'biographyuniqueneedle',
-    });
-    const result = await search('former-discovery-name');
-    expect(result.errors).toBeUndefined();
-    expect(result.data.searchProfiles.edges[0].node).toMatchObject({
-      id: 'user_private_aliases', handle: 'current-name', canonicalPath: '/profiles/@current-name',
-    });
-    expect(JSON.stringify(result)).not.toContain('former-discovery-name');
-    const biographyOnly = await search('biographyuniqueneedle');
-    expect(biographyOnly.errors).toBeUndefined();
-    expect(biographyOnly.data.searchProfiles.edges).toEqual([]);
-
-    const enumeration = await tester.getApp().inject({
-      method: 'POST', url: '/graphql',
-      payload: { query: '{ searchProfiles(query: "former-discovery-name") { edges { node { aliases { handle } } } } }' },
-    });
-    expect(enumeration.json().errors[0].message).toContain('Cannot query field "aliases"');
-  });
-
-  it('accepts the displayed @Handle syntax and shares its cursor with the plain Handle query', async () => {
-    await project({ id: 'user_at_a', handle: 'aurora' });
-    await project({ id: 'user_at_b', handle: 'aurora-night' });
-    const first = await search(' @AURORA ', 1);
-    expect(first.errors).toBeUndefined();
-    expect(first.data.searchProfiles.edges[0]?.node.id).toBe('user_at_a');
-    const second = await search('aurora', 1, first.data.searchProfiles.pageInfo.endCursor);
-    expect(second.errors).toBeUndefined();
-    expect(second.data.searchProfiles.edges[0]?.node.id).toBe('user_at_b');
-    const empty = await search('@', 1);
-    expect(empty.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
-  });
-
-  it('accepts only unexpired signed Profile cursors bound to the normalized search query', async () => {
-    await project({ id: 'user_cursor_a', handle: 'aurora' });
-    await project({ id: 'user_cursor_b', handle: 'aurora-night' });
-    const first = await search('aurora', 1);
-    const cursor = first.data.searchProfiles.pageInfo.endCursor;
-    const second = await search('  AURORA  ', 1, cursor);
-    expect(second.errors).toBeUndefined();
-    expect(second.data.searchProfiles.edges[0].node.id).toBe('user_cursor_b');
-
-    const wrongQuery = await search('another', 1, cursor);
-    expect(wrongQuery.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
-
-    const signer = container.resolve(CursorService);
-    for (const invalidCursor of [
-      '', 'not-a-cursor', 'x'.repeat(2049),
-      signer.encode(['user_cursor_a']),
-      signer.encode(['wallpapers', 'aurora', 6, 'user_cursor_a']),
-      signer.encode(['profiles', 'aurora', '6', 'user_cursor_a']),
-      signer.encode(['profiles', 'aurora', 7, 'user_cursor_a']),
-      signer.encode(['profiles', 'aurora', 6, '']),
-      signer.encode(['profiles', 'aurora', 6, 'user_cursor_a', 'extra']),
-    ]) {
-      const result = await search('aurora', 1, invalidCursor);
-      expect(result.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
-    }
-
-    const now = Date.now();
-    const config = container.resolve<Config>('config');
-    vi.spyOn(Date, 'now').mockReturnValue(now + config.cursorExpirationMs + 1);
-    try {
-      const expired = await search('aurora', 1, cursor);
-      expect(expired.errors?.[0].extensions.code).toBe('INVALID_CURSOR');
-    } finally {
-      vi.restoreAllMocks();
-    }
-  });
-
-  it('normalizes Profile search text and rejects unbounded or empty requests', async () => {
-    await project({ id: 'user_normalized', handle: 'aurora' });
-    const normalized = await search('  AuRoRa  ', 1);
-    expect(normalized.errors).toBeUndefined();
-    expect(normalized.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_normalized']);
-
-    for (const query of ['', '   ', 'a'.repeat(101)]) {
-      const result = await search(query, 1);
-      expect(result.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
-    }
-    for (const first of [0, -1, 51]) {
-      const result = await search('aurora', first);
-      expect(result.errors?.[0].extensions.code).toBe('BAD_USER_INPUT');
-    }
-  });
-
-  it('paginates equal-rank Profiles by immutable ID without repeats or gaps', async () => {
-    for (const suffix of ['05', '01', '04', '02', '03']) {
-      await project({ id: `user_${suffix}`, handle: `constellation-${suffix}` });
-    }
-    const first = await search('constellation', 2);
-    expect(first.errors).toBeUndefined();
-    expect(first.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_01', 'user_02']);
-    expect(first.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: false });
-
-    // Extra matching Display names alter index statistics, but never existing rank scores.
-    await project({ id: 'user_name', handle: 'night-artist', displayName: 'Constellation Painter' });
-    const second = await search('constellation', 2, first.data.searchProfiles.pageInfo.endCursor);
-    expect(second.errors).toBeUndefined();
-    expect(second.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_03', 'user_04']);
-    expect(second.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: true, hasPreviousPage: true });
-
-    const third = await search('constellation', 2, second.data.searchProfiles.pageInfo.endCursor);
-    expect(third.errors).toBeUndefined();
-    expect(third.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_05', 'user_name']);
-    expect(third.data.searchProfiles.pageInfo).toMatchObject({ hasNextPage: false, hasPreviousPage: true });
-
-    const end = await search('constellation', 2, third.data.searchProfiles.pageInfo.endCursor);
-    expect(end.errors).toBeUndefined();
-    expect(end.data.searchProfiles).toEqual({
-      edges: [],
-      pageInfo: { hasNextPage: false, hasPreviousPage: true, startCursor: null, endCursor: null },
-    });
-  });
-
-  it('keeps scheduled aliases searchable until their exact deadline and retained aliases afterward', async () => {
-    const deadline = new Date('2030-01-01T00:00:00.000Z');
-    await project({
-      id: 'user_retained', handle: 'retained-owner',
-      aliases: [{ handle: 'aurora-retained', claimGeneration: 2 }],
-    });
-    await project({
-      id: 'user_scheduled', handle: 'scheduled-owner',
-      aliases: [
-        { handle: 'aurora', claimGeneration: 2, expiresAt: deadline.toISOString() },
-        { handle: 'unrelated-retained', claimGeneration: 3 },
-      ],
-    });
-    vi.useFakeTimers({ toFake: ['Date'] });
-    try {
-      vi.setSystemTime(deadline.getTime() - 1);
-      const before = await search('aurora');
-      expect(before.errors).toBeUndefined();
-      expect(before.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-        .toEqual(['user_scheduled', 'user_retained']);
-
-      vi.setSystemTime(deadline);
-      const expired = await search('aurora');
-      expect(expired.errors).toBeUndefined();
-      expect(expired.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-        .toEqual(['user_retained']);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('ranks current Handles, active aliases, and Display names in strict tiers', async () => {
-    await project({ id: 'user_rank_7', handle: 'aurora', displayName: 'Aurora' });
-    await project({ id: 'user_rank_6', handle: 'aurora-ridge' });
-    await project({
-      id: 'user_rank_5', handle: 'renamed-exact', displayName: 'Aurora Aurora Aurora',
+  it('ranks current Handles, active aliases and Display names in strict non-additive tiers', async () => {
+    await publish({ id: 'rank-7', handle: 'aurora', displayName: 'Aurora' });
+    await publish({ id: 'rank-6', handle: 'aurora-ridge' });
+    await publish({
+      id: 'rank-5',
+      handle: 'renamed-exact',
+      displayName: 'Aurora Aurora Aurora',
       aliases: [
         { handle: 'aurora', claimGeneration: 2 },
         { handle: 'aurora-one', claimGeneration: 3 },
@@ -272,39 +71,188 @@ describe('Profile search integration', () => {
         { handle: 'aurora-three', claimGeneration: 5 },
       ],
     });
-    await project({
-      id: 'user_rank_4', handle: 'renamed-prefix', displayName: 'Aurora',
+    await publish({
+      id: 'rank-4',
+      handle: 'renamed-prefix',
+      displayName: 'Aurora',
       aliases: [{ handle: 'aurora-hill', claimGeneration: 2 }],
     });
-    await project({ id: 'user_rank_3', handle: 'phrase-artist', displayName: 'The Aurora Artist' });
-    await project({ id: 'user_rank_2', handle: 'prefix-artist', displayName: 'Auroral Painter' });
-    await project({ id: 'user_rank_1', handle: 'fuzzy-artist', displayName: 'Aurorra' });
-
+    await publish({ id: 'rank-3', handle: 'phrase-artist', displayName: 'The Aurora Artist' });
+    await publish({ id: 'rank-2', handle: 'prefix-artist', displayName: 'Auroral Painter' });
+    await publish({ id: 'rank-1', handle: 'fuzzy-artist', displayName: 'Aurorra' });
     const result = await search('aurora');
-
-    expect(result.errors).toBeUndefined();
-    expect(result.data.searchProfiles.edges.map((edge: { node: { id: string } }) => edge.node.id))
-      .toEqual(['user_rank_7', 'user_rank_6', 'user_rank_5', 'user_rank_4', 'user_rank_2', 'user_rank_3', 'user_rank_1']);
+    expect(
+      result.entries.map(({ profile, cursor }) => ({ id: profile.id, score: cursor[0] }))
+    ).toEqual([
+      { id: 'rank-7', score: 6 },
+      { id: 'rank-6', score: 5 },
+      { id: 'rank-5', score: 4 },
+      { id: 'rank-4', score: 3 },
+      { id: 'rank-2', score: 2 },
+      { id: 'rank-3', score: 2 },
+      { id: 'rank-1', score: 1 },
+    ]);
   });
 
-  it('finds an exact current Handle as a public Profile connection', async () => {
-    await project({ id: 'user_aurora', handle: 'aurora', displayName: 'Aurora Artist' });
-    await project({ id: 'user_other', handle: 'other' });
-
-    const result = await search('aurora');
-
-    expect(result.errors).toBeUndefined();
-    expect(result.data.searchProfiles.edges).toEqual([
-      { node: {
-        id: 'user_aurora', handle: 'aurora', displayName: 'Aurora Artist',
-        canonicalPath: '/profiles/@aurora', picture: null,
-      } },
+  it('paginates stable rank and immutable ID without repeats when index statistics change', async () => {
+    for (const suffix of ['05', '01', '04', '02', '03']) {
+      await publish({ id: `constellation-${suffix}`, handle: `constellation-${suffix}` });
+    }
+    const first = await search('constellation', { size: 2 });
+    expect(first.entries.map(({ profile }) => profile.id)).toEqual([
+      'constellation-01',
+      'constellation-02',
     ]);
-    expect(result.data.searchProfiles.pageInfo).toEqual({
-      hasNextPage: false,
-      hasPreviousPage: false,
-      startCursor: expect.any(String),
-      endCursor: expect.any(String),
+    await publish({
+      id: 'constellation-name',
+      handle: 'sky-painter',
+      displayName: 'Constellation Painter',
     });
+    const second = await search('constellation', {
+      size: 2,
+      searchAfter: first.entries.at(-1)?.cursor,
+    });
+    expect(second.entries.map(({ profile }) => profile.id)).toEqual([
+      'constellation-03',
+      'constellation-04',
+    ]);
+    const third = await search('constellation', {
+      size: 2,
+      searchAfter: second.entries.at(-1)?.cursor,
+    });
+    expect(third.entries.map(({ profile }) => profile.id)).toEqual([
+      'constellation-05',
+      'constellation-name',
+    ]);
+    expect(
+      (await search('constellation', { size: 2, searchAfter: third.entries.at(-1)?.cursor }))
+        .entries
+    ).toEqual([]);
+  });
+
+  effectIt.effect('expires only the matching alias at its exact deadline', () =>
+    Effect.gen(function* () {
+      const expiresAt = '2030-01-01T00:00:00.000Z';
+      yield* Effect.promise(() =>
+        publish({
+          id: 'expiry-retained',
+          handle: 'expiry-retained-owner',
+          aliases: [{ handle: 'expirydiscovery-retained', claimGeneration: 2 }],
+        })
+      );
+      yield* Effect.promise(() =>
+        publish({
+          id: 'expiry-scheduled',
+          handle: 'expiry-scheduled-owner',
+          aliases: [
+            { handle: 'expirydiscovery', claimGeneration: 2, expiresAt },
+            { handle: 'unrelated-retained', claimGeneration: 3 },
+          ],
+        })
+      );
+      yield* TestClock.setTime(DateTime.toEpochMillis(DateTime.makeUnsafe(expiresAt)) - 1);
+      const before = yield* adapter.read.searchProfiles({ query: 'expirydiscovery', size: 10 });
+      expect(before.entries.map(({ profile }) => profile.id)).toEqual([
+        'expiry-scheduled',
+        'expiry-retained',
+      ]);
+      yield* TestClock.adjust(1);
+      const after = yield* adapter.read.searchProfiles({ query: 'expirydiscovery', size: 10 });
+      expect(after.entries.map(({ profile }) => profile.id)).toEqual(['expiry-retained']);
+    })
+  );
+
+  it('keeps current Handle discovery ahead of newer alias claims while exact resolution honors claim generation', async () => {
+    const current = await publish({
+      id: 'claim-old-current',
+      handle: 'reclaimeddiscovery',
+      claimGeneration: 10,
+    });
+    const alias = await publish({
+      id: 'claim-new-alias',
+      handle: 'new-claim-owner',
+      claimGeneration: 20,
+      aliases: [{ handle: 'reclaimeddiscovery', claimGeneration: 11 }],
+    });
+    const stale = await publish({
+      id: 'claim-stale-alias',
+      handle: 'unrelated-claim',
+      claimGeneration: 100,
+      aliases: [
+        { handle: 'reclaimeddiscovery', claimGeneration: 9 },
+        { handle: 'unrelated-old-alias', claimGeneration: 99 },
+      ],
+    });
+    expect((await search('reclaimeddiscovery')).entries.map(({ profile }) => profile)).toEqual([
+      current,
+      alias,
+      stale,
+    ]);
+    expect(await Effect.runPromise(adapter.read.profileByHandle('reclaimeddiscovery'))).toEqual(
+      alias
+    );
+  });
+
+  it('returns canonical snapshots for active alias matches without searching Biography', async () => {
+    const snapshot = await publish({
+      id: 'search-biography',
+      handle: 'canonical-biography-owner',
+      aliases: [{ handle: 'formerdiscoveryname', claimGeneration: 2 }],
+      biographyMarkdown: 'biographyuniqueneedle',
+    });
+    expect((await search('formerdiscoveryname')).entries.map(({ profile }) => profile)).toEqual([
+      snapshot,
+    ]);
+    expect((await search('biographyuniqueneedle')).entries).toEqual([]);
+    expect((await search('missing-discovery-query')).entries).toEqual([]);
+  });
+
+  it('continues filtering wallpapers by exact immutable Profile ID after a discovered Profile changes Handle', async () => {
+    const selected = await publish({
+      id: 'selected-profile',
+      handle: 'skyartist',
+      displayName: 'Blue Skies',
+    });
+    await publish({ id: 'other-profile', handle: 'other-artist', displayName: 'Blue Skies' });
+    for (const [wallpaperId, profileId] of [
+      ['selected-wallpaper', selected.id],
+      ['same-name-wallpaper', 'other-profile'],
+      ['prefix-wallpaper', `${selected.id}-extra`],
+    ]) {
+      await Effect.runPromise(
+        project.record({
+          _tag: 'WallpaperUploaded',
+          wallpaperId,
+          profileId,
+          uploadedAt: timestamp,
+          occurrence: { source: 'wallpaperdb/wallpaper', id: wallpaperId, occurredAt: timestamp },
+        })
+      );
+    }
+    const selectedId = (await search('skyartis')).entries[0].profile.id;
+    await publish({ ...selected, handle: 'eveningartist', version: 2 });
+    const wallpapers = await Effect.runPromise(
+      adapter.read.search({ profileId: selectedId, size: 10, sortOrder: 'asc' })
+    );
+    expect(
+      wallpapers.entries.map(({ wallpaper }) => [wallpaper.wallpaperId, wallpaper.profileId])
+    ).toEqual([['selected-wallpaper', selected.id]]);
+    expect((await Effect.runPromise(adapter.read.profile(selectedId)))?.handle).toBe(
+      'eveningartist'
+    );
+  });
+
+  it('rejects malformed projected discovery results as a typed storage failure', async () => {
+    await client.index({
+      index: searchFixture.index('profiles'),
+      id: 'malformed-discovery',
+      body: { id: 'malformed-discovery', handle: 'malformeddiscovery' },
+      refresh: true,
+    });
+    expect(
+      await Effect.runPromise(
+        Effect.flip(adapter.read.searchProfiles({ query: 'malformeddiscovery', size: 10 }))
+      )
+    ).toMatchObject({ _tag: 'CatalogueUnavailable' });
   });
 });

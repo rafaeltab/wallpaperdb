@@ -4,7 +4,7 @@ import { defineConfig, mergeConfig } from 'vitest/config';
 import baseline from './coverage-baseline.json';
 
 const require = createRequire(import.meta.url);
-const searchTests = ['test/{opensearch,profile,integration,server}.test.ts'];
+const searchTests = ['test/{opensearch,profile,profile-search,integration,server}.test.ts'];
 const instrumentationTests = ['test/unit/otel.test.ts'];
 
 export default mergeConfig(

@@ -15,6 +15,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type {
   Catalogue,
   Profile,
+  ProfileSearchOutcome,
+  SearchProfiles,
   SearchOutcome,
   SearchWallpapers,
   Wallpaper,
@@ -56,12 +58,19 @@ const page = {
 class Inbound implements Catalogue {
   calls: Array<{ operation: string; input: unknown }> = [];
   searchOutcome: SearchOutcome | CatalogueUnavailable = { _tag: 'Found', value: page };
+  profileSearchOutcome: ProfileSearchOutcome | CatalogueUnavailable = {
+    _tag: 'Found',
+    value: { profiles: [profile], pageInfo: page.pageInfo },
+  };
   wallpaperOutcome: Wallpaper | null | CatalogueUnavailable = wallpaper;
   profileOutcome: Profile | null | CatalogueUnavailable = profile;
   batchOutcome: Array<Profile | null> | CatalogueUnavailable = [profile];
   defect = false;
   search(input: SearchWallpapers) {
     return this.respond('search', input, this.searchOutcome);
+  }
+  searchProfiles(input: SearchProfiles) {
+    return this.respond('searchProfiles', input, this.profileSearchOutcome);
   }
   wallpaper(input: string) {
     return this.respond('wallpaper', input, this.wallpaperOutcome);
@@ -70,7 +79,19 @@ class Inbound implements Catalogue {
     return this.respond('profile', input, this.profileOutcome);
   }
   profileByHandle(input: string) {
-    return this.respond('profileByHandle', input, this.profileOutcome);
+    const value = this.profileOutcome;
+    return this.respond(
+      'profileByHandle',
+      input,
+      value instanceof CatalogueUnavailable || value === null
+        ? value
+        : {
+            profile: value,
+            requestedHandle: input,
+            canonicalHandle: value.handle,
+            isAlias: input.toLowerCase() !== value.handle,
+          }
+    );
   }
   profiles(input: string[]) {
     return this.respond('profiles', input, this.batchOutcome);
@@ -260,7 +281,7 @@ describe('GraphQL driving adapter contract', () => {
   it('returns Profiles by ID and Handle, public picture and canonical path', async () => {
     const { query, inbound } = await setup();
     const response = await query(
-      '{profile(id:"profile_a"){id handle displayName biographyMarkdown version createdAt updatedAt canonicalPath picture{id url}} profileByHandle(handle:"ARTIST"){id}}'
+      '{profile(id:"profile_a"){id handle displayName biographyMarkdown version createdAt updatedAt canonicalPath picture{id url}} profileByHandle(handle:"ARTIST"){profile{id} requestedHandle isAlias canonicalHandle}}'
     );
     expect(response.body.data.profile).toEqual({
       id: 'profile_a',
@@ -273,7 +294,12 @@ describe('GraphQL driving adapter contract', () => {
       canonicalPath: '/profiles/@artist',
       picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
     });
-    expect(response.body.data.profileByHandle).toEqual({ id: 'profile_a' });
+    expect(response.body.data.profileByHandle).toEqual({
+      profile: { id: 'profile_a' },
+      requestedHandle: 'ARTIST',
+      isAlias: false,
+      canonicalHandle: 'artist',
+    });
     expect(inbound.calls).toContainEqual({ operation: 'profile', input: 'profile_a' });
     expect(inbound.calls).toContainEqual({ operation: 'profileByHandle', input: 'ARTIST' });
   });
@@ -284,7 +310,7 @@ describe('GraphQL driving adapter contract', () => {
     expect(
       (
         await query(
-          '{getWallpaper(wallpaperId:"wlpr_missing"){wallpaperId} profile(id:"missing"){id} profileByHandle(handle:"missing"){id}}'
+          '{getWallpaper(wallpaperId:"wlpr_missing"){wallpaperId} profile(id:"missing"){id} profileByHandle(handle:"missing"){profile{id}}}'
         )
       ).body.data
     ).toEqual({ getWallpaper: null, profile: null, profileByHandle: null });
@@ -292,6 +318,78 @@ describe('GraphQL driving adapter contract', () => {
     expect(
       (await query('{profile(id:"profile_a"){picture{id}}}')).body.data.profile.picture
     ).toBeNull();
+  });
+  it('translates alias resolution without exposing the private alias list', async () => {
+    const { query, inbound } = await setup();
+    inbound.profileOutcome = { ...profile, aliases: [{ handle: 'former', claimGeneration: 2 }] };
+    const response = await query(
+      '{profileByHandle(handle:"FoRmEr"){requestedHandle isAlias canonicalHandle profile{id version handle canonicalPath picture{id url}}}}'
+    );
+    expect(response.body.errors).toBeUndefined();
+    expect(response.body.data.profileByHandle).toEqual({
+      requestedHandle: 'FoRmEr',
+      isAlias: true,
+      canonicalHandle: 'artist',
+      profile: {
+        id: 'profile_a',
+        version: 1,
+        handle: 'artist',
+        canonicalPath: '/profiles/@artist',
+        picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+      },
+    });
+    const enumeration = await query('{profile(id:"profile_a"){aliases}}');
+    expect(enumeration.body.errors[0].message).toContain('Cannot query field "aliases"');
+  });
+  it('translates Profile discovery into its capability request and public connection', async () => {
+    const { query, inbound } = await setup();
+    const response = await query(`{
+      searchProfiles(query:" @Aurora ",first:2,after:"cursor") {
+        edges {node{id version handle displayName canonicalPath picture{id url}}}
+        pageInfo {hasNextPage hasPreviousPage startCursor endCursor}
+      }
+    }`);
+    expect(response.body.errors).toBeUndefined();
+    expect(inbound.calls).toEqual([
+      { operation: 'searchProfiles', input: { query: ' @Aurora ', first: 2, after: 'cursor' } },
+    ]);
+    expect(response.body.data.searchProfiles).toEqual({
+      edges: [
+        {
+          node: {
+            id: 'profile_a',
+            version: 1,
+            handle: 'artist',
+            displayName: 'Artist',
+            canonicalPath: '/profiles/@artist',
+            picture: { id: 'picture_a', url: 'http://media:3000/profile-pictures/picture_a' },
+          },
+        },
+      ],
+      pageInfo: page.pageInfo,
+    });
+  });
+  it('normalizes nullable Profile pagination to the capability defaults', async () => {
+    const { query, inbound } = await setup();
+    expect(
+      (await query('{searchProfiles(query:"a",first:null,after:null){edges{node{id}}}}')).body
+        .errors
+    ).toBeUndefined();
+    expect(inbound.calls).toEqual([
+      { operation: 'searchProfiles', input: { query: 'a', first: undefined, after: undefined } },
+    ]);
+  });
+  it.each([
+    [new CatalogueUnavailable({ cause: 'private search failure' }), 'SERVICE_UNAVAILABLE'],
+    [{ _tag: 'InvalidCursor' }, 'INVALID_CURSOR'],
+    [{ _tag: 'InvalidSearch', reason: 'Profile query is invalid' }, 'BAD_USER_INPUT'],
+  ] as const)('translates Profile discovery outcome %j', async (outcome, code) => {
+    const { query, inbound } = await setup();
+    inbound.profileSearchOutcome = outcome;
+    const response = await query('{searchProfiles(query:"a"){edges{node{id}}}}');
+    expect(response.body.data).toBeNull();
+    expect(response.body.errors[0].extensions.code).toBe(code);
+    expect(JSON.stringify(response)).not.toContain('private search failure');
   });
   it('scopes nested wallpaper reads to the resolved Profile', async () => {
     const { query, inbound } = await setup();
@@ -354,7 +452,7 @@ describe('GraphQL driving adapter contract', () => {
   it.each([
     'getWallpaper(wallpaperId:"wlpr_a"){wallpaperId}',
     'profile(id:"profile_a"){id}',
-    'profileByHandle(handle:"artist"){id}',
+    'profileByHandle(handle:"artist"){profile{id}}',
     'searchWallpapers{edges{node{profile{id}}}}',
   ])('translates read unavailability for %s', async (field) => {
     const { query, inbound } = await setup();
@@ -387,7 +485,7 @@ describe('GraphQL driving adapter contract', () => {
     'getWallpaper(wallpaperId:""){wallpaperId}',
     'getWallpaper(wallpaperId:"invalid"){wallpaperId}',
     'profile(id:""){id}',
-    'profileByHandle(handle:""){id}',
+    'profileByHandle(handle:""){profile{id}}',
   ])('rejects invalid external identity before invoking the capability: %s', async (field) => {
     const { query, inbound } = await setup();
     const response = await query(`{${field}}`);

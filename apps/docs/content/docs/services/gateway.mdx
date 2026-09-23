@@ -44,7 +44,6 @@ make gateway-build
 make gateway-check-types
 make gateway-lint
 make gateway-test-coverage
-make gateway-quality
 ```
 
 Use `make gateway-test-focused GATEWAY_TEST_ARGS='test/catalogue.test.ts'` for a focused behavioral suite. Capability tests use controlled adapters; transport contracts use Fastify injection; storage and broker contracts use real containers. Integration tests check a representative publication-to-query path and lifecycle behavior.
@@ -53,7 +52,7 @@ The search test project owns one OpenSearch server per invocation. Each fixture 
 
 Two worker threads reuse loaded modules while fixtures own mutable application state. The OpenTelemetry bootstrap test runs in an isolated process because SDK shutdown leaves module instrumentation installed. Shuffled file/test runs verify order independence. Use `GATEWAY_TEST_ARGS='--maxWorkers=1'` with the focused or coverage target to reduce worker memory at the cost of elapsed time.
 
-Coverage includes every gateway source file. The measured pre-migration minimums are 89.72% statements and lines, 87.50% branches, and 96.74% functions. The dependency-graph check enforces capability entry points, inward dependencies and acyclicity. The gateway's configured per-function CRAP threshold is 30; its report combines cyclomatic complexity with observed line coverage and supplements behavioral tests.
+Coverage includes every gateway source file. The measured pre-migration minimums are 89.72% statements and lines, 87.50% branches, and 96.74% functions. The dependency-graph check enforces capability entry points, inward dependencies and acyclicity. The gateway-specific CRAP checker has been removed. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback and generator coverage in the shared repository analyzer; no gateway CRAP score is claimed until that tooling is corrected.
 
 ## Operational notes
 

@@ -125,7 +125,7 @@ export type UploadOutcome =
   | ValidationRejection;
 export interface Ingestion {
   upload(input: UploadInput): Effect.Effect<UploadOutcome, IngestionUnavailable>;
-  reconcile(): Effect.Effect<void, IngestionUnavailable>;
+  reconcile(): Effect.Effect<{ readonly processed: number }, IngestionUnavailable>;
   cleanup(): Effect.Effect<void, IngestionUnavailable>;
 }
 export const Ingestion = Context.Service<Ingestion>('wallpaperdb.ingestor.ingestion');
@@ -245,7 +245,7 @@ export function ingestionLayer(): Layer.Layer<
           leaseToken: ids.leaseToken,
           event: {
             id: ids.eventId,
-            source: 'wallpaperdb/ingestor',
+            source: 'urn:wallpaperdb:ingestor',
             occurredAt: wallpaper.uploadedAt,
             correlationId: ids.correlationId,
             causationId: ids.causationId,
@@ -278,13 +278,17 @@ export function ingestionLayer(): Layer.Layer<
             new Date(now + 60_000),
             100
           );
-          yield* Effect.forEach(
+          const outcomes = yield* Effect.forEach(
             records,
             (record) =>
-              recover(record).pipe(Effect.catchTag('IngestionUnavailable', () => Effect.void)),
-            { concurrency: 5, discard: true }
+              recover(record).pipe(
+                Effect.as(1),
+                Effect.catchTag('IngestionUnavailable', () => Effect.succeed(0))
+              ),
+            { concurrency: 5 }
           );
           yield* store.expireIntents(new Date(now - 60 * 60 * 1000));
+          return { processed: outcomes.reduce((sum, count) => sum + count, 0) };
         }),
         cleanup: Effect.fn('ingestion.cleanup')(function* () {
           for (let page = 0; page < 10; page++) {

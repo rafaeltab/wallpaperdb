@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect';
+import { Clock, Effect, Layer } from 'effect';
 import { AssetStorage, ContentInspection, IngestionIdentity, IngestionStore, UploadEvents, ingestionLayer, type AssetReference, type UploadedEvent, type UploadRecord } from '../../src/ingestion/index.js';
 
 export const metadata = { fileType: 'image' as const, mimeType: 'image/png', width: 1920, height: 1080, fileSizeBytes: 3, contentHash: 'hash', extension: 'png' };
@@ -7,26 +7,41 @@ export const uploadInput = { principal: { profileId: 'profile-1' }, bytes: new U
 export class ControlledStore implements IngestionStore {
   readonly records = new Map<string, UploadRecord>();
   readonly outbox = new Map<string, UploadedEvent>();
-  reserve: IngestionStore['reserve'] = (record) => Effect.sync(() => {
+  readonly deadlines = new Map<string, { changed: number; lease: number }>();
+  constructor(private readonly now: () => number) {}
+  private owns(record: UploadRecord) { const current = this.records.get(record.wallpaper.id); return current?.state === record.state && current.leaseToken === record.leaseToken; }
+  reserve: IngestionStore['reserve'] = (record, leaseUntil) => Effect.sync(() => {
     const existing = [...this.records.values()].find((entry) => entry.state !== 'failed' && entry.wallpaper.profileId === record.wallpaper.profileId && entry.wallpaper.metadata.contentHash === record.wallpaper.metadata.contentHash);
     if (existing) return { _tag: 'Existing', record: existing };
     this.records.set(record.wallpaper.id, record);
+    this.deadlines.set(record.wallpaper.id, { changed: this.now(), lease: leaseUntil.getTime() });
     return { _tag: 'Reserved', record };
   });
   stored: IngestionStore['stored'] = (record) => Effect.sync(() => {
-    this.records.set(record.wallpaper.id, { ...record, state: 'stored' });
+    if (!this.owns(record) || record.state !== 'uploading') return false;
+    this.records.set(record.wallpaper.id, { ...record, state: 'stored', attempts: 0 });
+    this.deadlines.set(record.wallpaper.id, { changed: this.now(), lease: this.deadlines.get(record.wallpaper.id)?.lease ?? 0 });
     this.outbox.set(record.event.id, record.event);
     return true;
   });
   published: IngestionStore['published'] = (record) => Effect.sync(() => {
+    if (!this.owns({ ...record, state: 'stored' })) return;
     this.records.set(record.wallpaper.id, { ...record, state: 'processing' });
     this.outbox.delete(record.event.id);
   });
-  defer: IngestionStore['defer'] = (record, _now, maxAttempts) => Effect.sync(() => {
+  defer: IngestionStore['defer'] = (record, now, maxAttempts) => Effect.sync(() => {
+    if (!this.owns(record)) return;
     const attempts = record.attempts + 1;
     this.records.set(record.wallpaper.id, { ...record, attempts, state: record.state === 'uploading' && attempts >= maxAttempts ? 'failed' : record.state });
+    this.deadlines.set(record.wallpaper.id, { changed: now.getTime(), lease: 0 });
   });
-  claim: IngestionStore['claim'] = (_now, _staleBefore, _leaseUntil, limit) => Effect.sync(() => [...this.records.values()].filter((record) => (record.state === 'uploading' || record.state === 'stored') && record.attempts < 10).slice(0, limit));
+  claim: IngestionStore['claim'] = (now, staleBefore, leaseUntil, limit) => Effect.sync(() => {
+    const records = [...this.records.values()].filter((record) => {
+      const deadline = this.deadlines.get(record.wallpaper.id);
+      return (record.state === 'uploading' || record.state === 'stored') && record.attempts < (record.state === 'uploading' ? 3 : 10) && Boolean(deadline && deadline.changed < staleBefore.getTime() && deadline.lease <= now.getTime());
+    }).slice(0, limit);
+    return records.map((record) => { const claimed = { ...record, leaseToken: `${record.leaseToken}-claimed` }; this.records.set(record.wallpaper.id, claimed); this.deadlines.set(record.wallpaper.id, { changed: this.now(), lease: leaseUntil.getTime() }); return claimed; });
+  });
   expireIntents = () => Effect.void;
   assetDisposition: IngestionStore['assetDisposition'] = (id) => Effect.sync(() => {
     const record = this.records.get(id);
@@ -34,7 +49,9 @@ export class ControlledStore implements IngestionStore {
   });
 }
 export function fixture(overrides: { inspection?: ContentInspection; storage?: Partial<AssetStorage>; events?: UploadEvents } = {}) {
-  const store = new ControlledStore();
+  let now = Date.now();
+  const store = new ControlledStore(() => now);
+  const clock: Clock.Clock = { currentTimeMillisUnsafe: () => now, currentTimeMillis: Effect.sync(() => now), currentTimeNanosUnsafe: () => BigInt(now) * 1_000_000n, currentTimeNanos: Effect.sync(() => BigInt(now) * 1_000_000n), monotonicTimeNanosUnsafe: () => BigInt(now) * 1_000_000n, monotonicTimeNanos: Effect.sync(() => BigInt(now) * 1_000_000n), sleep: () => Effect.void };
   const objects: AssetReference[] = [];
   const published: UploadedEvent[] = [];
   let sequence = 0;
@@ -51,6 +68,6 @@ export function fixture(overrides: { inspection?: ContentInspection; storage?: P
     Layer.succeed(ContentInspection, overrides.inspection ?? { inspect: () => Effect.succeed({ _tag: 'Inspected', metadata }) }),
     Layer.succeed(AssetStorage, storage),
     Layer.succeed(UploadEvents, overrides.events ?? { publish: (event) => Effect.sync(() => { published.push(event); }) }),
-  )));
-  return { store, objects, published, layer };
+  )), Layer.provideMerge(Layer.succeed(Clock.Clock, clock)));
+  return { store, objects, published, layer, advance: () => Effect.sync(() => { now += 11 * 60_000; }) };
 }

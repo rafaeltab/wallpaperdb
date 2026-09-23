@@ -10,7 +10,7 @@ import { metadata } from './helpers/ingestion.js';
 
 function record(id: string, owner = 'profile'): UploadRecord {
   const wallpaper = { id, profileId: owner, metadata, originalFilename: 'wallpaper.png', uploadedAt: '2026-01-01T00:00:00.000Z' };
-  return { wallpaper, state: 'uploading', attempts: 0, leaseToken: `lease-${id}`, event: { id: `event-${id}`, source: 'wallpaperdb/ingestor', occurredAt: wallpaper.uploadedAt, correlationId: `workflow-${id}`, causationId: `command-${id}`, wallpaper } };
+  return { wallpaper, state: 'uploading', attempts: 0, leaseToken: `lease-${id}`, event: { id: `event-${id}`, source: 'urn:wallpaperdb:ingestor', occurredAt: wallpaper.uploadedAt, correlationId: `workflow-${id}`, causationId: `command-${id}`, wallpaper } };
 }
 
 describe('PostgreSQL ingestion contract', () => {
@@ -43,6 +43,36 @@ describe('PostgreSQL ingestion contract', () => {
       const result = yield* store.stored(collision).pipe(Effect.result);
       expect(result._tag).toBe('Failure');
       expect((yield* store.reserve(collision, new Date())).record.state).toBe('uploading');
+    })));
+  });
+  it('releases failed upload content for a retry and quarantines exhausted committed publications', async () => {
+    const failed = record('wlpr_failed', 'failed-owner');
+    const quarantined = record('wlpr_quarantined', 'quarantined-owner');
+    await runtime.runPromise(IngestionStore.use((store) => Effect.gen(function* () {
+      yield* store.reserve(failed, new Date());
+      yield* store.defer(failed, new Date(), 1);
+      expect(yield* store.assetDisposition(failed.wallpaper.id)).toBe('remove');
+      expect((yield* store.reserve(record('wlpr_replacement', 'failed-owner'), new Date()))._tag).toBe('Reserved');
+      yield* store.reserve(quarantined, new Date());
+      yield* store.stored(quarantined);
+      yield* store.defer({ ...quarantined, state: 'stored', attempts: 9 }, new Date(), 10);
+      const later = new Date(Date.now() + 3600_000);
+      expect((yield* store.claim(later, later, later, 100)).some((entry) => entry.wallpaper.id === quarantined.wallpaper.id)).toBe(false);
+      expect(yield* store.assetDisposition(quarantined.wallpaper.id)).toBe('retain');
+      expect(yield* store.assetDisposition('does-not-exist')).toBe('remove');
+    })));
+  });
+  it('rejects stale transitions and obeys active leases and batch bounds', async () => {
+    const candidate = record('wlpr_leased', 'leased-owner');
+    const later = new Date(Date.now() + 3600_000);
+    await runtime.runPromise(IngestionStore.use((store) => Effect.gen(function* () {
+      yield* store.reserve(candidate, later);
+      expect(yield* store.stored({ ...candidate, leaseToken: 'other-worker' })).toBe(false);
+      expect((yield* store.claim(new Date(), later, later, 1)).some((entry) => entry.wallpaper.id === candidate.wallpaper.id)).toBe(false);
+      expect((yield* store.claim(later, later, later, 1)).length).toBeLessThanOrEqual(1);
+      yield* store.published(candidate);
+      expect((yield* store.reserve(candidate, later)).record.state).toBe('uploading');
+      yield* store.expireIntents(later);
     })));
   });
   it('claims committed publication once across workers and preserves its occurrence after a retry', async () => {

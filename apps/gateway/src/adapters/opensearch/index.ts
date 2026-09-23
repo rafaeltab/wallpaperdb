@@ -13,6 +13,7 @@ import {
   ProjectionUnavailable,
   type ProjectionWrite,
 } from '../../projection/index.js';
+import { StartupDiagnostic } from '../../startup-diagnostics.js';
 import {
   partialWallpaperResponse,
   profileBatchResponse,
@@ -47,11 +48,60 @@ export const OpenSearchGateway = Context.Service<OpenSearchGateway>(
 );
 export class OpenSearchStartupError extends Schema.TaggedError<OpenSearchStartupError>()(
   'OpenSearchStartupError',
-  { cause: Schema.Defect() }
+  { diagnostic: StartupDiagnostic, cause: Schema.Defect() }
 ) {}
 class SearchRequestError extends Schema.TaggedError<SearchRequestError>()('SearchRequestError', {
   cause: Schema.Defect(),
 }) {}
+
+const startupErrorCode = Schema.decodeUnknownOption(
+  Schema.Struct({
+    name: Schema.Literals([
+      'OpenSearchClientError',
+      'TimeoutError',
+      'ConnectionError',
+      'NoLivingConnectionsError',
+      'SerializationError',
+      'DeserializationError',
+      'ConfigurationError',
+      'ResponseError',
+      'RequestAbortedError',
+      'NotCompatibleError',
+    ]),
+  })
+);
+const startupStatusCode = Schema.decodeUnknownOption(
+  Schema.Struct({
+    meta: Schema.Struct({
+      statusCode: Schema.Int.check(Schema.isBetween({ minimum: 100, maximum: 599 })),
+    }),
+  })
+);
+
+function startupFailure(
+  operation:
+    | 'initialize-client'
+    | 'inspect-index'
+    | 'update-index-mapping'
+    | 'create-index'
+    | 'recheck-index',
+  cause: unknown,
+  index?: string
+): OpenSearchStartupError {
+  const underlying = cause instanceof SearchRequestError ? cause.cause : cause;
+  const code = startupErrorCode(underlying);
+  const statusCode = startupStatusCode(underlying);
+  return new OpenSearchStartupError({
+    diagnostic: {
+      dependency: 'opensearch',
+      operation,
+      code: code._tag === 'Some' ? code.value.name : 'UnknownError',
+      ...(index === undefined ? {} : { index }),
+      ...(statusCode._tag === 'Some' ? { statusCode: statusCode.value.meta.statusCode } : {}),
+    },
+    cause,
+  });
+}
 
 class SearchProjection implements CatalogueRead, ProjectionStore {
   constructor(
@@ -303,7 +353,7 @@ export function openSearchLayer(
                 ? { auth: { username: options.username, password: options.password } }
                 : {}),
             }),
-          catch: (cause) => new OpenSearchStartupError({ cause }),
+          catch: (cause) => startupFailure('initialize-client', cause),
         }),
         (client) =>
           Effect.gen(function* () {
@@ -337,34 +387,39 @@ export function openSearchLayer(
     })
   );
 }
-const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(
-  function* (
-    adapter: SearchProjection,
-    client: Client,
-    name: string,
-    mapping: { settings?: Record<string, unknown>; properties: Record<string, unknown> }
-  ) {
-    const exists = yield* adapter.request(() => client.indices.exists({ index: name }));
-    if (exists.body) {
-      yield* adapter.request(() =>
-        client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
-      );
-      return;
-    }
+const ensureIndex = Effect.fn('catalogue.storage.ensure-index')(function* (
+  adapter: SearchProjection,
+  client: Client,
+  name: string,
+  mapping: { settings?: Record<string, unknown>; properties: Record<string, unknown> }
+) {
+  const exists = yield* adapter
+    .request(() => client.indices.exists({ index: name }))
+    .pipe(Effect.mapError((cause) => startupFailure('inspect-index', cause, name)));
+  if (exists.body) {
     yield* adapter
       .request(() =>
-        client.indices.create({
-          index: name,
-          body: { settings: mapping.settings, mappings: { properties: mapping.properties } },
-        })
+        client.indices.putMapping({ index: name, body: { properties: mapping.properties } })
       )
-      .pipe(
-        Effect.catch((error) =>
-          adapter
-            .request(() => client.indices.exists({ index: name }))
-            .pipe(Effect.flatMap((result) => (result.body ? Effect.void : Effect.fail(error))))
-        )
-      );
-  },
-  Effect.mapError((cause) => new OpenSearchStartupError({ cause }))
-);
+      .pipe(Effect.mapError((cause) => startupFailure('update-index-mapping', cause, name)));
+    return;
+  }
+  yield* adapter
+    .request(() =>
+      client.indices.create({
+        index: name,
+        body: { settings: mapping.settings, mappings: { properties: mapping.properties } },
+      })
+    )
+    .pipe(
+      Effect.mapError((cause) => startupFailure('create-index', cause, name)),
+      Effect.catch((error) =>
+        adapter
+          .request(() => client.indices.exists({ index: name }))
+          .pipe(
+            Effect.mapError((cause) => startupFailure('recheck-index', cause, name)),
+            Effect.flatMap((result) => (result.body ? Effect.void : Effect.fail(error)))
+          )
+      )
+    );
+});

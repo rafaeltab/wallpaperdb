@@ -1,106 +1,92 @@
-import { config as loadEnv } from 'dotenv';
-import { z } from 'zod';
 import {
-  ServerConfigSchema,
-  DatabaseConfigSchema,
-  S3ConfigSchema,
-  NatsConfigSchema,
-  RedisConfigSchema,
-  OtelConfigSchema,
-  parseIntEnv,
-  parseBoolEnv,
-  getEnv,
-} from '@wallpaperdb/core/config';
+  Config as Configuration,
+  ConfigProvider,
+  Effect,
+  Option,
+  Schema,
+  SchemaIssue,
+} from 'effect';
 
-// Load environment variables from .env file
-loadEnv();
+const urlString = Schema.String.check(
+  Schema.makeFilter((value) => URL.canParse(value), { expected: 'an absolute URL' })
+);
+const positiveInteger = Schema.Int.check(Schema.isGreaterThan(0));
+const boundedPort = Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 }));
+const positive = (name: string, fallback: number) =>
+  Configuration.schema(positiveInteger, name).pipe(Configuration.withDefault(fallback));
+const boolean = (name: string, fallback: boolean) =>
+  Configuration.Literals(['true', 'false'], name).pipe(
+    Configuration.map((value) => value === 'true'),
+    Configuration.withDefault(fallback)
+  );
+const optional = <A>(config: Configuration.Config<A>) =>
+  config.pipe(Configuration.option, Configuration.map(Option.getOrUndefined));
 
-// Compose full config from shared schemas + ingestor-specific fields
-const configSchema = z.object({
-  // Server config
-  ...ServerConfigSchema.shape,
-  // Database config
-  ...DatabaseConfigSchema.shape,
-  // S3 config
-  ...S3ConfigSchema.shape,
-  // NATS config
-  ...NatsConfigSchema.shape,
-  // Redis config
-  ...RedisConfigSchema.shape,
-  // OTEL config
-  ...OtelConfigSchema.shape,
-  // Clerk config
-  clerkDomain: z.string().min(1).optional(),
-  clerkSecretKey: z.string().min(1).optional(),
-  // Ingestor-specific config (reconciliation, rate limiting)
-  reconciliationIntervalMs: z
-    .number()
-    .int()
-    .positive()
-    .default(5 * 60 * 1000), // 5 minutes
-  s3CleanupIntervalMs: z
-    .number()
-    .int()
-    .positive()
-    .default(24 * 60 * 60 * 1000), // 24 hours
-  rateLimitMax: z.number().int().positive().default(100), // Max uploads per window
-  rateLimitWindowMs: z
-    .number()
-    .int()
-    .positive()
-    .default(60 * 60 * 1000), // 1 hour
-});
+export class IngestorConfigurationError extends Schema.TaggedError<IngestorConfigurationError>()(
+  'IngestorConfigurationError',
+  { message: Schema.String, fields: Schema.Array(Schema.String) }
+) {}
 
-export type Config = z.infer<typeof configSchema>;
+const configurationIssues = SchemaIssue.makeFormatterStandardSchemaV1();
 
-export function loadConfig(): Config {
-  const nodeEnv = getEnv('NODE_ENV', 'development');
+function configurationError(error: Configuration.ConfigError): IngestorConfigurationError {
+  const fields =
+    error.cause._tag === 'SchemaError'
+      ? configurationIssues(error.cause.issue).issues.map((issue) =>
+          (issue.path ?? [])
+            .map((part) => String(typeof part === 'object' ? part.key : part))
+            .join('.')
+        )
+      : [];
+  return new IngestorConfigurationError({
+    message: 'Invalid ingestor configuration',
+    fields: [...new Set(fields)],
+  });
+}
 
-  const raw = {
-    // Server
-    port: parseIntEnv(process.env.PORT, 3001),
-    nodeEnv,
-
-    // Database
-    databaseUrl: process.env.DATABASE_URL,
-
-    // S3
-    s3Endpoint: process.env.S3_ENDPOINT,
-    s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
-    s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
-    s3Bucket: getEnv('S3_BUCKET', 'wallpapers'),
-    s3Region: getEnv('S3_REGION', 'us-east-1'),
-
-    // NATS
-    natsUrl: process.env.NATS_URL,
-    natsStream: getEnv('NATS_STREAM', 'WALLPAPER'),
-
-    // OTEL
-    otelEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-    otelServiceName: getEnv('OTEL_SERVICE_NAME', 'ingestor'),
-
-    // Redis
-    redisHost: process.env.REDIS_HOST,
-    redisPort: parseIntEnv(process.env.REDIS_PORT),
-    redisPassword: process.env.REDIS_PASSWORD,
-    redisEnabled: parseBoolEnv(process.env.REDIS_ENABLED, true),
-
-    // Clerk
-    clerkDomain: process.env.CLERK_DOMAIN,
-    clerkSecretKey: process.env.CLERK_SECRET_KEY,
-
-    // Ingestor-specific
-    reconciliationIntervalMs: parseIntEnv(
-      process.env.RECONCILIATION_INTERVAL_MS,
-      5 * 60 * 1000 // 5 minutes (production default — tests use FakeTimerService)
-    ),
-    s3CleanupIntervalMs: parseIntEnv(
-      process.env.S3_CLEANUP_INTERVAL_MS,
-      24 * 60 * 60 * 1000 // 24 hours (production default — tests use runS3CleanupNow())
-    ),
-    rateLimitMax: parseIntEnv(process.env.RATE_LIMIT_MAX, 100),
-    rateLimitWindowMs: parseIntEnv(process.env.RATE_LIMIT_WINDOW_MS, 60 * 60 * 1000),
-  };
-
-  return configSchema.parse(raw);
+/** Parse once before constructing adapters; only adapters receive unwrapped secrets. */
+export const ingestorConfig = Configuration.all({
+  nodeEnv: Configuration.Literals(['development', 'production', 'test'], 'NODE_ENV').pipe(
+    Configuration.withDefault('development')
+  ),
+  port: Configuration.schema(boundedPort, 'PORT').pipe(Configuration.withDefault(3001)),
+  databaseUrl: Configuration.Redacted('DATABASE_URL'),
+  s3Endpoint: Configuration.schema(urlString, 'S3_ENDPOINT'),
+  s3AccessKeyId: Configuration.Redacted('S3_ACCESS_KEY_ID'),
+  s3SecretAccessKey: Configuration.Redacted('S3_SECRET_ACCESS_KEY'),
+  s3Bucket: Configuration.NonEmptyString('S3_BUCKET').pipe(Configuration.withDefault('wallpapers')),
+  s3Region: Configuration.NonEmptyString('S3_REGION').pipe(Configuration.withDefault('us-east-1')),
+  natsUrl: Configuration.schema(urlString, 'NATS_URL'),
+  natsStream: Configuration.NonEmptyString('NATS_STREAM').pipe(
+    Configuration.withDefault('WALLPAPER')
+  ),
+  redisEnabled: boolean('REDIS_ENABLED', true),
+  redisHost: Configuration.NonEmptyString('REDIS_HOST').pipe(
+    Configuration.withDefault('127.0.0.1')
+  ),
+  redisPort: Configuration.schema(boundedPort, 'REDIS_PORT').pipe(Configuration.withDefault(6379)),
+  redisPassword: optional(Configuration.Redacted('REDIS_PASSWORD')),
+  clerkDomain: optional(Configuration.schema(urlString, 'CLERK_DOMAIN')),
+  clerkSecretKey: optional(Configuration.Redacted('CLERK_SECRET_KEY')),
+  otelEndpoint: optional(Configuration.schema(urlString, 'OTEL_EXPORTER_OTLP_ENDPOINT')),
+  otelServiceName: Configuration.NonEmptyString('OTEL_SERVICE_NAME').pipe(
+    Configuration.withDefault('ingestor')
+  ),
+  reconciliationIntervalMs: positive('RECONCILIATION_INTERVAL_MS', 5 * 60 * 1000),
+  s3CleanupIntervalMs: positive('S3_CLEANUP_INTERVAL_MS', 24 * 60 * 60 * 1000),
+  rateLimitMax: positive('RATE_LIMIT_MAX', 100),
+  rateLimitWindowMs: positive('RATE_LIMIT_WINDOW_MS', 60 * 60 * 1000),
+}).pipe(Effect.mapError(configurationError));
+export type Config = Effect.Success<typeof ingestorConfig>;
+export function loadConfig(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): Config {
+  return Effect.runSync(
+    ingestorConfig.pipe(
+      Effect.provideService(
+        ConfigProvider.ConfigProvider,
+        ConfigProvider.fromUnknown(environment, { preserveEmptyStrings: true })
+      )
+    )
+  );
 }

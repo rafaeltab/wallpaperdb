@@ -146,8 +146,7 @@ class PostgresIngestionStore implements IngestionStore {
             eventId: record.event.id,
             wallpaperId: record.wallpaper.id,
             event: record.event,
-          })
-          .onConflictDoNothing();
+          });
         return true;
       })
     );

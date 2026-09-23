@@ -55,6 +55,14 @@ const decodeResponse = Schema.decodeUnknownEffect(
   { reportInput: false }
 );
 
+// Redis errors can carry the entire command, including the Profile key. Keep
+// actionable diagnostics without recording command arguments or credentials.
+function diagnostic(cause: unknown) {
+  return cause instanceof Error
+    ? { name: cause.name, message: cause.message }
+    : { name: 'UnknownRedisFailure' };
+}
+
 export interface RedisQuotaConfig {
   readonly redisEnabled: boolean;
   readonly redisHost: string;
@@ -105,7 +113,7 @@ class RedisQuota implements Quota {
         Effect.tapError((cause) =>
           Effect.logWarning('Distributed upload quota failed; enforcing local quota', {
             operation: 'consume-upload-quota',
-            cause,
+            cause: diagnostic(cause),
           })
         ),
         Effect.catch(() =>
@@ -143,7 +151,7 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
         Stream.runForEach((cause) =>
           Effect.logWarning('Distributed upload quota connection failed', {
             operation: 'connect-upload-quota',
-            cause,
+            cause: diagnostic(cause),
           })
         ),
         Effect.forkScoped
@@ -191,7 +199,7 @@ export function redisQuotaLayer(config: RedisQuotaConfig): Layer.Layer<Quota> {
             'Distributed upload quota unavailable at startup; enforcing local quota',
             {
               operation: 'connect-upload-quota',
-              cause,
+              cause: diagnostic(cause),
             }
           )
         )

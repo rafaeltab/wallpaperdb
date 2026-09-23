@@ -2,7 +2,9 @@
 
 ## Quality tooling follow-up
 
-The gateway-specific CRAP analyzer and its gate were removed on 2026-09-23. Its overlapping coverage attribution could hide uncovered functions, so the historical CRAP claims below are withdrawn. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback/generator coverage in the shared analyzer and preserves exact commit links to the removed implementation. Architecture checks and source-wide coverage thresholds remain enabled.
+The gateway-specific CRAP analyzer and its gate were removed on 2026-09-23. Its overlapping coverage attribution could hide uncovered functions, so the historical CRAP claims below are withdrawn. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback/generator coverage in the shared analyzer and preserves exact commit links to the removed implementation. Architecture checks and source-wide coverage reporting remain enabled.
+
+The migration-specific coverage percentage gates were also removed following review. The dated validation records below describe the thresholds used at those revisions; current Vitest configuration uses shared coverage reporting without additional gateway minimums.
 
 ## Current validation commands
 
@@ -10,7 +12,7 @@ The repository now uses shared Make targets: `make build PACKAGE=gateway`, `make
 
 ## Objective
 
-Migrate the gateway to Effect and CODING_STANDARDS.md while preserving public functionality and matching or improving the measured coverage baseline.
+Migrate the gateway to Effect and CODING_STANDARDS.md while preserving public functionality and validating behavior with source-wide coverage reporting.
 
 ## Work
 
@@ -25,7 +27,7 @@ Migrate the gateway to Effect and CODING_STANDARDS.md while preserving public fu
 
 ## Baseline
 
-151 tests passed, one skipped. Statements/lines 89.72%, branches 87.50%, functions 96.74%. Source coverage continues to include all `src/**/*.ts`, excluding only test/declaration files. The same coverage floors are configured directly in `apps/gateway/vitest.config.ts`.
+151 tests passed, one skipped. Statements/lines 89.72%, branches 87.50%, functions 96.74%. These are historical measurements. Source coverage continues to include all `src/**/*.ts`, excluding only test/declaration files.
 
 ## Validation
 

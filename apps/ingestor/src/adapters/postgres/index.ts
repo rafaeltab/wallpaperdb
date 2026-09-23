@@ -4,6 +4,7 @@ import { Context, Effect, Layer } from 'effect';
 import pg from 'pg';
 import { ulid } from 'ulid';
 import { z } from 'zod';
+export { migrateIngestionDatabase } from './migration.js';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import * as schema from '../../db/schema.js';
 import {
@@ -24,6 +25,7 @@ const metadataSchema = z.object({
   extension: z.string().regex(/^[a-z0-9]+$/),
 });
 const snapshotSchema = z.object({
+  traceContext: z.object({ traceparent: z.string(), tracestate: z.string().optional() }).optional(),
   id: z.string().min(1),
   source: z.string().min(1),
   occurredAt: z.string().datetime(),
@@ -69,10 +71,15 @@ function operation<A>(name: string, run: () => Promise<A>): Effect.Effect<A, Ing
     catch: (cause) => new IngestionUnavailable({ operation: name, cause }),
   }).pipe(
     Effect.tapError((error) =>
-      Effect.logError('Ingestion persistence failed', { operation: name, cause: error.cause })
+      Effect.logError('Ingestion persistence failed', { operation: name, cause: databaseDiagnostic(error.cause) })
     ),
     Effect.withSpan(`ingestion.persistence.${name}`)
   );
+}
+function databaseDiagnostic(cause: unknown) {
+  const underlying = cause instanceof Error && cause.cause ? cause.cause : cause;
+  const details = z.object({ code: z.string().optional(), constraint: z.string().optional() }).safeParse(underlying);
+  return { name: underlying instanceof Error ? underlying.name : 'PersistenceFailure', ...(details.success ? details.data : {}) };
 }
 function owned(record: UploadRecord) {
   return and(
@@ -94,6 +101,26 @@ class PostgresIngestionStore implements IngestionStore {
   constructor(private readonly db: Database) {}
 
   reserve = (
+    record: UploadRecord,
+    leaseUntil: Date
+  ): Effect.Effect<Reservation, IngestionUnavailable> =>
+    Effect.currentSpan.pipe(
+      Effect.map(
+        (span): UploadRecord => ({
+          ...record,
+          event: {
+            ...record.event,
+            traceContext: record.event.traceContext ?? {
+              traceparent: `00-${span.traceId}-${span.spanId}-${span.sampled ? '01' : '00'}`,
+            },
+          },
+        })
+      ),
+      Effect.catchTag('NoSuchElementError', () => Effect.succeed(record)),
+      Effect.flatMap((captured) => this.reserveRecord(captured, leaseUntil))
+    );
+
+  private reserveRecord = (
     record: UploadRecord,
     leaseUntil: Date
   ): Effect.Effect<Reservation, IngestionUnavailable> =>
@@ -158,7 +185,7 @@ class PostgresIngestionStore implements IngestionStore {
       })
     ).pipe(
       Effect.tap((committed) =>
-        Effect.sync(() => recordTransition('uploading', 'stored', committed))
+        Effect.try(() => recordTransition('uploading', 'stored', committed)).pipe(Effect.ignore)
       )
     );
 
@@ -185,7 +212,7 @@ class PostgresIngestionStore implements IngestionStore {
       })
     ).pipe(
       Effect.tap((committed) =>
-        Effect.sync(() => recordTransition('stored', 'processing', committed))
+        Effect.try(() => recordTransition('stored', 'processing', committed)).pipe(Effect.ignore)
       ),
       Effect.asVoid
     );
@@ -215,7 +242,9 @@ class PostgresIngestionStore implements IngestionStore {
         return updated.length > 0 && exhausted && record.state === 'uploading';
       })
     ).pipe(
-      Effect.tap((failed) => Effect.sync(() => recordTransition('uploading', 'failed', failed))),
+      Effect.tap((failed) =>
+        Effect.try(() => recordTransition('uploading', 'failed', failed)).pipe(Effect.ignore)
+      ),
       Effect.asVoid
     );
 

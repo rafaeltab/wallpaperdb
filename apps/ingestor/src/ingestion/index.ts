@@ -95,6 +95,8 @@ export interface UploadedEvent {
   readonly occurredAt: string;
   readonly correlationId: string;
   readonly causationId: string;
+  /** Opaque W3C propagation carrier retained with the durable occurrence. */
+  readonly traceContext?: { readonly traceparent: string; readonly tracestate?: string };
   readonly wallpaper: UploadedWallpaper;
 }
 /** Publication completes only after durable broker acknowledgement; retries preserve the complete occurrence. */
@@ -217,7 +219,11 @@ export function ingestionLayer(): Layer.Layer<
           const committed = yield* store.stored(record);
           if (!committed) return;
         }
-        yield* publishOrDefer({ ...record, state: 'stored' });
+        yield* publishOrDefer({
+          ...record,
+          state: 'stored',
+          attempts: record.state === 'uploading' ? 0 : record.attempts,
+        });
       });
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
@@ -238,7 +244,7 @@ export function ingestionLayer(): Layer.Layer<
           originalFilename: input.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255),
           uploadedAt: new Date(now).toISOString(),
         };
-        const record: UploadRecord = {
+        const draft: UploadRecord = {
           wallpaper,
           state: 'uploading',
           attempts: 0,
@@ -252,12 +258,13 @@ export function ingestionLayer(): Layer.Layer<
             wallpaper,
           },
         };
-        const reservation = yield* store.reserve(record, new Date(now + 10 * 60 * 1000));
+        const reservation = yield* store.reserve(draft, new Date(now + 10 * 60 * 1000));
         if (reservation._tag === 'Existing') {
           return reservation.record.state === 'uploading'
             ? { _tag: 'InProgress' }
             : { _tag: 'Duplicate', upload: receipt(reservation.record.wallpaper) };
         }
+        const record = reservation.record;
         yield* assets.put({
           wallpaperId: wallpaper.id,
           profileId: wallpaper.profileId,
@@ -271,24 +278,30 @@ export function ingestionLayer(): Layer.Layer<
       return Ingestion.of({
         upload,
         reconcile: Effect.fn('ingestion.reconcile')(function* () {
+          let processed = 0;
+          for (let batch = 0; batch < 20; batch++) {
+            const now = yield* Clock.currentTimeMillis;
+            const records = yield* store.claim(
+              new Date(now),
+              new Date(now - 10 * 60_000),
+              new Date(now + 2 * 60_000),
+              5
+            );
+            const outcomes = yield* Effect.forEach(
+              records,
+              (record) =>
+                recover(record).pipe(
+                  Effect.as(1),
+                  Effect.catchTag('IngestionUnavailable', () => Effect.succeed(0))
+                ),
+              { concurrency: 5 }
+            );
+            processed += outcomes.reduce((sum, count) => sum + count, 0);
+            if (records.length < 5) break;
+          }
           const now = yield* Clock.currentTimeMillis;
-          const records = yield* store.claim(
-            new Date(now),
-            new Date(now - 10 * 60 * 1000),
-            new Date(now + 60_000),
-            100
-          );
-          const outcomes = yield* Effect.forEach(
-            records,
-            (record) =>
-              recover(record).pipe(
-                Effect.as(1),
-                Effect.catchTag('IngestionUnavailable', () => Effect.succeed(0))
-              ),
-            { concurrency: 5 }
-          );
           yield* store.expireIntents(new Date(now - 60 * 60 * 1000));
-          return { processed: outcomes.reduce((sum, count) => sum + count, 0) };
+          return { processed };
         }),
         cleanup: Effect.fn('ingestion.cleanup')(function* () {
           for (let page = 0; page < 10; page++) {

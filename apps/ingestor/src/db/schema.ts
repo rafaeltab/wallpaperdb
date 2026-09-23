@@ -78,7 +78,7 @@ export const wallpapers = pgTable(
       .where(sql`${table.contentHash} IS NOT NULL AND ${table.uploadState} <> 'failed'`),
     check(
       'wallpaper_stored_metadata',
-      sql`${table.uploadState} NOT IN ('stored', 'processing', 'completed') OR (${table.fileType} IS NOT NULL AND ${table.mimeType} IS NOT NULL AND ${table.width} > 0 AND ${table.height} > 0 AND ${table.fileSizeBytes} > 0 AND ${table.originalFilename} IS NOT NULL)`
+      sql`${table.uploadState} NOT IN ('stored', 'processing', 'completed') OR (${table.fileType} IS NOT NULL AND ${table.mimeType} IS NOT NULL AND ${table.width} IS NOT NULL AND ${table.width} > 0 AND ${table.height} IS NOT NULL AND ${table.height} > 0 AND ${table.fileSizeBytes} IS NOT NULL AND ${table.fileSizeBytes} > 0 AND ${table.originalFilename} IS NOT NULL)`
     ),
   ]
 );

@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect';
-import { AssetStorage, ContentInspection, IngestionStore, UploadEvents, ingestionLayer, type AssetReference, type UploadedEvent, type UploadRecord } from '../../src/ingestion/index.js';
+import { AssetStorage, ContentInspection, IngestionIdentity, IngestionStore, UploadEvents, ingestionLayer, type AssetReference, type UploadedEvent, type UploadRecord } from '../../src/ingestion/index.js';
 
 export const metadata = { fileType: 'image' as const, mimeType: 'image/png', width: 1920, height: 1080, fileSizeBytes: 3, contentHash: 'hash', extension: 'png' };
 export const uploadInput = { principal: { profileId: 'profile-1' }, bytes: new Uint8Array([1, 2, 3]), filename: '../wallpaper.png', declaredMimeType: 'image/png' };
@@ -37,6 +37,7 @@ export function fixture(overrides: { inspection?: ContentInspection; storage?: P
   const store = new ControlledStore();
   const objects: AssetReference[] = [];
   const published: UploadedEvent[] = [];
+  let sequence = 0;
   const storage: AssetStorage = {
     put: (input) => Effect.sync(() => { objects.push({ wallpaperId: input.wallpaperId, extension: input.metadata.extension }); }),
     exists: (ref) => Effect.sync(() => objects.some((item) => item.wallpaperId === ref.wallpaperId && item.extension === ref.extension)),
@@ -46,6 +47,7 @@ export function fixture(overrides: { inspection?: ContentInspection; storage?: P
   };
   const layer = ingestionLayer().pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(IngestionStore, store),
+    Layer.succeed(IngestionIdentity, { next: () => Effect.sync(() => { sequence++; return { wallpaperId: `wlpr_${sequence}`, eventId: `event-${sequence}`, correlationId: `workflow-${sequence}`, causationId: `command-${sequence}`, leaseToken: `lease-${sequence}` }; }) }),
     Layer.succeed(ContentInspection, overrides.inspection ?? { inspect: () => Effect.succeed({ _tag: 'Inspected', metadata }) }),
     Layer.succeed(AssetStorage, storage),
     Layer.succeed(UploadEvents, overrides.events ?? { publish: (event) => Effect.sync(() => { published.push(event); }) }),

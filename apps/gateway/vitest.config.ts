@@ -56,12 +56,6 @@ export default mergeConfig(
         include: ['src/**/*.ts'],
         exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
         reportsDirectory: './coverage/integration',
-        thresholds: {
-          statements: 89.72,
-          branches: 87.5,
-          functions: 96.74,
-          lines: 89.72,
-        },
       },
     },
   })

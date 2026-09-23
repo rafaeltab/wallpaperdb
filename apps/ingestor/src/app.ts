@@ -97,6 +97,7 @@ export async function createApp(
   const app = await createHttpApp(
     {
       nodeEnv: config.nodeEnv,
+      requestTimeoutMs: config.requestTimeoutMs,
       port: config.port,
       rateLimitMax: config.rateLimitMax,
       clerkPublishableKey: config.clerkPublishableKey,

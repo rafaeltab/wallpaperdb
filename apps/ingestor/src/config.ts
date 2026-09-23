@@ -50,10 +50,13 @@ export const ingestorConfig = Configuration.all({
     Configuration.withDefault('development')
   ),
   port: Configuration.schema(boundedPort, 'PORT').pipe(Configuration.withDefault(3001)),
-  databaseUrl: Configuration.Redacted('DATABASE_URL'),
+  databaseUrl: Configuration.schema(Schema.Redacted(urlString), 'DATABASE_URL'),
   s3Endpoint: Configuration.schema(urlString, 'S3_ENDPOINT'),
-  s3AccessKeyId: Configuration.Redacted('S3_ACCESS_KEY_ID'),
-  s3SecretAccessKey: Configuration.Redacted('S3_SECRET_ACCESS_KEY'),
+  s3AccessKeyId: Configuration.schema(Schema.Redacted(Schema.NonEmptyString), 'S3_ACCESS_KEY_ID'),
+  s3SecretAccessKey: Configuration.schema(
+    Schema.Redacted(Schema.NonEmptyString),
+    'S3_SECRET_ACCESS_KEY'
+  ),
   s3Bucket: Configuration.NonEmptyString('S3_BUCKET').pipe(Configuration.withDefault('wallpapers')),
   s3Region: Configuration.NonEmptyString('S3_REGION').pipe(Configuration.withDefault('us-east-1')),
   natsUrl: Configuration.schema(urlString, 'NATS_URL'),
@@ -66,6 +69,7 @@ export const ingestorConfig = Configuration.all({
   ),
   redisPort: Configuration.schema(boundedPort, 'REDIS_PORT').pipe(Configuration.withDefault(6379)),
   redisPassword: optional(Configuration.Redacted('REDIS_PASSWORD')),
+  clerkPublishableKey: optional(Configuration.NonEmptyString('CLERK_PUBLISHABLE_KEY')),
   clerkDomain: optional(Configuration.schema(urlString, 'CLERK_DOMAIN')),
   clerkSecretKey: optional(Configuration.Redacted('CLERK_SECRET_KEY')),
   otelEndpoint: optional(Configuration.schema(urlString, 'OTEL_EXPORTER_OTLP_ENDPOINT')),
@@ -76,7 +80,23 @@ export const ingestorConfig = Configuration.all({
   s3CleanupIntervalMs: positive('S3_CLEANUP_INTERVAL_MS', 24 * 60 * 60 * 1000),
   rateLimitMax: positive('RATE_LIMIT_MAX', 100),
   rateLimitWindowMs: positive('RATE_LIMIT_WINDOW_MS', 60 * 60 * 1000),
-}).pipe(Effect.mapError(configurationError));
+}).pipe(
+  Effect.mapError(configurationError),
+  Effect.flatMap((config) => {
+    const fields =
+      config.nodeEnv === 'test'
+        ? []
+        : [
+            ...(config.clerkSecretKey === undefined ? ['CLERK_SECRET_KEY'] : []),
+            ...(config.clerkPublishableKey === undefined ? ['CLERK_PUBLISHABLE_KEY'] : []),
+          ];
+    return fields.length
+      ? Effect.fail(
+          new IngestorConfigurationError({ message: 'Invalid ingestor configuration', fields })
+        )
+      : Effect.succeed(config);
+  })
+);
 export type Config = Effect.Success<typeof ingestorConfig>;
 export function loadConfig(
   environment: Readonly<Record<string, string | undefined>> = process.env

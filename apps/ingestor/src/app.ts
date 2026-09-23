@@ -1,205 +1,111 @@
-import Fastify, { type FastifyInstance } from 'fastify';
-import cors from '@fastify/cors';
-import { container } from 'tsyringe';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import { getClerkSecuritySchemes, registerAuth } from '@wallpaperdb/auth';
+import { Effect, Layer, Redacted } from 'effect';
+import type { FastifyInstance } from 'fastify';
+import { ulid } from 'ulid';
+import { AssetsHealth, assetsLayer } from './adapters/assets/index.js';
+import { UploadEventsHealth, uploadedEventsLayer } from './adapters/events/index.js';
+import { imageInspectionLayer } from './adapters/inspection/index.js';
+import { PostgresUploads, postgresUploadsLayer } from './adapters/postgres/index.js';
+import { redisQuotaLayer } from './adapters/quota/index.js';
+import { admissionLayer } from './admission/index.js';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
 import type { Config } from './config.js';
-import { NatsConnectionManager } from './connections/nats.js';
-import { RedisConnection } from './connections/redis.js';
-import { DatabaseConnection } from './connections/database.js';
-import { S3Connection } from './connections/s3.js';
-import { registerRoutes } from './routes/index.js';
-import { getOtelSdk, shutdownOtel } from './otel-init.js';
-import {
-  UploadSuccessResponseJsonSchema,
-  uploadBodySchemaForDocs,
-} from './routes/schemas/upload.schema.js';
-import { RateLimitService } from './services/rate-limit.service.js';
-import { DefaultValidationLimitsService } from './services/validation-limits.service.js';
-import { SystemTimeService } from './services/core/time.service.js';
-import { FastifyLogger } from './services/core/logger.service.js';
-import { SystemTimerService } from '@wallpaperdb/core/timer';
+import { createHttpApp } from './http/index.js';
+import { IngestionIdentity, ingestionLayer } from './ingestion/index.js';
+import { ingestorTracingLayer } from './runtime.js';
+import { reconciliationLayer } from './workers.js';
 
-// Connection state interface
-export interface ConnectionsState {
-  isShuttingDown: boolean;
-  connectionsInitialized: boolean;
+interface AppOptions {
+  readonly logger?: boolean;
+  readonly signal?: AbortSignal;
+  readonly shutdownTimeoutMs?: number;
+  readonly otelHealthy?: boolean;
 }
-
-// Extend Fastify instance with our custom state
-declare module 'fastify' {
-  interface FastifyInstance {
-    connectionsState: ConnectionsState;
-    rateLimitService: RateLimitService;
-    container: typeof container;
-  }
-
-  interface FastifyContextConfig {
-    skipAuth?: boolean;
-  }
+/** One application graph owns shared adapters, request fibers, and recovery workers. */
+export function ingestorLayer(config: Config, options: AppOptions = {}) {
+  const database = postgresUploadsLayer({ databaseUrl: Redacted.value(config.databaseUrl) });
+  const assets = assetsLayer({
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: Redacted.value(config.s3AccessKeyId),
+    secretAccessKey: Redacted.value(config.s3SecretAccessKey),
+    bucket: config.s3Bucket,
+  });
+  const events = uploadedEventsLayer({
+    url: config.natsUrl,
+    stream: config.natsStream,
+    serviceName: config.otelServiceName,
+    assetBucket: config.s3Bucket,
+  });
+  const identity = Layer.succeed(IngestionIdentity, {
+    next: () =>
+      Effect.sync(() => ({
+        wallpaperId: `wlpr_${ulid()}`,
+        eventId: ulid(),
+        correlationId: ulid(),
+        causationId: ulid(),
+        leaseToken: ulid(),
+      })),
+  });
+  const ingestion = ingestionLayer().pipe(
+    Layer.provide(Layer.mergeAll(database, assets, events, imageInspectionLayer, identity))
+  );
+  const admission = admissionLayer({
+    limit: config.rateLimitMax,
+    windowMs: config.rateLimitWindowMs,
+  }).pipe(
+    Layer.provide(
+      redisQuotaLayer({
+        redisEnabled: config.redisEnabled,
+        redisHost: config.redisHost,
+        redisPort: config.redisPort,
+        redisPassword:
+          config.redisPassword === undefined ? undefined : Redacted.value(config.redisPassword),
+      })
+    )
+  );
+  const health = Layer.effect(
+    AvailabilityProbe,
+    Effect.gen(function* () {
+      const database = yield* PostgresUploads;
+      const storage = yield* AssetsHealth;
+      const events = yield* UploadEventsHealth;
+      return AvailabilityProbe.of({
+        inspect: () =>
+          Effect.all(
+            {
+              database: database.check(),
+              s3: storage.check(),
+              nats: events.check(),
+              otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
+            },
+            { concurrency: 'unbounded' }
+          ),
+      });
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(database, assets, events)));
+  return Layer.mergeAll(
+    ingestion,
+    admission,
+    availabilityLayer.pipe(Layer.provide(health)),
+    reconciliationLayer(config).pipe(Layer.provide(ingestion))
+  ).pipe(Layer.provide(ingestorTracingLayer));
 }
-
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean }
+  options: AppOptions = {}
 ): Promise<FastifyInstance> {
-  container.register('config', { useValue: config });
-  container.register('ValidationLimitsService', {
-    useClass: DefaultValidationLimitsService,
-  });
-  // Register TimeService as singleton instance for testability
-  container.register('TimeService', { useValue: new SystemTimeService() });
-  // Register TimerService — swap with FakeTimerService in tests via the builder
-  container.register('TimerService', { useValue: new SystemTimerService() });
-  // Register scalar interval values from config so SchedulerService can inject them
-  container.register('reconciliationIntervalMs', { useValue: config.reconciliationIntervalMs });
-  container.register('s3CleanupIntervalMs', { useValue: config.s3CleanupIntervalMs });
-
-  // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
-  // This allows the SDK to be accessed via DI if needed
-  const otelSdk = getOtelSdk();
-  if (otelSdk) {
-    container.register('otelSdk', { useValue: otelSdk });
-  }
-
-  // Create Fastify server
-  const fastify = Fastify({
-    logger:
-      options?.logger !== false
-        ? {
-            level: config.nodeEnv === 'development' ? 'debug' : 'info',
-            transport:
-              config.nodeEnv === 'development'
-                ? {
-                    target: 'pino-pretty',
-                    options: {
-                      translateTime: 'HH:MM:ss Z',
-                      ignore: 'pid,hostname',
-                    },
-                  }
-                : undefined,
-          }
-        : false,
-  });
-
-  container.register('Logger', { useValue: new FastifyLogger(fastify.log) });
-
-  // Register CORS for development (allow docs site to access API)
-  await fastify.register(cors, {
-    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  });
-
-  await registerAuth(fastify, {
-    secretKey: config.clerkSecretKey,
-    testMode: config.nodeEnv === 'test',
-  });
-
-  // Register OpenAPI documentation
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Ingestor API',
-    version: '1.0.0',
-    description:
-      'Wallpaper upload and ingestion service. Accepts wallpaper uploads, validates files, stores them in object storage, and publishes events for downstream processing.',
-    servers:
-      config.nodeEnv === 'production'
-        ? undefined
-        : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
-    securitySchemes: config.clerkDomain
-      ? getClerkSecuritySchemes({ clerkDomain: config.clerkDomain })
-      : undefined,
-    additionalSchemas: {
-      UploadSuccessResponse: UploadSuccessResponseJsonSchema,
+  const app = await createHttpApp(
+    {
+      nodeEnv: config.nodeEnv,
+      port: config.port,
+      rateLimitMax: config.rateLimitMax,
+      clerkPublishableKey: config.clerkPublishableKey,
+      clerkSecretKey:
+        config.clerkSecretKey === undefined ? undefined : Redacted.value(config.clerkSecretKey),
     },
-    multipartBodies: [
-      {
-        url: '/upload',
-        schema: uploadBodySchemaForDocs,
-        errorResponses: [
-          {
-            statusCode: 400,
-            description: 'Validation error. The file format, size, or dimensions are invalid.',
-          },
-          {
-            statusCode: 409,
-            description:
-              'Duplicate file. A file with the same content hash already exists for this user.',
-          },
-          {
-            statusCode: 413,
-            description: 'File too large. The file exceeds the maximum allowed size.',
-          },
-          {
-            statusCode: 429,
-            description: 'Rate limit exceeded. Too many upload requests in a short period.',
-          },
-          {
-            statusCode: 500,
-            description: 'Internal server error. An unexpected error occurred during processing.',
-          },
-        ],
-      },
-    ],
-  });
-
-  // Decorate Fastify with container for access in routes
-  fastify.decorate('container', container);
-
-  // Initialize connection state
-  fastify.decorate('connectionsState', {
-    isShuttingDown: false,
-    connectionsInitialized: false,
-  });
-
-  // Initialize connections
-  fastify.log.info('Initializing connections...');
-
-  try {
-    await container.resolve(DatabaseConnection).initialize();
-    fastify.log.info('Database connection pool created');
-
-    // Initialize S3 connection
-    await container.resolve(S3Connection).initialize();
-    fastify.log.info('S3 connection created');
-
-    // Initialize NATS connection
-    await container.resolve(NatsConnectionManager).initialize();
-    fastify.log.info('NATS connection created');
-
-    // Initialize Redis connection (optional - for rate limiting)
-    if (config.redisEnabled) {
-      await container.resolve(RedisConnection).initialize();
-      fastify.log.info('Redis connection created');
-    }
-
-    fastify.connectionsState.connectionsInitialized = true;
-    fastify.log.info('All connections initialized successfully');
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to initialize connections');
-    throw error;
-  }
-
-  // Add cleanup hook
-  fastify.addHook('onClose', async () => {
-    fastify.connectionsState.isShuttingDown = true;
-    await container.resolve(NatsConnectionManager).close();
-    await container.resolve(DatabaseConnection).close();
-    await container.resolve(S3Connection).close();
-    await container.resolve(RedisConnection).close();
-    await shutdownOtel();
-  });
-
-  // Initialize custom rate limiting service
-  // (Per-user rate limiting applied in upload route after userId extraction)
-  const rateLimitService = container.resolve(RateLimitService);
-  fastify.decorate('rateLimitService', rateLimitService);
-  const rateLimitStore = config.redisEnabled ? 'Redis' : 'in-memory';
-  fastify.log.info(`Rate limiting configured (store: ${rateLimitStore})`);
-
-  // Register all routes
-  await registerRoutes(fastify, config);
-
-  return fastify;
+    ingestorLayer(config, options),
+    options
+  );
+  app.connectionsState.connectionsInitialized = true;
+  return app;
 }

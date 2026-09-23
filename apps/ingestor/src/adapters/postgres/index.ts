@@ -71,15 +71,23 @@ function operation<A>(name: string, run: () => Promise<A>): Effect.Effect<A, Ing
     catch: (cause) => new IngestionUnavailable({ operation: name, cause }),
   }).pipe(
     Effect.tapError((error) =>
-      Effect.logError('Ingestion persistence failed', { operation: name, cause: databaseDiagnostic(error.cause) })
+      Effect.logError('Ingestion persistence failed', {
+        operation: name,
+        cause: databaseDiagnostic(error.cause),
+      })
     ),
     Effect.withSpan(`ingestion.persistence.${name}`)
   );
 }
 function databaseDiagnostic(cause: unknown) {
   const underlying = cause instanceof Error && cause.cause ? cause.cause : cause;
-  const details = z.object({ code: z.string().optional(), constraint: z.string().optional() }).safeParse(underlying);
-  return { name: underlying instanceof Error ? underlying.name : 'PersistenceFailure', ...(details.success ? details.data : {}) };
+  const details = z
+    .object({ code: z.string().optional(), constraint: z.string().optional() })
+    .safeParse(underlying);
+  return {
+    name: underlying instanceof Error ? underlying.name : 'PersistenceFailure',
+    ...(details.success ? details.data : {}),
+  };
 }
 function owned(record: UploadRecord) {
   return and(

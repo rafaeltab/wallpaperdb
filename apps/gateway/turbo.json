@@ -19,7 +19,7 @@
       ]
     },
     "test:integration": {
-      "inputs": ["src/**", "test/**", "vitest.config.ts", "package.json", "coverage-baseline.json"]
+      "inputs": ["src/**", "test/**", "vitest.config.ts", "package.json"]
     }
   }
 }

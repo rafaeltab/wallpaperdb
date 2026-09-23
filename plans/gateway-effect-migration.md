@@ -25,7 +25,7 @@ Migrate the gateway to Effect and CODING_STANDARDS.md while preserving public fu
 
 ## Baseline
 
-151 tests passed, one skipped. Statements/lines 89.72%, branches 87.50%, functions 96.74%. Source coverage continues to include all `src/**/*.ts`, excluding only test/declaration files. Machine-readable counts are in `apps/gateway/coverage-baseline.json`.
+151 tests passed, one skipped. Statements/lines 89.72%, branches 87.50%, functions 96.74%. Source coverage continues to include all `src/**/*.ts`, excluding only test/declaration files. The same coverage floors are configured directly in `apps/gateway/vitest.config.ts`.
 
 ## Validation
 

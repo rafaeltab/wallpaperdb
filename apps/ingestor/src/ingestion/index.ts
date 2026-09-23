@@ -1,5 +1,4 @@
 import { Clock, Context, Effect, Layer, Schema } from 'effect';
-import { ulid } from 'ulid';
 
 export interface ValidationLimits {
   readonly maxFileSizeImage: number;
@@ -130,6 +129,10 @@ export interface Ingestion {
   cleanup(): Effect.Effect<void, IngestionUnavailable>;
 }
 export const Ingestion = Context.Service<Ingestion>('wallpaperdb.ingestor.ingestion');
+export interface IngestionIdentity {
+  next(): Effect.Effect<{ readonly wallpaperId: string; readonly eventId: string; readonly correlationId: string; readonly causationId: string; readonly leaseToken: string }>;
+}
+export const IngestionIdentity = Context.Service<IngestionIdentity>('wallpaperdb.ingestor.ingestion.identity');
 
 export interface UploadRecord {
   readonly wallpaper: UploadedWallpaper;
@@ -175,7 +178,7 @@ export const IngestionStore = Context.Service<IngestionStore>(
 export function ingestionLayer(): Layer.Layer<
   Ingestion,
   never,
-  ContentInspection | AssetStorage | UploadEvents | IngestionStore
+  ContentInspection | AssetStorage | UploadEvents | IngestionStore | IngestionIdentity
 > {
   return Layer.effect(
     Ingestion,
@@ -184,6 +187,7 @@ export function ingestionLayer(): Layer.Layer<
       const assets = yield* AssetStorage;
       const events = yield* UploadEvents;
       const store = yield* IngestionStore;
+      const identity = yield* IngestionIdentity;
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
       ): Effect.fn.Return<UploadOutcome, IngestionUnavailable> {
@@ -194,8 +198,9 @@ export function ingestionLayer(): Layer.Layer<
         );
         if (inspected._tag !== 'Inspected') return inspected;
         const now = yield* Clock.currentTimeMillis;
+        const ids = yield* identity.next();
         const wallpaper: UploadedWallpaper = {
-          id: `wlpr_${ulid()}`,
+          id: ids.wallpaperId,
           profileId: input.principal.profileId,
           metadata: inspected.metadata,
           originalFilename: input.filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255),
@@ -205,17 +210,22 @@ export function ingestionLayer(): Layer.Layer<
           wallpaper,
           state: 'uploading',
           attempts: 0,
-          leaseToken: ulid(),
+          leaseToken: ids.leaseToken,
           event: {
-            id: ulid(),
+            id: ids.eventId,
             source: 'wallpaperdb/ingestor',
             occurredAt: wallpaper.uploadedAt,
-            correlationId: ulid(),
-            causationId: ulid(),
+            correlationId: ids.correlationId,
+            causationId: ids.causationId,
             wallpaper,
           },
         };
-        yield* store.reserve(record, new Date(now + 10 * 60 * 1000));
+        const reservation = yield* store.reserve(record, new Date(now + 10 * 60 * 1000));
+        if (reservation._tag === 'Existing') {
+          return reservation.record.state === 'uploading'
+            ? { _tag: 'InProgress' }
+            : { _tag: 'Duplicate', upload: receipt(reservation.record.wallpaper) };
+        }
         yield* assets.put({
           wallpaperId: wallpaper.id,
           profileId: wallpaper.profileId,

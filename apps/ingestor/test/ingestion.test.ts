@@ -4,6 +4,13 @@ import { Ingestion } from '../src/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
 
 describe('Wallpaper ingestion', () => {
+  it('reuses an owner’s committed content without storing or publishing it twice', async () => {
+    const test = fixture();
+    const results = await Effect.runPromise(Ingestion.use((ingestion) => Effect.all([ingestion.upload(uploadInput), ingestion.upload(uploadInput)])).pipe(Effect.provide(test.layer)));
+    expect(results.map((result) => result._tag)).toEqual(['Accepted', 'Duplicate']);
+    expect(test.objects).toHaveLength(1);
+    expect(test.published).toHaveLength(1);
+  });
   it('durably accepts an inspected wallpaper and publishes its committed snapshot', async () => {
     const test = fixture();
     const result = await Effect.runPromise(Ingestion.use((ingestion) => ingestion.upload(uploadInput)).pipe(Effect.provide(test.layer)));

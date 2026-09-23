@@ -72,7 +72,7 @@ The public wallpaper catalogue provides GraphQL discovery from gateway-owned Ope
 
 **Key features:**
 
-- Wallpaper and contributor Profile reads, color ranking, rendition filters and bidirectional pagination
+- Wallpaper and contributor Profile reads, Profile discovery and canonical Handle routing, color ranking, rendition filters and pagination
 - Effect execution with explicit application ports and scoped resource cleanup
 - Replay-safe projection updates, bounded retries and durable quarantine
 - Query security limits, visitor quotas and OpenTelemetry tracing
@@ -80,3 +80,262 @@ The public wallpaper catalogue provides GraphQL discovery from gateway-owned Ope
 **Consumes:** `wallpaper.uploaded`, `wallpaper.variant.available`, `wallpaper.colors.extracted`, `profile.created`, and `profile.updated`.
 
 [View full documentation](/docs/services/gateway)
+
+### Web Frontend
+**Status:** ✅ COMPLETE
+
+React-based web application for browsing and uploading wallpapers.
+
+**Key Features:**
+- Wallpaper upload interface
+- Muuri grid layout for browsing
+- Integration with Gateway GraphQL API
+- Responsive design
+
+## Planned Services
+
+The following services are planned as part of the multi-service architecture expansion:
+
+### Thumbnail Extractor
+**Status:** 📋 Planned
+
+Generates thumbnails for video wallpapers using FFmpeg.
+
+**Planned Features:**
+- Video thumbnail generation at multiple timestamps
+- Multiple thumbnail variants (small, medium, large)
+- FFmpeg integration
+- Batch processing support
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded` (video files)
+- Publishes: `wallpaper.thumbnail.generated`
+
+### Quality Enrichment
+**Status:** 📋 Planned
+
+Analyzes image quality and assigns quality scores.
+
+**Planned Features:**
+- Resolution and sharpness analysis
+- Compression artifact detection
+- ML-based quality scoring
+- Quality tier assignment (low, medium, high, ultra)
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded` (image files)
+- Publishes: `wallpaper.quality.analyzed`
+
+### Color Enrichment
+**Status:** 📋 Planned
+
+Extracts dominant colors and color palettes from wallpapers.
+
+**Planned Features:**
+- Dominant color extraction
+- Color palette generation (5-10 colors)
+- Color clustering algorithms
+- Perceptual color space analysis
+
+**Event-driven:**
+- Consumes: `wallpaper.uploaded`
+- Publishes: `wallpaper.colors.extracted`
+
+### User Service
+**Status:** 🚧 In Development
+
+Manages user identities, profiles, and Clerk webhook processing.
+
+**Key Features:**
+- Clerk webhook processing for user lifecycle events
+- User profile persistence in PostgreSQL
+- NATS event publishing for user-related changes
+
+**API Endpoints:**
+- `GET /health` - Health check with dependency status
+- `GET /ready` - Readiness probe
+
+**Event-driven:**
+- Consumes: Clerk webhooks (HTTP)
+- Publishes: user events (NATS)
+
+[View Full Documentation →](/docs/services/user)
+
+### Tagging Service
+**Status:** 🚧 In Development
+
+Minimal service shell for future tagging work.
+
+**Current Scope:**
+- Tag service scaffold with PostgreSQL and NATS wiring
+- Health and readiness endpoints only
+
+**API-driven:**
+- Operational endpoints only for now
+
+[View Full Documentation →](/docs/services/tags)
+
+### Gateway
+**Status:** 📋 Planned
+
+GraphQL API gateway for unified access to all services.
+
+**Planned Features:**
+- GraphQL schema stitching
+- Query optimization and caching
+- Authentication and authorization
+- Rate limiting
+- API analytics
+
+## Service Architecture
+
+### Communication Patterns
+
+**Event-Driven (NATS JetStream):**
+- Services publish events when work is complete
+- Other services consume events asynchronously
+- Enables loose coupling and independent scaling
+- Provides durability and replay capabilities
+
+```
+Ingestor → wallpaper.uploaded → {
+  Media Service (caches metadata)
+  Thumbnail Extractor (generates thumbnails)
+  Quality Enrichment (analyzes quality)
+  Color Enrichment (extracts colors)
+}
+```
+
+**Synchronous (HTTP/REST):**
+- Used for retrieval operations
+- Client-facing endpoints
+- Service-to-service queries (when needed)
+
+### Service Registry
+
+| Service | Port | Database | S3/SeaweedFS | NATS | Redis | Status |
+|---------|------|----------|----------|------|-------|--------|
+| Ingestor | 3001 | ✓ | ✓ | ✓ (publish) | ✓ | ✅ Complete |
+| Media | 3002 | ✓ | ✓ | ✓ (consume) | - | ✅ Complete |
+| Variant Gen | 3004 | - | ✓ | ✓ (pub/sub) | - | ✅ Complete |
+| Gateway | 3000 | ✓ | - | ✓ (consume) | ✓ | ✅ Complete |
+| Web | 3005 | - | - | - | - | ✅ Complete |
+| Thumbnail | 3003 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Quality | 3006 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| Color | 3007 | ✓ | ✓ | ✓ | - | 📋 Planned |
+| User | 3009 | ✓ | - | ✓ (publish) | - | 🚧 In Development |
+| Tagging | 3008 | ✓ | - | ✓ | - | 🚧 In Development |
+
+### Shared Infrastructure
+
+All services use:
+- **PostgreSQL** - Primary data store
+- **SeaweedFS** - S3-compatible object storage
+- **NATS JetStream** - Event bus with durability
+- **Grafana LGTM** - Observability (traces, metrics, logs)
+
+Selected services use:
+- **Redis** - Rate limiting and caching
+- **OpenSearch** - Full-text search (future)
+
+## Technology Stack
+
+### Core Framework
+- **Fastify** - High-performance HTTP server
+- **TypeScript** - Type-safe development
+- **TSyringe** - Dependency injection
+
+### Shared Packages
+- **@wallpaperdb/core** - Connections, config, telemetry, health
+- **@wallpaperdb/events** - Event schemas and pub/sub abstractions
+- **@wallpaperdb/test-utils** - TesterBuilder pattern for testing
+
+See [Packages](/docs/packages) for complete package documentation.
+
+### Database & Storage
+- **Drizzle ORM** - Type-safe PostgreSQL queries
+- **AWS SDK v3** - S3/SeaweedFS client
+- **IORedis** - Redis client
+
+### Observability
+- **OpenTelemetry** - Distributed tracing and metrics
+- **Pino** - Structured logging
+- **Grafana** - Dashboards and alerting
+
+## Development Workflow
+
+### Running a Service
+
+```bash
+# Start infrastructure first
+make infra-start
+
+# Run ingestor service
+make dev PACKAGE=ingestor
+
+# Run media service
+make dev PACKAGE=media
+
+# Run all services
+make dev
+```
+
+### Testing a Service
+
+```bash
+# Test specific service
+make test PACKAGE=ingestor
+make test PACKAGE=media
+
+# Test all services
+make test
+```
+
+### Building for Production
+
+```bash
+# Build specific service
+make build PACKAGE=ingestor
+make build PACKAGE=media
+
+# Build all services
+make build
+```
+
+## Service Development Timeline
+
+**Completed:**
+- ✅ Ingestor Service (production-ready)
+- ✅ Media Service (production-ready)
+- ✅ Variant Generator (production-ready)
+- ✅ Gateway (production-ready)
+- ✅ Web Frontend (production-ready)
+
+**Actual Timeline:**
+- Phase 1: Ingestor (~2 weeks)
+- Phase 2: Media Service (~1 week)
+- Phase 3: Variant Generator (~1 week)
+- Phase 4: Gateway (~2 weeks)
+- Phase 5: Web Frontend (~2 weeks)
+
+**Priority Order (Remaining):**
+1. User Service (Clerk webhooks, profile management)
+2. Thumbnail Extractor (event consumer pattern)
+3. Quality/Color Enrichment (parallel processing)
+4. Tagging Service (CRUD API)
+
+## Architecture Decisions
+
+Key architectural decisions are documented in ADRs:
+
+- [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs) - Framework choice
+- [Multi-Service Architecture](/docs/architecture/multi-service) - Service decomposition strategy
+- [Service Registry](/docs/architecture/service-registry) - Complete service catalog
+
+## Related Documentation
+
+- [Architecture: Multi-Service](/docs/architecture/multi-service) - Architecture strategy and patterns
+- [Architecture: Service Registry](/docs/architecture/service-registry) - Detailed service specifications
+- [Package: Events](/docs/packages/events) - Event schemas and pub/sub
+- [Guide: Creating New Service](/docs/guides/creating-new-service) - Step-by-step service creation
+- [Testing](/docs/testing) - Testing strategies for services

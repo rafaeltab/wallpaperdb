@@ -24,6 +24,29 @@ async function build(overrides: Partial<HttpConfig> = {}, ports: Partial<HttpTes
   return app;
 }
 const query = '{ searchWallpapers(first:10) { edges { node { wallpaperId variants { url } } } } }';
+const nestedQueries = [
+  `{
+    searchWallpapers(first:10) {
+      edges { node { profile { wallpapers(first:10) {
+        edges { node { profile { wallpapers(first:10) {
+          edges { node { wallpaperId } }
+        } } } }
+      } } } }
+    }
+  }`,
+  `{
+    searchWallpapers(first: 10) { ...P1 }
+  }
+  fragment P1 on WallpaperConnection {
+    edges { node { profile { wallpapers(first: 10) { ...P2 } } } }
+  }
+  fragment P2 on WallpaperConnection {
+    edges { node { profile { wallpapers(first: 10) { ...P3 } } } }
+  }
+  fragment P3 on WallpaperConnection {
+    edges { node { wallpaperId } }
+  }`,
+];
 async function execute(
   app: FastifyInstance,
   text = query,
@@ -51,6 +74,178 @@ describe('GraphQL security driving contract', () => {
   it('rejects queries over the depth limit', async () => {
     const app = await build({ graphqlMaxDepth: 4 });
     expect((await execute(app)).json().errors).toBeDefined();
+  });
+  it.each(
+    nestedQueries
+  )('rejects nested page expansion before catalogue work: %s', async (text) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    expect((await execute(app, text)).json().errors).toBeDefined();
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each(nestedQueries)('applies depth limits through fragment boundaries: %s', async (text) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: 100_000 }, { catalogue });
+    expect((await execute(app, text)).json().errors?.[0].extensions.code).toBe(
+      'DEPTH_LIMIT_EXCEEDED'
+    );
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each(nestedQueries)('multiplies descendant costs by each parent page: %s', async (text) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxDepth: 20 }, { catalogue });
+    expect((await execute(app, text)).json().errors?.[0].extensions.code).toBe(
+      'COMPLEXITY_LIMIT_EXCEEDED'
+    );
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('charges a reused fragment at each different parent position', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: 75 }, { catalogue });
+    const response = await execute(
+      app,
+      `
+      { a:profile(id:"profile_a"){...Page} b:profile(id:"profile_b"){...Page} }
+      fragment Page on Profile {wallpapers(first:3){edges{node{wallpaperId}}}}
+    `
+    );
+    expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('counts reused aliases at each different parent position', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxAliases: 3 }, { catalogue });
+    const response = await execute(
+      app,
+      `
+      { a:profile(id:"profile_a"){...ProfileName} b:profile(id:"profile_b"){...ProfileName} }
+      fragment ProfileName on Profile {name:handle}
+    `
+    );
+    expect(response.json().errors?.[0].extensions).toMatchObject({
+      code: 'BREADTH_LIMIT_EXCEEDED',
+      aliases: 4,
+    });
+    expect(catalogue.calls).toEqual([]);
+  });
+  it.each([
+    14, 15,
+  ])('merges repeated response fields and unions their children at cost %i', async (limit) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: limit, graphqlMaxAliases: 1 }, { catalogue });
+    const response = await execute(
+      app,
+      `
+      { profile(id:"profile_a"){...Page ...Page ...More} }
+      fragment Page on Profile {page:wallpapers(first:1){edges{node{wallpaperId}}}}
+      fragment More on Profile {page:wallpapers(first:1){edges{node{profileId}}}}
+    `
+    );
+    if (limit === 15) {
+      expect(response.json().errors).toBeUndefined();
+      expect(catalogue.calls).toEqual(['profile']);
+    } else {
+      expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+      expect(catalogue.calls).toEqual([]);
+    }
+  });
+  it.each([
+    {
+      placement: 'field',
+      selection: 'searchWallpapers(first:100) @include(if:$include){edges{node{wallpaperId}}}',
+      fragment: '',
+    },
+    {
+      placement: 'spread',
+      selection: '...Expensive @include(if:$include)',
+      fragment:
+        'fragment Expensive on Query {searchWallpapers(first:100){edges{node{wallpaperId}}}}',
+    },
+    {
+      placement: 'inline fragment',
+      selection:
+        '... on Query @include(if:$include){searchWallpapers(first:100){edges{node{wallpaperId}}}}',
+      fragment: '',
+    },
+  ])('honors coerced directives on a $placement', async ({ selection, fragment }) => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxComplexity: 10 }, { catalogue });
+    const text = `query($include:Boolean=false){profile(id:"profile_a"){id} ${selection}} ${fragment}`;
+    expect((await execute(app, text)).json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['profile']);
+    catalogue.calls.length = 0;
+    expect((await execute(app, text, { include: true })).json().errors?.[0].extensions.code).toBe(
+      'COMPLEXITY_LIMIT_EXCEEDED'
+    );
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('gives skip precedence over include and does not count skipped depth or aliases', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build(
+      { graphqlMaxDepth: 2, graphqlMaxAliases: 1, graphqlMaxComplexity: 2 },
+      { catalogue }
+    );
+    const response = await execute(
+      app,
+      `{
+      profile(id:"profile_a"){id}
+      ... on Query @skip(if:true) @include(if:true) {
+        a:searchWallpapers{edges{node{wallpaperId}}}
+        b:searchWallpapers{edges{node{wallpaperId}}}
+      }
+    }`
+    );
+    expect(response.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['profile']);
+  });
+  it('limits depth only for the selected operation', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({}, { catalogue });
+    const text = `query Small{profile(id:"profile_a"){id}} query Large${nestedQueries[0]}`;
+    expect((await execute(app, text, undefined, 'Small')).json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['profile']);
+    catalogue.calls.length = 0;
+    expect((await execute(app, text, undefined, 'Large')).json().errors).toBeDefined();
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('collects a diamond fragment graph without expanding repeated selections', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxDepth: 2, graphqlMaxComplexity: 2 }, { catalogue });
+    const fragments = Array.from(
+      { length: 40 },
+      (_, i) => `fragment F${i} on Profile {${i === 39 ? 'id' : `...F${i + 1} ...F${i + 1}`}}`
+    ).join('\n');
+    const response = await execute(app, `{profile(id:"profile_a"){...F0}} ${fragments}`);
+    expect(response.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['profile']);
+  });
+  it('stops costing a branching fragment graph as soon as its work budget is exceeded', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxDepth: 500, graphqlMaxAliases: 1000 }, { catalogue });
+    const fragments = Array.from({ length: 40 }, (_, i) => {
+      const child = i === 39 ? 'id' : `...F${i + 1}`;
+      return `fragment F${i} on Profile {
+        a:wallpapers(first:1){edges{node{profile{${child}}}}}
+        b:wallpapers(first:1){edges{node{profile{${child}}}}}
+      }`;
+    }).join('\n');
+    const response = await execute(app, `{profile(id:"profile_a"){...F0}} ${fragments}`);
+    expect(response.json().errors?.[0].extensions.code).toBe('COMPLEXITY_LIMIT_EXCEEDED');
+    expect(catalogue.calls).toEqual([]);
+  });
+  it('does not add depth for inline fragments or multiply connection metadata by page size', async () => {
+    const catalogue = new ObservedCatalogue();
+    const app = await build({ graphqlMaxDepth: 3, graphqlMaxComplexity: 102 }, { catalogue });
+    const response = await execute(
+      app,
+      `{
+      ... { ... on Query {
+        searchWallpapers(first:10) { ... on WallpaperConnection {pageInfo{hasNextPage}} }
+      } }
+    }`
+    );
+    expect(response.json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['search']);
   });
   it.each([1, 11])('rejects batch arrays of size %i in GraphQL format', async (size) => {
     const app = await build();
@@ -141,7 +336,8 @@ describe('GraphQL security driving contract', () => {
       size,
     }) => {
       const catalogue = new ObservedCatalogue();
-      const app = await build({ graphqlMaxComplexity: size * 5 }, { catalogue });
+      const complexity = size * 12 + (field === 'searchWallpapers' ? 1 : 2);
+      const app = await build({ graphqlMaxComplexity: complexity - 1 }, { catalogue });
       const selection =
         field === 'searchWallpapers'
           ? `searchWallpapers${args}{edges{node{wallpaperId}}}`
@@ -149,7 +345,7 @@ describe('GraphQL security driving contract', () => {
       const response = await execute(app, `query${definition}{${selection}}`, variables);
       expect(response.json().errors?.[0].extensions).toMatchObject({
         code: 'COMPLEXITY_LIMIT_EXCEEDED',
-        complexity: size * 10 + (field === 'searchWallpapers' ? 3 : 4),
+        complexity,
       });
       expect(catalogue.calls).toEqual([]);
     });

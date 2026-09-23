@@ -296,7 +296,6 @@ export async function createHttpApp<E>(
       ...graphql,
       graphiql: config.nodeEnv === 'development',
       path: '/graphql',
-      queryDepth: config.graphqlMaxDepth,
       validationRules:
         config.nodeEnv === 'production' || !config.graphqlIntrospectionEnabled
           ? [NoSchemaIntrospectionCustomRule]

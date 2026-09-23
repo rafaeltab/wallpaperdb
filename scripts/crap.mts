@@ -131,6 +131,56 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+function normalizeLineEnd(span: unknown) {
+  if (isRecord(span) && isRecord(span.end) && span.end.column === null) {
+    // Vitest 5 serializes Istanbul's Infinity (through end of line) as null.
+    // Match the core parser's line-end sentinel, without inventing any hits.
+    span.end.column = Number.MAX_SAFE_INTEGER;
+  }
+}
+
+function isImplicitElse(span: unknown) {
+  return (
+    isRecord(span) &&
+    isRecord(span.start) &&
+    isRecord(span.end) &&
+    Object.keys(span.start).length === 0 &&
+    Object.keys(span.end).length === 0
+  );
+}
+
+function normalizeVitestCoverage(file: unknown) {
+  if (!isRecord(file)) return;
+  if (isRecord(file.statementMap)) {
+    for (const span of Object.values(file.statementMap)) normalizeLineEnd(span);
+  }
+  if (isRecord(file.fnMap)) {
+    for (const entry of Object.values(file.fnMap)) {
+      if (!isRecord(entry)) continue;
+      normalizeLineEnd(entry.decl);
+      normalizeLineEnd(entry.loc);
+    }
+  }
+  if (isRecord(file.branchMap)) {
+    for (const entry of Object.values(file.branchMap)) {
+      if (!isRecord(entry)) continue;
+      normalizeLineEnd(entry.loc);
+      if (!Array.isArray(entry.locations)) continue;
+      // An if without an else still measures its false path. Vitest leaves that
+      // path's location empty; retain its own counter at the enclosing decision.
+      // Other absent ranges remain malformed and are rejected below.
+      if (
+        entry.type === 'if' &&
+        entry.locations.length === 2 &&
+        isImplicitElse(entry.locations[1])
+      ) {
+        entry.locations[1] = entry.loc;
+      }
+      for (const location of entry.locations) normalizeLineEnd(location);
+    }
+  }
+}
+
 function validateSpan(span: unknown): asserts span is Range {
   assert(isRecord(span) && isRecord(span.start) && isRecord(span.end), 'Invalid coverage span');
   for (const point of [span.start, span.end]) {
@@ -251,6 +301,7 @@ async function combineCoverage(workspaces: Workspace[], temporaryDirectory: stri
         const report: unknown = JSON.parse(await readFile(reportPath, 'utf8'));
         assert(isRecord(report), 'Expected an Istanbul coverage object');
         for (const file of Object.values(report)) {
+          normalizeVitestCoverage(file);
           // The core tolerates malformed entries. Fail here before it can silently
           // discard counters and present an apparently successful analysis.
           validateFileCoverage(file);
@@ -284,7 +335,11 @@ async function analyze(files: string[], coverage: Coverage) {
   const rows = [];
   for (const file of files) {
     const methods = await parseFileMethods(file);
-    const attributed = coverageForMethods(methods, coverage.get(file));
+    // The core parser keys its map with normalized, case-insensitive paths.
+    const attributed = coverageForMethods(
+      methods,
+      coverage.get(file.replaceAll('\\', '/').toLowerCase()),
+    );
     for (const [index, method] of methods.entries()) {
       const percent = effectiveCoverage(method, attributed[index]);
       const score = calculateCrapScore(method.complexity, percent);

@@ -61,6 +61,7 @@ async function proxy() {
   const heldReplies: Array<{ socket: Socket; chunk: Buffer }> = [];
   let acceptsConnections = true;
   let evals = 0;
+  let connections = 0;
   const sockets = new Set<Socket>();
   const server = createServer((socket) => {
     if (!acceptsConnections) {
@@ -68,6 +69,7 @@ async function proxy() {
       return;
     }
     sockets.add(socket);
+    connections += 1;
     const upstream = connect(container.getMappedPort(6379), '127.0.0.1');
     socket.on('data', (chunk) => {
       evals += chunk.toString().split('\r\neval\r\n').length - 1;
@@ -96,6 +98,9 @@ async function proxy() {
     },
     get evals() {
       return evals;
+    },
+    get connections() {
+      return connections;
     },
     stall() {
       forwardsReplies = false;
@@ -200,6 +205,52 @@ describe('quota storage contract', () => {
       ).toBe(true);
       expect(await control.get('graphql:ratelimit:healthy-saturation')).toBe('64');
       expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
+    } finally {
+      bridge.releaseReplies();
+      await Promise.allSettled([pending]);
+      control.disconnect();
+      await adapter.dispose();
+      await bridge.close();
+      await observed.close();
+    }
+  });
+  it('keeps cancelled commands bounded without disconnecting shared quota enforcement', async () => {
+    const bridge = await proxy();
+    const adapter = await distributed(bridge.port);
+    const control = new Redis({ host: '127.0.0.1', port: container.getMappedPort(6379) });
+    const observed = observeQuotaMetrics();
+    const controller = new AbortController();
+    let pending: Promise<unknown> | undefined;
+    try {
+      expect(await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000))).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 0,
+      });
+      bridge.holdReplies();
+      pending = Effect.runPromiseExit(
+        Effect.all(
+          Array.from({ length: 64 }, () => adapter.quota.take('cancel-held', 100, 60000)),
+          { concurrency: 'unbounded' }
+        ),
+        { signal: controller.signal }
+      );
+      await expect
+        .poll(() => control.get('graphql:ratelimit:cancel-held'), { interval: 5 })
+        .toBe('64');
+      controller.abort();
+      expect(await control.ping()).toBe('PONG');
+      expect(await Effect.runPromise(adapter.quota.take('cancel-held', 100, 60000))).toMatchObject({
+        _tag: 'Allowed',
+        remaining: 100,
+      });
+      expect(await observed.read()).toEqual([{ attributes: { reason: 'saturated' }, value: 1 }]);
+      expect(await control.get('graphql:ratelimit:cancel-held')).toBe('64');
+      bridge.releaseReplies();
+      expect(await pending).toMatchObject({ _tag: 'Failure' });
+      expect(await Effect.runPromise(adapter.quota.take('cancel-other', 1, 60000))).toMatchObject({
+        _tag: 'Limited',
+      });
+      expect(bridge.connections).toBe(1);
     } finally {
       bridge.releaseReplies();
       await Promise.allSettled([pending]);

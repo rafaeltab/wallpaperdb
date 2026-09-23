@@ -48,12 +48,7 @@ class RedisQuota implements Quota {
     const client = this.client;
     const reply = yield* this.permits.withPermitsIfAvailable(1)(
       Effect.tryPromise({
-        try: (signal) => {
-          signal.addEventListener('abort', this.disconnect, { once: true });
-          return client
-            .eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs)
-            .finally(() => signal.removeEventListener('abort', this.disconnect));
-        },
+        try: () => client.eval(consume, 1, `graphql:ratelimit:${visitor}`, limit, windowMs),
         catch: (cause) => cause,
       }).pipe(
         Effect.flatMap((response) =>
@@ -71,7 +66,10 @@ class RedisQuota implements Quota {
             this.disconnect();
             return undefined;
           })
-        )
+        ),
+        // Redis cannot cancel an issued command. Keep its permit until the command
+        // settles under the client's one-second deadline, including on caller cancellation.
+        Effect.uninterruptible
       )
     );
     if (reply._tag === 'None') return yield* allowWithoutQuota(limit, windowMs, 'saturated');

@@ -34,7 +34,7 @@ describe('Gateway bootstrap and deployed artifact', () => {
   const tester = createGatewayTester({ app: false });
   beforeAll(async () => {
     await tester.setup();
-    await execute('make', ['gateway-build'], {
+    await execute('make', ['build', 'PACKAGE=gateway'], {
       cwd: fileURLToPath(new URL('../../../', import.meta.url)),
     });
   });

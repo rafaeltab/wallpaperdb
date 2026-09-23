@@ -37,9 +37,15 @@ test('test tiers preserve sequential container execution', () => {
 
 test('focused tests select one workspace and serialize dependency builds and tests', () => {
   assert.notEqual(make('test-focused').status, 0);
-  const focused = output('test-focused', 'PACKAGE=web', 'ARGS=test/components/profile/public-profile-page.test.tsx');
-  assert.match(focused, /run build --filter="@wallpaperdb\/web\^\.\.\." --concurrency=1/);
-  assert.match(focused, /vitest run --maxWorkers=1 --minWorkers=1 --no-file-parallelism test\/components\/profile\/public-profile-page.test.tsx/);
+  for (const [workspace, file] of [
+    ['web', 'test/components/profile/public-profile-page.test.tsx'],
+    ['gateway', 'test/catalogue.test.ts'],
+  ]) {
+    const focused = output('test-focused', `PACKAGE=${workspace}`, `ARGS=${file}`);
+    assert.ok(focused.includes(`run build --filter="@wallpaperdb/${workspace}^..." --concurrency=1`));
+    assert.ok(focused.includes(`pnpm --filter @wallpaperdb/${workspace} exec vitest run --maxWorkers=1 --no-file-parallelism ${file}`));
+    assert.doesNotMatch(focused, /--minWorkers/, 'the shared command must support gateway Vitest 5');
+  }
 });
 
 test('dev defaults to Compose and scopes workspace dev through Turbo', () => {

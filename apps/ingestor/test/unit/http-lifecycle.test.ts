@@ -1,7 +1,11 @@
 import { Deferred, Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { Admission } from '../../src/admission/index.js';
-import { AvailabilityProbe, availabilityLayer } from '../../src/availability/index.js';
+import {
+  AvailabilityProbe,
+  availabilityLayer,
+  type DependencyHealth,
+} from '../../src/availability/index.js';
 import { Ingestion, type UploadOutcome } from '../../src/ingestion/index.js';
 import { createHttpApp } from '../../src/http/index.js';
 const receipt = {
@@ -23,11 +27,23 @@ const availability = availabilityLayer.pipe(
 const admission = Layer.succeed(Admission, {
   admit: () => Effect.succeed({ _tag: 'Allowed', remaining: 1, reset: 1000 }),
 });
-function serve(upload: Effect.Effect<UploadOutcome>, shutdownTimeoutMs = 30) {
+function serve(
+  upload: Effect.Effect<UploadOutcome>,
+  options: {
+    readonly shutdownTimeoutMs?: number;
+    readonly requestTimeoutMs?: number;
+    readonly probe?: Effect.Effect<DependencyHealth>;
+  } = {}
+) {
+  const probe = options.probe;
   return createHttpApp(
-    { nodeEnv: 'test', port: 0, rateLimitMax: 2 },
+    { nodeEnv: 'test', port: 0, rateLimitMax: 2, requestTimeoutMs: options.requestTimeoutMs },
     Layer.mergeAll(
-      availability,
+      probe
+        ? availabilityLayer.pipe(
+            Layer.provide(Layer.succeed(AvailabilityProbe, { inspect: () => probe }))
+          )
+        : availability,
       admission,
       Layer.succeed(Ingestion, {
         upload: () => upload,
@@ -35,7 +51,7 @@ function serve(upload: Effect.Effect<UploadOutcome>, shutdownTimeoutMs = 30) {
         cleanup: () => Effect.void,
       })
     ),
-    { shutdownTimeoutMs }
+    { shutdownTimeoutMs: options.shutdownTimeoutMs ?? 30 }
   );
 }
 function send(address: string, signal?: AbortSignal) {
@@ -51,6 +67,66 @@ function send(address: string, signal?: AbortSignal) {
   });
 }
 describe('HTTP ownership', () => {
+  it('closes a stalled multipart upload at the configured socket deadline', async () => {
+    let ingested = false;
+    const app = await serve(
+      Effect.sync(() => {
+        ingested = true;
+        return { _tag: 'InProgress' } as const;
+      }),
+      { requestTimeoutMs: 30 }
+    );
+    const address = await app.listen({ host: '127.0.0.1', port: 0 });
+    const request = httpRequest(`${address}/upload`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'owner' })).toString('base64')}`,
+        'content-type': 'multipart/form-data; boundary=stalled',
+      },
+    });
+    request.on('error', () => undefined);
+    try {
+      request.write(
+        '--stalled\r\nContent-Disposition: form-data; name="file"; filename="upload.png"\r\nContent-Type: image/png\r\n\r\npartial'
+      );
+      await expect.poll(() => request.destroyed, { timeout: 1000 }).toBe(true);
+      expect(ingested).toBe(false);
+    } finally {
+      request.destroy();
+      await app.close();
+    }
+  });
+
+  it('interrupts a dependency probe when its caller disconnects', async () => {
+    let entered = false;
+    let interrupted = false;
+    const app = await serve(Effect.succeed({ _tag: 'InProgress' }), {
+      probe: Effect.sync(() => {
+        entered = true;
+      }).pipe(
+        Effect.andThen(Effect.never),
+        Effect.onInterrupt(() =>
+          Effect.sync(() => {
+            interrupted = true;
+          })
+        )
+      ),
+    });
+    const address = await app.listen({ host: '127.0.0.1', port: 0 });
+    const abort = new AbortController();
+    try {
+      const response = fetch(`${address}/health`, { signal: abort.signal }).catch(
+        (error: unknown) => error
+      );
+      await expect.poll(() => entered).toBe(true);
+      abort.abort();
+      expect(await response).toBeInstanceOf(Error);
+      await expect.poll(() => interrupted, { timeout: 500 }).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('cancels a blocked upload when the client abandons its response', async () => {
     let entered = false;
     let interrupted = false;
@@ -89,7 +165,7 @@ it('allows an accepted request to finish within shutdown grace', async () => {
       Effect.andThen(Deferred.await(release)),
       Effect.as<UploadOutcome>({ _tag: 'Accepted', upload: receipt })
     ),
-    1000
+    { shutdownTimeoutMs: 1000 }
   );
   const address = await app.listen({ host: '127.0.0.1', port: 0 });
   const response = send(address).then((response) => response.json());
@@ -140,3 +216,4 @@ it('releases acquired resources when later startup fails', async () => {
   ).rejects.toThrow();
   expect(closed).toBe(true);
 });
+import { request as httpRequest } from 'node:http';

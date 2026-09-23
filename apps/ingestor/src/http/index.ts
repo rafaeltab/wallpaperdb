@@ -18,6 +18,7 @@ export interface HttpConfig {
   readonly rateLimitMax: number;
   readonly clerkSecretKey?: string;
   readonly clerkPublishableKey?: string;
+  readonly requestTimeoutMs?: number;
 }
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -50,7 +51,13 @@ export async function createHttpApp<E>(
   options: { logger?: boolean; signal?: AbortSignal; shutdownTimeoutMs?: number } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(httpExecutionLayer.pipe(Layer.provide(services)));
-  const app = Fastify({ logger: options.logger ?? false, forceCloseConnections: 'idle' });
+  const requestTimeout = config.requestTimeoutMs ?? 120_000;
+  const app = Fastify({
+    logger: options.logger ?? false,
+    forceCloseConnections: 'idle',
+    requestTimeout,
+    connectionTimeout: requestTimeout,
+  });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   app.addHook('onClose', () => runtime.dispose());
   app.setNotFoundHandler((_request, reply) => sendProblem(reply, 404, 'not-found', 'Not found'));
@@ -93,11 +100,12 @@ export async function createHttpApp<E>(
     app.get(
       '/health',
       { schema: { tags: ['Health'], summary: 'Dependency health' } },
-      async (_request, reply) => {
+      async (request, reply) => {
         const health = await execution.run(
           Availability.use((availability) =>
             availability.health(app.connectionsState.isShuttingDown)
-          )
+          ),
+          { signal: request.ingestorSignal }
         );
         if (health.status === 'healthy') return health;
         return sendProblem(reply, 503, 'service-unavailable', 'Service unavailable', {
@@ -111,14 +119,15 @@ export async function createHttpApp<E>(
     app.get(
       '/ready',
       { schema: { tags: ['Health'], summary: 'Readiness' } },
-      async (_request, reply) => {
+      async (request, reply) => {
         const ready = await execution.run(
           Availability.use((availability) =>
             availability.ready(
               app.connectionsState.isShuttingDown,
               app.connectionsState.connectionsInitialized
             )
-          )
+          ),
+          { signal: request.ingestorSignal }
         );
         if (ready.ready) return ready;
         return sendProblem(reply, 503, 'service-unavailable', 'Service unavailable', { ...ready });

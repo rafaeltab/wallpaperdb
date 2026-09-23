@@ -27,6 +27,12 @@ export interface NatsContainerOptions {
   additionalArgs?: string[];
 
   /**
+   * Maximum wait for the NATS HTTP readiness endpoint, in milliseconds
+   * @default 60000
+   */
+  startupTimeoutMs?: number;
+
+  /**
    * Docker network to connect the container to
    */
   network?: StartedNetwork;
@@ -106,6 +112,7 @@ export async function createNatsContainer(
     image = 'nats:2.10-alpine',
     enableJetStream = true,
     additionalArgs = [],
+    startupTimeoutMs = 60000,
     network,
     networkAliases = [],
   } = options;
@@ -122,7 +129,9 @@ export async function createNatsContainer(
   let containerBuilder = new GenericContainer(image)
     .withExposedPorts(4222, 8222)
     .withCommand(command)
-    .withWaitStrategy(Wait.forHttp('/healthz', 8222).forStatusCode(200).withStartupTimeout(60000));
+    .withWaitStrategy(
+      Wait.forHttp('/healthz', 8222).forStatusCode(200).withStartupTimeout(startupTimeoutMs)
+    );
 
   // Add network if specified
   if (network) {

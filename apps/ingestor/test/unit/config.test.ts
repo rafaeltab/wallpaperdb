@@ -46,6 +46,14 @@ it('rejects malformed database URLs and empty storage credentials during configu
 });
 it('requires Clerk credentials before non-test startup', () => {
   expect(() => loadConfig({ ...environment, NODE_ENV: 'production' })).toThrow();
+  expect(() =>
+    loadConfig({
+      ...environment,
+      NODE_ENV: 'production',
+      CLERK_SECRET_KEY: '',
+      CLERK_PUBLISHABLE_KEY: 'public',
+    })
+  ).toThrow();
   expect(
     loadConfig({
       ...environment,

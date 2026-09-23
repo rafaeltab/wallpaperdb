@@ -71,7 +71,9 @@ export const ingestorConfig = Configuration.all({
   redisPassword: optional(Configuration.Redacted('REDIS_PASSWORD')),
   clerkPublishableKey: optional(Configuration.NonEmptyString('CLERK_PUBLISHABLE_KEY')),
   clerkDomain: optional(Configuration.schema(urlString, 'CLERK_DOMAIN')),
-  clerkSecretKey: optional(Configuration.Redacted('CLERK_SECRET_KEY')),
+  clerkSecretKey: optional(
+    Configuration.schema(Schema.Redacted(Schema.NonEmptyString), 'CLERK_SECRET_KEY')
+  ),
   otelEndpoint: optional(Configuration.schema(urlString, 'OTEL_EXPORTER_OTLP_ENDPOINT')),
   otelServiceName: Configuration.NonEmptyString('OTEL_SERVICE_NAME').pipe(
     Configuration.withDefault('ingestor')

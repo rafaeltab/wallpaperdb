@@ -52,8 +52,9 @@ function occurrence(value: unknown): UploadedEvent {
 async function prepareLegacy(client: pg.PoolClient): Promise<void> {
   const exists = await client.query("SELECT to_regclass('public.wallpapers') AS relation");
   if (!exists.rows[0]?.relation) return;
+  await validateCommitted(client);
   await client.query(`UPDATE wallpapers SET upload_state = 'failed', processing_error = 'Legacy upload metadata incomplete; retry upload', state_changed_at = NOW()
-    WHERE upload_state IN ('initiated', 'uploading', 'stored') AND
+    WHERE upload_state IN ('initiated', 'uploading') AND
     (file_type IS DISTINCT FROM 'image' OR mime_type NOT IN ('image/jpeg', 'image/png', 'image/webp') OR mime_type IS NULL
       OR width IS NULL OR height IS NULL OR width <= 0 OR height <= 0 OR file_size_bytes IS NULL OR file_size_bytes <= 0
       OR original_filename IS NULL OR content_hash IS NULL)`);
@@ -63,6 +64,18 @@ async function prepareLegacy(client: pg.PoolClient): Promise<void> {
     FROM wallpapers WHERE content_hash IS NOT NULL AND upload_state <> 'failed'
   ) UPDATE wallpapers SET upload_state = 'failed', processing_error = 'Superseded legacy upload reservation', state_changed_at = NOW()
     FROM ranked WHERE wallpapers.id = ranked.id AND ranked.position > 1 AND wallpapers.upload_state IN ('initiated', 'uploading')`);
+}
+
+async function validateCommitted(client: pg.PoolClient): Promise<void> {
+  let after: string | null = null;
+  while (true) {
+    const rows = await client.query(
+      "SELECT * FROM wallpapers WHERE upload_state IN ('stored', 'processing', 'completed') AND ($1::text IS NULL OR id > $1) ORDER BY id LIMIT 100",
+      [after]
+    );
+    for (const row of rows.rows) after = occurrence(row).wallpaper.id;
+    if (rows.rows.length < 100) return;
+  }
 }
 
 async function adoptLegacy(client: pg.PoolClient): Promise<void> {

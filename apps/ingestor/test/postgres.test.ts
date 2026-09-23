@@ -58,7 +58,7 @@ describe('PostgreSQL ingestion contract', () => {
     await container?.stop();
   });
 
-  it('upgrades populated legacy records without losing stored originals or duplicating event occurrences', async () => {
+  it('requires repair of incomplete stored originals before upgrading legacy records without duplicate occurrences', async () => {
     const admin = new pg.Pool({ connectionString: databaseUrl });
     await admin.query('CREATE DATABASE legacy_ingestion');
     await admin.end();
@@ -94,19 +94,43 @@ describe('PostgreSQL ingestion contract', () => {
       await pool.query(
         "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-interrupted','owner','uploading')"
       );
+      await pool.query(
+        "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-incomplete-stored','repair-owner','stored')"
+      );
+      const rejected = await Effect.runPromise(
+        migrateIngestionDatabase(pool, migrationsFolder).pipe(Effect.result)
+      );
+      expect(rejected._tag).toBe('Failure');
+      const unchanged = await pool.query(
+        "SELECT id, upload_state FROM wallpapers WHERE id IN ('legacy-incomplete-stored', 'legacy-interrupted', 'legacy-duplicate') ORDER BY id"
+      );
+      expect(unchanged.rows).toEqual([
+        { id: 'legacy-duplicate', upload_state: 'uploading' },
+        { id: 'legacy-incomplete-stored', upload_state: 'stored' },
+        { id: 'legacy-interrupted', upload_state: 'uploading' },
+      ]);
+      expect(
+        (await pool.query("SELECT to_regclass('public.upload_outbox') AS relation")).rows
+      ).toEqual([{ relation: null }]);
+      await pool.query(
+        "UPDATE wallpapers SET content_hash = 'repaired-hash', file_type = 'image', mime_type = 'image/png', width = 1920, height = 1080, file_size_bytes = 3, original_filename = 'legacy.png', storage_key = 'legacy-incomplete-stored/original.png' WHERE id = 'legacy-incomplete-stored'"
+      );
       await Effect.runPromise(migrateIngestionDatabase(pool, migrationsFolder));
       await Effect.runPromise(migrateIngestionDatabase(pool, migrationsFolder));
       const rows = await pool.query(
         'SELECT id, upload_state, ingestion_snapshot FROM wallpapers ORDER BY id'
       );
       expect(rows.rows.find((row) => row.id === 'legacy-stored')?.upload_state).toBe('stored');
+      expect(rows.rows.find((row) => row.id === 'legacy-incomplete-stored')?.upload_state).toBe(
+        'stored'
+      );
       expect(rows.rows.find((row) => row.id === 'legacy-completed')?.upload_state).toBe(
         'completed'
       );
       expect(rows.rows.find((row) => row.id === 'legacy-duplicate')?.upload_state).toBe('failed');
       expect(rows.rows.find((row) => row.id === 'legacy-interrupted')?.upload_state).toBe('failed');
       const outbox = await pool.query('SELECT event_id, event FROM upload_outbox');
-      expect(outbox.rows).toHaveLength(1);
+      expect(outbox.rows).toHaveLength(2);
       expect(outbox.rows[0]?.event.source).toBe('urn:wallpaperdb:ingestor');
       expect(outbox.rows[0]?.event.wallpaper.metadata.extension).toBe('png');
     } finally {

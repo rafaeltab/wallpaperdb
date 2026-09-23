@@ -1,5 +1,5 @@
 import { Client } from '@opensearch-project/opensearch';
-import type { WallpaperUploadedEvent } from '@wallpaperdb/events';
+import type { ProfileUpdatedEvent, WallpaperUploadedEvent } from '@wallpaperdb/events';
 import { Effect } from 'effect';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
@@ -88,6 +88,90 @@ describe('Gateway composition with real adapters', () => {
     const ready = await app.inject({ method: 'GET', url: '/ready' });
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toMatchObject({ ready: true });
+  });
+
+  it('projects a Profile update into public discovery and canonical alias resolution', async () => {
+    const event: ProfileUpdatedEvent = {
+      eventId: 'evt_profile_discovery_integration',
+      eventType: 'profile.updated',
+      timestamp,
+      change: {
+        type: 'picture-changed',
+        before: null,
+        after: 'picture_integration',
+        source: 'upload',
+        asset: {
+          id: 'picture_integration',
+          storageBucket: 'private-profile-pictures',
+          storageKey: 'private/integration.webp',
+          mimeType: 'image/webp',
+          width: 256,
+          height: 256,
+          fileSizeBytes: 1024,
+        },
+      },
+      profile: {
+        id: 'profile_discovery_integration',
+        handle: 'integration-artist',
+        displayName: 'Integration Artist',
+        biographyMarkdown: '  # Authored biography\n\n**Preserved**\n',
+        pictureAssetId: 'picture_integration',
+        claimGeneration: 2,
+        aliases: [
+          {
+            handle: 'former-integration-artist',
+            claimGeneration: 1,
+            createdAt: timestamp,
+            expiresAt: null,
+          },
+        ],
+        version: 2,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    };
+    const js = await tester.nats.getJsClient();
+    await js.publish(event.eventType, JSON.stringify(event));
+    await expect
+      .poll(
+        async () => {
+          const response = await tester.getApp().inject({
+            method: 'POST',
+            url: '/graphql',
+            payload: {
+              query: `{
+            profileByHandle(handle:"FORMER-INTEGRATION-ARTIST") {
+              requestedHandle isAlias canonicalHandle
+              profile {id version biographyMarkdown picture{id}}
+            }
+            searchProfiles(query:"integration-artist") {
+              edges {node {id handle}}
+            }
+          }`,
+            },
+          });
+          return response.json();
+        },
+        { timeout: 10000, interval: 25 }
+      )
+      .toEqual({
+        data: {
+          profileByHandle: {
+            requestedHandle: 'FORMER-INTEGRATION-ARTIST',
+            isAlias: true,
+            canonicalHandle: 'integration-artist',
+            profile: {
+              id: event.profile.id,
+              version: 2,
+              biographyMarkdown: event.profile.biographyMarkdown,
+              picture: { id: 'picture_integration' },
+            },
+          },
+          searchProfiles: {
+            edges: [{ node: { id: event.profile.id, handle: 'integration-artist' } }],
+          },
+        },
+      });
   });
 
   it('creates named indexes with independent Profile and color-search mappings, and starts idempotently', async () => {

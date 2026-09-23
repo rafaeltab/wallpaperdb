@@ -160,6 +160,123 @@ describe('Projection event driving adapter contract', () => {
     ]);
   });
 
+  it.each([
+    {
+      change: {
+        type: 'profile-details-changed',
+        before: { displayName: 'Before', biographyMarkdown: '' },
+        after: {
+          displayName: 'Profile',
+          biographyMarkdown: '  # About\n\nAuthored **Markdown**\n',
+        },
+      },
+      fields: { biographyMarkdown: '  # About\n\nAuthored **Markdown**\n' },
+    },
+    {
+      change: { type: 'biography-changed', before: '# Old biography', after: '' },
+      fields: { biographyMarkdown: '' },
+    },
+    ...['upload', 'clerk-import'].map((source) => ({
+      change: {
+        type: 'picture-changed',
+        before: 'previous-picture',
+        after: 'public-picture',
+        source,
+        asset: {
+          id: 'public-picture',
+          storageBucket: 'private-profile-pictures',
+          storageKey: 'private/picture.webp',
+          mimeType: 'image/webp',
+          width: 256,
+          height: 256,
+          fileSizeBytes: 1024,
+        },
+      },
+      fields: { pictureAssetId: 'public-picture' },
+    })),
+    {
+      change: {
+        type: 'picture-changed',
+        before: 'public-picture',
+        after: null,
+        source: 'remove',
+        asset: null,
+      },
+      fields: { pictureAssetId: null },
+    },
+    {
+      change: {
+        type: 'handle-changed',
+        before: 'former',
+        after: 'profile',
+        scheduledAliases: [{ handle: 'former', expiresAt: '2026-02-01T00:00:00.000Z' }],
+      },
+      fields: {
+        aliases: [
+          {
+            handle: 'former',
+            claimGeneration: 1,
+            createdAt: timestamp,
+            expiresAt: '2026-02-01T00:00:00.000Z',
+          },
+        ],
+      },
+    },
+    {
+      change: {
+        type: 'alias-expiry-scheduled',
+        handle: 'former',
+        before: null,
+        after: '2026-02-01T00:00:00.000Z',
+      },
+      fields: {
+        aliases: [
+          {
+            handle: 'former',
+            claimGeneration: 1,
+            createdAt: timestamp,
+            expiresAt: '2026-02-01T00:00:00.000Z',
+          },
+        ],
+      },
+    },
+    {
+      change: {
+        type: 'alias-reactivated',
+        handle: 'former',
+        claimGeneration: 2,
+        before: '2026-02-01T00:00:00.000Z',
+        after: null,
+      },
+      fields: {
+        aliases: [{ handle: 'former', claimGeneration: 2, createdAt: timestamp, expiresAt: null }],
+      },
+    },
+    ...['scheduled', 'immediate'].map((reason) => ({
+      change: {
+        type: 'alias-expired',
+        handle: 'former',
+        claimGeneration: 1,
+        before: '2026-02-01T00:00:00.000Z',
+        after: null,
+        reason,
+      },
+      fields: { aliases: [] },
+    })),
+  ])('projects a $change.type snapshot without event-only metadata', async ({ change, fields }) => {
+    const project = new ControlledProjection();
+    const profile = { ...snapshot, ...fields, version: 2 };
+    const event = { ...base, eventType: 'profile.updated', change, profile };
+    expect(await deliver(event.eventType, event, project)).toEqual({ _tag: 'Completed' });
+    expect(project.changes).toEqual([
+      {
+        _tag: 'ProfilePublished',
+        profile,
+        occurrence: { source: 'wallpaperdb/profile', id: 'event-1', occurredAt: timestamp },
+      },
+    ]);
+  });
+
   it('continues to accept historical profile-created events while stripping obsolete fields', async () => {
     const project = new ControlledProjection();
     await deliver(

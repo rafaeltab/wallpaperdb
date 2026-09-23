@@ -1,4 +1,4 @@
-import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Effect, ManagedRuntime } from 'effect';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,6 +8,7 @@ import { AssetStorage } from '../../src/ingestion/index.js';
 describe('owned wallpaper assets', () => {
   let container: StartedTestContainer;
   let runtime: ManagedRuntime.ManagedRuntime<AssetStorage | AssetsHealth, unknown>;
+  let client: S3Client;
   beforeAll(async () => {
     container = await new GenericContainer('chrislusf/seaweedfs:4.47')
       .withEnvironment({ AWS_ACCESS_KEY_ID: 'storageadmin', AWS_SECRET_ACCESS_KEY: 'storageadmin' })
@@ -24,15 +25,15 @@ describe('owned wallpaper assets', () => {
       region: 'us-east-1', accessKeyId: 'storageadmin', secretAccessKey: 'storageadmin',
       bucket: 'ingestor-assets',
     };
-    const client = new S3Client({ endpoint: config.endpoint, region: config.region,
+    client = new S3Client({ endpoint: config.endpoint, region: config.region,
       credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
       forcePathStyle: true });
-    try { await client.send(new CreateBucketCommand({ Bucket: config.bucket })); }
-    finally { client.destroy(); }
+    await client.send(new CreateBucketCommand({ Bucket: config.bucket }));
     runtime = ManagedRuntime.make(assetsLayer(config));
   });
   afterAll(async () => {
     await runtime?.dispose();
+    client?.destroy();
     await container?.stop();
   });
   it('stores, finds, lists, and idempotently removes an owned asset', async () => {
@@ -51,6 +52,26 @@ describe('owned wallpaper assets', () => {
       yield* assets.remove(reference);
       expect(yield* assets.exists(reference)).toBe(false);
     }));
+  });
+  it('paginates bounded cleanup batches and excludes foreign object layouts', async () => {
+    const names = Array.from({ length: 101 }, (_, index) => `wlpr_page_${index}`);
+    const keys = [...names.map((name) => `${name}/original.png`),
+      'profile-picture/image.png', 'wlpr_other/variant.png'];
+    await Effect.runPromise(Effect.forEach(keys, (Key) => Effect.promise(() =>
+      client.send(new PutObjectCommand({ Bucket: 'ingestor-assets', Key, Body: new Uint8Array([1]) }))
+    ), { concurrency: 8 }));
+    const found: string[] = [];
+    await runtime.runPromise(Effect.gen(function* () {
+      const assets = yield* AssetStorage;
+      let cursor: string | undefined;
+      do {
+        const page = yield* assets.list(cursor);
+        expect(page.assets.length).toBeLessThanOrEqual(100);
+        found.push(...page.assets.map((asset) => asset.wallpaperId));
+        cursor = page.cursor;
+      } while (cursor);
+    }));
+    expect(found.sort()).toEqual(names.sort());
   });
   it('distinguishes unavailable storage from an absent object', async () => {
     expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(true);

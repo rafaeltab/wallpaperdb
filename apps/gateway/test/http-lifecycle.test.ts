@@ -146,4 +146,53 @@ describe('HTTP request lifecycle', () => {
     ).rejects.toBe(failure);
     expect(released).toBe(true);
   });
+
+  it('waits for acquired resources to close when dependency startup is cancelled', async () => {
+    const release = Effect.runSync(Deferred.make<void>());
+    const finishCleanup = Effect.runSync(Deferred.make<void>());
+    const abort = new AbortController();
+    let entered = false;
+    let closing = false;
+    let closed = false;
+    let settled = false;
+    const catalogue = Layer.effect(
+      Catalogue,
+      Effect.gen(function* () {
+        yield* Effect.acquireRelease(Effect.void, () =>
+          Effect.gen(function* () {
+            closing = true;
+            yield* Deferred.await(finishCleanup);
+            closed = true;
+          })
+        );
+        entered = true;
+        yield* Deferred.await(release);
+        return new EmptyCatalogue();
+      })
+    );
+    const startup = createHttpApp(httpConfig, httpTestLayer().pipe(Layer.provideMerge(catalogue)), {
+      signal: abort.signal,
+    });
+    const result = startup
+      .catch((error: unknown) => error)
+      .finally(() => {
+        settled = true;
+      });
+    try {
+      await expect.poll(() => entered).toBe(true);
+      abort.abort();
+      await expect.poll(() => closing, { timeout: 1000 }).toBe(true);
+      expect(settled).toBe(false);
+      await Effect.runPromise(Deferred.succeed(finishCleanup, undefined));
+      expect(await result).toBeInstanceOf(Error);
+      expect(closed).toBe(true);
+    } finally {
+      await Effect.runPromise(Deferred.succeed(finishCleanup, undefined));
+      await Effect.runPromise(Deferred.succeed(release, undefined));
+      await startup.then(
+        (app) => app.close(),
+        () => undefined
+      );
+    }
+  });
 });

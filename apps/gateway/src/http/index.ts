@@ -260,14 +260,14 @@ function installHealth(app: FastifyInstance, execution: HttpExecution['Service']
 export async function createHttpApp<E>(
   config: HttpConfig,
   services: Layer.Layer<HttpServices, E>,
-  options: { logger?: boolean; shutdownTimeoutMs?: number } = {}
+  options: { logger?: boolean; shutdownTimeoutMs?: number; signal?: AbortSignal } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(httpExecutionLayer.pipe(Layer.provide(services)));
   const app = Fastify({ logger: options.logger ?? false, forceCloseConnections: 'idle' });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   app.addHook('onClose', () => runtime.dispose());
   try {
-    const execution = await runtime.runPromise(HttpExecution);
+    const execution = await runtime.runPromise(HttpExecution, { signal: options.signal });
     const requests = installRequestLifecycle(app);
     app.addHook('preClose', async () => {
       app.connectionsState.isShuttingDown = true;

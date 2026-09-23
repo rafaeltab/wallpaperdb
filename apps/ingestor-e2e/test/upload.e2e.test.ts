@@ -56,7 +56,7 @@ describe('deployed ingestor', () => {
     });
   };
 
-  it('serves health, readiness, and the deployed OpenAPI documentation', async () => {
+  it('initializes telemetry and serves health, readiness, and deployed OpenAPI documentation', async () => {
     const health = await fetch(`${baseUrl}/health`);
     expect(health.status).toBe(200);
     expect(await health.json()).toMatchObject({

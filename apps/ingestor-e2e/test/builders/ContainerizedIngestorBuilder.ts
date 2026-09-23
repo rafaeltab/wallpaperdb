@@ -51,6 +51,9 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
               NATS_URL: nats.endpoints.networked,
               NATS_STREAM: 'WALLPAPER',
               REDIS_ENABLED: 'false',
+              // The image must initialize its own SDK versions even without a collector.
+              OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+              OTEL_SERVICE_NAME: 'ingestor-deployed-test',
               RECONCILIATION_INTERVAL_MS: '1000',
               S3_CLEANUP_INTERVAL_MS: '3600000',
             })

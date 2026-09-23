@@ -54,7 +54,7 @@ The initial migration increased median full coverage runtime from 37.37 seconds 
 - [x] Record repeated before/after wall time, CPU, memory, coverage and methodology.
 - [x] Run repository CI, format and review the follow-up for PR #215.
 
-The [performance report](../apps/gateway/docs/test-performance.md) records a full coverage median of 12.50 seconds versus 37.37 seconds on main and 77.87 seconds before optimization. All six measured runs passed 239 tests. Docker CPU improved; host CPU remains above main and worker/module reuse increases host memory. Repository CI passed all 67 main tasks, all nine E2E-stage tasks and coverage merging in 192 seconds.
+Measurements from 2026-09-15 recorded a full coverage median of 12.50 seconds versus 37.37 seconds on main and 77.87 seconds before optimization. All six measured runs passed 239 tests. Docker CPU improved; host CPU remains above main and worker/module reuse increases host memory. Repository CI passed all 67 main tasks, all nine E2E-stage tasks and coverage merging in 192 seconds.
 
 ## Effect 4 continuation
 

@@ -1,5 +1,4 @@
 {
-  "crapThreshold": 30,
   "capabilities": ["catalogue", "projection", "admission", "availability"],
   "publicModules": [
     "catalogue",

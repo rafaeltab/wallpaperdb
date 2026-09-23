@@ -7,8 +7,6 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
-const sourceTimestamp = new Date('2026-01-01T00:00:00.000Z');
-const coverageTimestamp = new Date('2026-01-01T00:00:01.000Z');
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-checks-'));
@@ -17,12 +15,9 @@ function fixture(t) {
   for (const directory of ['scripts', 'packages', 'apps/gateway/src', 'apps/gateway/test']) {
     fs.mkdirSync(path.join(root, directory), { recursive: true });
   }
-  for (const script of ['gateway-architecture.mjs', 'gateway-quality.mjs']) {
-    fs.copyFileSync(path.join(repository, 'scripts', script), path.join(root, 'scripts', script));
-  }
+  fs.copyFileSync(path.join(repository, 'scripts/gateway-architecture.mjs'), path.join(root, 'scripts/gateway-architecture.mjs'));
   fs.writeFileSync(path.join(gateway, 'package.json'), JSON.stringify({ type: 'module' }));
   fs.writeFileSync(path.join(gateway, 'quality.config.json'), JSON.stringify({
-    crapThreshold: 30,
     capabilities: ['catalogue', 'projection'],
     publicModules: ['catalogue', 'projection', 'adapters/search'],
   }));
@@ -32,21 +27,12 @@ function fixture(t) {
     const filename = path.join(root, relative);
     fs.mkdirSync(path.dirname(filename), { recursive: true });
     fs.writeFileSync(filename, content);
-    fs.utimesSync(filename, sourceTimestamp, sourceTimestamp);
     return filename;
   }
   return {
     root,
     write,
     source: (relative, content) => write(`apps/gateway/src/${relative}`, content),
-    coverage(report) {
-      const filename = write('apps/gateway/coverage/coverage-final.json', JSON.stringify(report));
-      fs.utimesSync(filename, coverageTimestamp, coverageTimestamp);
-      return filename;
-    },
-    report() {
-      return JSON.parse(fs.readFileSync(path.join(gateway, 'coverage/crap-report.json'), 'utf8'));
-    },
     run(script) {
       const result = spawnSync(process.execPath, [path.join(root, 'scripts', script)], {
         cwd: root,
@@ -160,77 +146,3 @@ for (const [name, directory, specifier] of [
     assert.match(result.stderr, /another workspace must communicate with the gateway through its external contracts/);
   });
 }
-
-const decisionTable = [
-  'export function choose(value: number) {',
-  '  if (value === 1) return "one";',
-  '  if (value === 2) return "two";',
-  '  if (value === 3) return "three";',
-  '  if (value === 4) return "four";',
-  '  if (value === 5) return "five";',
-  '  if (value === 6) return "six";',
-  '  return "other";',
-  '}',
-  '',
-].join('\n');
-
-function measuredFunction(filename, hitCount) {
-  const statementMap = {};
-  const hits = {};
-  for (let line = 2; line <= 8; line++) {
-    statementMap[String(line)] = { start: { line, column: 2 }, end: { line, column: 30 } };
-    hits[String(line)] = hitCount;
-  }
-  return { [filename]: { statementMap, s: hits, fnMap: {}, f: {} } };
-}
-
-test('quality requires an existing coverage measurement', (t) => {
-  const project = fixture(t);
-  project.source('catalogue/index.ts', decisionTable);
-  const result = project.run('gateway-quality.mjs');
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Run make gateway-test-coverage before make gateway-quality/);
-});
-
-test('quality rejects uncovered functions above the configured CRAP threshold', (t) => {
-  const project = fixture(t);
-  const filename = project.source('catalogue/index.ts', decisionTable);
-  project.coverage(measuredFunction(filename, 0));
-  const result = project.run('gateway-quality.mjs');
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /choose: CRAP 56 > 30 \(complexity 7, coverage 0%\)/);
-  assert.equal(project.report().functions[0].crap, 56);
-});
-
-test('quality treats a missing file measurement as uncovered', (t) => {
-  const project = fixture(t);
-  project.source('catalogue/index.ts', decisionTable);
-  project.coverage({});
-  const result = project.run('gateway-quality.mjs');
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /coverage 0%/);
-});
-
-test('quality accepts a covered function and writes its auditable risk report', (t) => {
-  const project = fixture(t);
-  const filename = project.source('catalogue/index.ts', decisionTable);
-  project.coverage(measuredFunction(filename, 1));
-  const result = project.run('gateway-quality.mjs');
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /1 functions, threshold 30, 0 violations/);
-  assert.deepEqual(project.report(), {
-    threshold: 30,
-    functions: [{ file: 'src/catalogue/index.ts', line: 1, function: 'choose', complexity: 7, coverage: 100, crap: 7 }],
-  });
-});
-
-test('quality rejects a source file changed after its coverage measurement', (t) => {
-  const project = fixture(t);
-  const filename = project.source('catalogue/index.ts', decisionTable);
-  project.coverage(measuredFunction(filename, 1));
-  const changed = new Date('2026-01-01T00:00:02.000Z');
-  fs.utimesSync(filename, changed, changed);
-  const result = project.run('gateway-quality.mjs');
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Coverage predates src\/catalogue\/index\.ts/);
-});

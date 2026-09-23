@@ -3,7 +3,7 @@ import { WallpaperUploadedEventSchema } from '@wallpaperdb/events/schemas';
 import { ManagedRuntime } from 'effect';
 import { connect, type NatsConnection } from 'nats';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { uploadedEventsLayer } from '../../src/adapters/events/index.js';
+import { UploadEventsHealth, uploadedEventsLayer } from '../../src/adapters/events/index.js';
 import { UploadEvents, type UploadedEvent } from '../../src/ingestion/index.js';
 
 const occurrence: UploadedEvent = {
@@ -21,7 +21,7 @@ const occurrence: UploadedEvent = {
 describe('upload event publication', () => {
   let container: StartedNatsContainer;
   let connection: NatsConnection;
-  let runtime: ManagedRuntime.ManagedRuntime<UploadEvents, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<UploadEvents | UploadEventsHealth, unknown>;
   beforeAll(async () => {
     container = await createNatsContainer();
     const url = container.getConnectionUrl();
@@ -38,6 +38,7 @@ describe('upload event publication', () => {
     await container?.stop();
   });
   it('confirms persistence and deduplicates retries using the original occurrence identity', async () => {
+    expect(await runtime.runPromise(UploadEventsHealth.use((health) => health.check()))).toBe(true);
     const publish = UploadEvents.use((events) => events.publish(occurrence));
     await runtime.runPromise(publish);
     await runtime.runPromise(publish);

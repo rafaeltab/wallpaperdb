@@ -6,7 +6,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { DateTime, Effect, Layer } from 'effect';
+import { Context, DateTime, Effect, Layer } from 'effect';
 import { AssetStorage, type AssetReference, IngestionUnavailable } from '../../ingestion/index.js';
 
 export interface AssetsConfig {
@@ -16,6 +16,11 @@ export interface AssetsConfig {
   readonly secretAccessKey: string;
   readonly bucket: string;
 }
+
+export interface AssetsHealth {
+  check(): Effect.Effect<boolean>;
+}
+export const AssetsHealth = Context.Service<AssetsHealth>('wallpaperdb.ingestor.assets.health');
 
 const key = (reference: AssetReference) =>
   `${reference.wallpaperId}/original.${reference.extension}`;
@@ -125,9 +130,10 @@ function missing(cause: unknown): boolean {
 }
 
 /** Shared client lifetime; every request forwards cancellation to the SDK and has no implicit retries. */
-export function assetsLayer(config: AssetsConfig): Layer.Layer<AssetStorage, IngestionUnavailable> {
-  return Layer.effect(
-    AssetStorage,
+export function assetsLayer(
+  config: AssetsConfig
+): Layer.Layer<AssetStorage | AssetsHealth, IngestionUnavailable> {
+  return Layer.effectContext(
     Effect.gen(function* () {
       const client = yield* Effect.acquireRelease(
         Effect.sync(
@@ -149,7 +155,17 @@ export function assetsLayer(config: AssetsConfig): Layer.Layer<AssetStorage, Ing
       yield* request('connect-assets', (abortSignal) =>
         client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
       );
-      return new S3Assets(client, config.bucket);
+      return Context.make(AssetStorage, new S3Assets(client, config.bucket)).pipe(
+        Context.add(AssetsHealth, {
+          check: () =>
+            request('check-assets', (abortSignal) =>
+              client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
+            ).pipe(
+              Effect.timeout('1 second'),
+              Effect.match({ onSuccess: () => true, onFailure: () => false })
+            ),
+        })
+      );
     })
   );
 }

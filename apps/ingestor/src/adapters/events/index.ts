@@ -3,7 +3,7 @@ import {
   WallpaperUploadedCloudEventSchema,
   WALLPAPER_UPLOADED_SUBJECT,
 } from '@wallpaperdb/events/schemas';
-import { Effect, Layer, Semaphore } from 'effect';
+import { Context, Effect, Layer, Semaphore } from 'effect';
 import { connect, headers, type JetStreamClient } from 'nats';
 import { IngestionUnavailable, UploadEvents, type UploadedEvent } from '../../ingestion/index.js';
 
@@ -13,6 +13,13 @@ export interface UploadedEventsConfig {
   readonly serviceName: string;
   readonly assetBucket: string;
 }
+
+export interface UploadEventsHealth {
+  check(): Effect.Effect<boolean>;
+}
+export const UploadEventsHealth = Context.Service<UploadEventsHealth>(
+  'wallpaperdb.ingestor.events.health'
+);
 const broker = <A>(operation: string, send: () => Promise<A>) =>
   Effect.tryPromise({
     try: send,
@@ -97,9 +104,8 @@ class NatsUploadEvents implements UploadEvents {
 
 export function uploadedEventsLayer(
   config: UploadedEventsConfig
-): Layer.Layer<UploadEvents, IngestionUnavailable> {
-  return Layer.effect(
-    UploadEvents,
+): Layer.Layer<UploadEvents | UploadEventsHealth, IngestionUnavailable> {
+  return Layer.effectContext(
     Effect.gen(function* () {
       const connection = yield* Effect.acquireRelease(
         broker('connect-upload-events', () =>
@@ -112,11 +118,23 @@ export function uploadedEventsLayer(
           )
       );
       const manager = yield* broker('inspect-upload-stream', () =>
-        connection.jetstreamManager({ timeout: 5000 })
+        connection.jetstreamManager({ timeout: 1000 })
       );
       yield* broker('inspect-upload-stream', () => manager.streams.info(config.stream));
       const permits = yield* Semaphore.make(32);
-      return new NatsUploadEvents(connection.jetstream({ timeout: 5000 }), config, permits);
+      return Context.make(
+        UploadEvents,
+        new NatsUploadEvents(connection.jetstream({ timeout: 5000 }), config, permits)
+      ).pipe(
+        Context.add(UploadEventsHealth, {
+          check: () =>
+            connection.isClosed()
+              ? Effect.succeed(false)
+              : broker('check-upload-events', () => manager.streams.info(config.stream)).pipe(
+                  Effect.match({ onSuccess: () => true, onFailure: () => false })
+                ),
+        })
+      );
     })
   );
 }

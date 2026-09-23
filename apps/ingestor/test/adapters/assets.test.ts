@@ -2,12 +2,12 @@ import { CreateBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Effect, ManagedRuntime } from 'effect';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { assetsLayer } from '../../src/adapters/assets/index.js';
+import { AssetsHealth, assetsLayer } from '../../src/adapters/assets/index.js';
 import { AssetStorage } from '../../src/ingestion/index.js';
 
 describe('owned wallpaper assets', () => {
   let container: StartedTestContainer;
-  let runtime: ManagedRuntime.ManagedRuntime<AssetStorage, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<AssetStorage | AssetsHealth, unknown>;
   beforeAll(async () => {
     container = await new GenericContainer('chrislusf/seaweedfs:4.47')
       .withEnvironment({ AWS_ACCESS_KEY_ID: 'storageadmin', AWS_SECRET_ACCESS_KEY: 'storageadmin' })
@@ -51,5 +51,13 @@ describe('owned wallpaper assets', () => {
       yield* assets.remove(reference);
       expect(yield* assets.exists(reference)).toBe(false);
     }));
+  });
+  it('distinguishes unavailable storage from an absent object', async () => {
+    expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(true);
+    await container.stop();
+    expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(false);
+    expect(await runtime.runPromise(AssetStorage.use((assets) =>
+      assets.exists({ wallpaperId: 'wlpr_outage', extension: 'png' }).pipe(Effect.flip)
+    ))).toMatchObject({ _tag: 'IngestionUnavailable', operation: 'inspect-asset' });
   });
 });

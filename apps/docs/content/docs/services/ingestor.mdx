@@ -1,526 +1,72 @@
 ---
 title: Ingestor Service
-description: Wallpaper upload and validation service with state machine workflow
+description: Authenticated wallpaper ingestion with durable upload recovery
 ---
 
-The Ingestor Service is the entry point for wallpapers into WallpaperDB. It handles file uploads, validation, storage in SeaweedFS, metadata recording in PostgreSQL, and event publishing for downstream processing.
+The ingestor accepts wallpaper bytes for an authenticated Profile, validates content, stores the immutable original, and publishes an upload announcement for downstream consumers.
 
-**Status:** ✅ Production-ready
+## Upload contract
 
-## Quick Start
+`POST /upload` accepts one multipart file. The Profile ID comes from Clerk authentication; multipart ownership fields cannot override it. Images are buffered within a 200 MiB transport ceiling before inspection. Supported image formats are JPEG, PNG, and WebP, with a 50 MiB content limit and dimensions from 1280×720 through 7680×4320. Video uploads are not supported.
+
+A successful response is HTTP 200 with `id`, `status`, `uploadedAt`, `fileType`, `mimeType`, `width`, `height`, and `fileSizeBytes`. The status is `processing` for accepted content or `already_uploaded` for existing content owned by that Profile. Concurrent requests for unfinished identical content receive HTTP 409.
+
+Expected failures use RFC 9457 `application/problem+json`, with stable problem-type URIs under the repository's `docs/problems` directory. Validation is 400, missing authentication 401, oversized input 413, quota denial 429, unavailable dependencies 503, and unexpected defects 500. Internal diagnostic causes are never included in responses.
+
+`GET /health`, `GET /ready`, and Swagger UI at `/documentation` are public. Readiness becomes true only after the application graph is acquired; health checks PostgreSQL, object storage, NATS, and configured telemetry.
+
+## Application architecture
+
+The ingestor is one application boundary in the Wallpaper Ingestion context. `Ingestion`, `Admission`, and `Availability` expose application-owned interfaces and namespaced Effect services. Their layers resolve dependencies at construction. PostgreSQL, S3, image inspection, NATS, and Redis remain behind driven adapters; Fastify translates multipart requests and application outcomes.
+
+The composition root owns shared adapters, request fibers, and recovery workers. Configuration is parsed once, credentials are redacted, and secrets are unwrapped only for adapters. Telemetry initializes before dynamically loading instrumented server dependencies. Shutdown stops accepting requests, gives in-flight responses a bounded grace period, interrupts remaining work, and releases resources. Recovery loops do not overlap themselves and stop with the application's scope.
+
+Architecture lint checks public module entry points, inward dependency direction, dependency cycles, and absence of TSyringe or global service locators.
+
+## Durable upload and recovery
+
+1. Inspect content and atomically reserve its Profile/content identity, complete metadata, logical asset reference, and event occurrence.
+2. Store the original under the stable asset identity.
+3. Atomically commit stored state and the upload announcement to an outbox.
+4. Publish with the original event occurrence ID and wait for broker acknowledgement.
+5. Mark the upload `processing`. Downstream completion is a separate responsibility.
+
+A storage failure leaves enough information to check the exact original during recovery, including non-JPEG extensions. A publication failure retains the stored original and outbox occurrence. Retries preserve occurrence, correlation, causation, and persisted trace context. CloudEvents 1.0 metadata wraps the shared wallpaper payload; existing consumers can still parse retained legacy events. The shared payload still carries legacy bucket/key fields pending coordinated consumer migration.
+
+Recovery considers records unchanged for more than ten minutes on the next scheduled cycle. Each cycle leases up to five eligible records, processes them concurrently, then repeats for at most twenty batches (100 records). Expiring leases and conditional writes prevent stale workers from overwriting newer progress. Database transactions finish before S3 or NATS operations begin. Missing originals receive three attempts; publication is quarantined after ten attempts while retaining the original and occurrence for investigation. Cleanup processes at most ten pages per cycle, resumes pagination, and deletes only ingestor-owned orphaned or failed assets.
+
+## Admission and telemetry
+
+Redis atomically enforces a per-Profile fixed window; denied requests do not extend it. Defaults are 100 uploads per hour. Disabled or unavailable Redis uses bounded instance-local quota state. This fallback does not provide a fleet-wide quota; its metric drives a provisioned degradation alert.
+
+Existing upload, storage, file-processing, and reconciliation metric names are preserved. Effect spans bridge request context into driven operations. Exporter connections and stalled telemetry responses have bounded cleanup, and telemetry failures do not alter application decisions.
+
+## Running and upgrading
 
 ```bash
-# Start infrastructure
-make infra-start
-
-# Run ingestor in development mode
-make dev PACKAGE=ingestor
-
-# The service starts on http://localhost:3001
+make build PACKAGE=ingestor
+make migrate PACKAGE=ingestor
+make run PACKAGE=ingestor SCRIPT=start
 ```
 
-## Features
+Before upgrading a populated database, drain and stop all old ingestor replicas. Use `make migrate PACKAGE=ingestor`, which prepares legacy reservations, applies generated Drizzle migrations, and adopts complete records. Do not invoke Drizzle Kit directly on an existing database: preparation must run before the broadened uniqueness constraint.
 
-### Core Functionality
-- **Multi-part file upload** with streaming (no full file in memory)
-- **Content-based MIME detection** (doesn't trust client headers)
-- **SHA256 deduplication** per user (prevents duplicate uploads)
-- **State machine workflow** (6 states for reliability)
-- **Reconciliation system** for eventual consistency
-- **Distributed rate limiting** via Redis
-- **RFC 7807 error responses** with structured problem details
+The upgrade preserves committed originals and their states, resolves duplicate unfinished reservations deterministically, and marks interrupted, uncommitted records with incomplete metadata failed so clients can retry. Incomplete committed records stop migration for repair without becoming eligible for cleanup. Legacy stored uploads receive one stable outbox occurrence. Migration can be rerun safely after a failure. The context ADR records this deployment requirement and the event compatibility scope.
 
-### File Processing
-- **Format validation**: JPEG, PNG, WebP (images), MP4, WebM (videos)
-- **Size limits**: 50MB for images, 200MB for videos
-- **Dimension limits**: 16384x16384 pixels (decompression bomb protection)
-- **Metadata extraction**: Width, height, aspect ratio via Sharp
-- **Security**: Filename sanitization, content validation
+Non-test startup also requires `CLERK_SECRET_KEY` and `CLERK_PUBLISHABLE_KEY`. `HTTP_REQUEST_TIMEOUT_MS` bounds request receipt and socket inactivity (default two minutes).
 
-### Observability
-- **OpenTelemetry** traces and metrics
-- **Structured logging** with Pino
-- **Health checks** for all dependencies
-- **Grafana dashboards** for monitoring
+Required connection settings are `DATABASE_URL`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `NATS_URL`. Bucket, region, stream, Redis, Clerk, telemetry, quota, and recovery interval settings are parsed by the composition root. `NODE_ENV=test` uses the test authentication adapter; deployed environments use Clerk.
 
-## Architecture
-
-### State Machine
-
-The ingestor uses a 6-state machine for reliable uploads:
-
-```
-initiated → uploading → stored → processing → completed
-                                            ↘ failed
-```
-
-**State Transitions:**
-
-1. **initiated** - Intent recorded (write-ahead log)
-   - Database record created with user ID and generated wallpaper ID
-   - Content hash not yet calculated
-   - No file uploaded
-
-2. **uploading** - File being uploaded to SeaweedFS
-   - Content hash calculated (SHA256)
-   - File streamed to SeaweedFS
-   - Metadata extracted (dimensions, MIME type, file size)
-
-3. **stored** - File in SeaweedFS, metadata in DB, awaiting NATS publish
-   - File successfully stored in SeaweedFS
-   - All metadata recorded in database
-   - Ready to publish event
-
-4. **processing** - Event published to NATS, downstream services working
-   - `wallpaper.uploaded` event published to NATS
-   - Downstream services (media, thumbnail, etc.) processing
-
-5. **completed** - All downstream processing complete (terminal state)
-   - All enrichment services have finished
-   - Wallpaper fully ready for serving
-
-6. **failed** - Terminal failure state
-   - Upload failed after max retries
-   - Error message recorded in `processingError` field
-   - User notified
-
-**Key Design:** Upload succeeds even if NATS publish fails (stays in `stored` state). Reconciliation system will retry publishing.
-
-### Database Schema
-
-```typescript
-wallpapers {
-  id: text                    // Format: wlpr_<ulid>
-  userId: text
-  contentHash: text           // SHA256 for deduplication
-  uploadState: enum           // State machine
-  stateChangedAt: timestamp
-  uploadAttempts: integer
-  processingError: text       // Error if failed
-
-  // File metadata (null until 'stored')
-  fileType: enum              // 'image' | 'video'
-  mimeType: text
-  fileSizeBytes: bigint
-  width, height: integer
-  aspectRatio: decimal(10,4)
-
-  // Storage references
-  storageKey: text            // S3 path: wlpr_<ulid>/original.<ext>
-  storageBucket: text
-
-  uploadedAt, updatedAt: timestamp
-}
-```
-
-**Critical Index:**
-```sql
-CREATE UNIQUE INDEX idx_wallpapers_content_hash
-ON wallpapers(user_id, content_hash)
-WHERE content_hash IS NOT NULL
-  AND upload_state IN ('stored', 'processing', 'completed');
-```
-
-This conditional unique index prevents duplicate uploads while allowing failed uploads to be retried.
-
-### Upload Flow
-
-```
-1. Client POSTs to /upload
-2. File validated (format, size, dimensions)
-3. SHA256 hash calculated
-4. Duplicate check against DB (per user)
-5. State: initiated → Insert DB record
-6. State: uploading → Upload to SeaweedFS
-7. State: stored → Record all metadata
-8. Publish NATS event to "wallpaper.uploaded"
-9. State: processing (if NATS succeeds)
-   OR stays stored (reconciliation will retry)
-```
-
-### Reconciliation System
-
-Four background jobs ensure eventual consistency:
-
-#### 1. Stuck Uploads Reconciliation
-Recovers uploads stuck in `uploading` state.
-
-**Logic:**
-- Find records in `uploading` state for >5 minutes
-- Check if file exists in SeaweedFS
-- If exists: transition to `stored` state
-- If missing: increment retry count
-- After 3 retries: mark as `failed`
-
-**Runs:** Every 5 minutes
-
-#### 2. Missing Events Reconciliation
-Republishes NATS events for records stuck in `stored` state.
-
-**Logic:**
-- Find records in `stored` state for >5 minutes
-- Republish to NATS
-- If successful: transition to `processing`
-- If failed: stays in `stored` for retry
-
-**Runs:** Every 5 minutes
-
-#### 3. Orphaned Intents Reconciliation
-Deletes abandoned `initiated` records.
-
-**Logic:**
-- Find records in `initiated` state for >1 hour
-- Delete (upload never started)
-
-**Runs:** Every 5 minutes
-
-#### 4. Orphaned SeaweedFS Reconciliation
-Deletes SeaweedFS objects without DB records.
-
-**Logic:**
-- List all objects in wallpapers bucket
-- Check for corresponding DB record
-- Delete orphans (objects without DB records)
-
-**Runs:** Every 24 hours
-
-**Multi-Instance Safety:**
-- Row-level locking (`FOR UPDATE SKIP LOCKED`)
-- Idempotent operations
-- Transaction-based processing
-
-### Rate Limiting
-
-Distributed rate limiting via Redis with atomic Lua script.
-
-**Implementation:**
-```typescript
-// Redis Lua script for atomic rate limiting
-const script = `
-  local key = KEYS[1]
-  local limit = tonumber(ARGV[1])
-  local window = tonumber(ARGV[2])
-  local current = redis.call('INCR', key)
-  if current == 1 then
-    redis.call('EXPIRE', key, window)
-  end
-  if current > limit then
-    return 0
-  end
-  return 1
-`;
-```
-
-**Features:**
-- **Atomic operations** (no race conditions)
-- **Per-user limits** (configurable by subscription tier)
-- **In-memory fallback** for testing
-- **RFC 7807 errors** with `Retry-After` header
-
-**Default Limits:**
-- Free tier: 10 uploads per hour
-- Configurable via `ValidationLimitsService`
-
-See [Rate Limiting Guide](/docs/guides/rate-limiting) for details.
-
-### Error Handling
-
-All errors follow RFC 7807 Problem Details standard.
-
-**Example Response:**
-```json
-{
-  "type": "https://wallpaperdb.dev/problems/validation-error",
-  "title": "Validation Error",
-  "status": 400,
-  "detail": "File format not supported. Allowed: jpeg, png, webp",
-  "instance": "/upload",
-  "allowedFormats": ["jpeg", "png", "webp"]
-}
-```
-
-**Error Types:**
-- `ValidationError` (400) - Invalid file format, size, or dimensions
-- `ConflictError` (409) - Duplicate upload (same content hash)
-- `RateLimitError` (429) - Rate limit exceeded
-- `InternalError` (500) - Server error
-
-See [Error Handling Guide](/docs/guides/error-handling) for details.
-
-## API Reference
-
-### POST /upload
-
-Upload a wallpaper file.
-
-**Request:**
-```bash
-curl -X POST http://localhost:3001/upload \
-  -F "file=@wallpaper.jpg" \
-  -F "userId=user_123"
-```
-
-**Content-Type:** `multipart/form-data`
-
-**Parameters:**
-- `file` (required) - File to upload
-- `userId` (required) - User ID
-
-**Success Response (201):**
-```json
-{
-  "wallpaperId": "wlpr_01HABCDEF123456789",
-  "uploadState": "processing",
-  "fileType": "image",
-  "mimeType": "image/jpeg",
-  "fileSizeBytes": 1024000,
-  "width": 1920,
-  "height": 1080,
-  "aspectRatio": "1.7778"
-}
-```
-
-**Error Responses:**
-- `400` - Validation error (invalid format, size, dimensions)
-- `409` - Duplicate upload (same content hash for user)
-- `429` - Rate limit exceeded
-- `500` - Internal server error
-
-**Validation Rules:**
-- **Formats**: JPEG, PNG, WebP (images), MP4, WebM (videos)
-- **Image size**: Max 50MB
-- **Video size**: Max 200MB
-- **Dimensions**: Max 16384x16384 pixels
-- **MIME detection**: Content-based (not from client header)
-
-[View OpenAPI Specification →](/docs/openapi/ingestor/upload/post)
-
-### GET /health
-
-Health check with dependency status.
-
-**Response (200):**
-```json
-{
-  "status": "healthy",
-  "checks": {
-    "database": { "status": "healthy" },
-    "s3": { "status": "healthy" },
-    "nats": { "status": "healthy" },
-    "redis": { "status": "healthy" }
-  }
-}
-```
-
-**Status Codes:**
-- `200` - All checks healthy or degraded
-- `503` - Unhealthy (critical dependencies down)
-
-**Status Values:**
-- `healthy` - All dependencies operational
-- `degraded` - Some dependencies failed (service still operational)
-- `unhealthy` - Critical dependencies failed
-
-[View OpenAPI Specification →](/docs/openapi/ingestor/health/get)
-
-### GET /ready
-
-Kubernetes-style readiness probe.
-
-**Response (200):**
-```json
-{
-  "ready": true
-}
-```
-
-**Status Codes:**
-- `200` - Service ready to accept traffic
-- `503` - Service not ready
-
-[View OpenAPI Specification →](/docs/openapi/ingestor/ready/get)
-
-## Configuration
-
-Environment variables (Zod-validated):
+## Verification
 
 ```bash
-# Server
-PORT=3001
-NODE_ENV=development
-
-# Database
-DATABASE_URL=postgresql://wallpaperdb:wallpaperdb@localhost:5432/wallpaperdb
-
-# SeaweedFS/S3
-S3_ENDPOINT=http://localhost:8002
-S3_ACCESS_KEY_ID=storageadmin
-S3_SECRET_ACCESS_KEY=storageadmin
-S3_BUCKET=wallpapers
-S3_REGION=us-east-1
-
-# NATS
-NATS_URL=nats://localhost:4222
-
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=
-REDIS_DB=0
-
-# OpenTelemetry
-OTLP_ENDPOINT=http://localhost:4318
-SERVICE_NAME=wallpaperdb-ingestor
+make check PACKAGE=ingestor
+make test-integration PACKAGE=ingestor
+make check-crap PACKAGE=ingestor CRAP_THRESHOLD=30
+make run PACKAGE=ingestor SCRIPT=build:docker
+make test-e2e PACKAGE=ingestor-e2e
 ```
 
-## Testing
+Capability tests use controlled adapters and the Effect test clock. Real adapter contracts verify database atomicity and concurrency, storage semantics, durable broker publication, and distributed quota. A representative composition test verifies complete wiring; a small Docker suite verifies the deployed artifact. Tests use observable conditions and controlled clocks instead of fixed sleeps.
 
-The ingestor has comprehensive test coverage using the TesterBuilder pattern.
-
-**Run tests:**
-```bash
-make test PACKAGE=ingestor          # All tests
-make run PACKAGE=ingestor SCRIPT=test:watch    # Watch mode
-```
-
-**Test categories:**
-- **Upload flow** - Happy path for JPEG, PNG, WebP
-- **Validation** - Format, size, dimension checks
-- **Deduplication** - Same content hash rejection
-- **Reconciliation** - All 4 reconciliation jobs
-- **Rate limiting** - Both in-memory and Redis
-- **Multi-instance** - Concurrent upload safety
-- **State machine** - State transition logic
-
-**Example test:**
-```typescript
-import { PostgresTesterBuilder } from "@wallpaperdb/test-utils";
-
-describe("Upload Flow", () => {
-  it("should upload JPEG successfully", async () => {
-    const tester = await new PostgresTesterBuilder()
-      .withPostgres()
-      .withS3()
-      .withS3Bucket("wallpapers")
-      .withNats()
-      .withRedis()
-      .withMigrations("./drizzle")
-      .build();
-
-    const app = await createApp(/* ... */);
-
-    const response = await app.inject({
-      method: 'POST',
-      url: '/upload',
-      payload: createMultipartPayload(jpegBuffer, 'user_123')
-    });
-
-    expect(response.statusCode).toBe(201);
-    expect(response.json().uploadState).toBe('processing');
-  });
-});
-```
-
-See [Testing Documentation](/docs/testing) for more details.
-
-## Observability
-
-### Metrics
-
-Key metrics recorded:
-
-- `uploads.total` - Total uploads (by status, file type)
-- `upload.duration_ms` - Upload duration histogram
-- `reconciliation.processed` - Reconciliation job counts
-- `rate_limit.exceeded` - Rate limit violations
-
-### Traces
-
-Distributed tracing with OpenTelemetry:
-
-- `upload.process` - Full upload workflow
-- `upload.validate` - File validation
-- `upload.hash` - SHA256 calculation
-- `upload.s3` - SeaweedFS upload
-- `upload.nats` - NATS publish
-- `reconciliation.*` - Reconciliation jobs
-
-### Dashboards
-
-View metrics in Grafana:
-- **Ingestor Overview** - Upload rates, errors, latency
-- **Reconciliation** - Stuck uploads, missing events
-
-Access Grafana: http://localhost:3000 (admin/admin)
-
-## Deployment
-
-### Local Docker containers
-
-Build and run development containers through Compose:
-
-```bash
-make apps-build SERVICE=ingestor  # Build image
-make apps-start SERVICE=ingestor    # Run container
-make apps-logs SERVICE=ingestor   # View logs
-make apps-stop SERVICE=ingestor   # Stop container
-```
-
-### Production Build
-
-```bash
-make build PACKAGE=ingestor  # TypeScript compilation
-make run PACKAGE=ingestor SCRIPT=start  # Run production build
-```
-
-Output: `apps/ingestor/dist/`
-
-## Project Structure
-
-```
-apps/ingestor/
-├── src/
-│   ├── app.ts                    # Fastify app factory
-│   ├── index.ts                  # Entry point (server lifecycle)
-│   ├── config.ts                 # Zod-validated config
-│   ├── connections/              # Singleton connection managers
-│   │   ├── database.ts          # PostgreSQL pool
-│   │   ├── s3.ts             # S3 client
-│   │   ├── nats.ts              # NATS client
-│   │   ├── redis.ts             # Redis client
-│   │   └── otel.ts              # OpenTelemetry SDK
-│   ├── db/schema.ts              # Drizzle schema
-│   ├── routes/                   # HTTP handlers
-│   │   ├── health.routes.ts     # /health, /ready
-│   │   └── upload.routes.ts     # /upload
-│   ├── services/                 # Business logic
-│   │   ├── upload-orchestrator.service.ts  # Upload workflow
-│   │   ├── file-processor.service.ts       # Validation, metadata
-│   │   ├── storage.service.ts              # SeaweedFS operations
-│   │   ├── events.service.ts               # NATS publishing
-│   │   ├── validation-limits.service.ts    # Per-user limits
-│   │   ├── rate-limit.service.ts           # Redis rate limiting
-│   │   ├── state-machine/                  # State management
-│   │   │   └── wallpaper-state-machine.service.ts
-│   │   └── reconciliation/                 # Eventual consistency
-│   │       ├── stuck-uploads.service.ts
-│   │       ├── missing-events.service.ts
-│   │       ├── orphaned-intents.service.ts
-│   │       └── orphaned-s3.service.ts
-│   └── errors/problem-details.ts           # RFC 7807 errors
-├── test/                         # Integration tests
-├── drizzle/                      # Database migrations
-├── package.json
-└── tsconfig.json
-```
-
-## Related Documentation
-
-- [Services Overview](/docs/services) - All services
-- [Services: Media](/docs/services/media) - Retrieval service
-- [Package: Core](/docs/packages/core) - Shared infrastructure
-- [Package: Events](/docs/packages/events) - Event schemas
-- [Guide: Rate Limiting](/docs/guides/rate-limiting) - Rate limiting patterns
-- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 errors
-- [Testing](/docs/testing) - Testing strategies
-- [Observability](/docs/observability) - OpenTelemetry setup
+Coverage reports include all ingestor source files. CRAP is a risk indicator alongside behavioral tests; the shared analyzer's missing callback/generator inventory is tracked in issue #217, so a numeric pass does not establish that every callback was assessed.

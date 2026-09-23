@@ -78,6 +78,7 @@ export const ingestorConfig = Configuration.all({
   ),
   reconciliationIntervalMs: positive('RECONCILIATION_INTERVAL_MS', 5 * 60 * 1000),
   s3CleanupIntervalMs: positive('S3_CLEANUP_INTERVAL_MS', 24 * 60 * 60 * 1000),
+  requestTimeoutMs: positive('HTTP_REQUEST_TIMEOUT_MS', 120000),
   rateLimitMax: positive('RATE_LIMIT_MAX', 100),
   rateLimitWindowMs: positive('RATE_LIMIT_WINDOW_MS', 60 * 60 * 1000),
 }).pipe(

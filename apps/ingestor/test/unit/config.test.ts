@@ -22,6 +22,7 @@ describe('ingestor configuration', () => {
 it.each([
   'PORT',
   'REDIS_PORT',
+  'HTTP_REQUEST_TIMEOUT_MS',
   'RATE_LIMIT_MAX',
   'RATE_LIMIT_WINDOW_MS',
   'RECONCILIATION_INTERVAL_MS',

@@ -4,6 +4,7 @@
 
 - [User](./apps/user/CONTEXT.md) - owns Profiles and their community-facing identity
 - [Gateway Catalogue](./apps/gateway/CONTEXT.md) - owns public wallpaper discovery and its interpretations of contributor Profiles
+- [Wallpaper Ingestion](./apps/ingestor/CONTEXT.md) - owns upload acceptance, immutable originals, and durable upload announcements
 
 Additional contexts are documented lazily as their domain language is resolved.
 

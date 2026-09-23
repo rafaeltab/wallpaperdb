@@ -4,6 +4,7 @@ import { Context, Effect, Layer } from 'effect';
 import pg from 'pg';
 import { ulid } from 'ulid';
 import { z } from 'zod';
+import { recordCounter } from '@wallpaperdb/core/telemetry';
 import * as schema from '../../db/schema.js';
 import {
   IngestionStore,
@@ -80,6 +81,14 @@ function owned(record: UploadRecord) {
     eq(wallpapers.uploadState, record.state)
   );
 }
+function recordTransition(from: string, to: string, committed: boolean) {
+  if (committed)
+    recordCounter('upload.state_transitions.total', 1, {
+      from_state: from,
+      to_state: to,
+      success: true,
+    });
+}
 
 class PostgresIngestionStore implements IngestionStore {
   constructor(private readonly db: Database) {}
@@ -140,15 +149,17 @@ class PostgresIngestionStore implements IngestionStore {
           .where(and(owned(record), eq(wallpapers.uploadState, 'uploading')))
           .returning({ id: wallpapers.id });
         if (!updated.length) return false;
-        await tx
-          .insert(uploadOutbox)
-          .values({
-            eventId: record.event.id,
-            wallpaperId: record.wallpaper.id,
-            event: record.event,
-          });
+        await tx.insert(uploadOutbox).values({
+          eventId: record.event.id,
+          wallpaperId: record.wallpaper.id,
+          event: record.event,
+        });
         return true;
       })
+    ).pipe(
+      Effect.tap((committed) =>
+        Effect.sync(() => recordTransition('uploading', 'stored', committed))
+      )
     );
 
   published = (record: UploadRecord) =>
@@ -165,12 +176,18 @@ class PostgresIngestionStore implements IngestionStore {
             )
           )
           .returning({ id: wallpapers.id });
-        if (!updated.length) return;
+        if (!updated.length) return false;
         await tx
           .update(uploadOutbox)
           .set({ publishedAt: new Date() })
           .where(eq(uploadOutbox.eventId, record.event.id));
+        return true;
       })
+    ).pipe(
+      Effect.tap((committed) =>
+        Effect.sync(() => recordTransition('stored', 'processing', committed))
+      ),
+      Effect.asVoid
     );
 
   defer = (record: UploadRecord, now: Date, maxAttempts: number) =>
@@ -195,7 +212,11 @@ class PostgresIngestionStore implements IngestionStore {
             .set({ quarantinedAt: now })
             .where(eq(uploadOutbox.eventId, record.event.id));
         }
+        return updated.length > 0 && exhausted && record.state === 'uploading';
       })
+    ).pipe(
+      Effect.tap((failed) => Effect.sync(() => recordTransition('uploading', 'failed', failed))),
+      Effect.asVoid
     );
 
   claim = (now: Date, staleBefore: Date, leaseUntil: Date, limit: number) =>

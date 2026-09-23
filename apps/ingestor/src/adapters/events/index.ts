@@ -1,9 +1,10 @@
 import { context, propagation } from '@opentelemetry/api';
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import {
   WallpaperUploadedCloudEventSchema,
   WALLPAPER_UPLOADED_SUBJECT,
 } from '@wallpaperdb/events/schemas';
-import { Context, Effect, Layer, Semaphore } from 'effect';
+import { Clock, Context, Effect, Exit, Layer, Semaphore } from 'effect';
 import { connect, headers, type JetStreamClient } from 'nats';
 import { IngestionUnavailable, UploadEvents, type UploadedEvent } from '../../ingestion/index.js';
 
@@ -77,7 +78,12 @@ class NatsUploadEvents implements UploadEvents {
     const value = yield* Effect.try({
       try: () => envelope(event, this.config.assetBucket),
       catch: (cause) => new IngestionUnavailable({ operation: 'encode-upload-event', cause }),
-    });
+    }).pipe(
+      Effect.tapError((error) =>
+        Effect.logError('Upload event encoding failed', { cause: error.cause })
+      )
+    );
+    const started = yield* Clock.currentTimeMillis;
     const metadata = headers();
     const carrier: Record<string, string> = {};
     propagation.inject(context.active(), carrier);
@@ -97,7 +103,22 @@ class NatsUploadEvents implements UploadEvents {
             timeout: 5000,
           }
         )
-      ).pipe(Effect.uninterruptible)
+      ).pipe(
+        Effect.onExit((exit) =>
+          Effect.gen(function* () {
+            const finished = yield* Clock.currentTimeMillis;
+            yield* Effect.try(() => {
+              const attributes = { 'event.type': 'wallpaper.uploaded' };
+              recordCounter('events.published.total', 1, {
+                ...attributes,
+                status: Exit.isSuccess(exit) ? 'success' : 'error',
+              });
+              recordHistogram('events.publish_duration_ms', finished - started, attributes);
+            }).pipe(Effect.ignore);
+          })
+        ),
+        Effect.uninterruptible
+      )
     );
   });
 }

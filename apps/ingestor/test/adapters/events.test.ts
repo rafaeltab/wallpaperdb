@@ -1,6 +1,6 @@
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import { WallpaperUploadedEventSchema } from '@wallpaperdb/events/schemas';
-import { ManagedRuntime } from 'effect';
+import { Effect, ManagedRuntime } from 'effect';
 import { connect, type NatsConnection } from 'nats';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { UploadEventsHealth, uploadedEventsLayer } from '../../src/adapters/events/index.js';
@@ -53,5 +53,17 @@ describe('upload event publication', () => {
       eventId: occurrence.id, wallpaper: { id: occurrence.wallpaper.id, userId: 'user_events',
         storageKey: 'wlpr_events/original.png', storageBucket: 'wallpapers' },
     });
+  });
+  it('reports permanent encoding failures and missing broker storage as technical failures', async () => {
+    const events = await runtime.runPromise(UploadEvents);
+    const invalid = { ...occurrence, wallpaper: { ...occurrence.wallpaper,
+      metadata: { ...occurrence.wallpaper.metadata, width: 0 } } };
+    expect(await Effect.runPromise(events.publish(invalid).pipe(Effect.flip)))
+      .toMatchObject({ _tag: 'IngestionUnavailable', operation: 'encode-upload-event' });
+    const manager = await connection.jetstreamManager();
+    await manager.streams.delete('UPLOADS');
+    expect(await runtime.runPromise(UploadEventsHealth.use((health) => health.check()))).toBe(false);
+    expect(await Effect.runPromise(events.publish(occurrence).pipe(Effect.flip)))
+      .toMatchObject({ _tag: 'IngestionUnavailable', operation: 'publish-upload-event' });
   });
 });

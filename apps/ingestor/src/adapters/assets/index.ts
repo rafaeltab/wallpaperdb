@@ -6,7 +6,8 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
-import { Context, DateTime, Effect, Layer } from 'effect';
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
+import { Clock, Context, DateTime, Effect, Exit, Layer } from 'effect';
 import { AssetStorage, type AssetReference, IngestionUnavailable } from '../../ingestion/index.js';
 
 export interface AssetsConfig {
@@ -37,6 +38,28 @@ const request = <A>(operation: string, send: (signal: AbortSignal) => Promise<A>
     )
   );
 
+const measure =
+  (operation: string) =>
+  <A, E>(effect: Effect.Effect<A, E>) =>
+    Effect.gen(function* () {
+      const started = yield* Clock.currentTimeMillis;
+      return yield* effect.pipe(
+        Effect.onExit((exit) =>
+          Effect.gen(function* () {
+            const finished = yield* Clock.currentTimeMillis;
+            yield* Effect.try(() => {
+              const attributes = {
+                'operation.name': operation,
+                'operation.success': Exit.isSuccess(exit),
+              };
+              recordCounter('storage.operations.total', 1, attributes);
+              recordHistogram('storage.operation_duration_ms', finished - started, attributes);
+            }).pipe(Effect.ignore);
+          })
+        )
+      );
+    });
+
 class S3Assets implements AssetStorage {
   constructor(
     private readonly client: S3Client,
@@ -59,7 +82,7 @@ class S3Assets implements AssetStorage {
         }),
         { abortSignal }
       )
-    );
+    ).pipe(measure('put_object'));
   });
 
   readonly exists = Effect.fn('ingestion.assets.exists')((reference: AssetReference) =>
@@ -80,7 +103,10 @@ class S3Assets implements AssetStorage {
           ? Effect.succeed(false)
           : Effect.fail(new IngestionUnavailable({ operation: 'inspect-asset', cause }))
       ),
-      Effect.tapError((error) => Effect.logError('Asset inspection failed', { cause: error.cause }))
+      Effect.tapError((error) =>
+        Effect.logError('Asset inspection failed', { cause: error.cause })
+      ),
+      measure('head_object')
     )
   );
 
@@ -93,7 +119,7 @@ class S3Assets implements AssetStorage {
         }),
         { abortSignal }
       )
-    ).pipe(Effect.asVoid)
+    ).pipe(Effect.asVoid, measure('delete_object'))
   );
 
   readonly list = Effect.fn('ingestion.assets.list')(function* (this: S3Assets, cursor?: string) {

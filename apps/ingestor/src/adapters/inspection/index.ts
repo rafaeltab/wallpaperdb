@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { Effect, Layer } from 'effect';
+import { recordHistogram } from '@wallpaperdb/core/telemetry';
+import { Clock, Effect, Layer } from 'effect';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { ContentInspection, type ValidationLimits } from '../../ingestion/index.js';
@@ -10,6 +11,7 @@ class ImageInspection implements ContentInspection {
     declaredMimeType: string,
     limits: ValidationLimits
   ) {
+    const started = yield* Clock.currentTimeMillis;
     const detected = yield* Effect.tryPromise({
       try: () => fileTypeFromBuffer(bytes),
       catch: (cause) => cause,
@@ -30,6 +32,7 @@ class ImageInspection implements ContentInspection {
       } as const;
     if (!detected || !limits.allowedFormats.includes(mimeType) || fileType !== 'image')
       return { _tag: 'InvalidFormat', mimeType } as const;
+    const metadataStarted = yield* Clock.currentTimeMillis;
     const dimensions = yield* Effect.tryPromise({
       try: () => sharp(bytes, { limitInputPixels: 268402689, sequentialRead: true }).metadata(),
       catch: (cause) => cause,
@@ -39,6 +42,7 @@ class ImageInspection implements ContentInspection {
     );
     if (!dimensions?.width || !dimensions.height)
       return { _tag: 'InvalidFormat', mimeType } as const;
+    yield* duration('file_processor.metadata_extraction_duration_ms', metadataStarted);
     if (
       dimensions.width < limits.minWidth ||
       dimensions.height < limits.minHeight ||
@@ -54,6 +58,10 @@ class ImageInspection implements ContentInspection {
         maxWidth: limits.maxWidth,
         maxHeight: limits.maxHeight,
       } as const;
+    const hashStarted = yield* Clock.currentTimeMillis;
+    const contentHash = createHash('sha256').update(bytes).digest('hex');
+    yield* duration('file_processor.hash_duration_ms', hashStarted);
+    yield* duration('file_processor.total_duration_ms', started);
     return {
       _tag: 'Inspected',
       metadata: {
@@ -62,11 +70,19 @@ class ImageInspection implements ContentInspection {
         width: dimensions.width,
         height: dimensions.height,
         fileSizeBytes: bytes.byteLength,
-        contentHash: createHash('sha256').update(bytes).digest('hex'),
+        contentHash,
         extension: detected.ext,
       },
     } as const;
   });
 }
+
+const duration = (name: string, started: number) =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis;
+    yield* Effect.try(() => recordHistogram(name, now - started, { 'file.type': 'image' })).pipe(
+      Effect.ignore
+    );
+  });
 
 export const imageInspectionLayer = Layer.succeed(ContentInspection, new ImageInspection());

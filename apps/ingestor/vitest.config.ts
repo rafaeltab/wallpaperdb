@@ -1,27 +1,44 @@
-import { defineBaseConfig } from '@wallpaperdb/vitest-config';
+import { defaults } from '@wallpaperdb/vitest-config/defaults';
+import { defineConfig, mergeConfig } from 'vitest/config';
 
-export default defineBaseConfig({
-  test: {
-    name: 'ingestor',
-    globals: true,
-    environment: 'node',
-    include: ['test/**/*.test.ts'],
-    testTimeout: 60000, // 60 seconds for testcontainers
-    hookTimeout: 60000,
-    // Enable parallel test execution within files
-    maxConcurrency: 5, // Run up to 5 tests in parallel per file
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
+const instrumentationTests = ['test/otel-init.test.ts'];
+
+export default mergeConfig(
+  defaults,
+  defineConfig({
+    test: {
+      name: 'ingestor',
+      environment: 'node',
+      testTimeout: 60000,
+      hookTimeout: 60000,
+      pool: 'threads',
+      maxWorkers: 2,
+      projects: [
+        {
+          extends: true,
+          test: {
+            name: 'ingestor',
+            include: ['test/**/*.test.ts'],
+            exclude: instrumentationTests,
+          },
+        },
+        {
+          extends: true,
+          test: {
+            name: 'ingestor-instrumentation',
+            include: instrumentationTests,
+            // OpenTelemetry SDK module patches outlive exporter shutdown.
+            pool: 'forks',
+            isolate: true,
+          },
+        },
+      ],
+      coverage: {
+        provider: 'v8',
+        include: ['src/**/*.ts'],
+        exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
+        reportsDirectory: './coverage/integration',
       },
     },
-    coverage: {
-      provider: 'v8',
-      include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
-      reportsDirectory: './coverage/integration',
-    },
-  },
-});
+  })
+);

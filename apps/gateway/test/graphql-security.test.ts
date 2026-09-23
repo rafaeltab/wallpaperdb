@@ -64,13 +64,41 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 describe('GraphQL security driving contract', () => {
-  it('accepts depth-limit queries, returns rate headers and ignores spoofed forwarded IP', async () => {
+  it('accepts depth-limit queries and returns rate headers', async () => {
     const app = await build();
     const result = await execute(app);
     expect(result.statusCode).toBe(200);
     expect(result.json().errors).toBeUndefined();
     expect(result.headers['x-ratelimit-remaining']).toBe('99');
     expect(result.headers['x-ratelimit-reset']).toBeDefined();
+  });
+  it('shares the client quota across changing spoofed forwarded-IP headers', async () => {
+    const app = await build({ rateLimitMaxAnonymous: 2 });
+    const responses = [];
+    for (const forwardedIp of ['198.51.100.1', '198.51.100.2', '198.51.100.3']) {
+      responses.push(
+        await app.inject({
+          method: 'POST',
+          url: '/graphql',
+          remoteAddress: '127.0.0.1',
+          headers: {
+            'user-agent': 'quota-contract',
+            'x-forwarded-for': forwardedIp,
+            forwarded: `for=${forwardedIp}`,
+          },
+          payload: { query },
+        })
+      );
+    }
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 429]);
+    expect(responses.slice(0, 2).map((response) => response.json().errors)).toEqual([
+      undefined,
+      undefined,
+    ]);
+    expect(
+      responses.slice(0, 2).map((response) => response.headers['x-ratelimit-remaining'])
+    ).toEqual(['1', '0']);
+    expect(responses[2]?.json().errors[0].extensions.code).toBe('RATE_LIMIT_EXCEEDED');
   });
   it('rejects queries over the depth limit', async () => {
     const app = await build({ graphqlMaxDepth: 4 });

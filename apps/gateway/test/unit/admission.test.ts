@@ -7,7 +7,7 @@ import { memoryQuotaLayer } from '../helpers/quota.js';
 const policy = { enabled: true, limit: 2, windowMs: 1000 };
 const layer = admissionLayer(policy).pipe(Layer.provide(memoryQuotaLayer));
 describe('request admission', () => {
-  it.effect('admits only the configured quota and renews it when the window ends', () =>
+  it.effect('passes the configured policy to the quota adapter and forwards its decisions', () =>
     Effect.gen(function* () {
       const admission = yield* Admission;
       expect(yield* admission.admit('visitor')).toEqual({
@@ -29,7 +29,7 @@ describe('request admission', () => {
       });
     }).pipe(Effect.provide(layer))
   );
-  it.effect('isolates visitors and application instances', () =>
+  it.effect('passes visitor keys to independently provided quota adapters', () =>
     Effect.gen(function* () {
       yield* Effect.gen(function* () {
         const admission = yield* Admission;

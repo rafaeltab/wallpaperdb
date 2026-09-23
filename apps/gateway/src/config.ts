@@ -86,7 +86,7 @@ export const gatewayConfig = Effect.gen(function* () {
       'COLOR_SPREAD_STRATEGY'
     ).pipe(Configuration.withDefault('linear')),
     graphqlMaxDepth: positive('GRAPHQL_MAX_DEPTH', 5),
-    graphqlMaxComplexity: positive('GRAPHQL_MAX_COMPLEXITY', 1000),
+    graphqlMaxComplexity: positive('GRAPHQL_MAX_COMPLEXITY', 2000),
     graphqlMaxUniqueFields: positive('GRAPHQL_MAX_UNIQUE_FIELDS', 50),
     graphqlMaxAliases: positive('GRAPHQL_MAX_ALIASES', 20),
     graphqlMaxBatchSize: positive('GRAPHQL_MAX_BATCH_SIZE', 10),

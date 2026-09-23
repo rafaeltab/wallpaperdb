@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import { metrics } from '@opentelemetry/api';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
+import { loadConfig } from '../src/config.js';
 import type { HttpConfig } from '../src/http/index.js';
 import type { HttpTestServices } from './unit/http-fixture.js';
 import { createTestHttpApp, EmptyCatalogue, httpConfig } from './unit/http-fixture.js';
@@ -74,6 +75,42 @@ describe('GraphQL security driving contract', () => {
   it('rejects queries over the depth limit', async () => {
     const app = await build({ graphqlMaxDepth: 4 });
     expect((await execute(app)).json().errors).toBeDefined();
+  });
+  it('admits the shipped 20-wallpaper browse query under the production default budget', async () => {
+    const catalogue = new ObservedCatalogue();
+    const config = loadConfig({
+      NODE_ENV: 'production',
+      OPENSEARCH_URL: 'http://127.0.0.1:9200',
+      NATS_URL: 'nats://127.0.0.1:4222',
+      MEDIA_SERVICE_URL: 'http://127.0.0.1:3003',
+      CURSOR_SECRET: 'test-secret-000000000000000000000000',
+    });
+    const app = await build(config, { catalogue });
+    const text = `
+      query SearchWallpapers($filter:WallpaperFilter,$sort:WallpaperSort,$first:Int,$after:String) {
+        searchWallpapers(filter:$filter,sort:$sort,first:$first,after:$after) {
+          edges {
+            node {
+              wallpaperId profileId uploadedAt updatedAt
+              variants {width height aspectRatio format fileSizeBytes createdAt url}
+            }
+          }
+          pageInfo {hasNextPage hasPreviousPage startCursor endCursor}
+        }
+      }
+    `;
+    expect((await execute(app, text, { first: 20 })).json().errors).toBeUndefined();
+    expect(catalogue.calls).toEqual(['search']);
+    catalogue.calls.length = 0;
+    expect((await execute(app, nestedQueries[1])).json().errors).toBeDefined();
+    expect(catalogue.calls).toEqual([]);
+    const strict = await build({ ...config, graphqlMaxComplexity: 1505 }, { catalogue });
+    expect((await execute(strict, text, { first: 20 })).json().errors?.[0].extensions).toEqual({
+      code: 'COMPLEXITY_LIMIT_EXCEEDED',
+      complexity: 1506,
+      maxComplexity: 1505,
+    });
+    expect(catalogue.calls).toEqual([]);
   });
   it.each(
     nestedQueries
@@ -270,7 +307,7 @@ describe('GraphQL security driving contract', () => {
     expect((await execute(narrow)).json().errors[0].message).toContain('unique fields');
   });
   it('prices Profile wallpaper reads and literal/variable first and last arguments', async () => {
-    const app = await build();
+    const app = await build({ graphqlMaxComplexity: 1000 });
     const expensive = await execute(
       app,
       '{ profile(id:"user_a") { wallpapers(first:100) { edges { node { wallpaperId } } } } }'

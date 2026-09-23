@@ -43,6 +43,7 @@ describe('startup configuration', () => {
       colorSpreadStrategy: 'linear',
       redisEnabled: false,
       graphqlIntrospectionEnabled: true,
+      graphqlMaxComplexity: 2000,
       cursorExpirationMs: 604800000,
     });
   });
@@ -67,6 +68,7 @@ describe('startup configuration', () => {
         COLOR_SPREAD_STRATEGY: 'exact',
         RATE_LIMIT_ENABLED: 'false',
         GRAPHQL_INTROSPECTION_ENABLED: 'true',
+        GRAPHQL_MAX_COMPLEXITY: '1505',
         REDIS_ENABLED: 'true',
         REDIS_HOST: '127.0.0.1',
         REDIS_PORT: '6379',
@@ -78,6 +80,7 @@ describe('startup configuration', () => {
       colorSpreadStrategy: 'exact',
       rateLimitEnabled: false,
       graphqlIntrospectionEnabled: true,
+      graphqlMaxComplexity: 1505,
       redisEnabled: true,
     });
     expect(loadConfig({ ...environment, NODE_ENV: 'production' }).graphqlIntrospectionEnabled).toBe(

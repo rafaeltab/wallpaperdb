@@ -4,6 +4,10 @@
 
 The gateway-specific CRAP analyzer and its gate were removed on 2026-09-23. Its overlapping coverage attribution could hide uncovered functions, so the historical CRAP claims below are withdrawn. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback/generator coverage in the shared analyzer and preserves exact commit links to the removed implementation. Architecture checks and source-wide coverage thresholds remain enabled.
 
+## Current validation commands
+
+The repository now uses shared Make targets: `make build PACKAGE=gateway`, `make check-types PACKAGE=gateway`, `make lint PACKAGE=gateway`, and `make test-integration PACKAGE=gateway`. Use `FORCE=1` to bypass Turbo's cache, or `make test-focused PACKAGE=gateway ARGS='test/catalogue.test.ts'` for selected tests. Focused runs build dependencies and use one worker with options supported by both repository Vitest versions. Gateway coverage lives in `apps/gateway/coverage/integration`, which the shared analyzer expects. The dated measurements below describe their original revisions and test matrices.
+
 ## Objective
 
 Migrate the gateway to Effect and CODING_STANDARDS.md while preserving public functionality and matching or improving the measured coverage baseline.

@@ -6,6 +6,7 @@ The public discovery layer for WallpaperDB. It lets visitors browse wallpapers a
 
 - Search wallpapers by contributor, rendition dimensions and format, with color preference ranking and bidirectional pagination.
 - Retrieve wallpapers and public Profiles, batch contributor lookups, and present media URLs.
+- Discover Profiles by current Handles, active aliases and Display names, with ranked cursor pagination; resolve exact Handles and aliases to the canonical Profile while keeping alias lists private.
 - Keep the catalogue up to date through replay-safe projection updates and durable handling of failed deliveries.
 - Bound query depth, breadth, complexity, batching and visitor request rates.
 - Report availability and trace requests through catalogue reads and projection updates.

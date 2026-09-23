@@ -41,10 +41,10 @@ The resulting suite starts one OpenSearch, three private NATS servers and one Re
 
 Docker CPU fell by 35% versus main and 71% versus the initial migration. Host CPU fell by 39% versus the initial migration, but remains above main. Peak host memory increased as loaded modules and two workers coexist. Docker memory is roughly unchanged.
 
-For lower worker memory, run:
+For lower worker memory with the current Make interface, run the coverage suite serially:
 
 ```sh
-make gateway-test-coverage GATEWAY_TEST_ARGS='--maxWorkers=1'
+make test-focused PACKAGE=gateway ARGS='--coverage'
 ```
 
 A preliminary one-worker experiment took 16.86 seconds with a 509 MiB host RSS peak. That was one run before the final instrumentation split and malformed-data fix; it establishes a tuning option, not a second repeated benchmark.
@@ -62,7 +62,7 @@ coverage:
 	./node_modules/.bin/vitest run --coverage --coverage.reporter=text --coverage.reporter=json-summary
 ```
 
-Installation and prerequisite builds were outside timing. The built-service smoke test's own `make gateway-build` remains inside timing. Main's automatic service cleanup occurs after command exit; optimized fixture cleanup occurs inside the command. Remaining Ryuk helper cleanup was awaited outside timing before starting the next run.
+Installation and prerequisite builds were outside timing. The built-service smoke test's then-current `make gateway-build` command remains inside timing; its current equivalent is `make build PACKAGE=gateway`. Main's automatic service cleanup occurs after command exit; optimized fixture cleanup occurs inside the command. Remaining Ryuk helper cleanup was awaited outside timing before starting the next run.
 
 GNU time measures command wall time and host CPU. Host aggregate RSS is sampled every 0.2 seconds; Docker CPU and working set every 0.5 seconds. Preexisting containers and the collector are excluded. Docker CPU is a sampled lower bound: Redis was missed entirely in three optimized runs, one observed Redis lacked a CPU sample, and one stats request raced container removal and returned HTTP 404. Independent memory peaks must not be added as a simultaneous total.
 
@@ -70,6 +70,6 @@ Raw logs, samples, environment details, coverage counts and source fingerprints 
 
 ## Effect 4 continuation, September 16
 
-The Effect 4 migration preserves the shared search fixture, worker reuse, and separate instrumentation process. It expands the suite from 239 to 271 tests, including cancellation, Redis recovery, transport draining, and startup failure coverage. Fresh `make gateway-test-coverage` runs completed in 15.16 and 14.94 seconds; the same suite took 28.59 seconds during concurrent repository CI work. All tests passed. These are validation observations with other local services running, not a new repeated CPU/memory benchmark. The earlier benchmark remains evidence for its recorded revision rather than a performance claim about Effect 4.
+The Effect 4 migration preserves the shared search fixture, worker reuse, and separate instrumentation process. It expands the suite from 239 to 271 tests, including cancellation, Redis recovery, transport draining, and startup failure coverage. Fresh runs using the then-current `make gateway-test-coverage` command completed in 15.16 and 14.94 seconds; the same suite took 28.59 seconds during concurrent repository CI work. All tests passed. These are validation observations with other local services running, not a new repeated CPU/memory benchmark. The earlier benchmark remains evidence for its recorded revision rather than a performance claim about Effect 4. Use `make test-integration PACKAGE=gateway FORCE=1` for a fresh coverage run with the current interface.
 
 The subsequent `@effect/vitest` adoption moves only the gateway to Vitest 5.0.1 and expands failure coverage to 276 tests. A full coverage run completed in 17.97 seconds, and the run during parallel repository CI took 30.40 seconds. Both passed with the original thresholds. This is a validation observation, not a controlled comparison of Vitest versions; source remapping and the behavioral matrix changed. The shared search fixture, two-worker limit, module reuse, and isolated instrumentation process remain.

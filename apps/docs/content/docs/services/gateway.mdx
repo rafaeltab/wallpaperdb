@@ -17,7 +17,11 @@ When a collector is configured, traces, metrics, and SDK logs use explicitly own
 
 Fastify and Mercurius preserve the GraphQL schema, including cursor pagination, color preferences, nullable contributor batching, and media URLs. HTTP failures outside GraphQL use RFC 9457 Problem Details; GraphQL failures keep `errors` and applicable `data` with safe metadata in `extensions`.
 
-Catalogue pages default to 10 results. Both `first` and `last` must be integers between 1 and 100 when supplied; `first` selects the page size if both are present. The capability rejects unsupported sizes before cursor decoding or catalogue storage access.
+Wallpaper pages default to 10 results. Both `first` and `last` must be integers between 1 and 100 when supplied; `first` selects the page size if both are present. The capability rejects unsupported sizes before cursor decoding or catalogue storage access.
+
+`searchProfiles(query, first, after)` discovers contributors through current Handles, active aliases and Display names. Biography is excluded from discovery, and alias lists are never returned. Exact current Handles rank before prefixes and alias matches, followed by Display-name matches. Profile ID breaks ties, and cursors bind the normalized query and ranking position. Queries ignore surrounding whitespace, case and one optional leading `@`; pages default to 10 with a maximum of 50. Selecting a contributor filters wallpapers by its exact Profile ID.
+
+Exact Handle lookup returns the Profile together with the requested Handle, canonical Handle and alias indicator. Alias routing stops at a scheduled expiry even before the expiry event reaches the projection; retained aliases without an expiry remain active. Reclaimed Handles resolve using the newest generation of the matched claim, independently of discovery ranking. Profile snapshots preserve authored Biography content and current picture identity while older events cannot restore superseded state.
 
 GraphQL complexity admission uses the selected operation and its referenced fragments, GraphQL-coerced arguments and variable defaults, and the catalogue's resolved page size. Equivalent pagination expressed as literals, supplied variables, or variable defaults receives the same cost estimate; omitted and null page sizes use the catalogue default.
 
@@ -48,19 +52,19 @@ Quarantine publication IDs fingerprint the broker domain/account, source stream,
 ## Verification
 
 ```sh
-make gateway-build
-make gateway-check-types
-make gateway-lint
-make gateway-test-coverage
+make build PACKAGE=gateway
+make check-types PACKAGE=gateway
+make lint PACKAGE=gateway
+make test-integration PACKAGE=gateway
 ```
 
-Use `make gateway-test-focused GATEWAY_TEST_ARGS='test/catalogue.test.ts'` for a focused behavioral suite. Capability tests use controlled adapters; transport contracts use Fastify injection; storage and broker contracts use real containers. Integration tests check a representative publication-to-query path and lifecycle behavior.
+Use `make test-focused PACKAGE=gateway ARGS='test/catalogue.test.ts'` for a focused behavioral suite. This builds prerequisites and runs one worker. Capability tests use controlled adapters; transport contracts use Fastify injection; storage and broker contracts use real containers. Integration tests check a representative publication-to-query path and lifecycle behavior.
 
 The search test project owns one OpenSearch server per invocation. Each fixture owns unique wallpaper and Profile indices, its application, and its broker. Cleanup deletes only that fixture's indices, including closed indices; focused tests start only their required infrastructure. NATS readiness uses its health endpoint and bounded protocol requests.
 
-Two worker threads reuse loaded modules while fixtures own mutable application state. The OpenTelemetry bootstrap test runs in an isolated process because SDK shutdown leaves module instrumentation installed. Shuffled file/test runs verify order independence. Use `GATEWAY_TEST_ARGS='--maxWorkers=1'` with the focused or coverage target to reduce worker memory at the cost of elapsed time.
+Full suites use two worker threads and reuse loaded modules while fixtures own mutable application state. The OpenTelemetry bootstrap test runs in an isolated process because SDK shutdown leaves module instrumentation installed. Shuffled file/test runs verify order independence. Use `make test-focused PACKAGE=gateway ARGS='--coverage'` to run the coverage suite serially and reduce worker memory at the cost of elapsed time.
 
-Coverage includes every gateway source file. The measured pre-migration minimums are 89.72% statements and lines, 87.50% branches, and 96.74% functions. The dependency-graph check enforces capability entry points, inward dependencies and acyclicity. The gateway-specific CRAP checker has been removed. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback and generator coverage in the shared repository analyzer; no gateway CRAP score is claimed until that tooling is corrected.
+Coverage includes every gateway source file and writes reports to `apps/gateway/coverage/integration`, matching the shared repository analyzer's input layout. The measured pre-migration minimums are 89.72% statements and lines, 87.50% branches, and 96.74% functions. The dependency-graph check enforces capability entry points, inward dependencies and acyclicity. The gateway-specific CRAP checker has been removed. [Issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217) tracks callback and generator coverage in the shared repository analyzer; no gateway CRAP score is claimed until that tooling is corrected.
 
 ## Operational notes
 

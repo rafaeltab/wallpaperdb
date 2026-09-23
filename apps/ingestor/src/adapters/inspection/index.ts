@@ -2,11 +2,7 @@ import { createHash } from 'node:crypto';
 import { Effect, Layer } from 'effect';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
-import {
-  ContentInspection,
-  IngestionUnavailable,
-  type ValidationLimits,
-} from '../../ingestion/index.js';
+import { ContentInspection, type ValidationLimits } from '../../ingestion/index.js';
 
 class ImageInspection implements ContentInspection {
   readonly inspect = Effect.fn('ingestion.inspect')(function* (
@@ -16,8 +12,11 @@ class ImageInspection implements ContentInspection {
   ) {
     const detected = yield* Effect.tryPromise({
       try: () => fileTypeFromBuffer(bytes),
-      catch: (cause) => new IngestionUnavailable({ operation: 'inspect-content', cause }),
-    });
+      catch: (cause) => cause,
+    }).pipe(
+      Effect.tapError((cause) => Effect.logDebug('File signature could not be decoded', { cause })),
+      Effect.catch(() => Effect.succeed(undefined))
+    );
     const mimeType = detected?.mime ?? declaredMimeType;
     const fileType = mimeType.startsWith('image/') ? 'image' : 'video';
     const maxFileSizeBytes =

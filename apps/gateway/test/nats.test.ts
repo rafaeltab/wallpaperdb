@@ -594,6 +594,18 @@ describe('NATS projection adapter contract', () => {
         cause: {
           _tag: 'MessageBudgetError',
           message: expect.stringContaining(`retains ${bytes} bytes`),
+          diagnostic: {
+            dependency: 'nats',
+            operation: 'audit-retained-message',
+            code: 'RETAINED_MESSAGE_TOO_LARGE',
+            stream: 'WALLPAPER',
+            sequence: published.seq,
+            payloadBytes: original.byteLength,
+            headerBytes: bytes - original.byteLength,
+            actualBytes: bytes,
+            limitBytes: 64 * 1024,
+            remediation: expect.stringContaining('Export and resolve'),
+          },
         },
       });
       expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
@@ -705,6 +717,15 @@ describe('NATS projection adapter contract', () => {
         cause: {
           _tag: 'MessageBudgetError',
           message: expect.stringContaining('GATEWAY_QUARANTINE'),
+          diagnostic: {
+            dependency: 'nats',
+            operation: 'check-quarantine-message-budget',
+            code: 'QUARANTINE_MESSAGE_LIMIT_TOO_SMALL',
+            stream: 'GATEWAY_QUARANTINE',
+            actualBytes: 64 * 1024,
+            minimumBytes: 256 * 1024,
+            remediation: expect.stringContaining('max_msg_size'),
+          },
         },
       });
     } finally {
@@ -731,7 +752,18 @@ describe('NATS projection adapter contract', () => {
         })
       ).rejects.toMatchObject({
         _tag: 'NatsProjectionStartupError',
-        cause: { _tag: 'MessageBudgetError', message: expect.stringContaining('max_payload') },
+        cause: {
+          _tag: 'MessageBudgetError',
+          message: expect.stringContaining('max_payload'),
+          diagnostic: {
+            dependency: 'nats',
+            operation: 'check-broker-payload-limit',
+            code: 'BROKER_PAYLOAD_TOO_SMALL',
+            actualBytes: 128 * 1024,
+            minimumBytes: 256 * 1024,
+            remediation: expect.stringContaining('max_payload'),
+          },
+        },
       });
     } finally {
       await broker.stop();
@@ -825,6 +857,16 @@ describe('NATS projection adapter contract', () => {
     try {
       await expect(consumer(new ControlledProjection())).rejects.toMatchObject({
         _tag: 'NatsProjectionStartupError',
+        cause: {
+          _tag: 'MessageBudgetError',
+          diagnostic: {
+            dependency: 'nats',
+            operation: 'inspect-message-budget',
+            code: 'NATS_REQUEST_FAILED',
+            stream: 'PROFILE',
+            statusCode: 404,
+          },
+        },
       });
     } finally {
       await manager.streams.add({ name: 'PROFILE', subjects: ['profile.>'] });
@@ -834,6 +876,16 @@ describe('NATS projection adapter contract', () => {
   it('fails startup with a typed error when the broker is unreachable', async () => {
     await expect(
       consumer(new ControlledProjection(), { url: 'nats://127.0.0.1:1' })
-    ).rejects.toMatchObject({ _tag: 'NatsProjectionStartupError' });
+    ).rejects.toMatchObject({
+      _tag: 'NatsProjectionStartupError',
+      cause: {
+        _tag: 'BrokerError',
+        diagnostic: {
+          dependency: 'nats',
+          operation: 'connect',
+          code: 'CONNECTION_REFUSED',
+        },
+      },
+    });
   });
 });

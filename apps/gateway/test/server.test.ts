@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { headers } from 'nats';
 import { Cause, ConfigProvider, Effect, Exit, Fiber, Scope } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest';
 import { loadConfig } from '../src/config.js';
@@ -184,6 +185,56 @@ describe('Gateway bootstrap and deployed artifact', () => {
       await new Promise<void>((resolve, reject) =>
         dependency.close((error) => (error ? reject(error) : resolve()))
       );
+    }
+  });
+
+  it('reports retained-message remediation from the executable without exposing the original', async () => {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const { config } = await manager.streams.info('WALLPAPER');
+    await manager.streams.update('WALLPAPER', { max_msg_size: -1, metadata: {} });
+    const payloadSecret = 'startup-private-retained-payload';
+    const headerSecret = 'startup-private-retained-header';
+    const payload = Buffer.alloc(65520, 0x78);
+    payload.write(payloadSecret);
+    const messageHeaders = headers();
+    messageHeaders.set('X-Private', headerSecret);
+    const headerBytes = Buffer.byteLength(`NATS/1.0\r\nX-Private: ${headerSecret}\r\n\r\n`);
+    const published = await (await tester.nats.getJsClient()).publish(
+      'wallpaper.uploaded',
+      payload,
+      { headers: messageHeaders }
+    );
+    try {
+      const { output, failures } = await failedExecutable({});
+      expect(failures).toContainEqual(
+        expect.objectContaining({
+          kind: 'GatewayStartupError',
+          stage: 'application',
+          diagnostics: [
+            expect.objectContaining({
+              dependency: 'nats',
+              operation: 'audit-retained-message',
+              code: 'RETAINED_MESSAGE_TOO_LARGE',
+              stream: 'WALLPAPER',
+              sequence: published.seq,
+              actualBytes: payload.byteLength + headerBytes,
+              payloadBytes: payload.byteLength,
+              headerBytes,
+              limitBytes: 65536,
+              remediation: expect.stringContaining('Export and resolve'),
+            }),
+          ],
+        })
+      );
+      for (const secret of [payloadSecret, headerSecret, payload.toString('base64')])
+        expect(output).not.toContain(secret);
+      const retained = await manager.streams.getMessage('WALLPAPER', { seq: published.seq });
+      expect(Buffer.from(retained.data)).toEqual(payload);
+      expect(retained.header.get('X-Private')).toBe(headerSecret);
+      expect((await manager.streams.info('GATEWAY_QUARANTINE')).state.messages).toBe(0);
+    } finally {
+      await manager.streams.deleteMessage('WALLPAPER', published.seq);
+      await manager.streams.update('WALLPAPER', config);
     }
   });
 

@@ -173,7 +173,11 @@ export function assetsLayer(
               },
               forcePathStyle: true,
               maxAttempts: 1,
-              requestHandler: { connectionTimeout: 5000, requestTimeout: 30000 },
+              requestHandler: {
+                connectionTimeout: 5000,
+                requestTimeout: 30000,
+                throwOnRequestTimeout: true,
+              },
             })
         ),
         (client) => Effect.sync(() => client.destroy())

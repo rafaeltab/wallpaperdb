@@ -1,41 +1,64 @@
 import { createServer } from 'node:http';
-import { Deferred, Effect, ManagedRuntime } from 'effect';
+import { once } from 'node:events';
+import { Effect, ManagedRuntime } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { assetsLayer } from '../../src/adapters/assets/index.js';
 import { AssetStorage } from '../../src/ingestion/index.js';
 
-it('aborts the underlying S3 request when upload work is interrupted', async () => {
-  const started = Deferred.makeUnsafe<void>();
-  let aborted = false;
+it('aborts connected storage requests that exceed their deadline', async () => {
+  let entered = () => {};
+  const enteredPromise = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
   const server = createServer((request, response) => {
-    if (request.url?.includes('wlpr_pending')) {
-      response.once('close', () => { aborted = true; });
-      Effect.runSync(Deferred.succeed(started, undefined));
+    if (request.url?.includes('/original.')) {
+      entered();
       return;
     }
-    response.writeHead(200);
-    response.end();
+    response.writeHead(200).end();
   });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
   const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('Expected TCP address');
-  const runtime = ManagedRuntime.make(assetsLayer({
-    endpoint: `http://127.0.0.1:${address.port}`, region: 'us-east-1',
-    accessKeyId: 'access', secretAccessKey: 'secret', bucket: 'wallpapers',
-  }));
+  if (!address || typeof address === 'string') throw new Error('Missing test listener');
+  const runtime = ManagedRuntime.make(
+    assetsLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      bucket: 'assets',
+      accessKeyId: 'test',
+      secretAccessKey: 'test',
+    })
+  );
+  const controller = new AbortController();
+  let outcome: unknown;
+  let pending: Promise<void> | undefined;
   try {
-    const controller = new AbortController();
-    const pending = runtime.runPromise(AssetStorage.use((assets) =>
-      assets.exists({ wallpaperId: 'wlpr_pending', extension: 'png' })
-    ), { signal: controller.signal });
-    const rejected = expect(pending).rejects.toThrow();
-    await Effect.runPromise(Deferred.await(started).pipe(Effect.timeout('2 seconds')));
-    controller.abort();
-    await rejected;
-    await vi.waitFor(() => expect(aborted).toBe(true), { timeout: 1000 });
+    const assets = await runtime.runPromise(AssetStorage);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    pending = runtime
+      .runPromise(
+        assets.exists({ wallpaperId: 'wlpr_hanging', extension: 'png' }).pipe(Effect.result),
+        { signal: controller.signal }
+      )
+      .then(
+        (result) => {
+          outcome = result;
+        },
+        () => {}
+      );
+    await enteredPromise;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(outcome).toMatchObject({
+      _tag: 'Failure',
+      failure: { _tag: 'IngestionUnavailable', operation: 'inspect-asset' },
+    });
   } finally {
+    controller.abort();
+    vi.useRealTimers();
+    await pending;
     await runtime.dispose();
     server.closeAllConnections();
-    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });

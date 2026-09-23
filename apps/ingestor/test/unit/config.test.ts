@@ -10,19 +10,47 @@ const environment = {
 };
 describe('ingestor configuration', () => {
   it('resolves configuration from the supplied environment with safe defaults', () => {
-    expect(loadConfig({ ...environment, PORT: '7139' })).toMatchObject({ port: 7139, rateLimitMax: 100, s3CleanupIntervalMs: 86400000 });
+    expect(loadConfig({ ...environment, PORT: '7139' })).toMatchObject({
+      port: 7139,
+      rateLimitMax: 100,
+      s3CleanupIntervalMs: 86400000,
+    });
     expect(JSON.stringify(loadConfig(environment))).not.toContain('private-storage-secret');
   });
 });
 
-it.each(['PORT', 'REDIS_PORT', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS', 'RECONCILIATION_INTERVAL_MS', 'S3_CLEANUP_INTERVAL_MS'])('rejects invalid %s before startup', (key) => {
+it.each([
+  'PORT',
+  'REDIS_PORT',
+  'RATE_LIMIT_MAX',
+  'RATE_LIMIT_WINDOW_MS',
+  'RECONCILIATION_INTERVAL_MS',
+  'S3_CLEANUP_INTERVAL_MS',
+])('rejects invalid %s before startup', (key) => {
   expect(() => loadConfig({ ...environment, [key]: '0' })).toThrow();
   expect(() => loadConfig({ ...environment, [key]: '3junk' })).toThrow();
 });
 it('rejects invalid booleans and missing required values without echoing secrets', () => {
   expect(() => loadConfig({ ...environment, REDIS_ENABLED: 'perhaps' })).toThrow();
   expect(() => loadConfig({ ...environment, S3_ENDPOINT: 'private-invalid-url' })).toThrow();
-  try { loadConfig({ ...environment, S3_ENDPOINT: 'private-invalid-url' }); } catch (error) {
+  try {
+    loadConfig({ ...environment, S3_ENDPOINT: 'private-invalid-url' });
+  } catch (error) {
     expect(String(error)).not.toContain('private-invalid-url');
   }
+});
+it('rejects malformed database URLs and empty storage credentials during configuration', () => {
+  expect(() => loadConfig({ ...environment, DATABASE_URL: 'invalid database secret' })).toThrow();
+  expect(() => loadConfig({ ...environment, S3_SECRET_ACCESS_KEY: '' })).toThrow();
+});
+it('requires Clerk credentials before non-test startup', () => {
+  expect(() => loadConfig({ ...environment, NODE_ENV: 'production' })).toThrow();
+  expect(
+    loadConfig({
+      ...environment,
+      NODE_ENV: 'production',
+      CLERK_SECRET_KEY: 'secret',
+      CLERK_PUBLISHABLE_KEY: 'public',
+    }).clerkPublishableKey
+  ).toBe('public');
 });

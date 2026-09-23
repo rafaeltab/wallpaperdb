@@ -12,22 +12,40 @@ describe('owned wallpaper assets', () => {
   beforeAll(async () => {
     container = await new GenericContainer('chrislusf/seaweedfs:4.47')
       .withEnvironment({ AWS_ACCESS_KEY_ID: 'storageadmin', AWS_SECRET_ACCESS_KEY: 'storageadmin' })
-      .withCommand(['mini', '-dir=/data', '-ip=127.0.0.1', '-ip.bind=0.0.0.0', '-s3.port=9000',
-        '-s3.autoCreateBucket=false', '-s3.port.iceberg=0', '-s3.port.lance=0', '-admin.ui=false',
-        '-webdav=false', '-master.telemetry=false'])
+      .withCommand([
+        'mini',
+        '-dir=/data',
+        '-ip=127.0.0.1',
+        '-ip.bind=0.0.0.0',
+        '-s3.port=9000',
+        '-s3.autoCreateBucket=false',
+        '-s3.port.iceberg=0',
+        '-s3.port.lance=0',
+        '-admin.ui=false',
+        '-webdav=false',
+        '-master.telemetry=false',
+      ])
       .withExposedPorts(9000)
-      .withWaitStrategy(Wait.forAll([
-        Wait.forLogMessage('All enabled components are running and ready to use:'),
-        Wait.forHttp('/healthz', 9000),
-      ])).start();
+      .withWaitStrategy(
+        Wait.forAll([
+          Wait.forLogMessage('All enabled components are running and ready to use:'),
+          Wait.forHttp('/healthz', 9000),
+        ])
+      )
+      .start();
     const config = {
       endpoint: `http://${container.getHost()}:${container.getMappedPort(9000)}`,
-      region: 'us-east-1', accessKeyId: 'storageadmin', secretAccessKey: 'storageadmin',
+      region: 'us-east-1',
+      accessKeyId: 'storageadmin',
+      secretAccessKey: 'storageadmin',
       bucket: 'ingestor-assets',
     };
-    client = new S3Client({ endpoint: config.endpoint, region: config.region,
+    client = new S3Client({
+      endpoint: config.endpoint,
+      region: config.region,
       credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-      forcePathStyle: true });
+      forcePathStyle: true,
+    });
     await client.send(new CreateBucketCommand({ Bucket: config.bucket }));
     runtime = ManagedRuntime.make(assetsLayer(config));
   });
@@ -37,48 +55,77 @@ describe('owned wallpaper assets', () => {
     await container?.stop();
   });
   it('stores, finds, lists, and idempotently removes an owned asset', async () => {
-    await runtime.runPromise(Effect.gen(function* () {
-      const assets = yield* AssetStorage;
-      const reference = { wallpaperId: 'wlpr_assets', extension: 'png' };
-      expect(yield* assets.exists(reference)).toBe(false);
-      yield* assets.put({ wallpaperId: reference.wallpaperId, profileId: 'user_assets',
-        bytes: new Uint8Array([1, 2, 3]), metadata: {
-          mimeType: 'image/png', fileType: 'image', width: 12, height: 8, fileSizeBytes: 3,
-          contentHash: 'hash', extension: reference.extension,
-        } });
-      expect(yield* assets.exists(reference)).toBe(true);
-      expect((yield* assets.list()).assets).toContainEqual(reference);
-      yield* assets.remove(reference);
-      yield* assets.remove(reference);
-      expect(yield* assets.exists(reference)).toBe(false);
-    }));
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const assets = yield* AssetStorage;
+        const reference = { wallpaperId: 'wlpr_assets', extension: 'png' };
+        expect(yield* assets.exists(reference)).toBe(false);
+        yield* assets.put({
+          wallpaperId: reference.wallpaperId,
+          profileId: 'user_assets',
+          bytes: new Uint8Array([1, 2, 3]),
+          metadata: {
+            mimeType: 'image/png',
+            fileType: 'image',
+            width: 12,
+            height: 8,
+            fileSizeBytes: 3,
+            contentHash: 'hash',
+            extension: reference.extension,
+          },
+        });
+        expect(yield* assets.exists(reference)).toBe(true);
+        expect((yield* assets.list()).assets).toContainEqual(reference);
+        yield* assets.remove(reference);
+        yield* assets.remove(reference);
+        expect(yield* assets.exists(reference)).toBe(false);
+      })
+    );
   });
   it('paginates bounded cleanup batches and excludes foreign object layouts', async () => {
     const names = Array.from({ length: 101 }, (_, index) => `wlpr_page_${index}`);
-    const keys = [...names.map((name) => `${name}/original.png`),
-      'profile-picture/image.png', 'wlpr_other/variant.png'];
-    await Effect.runPromise(Effect.forEach(keys, (Key) => Effect.promise(() =>
-      client.send(new PutObjectCommand({ Bucket: 'ingestor-assets', Key, Body: new Uint8Array([1]) }))
-    ), { concurrency: 8 }));
+    const keys = [
+      ...names.map((name) => `${name}/original.png`),
+      'profile-picture/image.png',
+      'wlpr_other/variant.png',
+    ];
+    await Effect.runPromise(
+      Effect.forEach(
+        keys,
+        (Key) =>
+          Effect.promise(() =>
+            client.send(
+              new PutObjectCommand({ Bucket: 'ingestor-assets', Key, Body: new Uint8Array([1]) })
+            )
+          ),
+        { concurrency: 8 }
+      )
+    );
     const found: string[] = [];
-    await runtime.runPromise(Effect.gen(function* () {
-      const assets = yield* AssetStorage;
-      let cursor: string | undefined;
-      do {
-        const page = yield* assets.list(cursor);
-        expect(page.assets.length).toBeLessThanOrEqual(100);
-        found.push(...page.assets.map((asset) => asset.wallpaperId));
-        cursor = page.cursor;
-      } while (cursor);
-    }));
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const assets = yield* AssetStorage;
+        let cursor: string | undefined;
+        do {
+          const page = yield* assets.list(cursor);
+          expect(page.assets.length).toBeLessThanOrEqual(100);
+          found.push(...page.assets.map((asset) => asset.wallpaperId));
+          cursor = page.cursor;
+        } while (cursor);
+      })
+    );
     expect(found.sort()).toEqual(names.sort());
   });
   it('distinguishes unavailable storage from an absent object', async () => {
     expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(true);
     await container.stop();
     expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(false);
-    expect(await runtime.runPromise(AssetStorage.use((assets) =>
-      assets.exists({ wallpaperId: 'wlpr_outage', extension: 'png' }).pipe(Effect.flip)
-    ))).toMatchObject({ _tag: 'IngestionUnavailable', operation: 'inspect-asset' });
+    expect(
+      await runtime.runPromise(
+        AssetStorage.use((assets) =>
+          assets.exists({ wallpaperId: 'wlpr_outage', extension: 'png' }).pipe(Effect.flip)
+        )
+      )
+    ).toMatchObject({ _tag: 'IngestionUnavailable', operation: 'inspect-asset' });
   });
 });

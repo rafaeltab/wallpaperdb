@@ -171,14 +171,15 @@ describe("NATS Container Configuration", () => {
                     // NATS still accepts connections on 4222, but the health check
                     // on 8222 must fail. An open port alone is not readiness.
                     additionalArgs: ["-m", "8223"],
+                    startupTimeoutMs: 2000,
                 });
             };
 
-            await expect(start()).rejects.toThrow(/Health check (failed|not healthy)/);
+            await expect(start()).rejects.toThrow("URL /healthz not accessible after 2000ms");
         } finally {
             await container?.stop();
         }
-    }, 60000);
+    }, 30000);
 
     it("should work with custom image", async () => {
         const container = await createNatsContainer({

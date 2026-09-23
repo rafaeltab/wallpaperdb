@@ -35,6 +35,13 @@ test('test tiers preserve sequential container execution', () => {
   }
 });
 
+test('CRAP commands pass the optional workspace selector to the shared analyzer', () => {
+  for (const target of ['crap', 'check-crap']) {
+    assert.match(output(target, 'PACKAGE=ingestor'), /PACKAGE="ingestor".*scripts\/crap\.mts/);
+    assert.match(output(target), /PACKAGE="".*scripts\/crap\.mts/);
+  }
+});
+
 test('focused tests select one workspace and serialize dependency builds and tests', () => {
   assert.notEqual(make('test-focused').status, 0);
   for (const [workspace, file] of [

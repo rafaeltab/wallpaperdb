@@ -46,11 +46,13 @@ function readThreshold() {
 
 async function discoverWorkspaces(): Promise<Workspace[]> {
   const workspaces: Workspace[] = [];
+  const selected = process.env.PACKAGE?.trim();
   for (const parent of config.workspaceRoots) {
     for (const entry of await readdir(path.join(root, parent), { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
       const directory = `${parent}/${entry.name}`;
       if (config.excludedWorkspaces.includes(directory)) continue;
+      if (selected && entry.name !== selected) continue;
       const manifest: unknown = JSON.parse(
         await readFile(path.join(root, directory, 'package.json'), 'utf8'),
       );
@@ -64,7 +66,10 @@ async function discoverWorkspaces(): Promise<Workspace[]> {
       workspaces.push({ directory, name: manifest.name, tasks });
     }
   }
-  assert(workspaces.length > 0, 'No application or package workspaces found');
+  assert(
+    workspaces.length > 0,
+    selected ? `No CRAP workspace matches PACKAGE=${selected}` : 'No application or package workspaces found',
+  );
   return workspaces.sort((a, b) => a.directory.localeCompare(b.directory));
 }
 

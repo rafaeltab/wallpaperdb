@@ -198,11 +198,11 @@ storage-infra-test: ## Test storage config, auth, bootstrap, and persistence
 coverage-summary: ## Summarize existing test coverage
 	@node scripts/coverage-summary.js
 
-crap: ## Rank functions using existing test coverage
-	@pnpm exec tsx scripts/crap.mts report
+crap: ## Rank functions using fresh test coverage (optional PACKAGE)
+	@PACKAGE="$(PACKAGE)" pnpm exec tsx scripts/crap.mts report
 
-check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD)
-	@pnpm exec tsx scripts/crap.mts check
+check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
+	@PACKAGE="$(PACKAGE)" pnpm exec tsx scripts/crap.mts check
 
 crap-check-types: ## Type-check CRAP tooling
 	@pnpm crap:check-types
@@ -241,7 +241,7 @@ sandcastle-check-types: ## Type-check Sandcastle runner
 	@pnpm sandcastle:check-types
 
 test-make: ## Test command routing without starting services
-	@node --test scripts/makefile.test.mjs
+	@node --test scripts/makefile.test.mjs scripts/crap-scope.test.mjs
 
 worktree-env-test: ## Verify generated service credentials and environment rules
 	@pnpm exec vitest run scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism

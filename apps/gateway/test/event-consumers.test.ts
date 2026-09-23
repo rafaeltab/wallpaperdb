@@ -230,6 +230,35 @@ describe('Projection event driving adapter contract', () => {
   });
 
   it.each([
+    '2026-01-01T00:00:00.123100Z',
+    '2026-01-01T02:00:00.1231+02:00',
+    '2025-12-31T18:30:00.123100000-05:30',
+  ])('preserves fractional occurrence precision when normalizing %s', async (time) => {
+    const project = new ControlledProjection();
+    const event = {
+      specversion: '1.0',
+      id: 'precise-event',
+      source: '/contexts/colors',
+      type: colors.eventType,
+      time,
+      data: colors,
+    };
+    expect(await deliver(event.type, event, project)).toEqual({ _tag: 'Completed' });
+    expect(project.changes[0]?.occurrence.occurredAt).toBe('2026-01-01T00:00:00.1231Z');
+  });
+
+  it('preserves precise legacy occurrences and equivalent trailing zeros', async () => {
+    const project = new ControlledProjection();
+    for (const time of ['2026-01-01T00:00:00.123100Z', '2026-01-01T00:00:00.1231Z']) {
+      expect(await deliver(colors.eventType, { ...colors, timestamp: time }, project)).toEqual({
+        _tag: 'Completed',
+      });
+    }
+    expect(project.changes[0]).toEqual(project.changes[1]);
+    expect(project.changes[0]?.occurrence.occurredAt).toBe('2026-01-01T00:00:00.1231Z');
+  });
+
+  it.each([
     'invalid',
     '2026-01-01',
     '2026-01-01T00:00:00',

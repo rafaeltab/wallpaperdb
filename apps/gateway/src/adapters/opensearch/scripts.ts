@@ -1,4 +1,14 @@
+import { DateTime } from 'effect';
 import type { ProjectionMutation } from '../../projection/index.js';
+
+// Removing the UTC suffix makes the separator sort before another fractional digit.
+// The stored format stays compatible with existing millisecond occurrence keys.
+const compareOrder = `
+  String comparableOrder(String order) {
+    int separator = order.indexOf('/');
+    return order.substring(0, separator - 1) + order.substring(separator);
+  }
+`;
 
 const advanceUpdatedAt = `
   if (ctx._source.updatedAt == null || params.updatedAt.compareTo(ctx._source.updatedAt) > 0) {
@@ -9,6 +19,7 @@ const advanceUpdatedAt = `
 export function projectionUpdate(mutation: ProjectionMutation) {
   const occurrence = mutation.occurrence;
   const order = `${occurrence.occurredAt}/${JSON.stringify([occurrence.source, occurrence.id])}`;
+  const updatedAt = DateTime.formatIso(DateTime.makeUnsafe(occurrence.occurredAt));
   switch (mutation._tag) {
     case 'PublishWallpaper':
       return {
@@ -26,7 +37,7 @@ export function projectionUpdate(mutation: ProjectionMutation) {
           params: {
             userId: mutation.profileId,
             uploadedAt: mutation.uploadedAt,
-            updatedAt: occurrence.occurredAt,
+            updatedAt,
           },
         },
         upsert: { wallpaperId: mutation.wallpaperId, variants: [] },
@@ -37,6 +48,7 @@ export function projectionUpdate(mutation: ProjectionMutation) {
         script: {
           lang: 'painless',
           source: `
+          ${compareOrder}
           if (ctx._source.variantOrder == null) { ctx._source.variantOrder = [:]; }
           def previous = ctx._source.variantOrder[params.key];
           if (previous == null) {
@@ -47,7 +59,7 @@ export function projectionUpdate(mutation: ProjectionMutation) {
               }
             }
           }
-          if (previous != null && params.order.compareTo(previous) <= 0) { ctx.op = 'none'; }
+          if (previous != null && comparableOrder(params.order).compareTo(comparableOrder(previous)) <= 0) { ctx.op = 'none'; }
           if (ctx.op != 'none') {
             ctx._source.variants.removeIf(v -> v.width == params.variant.width && v.height == params.variant.height && v.format == params.variant.format);
             ctx._source.variants.add(params.variant);
@@ -64,7 +76,7 @@ export function projectionUpdate(mutation: ProjectionMutation) {
               mutation.variant.format,
             ]),
             order,
-            updatedAt: occurrence.occurredAt,
+            updatedAt,
           },
         },
         upsert: { wallpaperId: mutation.wallpaperId, variants: [] },
@@ -75,7 +87,8 @@ export function projectionUpdate(mutation: ProjectionMutation) {
         script: {
           lang: 'painless',
           source: `
-          if (ctx._source.colorOrder != null && params.order.compareTo(ctx._source.colorOrder) <= 0) { ctx.op = 'none'; }
+          ${compareOrder}
+          if (ctx._source.colorOrder != null && comparableOrder(params.order).compareTo(comparableOrder(ctx._source.colorOrder)) <= 0) { ctx.op = 'none'; }
           else {
             ctx._source.colorHistogram = params.colorHistogram;
             ctx._source.colorSpace = params.colorSpace;
@@ -87,7 +100,7 @@ export function projectionUpdate(mutation: ProjectionMutation) {
             colorHistogram: mutation.colorHistogram,
             colorSpace: mutation.colorSpace,
             order,
-            updatedAt: occurrence.occurredAt,
+            updatedAt,
           },
         },
         upsert: { wallpaperId: mutation.wallpaperId, variants: [] },

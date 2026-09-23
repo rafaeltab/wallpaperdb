@@ -292,6 +292,108 @@ describe('OpenSearch catalogue port contract', () => {
     expect(persisted.body._source.colorHistogram).toEqual(current);
   });
 
+  it.each([
+    false,
+    true,
+  ])('orders same-millisecond colors and variants precisely (newer first: %s)', async (newerFirst) => {
+    const id = `precise-${newerFirst}`;
+    await upload(id);
+    const oldOccurrence = occurrence('z-older', '2026-01-01T00:00:00.1231Z');
+    const newOccurrence = occurrence('a-newer', '2026-01-01T00:00:00.1239Z');
+    const newerColors = Array.from({ length: 64 }, (_, index) => (index === 10 ? 1 : 0));
+    const newerVariant = { ...variant, fileSizeBytes: 2000 };
+    const events: ProjectionChange[] = [
+      {
+        _tag: 'ColorsExtracted',
+        wallpaperId: id,
+        occurrence: oldOccurrence,
+        colorHistogram: colors,
+        colorSpace: 'hsv',
+      },
+      { _tag: 'VariantAvailable', wallpaperId: id, occurrence: oldOccurrence, variant },
+      {
+        _tag: 'ColorsExtracted',
+        wallpaperId: id,
+        occurrence: newOccurrence,
+        colorHistogram: newerColors,
+        colorSpace: 'hsv',
+      },
+      {
+        _tag: 'VariantAvailable',
+        wallpaperId: id,
+        occurrence: newOccurrence,
+        variant: newerVariant,
+      },
+    ];
+    for (const event of newerFirst ? [...events].reverse() : events) await record(event);
+    for (const event of events) expect(await record(event)).toEqual({ _tag: 'Ignored' });
+    expect((await get(id))?.variants).toEqual([newerVariant]);
+    expect((await get(id))?.updatedAt).toBe('2026-01-01T00:00:00.123Z');
+    const persisted = await client.get({ index: searchFixture.index('wallpapers'), id });
+    expect(persisted.body._source.colorHistogram).toEqual(newerColors);
+  });
+
+  it('compares precise occurrences against existing millisecond ordering metadata', async () => {
+    const id = 'legacy-millisecond-order';
+    await upload(id);
+    const legacyOccurrence = occurrence('z-legacy', '2026-01-01T00:00:00.123Z');
+    const legacyOrder = `${legacyOccurrence.occurredAt}/${JSON.stringify([legacyOccurrence.source, legacyOccurrence.id])}`;
+    await client.update({
+      index: searchFixture.index('wallpapers'),
+      id,
+      refresh: true,
+      body: {
+        doc: {
+          colorHistogram: colors,
+          colorSpace: 'hsv',
+          colorOrder: legacyOrder,
+          variants: [variant],
+          variantOrder: {
+            [JSON.stringify([variant.width, variant.height, variant.format])]: legacyOrder,
+          },
+          updatedAt: legacyOccurrence.occurredAt,
+        },
+      },
+    });
+    const next = occurrence('a-newer', '2026-01-01T00:00:00.123000000001Z');
+    const newerVariant = { ...variant, fileSizeBytes: 2000 };
+    expect(
+      await record({
+        _tag: 'VariantAvailable',
+        wallpaperId: id,
+        occurrence: next,
+        variant: newerVariant,
+      })
+    ).toEqual({ _tag: 'Completed' });
+    expect(
+      await record({
+        _tag: 'ColorsExtracted',
+        wallpaperId: id,
+        occurrence: next,
+        colorHistogram: colors,
+        colorSpace: 'hsv',
+      })
+    ).toEqual({ _tag: 'Completed' });
+    expect(
+      await record({
+        _tag: 'VariantAvailable',
+        wallpaperId: id,
+        occurrence: legacyOccurrence,
+        variant,
+      })
+    ).toEqual({ _tag: 'Ignored' });
+    expect(
+      await record({
+        _tag: 'ColorsExtracted',
+        wallpaperId: id,
+        occurrence: legacyOccurrence,
+        colorHistogram: colors,
+        colorSpace: 'hsv',
+      })
+    ).toEqual({ _tag: 'Ignored' });
+    expect((await get(id))?.variants).toEqual([newerVariant]);
+  });
+
   it('preserves newer enrichment timestamp when the initial upload arrives late', async () => {
     await addVariant('late-upload', variant, '2026-02-01T00:00:00.000Z');
     await upload('late-upload');

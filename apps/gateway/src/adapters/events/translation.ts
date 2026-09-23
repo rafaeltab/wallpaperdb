@@ -31,11 +31,17 @@ const calendarDate = [
 ].join('|');
 const clockTime = /(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?/.source;
 const offset = /(?:[zZ]|[+-](?:[01]\d|2[0-3]):[0-5]\d)/.source;
+// DateTime normalizes the UTC second; retain the validated decimal fraction separately.
+function occurrenceTime(value: string): string {
+  const utc = DateTime.formatIso(DateTime.makeUnsafe(value.toUpperCase()));
+  const fraction = (/\.(\d+)/.exec(value)?.[1] ?? '').replace(/0+$/, '').padEnd(3, '0');
+  return `${utc.slice(0, -4)}${fraction}Z`;
+}
 const cloudTime = Schema.String.check(
   Schema.isPattern(new RegExp(`^(?:${calendarDate})[tT]${clockTime}${offset}$`))
 ).pipe(
-  Schema.decodeTo(Schema.DateTimeUtcFromString, {
-    decode: SchemaGetter.toUpperCase(),
+  Schema.decodeTo(Schema.String, {
+    decode: SchemaGetter.transform(occurrenceTime),
     encode: SchemaGetter.passthrough(),
   })
 );
@@ -111,7 +117,7 @@ export function translate(subject: string, payload: Uint8Array): TranslatedEvent
           ...envelope.value.data,
           eventId: envelope.value.id,
           eventType: envelope.value.type,
-          timestamp: DateTime.formatIso(envelope.value.time),
+          timestamp: envelope.value.time,
         }
       : raw.value
   );
@@ -119,7 +125,7 @@ export function translate(subject: string, payload: Uint8Array): TranslatedEvent
   const occurrence: Occurrence = {
     source: Option.isSome(envelope) ? envelope.value.source : legacySource(event.eventType),
     id: event.eventId,
-    occurredAt: DateTime.formatIso(DateTime.makeUnsafe(event.timestamp)),
+    occurredAt: occurrenceTime(event.timestamp),
   };
   return {
     _tag: 'Translated',

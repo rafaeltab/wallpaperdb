@@ -205,6 +205,74 @@ describe('Projection event driving adapter contract', () => {
   });
 
   it.each([
+    '2026-01-01T00:00:00.000Z',
+    '2026-01-01T02:00:00.000+02:00',
+    '2025-12-31T18:30:00.000-05:30',
+    '2026-01-01t00:00:00z',
+  ])('normalizes the CloudEvent occurrence time %s before payload validation', async (time) => {
+    const project = new ControlledProjection();
+    const event = {
+      specversion: '1.0',
+      id: 'cloud-1',
+      source: '/contexts/profile',
+      type: 'profile.created',
+      time,
+      data: { profile: snapshot, change: { type: 'created' } },
+    };
+    expect(await deliver(event.type, event, project)).toEqual({ _tag: 'Completed' });
+    expect(project.changes).toEqual([
+      {
+        _tag: 'ProfilePublished',
+        profile: snapshot,
+        occurrence: { source: '/contexts/profile', id: 'cloud-1', occurredAt: timestamp },
+      },
+    ]);
+  });
+
+  it.each([
+    'invalid',
+    '2026-01-01',
+    '2026-01-01T00:00:00',
+    '2026-01-01T00:00:00+0200',
+    '2026-01-01T24:00:00Z',
+    '2026-01-01T00:60:00Z',
+    '2026-01-01T00:00:00+24:00',
+    '2026-01-01T00:00:00+02:60',
+    '2026-02-30T00:00:00+02:00',
+    '1900-02-29T00:00:00-05:00',
+  ])('rejects malformed CloudEvent occurrence time %s before calling the port', async (time) => {
+    const project = new ControlledProjection();
+    const event = {
+      specversion: '1.0',
+      id: 'cloud-1',
+      source: '/contexts/profile',
+      type: 'profile.created',
+      time,
+      data: { profile: snapshot, change: { type: 'created' } },
+    };
+    expect(await deliver(event.type, event, project)).toEqual({ _tag: 'Invalid' });
+    expect(project.changes).toEqual([]);
+  });
+
+  it('accepts a CloudEvent leap day without changing the legacy UTC-only timestamp contract', async () => {
+    const project = new ControlledProjection();
+    const event = {
+      specversion: '1.0',
+      id: 'cloud-1',
+      source: '/contexts/profile',
+      type: 'profile.created',
+      time: '2000-02-29T02:00:00+02:00',
+      data: { profile: snapshot, change: { type: 'created' } },
+    };
+    expect(await deliver(event.type, event, project)).toEqual({ _tag: 'Completed' });
+    expect(project.changes[0]?.occurrence.occurredAt).toEqual('2000-02-29T00:00:00.000Z');
+    expect(await deliver(upload.eventType, { ...upload, timestamp: event.time }, project)).toEqual({
+      _tag: 'Invalid',
+    });
+    expect(project.changes).toHaveLength(1);
+  });
+
+  it.each([
     null,
     {},
     { ...upload, timestamp: 'invalid' },

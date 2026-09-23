@@ -21,6 +21,8 @@ Catalogue pages default to 10 results. Both `first` and `last` must be integers 
 
 GraphQL complexity admission uses the selected operation and its referenced fragments, GraphQL-coerced arguments and variable defaults, and the catalogue's resolved page size. Equivalent pagination expressed as literals, supplied variables, or variable defaults receives the same cost estimate; omitted and null page sizes use the catalogue default.
 
+Depth and cost follow executable field positions through fragments and honor `@skip` and `@include`. Repeated fields with the same response key merge their selections; aliases and different parent positions are charged separately. Nested list sizes multiply descendant costs, while connection metadata is counted once per connection. Analysis stops when a configured budget is exceeded, before catalogue work begins.
+
 Successful `/health` and `/ready` responses and their HTTP status codes are unchanged. Failed probes return HTTP 503 with `application/problem+json`. Failed `/health` bodies use numeric `status: 503` and report the health state (`degraded`, `unhealthy`, or `shutting_down`) in `healthStatus`, alongside dependency checks and timing. Failed `/ready` bodies retain `ready: false`, `reason`, and `timestamp` within the problem envelope. Consumers of the former failed-health string `status` must read `healthStatus`; probes that only inspect HTTP status remain compatible.
 
 ## Projection delivery

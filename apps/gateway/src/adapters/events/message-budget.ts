@@ -1,5 +1,6 @@
 import { Effect, Option, Schema } from 'effect';
 import type { JetStreamManager, NatsConnection, StreamInfo } from 'nats';
+import { StartupDiagnostic } from '../../startup-diagnostics.js';
 
 const sourceMessageBytes = 64 * 1024;
 export const quarantineMessageBytes = 256 * 1024;
@@ -32,13 +33,41 @@ const decodeRetained = Schema.decodeUnknownEffect(
 
 class MessageBudgetError extends Schema.TaggedError<MessageBudgetError>()('MessageBudgetError', {
   message: Schema.String,
+  diagnostic: StartupDiagnostic,
   cause: Schema.optionalKey(Schema.Defect()),
 }) {}
 
-function request<A>(message: string, run: () => Promise<A>): Effect.Effect<A, MessageBudgetError> {
+const decodeStatus = Schema.decodeUnknownOption(
+  Schema.Struct({
+    code: Schema.Union([Schema.Int, Schema.NumberFromString]).check(
+      Schema.isBetween({ minimum: 100, maximum: 599 })
+    ),
+  })
+);
+
+function statusDetails(error: unknown): { statusCode?: number } {
+  const status = decodeStatus(error);
+  return Option.isSome(status) ? { statusCode: status.value.code } : {};
+}
+
+function request<A>(
+  message: string,
+  context: { operation: string; stream: string; sequence?: number },
+  run: () => Promise<A>
+): Effect.Effect<A, MessageBudgetError> {
   return Effect.tryPromise({
     try: run,
-    catch: (cause) => new MessageBudgetError({ message, cause }),
+    catch: (cause) =>
+      new MessageBudgetError({
+        message,
+        cause,
+        diagnostic: {
+          dependency: 'nats',
+          code: 'NATS_REQUEST_FAILED',
+          ...context,
+          ...statusDetails(cause),
+        },
+      }),
   });
 }
 
@@ -63,15 +92,28 @@ const auditHistory = Effect.fn('catalogue.events.auditMessageBudget')(function* 
   while (sequence <= snapshot.state.last_seq) {
     // Read raw stored headers: the SDK's parsed headers discard original wire whitespace.
     const query = { seq: sequence, next_by_subj: '>' };
-    const reply = yield* request(`Inspect retained ${name} sequence ${sequence}`, () =>
-      connection.request(`${options.apiPrefix}.STREAM.MSG.GET.${name}`, JSON.stringify(query), {
-        timeout: options.timeout ?? 5000,
-      })
+    const reply = yield* request(
+      `Inspect retained ${name} sequence ${sequence}`,
+      { operation: 'inspect-retained-message', stream: name, sequence },
+      () =>
+        connection.request(`${options.apiPrefix}.STREAM.MSG.GET.${name}`, JSON.stringify(query), {
+          timeout: options.timeout ?? 5000,
+        })
     );
     const response = yield* decodeRetained(reply.string()).pipe(
       Effect.mapError(
         (cause) =>
-          new MessageBudgetError({ message: `Decode retained ${name} sequence ${sequence}`, cause })
+          new MessageBudgetError({
+            message: `Decode retained ${name} sequence ${sequence}`,
+            cause,
+            diagnostic: {
+              dependency: 'nats',
+              operation: 'decode-retained-message',
+              code: 'INVALID_RETAINED_MESSAGE_RESPONSE',
+              stream: name,
+              sequence,
+            },
+          })
       )
     );
     if ('error' in response) {
@@ -79,14 +121,37 @@ const auditHistory = Effect.fn('catalogue.events.auditMessageBudget')(function* 
       return yield* new MessageBudgetError({
         message: `Inspect retained ${name} sequence ${sequence}`,
         cause: response.error,
+        diagnostic: {
+          dependency: 'nats',
+          operation: 'inspect-retained-message',
+          code: 'NATS_REQUEST_FAILED',
+          stream: name,
+          sequence,
+          ...statusDetails(response.error),
+        },
       });
     }
     const message = response.message;
     if (message.seq > snapshot.state.last_seq) return;
-    const bytes = (message.data?.byteLength ?? 0) + (message.hdrs?.byteLength ?? 0);
+    const payloadBytes = message.data?.byteLength ?? 0;
+    const headerBytes = message.hdrs?.byteLength ?? 0;
+    const bytes = payloadBytes + headerBytes;
     if (bytes > sourceMessageBytes) {
       return yield* new MessageBudgetError({
         message: `${name} sequence ${message.seq} retains ${bytes} bytes including headers, exceeding the ${sourceMessageBytes}-byte event budget. Export and resolve this retained message before restarting; it has not been deleted or acknowledged.`,
+        diagnostic: {
+          dependency: 'nats',
+          operation: 'audit-retained-message',
+          code: 'RETAINED_MESSAGE_TOO_LARGE',
+          stream: name,
+          sequence: message.seq,
+          payloadBytes,
+          headerBytes,
+          actualBytes: bytes,
+          limitBytes: sourceMessageBytes,
+          remediation:
+            'Export and resolve this retained message before restarting; it has not been deleted or acknowledged.',
+        },
       });
     }
     sequence = message.seq + 1;
@@ -100,6 +165,13 @@ const verifyUnchanged = Effect.fnUntraced(function* (snapshot: StreamInfo, curre
   ) {
     return yield* new MessageBudgetError({
       message: `${snapshot.config.name} was recreated or its message limit changed during the quarantine-budget audit; retry startup.`,
+      diagnostic: {
+        dependency: 'nats',
+        operation: 'verify-message-budget',
+        code: 'MESSAGE_BUDGET_CHANGED',
+        stream: snapshot.config.name,
+        remediation: 'Retry startup after completing stream recreation or message-limit changes.',
+      },
     });
   }
 });
@@ -109,32 +181,43 @@ const ensureSourceBudget = Effect.fn('catalogue.events.ensureSourceMessageBudget
   manager: JetStreamManager,
   name: string
 ) {
-  let snapshot = yield* request(`Inspect ${name} message budget`, () => manager.streams.info(name));
+  let snapshot = yield* request(
+    `Inspect ${name} message budget`,
+    { operation: 'inspect-message-budget', stream: name },
+    () => manager.streams.info(name)
+  );
   if (snapshot.config.max_msg_size <= 0 || snapshot.config.max_msg_size > sourceMessageBytes) {
     const metadata = { ...snapshot.config.metadata };
     delete metadata[certificateKey];
-    snapshot = yield* request(`Limit ${name} messages to ${sourceMessageBytes} bytes`, () =>
-      manager.streams.update(name, { max_msg_size: sourceMessageBytes, metadata })
+    snapshot = yield* request(
+      `Limit ${name} messages to ${sourceMessageBytes} bytes`,
+      { operation: 'limit-source-messages', stream: name },
+      () => manager.streams.update(name, { max_msg_size: sourceMessageBytes, metadata })
     );
   }
   if (certified(snapshot)) return;
   yield* auditHistory(connection, manager, snapshot);
-  const current = yield* request(`Recheck ${name} message budget`, () =>
-    manager.streams.info(name)
+  const current = yield* request(
+    `Recheck ${name} message budget`,
+    { operation: 'recheck-message-budget', stream: name },
+    () => manager.streams.info(name)
   );
   yield* verifyUnchanged(snapshot, current);
-  const updated = yield* request(`Certify ${name} retained message budget`, () =>
-    manager.streams.update(name, {
-      metadata: {
-        ...current.config.metadata,
-        [certificateKey]: JSON.stringify({
-          version: 2,
-          created: snapshot.created,
-          maxMessageBytes: snapshot.config.max_msg_size,
-          auditedThrough: snapshot.state.last_seq,
-        }),
-      },
-    })
+  const updated = yield* request(
+    `Certify ${name} retained message budget`,
+    { operation: 'certify-message-budget', stream: name },
+    () =>
+      manager.streams.update(name, {
+        metadata: {
+          ...current.config.metadata,
+          [certificateKey]: JSON.stringify({
+            version: 2,
+            created: snapshot.created,
+            maxMessageBytes: snapshot.config.max_msg_size,
+            auditedThrough: snapshot.state.last_seq,
+          }),
+        },
+      })
   );
   yield* verifyUnchanged(snapshot, updated);
 });
@@ -149,10 +232,23 @@ export const ensureMessageBudgets = Effect.fn('catalogue.events.ensureMessageBud
   if (maximumPayload === undefined || maximumPayload < quarantineMessageBytes) {
     return yield* new MessageBudgetError({
       message: `NATS max_payload must allow at least ${quarantineMessageBytes} bytes for gateway quarantine messages.`,
+      diagnostic: {
+        dependency: 'nats',
+        operation: 'check-broker-payload-limit',
+        code:
+          maximumPayload === undefined
+            ? 'BROKER_PAYLOAD_LIMIT_UNAVAILABLE'
+            : 'BROKER_PAYLOAD_TOO_SMALL',
+        ...(maximumPayload === undefined ? {} : { actualBytes: maximumPayload }),
+        minimumBytes: quarantineMessageBytes,
+        remediation: 'Configure NATS max_payload to at least 262144 bytes and restart the gateway.',
+      },
     });
   }
-  const quarantine = yield* request('Inspect quarantine message budget', () =>
-    manager.streams.info(quarantineStream)
+  const quarantine = yield* request(
+    'Inspect quarantine message budget',
+    { operation: 'inspect-quarantine-message-budget', stream: quarantineStream },
+    () => manager.streams.info(quarantineStream)
   );
   if (
     quarantine.config.max_msg_size > 0 &&
@@ -160,6 +256,16 @@ export const ensureMessageBudgets = Effect.fn('catalogue.events.ensureMessageBud
   ) {
     return yield* new MessageBudgetError({
       message: `${quarantineStream} max_msg_size must allow at least ${quarantineMessageBytes} bytes for gateway quarantine messages.`,
+      diagnostic: {
+        dependency: 'nats',
+        operation: 'check-quarantine-message-budget',
+        code: 'QUARANTINE_MESSAGE_LIMIT_TOO_SMALL',
+        stream: quarantineStream,
+        actualBytes: quarantine.config.max_msg_size,
+        minimumBytes: quarantineMessageBytes,
+        remediation:
+          'Configure the quarantine stream max_msg_size to at least 262144 bytes and restart the gateway.',
+      },
     });
   }
   for (const stream of sourceStreams) yield* ensureSourceBudget(connection, manager, stream);

@@ -19,6 +19,7 @@ import {
   AckPolicy,
   connect,
   DiscardPolicy,
+  ErrorCode,
   headers,
   StorageType,
   type ConsumerMessages,
@@ -28,6 +29,7 @@ import {
   type NatsConnection,
 } from 'nats';
 import { ProjectCatalogue, type ProjectionOutcome } from '../../projection/index.js';
+import { StartupDiagnostic } from '../../startup-diagnostics.js';
 import { ensureMessageBudgets, quarantineMessageBytes } from './message-budget.js';
 import { translate, type TranslatedEvent } from './translation.js';
 
@@ -107,8 +109,42 @@ export class NatsProjectionStartupError extends Schema.TaggedError<NatsProjectio
 
 class BrokerError extends Schema.TaggedError<BrokerError>()('BrokerError', {
   operation: Schema.String,
+  diagnostic: StartupDiagnostic,
   cause: Schema.Defect(),
 }) {}
+
+const decodeBrokerCode = Schema.decodeUnknownOption(
+  Schema.Struct({
+    code: Schema.Union([
+      Schema.Enum(ErrorCode),
+      Schema.Literals([
+        'ECONNREFUSED',
+        'ECONNRESET',
+        'ETIMEDOUT',
+        'ENOTFOUND',
+        'EAI_AGAIN',
+        'EHOSTUNREACH',
+        'ENETUNREACH',
+        'EPIPE',
+      ]),
+    ]),
+  })
+);
+
+function brokerError(operation: string, cause: unknown): BrokerError {
+  return new BrokerError({
+    operation,
+    cause,
+    diagnostic: {
+      dependency: 'nats',
+      operation,
+      code: Option.match(decodeBrokerCode(cause), {
+        onNone: () => 'UnknownError',
+        onSome: ({ code }) => code,
+      }),
+    },
+  });
+}
 
 const subscriptions = [
   { stream: 'WALLPAPER', subject: 'wallpaper.uploaded', durable: 'gateway-wallpaper-uploaded' },
@@ -128,7 +164,7 @@ const subscriptions = [
 const notFound = Schema.is(Schema.Struct({ code: Schema.Literal('404') }));
 
 function broker<A>(operation: string, run: () => Promise<A>): Effect.Effect<A, BrokerError> {
-  return Effect.tryPromise({ try: run, catch: (cause) => new BrokerError({ operation, cause }) });
+  return Effect.tryPromise({ try: run, catch: (cause) => brokerError(operation, cause) });
 }
 
 const ensureQuarantine = Effect.fn('catalogue.events.ensureQuarantine')(function* (
@@ -377,9 +413,8 @@ export function natsProjectionLayer(
       for (const subscription of subscriptions) {
         const subscriptionMessages = yield* subscribe(manager, js, subscription, options);
         messages.push(subscriptionMessages);
-        const worker = yield* Stream.fromAsyncIterable(
-          subscriptionMessages,
-          (cause) => new BrokerError({ operation: 'read subscription', cause })
+        const worker = yield* Stream.fromAsyncIterable(subscriptionMessages, (cause) =>
+          brokerError('read subscription', cause)
         ).pipe(
           Stream.runForEach((message) =>
             Effect.gen(function* () {

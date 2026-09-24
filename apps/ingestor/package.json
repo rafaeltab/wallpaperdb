@@ -20,7 +20,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "architecture:test": "node --test ../../scripts/ingestor-architecture.test.mjs",
     "format:files": "biome format --write"

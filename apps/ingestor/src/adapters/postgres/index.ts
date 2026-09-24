@@ -4,7 +4,6 @@ import { Context, Effect, Layer } from 'effect';
 import pg from 'pg';
 import { ulid } from 'ulid';
 import { z } from 'zod';
-export { migrateIngestionDatabase } from './migration.js';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import * as schema from '../../db/schema.js';
 import {

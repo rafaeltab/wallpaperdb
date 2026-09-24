@@ -7,7 +7,7 @@ Color Extractor reads immutable original wallpaper images and publishes a normal
 
 ## Execution and delivery
 
-The extraction capability uses Effect services for histogram extraction and result publication. The image adapter owns S3 reads and Sharp decoding. The event adapter translates legacy and CloudEvents upload messages into local input. Composition owns the clients, consumer, health request fibers and shutdown scope. Pure HSV calculations remain ordinary TypeScript.
+The extraction capability uses Effect services for histogram extraction and result publication. The image adapter owns S3 reads and Sharp decoding. The native-process decision is recorded in the context ADR `0001-isolate-native-image-decoding`. The event adapter translates legacy and CloudEvents upload messages into local input. Composition owns the clients, consumer, health request fibers and shutdown scope. Pure HSV calculations remain ordinary TypeScript.
 
 The durable consumer `color-extractor-wallpaper-uploaded-consumer` reads `wallpaper.uploaded` from the configured stream. Each replica pulls one message at a time. The existing acknowledgement deadline is 120 seconds, with an in-progress acknowledgement every 30 seconds while processing. The service acknowledges an image only after JetStream confirms the histogram publication, or acknowledges a video after the skip result.
 
@@ -19,7 +19,7 @@ Results use CloudEvents 1.0 on `wallpaper.colors.extracted`, with the unchanged 
 
 ## Resource ownership
 
-S3 reads have a 100-second deadline and health probes have a five-second deadline. Interruption aborts the request and closes its body. The image adapter serializes native decoding, retains its permit until native completion and gives the Sharp pixel pipeline a ten-second native timeout. Sharp metadata reads are not cancellable; graceful shutdown can wait for native metadata work to finish. Do not interpret the consumer drain timeout as a hard bound on arbitrary native code.
+S3 reads have a 100-second deadline and health probes have a five-second deadline. Interruption aborts the request and closes its body. The image adapter serializes decoding in an owned child process. A ten-second deadline includes metadata reads and the pixel pipeline. Interruption or deadline kills the decoder and waits for process exit before releasing the permit. This also bounds nonresponsive native metadata work, which Sharp itself cannot cancel. The build emits `decoder.mjs` beside `index.mjs`; deploy both files.
 
 Shutdown stops consumer intake, allows current work to finish within the configured drain period, then interrupts unfinished Effect work before closing clients. Failed startup releases resources already acquired. Health request fibers belong to the HTTP runtime. Telemetry exporters belong to the executable's outer scope.
 
@@ -39,7 +39,7 @@ make run PACKAGE=color-extractor SCRIPT=test:all
 make check-crap PACKAGE=color-extractor CRAP_THRESHOLD=30
 ```
 
-Unit tests cover extraction decisions, the HSV table, real Sharp formats and alpha handling, HTTP translation, configuration, and cancellable S3 sockets. Integration tests cover real SeaweedFS image reads, NATS publication and delivery guarantees, and the production composition processing a stored image. Telemetry tests exercise a real local collector. Coverage includes every source file; the shared CRAP tool's callback/generator limitation is tracked in issue #217.
+Unit tests cover extraction decisions, the HSV table, real Sharp formats and alpha handling, HTTP translation, configuration, and cancellable S3 sockets. Integration tests cover real SeaweedFS image reads, NATS publication and delivery guarantees, and the production composition processing a stored image. Telemetry tests exercise a real local collector. Linux process tests stop an actual decoder and prove deadline/interruption reaps it. Coverage includes every source file; child-process decoder execution does not contribute to the parent Vitest coverage and remains reported as uncovered despite its blackbox image tests. the shared CRAP tool's callback/generator limitation is tracked in issue #217.
 
 ## Rollout
 

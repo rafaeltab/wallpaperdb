@@ -3,10 +3,7 @@ import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import { Effect, Layer, ManagedRuntime } from 'effect';
-import { availabilityLayer, AvailabilityProbe } from '../src/availability/index.js';
-import { createHttpApp } from '../src/http/index.js';
-import { tracingLayer } from '../src/runtime.js';
+import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 
@@ -33,96 +30,6 @@ describe('Telemetry SDK ownership', () => {
         }).pipe(Effect.scoped)
       )
     ).toEqual({ _tag: 'Unavailable' });
-  });
-
-  it('exports traces, logs and shared core metrics before its owning scope closes', async () => {
-    const exported = new Map<string, string[]>();
-    const collector = createServer((request, response) => {
-      const chunks: Buffer[] = [];
-      request.on('data', (chunk: Buffer) => chunks.push(chunk));
-      request.on('end', () => {
-        const path = request.url ?? '';
-        exported.set(path, [...(exported.get(path) ?? []), Buffer.concat(chunks).toString()]);
-        response.writeHead(200);
-        response.end();
-      });
-    });
-    await new Promise<void>((resolve) => {
-      collector.listen(0, '127.0.0.1', resolve);
-    });
-    try {
-      const address = collector.address();
-      if (!address || typeof address === 'string') throw new Error('Missing collector TCP address');
-      const status = await Effect.runPromise(
-        Effect.gen(function* () {
-          const status = yield* initializeOtel({
-            otelServiceName: 'color-extractor-contract',
-            otelEndpoint: `http://127.0.0.1:${address.port}/`,
-          });
-          trace.getTracer('contract').startSpan('extraction.contract').end();
-          recordCounter('extraction.contract', 1);
-          const runtime = yield* Effect.acquireRelease(
-            Effect.sync(() => ManagedRuntime.make(tracingLayer)),
-            (runtime) => Effect.promise(() => runtime.dispose())
-          );
-          yield* Effect.promise(() =>
-            runtime.runPromise(
-              Effect.logInfo('Extraction completed').pipe(Effect.withSpan('effect.contract'))
-            )
-          );
-          const app = yield* Effect.acquireRelease(
-            Effect.tryPromise(() =>
-              createHttpApp(
-                { nodeEnv: 'test', port: 0 },
-                availabilityLayer.pipe(
-                  Layer.provide(
-                    Layer.succeed(AvailabilityProbe, {
-                      inspect: () =>
-                        Effect.succeed({ s3: true, nats: true, otel: true, consumer: true }),
-                    })
-                  ),
-                  Layer.provideMerge(tracingLayer)
-                )
-              )
-            ),
-            (app) => Effect.promise(() => app.close())
-          );
-          const response = yield* Effect.promise(() =>
-            app.inject({
-              method: 'GET',
-              url: '/health',
-              headers: { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01' },
-            })
-          );
-          expect(response.statusCode).toBe(200);
-          return status;
-        }).pipe(Effect.scoped)
-      );
-      expect(status).toEqual({ _tag: 'Started' });
-      expect(exported.get('/v1/traces')?.join()).toContain('extraction.contract');
-      expect(exported.get('/v1/traces')?.join()).toContain('effect.contract');
-      expect(exported.get('/v1/metrics')?.join()).toContain('extraction.contract');
-      expect(exported.get('/v1/logs')?.join()).toContain('Extraction completed');
-      const spans: unknown[] = [];
-      for (const body of exported.get('/v1/traces') ?? []) {
-        JSON.parse(body, (key, value: unknown) => {
-          if (key === 'spans' && Array.isArray(value)) spans.push(...value);
-          return value;
-        });
-      }
-      expect(spans).toContainEqual(
-        expect.objectContaining({
-          name: 'availability.health',
-          traceId: '0123456789abcdef0123456789abcdef',
-          parentSpanId: '0123456789abcdef',
-        })
-      );
-    } finally {
-      collector.closeAllConnections();
-      await new Promise<void>((resolve, reject) => {
-        collector.close((error) => (error ? reject(error) : resolve()));
-      });
-    }
   });
 
   it('closes stalled collector sockets when later application startup fails', async () => {

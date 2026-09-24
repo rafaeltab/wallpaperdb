@@ -3,7 +3,7 @@ import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import { Effect, ManagedRuntime, Result } from 'effect';
+import { Effect, ManagedRuntime } from 'effect';
 import { tracingLayer } from '../src/runtime.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';

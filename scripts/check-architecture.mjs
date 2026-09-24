@@ -4,11 +4,17 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('../', import.meta.url));
-const ingestor = path.join(repo, 'apps/ingestor');
-const src = path.join(ingestor, 'src');
-const require = createRequire(path.join(ingestor, 'package.json'));
+if (process.argv.length !== 3) {
+  console.error('Usage: node scripts/check-architecture.mjs apps/<application>');
+  process.exit(1);
+}
+const application = path.resolve(repo, process.argv[2]);
+const applicationName = path.basename(application);
+const packageName = JSON.parse(fs.readFileSync(path.join(application, 'package.json'), 'utf8')).name;
+const src = path.join(application, 'src');
+const require = createRequire(path.join(application, 'package.json'));
 const ts = require('typescript');
-const config = JSON.parse(fs.readFileSync(path.join(ingestor, 'quality.config.json'), 'utf8'));
+const config = JSON.parse(fs.readFileSync(path.join(application, 'quality.config.json'), 'utf8'));
 const errors = [];
 
 function files(directory) {
@@ -45,14 +51,14 @@ function importPaths(source) {
 
 const sourceFiles = files(src);
 const graph = new Map(sourceFiles.map((filename) => [filename, []]));
-for (const filename of [...sourceFiles, ...files(path.join(ingestor, 'test'))]) {
+for (const filename of [...sourceFiles, ...files(path.join(application, 'test'))]) {
   const source = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
   const owner = capability(filename);
   for (const { specifier, node } of importPaths(source)) {
     const line = source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
     const location = `${path.relative(repo, filename)}:${line}`;
     const resolved = ts.resolveModuleName(specifier, filename, { moduleResolution: ts.ModuleResolutionKind.Bundler }, ts.sys).resolvedModule?.resolvedFileName;
-    if (specifier === 'tsyringe' || specifier === 'reflect-metadata') errors.push(`${location}: ingestor uses Effect service layers; remove ${specifier}`);
+    if (specifier === 'tsyringe' || specifier === 'reflect-metadata') errors.push(`${location}: ${applicationName} uses Effect service layers; remove ${specifier}`);
     if (owner && !specifier.startsWith('.') && specifier !== 'effect') errors.push(`${location}: ${owner} depends on external technology ${specifier}`);
     if (!resolved || !resolved.startsWith(`${src}${path.sep}`)) continue;
     if (graph.has(filename)) graph.get(filename).push(resolved);
@@ -64,7 +70,7 @@ for (const filename of [...sourceFiles, ...files(path.join(ingestor, 'test'))]) 
   }
 }
 
-// Package exports cannot prevent relative imports that bypass the ingestor package.
+// Package exports cannot prevent relative imports that bypass the application package.
 // Verify other workspace source trees do not reach into this deployable application.
 for (const group of ['apps', 'packages']) {
   for (const entry of fs.readdirSync(path.join(repo, group), { withFileTypes: true })) {
@@ -75,8 +81,8 @@ for (const group of ['apps', 'packages']) {
       const source = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
       for (const { specifier } of importPaths(source)) {
         const target = specifier.startsWith('.') ? path.resolve(path.dirname(filename), specifier) : undefined;
-        if (specifier === '@wallpaperdb/ingestor' || specifier.startsWith('@wallpaperdb/ingestor/') || target?.startsWith(`${ingestor}${path.sep}`)) {
-          errors.push(`${path.relative(repo, filename)}: another workspace must communicate with the ingestor through its external contracts`);
+        if (specifier === packageName || specifier.startsWith(`${packageName}/`) || target?.startsWith(`${application}${path.sep}`)) {
+          errors.push(`${path.relative(repo, filename)}: another workspace must communicate with the ${applicationName} through its external contracts`);
         }
       }
     }
@@ -102,5 +108,5 @@ if (errors.length > 0) {
   console.error(errors.join('\n'));
   process.exitCode = 1;
 } else {
-  console.log(`Ingestor architecture: ${sourceFiles.length} source files, public capability entries, inward dependencies and acyclicity verified.`);
+  console.log(`${applicationName} architecture: ${sourceFiles.length} source files, public capability entries, inward dependencies and acyclicity verified.`);
 }

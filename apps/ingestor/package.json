@@ -11,7 +11,7 @@
     "start": "node dist/index.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "lint": "biome lint . && node ../../scripts/ingestor-architecture.mjs && node --test ../../scripts/ingestor-architecture.test.mjs",
+    "lint": "biome lint . && node ../../scripts/check-architecture.mjs apps/ingestor && node --test ../../scripts/check-architecture.test.mjs",
     "lint:fix": "biome lint --write .",
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
@@ -22,7 +22,7 @@
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "architecture:test": "node --test ../../scripts/ingestor-architecture.test.mjs",
+    "architecture:test": "node --test ../../scripts/check-architecture.test.mjs",
     "format:files": "biome format --write"
   },
   "dependencies": {

@@ -18,8 +18,8 @@
     "lint": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/ingestor-architecture.mjs",
-        "$TURBO_ROOT$/scripts/ingestor-architecture.test.mjs",
+        "$TURBO_ROOT$/scripts/check-architecture.mjs",
+        "$TURBO_ROOT$/scripts/check-architecture.test.mjs",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/packages/*/src/**"
       ]

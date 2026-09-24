@@ -82,27 +82,46 @@ describe('Wallpaper ingestion', () => {
     expect(test.published[0]?.wallpaper.metadata.extension).toBe('png');
     expect(test.store.records.get('wlpr_1')?.state).toBe('processing');
   });
-  it('does not claim recent uploads and leaves storage outages recoverable', async () => {
+  it('leaves storage outages recoverable as soon as the claimed lease expires', async () => {
+    let available = false;
+    let inspections = 0;
     const test = fixture({
       storage: {
         put: () => Effect.fail(new IngestionUnavailable({ operation: 'put', cause: 'offline' })),
         exists: () =>
-          Effect.fail(new IngestionUnavailable({ operation: 'exists', cause: 'offline' })),
+          Effect.gen(function* () {
+            inspections++;
+            if (!available)
+              return yield* new IngestionUnavailable({ operation: 'exists', cause: 'offline' });
+            return true;
+          }),
       },
     });
     await Effect.runPromise(
       Ingestion.use((ingestion) =>
         Effect.gen(function* () {
           yield* ingestion.upload(uploadInput).pipe(Effect.ignore);
-          yield* ingestion.reconcile();
+          expect(yield* ingestion.reconcile()).toEqual({ processed: 0 });
+          expect(inspections).toBe(0);
           expect(test.store.records.get('wlpr_1')?.attempts).toBe(0);
           yield* test.advance();
-          yield* ingestion.reconcile();
+          expect(yield* ingestion.reconcile()).toEqual({ processed: 0 });
+          expect(inspections).toBe(1);
+          expect(test.store.records.get('wlpr_1')?.state).toBe('uploading');
+          expect(test.store.records.get('wlpr_1')?.attempts).toBe(0);
+          available = true;
+          yield* test.advance(2 * 60_000 - 1);
+          expect(yield* ingestion.reconcile()).toEqual({ processed: 0 });
+          expect(inspections).toBe(1);
+          yield* test.advance(1);
+          expect(yield* ingestion.reconcile()).toEqual({ processed: 1 });
         })
       ).pipe(Effect.provide(test.layer))
     );
-    expect(test.store.records.get('wlpr_1')?.state).toBe('uploading');
+    expect(test.store.records.get('wlpr_1')?.state).toBe('processing');
     expect(test.store.records.get('wlpr_1')?.attempts).toBe(0);
+    expect(inspections).toBe(2);
+    expect(test.published).toHaveLength(1);
   });
   it('cleans orphaned assets across pages while retaining active uploads', async () => {
     const test = fixture({

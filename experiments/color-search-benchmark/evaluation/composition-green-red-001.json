@@ -1,0 +1,450 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "presentationVersion": 1,
+  "id": "composition-green-red-001",
+  "status": "user-judged",
+  "category": [
+    "Combinations",
+    "Perceived color"
+  ],
+  "use": "development anchor",
+  "exampleType": "controlled-svg-composition",
+  "evaluationGroup": "green-red-specified-remainder",
+  "query": {
+    "userText": "50% green, 50% red",
+    "intent": "Find close matches to two named-color amount targets. Gather preferences across proportions, shade quality and another color without a predetermined tradeoff.",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 50
+      },
+      {
+        "colorName": "red",
+        "targetImagePercent": 50
+      }
+    ],
+    "unspecifiedRemainderPercent": 0,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/composition-green-red-001.html",
+    "presentation": "Six complete1600x900 SVGs, same source colors and band order except the declared shade variant. Equal16:9 rendered size per viewport on neutral #202020 page. Candidate amounts hidden.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": false,
+    "fixtureVariantNamesVisible": false,
+    "randomization": "One Python secrets.SystemRandom sample of all six variants, persisted in examples. Refresh does not reshuffle; no expected relevance order used.",
+    "judgmentFormat": "Brief descriptions for A–F and optional preferred order, ties, uncertainty or negligible differences. No mandatory numeric scale.",
+    "selection": "Same-ratio base and changed-green shade, reciprocal ratio differences, small blue and larger blue remainder. Construction choices do not establish relevance.",
+    "validation": "Six source hashes/colors/contiguous geometries verified; full1600x900 coverage and100% totals. Assets/page HTTP200, page checked through local tailnet. Desktop1280x1400/mobile390x844: six loaded fixtures at equal16:9 sizes, candidate percentages hidden, no overflow. Desktop screenshot inspected; browser closed."
+  },
+  "plannedFollowUp": {
+    "id": "composition-green-red-002",
+    "userText": "40% green, 40% red, the rest unspecified",
+    "status": "deferred after the user's realism caveat; prioritize natural-image validation before another stripe query",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 40
+      },
+      {
+        "colorName": "red",
+        "targetImagePercent": 40
+      }
+    ],
+    "unspecifiedRemainderPercent": 20,
+    "assetPolicy": "Reuse these exact source IDs, files and hashes; use a separate shuffled presentation mapping.",
+    "scope": "Related comparison within the same development group. Changes both targets and unspecified remainder; do not attribute ranking changes exclusively to one of those factors.",
+    "previousStatus": "authorized; prepare after first-query judgment",
+    "reason": "Assistant workflow adjustment in response to the user's concern, not an explicit user cancellation of the previously authorized partial query."
+  },
+  "construction": {
+    "createdDate": "2026-09-16",
+    "canvas": {
+      "width": 1600,
+      "height": 900
+    },
+    "layout": "Left-to-right contiguous full-height bands: green, red, then optional blue at the right edge. Bands exactly cover the canvas.",
+    "baseSourceColors": {
+      "green": "#22BB44",
+      "red": "#FF2200",
+      "blue": "#2255EE"
+    },
+    "alternativeGreen": "#668066",
+    "rendering": "Opaque SVG rects only. No gradients, filters, masks, textures, external assets or photo edits."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "fixtureVariant": "small_blue",
+      "wallpaperId": "composition-green-red-001-a",
+      "filename": "evaluation/fixtures/composition-green-red-001-a.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#22BB44",
+            "areaPercent": 49,
+            "x": 0,
+            "y": 0,
+            "width": 784,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 49,
+            "x": 784,
+            "y": 0,
+            "width": 784,
+            "height": 900
+          },
+          {
+            "sourceColorName": "blue",
+            "hex": "#2255EE",
+            "areaPercent": 2,
+            "x": 1568,
+            "y": 0,
+            "width": 32,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This is very close to the right ratio, but it has an extra color",
+        "ratioOrAmountObservation": "Very close to the right ratio.",
+        "colorObservation": "Has an extra color.",
+        "wholeImageMatchDescription": null,
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "7ae9552ce04cad1887f75835929184a79afda8b767c6feebf3a5b15ca42fafea"
+    },
+    {
+      "label": "B",
+      "fixtureVariant": "balanced",
+      "wallpaperId": "composition-green-red-001-b",
+      "filename": "evaluation/fixtures/composition-green-red-001-b.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#22BB44",
+            "areaPercent": 50,
+            "x": 0,
+            "y": 0,
+            "width": 800,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 50,
+            "x": 800,
+            "y": 0,
+            "width": 800,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This is the perfect example",
+        "ratioOrAmountObservation": null,
+        "colorObservation": null,
+        "wholeImageMatchDescription": "The perfect example.",
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "926aeee417ed97e403d27c334c8d56b3ed85325e3eba2bd4c1b2bed6e6cc4ad8"
+    },
+    {
+      "label": "C",
+      "fixtureVariant": "open_remainder",
+      "wallpaperId": "composition-green-red-001-c",
+      "filename": "evaluation/fixtures/composition-green-red-001-c.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#22BB44",
+            "areaPercent": 40,
+            "x": 0,
+            "y": 0,
+            "width": 640,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 40,
+            "x": 640,
+            "y": 0,
+            "width": 640,
+            "height": 900
+          },
+          {
+            "sourceColorName": "blue",
+            "hex": "#2255EE",
+            "areaPercent": 20,
+            "x": 1280,
+            "y": 0,
+            "width": 320,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This has a lot of blue, red and green are in the right ratio",
+        "ratioOrAmountObservation": "Red and green are in the right ratio.",
+        "colorObservation": "Has a lot of blue.",
+        "wholeImageMatchDescription": null,
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "a3804616127501aeba1201bf64c04b4d86846018baade78fad202c5133774a5a"
+    },
+    {
+      "label": "D",
+      "fixtureVariant": "muted_green",
+      "wallpaperId": "composition-green-red-001-d",
+      "filename": "evaluation/fixtures/composition-green-red-001-d.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#668066",
+            "areaPercent": 50,
+            "x": 0,
+            "y": 0,
+            "width": 800,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 50,
+            "x": 800,
+            "y": 0,
+            "width": 800,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Its green, but not very green",
+        "ratioOrAmountObservation": null,
+        "colorObservation": "Green, but not very green.",
+        "wholeImageMatchDescription": null,
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "076e6c9a08b0d2dcf3d5ee637e9924847ba6c841e38379f6ac153a18fe649de6"
+    },
+    {
+      "label": "E",
+      "fixtureVariant": "more_red",
+      "wallpaperId": "composition-green-red-001-e",
+      "filename": "evaluation/fixtures/composition-green-red-001-e.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#22BB44",
+            "areaPercent": 35,
+            "x": 0,
+            "y": 0,
+            "width": 560,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 65,
+            "x": 560,
+            "y": 0,
+            "width": 1040,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Too little green",
+        "ratioOrAmountObservation": "Too little green.",
+        "colorObservation": null,
+        "wholeImageMatchDescription": null,
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "44e25f12a58dd3ffca3ad0f03caad1c4a9036f66cdd474717e785a8cebe1f1bb"
+    },
+    {
+      "label": "F",
+      "fixtureVariant": "more_green",
+      "wallpaperId": "composition-green-red-001-f",
+      "filename": "evaluation/fixtures/composition-green-red-001-f.svg",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "bands": [
+          {
+            "sourceColorName": "green",
+            "hex": "#22BB44",
+            "areaPercent": 65,
+            "x": 0,
+            "y": 0,
+            "width": 1040,
+            "height": 900
+          },
+          {
+            "sourceColorName": "red",
+            "hex": "#FF2200",
+            "areaPercent": 35,
+            "x": 1040,
+            "y": 0,
+            "width": 560,
+            "height": 900
+          }
+        ]
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Too much green",
+        "ratioOrAmountObservation": "Too much green.",
+        "colorObservation": null,
+        "wholeImageMatchDescription": null,
+        "wholeImageMatchRating": null,
+        "scope": "This constructed sheet; user explicitly cautions about transfer to real wallpapers."
+      },
+      "sha256": "7879176ce870a8aa158210f3e152f4b94a8862b6f2e02d3efec1969249b06d0a"
+    }
+  ],
+  "judgments": [
+    {
+      "id": "green-red-composition-order-001",
+      "source": "user-response-001",
+      "type": "two-color-composition-result-preference",
+      "orderedLabels": [
+        "B",
+        "D",
+        "E",
+        "F",
+        "A",
+        "C"
+      ],
+      "orderedWallpaperIds": [
+        "composition-green-red-001-b",
+        "composition-green-red-001-d",
+        "composition-green-red-001-e",
+        "composition-green-red-001-f",
+        "composition-green-red-001-a",
+        "composition-green-red-001-c"
+      ],
+      "tiesReported": false,
+      "status": "reported-with-real-image-transfer-caveat",
+      "scope": "Order supplied for the constructed set. The user finds pure colors hard to judge as a proxy for real preference and specifically doubts whether A would rank below E in a real example. Do not use the order as universal real-wallpaper ground truth."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "B",
+      "over": "D",
+      "source": "green-red-composition-order-001",
+      "scope": "constructed-sheet-only; real-image transfer uncertain",
+      "derivation": "Adjacent relation from one supplied ordering, not an independent judgment."
+    },
+    {
+      "preferred": "D",
+      "over": "E",
+      "source": "green-red-composition-order-001",
+      "scope": "constructed-sheet-only; real-image transfer uncertain",
+      "derivation": "Adjacent relation from one supplied ordering, not an independent judgment."
+    },
+    {
+      "preferred": "E",
+      "over": "F",
+      "source": "green-red-composition-order-001",
+      "scope": "constructed-sheet-only; real-image transfer uncertain",
+      "derivation": "Adjacent relation from one supplied ordering, not an independent judgment."
+    },
+    {
+      "preferred": "F",
+      "over": "A",
+      "source": "green-red-composition-order-001",
+      "scope": "constructed-sheet-only; real-image transfer uncertain",
+      "derivation": "Adjacent relation from one supplied ordering, not an independent judgment."
+    },
+    {
+      "preferred": "A",
+      "over": "C",
+      "source": "green-red-composition-order-001",
+      "scope": "constructed-sheet-only; real-image transfer uncertain",
+      "derivation": "Adjacent relation from one supplied ordering, not an independent judgment."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A This is very close to the right ratio, but it has an extra color\nB This is the perfect example\nC This has a lot of blue, red and green are in the right ratio\nD Its green, but not very green\nE Too little green\nF Too much green\n\nB, D, E, F, A, C\n\nTBH, with these pure colors it is hard to tell what my real preference is. No body is searching for pure colors so I dont know if I would actually score A below E in a real example."
+    }
+  ],
+  "notes": [
+    "User supplied B > D > E > F > A > C for these fixtures, plus a strong caveat about real-image validity. No numeric ratings or rejection labels.",
+    "Candidate percentages are hidden at the user's request; query target percentages stay visible. Do not reveal candidate facts in user-facing replies before judgment unless requested.",
+    "The variant names and geometric fractions are authoring facts, not human perceived membership or quality.",
+    "Only the green fill changes in the shade variant; do not transfer earlier single-green judgments automatically to this composition.",
+    "Base red is a source choice, not a user-confirmed ideal named red. Perceived balance may depend on both colors.",
+    "Reciprocal ratio errors need not imply equal relevance.",
+    "The user's earlier conceptual grayscale/red preference does not establish a universal rejection of blue in all fully specified requests.",
+    "Blue's fixed edge position, width and contrast may affect prominence. This cannot establish preferences over all spatial layouts.",
+    "All images and the planned follow-up belong to one green-red-specified-remainder development group; do not count repeated-image results as independent held-out evidence.",
+    "The partial-query stripe follow-up remains authorized but is deferred while prioritizing natural-image validation after the user's realism caveat. This is an assistant workflow adjustment, not a user cancellation.",
+    "Keep subjective amount, shade quality, relevance, exclusions and uncertainty distinct. Do not turn rank differences into numeric gaps.",
+    "No search method, harness, descriptor, index, benchmark or production behavior changed.",
+    "A/C's 'right ratio' observations concern the relative green:red balance. Extra blue means neither has50% of the whole image in each requested color. Do not convert ratio fit into exact full-image amount fit.",
+    "B is an explicit perfect reference within this constructed set, not a confirmed ideal natural wallpaper.",
+    "D's weaker green observation has no calibrated quality or effective-area number.",
+    "The supplied order is retained; the user did not retract it or give ties. Uncertainty concerns realism and especially transferring A-versus-E to photos.",
+    "Do not infer a universal extra-color veto, purity weighting, shade weighting or preferred under/overshoot from this case.",
+    "Pause the second stripe request and gather natural-image judgments; preserve its previous authorization and planned query for possible later use."
+  ],
+  "transferCaveats": [
+    {
+      "source": "user-response-001",
+      "description": "With pure colors it is hard for the user to tell their real preference; people are not searching for pure-color blocks.",
+      "specificComparison": {
+        "labels": [
+          "A",
+          "E"
+        ],
+        "reportedFixturePreference": "E over A",
+        "realImagePreference": "Uncertain; the user does not know whether A should rank below E in a real example."
+      },
+      "consequence": "Preserve the fixture order as contextual evidence. Validate the tradeoff with real wallpapers before defining general scoring rules."
+    }
+  ]
+}

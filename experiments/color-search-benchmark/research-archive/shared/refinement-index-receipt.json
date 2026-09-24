@@ -1,0 +1,27 @@
+{
+  "createdAt": "2026-09-20T01:10:29.757Z",
+  "index": "color-exploration-real-v1",
+  "updated": 545,
+  "sidecarSha256": "27dd963af85d3667711e9ca1fe3c26987261dc0b2c585ce0efc54827552d0638",
+  "fields": [
+    "rel_sample_width",
+    "rel_sample_height",
+    "rel_pixel_total",
+    "rel_l_mean",
+    "rel_l_median",
+    "rel_l_p95",
+    "rel_l_p99",
+    "rel_l_p999",
+    "rel_l_max",
+    "rel_span_p99",
+    "rel_span_p999",
+    "rel_highlight_10_area",
+    "rel_highlight_20_area",
+    "rel_highlight_30_area",
+    "rel_highlight_10_contrast",
+    "rel_highlight_tail_area",
+    "rel_dark_background",
+    "rel_dark_area50"
+  ],
+  "indexedCount": 545
+}

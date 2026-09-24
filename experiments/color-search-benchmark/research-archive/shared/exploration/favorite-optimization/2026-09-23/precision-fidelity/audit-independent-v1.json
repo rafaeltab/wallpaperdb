@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "precision",
+  "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/precision-fidelity",
+  "auditedAt": "2026-09-23T14:59:05.070751+00:00",
+  "integrityPassed": true,
+  "experimentPassed": true,
+  "sourceSnapshotHash": "01f871f5e02bc3cd4966cc9db16b2c1711e48f249dca21084cb28d91c122b016",
+  "summaryHash": "859478585f025d2cc0bba51bde715703f43f3c7cbe304acf2beb98ffd2b80fd0",
+  "auditCodeHash": "3e51eab38f8f66659c5183d4cbf8b78d63c2478c6702ca786b0854672033a98a",
+  "queryPresetCombinations": 144,
+  "methods": {
+    "favorite-utility-rank18": {
+      "comparisons": 144,
+      "documents": 78480,
+      "identicalOrders": 40,
+      "minimumTop20": 20,
+      "maximumScoreError": 2.0000000000575113e-06,
+      "maximumOracleError": 2.9799652079276484e-08,
+      "maximumInvertedScoreGap": 3.619999999981971e-06,
+      "maximumRankChange": 89,
+      "meaningfulInversions": 2458
+    },
+    "favorite-utility-rank27": {
+      "comparisons": 144,
+      "documents": 78480,
+      "identicalOrders": 129,
+      "minimumTop20": 20,
+      "maximumScoreError": 1.5000000008758008e-07,
+      "maximumOracleError": 2.980194091506405e-08,
+      "maximumInvertedScoreGap": 9.999999994736442e-08,
+      "maximumRankChange": 13,
+      "meaningfulInversions": 0
+    }
+  },
+  "documentScores": 156960,
+  "limitations": [
+    "Independent consistency audit of saved responses/oracles and source hashes; no service re-execution or new relevance labels."
+  ]
+}

@@ -1,0 +1,21 @@
+# Isolated scale experiment. Preserve unrelated application and historical indexes.
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    environment:
+      - discovery.type=single-node
+      - cluster.name=color-exploration-scale
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms4g -Xmx4g
+    ports:
+      - "127.0.0.1:19217:9200"
+    mem_limit: 12g
+    cpus: 8
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - color-exploration-scale:/usr/share/opensearch/data
+volumes:
+  color-exploration-scale:

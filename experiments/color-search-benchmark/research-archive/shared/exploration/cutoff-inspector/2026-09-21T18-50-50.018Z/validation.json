@@ -1,0 +1,1386 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-21T18:50:53.217Z",
+  "passed": true,
+  "corpusCount": 545,
+  "realCount": 523,
+  "excludedFixtureCount": 22,
+  "configurations": [
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "f46c13bfbd1b45dbd3775fedbe50bf39b9d8d9ff03d80bd386a1b0995d5aac92",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "32100266677aed6765acb95c71764ca6efcee7640e46b89d0b0e13cb38f992be",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "86388f2ee841fa899591c6102215442ba92cc3fc7dc5ac6910e6f5ea490603f4",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "c746f524005c80c1035bf50b809866b6b0103742c8e1852053b924323e823bcc",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "f46c13bfbd1b45dbd3775fedbe50bf39b9d8d9ff03d80bd386a1b0995d5aac92",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "32100266677aed6765acb95c71764ca6efcee7640e46b89d0b0e13cb38f992be",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "86388f2ee841fa899591c6102215442ba92cc3fc7dc5ac6910e6f5ea490603f4",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "c746f524005c80c1035bf50b809866b6b0103742c8e1852053b924323e823bcc",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "f46c13bfbd1b45dbd3775fedbe50bf39b9d8d9ff03d80bd386a1b0995d5aac92",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "32100266677aed6765acb95c71764ca6efcee7640e46b89d0b0e13cb38f992be",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "86388f2ee841fa899591c6102215442ba92cc3fc7dc5ac6910e6f5ea490603f4",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "c746f524005c80c1035bf50b809866b6b0103742c8e1852053b924323e823bcc",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "f46c13bfbd1b45dbd3775fedbe50bf39b9d8d9ff03d80bd386a1b0995d5aac92",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "32100266677aed6765acb95c71764ca6efcee7640e46b89d0b0e13cb38f992be",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "86388f2ee841fa899591c6102215442ba92cc3fc7dc5ac6910e6f5ea490603f4",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "c746f524005c80c1035bf50b809866b6b0103742c8e1852053b924323e823bcc",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-hard",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "9f0ef28de2fea3aa020aaff10504b984a6937b6b34e55c673e6db794d2ee39b6",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "28b17a0886666b844c0b374bde0d0366dcfc9f503b843db270245caa19d9d66b",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "691cf3bc17993fc4e2ac35914c4fddb1d74f9da11bd0715cce2990432a310994",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "76e6a3fe5358d3ac4676a171617ce4e371066c2313c45a36917304a4f856cfbb",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "4f2b032c31e650e034eeba71ebdf95b63b7e0f8dff4015aab1906ef598c7f2b8",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "9f0ef28de2fea3aa020aaff10504b984a6937b6b34e55c673e6db794d2ee39b6",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "28b17a0886666b844c0b374bde0d0366dcfc9f503b843db270245caa19d9d66b",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "691cf3bc17993fc4e2ac35914c4fddb1d74f9da11bd0715cce2990432a310994",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "76e6a3fe5358d3ac4676a171617ce4e371066c2313c45a36917304a4f856cfbb",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "4f2b032c31e650e034eeba71ebdf95b63b7e0f8dff4015aab1906ef598c7f2b8",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "9f0ef28de2fea3aa020aaff10504b984a6937b6b34e55c673e6db794d2ee39b6",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "28b17a0886666b844c0b374bde0d0366dcfc9f503b843db270245caa19d9d66b",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "691cf3bc17993fc4e2ac35914c4fddb1d74f9da11bd0715cce2990432a310994",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "76e6a3fe5358d3ac4676a171617ce4e371066c2313c45a36917304a4f856cfbb",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "4f2b032c31e650e034eeba71ebdf95b63b7e0f8dff4015aab1906ef598c7f2b8",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "9f0ef28de2fea3aa020aaff10504b984a6937b6b34e55c673e6db794d2ee39b6",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "28b17a0886666b844c0b374bde0d0366dcfc9f503b843db270245caa19d9d66b",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "691cf3bc17993fc4e2ac35914c4fddb1d74f9da11bd0715cce2990432a310994",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "76e6a3fe5358d3ac4676a171617ce4e371066c2313c45a36917304a4f856cfbb",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-feather",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "4f2b032c31e650e034eeba71ebdf95b63b7e0f8dff4015aab1906ef598c7f2b8",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "298f716d806c4ee53ce57cc66574c781b7e609282810bb480d0d757845f71355",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "28254fb6cdf61e338bc1a043bf595b60752a7b2340a5e6d0a1a8803f8eec0f42",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "12023237a515af6cf8bbb6d9bc09dd4e57bdc7754f888b3c1f27a0d9843921b7",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "e4e91a39b6590a062c84995519df8c801ce62a7aab7f71bf141db5fdb1d50276",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "86e9f2560cc98fcf145d7f0a546e2f3856db324abfe245f1bb9828797ee52f9f",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "298f716d806c4ee53ce57cc66574c781b7e609282810bb480d0d757845f71355",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "28254fb6cdf61e338bc1a043bf595b60752a7b2340a5e6d0a1a8803f8eec0f42",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "12023237a515af6cf8bbb6d9bc09dd4e57bdc7754f888b3c1f27a0d9843921b7",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "e4e91a39b6590a062c84995519df8c801ce62a7aab7f71bf141db5fdb1d50276",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "86e9f2560cc98fcf145d7f0a546e2f3856db324abfe245f1bb9828797ee52f9f",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "298f716d806c4ee53ce57cc66574c781b7e609282810bb480d0d757845f71355",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "28254fb6cdf61e338bc1a043bf595b60752a7b2340a5e6d0a1a8803f8eec0f42",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "12023237a515af6cf8bbb6d9bc09dd4e57bdc7754f888b3c1f27a0d9843921b7",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "e4e91a39b6590a062c84995519df8c801ce62a7aab7f71bf141db5fdb1d50276",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "86e9f2560cc98fcf145d7f0a546e2f3856db324abfe245f1bb9828797ee52f9f",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "298f716d806c4ee53ce57cc66574c781b7e609282810bb480d0d757845f71355",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "28254fb6cdf61e338bc1a043bf595b60752a7b2340a5e6d0a1a8803f8eec0f42",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "12023237a515af6cf8bbb6d9bc09dd4e57bdc7754f888b3c1f27a0d9843921b7",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "e4e91a39b6590a062c84995519df8c801ce62a7aab7f71bf141db5fdb1d50276",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-core-halo",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "86e9f2560cc98fcf145d7f0a546e2f3856db324abfe245f1bb9828797ee52f9f",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "e10cc8dbcd6e63410d969b716b4f6ad2ccd10198f3f2792c9f01c0a52ab0ee4c",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "e5db4ee92c1ce22f8d366cc6771dcb269459a23ce7efea283c8959cd6d640027",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "6bb36557339b353b2eda84373d3ac76f452160625e1db29cf3e50c6cd5d35143",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "db2a16ede6316c989c10a4defae5cd04702626c06375adce72fafc2e43ee750a",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-16-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "e10cc8dbcd6e63410d969b716b4f6ad2ccd10198f3f2792c9f01c0a52ab0ee4c",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "e5db4ee92c1ce22f8d366cc6771dcb269459a23ce7efea283c8959cd6d640027",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "6bb36557339b353b2eda84373d3ac76f452160625e1db29cf3e50c6cd5d35143",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "db2a16ede6316c989c10a4defae5cd04702626c06375adce72fafc2e43ee750a",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-64-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "e10cc8dbcd6e63410d969b716b4f6ad2ccd10198f3f2792c9f01c0a52ab0ee4c",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "e5db4ee92c1ce22f8d366cc6771dcb269459a23ce7efea283c8959cd6d640027",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "6bb36557339b353b2eda84373d3ac76f452160625e1db29cf3e50c6cd5d35143",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "db2a16ede6316c989c10a4defae5cd04702626c06375adce72fafc2e43ee750a",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-256-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "e10cc8dbcd6e63410d969b716b4f6ad2ccd10198f3f2792c9f01c0a52ab0ee4c",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "e5db4ee92c1ce22f8d366cc6771dcb269459a23ce7efea283c8959cd6d640027",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "6bb36557339b353b2eda84373d3ac76f452160625e1db29cf3e50c6cd5d35143",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "db2a16ede6316c989c10a4defae5cd04702626c06375adce72fafc2e43ee750a",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "cutoff-consensus",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "minimumQuality": 0.6,
+        "qualityInfluence": 1.5
+      },
+      "index": "color-exploration-cutoff-1024-real-v1",
+      "hits": 100,
+      "hitHash": "344d99b2321c247b3b312a52c1d8e3e65cec753a710408b84cc515d7dcc6f579",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-dense",
+      "parameters": {
+        "bucketCount": 16
+      },
+      "index": "color-exploration-overlap-16-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-dense",
+      "parameters": {
+        "bucketCount": 64
+      },
+      "index": "color-exploration-overlap-64-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-dense",
+      "parameters": {
+        "bucketCount": 256
+      },
+      "index": "color-exploration-overlap-256-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-dense",
+      "parameters": {
+        "bucketCount": 1024
+      },
+      "index": "color-exploration-overlap-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "parameters": {
+        "bucketCount": 16
+      },
+      "index": "color-exploration-overlap-16-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "parameters": {
+        "bucketCount": 64
+      },
+      "index": "color-exploration-overlap-64-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "parameters": {
+        "bucketCount": 256
+      },
+      "index": "color-exploration-overlap-256-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "parameters": {
+        "bucketCount": 1024
+      },
+      "index": "color-exploration-overlap-real-v1",
+      "hits": 100,
+      "hitHash": "8c3415eaf8af95fe353d32911d6c06de928e40bb0d9792e71599080ad4059180",
+      "fixtureExclusionVerified": true,
+      "includeFixturesTrueIgnored": true,
+      "nativeServiceOrderVerified": true
+    }
+  ]
+}

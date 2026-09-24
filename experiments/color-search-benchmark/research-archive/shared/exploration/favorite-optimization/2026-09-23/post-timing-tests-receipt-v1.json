@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-23T20:36:15.627818+00:00",
+  "fileOnly": true,
+  "serviceRequests": 0,
+  "runtimeChanges": false,
+  "command": [
+    "make",
+    "-f",
+    "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-audits-v1.mk",
+    "pooled-warmup-tests",
+    "cardinality-tests"
+  ],
+  "exitCode": 0,
+  "passed": 13,
+  "failed": 0,
+  "suites": [
+    {
+      "name": "pooled warmup audit helper",
+      "passed": 4,
+      "failed": 0
+    },
+    {
+      "name": "unintegrated cardinality compiler",
+      "passed": 9,
+      "failed": 0,
+      "runtimeIntegrated": false,
+      "performanceMeasured": false
+    }
+  ],
+  "log": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-isolated-tests-v1.log",
+  "files": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-audits-v1.mk",
+      "sha256": "ac4fd563d2e77c088b8ecbb93c7f9fc54cc914f8551adf2482e5b5d20a3461f6"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-isolated-tests-v1.log",
+      "sha256": "7b6b9b60eaff23e84e4aaef53ebc313c14e8fc62a745ff2d86e4f3a3aaac6e48"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/warmup-parity-pooled-audit-v1.mjs",
+      "sha256": "51604fff5e96260c0fab9fd9c9200d1fdf6a7d602664001e9934893853938966"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/warmup-parity-pooled-audit-v1.test.mjs",
+      "sha256": "01ca841d6557b950af556d5660ffda9b7b331ff9758bdda2bb640dd3f8d0ea16"
+    },
+    {
+      "path": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-cardinality-bounds.mjs",
+      "sha256": "5a5335e9cee1531193d2671320112a81598053e34cd0afab3a01787bd95c3c2e"
+    },
+    {
+      "path": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-cardinality-bounds.test.mjs",
+      "sha256": "45b627afe359e2fab12cfeaeaa92fe923d0f8a97adc842cbe7052ec5fb0222cc"
+    }
+  ]
+}

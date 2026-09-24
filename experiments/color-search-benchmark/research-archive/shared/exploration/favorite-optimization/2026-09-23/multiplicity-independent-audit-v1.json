@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-multiplicity-independent-audit",
+  "fileOnly": true,
+  "auditedAt": "2026-09-23T16:17:08.452873+00:00",
+  "fidelity": {
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/multiplicity-fidelity-v1",
+    "sources": {
+      "files": 31,
+      "hash": "35e6edf8a59de48a4e9d22b06853f048a8d62c36c56e69badc281d0cd33d7a70"
+    },
+    "indexUuid": "DV5g9x4cR4CUMQw3mhKeIg",
+    "corpusSize": 545,
+    "duplicateSuiteExecutions": 162,
+    "actualDuplicateWeightCorrections": 135,
+    "sameAnchorDifferentAmountUnchangedControls": 27,
+    "duplicateSuiteDocumentComparisons": 30564,
+    "ordinaryParentComparisons": 144,
+    "ordinaryParentDocumentComparisons": 78480,
+    "singleEquivalentOrUnchangedFullComparisons": 36,
+    "filteredComparisons": 3,
+    "maxIdealRepeatedMeanError": 7.947285973752827e-08,
+    "serviceTraceCount": 509,
+    "rawFiles": {
+      "fidelity.json": "e9985d861431003795a00683474fe35eb74b052fc4397addace63f7c77a33963",
+      "service-traces.jsonl": "3e7b8d8d9fab182a5fba96b30bfd0119b0e072e44d4237c8c1b4588bb84f0a35",
+      "oracles.jsonl": "e49512d4e2049c26bfffd2e17a2b4db27ae3f8fe716f29c3cc5bac30c3631f7d",
+      "index-before.json": "ce873c6935b5fe878664ee0c707ce55ddc855139b5b32547d8d6af4f8b644af2",
+      "index-after.json": "ce873c6935b5fe878664ee0c707ce55ddc855139b5b32547d8d6af4f8b644af2"
+    }
+  },
+  "feedback": {
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/multiplicity-feedback-v1",
+    "sources": {
+      "files": 60,
+      "hash": "8fb9a8474d1b35a90114daea6f275eca77ab364dc15f30d2278349e74865cff4"
+    },
+    "datasetHash": "13b02a574d997ad7a04fae92ea4a6abc0aea9dfa58dcd3c6fabbb71eadedf846",
+    "candidates": [
+      {
+        "id": "favorite-utility-numeric-docvalues",
+        "coverage": {
+          "ok": 32,
+          "unsupported": 6,
+          "errors": 0
+        },
+        "agreement": {
+          "queryMacroAgreement": 0.6947916666666667,
+          "completeCaseMacroAgreement": 0.6947916666666667,
+          "assessedCases": 32,
+          "completeCases": 32,
+          "totalCases": 38,
+          "assessedPairs": 234,
+          "totalPairs": 265,
+          "pairCoverage": 0.8830188679245283
+        },
+        "withoutUncertain": {
+          "queryMacroAgreement": 0.6885416666666667,
+          "completeCaseMacroAgreement": 0.6885416666666667,
+          "assessedCases": 32,
+          "completeCases": 32,
+          "totalCases": 38,
+          "assessedPairs": 229,
+          "totalPairs": 260,
+          "pairCoverage": 0.8807692307692307
+        }
+      },
+      {
+        "id": "favorite-utility-numeric-multiplicity",
+        "coverage": {
+          "ok": 32,
+          "unsupported": 6,
+          "errors": 0
+        },
+        "agreement": {
+          "queryMacroAgreement": 0.6947916666666667,
+          "completeCaseMacroAgreement": 0.6947916666666667,
+          "assessedCases": 32,
+          "completeCases": 32,
+          "totalCases": 38,
+          "assessedPairs": 234,
+          "totalPairs": 265,
+          "pairCoverage": 0.8830188679245283
+        },
+        "withoutUncertain": {
+          "queryMacroAgreement": 0.6885416666666667,
+          "completeCaseMacroAgreement": 0.6885416666666667,
+          "assessedCases": 32,
+          "completeCases": 32,
+          "totalCases": 38,
+          "assessedPairs": 229,
+          "totalPairs": 260,
+          "pairCoverage": 0.8807692307692307
+        }
+      }
+    ],
+    "serviceTraceCount": 64,
+    "existingHumanFeedbackDuplicateCases": 0,
+    "changedHumanPairOutcomes": 0,
+    "rawFiles": {
+      "feedback.json": "4693e8bf816673fd9231a4033b7bc6fef478dc2102835a564a592adc635bc55a",
+      "dataset.json": "fc7e9fbbe1464ecb3b31ded31aee4e3a18bd566a51ab0a18e213ac6b591a45d0",
+      "corpus.json": "e76b0c0389e354f29219184ba570e8a0b801ca5ef0182cbfc8c0aa03acd9aa6b",
+      "cases.jsonl": "ac4a00e212f996ca1b10385e93e213c6a7f252438239e3407ec69eda6fcf2fea",
+      "service-traces.jsonl": "bb15c5dcab5a272aa49500d21e7469f9f69fb912a09a12792f3abab5c9435c2e"
+    }
+  },
+  "limitations": [
+    "No service calls or image extraction. Arithmetic is reconstructed from saved native doc values and saved full service responses.",
+    "162 suite executions include135 actual duplicate rewrites and27 unchanged same-anchor/different-amount controls.144 ordinary comparisons are a separate full-ranking parity check.",
+    "Existing human judgments contain no duplicate-target cases. They establish absence of ordinary feedback regression, not user preference for corrected duplicate semantics.",
+    "Correctness on545 records (523real+22synthetic), not a capacity/latency claim. Original16 methods and favorite remain preserved."
+  ],
+  "integrityPassed": true,
+  "errors": [],
+  "auditCodeSha256": "2089d226a2d1f3e12b60d894d34d25fa7ad65e256d133db20fbc8370e0d448f5"
+}

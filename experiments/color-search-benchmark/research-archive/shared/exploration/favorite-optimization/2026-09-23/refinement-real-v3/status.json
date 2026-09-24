@@ -1,0 +1,73 @@
+{
+  "startedAt": "2026-09-23T14:38:50.333812+00:00",
+  "planSha256": "5e084bd15129aea87a56152b625224c5dc2082f78c5bc89897bb8135d2421be5",
+  "phases": [
+    {
+      "id": "points-real",
+      "startedAt": "2026-09-23T14:38:50.334162+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode real --scope full --presets all --encodings numeric --numeric-points true --index color-exploration-favorite-points-real-v2 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-real-v2"
+      ],
+      "finishedAt": "2026-09-23T14:40:55.745536+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "precision-fidelity",
+      "startedAt": "2026-09-23T14:40:55.746124+00:00",
+      "command": [
+        "make",
+        "color-favorite-precision-fidelity",
+        "COLOR_FAVORITE_ARGS=--directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/precision-fidelity"
+      ],
+      "finishedAt": "2026-09-23T14:58:24.934548+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "lean-feedback",
+      "startedAt": "2026-09-23T14:58:24.957744+00:00",
+      "command": [
+        "make",
+        "color-exploration-evaluate",
+        "COLOR_EXP_ARGS=--config experiments/color-search-benchmark/exploration/configs/favorite-optimization-feedback-lean.json"
+      ],
+      "finishedAt": "2026-09-23T15:12:26.804097+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "precision-feedback",
+      "startedAt": "2026-09-23T15:12:26.805184+00:00",
+      "command": [
+        "make",
+        "color-exploration-evaluate",
+        "COLOR_EXP_ARGS=--config experiments/color-search-benchmark/exploration/configs/favorite-precision-feedback.json"
+      ],
+      "finishedAt": "2026-09-23T15:20:49.193230+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "execution-fidelity",
+      "startedAt": "2026-09-23T15:20:49.193785+00:00",
+      "command": [
+        "make",
+        "color-favorite-execution-fidelity",
+        "COLOR_FAVORITE_ARGS=--directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/execution-fidelity"
+      ],
+      "finishedAt": "2026-09-23T15:32:41.393278+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "execution-feedback",
+      "startedAt": "2026-09-23T15:32:41.393772+00:00",
+      "command": [
+        "make",
+        "color-exploration-evaluate",
+        "COLOR_EXP_ARGS=--config experiments/color-search-benchmark/exploration/configs/favorite-execution-feedback.json"
+      ],
+      "finishedAt": "2026-09-23T15:35:13.171653+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T15:35:13.172297+00:00"
+}

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 1,
+  "id": "perceived-red-pagoda-001",
+  "status": "user-judged",
+  "recordedDate": "2026-09-21",
+  "category": "Perceived color",
+  "use": "optional development follow-up selected from search results",
+  "evaluationGroup": "shade-followup-pagoda",
+  "query": {
+    "userText": "red",
+    "preciseHex": "#ff0000",
+    "intent": "The wallpaper should feel red; hue must be more similar to the requested color to count.",
+    "subjectConstraint": null
+  },
+  "interpretationFlags": [
+    "The #FF0000 query is inferred from the ongoing red-query conversation, not explicitly restated in the latest feedback. No amount target is inferred.",
+    "The initial phrase about hue influencing slightly less is superseded by the explicit clarification: hue has to be more similar to count.",
+    "The inline attachment reference order and first/second wording are ambiguous. The preference is resolved by the user descriptions most red versus orange and verified image content, not by inline attachment position.",
+    "The images were selected from ranked search results; this is not blind or independent validation. Exact UI settings for the reported ranks were not supplied."
+  ],
+  "review": {
+    "presentation": "Two images attached by the user after trying the existing prototype. Method controls and search ranks were available; presentation was not randomized.",
+    "selection": "User selected perceived ranking failures from existing search results.",
+    "methodNamesVisible": true,
+    "computedRanksVisible": true,
+    "computedScoresVisible": "not established",
+    "blinded": false,
+    "relevanceScope": "One explicit relative preference. No numerical relevance grades, score gap, required final rank, or absolute acceptability labels were provided."
+  },
+  "examples": [
+    {
+      "label": "Pagoda",
+      "wallpaperId": "madness-wallhaven-ogg7ql",
+      "filename": "corpus/wallpapermadness/wallhaven-ogg7ql.png",
+      "thumbnail": "corpus/expanded-thumbnails/madness-wallhaven-ogg7ql.jpg",
+      "sha256": "c27b283be1c3fdad1d4660d837410854921e92fb14161f24f6b48285841be5f2",
+      "width": 2560,
+      "height": 1440,
+      "source": {
+        "kind": "user-provided-archive",
+        "archive": "/home/rafaeltab/wallpapermadness.zip",
+        "archiveSha256": "71ff6182e5fc8269319a02b5e73a5fb1682b0bd739a072c10a47d7414141ea01",
+        "member": "wallhaven-ogg7ql.png",
+        "license": "unknown",
+        "bytes": 4509627,
+        "compressedBytes": 4509627,
+        "crc32": 1641922295
+      },
+      "attachment": {
+        "path": "/home/rafaeltab/.t3/userdata/attachments/2e3d9373-52f7-4563-8387-0de843690bfe-ad207676-427b-444a-9610-f40b55003de1.png",
+        "sha256": "e9f4c07280646499083164582819d13fbfd59867425b977e72175378456c392d",
+        "width": 2560,
+        "height": 1440,
+        "bytes": 5308483
+      },
+      "identification": {
+        "report": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/shade-pair/2026-09-21/pagoda-identification/identification.json",
+        "sha256": "e480f85d01889f2ea8402318f0a76150b804d9f9347f505ea35bb5cf06150840",
+        "method": "Every real corpus thumbnail compared at auto-oriented sRGB64x64 fill RGB, followed by original-source verification. Errors use byte-valued RGB, 0..255.",
+        "sourceComparison": {
+          "meanAbsoluteRgbError": 0,
+          "rootMeanSquareRgbError": 0
+        }
+      }
+    },
+    {
+      "label": "Orange sky",
+      "wallpaperId": "wallpaper-031",
+      "filename": "corpus/wallpaper-031.jpg",
+      "thumbnail": "corpus/expanded-thumbnails/wallpaper-031.jpg",
+      "sha256": "7ad700c6e4bfb0799eda39221bf0c0738650c5a891056d36956bb46788b8496a",
+      "width": 1920,
+      "height": 1080,
+      "source": {
+        "url": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_on_a_road_with_orange_clouds_in_the_sky.jpg",
+        "page": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_on_a_road_with_orange_clouds_in_the_sky.jpg",
+        "license": "unknown"
+      },
+      "attachment": {
+        "path": "/home/rafaeltab/.t3/userdata/attachments/2e3d9373-52f7-4563-8387-0de843690bfe-ef560a1f-9f8f-4c2a-9afb-83a34754597d.png",
+        "sha256": "1a6a2746aa8f68f1f066360770d31fc447422cfc726ef61dc0e820962f9c6bdd",
+        "width": 640,
+        "height": 360,
+        "bytes": 311615
+      },
+      "identification": {
+        "report": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/shade-pair/2026-09-21/orange-sky-identification/identification.json",
+        "sha256": "b7cd89fdd0c3e315f3d2c55f59275a5e038c22440d7c408d40bd31c8cb4e99ec",
+        "method": "Every real corpus thumbnail compared at auto-oriented sRGB64x64 fill RGB, followed by original-source verification. Errors use byte-valued RGB, 0..255.",
+        "sourceComparison": {
+          "meanAbsoluteRgbError": 0.7685546875,
+          "rootMeanSquareRgbError": 1.2604381885214893
+        }
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "pagoda-over-orange-sky",
+      "type": "overall-perceived-redness-pair",
+      "source": "user-feedback-001",
+      "orderedWallpaperIds": [
+        "madness-wallhaven-ogg7ql",
+        "wallpaper-031"
+      ],
+      "basis": "The user describes the pagoda as the most red image and reports that the orange image ranks above it; clarifies that hue must be more similar to count.",
+      "scope": "This pair for the ongoing red query only. No strict ranking relative to any other wallpaper is established.",
+      "tiesReported": false
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-feedback-001",
+      "author": "user",
+      "text": "This is significantly better already. I do think we can let hue influence slightly less too though.\n\nI have attached two images. [Image: image.png; ref=image_14844948-bd58-44a8-818a-c1f53a6dfe84]\n\nThe first one (the most red one) was ranked 93, whereas the second one (orange) was ranked 61.\n\nI tested this against various settings, only way to reverse them is to set the quality influence to 3, but that also messes up other options.\n\n[Image: image.png; ref=image_5aa72f3a-ce78-467c-8e73-5fa34adc9b95]"
+    },
+    {
+      "id": "user-feedback-002",
+      "author": "user",
+      "text": "as in hue has to be more similar to count, is what I am trying to say."
+    }
+  ],
+  "reportedBehavior": {
+    "source": "user-feedback-001",
+    "ranks": {
+      "madness-wallhaven-ogg7ql": 93,
+      "wallpaper-031": 61
+    },
+    "settings": "Exact settings unknown; user reports trying various settings.",
+    "qualityInfluenceObservation": "The user reports 3\u00d7 can reverse this pair, while disrupting other options; this is reported behavior, not a universal threshold or a desired default."
+  },
+  "notes": [
+    "A single explicit human preference is recorded. No additional pairs, score margins, numeric confidence, image percentages or absolute relevance grades are inferred.",
+    "This follow-up is opt-in. The default legacy dataset remains 37 cases; including this record gives 38 cases and changes the evaluation dataset fingerprint.",
+    "Report this selected failure case separately when comparing against historical 37-case accuracy. Its result is development evidence and is not a held-out generalization test.",
+    "Source-image hashes and attachment hashes differ because the attachments use different encodings or sizes; original-source visual comparison evidence is retained. The pagoda comparison has zero sampled RGB error; the orange-sky comparison has nonzero small sampled error.",
+    "The source images and attachment files remain outside the repository. Their hashes and identification records are recorded here; no image bytes are committed.",
+    "Shared source wallpaper-031 connects this follow-up to earlier development cases for any later split design. Earlier human annotations and default dataset membership remain unchanged.",
+    "User-reported ranks are not asserted as an exact reproducible configuration. Separate machine replays belong in experiment artifacts, not in human labels."
+  ]
+}

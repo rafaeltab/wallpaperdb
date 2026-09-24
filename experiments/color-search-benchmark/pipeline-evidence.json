@@ -1,0 +1,572 @@
+{
+  "startedAt": "2026-09-15T22:31:33.311Z",
+  "completedAt": "2026-09-15T22:31:40.179Z",
+  "durationMs": 6867.601574,
+  "corpusManifestSha256": "74574cc2fa3cd32a0eac5d7fd6831dafa72447f7c5cc92c94b29b88c480c58d8",
+  "opensearchVersion": "2.11.0",
+  "natsVersion": "2.10.29",
+  "opensearchUrl": "http://127.0.0.1:19215",
+  "natsUrl": "nats://127.0.0.1:14223",
+  "indexes": {
+    "cosine": "color-benchmark-cosine",
+    "l2": "color-benchmark-l2"
+  },
+  "wallpapers": 100,
+  "extracted": 100,
+  "projected": 100,
+  "checksumVerified": 100,
+  "streamMessages": 200,
+  "consumers": [
+    {
+      "name": "color-extractor-wallpaper-uploaded-consumer",
+      "delivered": 100,
+      "pending": 0,
+      "ackPending": 0,
+      "redelivered": 0
+    },
+    {
+      "name": "gateway-wallpaper-colors-extracted",
+      "delivered": 100,
+      "pending": 0,
+      "ackPending": 0,
+      "redelivered": 0
+    }
+  ],
+  "extractionMatchesProjection": true,
+  "cosineAndL2DocumentsIdentical": true,
+  "productionRepositoryNativeScoreChecks": [
+    {
+      "color": "#FF0000",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 1.060396144225706e-7,
+      "topFive": [
+        {
+          "id": "wallpaper-038",
+          "score": 0.7556486
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.7320838
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.72264665
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.7189684
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.713176
+        }
+      ]
+    },
+    {
+      "color": "#FF0000",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 7.920139183381636e-9,
+      "topFive": [
+        {
+          "id": "wallpaper-037",
+          "score": 0.05668999
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.056496467
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.05649159
+        },
+        {
+          "id": "wallpaper-049",
+          "score": 0.05639326
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.056296173
+        }
+      ]
+    },
+    {
+      "color": "#FF0000",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 9.887327967472714e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.94546
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.9450248
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.944329
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.9410221
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.93901145
+        }
+      ]
+    },
+    {
+      "color": "#FFFF00",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 7.577003335867971e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-069",
+          "score": 0.7538425
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.7410706
+        },
+        {
+          "id": "wallpaper-003",
+          "score": 0.73072344
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.7269445
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.7163909
+        }
+      ]
+    },
+    {
+      "color": "#FFFF00",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 1.0960145263583243e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-003",
+          "score": 0.099971995
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.09810921
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.0979461
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.09725213
+        },
+        {
+          "id": "wallpaper-073",
+          "score": 0.097184785
+        }
+      ]
+    },
+    {
+      "color": "#FFFF00",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 8.148282593101186e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.945769
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.9414926
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.9338907
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.93256545
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.92835575
+        }
+      ]
+    },
+    {
+      "color": "#00FFFF",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 7.242342225932674e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-069",
+          "score": 0.7595811
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.7507571
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.726455
+        },
+        {
+          "id": "wallpaper-003",
+          "score": 0.7186125
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.7180902
+        }
+      ]
+    },
+    {
+      "color": "#00FFFF",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 8.535157511313507e-9,
+      "topFive": [
+        {
+          "id": "wallpaper-003",
+          "score": 0.0667836
+        },
+        {
+          "id": "wallpaper-010",
+          "score": 0.06607803
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.06605434
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.065804444
+        },
+        {
+          "id": "wallpaper-052",
+          "score": 0.06572796
+        }
+      ]
+    },
+    {
+      "color": "#00FFFF",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 9.503560116641552e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.9468487
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.9434157
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.937493
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.93356425
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.9331933
+        }
+      ]
+    },
+    {
+      "color": "#0000FF",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 8.180010757641298e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-038",
+          "score": 0.76035017
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.72685707
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.71859866
+        },
+        {
+          "id": "wallpaper-039",
+          "score": 0.7182872
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.71068263
+        }
+      ]
+    },
+    {
+      "color": "#0000FF",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 1.2228964951788157e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-032",
+          "score": 0.07018489
+        },
+        {
+          "id": "wallpaper-039",
+          "score": 0.07010424
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.06949704
+        },
+        {
+          "id": "wallpaper-036",
+          "score": 0.06938699
+        },
+        {
+          "id": "wallpaper-033",
+          "score": 0.069375366
+        }
+      ]
+    },
+    {
+      "color": "#0000FF",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 8.345640567508639e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.94723845
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.94600123
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.94496953
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.939706
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.93574536
+        }
+      ]
+    },
+    {
+      "color": "#000000",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 9.494451047586949e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-084",
+          "score": 0.74197686
+        },
+        {
+          "id": "wallpaper-023",
+          "score": 0.73144007
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.72340167
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.705468
+        },
+        {
+          "id": "wallpaper-061",
+          "score": 0.7038181
+        }
+      ]
+    },
+    {
+      "color": "#000000",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 1.2307673102895933e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-023",
+          "score": 0.09561984
+        },
+        {
+          "id": "wallpaper-005",
+          "score": 0.09384218
+        },
+        {
+          "id": "wallpaper-065",
+          "score": 0.09365083
+        },
+        {
+          "id": "wallpaper-001",
+          "score": 0.09339348
+        },
+        {
+          "id": "wallpaper-063",
+          "score": 0.09325425
+        }
+      ]
+    },
+    {
+      "color": "#000000",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 8.719176514127014e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.9427556
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.9421699
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.94125855
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.92688626
+        },
+        {
+          "id": "wallpaper-061",
+          "score": 0.92242634
+        }
+      ]
+    },
+    {
+      "color": "#FFFFFF",
+      "variant": "cosinesimil",
+      "total": 100,
+      "maxScoreError": 7.547057589984973e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-069",
+          "score": 0.77333814
+        },
+        {
+          "id": "wallpaper-003",
+          "score": 0.7581092
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.7577977
+        },
+        {
+          "id": "wallpaper-064",
+          "score": 0.734773
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.7281983
+        }
+      ]
+    },
+    {
+      "color": "#FFFFFF",
+      "variant": "l2-raw-query",
+      "total": 100,
+      "maxScoreError": 9.985215487784416e-9,
+      "topFive": [
+        {
+          "id": "wallpaper-003",
+          "score": 0.083657354
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.08155428
+        },
+        {
+          "id": "wallpaper-010",
+          "score": 0.081528924
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.08142587
+        },
+        {
+          "id": "wallpaper-051",
+          "score": 0.08139784
+        }
+      ]
+    },
+    {
+      "color": "#FFFFFF",
+      "variant": "l2-normalized-query",
+      "total": 100,
+      "maxScoreError": 6.941610974919854e-8,
+      "topFive": [
+        {
+          "id": "wallpaper-083",
+          "score": 0.94536656
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.94426227
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.9360726
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.9337353
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.9318087
+        }
+      ]
+    }
+  ],
+  "forwardPaginationUniqueDocumentsAcrossTwoPages": 20,
+  "boundaries": {
+    "real": [
+      "SharpHistogramProvider",
+      "HsvEmbeddingStrategy",
+      "WallpaperUploadedPublisher",
+      "WallpaperUploadedConsumerService",
+      "ColorExtractionProcessor",
+      "EventsService",
+      "WallpaperColorsExtractedPublisher",
+      "NATS JetStream",
+      "WallpaperColorsExtractedConsumer",
+      "WallpaperRepository",
+      "ColorSortService",
+      "IndexManagerService",
+      "OpenSearch 2.11.0"
+    ],
+    "substituted": [
+      "ImageReader reads checksum-verified local files instead of S3",
+      "Isolated physical index names"
+    ],
+    "bypassed": [
+      "Upload HTTP/auth/validation",
+      "Gateway uploaded-event base projection (seeded via real repository)",
+      "Gateway HTTP/GraphQL transport",
+      "Redis",
+      "OpenTelemetry exporter"
+    ]
+  }
+}

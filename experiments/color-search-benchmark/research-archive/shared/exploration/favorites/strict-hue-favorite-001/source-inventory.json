@@ -1,0 +1,2546 @@
+{
+  "schemaVersion": 1,
+  "hashAlgorithm": "SHA-256 of file bytes",
+  "files": {
+    "Makefile": {
+      "sha256": "09910ad77805f9d243e3c10a8b0d5dc9a477a800aa245e176b0496932701fff7",
+      "bytes": 62483
+    },
+    "apps/color-extractor/package.json": {
+      "sha256": "5b690f29e402cda6eaba18998a75a6b125a691ae7aae75c3b093d63079e00621",
+      "bytes": 2152
+    },
+    "apps/color-extractor/src/services/hsv-embedding-strategy.ts": {
+      "sha256": "25e657bb34e139eb990d3434939e671d4b82ec8c9f05b4e126f60eb43807fc55",
+      "bytes": 2167
+    },
+    "apps/color-extractor/src/services/sharp-histogram-provider.ts": {
+      "sha256": "939706b2063b47e5157983d95a8c4cb7b34c7c2345b737525444455ea3e2627a",
+      "bytes": 1256
+    },
+    "apps/gateway/package.json": {
+      "sha256": "489c4ae59a04e3a67040f701a526a900696969e3e2be7e6a66413073d4e766de",
+      "bytes": 2141
+    },
+    "apps/gateway/src/services/color-sort.service.ts": {
+      "sha256": "43a2b6ba098b20cd4519d83567c0ef64a1fd2914e411ec642596de2777f01b1b",
+      "bytes": 6987
+    },
+    "experiments/color-search-benchmark/AUDIT.md": {
+      "sha256": "90abb2c4699165042a86f52c6e40524658924c45e1672ee4a66fbb8266ae3781",
+      "bytes": 12946
+    },
+    "experiments/color-search-benchmark/COLOR-QUERY-GOALS.md": {
+      "sha256": "99a2077e585dbc9c3eea718c902a73a4263680a49c2e452cac4bc7db40a5465d",
+      "bytes": 20502
+    },
+    "experiments/color-search-benchmark/CORPUS-STORAGE.md": {
+      "sha256": "7a0e5913c318af8a907191525bfb17db4590df8fcf55c37936859c33362dda64",
+      "bytes": 5270
+    },
+    "experiments/color-search-benchmark/CORPUS.md": {
+      "sha256": "aa29e7619f95bf87bbdbe05ac2e75ec28aa5ee45d5a46d6e9d5317f167150ab5",
+      "bytes": 7669
+    },
+    "experiments/color-search-benchmark/EVALUATION-PHASE.md": {
+      "sha256": "c8a3c032bce78e2c8945f8a619ba7ab60d588cc6f97136678761f13d150a7964",
+      "bytes": 24889
+    },
+    "experiments/color-search-benchmark/EVALUATION-TOOLING.md": {
+      "sha256": "a3d92f7f3600421f9df769a1bcf54930182504effcb56de3ff37ec0a2ee55f50",
+      "bytes": 4650
+    },
+    "experiments/color-search-benchmark/FINDINGS.md": {
+      "sha256": "a40b5f9e2083a35b7ecc91f28b1193f3e0f930e309c8940ee6192edadbfdf34f",
+      "bytes": 13639
+    },
+    "experiments/color-search-benchmark/GLOBAL-ACCURACY.md": {
+      "sha256": "f54a1956669b609ed78477f026e6dccc20259d184afb6702ff3671af796b3bd8",
+      "bytes": 3835
+    },
+    "experiments/color-search-benchmark/GLOBAL-BOUNDED.md": {
+      "sha256": "99fb0aae6e87f53e8dc42775d0749015c513757babdd16d95148fb3a3728ab64",
+      "bytes": 10875
+    },
+    "experiments/color-search-benchmark/GLOBAL-DYNAMIC.md": {
+      "sha256": "0002a61e1db54a9e731dc608b4910c02ba1a3e809a6505ca04c1325627387f09",
+      "bytes": 9815
+    },
+    "experiments/color-search-benchmark/GLOBAL-FINDINGS.md": {
+      "sha256": "fb9e3c1bff3fdf9bedd964f7b12d4a9565bff8b8211e8a7e57bd35fe97214524",
+      "bytes": 15078
+    },
+    "experiments/color-search-benchmark/GLOBAL-JOINT.md": {
+      "sha256": "110d266eb95c834b58c54b130408530bf088dc57f2a3ad5dbcbf052953ef8128",
+      "bytes": 9377
+    },
+    "experiments/color-search-benchmark/GLOBAL-MEASUREMENTS.md": {
+      "sha256": "3ff7beb3d95d06d1d6cf10993c8ffd0f7bced9a11aa9b30c9cc2e4cac4dcc70a",
+      "bytes": 18483
+    },
+    "experiments/color-search-benchmark/GLOBAL-MULTI-DESIGN.md": {
+      "sha256": "f96d317d286365301e5399661d99fa7b9595688d4ae56934062134714c9f3134",
+      "bytes": 7791
+    },
+    "experiments/color-search-benchmark/GLOBAL-MULTI-FAST.md": {
+      "sha256": "5c346df4182e7742e97d4cf949bffd259cd3d7eed08c3e888a702cf8d048bf09",
+      "bytes": 5120
+    },
+    "experiments/color-search-benchmark/GLOBAL-MULTI.md": {
+      "sha256": "178669b3d95c9fe3aac84870aa1584467f958f73abdb16345843d08ea0c8c652",
+      "bytes": 10798
+    },
+    "experiments/color-search-benchmark/GLOBAL-NATIVE.md": {
+      "sha256": "4dfa24e1bd2fca594138ef44062357b2ead290fae68caa62ac4c6e993e82b43b",
+      "bytes": 9227
+    },
+    "experiments/color-search-benchmark/GLOBAL-OPTIONS.md": {
+      "sha256": "b2a1559ae96c3093aeed4c84caa9a5fba230d16eccc617479b8009654a5f0d38",
+      "bytes": 29243
+    },
+    "experiments/color-search-benchmark/GLOBAL-PLANNER.md": {
+      "sha256": "7cab6de831fa4dbdc0660bc1e5d1c595a48b1536d989ca6642c9b33d4b91c674",
+      "bytes": 8442
+    },
+    "experiments/color-search-benchmark/GLOBAL-SAMPLING.md": {
+      "sha256": "14382c40a378fd903dd068cee18fdf9c65a8d460872f172ca401e6df2e171541",
+      "bytes": 4297
+    },
+    "experiments/color-search-benchmark/GLOBAL-UI.md": {
+      "sha256": "8fc2a1d018c3b76b92f024f9f84a3d23df10823ee04062270e5589b15ae2f6cc",
+      "bytes": 7854
+    },
+    "experiments/color-search-benchmark/GLOBAL-VARIED.md": {
+      "sha256": "f8832744ed7e0d430f3ad559c8e2e7ec27878830b4ba9e112fba188693fbb7b2",
+      "bytes": 6037
+    },
+    "experiments/color-search-benchmark/GLOBAL-WORKLOG.md": {
+      "sha256": "3bda6fcd9ed5a877d2aef1e60e70e8490829dc5024073940bbdeeeb29ace8c9d",
+      "bytes": 91978
+    },
+    "experiments/color-search-benchmark/HISTORY.md": {
+      "sha256": "d90deb80306db5ded4bf641b2ea2ebe7159921bec0be6f14e9bf3183f4f4a0d6",
+      "bytes": 10394
+    },
+    "experiments/color-search-benchmark/METHOD-CHOICE-DISCUSSION.md": {
+      "sha256": "1f8467b8d457552ab820b698c64654ccefc70ae6f7d56ae7471bd4bbf88dec3d",
+      "bytes": 21118
+    },
+    "experiments/color-search-benchmark/METHOD-OPTIONS-OPENSEARCH-REVIEW.md": {
+      "sha256": "f37fcbd836eab8c17846cf402934639770f8e5d6d4ac4ad305853bd805407e0e",
+      "bytes": 11834
+    },
+    "experiments/color-search-benchmark/METHOD-OPTIONS-PERCEPTION-REVIEW.md": {
+      "sha256": "799466b9278df98cc098d11ff290bc930614edb19af8f9187370bb7c05bb0958",
+      "bytes": 19019
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-BROWSER-CHECK.md": {
+      "sha256": "3e91901c50d1fd3d7dba3466e7b6109318253eda1ae086ba2955ff7ddf71031f",
+      "bytes": 4185
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-DESIGN.md": {
+      "sha256": "e17afcbb62b460d9a3d32505d3960374a44c948f17e114639229f5c248d9f431",
+      "bytes": 10605
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-EVALUATION.md": {
+      "sha256": "e04189458e4b61d84143e3a5e27b08eb8f55c059ba1e7a922d0bd59c8643b242",
+      "bytes": 9470
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-FINDINGS.md": {
+      "sha256": "905fa45c4018bed3e01c2207978b68906c25e2df01bfc1e7e3f7d2f25eab36ee",
+      "bytes": 8145
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-README.md": {
+      "sha256": "3ac8f8bd9efd5f661e988bfe4a51b64733cf5ddc079e550a11d6c9dd1572a725",
+      "bytes": 5227
+    },
+    "experiments/color-search-benchmark/PROPORTIONS-WORKLOG.md": {
+      "sha256": "f6c665459647fcbdc3b2337be2849007c5ab908e9f63aa7a453628ba3c87043c",
+      "bytes": 7187
+    },
+    "experiments/color-search-benchmark/RANGES-BROWSER-CHECK.md": {
+      "sha256": "7a058909d508b170906371e03b16c626534116a8b6fd8070a67268d0efaf4ba6",
+      "bytes": 5240
+    },
+    "experiments/color-search-benchmark/RANGES-DESIGN.md": {
+      "sha256": "0e35f4cf9bc61dcf5f6156968dc63746293c1561605d57606294ded044080a64",
+      "bytes": 10240
+    },
+    "experiments/color-search-benchmark/RANGES-EVALUATION.md": {
+      "sha256": "3d59dfbe38c845ac91b1e50fc0e497d3e761b5154a1a87b17261621ed1025dd4",
+      "bytes": 5130
+    },
+    "experiments/color-search-benchmark/RANGES-FINDINGS.md": {
+      "sha256": "86fae9edcb5025c75b12df301a058686e49deaa9f601b7caed0c328235a6d456",
+      "bytes": 8358
+    },
+    "experiments/color-search-benchmark/RANGES-README.md": {
+      "sha256": "a42575213d94f599a702a71cb1774f3244906fc9899830af14d453dbf9352b00",
+      "bytes": 5116
+    },
+    "experiments/color-search-benchmark/RANGES-SCALING.md": {
+      "sha256": "7ab78b78d620ba62182fc338c4091c51e56f9a920cf6e12c4f39c9d2977a636d",
+      "bytes": 25512
+    },
+    "experiments/color-search-benchmark/RANGES-WORKLOG.md": {
+      "sha256": "e3e90da043e82d8b5e80ef4358048488df544d3152ce5c283183f808ab73b4b3",
+      "bytes": 5266
+    },
+    "experiments/color-search-benchmark/README.md": {
+      "sha256": "4c212eb5055f014fa53fe89874b32267d52106de044c7e5848df174a8582d0fb",
+      "bytes": 8548
+    },
+    "experiments/color-search-benchmark/RESEARCH.md": {
+      "sha256": "d76bcae53d7be8e71c930f66f8e4ba277ab095a6f232fa45c8918f7a1232ca6e",
+      "bytes": 15066
+    },
+    "experiments/color-search-benchmark/VISUAL-BLIND.md": {
+      "sha256": "0f84758820568f8fb1e99dc48623578f528a0e6b9945a2471460cd7324de6352",
+      "bytes": 9385
+    },
+    "experiments/color-search-benchmark/VISUAL-RESULTS.md": {
+      "sha256": "20c09ab5c46e60f4560d8e650b961fbca9afeb96a9c74b616ae3cbd845f40877",
+      "bytes": 1837
+    },
+    "experiments/color-search-benchmark/WORKLOG.md": {
+      "sha256": "4d82565df263bfff1b1a5a4cb990b65fc9ad4a29e853e6900031372b4c1df015",
+      "bytes": 8095
+    },
+    "experiments/color-search-benchmark/analysis.json": {
+      "sha256": "3626a8b270bfb803d1f05916472b134dfbe2122d9435004fbbacbc4768a79d9c",
+      "bytes": 58886
+    },
+    "experiments/color-search-benchmark/analyze.mjs": {
+      "sha256": "0e997a46a44635e80c8ec20d9533d8da523e73198fa4a3ef1794a961ca59a5ee",
+      "bytes": 4361
+    },
+    "experiments/color-search-benchmark/benchmark.ts": {
+      "sha256": "07c253a5ba9593495e5f67670a05ebb9f9dad591ffd3c863e962cd36387d227f",
+      "bytes": 14716
+    },
+    "experiments/color-search-benchmark/compose.yml": {
+      "sha256": "21385da3f88423fa1e2559ae9faecba3008a40d4f6fafbf0d4ede73082a51741",
+      "bytes": 523
+    },
+    "experiments/color-search-benchmark/corpus-manifest.json": {
+      "sha256": "74574cc2fa3cd32a0eac5d7fd6831dafa72447f7c5cc92c94b29b88c480c58d8",
+      "bytes": 116307
+    },
+    "experiments/color-search-benchmark/corpus/selection-audit.json": {
+      "sha256": "32d7048bfdd5fbb672d17489621791c7f48568e4774f5c6cd3b0193a9ca13ca0",
+      "bytes": 320450
+    },
+    "experiments/color-search-benchmark/diagnose.ts": {
+      "sha256": "dc5669a3db9f6ceb31634c8fafce37bf0807c510a2deb696dba983da74f23e0f",
+      "bytes": 4549
+    },
+    "experiments/color-search-benchmark/diagnostics.json": {
+      "sha256": "c4fb110ef9372f0c11e0e4ce862b9a62655c989a6c0ecabf4df3d9cf7bf5e4b5",
+      "bytes": 35797
+    },
+    "experiments/color-search-benchmark/downloader.mjs": {
+      "sha256": "943a45c24f1cda5e9dcbd489c1848c7a9a76d48aab47de16cb74cb86c82f3e7e",
+      "bytes": 12702
+    },
+    "experiments/color-search-benchmark/evaluation/BATCH-REVIEW.md": {
+      "sha256": "c215993a7193a5306e43f84367965ae32dd6c6954532526bb0942f2c4bd97c3c",
+      "bytes": 6371
+    },
+    "experiments/color-search-benchmark/evaluation/CASES.md": {
+      "sha256": "8fd48a955358939aeb7ce1d9457e2ee08b706876e2d15ff4b6c7a0512f376b6f",
+      "bytes": 16687
+    },
+    "experiments/color-search-benchmark/evaluation/batch-001-results.json": {
+      "sha256": "c7a2ddbe4c6741cc3aacc6ca35f27e595614c2cf1cdfb0fbbe17e8f8a49fe98a",
+      "bytes": 87424
+    },
+    "experiments/color-search-benchmark/evaluation/batch-001-results.md": {
+      "sha256": "b8e2db3b71b2d540313be0083bf42ce0c78182d1eb4310ada6845dc877969503",
+      "bytes": 7264
+    },
+    "experiments/color-search-benchmark/evaluation/batch-001.json": {
+      "sha256": "eb1a95218944b9ff7b11be11e87537c6e86bc4d409440377222a249dfa1eb132",
+      "bytes": 103438
+    },
+    "experiments/color-search-benchmark/evaluation/batch-001.md": {
+      "sha256": "9f742bb2c52cddaa04150135565289ed7e35758ec92591585bb38240c17c0c80",
+      "bytes": 12249
+    },
+    "experiments/color-search-benchmark/evaluation/batch-review.css": {
+      "sha256": "40827ad868766f1be31eeb3c3b933b351f06abd199081cf3e8e0173d0d9f0f9b",
+      "bytes": 9933
+    },
+    "experiments/color-search-benchmark/evaluation/batch-review.html": {
+      "sha256": "3bf1088d5e0996cda6f944e720f7cbb96824448c1dabd89adc93529fd109f4ce",
+      "bytes": 1927
+    },
+    "experiments/color-search-benchmark/evaluation/batch-review.mjs": {
+      "sha256": "e87e0593241dcce1d7d9ebb137802f408fee16656ff8d081d476c87c18bc5a69",
+      "bytes": 26994
+    },
+    "experiments/color-search-benchmark/evaluation/cases.json": {
+      "sha256": "6c223d0daf8fd624a7ca72663c12f92285fe33366d890114edadef8e8ffccb22",
+      "bytes": 2974
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-001.html": {
+      "sha256": "bb8fcf9e1ffe47fd2f4946d442615cf4a8aecd498f878855dd55147d3942c633",
+      "bytes": 5805
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-001.json": {
+      "sha256": "4e891d27ae41d7576383a0a19421df06b50e686d30b3c8ce3aeb61c65a2cc021",
+      "bytes": 13446
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-001.md": {
+      "sha256": "751e6625ea7ebd2da0cb8f9e2eb799044cc3d403a663197bd9c9e52897305a2b",
+      "bytes": 5144
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-002.html": {
+      "sha256": "274b31b6078e1896e3c81049d573f69f6eb197e99bfa6754c52b50c5ceca661f",
+      "bytes": 5023
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-002.json": {
+      "sha256": "1be26bfc44de7c76838f9dc6639db3c3c59193d99faeb9813bc7d5e4e30d3522",
+      "bytes": 10670
+    },
+    "experiments/color-search-benchmark/evaluation/combination-gray-red-002.md": {
+      "sha256": "ac2dc9a0c6d59ed471b8cd8899aa91a92fb89f40ce1fe5d0cb5ec5b867881d10",
+      "bytes": 5200
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-001.html": {
+      "sha256": "99d250ee9e25859288f5a78f6bd5d523936240a22897153c82f3aed924686e3f",
+      "bytes": 5205
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-001.json": {
+      "sha256": "b2db4c992da0642f83adda818b3e93c6b352997383684a43b13c7341248df696",
+      "bytes": 17826
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-001.md": {
+      "sha256": "347bf02c34e2884c258cb28d1dbc84fc505df790c0216fdcc622cd0d38dcc17b",
+      "bytes": 6300
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-001.html": {
+      "sha256": "6d6e8558c19fbbe0c069095d9a6bac002607a30dad10ff27ebead0682e1d9485",
+      "bytes": 5195
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-001.json": {
+      "sha256": "c9206ec3f20407ddfdb9a1b326101d581551d3b4578845f512ef2f4e13e9869d",
+      "bytes": 12682
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-001.md": {
+      "sha256": "71a573f609ce2e88f121202a84a1df568a668ea9c852a5e48c2444e08254ffd0",
+      "bytes": 4460
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-002.html": {
+      "sha256": "282f2b0224f9856db6ebfbb1c9f343ed5ad0aa799b8c4fc69368318ef76206d2",
+      "bytes": 5217
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-002.json": {
+      "sha256": "f27232f41416320c4f90e1f1f600750f54249efb133d89dd74a8da5618f09734",
+      "bytes": 12558
+    },
+    "experiments/color-search-benchmark/evaluation/composition-green-red-real-002.md": {
+      "sha256": "989285ca7baedaed608c0b54f292fc20206f0f94a8f39801086a27a687ebb344",
+      "bytes": 3429
+    },
+    "experiments/color-search-benchmark/evaluation/loop/EXTENSIONS.md": {
+      "sha256": "a0fefcbcabfbe957629677d481c79c3148b08a3c08952c761e63478782abfe36",
+      "bytes": 5927
+    },
+    "experiments/color-search-benchmark/evaluation/loop/README.md": {
+      "sha256": "d64e1bae36180f81bcb2081b1a761e5f6b9982719d369e610973ab2896691b5a",
+      "bytes": 12475
+    },
+    "experiments/color-search-benchmark/evaluation/loop/VALIDATION.md": {
+      "sha256": "13b41e5a71d609fa025a45096a1baeddedda0c55151d0d8968b145616c42899d",
+      "bytes": 5630
+    },
+    "experiments/color-search-benchmark/evaluation/loop/adapters.mjs": {
+      "sha256": "6b84a9683c1304dcf38bb94f4c1c08723030ed4813976e04657b0f1bb2db72cd",
+      "bytes": 21484
+    },
+    "experiments/color-search-benchmark/evaluation/loop/adapters.test.mjs": {
+      "sha256": "72b1950e6b207d090258fb4edcd87c6463b15f92a771674876fee9ce7113aab3",
+      "bytes": 9827
+    },
+    "experiments/color-search-benchmark/evaluation/loop/cli.mjs": {
+      "sha256": "c5c924dffde97f0cdee672377991809bedefd01a4195c8bcc4a217b87ef1b69c",
+      "bytes": 2724
+    },
+    "experiments/color-search-benchmark/evaluation/loop/configs/initial.json": {
+      "sha256": "1bf85fb519ee0c7042f6ddfca46e5d48e2d6b7829ae934a5f390d5d7f268acd2",
+      "bytes": 912
+    },
+    "experiments/color-search-benchmark/evaluation/loop/configs/opensearch-smoke.json": {
+      "sha256": "e06392132f19e6fb78680546d26fbd71ffbe6b9bb1f6debf8f68066bca230e96",
+      "bytes": 1235
+    },
+    "experiments/color-search-benchmark/evaluation/loop/dataset.mjs": {
+      "sha256": "9cb2e8ae1927fe4044c4d5d083f7512714d7eead77c27a67c1cc81d3a1ca5f10",
+      "bytes": 10518
+    },
+    "experiments/color-search-benchmark/evaluation/loop/dataset.test.mjs": {
+      "sha256": "dcfa49889b8847ced1378b5b67e4cbd0a7bef89661b9b62a967515b2fce63fca",
+      "bytes": 7672
+    },
+    "experiments/color-search-benchmark/evaluation/loop/metrics.mjs": {
+      "sha256": "203881cc4466c53c16ccc22460f522b323fc1dc2569e83f7d1d45dee0139a69a",
+      "bytes": 6049
+    },
+    "experiments/color-search-benchmark/evaluation/loop/metrics.test.mjs": {
+      "sha256": "8721aa54d1e89f4c43e45ec2d868f33a1c86def12c8bfe15fac906cb8681f7b1",
+      "bytes": 4352
+    },
+    "experiments/color-search-benchmark/evaluation/loop/report.mjs": {
+      "sha256": "4739672761740450a1ce9e3325e1db427cdae8dd98fcf4f17c40c85200b1d01e",
+      "bytes": 31914
+    },
+    "experiments/color-search-benchmark/evaluation/loop/report.test.mjs": {
+      "sha256": "09fd9eef5d316f445372a1bb521468833bc175dd6ad7d9d939e401e75b327094",
+      "bytes": 14767
+    },
+    "experiments/color-search-benchmark/evaluation/loop/runner.mjs": {
+      "sha256": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+      "bytes": 19539
+    },
+    "experiments/color-search-benchmark/evaluation/loop/runner.test.mjs": {
+      "sha256": "583f6fd66818fc6acab86fb5777320ec509acc63b41358af8922d74bb2726bf8",
+      "bytes": 9704
+    },
+    "experiments/color-search-benchmark/evaluation/loop/server.mjs": {
+      "sha256": "43e1f2b5506784b5bde2e7eeec1fd59d8f5ac77702d420f012762c28a042cba8",
+      "bytes": 7715
+    },
+    "experiments/color-search-benchmark/evaluation/loop/server.test.mjs": {
+      "sha256": "f21fc2ccba048067fc782a66e7b0df208594c61043a6a53b05e2ac46e1b88a75",
+      "bytes": 6316
+    },
+    "experiments/color-search-benchmark/evaluation/perceived-red-001.html": {
+      "sha256": "cdb327df60a09b6d7b5c22d2c468e5bc216fd4c533aac23f30292d0c128104a1",
+      "bytes": 5381
+    },
+    "experiments/color-search-benchmark/evaluation/perceived-red-001.json": {
+      "sha256": "27428365299cdc9a2121f4108cd7d5a05aba7bd07a10c6a67d40c862d6dd0cd8",
+      "bytes": 12402
+    },
+    "experiments/color-search-benchmark/evaluation/perceived-red-001.md": {
+      "sha256": "6ff67133b87d36e41749afc2b08fc32d18db5793d03e20e9512044047bb43b9f",
+      "bytes": 5262
+    },
+    "experiments/color-search-benchmark/evaluation/perceived-red-pagoda-001.json": {
+      "sha256": "b4fad82d0d5048cb87ef3191ec463f639be0a40295e12d19aec2f81164eaf273",
+      "bytes": 8187
+    },
+    "experiments/color-search-benchmark/evaluation/perceived-red-pagoda-001.md": {
+      "sha256": "1afab61f76457ee63edd9f41d704bea26cd0fde7a65e96c3183a9750d2b7bb68",
+      "bytes": 3822
+    },
+    "experiments/color-search-benchmark/evaluation/precision-shade-001.html": {
+      "sha256": "b223effb965cad896fdb078d57e7cd89e2dfa23fcb9d067a8b9a1d28d797524a",
+      "bytes": 5174
+    },
+    "experiments/color-search-benchmark/evaluation/precision-shade-001.json": {
+      "sha256": "d2d73db4540a0e994618c8e8e154a0307315d66ca6abc71207358935d327f0b9",
+      "bytes": 11702
+    },
+    "experiments/color-search-benchmark/evaluation/precision-shade-001.md": {
+      "sha256": "84cdd366892b97c48be18d99d7490285047ea2ef2fd42b09f8c6619171efae08",
+      "bytes": 6683
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-001.html": {
+      "sha256": "8a0475567c85efc52bf9fc19580e866a5d910f89b9dee8973e83a0bc79064dab",
+      "bytes": 5647
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-001.json": {
+      "sha256": "cee9a143ec572e3794e9dfdffface59db51d3f74f54acecf29dbf7c43e4554cf",
+      "bytes": 14577
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-001.md": {
+      "sha256": "9ec4de9f076e191d642ac1d3dfe54e59eb0906f95af2c7c14c82a0130c531175",
+      "bytes": 6126
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-002.html": {
+      "sha256": "867b02cdb05a50a51ec072b98a27a10fc4a6e4406dc51d4f77c62b32786a619c",
+      "bytes": 5336
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-002.json": {
+      "sha256": "5f29377c1bc7196d0931553b43089fbcf5e897011a2bb45f1da3854713bf5aad",
+      "bytes": 17797
+    },
+    "experiments/color-search-benchmark/evaluation/proportion-green-002.md": {
+      "sha256": "9410090b29e1121c57710f06266c703b643f2661590c757f421f119e738e4e65",
+      "bytes": 6869
+    },
+    "experiments/color-search-benchmark/evaluation/responses/30b36a99-4c94-4f15-9e18-27373dea04c5.json": {
+      "sha256": "36a41bccdff3313eccbbf612ccb0057944b44e2a8b9e40524310d552592a0b76",
+      "bytes": 117518
+    },
+    "experiments/color-search-benchmark/evaluation/review-server.mjs": {
+      "sha256": "58ebd1f609ca8b2ac25efea30eca558fd38f3f1b47c632800cb64bbce7b99920",
+      "bytes": 9885
+    },
+    "experiments/color-search-benchmark/evaluation/review-server.test.mjs": {
+      "sha256": "11c5e20604ecfcbfb8d3a70e6d0bbf12af7ab1834439acb696328c168d329d0c",
+      "bytes": 4201
+    },
+    "experiments/color-search-benchmark/evaluation/semantic-red-city-001.html": {
+      "sha256": "585be11ba4568bea73675b56e4d36d41541037f718d624a5583f6bde55771896",
+      "bytes": 4445
+    },
+    "experiments/color-search-benchmark/evaluation/semantic-red-city-001.json": {
+      "sha256": "03cabaa751655b56a178bd83511292281ba55780164227fc49df7beae2937f41",
+      "bytes": 10837
+    },
+    "experiments/color-search-benchmark/evaluation/semantic-red-city-001.md": {
+      "sha256": "fe842c4585761ef59f1d54872af01269dec1998e5b9325eb58320ba22d0b6466",
+      "bytes": 4267
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-dark-001.html": {
+      "sha256": "f2a131158987446f2da9ffe5b743204bdc510aaea4e9cea8ea68156583f4b7b7",
+      "bytes": 5486
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-dark-001.json": {
+      "sha256": "8f5b87013eeac68e8d14d77c9c0bedc7ca605e6d256cff92e2b4989b544ba403",
+      "bytes": 11082
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-dark-001.md": {
+      "sha256": "01e8cf7f6703f29ba4ad342e948dc794fed043e573c6292a48bc79aee95cf186",
+      "bytes": 4035
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-grayscale-001.html": {
+      "sha256": "c22dd014d7ea2672d4076f4af0056bb637c5012a2c31540ec7ed24dd301cc0d3",
+      "bytes": 5569
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-grayscale-001.json": {
+      "sha256": "5219b05d424e4fe97db7f188023e05cd9161dda74743545f5bf077b537303e16",
+      "bytes": 11744
+    },
+    "experiments/color-search-benchmark/evaluation/vibe-grayscale-001.md": {
+      "sha256": "144a5a2684c3430e93450056db6ef7de7f731eb749f0e1644fc6ee4029af4570",
+      "bytes": 4258
+    },
+    "experiments/color-search-benchmark/exploration/ACCURACY-DIAGNOSTICS.md": {
+      "sha256": "05381091300db9f017d5e642b17c8d45d40af9dcaf84f6f575cc9eaabf5f620b",
+      "bytes": 7186
+    },
+    "experiments/color-search-benchmark/exploration/ACCURACY-FINDINGS.md": {
+      "sha256": "2d249d51ad74a8bc7aeb5339e1fef5ce30649a051f8dd9d182d0c4c769e43352",
+      "bytes": 12404
+    },
+    "experiments/color-search-benchmark/exploration/ALL-CUTOFFS.md": {
+      "sha256": "a8d8b2f187a1bc504f57a0ced72e072470b7404bdc10ba9fe0f48e8fc6c96e13",
+      "bytes": 11581
+    },
+    "experiments/color-search-benchmark/exploration/ARRIVAL-LOAD.md": {
+      "sha256": "51666d591e7b6ebb54cc8798619b5ff65802472c2d9acac96301d1c3f3182ed8",
+      "bytes": 9183
+    },
+    "experiments/color-search-benchmark/exploration/CLICKHOUSE-INTEGRATION.md": {
+      "sha256": "007d85e16c058e781ccd77a89aa3cabf6fcdd58f42b7288f1e0558810e7e878b",
+      "bytes": 4460
+    },
+    "experiments/color-search-benchmark/exploration/CLICKHOUSE.md": {
+      "sha256": "02583561615d8cf545164f571dadf71fdeda3ac953045f53179a1dba9fb305d8",
+      "bytes": 12792
+    },
+    "experiments/color-search-benchmark/exploration/CUTOFF-EVALUATION-REVIEW.md": {
+      "sha256": "0724d3ac94298ca089c295d2967ece3f9d645ea8a9107fb24aa28002e0f39ab9",
+      "bytes": 18052
+    },
+    "experiments/color-search-benchmark/exploration/CUTOFF-PROTOTYPES.md": {
+      "sha256": "ae886107288f4bcc9e31b10a6c44a75d1172b0b414f60afbecfee6a6dd5545e5",
+      "bytes": 11369
+    },
+    "experiments/color-search-benchmark/exploration/CUTOFF-SCALE.md": {
+      "sha256": "f63a8e77f0f2b4acc3a59e0611d1be89704ed300665b50545195fc3305246ffa",
+      "bytes": 13285
+    },
+    "experiments/color-search-benchmark/exploration/DARK-RED-DIAGNOSIS.md": {
+      "sha256": "7e3f19ca1d0d92013c8796ae311fd741a76112ca83869b8b911cdf70ded86532",
+      "bytes": 8199
+    },
+    "experiments/color-search-benchmark/exploration/DECISIONS.md": {
+      "sha256": "a6747a40b34ff20858fb7be2077309caf4b2768b91a0f0dd5076e3655cb283bc",
+      "bytes": 6793
+    },
+    "experiments/color-search-benchmark/exploration/FAST-SCRIPT-NOTES.md": {
+      "sha256": "cf21489213b05a55f5b9c5fb5ce0f03ec0d01a66de249c143b74761ee9886a67",
+      "bytes": 4347
+    },
+    "experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md": {
+      "sha256": "26bac5643d5f290710fd9515435702bc03da7ecf31a93d08eacf462776356e9f",
+      "bytes": 6594
+    },
+    "experiments/color-search-benchmark/exploration/FINAL-CORRECTNESS-AUDIT.md": {
+      "sha256": "a6b5c3b13908ea7d811db90c857e8dac410c6dad7341fd0231796511db96a3da",
+      "bytes": 4799
+    },
+    "experiments/color-search-benchmark/exploration/HISTOGRAM-INSPECTOR.md": {
+      "sha256": "c0b0273b29f93170f8d68c8352b9fc2e3c3c439b9b649fa18e39879bc3438aba",
+      "bytes": 8495
+    },
+    "experiments/color-search-benchmark/exploration/HUE-TOLERANCE.md": {
+      "sha256": "eabebc2dbd4270ab2d89bbf970c50e73a446f462b23734fd59b660287b39fbcc",
+      "bytes": 16276
+    },
+    "experiments/color-search-benchmark/exploration/METHODS.md": {
+      "sha256": "1e20decb2123a2f80f3bf280cfa849634fd698d2d46e416d8d795c33a3c4386f",
+      "bytes": 11168
+    },
+    "experiments/color-search-benchmark/exploration/NATIVE-REFINEMENTS.md": {
+      "sha256": "c9679cfec814e30b9d8d1c13d476aea025b8ff80e8878107c25c6cfa5ab4e7e4",
+      "bytes": 7888
+    },
+    "experiments/color-search-benchmark/exploration/OVERLAPPING-REGIONS.md": {
+      "sha256": "3ad6d4df0bb4d7db106a14e8d7f3493c76259c41cebc275bcb46430bd7c4dc57",
+      "bytes": 38338
+    },
+    "experiments/color-search-benchmark/exploration/PALETTE-BOUNDS.md": {
+      "sha256": "a372b63305f30ea22de6fe9722d6d8189c6c9bcecc5e6df49956eeddf05e9e25",
+      "bytes": 6438
+    },
+    "experiments/color-search-benchmark/exploration/PALETTE-MASS-BOUNDS.md": {
+      "sha256": "29daaa044a383756d71a91b68ba0284fcb541ed43e3d6e45f4093d9c478352bd",
+      "bytes": 6759
+    },
+    "experiments/color-search-benchmark/exploration/PERFORMANCE-FINDINGS.md": {
+      "sha256": "5c53780d2766601ffdd6638c92174c2d260d93b3722b1adc06bd942b00c5dc43",
+      "bytes": 14376
+    },
+    "experiments/color-search-benchmark/exploration/PLAN.md": {
+      "sha256": "595efb2d1eafc7cf9ad04a440bec97d4f07422590e7976a3d7e3298426beb82e",
+      "bytes": 54092
+    },
+    "experiments/color-search-benchmark/exploration/PRECISION-GRID.md": {
+      "sha256": "3a9cd7a0c78147b6b9ea63adb2f65a473198b3488880a7f494c64583795865ea",
+      "bytes": 10814
+    },
+    "experiments/color-search-benchmark/exploration/PRECISION-PRECOMPUTED.md": {
+      "sha256": "d358757b8e017081c18de56374389c8cdfb1cba361b8a1f0db0e442d8e36c2d3",
+      "bytes": 9196
+    },
+    "experiments/color-search-benchmark/exploration/PRECISION-TYPED.md": {
+      "sha256": "5c4019f5aad67471148b63d24dd6d86b0c8a51dc88c6d5ec34628b30b7b803ce",
+      "bytes": 3047
+    },
+    "experiments/color-search-benchmark/exploration/QUALITY-CURVE-SCALE.md": {
+      "sha256": "00622867a83e8979a6331c41314f525294e2313e023ea344fbb33e84c110beee",
+      "bytes": 7898
+    },
+    "experiments/color-search-benchmark/exploration/QUALITY-CURVES.md": {
+      "sha256": "9daef825363a7d2cb9ba3d226702ee803dc48fa00fe0858e36f8dee014dd55ea",
+      "bytes": 7064
+    },
+    "experiments/color-search-benchmark/exploration/RANK-FEATURE-NOTES.md": {
+      "sha256": "2aba78e55f8ae8105162b8357a223f7491327685072846a0287da136fdf9893d",
+      "bytes": 11168
+    },
+    "experiments/color-search-benchmark/exploration/RANK-FEATURE-SCALE.md": {
+      "sha256": "a5af44bad7f55ad0978382f221779becb9a1c41bac95fa8a935128abeaa1f163",
+      "bytes": 6381
+    },
+    "experiments/color-search-benchmark/exploration/README.md": {
+      "sha256": "a14a318879c15513561bc5eb77428405b638a37868fc62e15659214da73f638e",
+      "bytes": 12241
+    },
+    "experiments/color-search-benchmark/exploration/RECALL.md": {
+      "sha256": "b410bef19dd8339750d477e341deafe3edd525da530cd8fe05dc61ece1d3ed06",
+      "bytes": 6375
+    },
+    "experiments/color-search-benchmark/exploration/RELATIVE-CONTRAST-FEATURES.md": {
+      "sha256": "cb3a8c1df6f09042dcca0dc4c1a4950079ba5718bcdae841d458c0c02f0d645b",
+      "bytes": 7376
+    },
+    "experiments/color-search-benchmark/exploration/ROUND-1.md": {
+      "sha256": "b93983d4cab3f7a0219e3fcaa4503208016422c0438bb08d9be63246af241cfd",
+      "bytes": 4050
+    },
+    "experiments/color-search-benchmark/exploration/SHADE-AWARE.md": {
+      "sha256": "202c8954d46b107e300ad1fb28e88b50b8691dc5918934399caaeae41f89c4e6",
+      "bytes": 14258
+    },
+    "experiments/color-search-benchmark/exploration/SOURCES.md": {
+      "sha256": "e5e8d0578bbde1ac94fa0b20f2f6a7eaea91cc28595be5c201788f235fc73076",
+      "bytes": 1057
+    },
+    "experiments/color-search-benchmark/exploration/SUMMARY-README.md": {
+      "sha256": "33392f7fd1b706d39e3d0806f7998bd4a5515eea77a8cf2acbead716890a455f",
+      "bytes": 5382
+    },
+    "experiments/color-search-benchmark/exploration/adapter.mjs": {
+      "sha256": "af88ad8cb79e3907a7ff50798383a8c2b95f443629be825d20b90acae310906b",
+      "bytes": 12507
+    },
+    "experiments/color-search-benchmark/exploration/adapter.test.mjs": {
+      "sha256": "bbdf814abb5df9e8d30696fb11c621f4dd68afa8deee6d2f9decce4f8e997aef",
+      "bytes": 6078
+    },
+    "experiments/color-search-benchmark/exploration/arrival-load.mjs": {
+      "sha256": "890ea26010354fcadce87d38efeac084569bb1a39b1dd86ea4b28e2935afe54f",
+      "bytes": 11895
+    },
+    "experiments/color-search-benchmark/exploration/arrival-load.test.mjs": {
+      "sha256": "85de68e622f6d8484012750d78512bcdba2b26d3168e75ebbfeb15db8fc2ff37",
+      "bytes": 2555
+    },
+    "experiments/color-search-benchmark/exploration/arrival-scheduler.mjs": {
+      "sha256": "93caaed1a018d6e89cdbae6e74a221350f4c432ecc1bc57f7febc21a58d772ea",
+      "bytes": 3067
+    },
+    "experiments/color-search-benchmark/exploration/arrival-scheduler.test.mjs": {
+      "sha256": "c82f4ea61de3656306f14bed3cc5f28b07a0dc8c5da9fcc945050fb642584fae",
+      "bytes": 2112
+    },
+    "experiments/color-search-benchmark/exploration/browser-README.md": {
+      "sha256": "2bb730de28a96365d4518ef91878e00300bb7b668fe12001269873593f699013",
+      "bytes": 5229
+    },
+    "experiments/color-search-benchmark/exploration/browser-VALIDATION.md": {
+      "sha256": "b88e96f62e439133a02ad271e871262facf9f82864cf6b5a9ebe73fd287eb7a1",
+      "bytes": 14494
+    },
+    "experiments/color-search-benchmark/exploration/browser-WALKTHROUGH.md": {
+      "sha256": "93e7c8e083a50edce700ad0737ec5b5c48a7c1d2e4c70036b0a0c79cc151810b",
+      "bytes": 4056
+    },
+    "experiments/color-search-benchmark/exploration/browser-cli.mjs": {
+      "sha256": "a9575cdb65fefbfe2f8fcdbb8af77c76afbe8df31f2be4e656ff963bd8a11697",
+      "bytes": 942
+    },
+    "experiments/color-search-benchmark/exploration/browser-provider.mjs": {
+      "sha256": "ea99bddd7658fe0135fe8d48e9a38b529c5c54e1ad4b823fc15f56128f9123cb",
+      "bytes": 1408
+    },
+    "experiments/color-search-benchmark/exploration/browser-smoke.mjs": {
+      "sha256": "ac825212484f44bc549601eb6aa5da91d71bdefd0b52839471fa115488a1bf9e",
+      "bytes": 5689
+    },
+    "experiments/color-search-benchmark/exploration/browser.mjs": {
+      "sha256": "067da603450d9d1dd81f9b6454c3a1ce4baa140c93ac323723e35657d2315322",
+      "bytes": 12938
+    },
+    "experiments/color-search-benchmark/exploration/browser.test.mjs": {
+      "sha256": "4ad11940188f4e75196d54e948112575909f5067723c1b27dfc8172caac64e82",
+      "bytes": 6335
+    },
+    "experiments/color-search-benchmark/exploration/cli.mjs": {
+      "sha256": "903efe26648cc323c7859be0be30eb2a8e8dde8ca9e69e2723f5b03f7a91884c",
+      "bytes": 4356
+    },
+    "experiments/color-search-benchmark/exploration/clickhouse-compose.yml": {
+      "sha256": "7197f0ada93d698718e59c9fcdc3e8068356a88967bd47682c6ce842a0ae0cee",
+      "bytes": 474
+    },
+    "experiments/color-search-benchmark/exploration/clickhouse-index.mjs": {
+      "sha256": "89e434e4339b97da3e2793fc92936f42980f74b5f0e007b7a575235a8786368e",
+      "bytes": 4448
+    },
+    "experiments/color-search-benchmark/exploration/clickhouse-scale.mjs": {
+      "sha256": "3fdac6c2bc0e7d40fcbe87094bfd3b1dd1a5776e43fc147cb2dc86b3ae55e7b4",
+      "bytes": 14461
+    },
+    "experiments/color-search-benchmark/exploration/clickhouse-service.mjs": {
+      "sha256": "4fcc5d49cabbf7f2f0ffe7273bfee1119ba869e920f70d6ad94af5c4b6763083",
+      "bytes": 3818
+    },
+    "experiments/color-search-benchmark/exploration/compose.yml": {
+      "sha256": "474bc2f57e0acf33a65df49f2acf2f58a14a7cc5c1616a8b4af7265ee80ab5be",
+      "bytes": 580
+    },
+    "experiments/color-search-benchmark/exploration/configs/all-cutoffs.json": {
+      "sha256": "0269946cd3c6283974b68126e81e74be4d95e441bf25668eda72962972328337",
+      "bytes": 21471
+    },
+    "experiments/color-search-benchmark/exploration/configs/cutoff-profiles.json": {
+      "sha256": "f21e8eb2acae2c36a3640c86c088d907de0f63daaabf9d9d9fbccf59e113789a",
+      "bytes": 65840
+    },
+    "experiments/color-search-benchmark/exploration/configs/hue-aware.json": {
+      "sha256": "c268c0065bca29bbe0ebbe8db11bb6a3c871ea433ff1be5331e9bfd0dc8dd0c7",
+      "bytes": 22770
+    },
+    "experiments/color-search-benchmark/exploration/configs/hue-defaults-legacy.json": {
+      "sha256": "f5332fbad2b37fb881c7651dcc550dee17529a88646b94c774cc6fc59534ceb9",
+      "bytes": 1067
+    },
+    "experiments/color-search-benchmark/exploration/configs/objective-sweep.json": {
+      "sha256": "0f46873a25f4f8179b9e2b8c25692a486f90d1edcee6441048521d1e15794909",
+      "bytes": 1000
+    },
+    "experiments/color-search-benchmark/exploration/configs/overlap-bucket-counts.json": {
+      "sha256": "05610d1987c20f591ef4b53b6fc29757b92ab6f1c8d31180130539743d41f6a4",
+      "bytes": 2400
+    },
+    "experiments/color-search-benchmark/exploration/configs/quality-curves.json": {
+      "sha256": "573640a94807edcfdafe753b50d3cdce4a0eeb4b7bb4930881764e6c5debbbc3",
+      "bytes": 20820
+    },
+    "experiments/color-search-benchmark/exploration/configs/shade-aware.json": {
+      "sha256": "efae2572266d16450129bebe90e49f3b16146d20dce96538ba715c82dc96b0ed",
+      "bytes": 21662
+    },
+    "experiments/color-search-benchmark/exploration/configs/strict-hue-favorite-001.json": {
+      "sha256": "def908314d6f15d154e3d49b45645e0e5327191f7d909f1f43d2a2bbb4ea373c",
+      "bytes": 2383
+    },
+    "experiments/color-search-benchmark/exploration/corpus-colors.mjs": {
+      "sha256": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad",
+      "bytes": 4370
+    },
+    "experiments/color-search-benchmark/exploration/corpus-features.mjs": {
+      "sha256": "c7466bcd4dafcc37e6eecb3bb953b53ddd1b86d956e15f50c2130cbe5e10267d",
+      "bytes": 4441
+    },
+    "experiments/color-search-benchmark/exploration/corpus-worker.mjs": {
+      "sha256": "53780150143fe8bdd5c3cdfe2ed661ca4169b522f9c15f5dd3d43544ebb82dc9",
+      "bytes": 1877
+    },
+    "experiments/color-search-benchmark/exploration/corpus.mjs": {
+      "sha256": "18d3c8b1b87e9e062c43db797071c85b3b32a963aa8465483aca9ba0a6b1492b",
+      "bytes": 11542
+    },
+    "experiments/color-search-benchmark/exploration/corpus.test.mjs": {
+      "sha256": "4ef1a4575f8bbc7021f0fa88d4cf68c646c696aa8fd5f1d19fc683d20365ae00",
+      "bytes": 2838
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-api-smoke.mjs": {
+      "sha256": "9a388a2284822b59fcaab289562566e2de67e76b9a0451a9778e249b77274ece",
+      "bytes": 4546
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-blend.mjs": {
+      "sha256": "b4dbf5d041a44ab3270e3ecd12aa5e7c788656ede601c7bd91af6e636bcb9357",
+      "bytes": 2932
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-blend.test.mjs": {
+      "sha256": "57c553ee037309a0589d53b3a46778fb2de458ddab87842691c02ea9865b97a8",
+      "bytes": 3474
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-definition.mjs": {
+      "sha256": "2ddb90e261cb03e94e66fc9ccae720e284c690ace8ae19f579fc53a283514ab4",
+      "bytes": 5215
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-definition.test.mjs": {
+      "sha256": "24867e667493fac90060cbe7a38e47d9d6f652b7a5fbee4542720844ea94d327",
+      "bytes": 2660
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-diagnostics.mjs": {
+      "sha256": "56615947eb8c1e6fd84044564a633d7cb6fa2d9f80a13cae40f28c763a133904",
+      "bytes": 11727
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-diagnostics.test.mjs": {
+      "sha256": "c50f2c5ff94c5c4324283837ed1eb63d62038800374ea481ac54c4368e9ccbce",
+      "bytes": 23461
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-heavy.mjs": {
+      "sha256": "2a24298b22543bd156945ba2b601304f0f2d89a515c530a95551013c8d110146",
+      "bytes": 10757
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-heavy.test.mjs": {
+      "sha256": "5aa3cd69f7103fcc65f573014d2f53dd2b5f8ec93daffec20f1c763d37a2c936",
+      "bytes": 1431
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-index.mjs": {
+      "sha256": "a6ba4b7eee7e4ea7799840beb51b9d727acf60533c0f3094f19e244fa574f045",
+      "bytes": 21955
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-index.test.mjs": {
+      "sha256": "f645472ef3ea3db689db485ed6a4d6cb9e52e32587c1fcae391de2a0580b65d3",
+      "bytes": 3182
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-inspector-server.test.mjs": {
+      "sha256": "7b0192e795218bd5a7d43835dc8dba5816b678b84fa01aa86f006a3b67b17e7b",
+      "bytes": 6221
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-region-colors.mjs": {
+      "sha256": "2175f8e004eb918919be61a02076a68338fa07dd5d92e879221c63a0ca03916f",
+      "bytes": 8686
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-region-colors.test.mjs": {
+      "sha256": "564554f064a342b6505350fd7c33f89709a58b45a9ca264d75fe3bce4525e7ae",
+      "bytes": 9756
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-resume.mjs": {
+      "sha256": "bb5bd59f16a5251ec2e1ec37ab1a503c0371408f631597dd966c9c790a0f42ef",
+      "bytes": 3732
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-scale.mjs": {
+      "sha256": "02ae5e0c2416f9b7f035d6050a3067923dc810d41815d11d1614cb52f0c05d5e",
+      "bytes": 28915
+    },
+    "experiments/color-search-benchmark/exploration/cutoff-scale.test.mjs": {
+      "sha256": "c48fa84215ab4b7745c80f3507f6cf5d5c4ac3152e3564b4d48a2849650f9411",
+      "bytes": 6993
+    },
+    "experiments/color-search-benchmark/exploration/dark-red-diagnose.mjs": {
+      "sha256": "d4ab1f82953840b2cb1b2bddb206acf106c5077533634865cb608e7d5a3680fe",
+      "bytes": 7264
+    },
+    "experiments/color-search-benchmark/exploration/dark-red-identify.mjs": {
+      "sha256": "8dfe69467197a588284e0d2ab530e8becb48219b06b58dcd6898d2a117764b08",
+      "bytes": 7961
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-cli.mjs": {
+      "sha256": "7229b9669b859d86e1ae8f1add1c45f53df43df8ca7c3b0abe18d9af844c5cc2",
+      "bytes": 759
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-diagnostics.mjs": {
+      "sha256": "6ff6f496d8036a34e895361db8046666e6b45aec3b9f22d9b188e081b5db868a",
+      "bytes": 11880
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-diagnostics.test.mjs": {
+      "sha256": "6f139c558a4fd33ee5f03a737206abc347ca6e69732b8bd5e1228d98b267acb3",
+      "bytes": 6762
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-provider.mjs": {
+      "sha256": "fe2d91cd8246fff85b9ccdbdaea01f9b0fae87d71b2e8369ff70521811b17ea3",
+      "bytes": 1109
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-server.mjs": {
+      "sha256": "887708ff6086413109a0573fbff4b1fd716c5c8aa5b769e2700064cf7fe59a55",
+      "bytes": 7387
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-server.test.mjs": {
+      "sha256": "ed81d19e8da045a75ac3716e67bcf0c54d3a992e46609af849b4ed3e0e90a35d",
+      "bytes": 4070
+    },
+    "experiments/color-search-benchmark/exploration/histogram-inspector-smoke.mjs": {
+      "sha256": "fbfe98f7464a1044874ca087ccd694612659d2e80734f2dece22a5e81cf9e537",
+      "bytes": 4023
+    },
+    "experiments/color-search-benchmark/exploration/hue-definition.mjs": {
+      "sha256": "9f7123bfa540fc847f97892248a42f535b24f02b5bd0587f53bba7028ab3c73c",
+      "bytes": 4164
+    },
+    "experiments/color-search-benchmark/exploration/hue-definition.test.mjs": {
+      "sha256": "3da517071d3aaa9c322dd42e07ec79a6ce4e5dce260a2cff8fe99e8e1006033c",
+      "bytes": 4081
+    },
+    "experiments/color-search-benchmark/exploration/hue-evaluate.mjs": {
+      "sha256": "423b9e70f99ff0a8625154220b32d6bade9709e7e38c488d5d6136f6f4d109a3",
+      "bytes": 21552
+    },
+    "experiments/color-search-benchmark/exploration/hue-index.mjs": {
+      "sha256": "ce38441960b5775101cac87ac6945dc4e49c18bf16f50b403a3a4b2a9296e426",
+      "bytes": 21611
+    },
+    "experiments/color-search-benchmark/exploration/hue-index.test.mjs": {
+      "sha256": "121e1ca6197661d93995d5aad42ce7f36f9454c694bf65f890c40f9ca805e10e",
+      "bytes": 3352
+    },
+    "experiments/color-search-benchmark/exploration/hue-method.test.mjs": {
+      "sha256": "0a66dc43f35d51849cd55a985d334c0bb445e9d26086f003570db68c3b0cd899",
+      "bytes": 4278
+    },
+    "experiments/color-search-benchmark/exploration/hue-region-colors.test.mjs": {
+      "sha256": "8ff4f846b9cc6dbc0910ebd096353d71f0077296aae91c1fd3c4e1f3ebb2579f",
+      "bytes": 3699
+    },
+    "experiments/color-search-benchmark/exploration/hue-subset-audit.mjs": {
+      "sha256": "bf7eb3d5ee7c4350e1111c5336373bf7b83025af8eedfa07b7fc123c250fb026",
+      "bytes": 4752
+    },
+    "experiments/color-search-benchmark/exploration/intent.test.mjs": {
+      "sha256": "8e0e7d2ff4856720c2e08fe7f2f2b4c688063036d5011d782baf37320fb81798",
+      "bytes": 1894
+    },
+    "experiments/color-search-benchmark/exploration/methods-bounded.mjs": {
+      "sha256": "b4316a61a26c093ebc0441030a698cb6c525f8d0d4bc22a0df2f7170a60d7444",
+      "bytes": 4958
+    },
+    "experiments/color-search-benchmark/exploration/methods-bounded.test.mjs": {
+      "sha256": "99ef4b994c7df4f9d370e099d92d21454a91425188db04e2f84c65a49cc6ef5e",
+      "bytes": 2493
+    },
+    "experiments/color-search-benchmark/exploration/methods-clickhouse.mjs": {
+      "sha256": "ef75425cdfd8d33375dc40f3d010249ca415e8648e1552c18c52e7c1054213ef",
+      "bytes": 7716
+    },
+    "experiments/color-search-benchmark/exploration/methods-clickhouse.test.mjs": {
+      "sha256": "a6516c75b054e8125562621bda5c9aa1934b74a2cbfce1805f9f892077476e52",
+      "bytes": 5240
+    },
+    "experiments/color-search-benchmark/exploration/methods-cutoff.mjs": {
+      "sha256": "e09e27d243f0c7641d8cfe9fd64d84388262f190d3ac8fd8c1cf202756d7ab77",
+      "bytes": 12983
+    },
+    "experiments/color-search-benchmark/exploration/methods-cutoff.test.mjs": {
+      "sha256": "77b82ba59ab4deafd8f739a3a208e7fef753ed7700d4ccb827942f7acbecb76b",
+      "bytes": 11964
+    },
+    "experiments/color-search-benchmark/exploration/methods-direct-palette.mjs": {
+      "sha256": "65ca9f670a34f47cb5398756ab9f684bddb1af225d8e50a63c93947f4e94258e",
+      "bytes": 11849
+    },
+    "experiments/color-search-benchmark/exploration/methods-direct-palette.test.mjs": {
+      "sha256": "30e8edfca7f349474dc95eaf7dc56d839d5a8d27be9d9b7f3c29df4011620471",
+      "bytes": 3758
+    },
+    "experiments/color-search-benchmark/exploration/methods-fast.mjs": {
+      "sha256": "38272d41ab6c86d8f99a0368ecbe44809a1df2a8774b21f91d3869e39d2321b5",
+      "bytes": 3548
+    },
+    "experiments/color-search-benchmark/exploration/methods-fast.test.mjs": {
+      "sha256": "0f0e5a52fc84cc64905acd58a29d9ad2884cf0682f295a3faee4fea407b8e788",
+      "bytes": 2156
+    },
+    "experiments/color-search-benchmark/exploration/methods-native-refined-probe.mjs": {
+      "sha256": "c8b6830e26356e5ad5e437b1156a4096abc2166dd33cc149b81148bc1345a7e9",
+      "bytes": 5982
+    },
+    "experiments/color-search-benchmark/exploration/methods-native-refined.mjs": {
+      "sha256": "c2e5689b8ae929e662ea94fc28ff7235cc239cf8f25f0aad47c234a61ff22e32",
+      "bytes": 5998
+    },
+    "experiments/color-search-benchmark/exploration/methods-native-refined.test.mjs": {
+      "sha256": "6f5f9cca46fb39a680e192d1cb83b67c1ffcba4b11b0d0892007e43dfa30a426",
+      "bytes": 4122
+    },
+    "experiments/color-search-benchmark/exploration/methods-overlap.mjs": {
+      "sha256": "9529ea681364384cb7b27740f2952a0f6cfaa75bc67e272c22ce68f7b4c392ba",
+      "bytes": 10353
+    },
+    "experiments/color-search-benchmark/exploration/methods-overlap.test.mjs": {
+      "sha256": "184f6effa8fd79e9d0a91268f9b2f9b08e5ef1580fe8d3e4d9408c03da543795",
+      "bytes": 25539
+    },
+    "experiments/color-search-benchmark/exploration/methods-palette-bounded.mjs": {
+      "sha256": "aacb39fd6dc4cdc7c8be52f0a5fd60218dafca4167f8b96bb67cf7b5b870a390",
+      "bytes": 10004
+    },
+    "experiments/color-search-benchmark/exploration/methods-palette-bounded.test.mjs": {
+      "sha256": "bed2ba8cccaa20c04e2cb70c3486f7d6851dafedf2a4873d4efb2cf3bf47e48a",
+      "bytes": 3745
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-grid.mjs": {
+      "sha256": "e0ca0f9203cadb74b1bcd77153d66a25ea1c5e78e35626a4ec5220a86a5d7af0",
+      "bytes": 6190
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-grid.test.mjs": {
+      "sha256": "404669715647092d91a3b0a32b4ca296c0da44688ff029d48441fcbb3e387e6e",
+      "bytes": 5389
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-precomputed.mjs": {
+      "sha256": "420c963b4a30b638e45a6d55bef556d05af86d019338b730a6c594025eb2bfa8",
+      "bytes": 6816
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-precomputed.test.mjs": {
+      "sha256": "b9ebd28fcafeebce3508668dbc7a389f6617844020ec4694d675782b2b6aa851",
+      "bytes": 7154
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-typed.mjs": {
+      "sha256": "d0fa14848e38619271f58f0214ee94049c881daa5c3c41a56b7843fc3d655feb",
+      "bytes": 4194
+    },
+    "experiments/color-search-benchmark/exploration/methods-precision-typed.test.mjs": {
+      "sha256": "cd13d2b95ba3b4f3fec6c19507a6cee789e47967aeeacb7e80b8dc37fda76cf9",
+      "bytes": 2324
+    },
+    "experiments/color-search-benchmark/exploration/methods-rank-features.mjs": {
+      "sha256": "949bf542f9169353b6112d703fc021d953335b124b89a4867309b45aff46e3ba",
+      "bytes": 4468
+    },
+    "experiments/color-search-benchmark/exploration/methods-rank-features.test.mjs": {
+      "sha256": "b218cf4b1a2fa666805dcf39402bc684e3bc6552d741c2ae9a94cb50b2d631cf",
+      "bytes": 2948
+    },
+    "experiments/color-search-benchmark/exploration/methods-relative-probe.mjs": {
+      "sha256": "365b07153e538ccf4d0def303afd09091c0257afc040eaab8b9908d466e3ec71",
+      "bytes": 2013
+    },
+    "experiments/color-search-benchmark/exploration/methods-relative.mjs": {
+      "sha256": "95aac8d49339f85660ee9b5a510028648539c46fdac02edcf8cb524fe91e7173",
+      "bytes": 4368
+    },
+    "experiments/color-search-benchmark/exploration/methods-relative.test.mjs": {
+      "sha256": "781630f627325813746725396ea0ab254d1e008b8d80c050c78fc325c62b04af",
+      "bytes": 2471
+    },
+    "experiments/color-search-benchmark/exploration/methods-transport.mjs": {
+      "sha256": "84f7257da0d76aee16d22d0ce6129503378e8f6cf9f3bfdc9b4b5b8e6e0b8879",
+      "bytes": 5539
+    },
+    "experiments/color-search-benchmark/exploration/methods-transport.test.mjs": {
+      "sha256": "e4c2387e66ea471e6b90abf11335d0283b6c2f04cbd10a6f632e8977a924b033",
+      "bytes": 2462
+    },
+    "experiments/color-search-benchmark/exploration/methods.mjs": {
+      "sha256": "1020632d09d5d1e9760d0825c9fa3cd3912bc45543df75805ba6cda9364830a5",
+      "bytes": 16363
+    },
+    "experiments/color-search-benchmark/exploration/methods.test.mjs": {
+      "sha256": "5040329362a9ae4fbe680fb9adfb0964bf13112c93b45025f0c9d38feb5155f2",
+      "bytes": 4135
+    },
+    "experiments/color-search-benchmark/exploration/overlap-banks.mjs": {
+      "sha256": "661284ebe268353c5337877cc34f38bf9b84ceab17cfb58d87da077d71fb8018",
+      "bytes": 3093
+    },
+    "experiments/color-search-benchmark/exploration/overlap-bucket-index.mjs": {
+      "sha256": "e6fe315cd7436be2799f74da0b58a79ec40a07bba5c2288e5867d0ddc5b6eef6",
+      "bytes": 12921
+    },
+    "experiments/color-search-benchmark/exploration/overlap-bucket-index.test.mjs": {
+      "sha256": "00cb85c8cb64865a6240c17ffedd9b9981ff611a1a9db1347f8bd9ab938b5593",
+      "bytes": 6204
+    },
+    "experiments/color-search-benchmark/exploration/overlap-color-layers.test.mjs": {
+      "sha256": "f0942b5b8ade92099b72f2eaaadb6acf42ad05b40291a9c008c27909eecbe04b",
+      "bytes": 7404
+    },
+    "experiments/color-search-benchmark/exploration/overlap-color-layout.test.mjs": {
+      "sha256": "09b21fae5f9358e5ccf5af473a5d4910308aec592b72fbc7a23c0d363e738810",
+      "bytes": 7879
+    },
+    "experiments/color-search-benchmark/exploration/overlap-diagnostics.mjs": {
+      "sha256": "a4f5e416102f6c2e965fede87afec29d4512e9ce39f0265afe8965bba0f001dd",
+      "bytes": 8806
+    },
+    "experiments/color-search-benchmark/exploration/overlap-diagnostics.test.mjs": {
+      "sha256": "0e2051c233dad2f75bcbab2c224f5eb5283a5ac27ce21bb2a35ce9cefbc04ed6",
+      "bytes": 20719
+    },
+    "experiments/color-search-benchmark/exploration/overlap-diversity-probe.mjs": {
+      "sha256": "cd1ce57c100be28835a5705b8d9543dbf2da597d92e1bdff7a1d9baed8dc00e9",
+      "bytes": 16862
+    },
+    "experiments/color-search-benchmark/exploration/overlap-diversity-probe.test.mjs": {
+      "sha256": "48149e6e9b2bea3f4481e92d8164f37823350c49874f2c3d139e0b85f2bffbac",
+      "bytes": 7580
+    },
+    "experiments/color-search-benchmark/exploration/overlap-fidelity.mjs": {
+      "sha256": "fcf65b17def881f01a21f6f91a40a97e2ebc8b74b5fed2727422a9847d85b088",
+      "bytes": 12803
+    },
+    "experiments/color-search-benchmark/exploration/overlap-fidelity.test.mjs": {
+      "sha256": "7a60ebad33ae73be58fb4ac5df021a5241f02e0c49a8d570c16f730eb09d05f2",
+      "bytes": 1521
+    },
+    "experiments/color-search-benchmark/exploration/overlap-index.mjs": {
+      "sha256": "8113de104d7e8079aac0d973b3c8feb44718ba2be7091ff3087a77fa34d40194",
+      "bytes": 13683
+    },
+    "experiments/color-search-benchmark/exploration/overlap-index.test.mjs": {
+      "sha256": "a1f3945bc0a05d30a5eb3074d61bcecd35ae798ab39f824c31933feccc923eb0",
+      "bytes": 4252
+    },
+    "experiments/color-search-benchmark/exploration/overlap-inspector-cli.mjs": {
+      "sha256": "528f6cf5eaa1a2df773edcaa2a3f32f56158732a2097d6f8cdc85cc6af3c81ac",
+      "bytes": 751
+    },
+    "experiments/color-search-benchmark/exploration/overlap-inspector-provider.mjs": {
+      "sha256": "f3715d3298aa4c83ff765e6713c22990c1004aca0f4fb484b9c2b20f5761a720",
+      "bytes": 2115
+    },
+    "experiments/color-search-benchmark/exploration/overlap-inspector-server.mjs": {
+      "sha256": "948c9259af2ea66c95e9f106ae103f7631233b018e60214ab9e9b3ac2d196af6",
+      "bytes": 12656
+    },
+    "experiments/color-search-benchmark/exploration/overlap-inspector-server.test.mjs": {
+      "sha256": "2d424e21c9f1d521a2d07b439d37a1e97f2331a07b5243a7b0da007729d7464b",
+      "bytes": 16477
+    },
+    "experiments/color-search-benchmark/exploration/overlap-inspector-smoke.mjs": {
+      "sha256": "66c6346af436b1e152c9f33abce28c5ed7db080b73f3b2c9ee4ac13f3d632b0d",
+      "bytes": 8182
+    },
+    "experiments/color-search-benchmark/exploration/overlap-region-colors.mjs": {
+      "sha256": "d744d01920d688600a0a28de73fae5b9e0318b62e2daf6340e809b6fe44c385a",
+      "bytes": 7196
+    },
+    "experiments/color-search-benchmark/exploration/overlap-region-colors.test.mjs": {
+      "sha256": "00376236b9a4a08bd7ffeae6d1e36ec6ac41720a7be703f6ed4eae8bdfeadaa8",
+      "bytes": 6464
+    },
+    "experiments/color-search-benchmark/exploration/overlap-regions.mjs": {
+      "sha256": "fa1b265e0f5a7c06624df04e08061ecd9b6b80267e9639f00e0dfe42394b5906",
+      "bytes": 4193
+    },
+    "experiments/color-search-benchmark/exploration/overlap-scale-corpus.mjs": {
+      "sha256": "c6c3628b7bfdbcc1cce7247fd295dfe21ce088406649b1e451e34c289ed2c48a",
+      "bytes": 2281
+    },
+    "experiments/color-search-benchmark/exploration/overlap-scale-corpus.test.mjs": {
+      "sha256": "6177f6ab306fc5f684112428c18383c309bd0f1a302bf06041bd969794014f36",
+      "bytes": 1630
+    },
+    "experiments/color-search-benchmark/exploration/overlap-scale.mjs": {
+      "sha256": "17036cffeac76b59bcae334c07a82e5e6f82ba841121a0f2d5d7ae7de3d6a6ac",
+      "bytes": 14940
+    },
+    "experiments/color-search-benchmark/exploration/palette-cell-index.mjs": {
+      "sha256": "65e15d35c6c09f0acd939a94ebfc3f6059bf1fdb27a4d3defb2b77b877e5b55d",
+      "bytes": 1377
+    },
+    "experiments/color-search-benchmark/exploration/palette-mass-assessment.mjs": {
+      "sha256": "de436f2fdadf6ce9851d013217ecaae4de596c2aae69b552fae79b090cec2f9b",
+      "bytes": 7408
+    },
+    "experiments/color-search-benchmark/exploration/precision-docvalues-cache-probe.mjs": {
+      "sha256": "d5ad56d15778a4588a3a532c8e6c08b3e421bf15787f0d646a631711702c70f5",
+      "bytes": 4118
+    },
+    "experiments/color-search-benchmark/exploration/precision-grid-index.mjs": {
+      "sha256": "1a321c3315d53f5ae8befea1a22ef61b894ec19994586c4a3d1d2b13b481db78",
+      "bytes": 14489
+    },
+    "experiments/color-search-benchmark/exploration/precision-grid-scale.mjs": {
+      "sha256": "55ec8888496307f9d07b14e7cd8fee75172659b000c641541ffd3c3f40b44feb",
+      "bytes": 19507
+    },
+    "experiments/color-search-benchmark/exploration/precision-grid-scale.test.mjs": {
+      "sha256": "790cbdd570b96fb5d38abcc0bd921b7422e175fd27138abe71b8e00f13ed8387",
+      "bytes": 3220
+    },
+    "experiments/color-search-benchmark/exploration/precision-precomputed-index.mjs": {
+      "sha256": "c33b737a6acf3502cca5af5180cc1a71d08820a44ade3f74b45de8a162bd87a4",
+      "bytes": 2052
+    },
+    "experiments/color-search-benchmark/exploration/precision-precomputed-probe.mjs": {
+      "sha256": "b956dddec69d9ae2a512489aeab2e53226d78d87e2ccfab28c645e335049a943",
+      "bytes": 5071
+    },
+    "experiments/color-search-benchmark/exploration/quality-curve-scale.mjs": {
+      "sha256": "c2b460dde578c36312a5a90624b5dcd3cadafdf76e362b92291caec72daf1b72",
+      "bytes": 15639
+    },
+    "experiments/color-search-benchmark/exploration/quality-curve-scale.test.mjs": {
+      "sha256": "15686acdbb1ebffdeaaec0f2d64388ba0851befd986011f83e892da5efa1774f",
+      "bytes": 4201
+    },
+    "experiments/color-search-benchmark/exploration/quality-curve.mjs": {
+      "sha256": "01f9e76c7482979272bb8d78141077b7be7decdbe6f001c210f64c821f29e7eb",
+      "bytes": 1989
+    },
+    "experiments/color-search-benchmark/exploration/query-intent.test.mjs": {
+      "sha256": "48bfd0aa199a4cabab90751aa0cb6415e8940af511195709af22fa4bef55985c",
+      "bytes": 3980
+    },
+    "experiments/color-search-benchmark/exploration/query.mjs": {
+      "sha256": "4fa49dd04c07e255ed097ad99699799c9ec361fc24ff2407e16d6fe02a63c02e",
+      "bytes": 9688
+    },
+    "experiments/color-search-benchmark/exploration/rank-features-index.mjs": {
+      "sha256": "19c577003c07f8f71a47453b1c7b7dba8ddf04d2c61443fa5c36591c119c3008",
+      "bytes": 4137
+    },
+    "experiments/color-search-benchmark/exploration/rank-features-scale.mjs": {
+      "sha256": "d204f4e3451215b26fc65cf68d932cce59943dcb516ce1821417fa5ee9f062d0",
+      "bytes": 21484
+    },
+    "experiments/color-search-benchmark/exploration/rank-features-scale.test.mjs": {
+      "sha256": "e7986aae0eb1eded6992649f2529255357442b77c9761057875be765c7ce89fd",
+      "bytes": 2766
+    },
+    "experiments/color-search-benchmark/exploration/recall.mjs": {
+      "sha256": "505fc6b5ddaf614e4a8780b71b749b38034503c6e757d10b40a9369921aa55a2",
+      "bytes": 13681
+    },
+    "experiments/color-search-benchmark/exploration/refinement-features.mjs": {
+      "sha256": "62f629525fc8adff1e1350e4f845ad4384514930888d1e6fb17f8b4979f82627",
+      "bytes": 8065
+    },
+    "experiments/color-search-benchmark/exploration/refinement-features.test.mjs": {
+      "sha256": "2405b499fc7e6efa8b197123e4bebdb2b6a8cbb4bfc7e5ea912178e6a6347505",
+      "bytes": 4948
+    },
+    "experiments/color-search-benchmark/exploration/refinement-index.mjs": {
+      "sha256": "e97dcf1a8771c5bd1df13bd2e90ea4f402aa902e3e890d9c455094599c577439",
+      "bytes": 4638
+    },
+    "experiments/color-search-benchmark/exploration/refinement-index.test.mjs": {
+      "sha256": "2b27cc739e0452151eb4014d6bd5ec6c8f82574f18b36a90efdac02bcc386bd1",
+      "bytes": 2145
+    },
+    "experiments/color-search-benchmark/exploration/registry.mjs": {
+      "sha256": "63122832bd1314a8914fc8da72cb759475a6f86e2901cb46b4179a475f9f8e27",
+      "bytes": 12703
+    },
+    "experiments/color-search-benchmark/exploration/scale-corpus.mjs": {
+      "sha256": "01d86c395c74606ef7715438bc6df139cb77528529d8c9dc478fac35b6f46b00",
+      "bytes": 7726
+    },
+    "experiments/color-search-benchmark/exploration/scale.mjs": {
+      "sha256": "ef961ea8f3a65241364c2f0cc2856489d66eed283e8b5bf7381e80e288f0b040",
+      "bytes": 13972
+    },
+    "experiments/color-search-benchmark/exploration/service.mjs": {
+      "sha256": "df3a1e84ea30a5b87ef9dc61965184211ce4f8c120e46b7e498123edc0e16793",
+      "bytes": 8122
+    },
+    "experiments/color-search-benchmark/exploration/service.test.mjs": {
+      "sha256": "a1c0fd513e7e7e47ac1d120f83f26a8e75228decffb41a3b9cc3c2b2d2b07980",
+      "bytes": 1530
+    },
+    "experiments/color-search-benchmark/exploration/shade-definition.mjs": {
+      "sha256": "b4c0b5b0513c191390b1fb3ca6784584cc52dd3452041e28fe7278e09250943f",
+      "bytes": 4874
+    },
+    "experiments/color-search-benchmark/exploration/shade-definition.test.mjs": {
+      "sha256": "0d6604aecf58f754d9a03d122e91bfca52639626183f2cf204d8c57e3c32073f",
+      "bytes": 4262
+    },
+    "experiments/color-search-benchmark/exploration/shade-evaluate.mjs": {
+      "sha256": "959dbd94b1a8f8f03a8af87f94c2c7ee444f514005bcf4d64c4cf0fa2a027747",
+      "bytes": 15153
+    },
+    "experiments/color-search-benchmark/exploration/shade-index.mjs": {
+      "sha256": "6bd2a2d1cfff3426ce3ca70490639ec388b2d9885f13a75edefacf0b5da19117",
+      "bytes": 21712
+    },
+    "experiments/color-search-benchmark/exploration/shade-index.test.mjs": {
+      "sha256": "59a092e2b03e8eca502630c05cb85e140075bfa12141543c9648421de847de71",
+      "bytes": 3381
+    },
+    "experiments/color-search-benchmark/exploration/shade-method.test.mjs": {
+      "sha256": "c88b050786afba5663d2f0a3bb540b60afab55d30b76adead158d0b728442e11",
+      "bytes": 4293
+    },
+    "experiments/color-search-benchmark/exploration/shade-neutral-audit.mjs": {
+      "sha256": "5c0ae708b7be6b834ea41c24829ae35ca00680c2efa397cab91d16132197d313",
+      "bytes": 4180
+    },
+    "experiments/color-search-benchmark/exploration/shade-pair-probe.mjs": {
+      "sha256": "3439bb0864231df38abe500a20552cfb1e95153c39388db741ffb7b07e409868",
+      "bytes": 11584
+    },
+    "experiments/color-search-benchmark/exploration/shade-pair-replay.mjs": {
+      "sha256": "06df083d8ac4e0a36190eded908c94e0acf2f840e9a8f632ce0a4c8fe377e932",
+      "bytes": 7990
+    },
+    "experiments/color-search-benchmark/exploration/shade-region-colors.mjs": {
+      "sha256": "c1279237935f9bd958cfb4c3fa2992d497111cf729147edf8869d85b811fbdb3",
+      "bytes": 8127
+    },
+    "experiments/color-search-benchmark/exploration/shade-region-colors.test.mjs": {
+      "sha256": "9fce0b84b6ebd6222da123781b56038556738363c91707399de18df9e25e1a7a",
+      "bytes": 3903
+    },
+    "experiments/color-search-benchmark/exploration/summary.mjs": {
+      "sha256": "f8ceee3171f01d6f69c647496165310d297edeb52835ccc27a3ace6adc23541a",
+      "bytes": 45239
+    },
+    "experiments/color-search-benchmark/exploration/summary.test.mjs": {
+      "sha256": "bc0e0b319b42896cbf4776fcea7af0f987823f957ce86e71ad88fa55a3770c5c",
+      "bytes": 14977
+    },
+    "experiments/color-search-benchmark/exploration/web/browser.css": {
+      "sha256": "b9bde3b506ed4263ba631fc52c4cce73684c38b6d86b707860afe46819066cb9",
+      "bytes": 9964
+    },
+    "experiments/color-search-benchmark/exploration/web/browser.js": {
+      "sha256": "2268481226b1080c492d1bcb84120930ede35912256fa569b1c0df864ca16937",
+      "bytes": 26137
+    },
+    "experiments/color-search-benchmark/exploration/web/histogram-inspector.css": {
+      "sha256": "3ec16703955ed90f398b609f512dc710ea75445601baeec13fd3e86a370ffd9b",
+      "bytes": 11996
+    },
+    "experiments/color-search-benchmark/exploration/web/histogram-inspector.html": {
+      "sha256": "2c772291d0cbdd9d080968c17d128f0a42a2697880acb3368330d4a5ea451c00",
+      "bytes": 8605
+    },
+    "experiments/color-search-benchmark/exploration/web/histogram-inspector.js": {
+      "sha256": "49ce07b6d503b785eb74f49a024f20385ad7e5f78e5c19249c2a6d6e345a1a60",
+      "bytes": 33869
+    },
+    "experiments/color-search-benchmark/exploration/web/index.html": {
+      "sha256": "1304c6e68c4fb0787570d1e4c08e8246128ea459a2350b75910cf9a7ef71d7c1",
+      "bytes": 4508
+    },
+    "experiments/color-search-benchmark/exploration/web/overlap-color-layers.mjs": {
+      "sha256": "3a4eb78a8560a7aaf53229c9ed73c563a202b3cd48a133612defc9909a54d2fe",
+      "bytes": 3937
+    },
+    "experiments/color-search-benchmark/exploration/web/overlap-color-layout.mjs": {
+      "sha256": "392c3a47a7972ea8a47e22de8da0bc23bd831ad13ef579e3f2b6c1b63ab25d4b",
+      "bytes": 3280
+    },
+    "experiments/color-search-benchmark/exploration/web/overlap-inspector.css": {
+      "sha256": "0ef84b6420fe7e35b9269b66d00002c8c24051b47ed1fc89d5f3340faa221af8",
+      "bytes": 18214
+    },
+    "experiments/color-search-benchmark/exploration/web/overlap-inspector.html": {
+      "sha256": "19b466f142fd54f3da70332751aa2eefaef72f62f808463cc5c7ec2c6fe2880f",
+      "bytes": 14069
+    },
+    "experiments/color-search-benchmark/exploration/web/overlap-inspector.js": {
+      "sha256": "6ae4c40faca3ab56b6f5b921ffd90899620af2cc9a63870f20523bd71b1cd8e7",
+      "bytes": 60325
+    },
+    "experiments/color-search-benchmark/exploration/workload.mjs": {
+      "sha256": "967c574221464c9b53756827b3eb0008c10bf2776dd4fdfef673ad237f49aee2",
+      "bytes": 1738
+    },
+    "experiments/color-search-benchmark/global-accuracy.json": {
+      "sha256": "c92d9a81e9227374af021c4a8a16a17b9e056298fb9fae947142e51fc6eb9ce2",
+      "bytes": 28308
+    },
+    "experiments/color-search-benchmark/global-accuracy.ts": {
+      "sha256": "acddc1281a9e0e700f0e8e9468683f70eef2b834fb174771eec2cf23a973fdfe",
+      "bytes": 13323
+    },
+    "experiments/color-search-benchmark/global-adaptive-evaluation.json": {
+      "sha256": "1fe0f3c9eb7f574936723708c0e80b0ceb75a8b12799bd56c46d6fd126115e2d",
+      "bytes": 68810
+    },
+    "experiments/color-search-benchmark/global-adaptive.mjs": {
+      "sha256": "4d6b7f3a6dbadd085c315d1ca98d7a615198c4b2269e1fd18e46bab06cfd4927",
+      "bytes": 4192
+    },
+    "experiments/color-search-benchmark/global-bounded-probe.json": {
+      "sha256": "8ffa2a0b1039e306171687e4a65dcfae9473ad119be57b40b845ff3b51148107",
+      "bytes": 5987
+    },
+    "experiments/color-search-benchmark/global-bounded.mjs": {
+      "sha256": "4598b2776f700b5e84086229db31315fb927aa5e4c3ee3efe543243c3282890c",
+      "bytes": 12848
+    },
+    "experiments/color-search-benchmark/global-common.mjs": {
+      "sha256": "2ea6e0b9e0175b9f12d35dd1327bd0f6c803385d71d2490a013192967a2d8ca1",
+      "bytes": 3399
+    },
+    "experiments/color-search-benchmark/global-compose.yml": {
+      "sha256": "256da67d1bb9909ae2eb0747692f94e01be892dc6bb25eca5d756924c9972d6c",
+      "bytes": 551
+    },
+    "experiments/color-search-benchmark/global-data.json": {
+      "sha256": "933c470cf3058ca0d13903fe374de71119f28b1e020ba81f466677fd5f260b5d",
+      "bytes": 1236881
+    },
+    "experiments/color-search-benchmark/global-dynamic-probe.json": {
+      "sha256": "e3e35fb63086e79588f6ddfe76d514d0bf6aae66c7be554a1e82ed2cbf003191",
+      "bytes": 363
+    },
+    "experiments/color-search-benchmark/global-dynamic.mjs": {
+      "sha256": "8bc4f04977858b54cf51c05145f5572d98909c22f28eafc5ff854525b4466d46",
+      "bytes": 16057
+    },
+    "experiments/color-search-benchmark/global-evaluate.mjs": {
+      "sha256": "62b056371a24308b1d1d303c3246d2af65649cc44c49fbc8ad99f81e15cdcb8e",
+      "bytes": 12979
+    },
+    "experiments/color-search-benchmark/global-evaluation.json": {
+      "sha256": "420692dff576ef63aac8e6e49671c421aaa02ae216428a46e4e41c4f36109055",
+      "bytes": 5095799
+    },
+    "experiments/color-search-benchmark/global-index.mjs": {
+      "sha256": "d7f75a5d24839914e1e0588da2da784d4fe4e9ae0d460ea1932e25b81317c142",
+      "bytes": 4582
+    },
+    "experiments/color-search-benchmark/global-indexing.json": {
+      "sha256": "0c1282f5d36ae1a44b8cfe7ced51b1f9caa8713c812ebd9735a896b0ed859c62",
+      "bytes": 38411
+    },
+    "experiments/color-search-benchmark/global-joint-bounded-probe.json": {
+      "sha256": "6980503ca7444cfa996fda6c58fb794d0f7a52c8b1737bbf104376b493df638d",
+      "bytes": 5223
+    },
+    "experiments/color-search-benchmark/global-joint-bounded.mjs": {
+      "sha256": "ae3438ab30e0fc4cb611b15dc557ecf8d87415cc848a393a9351bfec58b0adbc",
+      "bytes": 13388
+    },
+    "experiments/color-search-benchmark/global-joint-probe.json": {
+      "sha256": "cc2bdccc1893299bbd74516f48c276d39411ce8963d3070d691b2c0cdac38564",
+      "bytes": 252
+    },
+    "experiments/color-search-benchmark/global-joint.mjs": {
+      "sha256": "867ea19121010e412fc6e096bcfaee0e88e0373e80c2d37a3b42977f1bbf336d",
+      "bytes": 14514
+    },
+    "experiments/color-search-benchmark/global-load.mjs": {
+      "sha256": "fee7d7736da1372d5d34f1b6388aaeacb6f3f4bfe0840ae034429c3dd9550182",
+      "bytes": 1609
+    },
+    "experiments/color-search-benchmark/global-multi-data.json": {
+      "sha256": "946b5bd711c47dbb1ce5a5c2f92cd47da7327fcea46237f9db300710ff468774",
+      "bytes": 1370932
+    },
+    "experiments/color-search-benchmark/global-multi-evaluate.mjs": {
+      "sha256": "dc437ecfa3450c09b61c7e89711c6f61929874f65d1ebc851e5d031c3712a35f",
+      "bytes": 7705
+    },
+    "experiments/color-search-benchmark/global-multi-evaluation.json": {
+      "sha256": "b2fb554848db06e73150bba7b49f6e1c67c4469b7231404507f96c316758906c",
+      "bytes": 201050
+    },
+    "experiments/color-search-benchmark/global-multi-fast-evaluate.mjs": {
+      "sha256": "b8f7fd6ba329945a86f702a9810e6eb9829a744aa0666da35c784bf1c79a9071",
+      "bytes": 5371
+    },
+    "experiments/color-search-benchmark/global-multi-fast-evaluation.json": {
+      "sha256": "cd1f6cab2ebd7e5212a6b126431caf15f20c626a7a66fc528a39db3e4f39877d",
+      "bytes": 36382
+    },
+    "experiments/color-search-benchmark/global-multi-fast-probe.json": {
+      "sha256": "bae62a54f422f4383336a3897d870df61b4288c4272fee3c827e0cee1e328b9a",
+      "bytes": 9519
+    },
+    "experiments/color-search-benchmark/global-multi-fast-source.mjs": {
+      "sha256": "dfc32df265cac823aed7f200cae324251f1648aa869643d099f6f82f0595ba8e",
+      "bytes": 1886
+    },
+    "experiments/color-search-benchmark/global-multi-fast.mjs": {
+      "sha256": "358d5a0520cddee236dc52c32d7bdde6f17580f0abc3bf28597abe9f46df7b67",
+      "bytes": 4821
+    },
+    "experiments/color-search-benchmark/global-multi-finalize.mjs": {
+      "sha256": "f1a1a836335a868248bf8bdb026bed45fbb20ab98374d23a2bd37675a4890d92",
+      "bytes": 2655
+    },
+    "experiments/color-search-benchmark/global-multi-index.mjs": {
+      "sha256": "dc3e63199edefdb98d6478a721f2483af0c0c170568db828e5f8ea3272ef270b",
+      "bytes": 3298
+    },
+    "experiments/color-search-benchmark/global-multi-indexing.json": {
+      "sha256": "ab06666a86d224cc166e3d47d45ca9b3091c87407894bf5954fd7c8a26243ae9",
+      "bytes": 13598
+    },
+    "experiments/color-search-benchmark/global-multi-prepare.mjs": {
+      "sha256": "b5996f6d4ba4d9711e6a8464a8e020f7ddd09732d9f47b71d4141726558aeab6",
+      "bytes": 7639
+    },
+    "experiments/color-search-benchmark/global-multi-probe.json": {
+      "sha256": "1297fed27b6847edd79315940e473de72b062f9b1d2f22a6f739e24d2e7e2870",
+      "bytes": 1691
+    },
+    "experiments/color-search-benchmark/global-multi-proof.json": {
+      "sha256": "aaeb85994319d0f9ac930b3ffc62d0446978a4b279aae6d930d0b3c3e141885e",
+      "bytes": 923
+    },
+    "experiments/color-search-benchmark/global-multi-verification.json": {
+      "sha256": "cf3cde383e0d2618b81ef4a94bb91f8a10368831fc9ae6e01886838d56770989",
+      "bytes": 7316
+    },
+    "experiments/color-search-benchmark/global-multi.mjs": {
+      "sha256": "78d72a8cda73127dfced2ae2c5487b9de0870a73fa91e6c1f1e6a332239c5d38",
+      "bytes": 29004
+    },
+    "experiments/color-search-benchmark/global-native-probe.json": {
+      "sha256": "4529e783bbb676756e8e4a9d1443f008c5a327983be2bef761cc7b25f6c411fd",
+      "bytes": 2954159
+    },
+    "experiments/color-search-benchmark/global-native.mjs": {
+      "sha256": "aee4fb817d3d92a6b51423345c5c73ab6a8be43a4a403ef3eb45956898e594d2",
+      "bytes": 11189
+    },
+    "experiments/color-search-benchmark/global-pixels.mjs": {
+      "sha256": "a06f3352339281d6cb182d0cb5aa0a8026e4e30a8a9103658a82b7840a662802",
+      "bytes": 3603
+    },
+    "experiments/color-search-benchmark/global-planner-evaluate.mjs": {
+      "sha256": "6f0df0297fa83457b2b090af30de04ed49d702ab121cbc7be1bd5704cda2b131",
+      "bytes": 18651
+    },
+    "experiments/color-search-benchmark/global-planner.json": {
+      "sha256": "8030465b4533a58c74b964a2f510a41eb96716692c57e525ac5b4feba39cbb25",
+      "bytes": 924921
+    },
+    "experiments/color-search-benchmark/global-planner.mjs": {
+      "sha256": "5be0dce728997b8946ce1e2f37283ef3fab3017f1e4c17f3931adabba5fa5c42",
+      "bytes": 6415
+    },
+    "experiments/color-search-benchmark/global-prepare.ts": {
+      "sha256": "d2353eac6fa8539e2cf1bde1e358298b77ee97d9ca71ffd62b1211a3557d162a",
+      "bytes": 2720
+    },
+    "experiments/color-search-benchmark/global-real-validation.json": {
+      "sha256": "22193d332ac1b56d9c4710c6a7daffe84d8d7f3523cd500138e229e336012740",
+      "bytes": 45831
+    },
+    "experiments/color-search-benchmark/global-report.mjs": {
+      "sha256": "a0d3bace82284db396d9510085441f9ed167ce94f51a32e96367f3e34c4d80d9",
+      "bytes": 13814
+    },
+    "experiments/color-search-benchmark/global-resources.json": {
+      "sha256": "eabf35139a09e1f70f505a0f7b6f0a2d99c2b384cd4c2a77dc9170036ee9751e",
+      "bytes": 37208
+    },
+    "experiments/color-search-benchmark/global-resources.mjs": {
+      "sha256": "6d2477bfa52f33533e592c9bee47ceb24d11a5f22773d9c5e35e74eef927463a",
+      "bytes": 3314
+    },
+    "experiments/color-search-benchmark/global-sampling.json": {
+      "sha256": "a76147ae608ed253a04099c7995b26c5559bdd53663fd9dec1da00be028978e7",
+      "bytes": 164369
+    },
+    "experiments/color-search-benchmark/global-sampling.ts": {
+      "sha256": "dfd2f29e90e0fe5f3603d32c225fcd66b81cc8a58fef671e5934a140c68f40e1",
+      "bytes": 18769
+    },
+    "experiments/color-search-benchmark/global-server.mjs": {
+      "sha256": "cba60af6ad6935b04eef2ecb59577f1df3bbc45a9cc5bb91de0e7a0409cf6c35",
+      "bytes": 18257
+    },
+    "experiments/color-search-benchmark/global-settle.mjs": {
+      "sha256": "4864611a19fe79e376bad218efa8fad3ef129286dd3a959ef6b22804d79b4999",
+      "bytes": 613
+    },
+    "experiments/color-search-benchmark/global-varied.json": {
+      "sha256": "2a2ceb86e8169324a06880a71edb7a44c666bd7852fe5f7915849c51536558a2",
+      "bytes": 543817
+    },
+    "experiments/color-search-benchmark/global-varied.mjs": {
+      "sha256": "22b226a8122b360582d13c21223dc708d2235fe8788efa4fbd1aed606722116e",
+      "bytes": 17538
+    },
+    "experiments/color-search-benchmark/global.html": {
+      "sha256": "530f4dba5020f5063d62f1c281b3f210d76f250628f57ddc0e5844537633961c",
+      "bytes": 24202
+    },
+    "experiments/color-search-benchmark/models.ts": {
+      "sha256": "27cf4e8a8e66a10a30bdbc5914b22fb3e53ca74ee3169d49fe5b98129ada839a",
+      "bytes": 6285
+    },
+    "experiments/color-search-benchmark/output/blind-key.json": {
+      "sha256": "c71a503309fc014f64833dcbbfe2c00013106934bf238dac67561358d0cf1863",
+      "bytes": 850
+    },
+    "experiments/color-search-benchmark/output/descriptors.json": {
+      "sha256": "914bcc19fa8d57e09103f91a1d73b81ebce7be5332e022fd1d699b218cf179ff",
+      "bytes": 745149
+    },
+    "experiments/color-search-benchmark/output/diagnostics.json": {
+      "sha256": "c4fb110ef9372f0c11e0e4ce862b9a62655c989a6c0ecabf4df3d9cf7bf5e4b5",
+      "bytes": 35797
+    },
+    "experiments/color-search-benchmark/output/features.json": {
+      "sha256": "159700a666dc0ee894fb02cabbef8f5a9dd79a18bcdf4a7a3d43646328b6d46a",
+      "bytes": 223491
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-001-1024-254220286ad08358.json": {
+      "sha256": "ffe8c92b15975665668ade259c491625f2e23c59ba9c9b70783b64d90a846774",
+      "bytes": 5904
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-002-1024-254220286ad08358.json": {
+      "sha256": "7fe96ac673e1ac0732ec1cbcb168a99f790ba4e625c60f75fd6057fa5964590f",
+      "bytes": 5990
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-003-1024-254220286ad08358.json": {
+      "sha256": "62774d8e44a8d6c4f29d5c80ca02a465dbde25963778d4885c2839285ce8e095",
+      "bytes": 5637
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-004-1024-254220286ad08358.json": {
+      "sha256": "d71daed81f43f62ed6080b139d76e91593d6878bbf11dde3b83795ef29ad3e8e",
+      "bytes": 6653
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-005-1024-254220286ad08358.json": {
+      "sha256": "42f6d09812778a8e01748cde962e67d17ecff3b27ff336f9e623dda510cdf409",
+      "bytes": 4681
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-006-1024-254220286ad08358.json": {
+      "sha256": "43fa8f1f51b98aeb048e27c14222b3a4ed02c642db16dae25fb694d25a5314a6",
+      "bytes": 4690
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-007-1024-254220286ad08358.json": {
+      "sha256": "e38f5560706d12fef01203c0a07ccedd06f9bb4e6308d9f254dc6d048a4cba1d",
+      "bytes": 5962
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-008-1024-254220286ad08358.json": {
+      "sha256": "55955e8d96db0a6b8f33655e8d8bc2ccbbbd91033d84d9d7f43b9caa48352f5e",
+      "bytes": 6705
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-009-1024-254220286ad08358.json": {
+      "sha256": "a88e265c2427bce9050135aa689442dfc661a444580150e8657437cc1f9f8652",
+      "bytes": 5789
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-010-1024-254220286ad08358.json": {
+      "sha256": "58470cfe6b1035905122716690b52f7c076b1219dcb7d106b33c1516ed9ac6c0",
+      "bytes": 6662
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-011-1024-254220286ad08358.json": {
+      "sha256": "316e2e5ff929a69646c9143918d018e66c11bd96a0c3f5600308e848edd8d7f2",
+      "bytes": 6556
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-012-1024-254220286ad08358.json": {
+      "sha256": "ffb4021d9e09cbb5bdb2a027632044cbead05d2d51e20d14f4fd9a10951a99fa",
+      "bytes": 6621
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-013-1024-254220286ad08358.json": {
+      "sha256": "92d97f8e463910194f7fa9b29ad79dd4dcf59d2e9bd5a148859dfd418d230d9b",
+      "bytes": 6300
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-014-1024-254220286ad08358.json": {
+      "sha256": "670b19b46aca9287de5e42db760e864542e024edb67d8a4fce41ac9be098c77b",
+      "bytes": 6301
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-015-1024-254220286ad08358.json": {
+      "sha256": "1254468c5ac8934c1e84b27777fb1f5bf9d4f24fd44ab49e12f76a687e8f8c03",
+      "bytes": 6728
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-016-1024-254220286ad08358.json": {
+      "sha256": "67278e55e5cf8a6ea7c62fb755f663ba122d258cad3753dff8dec57059c95b79",
+      "bytes": 6698
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-017-1024-254220286ad08358.json": {
+      "sha256": "c06ddbed27c68e0b4e049f4ed0bb5cff5533d5a8b773d7862c871d1899b6a7b7",
+      "bytes": 6586
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-018-1024-254220286ad08358.json": {
+      "sha256": "b0db0b7704039ce84b42fdc83927959da2d1d3cb019dc455c90fa8eb0feffae8",
+      "bytes": 6527
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-019-1024-254220286ad08358.json": {
+      "sha256": "48d1cced380ac6204b81d380a599323fa424b0d1d3b62dbdc99f7a4255702815",
+      "bytes": 6677
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-020-1024-254220286ad08358.json": {
+      "sha256": "9451f6a3a37252e26ab591f425904d68504ca7d197f3dacf50895f1eb27083b5",
+      "bytes": 6649
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-021-1024-254220286ad08358.json": {
+      "sha256": "e5390a49f35bb94afe689908539d3870346e9be6b71db407d202410ac9cd898d",
+      "bytes": 6757
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-022-1024-254220286ad08358.json": {
+      "sha256": "476259c4708829ca5b34222c34de5b34ae914570b49f6c061c8212bee5b4f47e",
+      "bytes": 6660
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-023-1024-254220286ad08358.json": {
+      "sha256": "60670e0de55a2f0828c312c9f0fe7410a25ce38bb80c069debf3ad48f590fd09",
+      "bytes": 4691
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-024-1024-254220286ad08358.json": {
+      "sha256": "38fc898883832a67171563d1e0c11b8eb41d446385cc38c101a4f1c786dcc60a",
+      "bytes": 6583
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-025-1024-254220286ad08358.json": {
+      "sha256": "e9b684f2dacf5c76037c54bd9824c1fe107e3b620a02a84c6e304fac1514759d",
+      "bytes": 6568
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-026-1024-254220286ad08358.json": {
+      "sha256": "ffae705cda74c6b9b5fc4bbde1fd9ed4505f7ce4e1565660278b21e1f2d460ea",
+      "bytes": 6688
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-027-1024-254220286ad08358.json": {
+      "sha256": "aba6834e09cee6094d8d25954e9641900805b7a73f8b33820ea927d2e48f4528",
+      "bytes": 6634
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-028-1024-254220286ad08358.json": {
+      "sha256": "2e23e1cef174b8060cd33d2bb40f871ff3650cf93c0f25cd3271cb140d96ba25",
+      "bytes": 6643
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-029-1024-254220286ad08358.json": {
+      "sha256": "d361fbc55c1aa8f1872df04fba4e4615d1260e96a66de1fb897ba562b39a9ab8",
+      "bytes": 6648
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-030-1024-254220286ad08358.json": {
+      "sha256": "00ec87cb53f725810645512c1a01453bf72e297e28d59ce4e4cd35cf9b1f88db",
+      "bytes": 6756
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-031-1024-254220286ad08358.json": {
+      "sha256": "9d956a254007338458e260965beaa27253906daf8d559ecfdca1e8606a846ae0",
+      "bytes": 6452
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-032-1024-254220286ad08358.json": {
+      "sha256": "a5f640b7abe67682de25ee3b87f3cbe15b0a344c5de9d6e7258018967b8f4220",
+      "bytes": 6076
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-033-1024-254220286ad08358.json": {
+      "sha256": "fabc73d11987961b08bd7162c73509ee46bce65adb0c4bdb270f5df0064cf835",
+      "bytes": 6706
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-034-1024-254220286ad08358.json": {
+      "sha256": "05d70f08fb18ef82dbb2b8adaa92fae02dbd8024c40b3e2c624d9214c1572abb",
+      "bytes": 6623
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-035-1024-254220286ad08358.json": {
+      "sha256": "3e856129ad12ba040854b30935e21a82db8a69d21261e2d2fd12bd5300c9c0fa",
+      "bytes": 6653
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-036-1024-254220286ad08358.json": {
+      "sha256": "360c89377dbd15262ce87923e834e83f4a13122414e570071dbba30cd4540646",
+      "bytes": 6607
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-037-1024-254220286ad08358.json": {
+      "sha256": "268355f49ce8816104dd16f064827e6c9bbf1ec0c32e44175364dc8612860a69",
+      "bytes": 6695
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-038-1024-254220286ad08358.json": {
+      "sha256": "167e16e4f172dc0833de9560317e37f8a365f060b9f61a82560778d9082c3e5a",
+      "bytes": 6693
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-039-1024-254220286ad08358.json": {
+      "sha256": "35796c064ad639f788987f2c1533ba96df9ad6ae69b41c9da1cedb5c3ea86ec5",
+      "bytes": 6677
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-040-1024-254220286ad08358.json": {
+      "sha256": "917b1a658a121f67680a53aca754be751314d97e531993f5ef0965b5cae760f0",
+      "bytes": 6568
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-041-1024-254220286ad08358.json": {
+      "sha256": "8cd194c4978a2693c8632c1ad4e69962eb4d127b0e8b210b6ba11d12061a2d2e",
+      "bytes": 6115
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-042-1024-254220286ad08358.json": {
+      "sha256": "b9816d69100bde859340fbee58baa641464e856548547437ae7d515540aacba7",
+      "bytes": 6573
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-043-1024-254220286ad08358.json": {
+      "sha256": "df5db53ede02f51a703df7cd7a29c7f2e3b33882d9dcaf30847e4f3b14c60c1f",
+      "bytes": 6682
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-044-1024-254220286ad08358.json": {
+      "sha256": "c8090951d9c1f228f817ee1261cc9c3d3b3b61a695622f3c055e892019f5b7a6",
+      "bytes": 6458
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-045-1024-254220286ad08358.json": {
+      "sha256": "ae4e1481d0c667468ad54072955f4f997dc5d3c997244f9331012fa6524c2a8c",
+      "bytes": 6586
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-046-1024-254220286ad08358.json": {
+      "sha256": "2a8df66e54fc8d2d1259f68f7f72caad9c842505a3398f5e0a08354b969aeb58",
+      "bytes": 6669
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-047-1024-254220286ad08358.json": {
+      "sha256": "68cbf90783e4e02216bf57e93042de58f0d2e32bff6b8a3024a8fa6eeca1b694",
+      "bytes": 6673
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-048-1024-254220286ad08358.json": {
+      "sha256": "56d85c5f024d49c74516f337392b52b95d3be3a8ebb867e960d2bb55f967ea57",
+      "bytes": 6340
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-049-1024-254220286ad08358.json": {
+      "sha256": "97b69820c563e3bd3c2283000904d8d57fea37844dfa55cab2b92cacc56b7cc0",
+      "bytes": 6457
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-050-1024-254220286ad08358.json": {
+      "sha256": "788269b487bd87f32d675f63dac5822c2beaf1b4fc9783b7c67ab6d3fe3d3375",
+      "bytes": 6722
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-051-1024-254220286ad08358.json": {
+      "sha256": "2161cdc1dbc68ae41dedc07b57b94106ae761cd6430a240b051c0b323fae1622",
+      "bytes": 4987
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-052-1024-254220286ad08358.json": {
+      "sha256": "45d1896514eae191fc64692fc8b35b41ffc54d84f02c4d66bd7e624dbb08fb3c",
+      "bytes": 5439
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-053-1024-254220286ad08358.json": {
+      "sha256": "4759a522601033715fbf9c4f21c8a01217cae133698eeb5e7c85ee2d523dee6c",
+      "bytes": 4669
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-054-1024-254220286ad08358.json": {
+      "sha256": "4159f0c4fe00597da788b3d657cbe609cc835f8fd20d5417376d4f1f0b604766",
+      "bytes": 6217
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-055-1024-254220286ad08358.json": {
+      "sha256": "8ac866abcce19e8c5c212a6887994e37a5c582fbecca1061423b1723af2ab51d",
+      "bytes": 4503
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-056-1024-254220286ad08358.json": {
+      "sha256": "98494b3ee1078e700ecba8c69f10f447fba131f0422b4f375bea8cb430184237",
+      "bytes": 6230
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-057-1024-254220286ad08358.json": {
+      "sha256": "f3254d02679e25564ba2060bbb3213937100a307f1f6b77761f6177c98b82202",
+      "bytes": 6632
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-058-1024-254220286ad08358.json": {
+      "sha256": "48ef32f693e320b85ba46d8b8d65bb1b338534a8d4cc05cfa964c4424ab57772",
+      "bytes": 5456
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-059-1024-254220286ad08358.json": {
+      "sha256": "5f076ac22dbbb4a57f1cd2fb6c2f3b0d54fe9633182de20dcda9f84243756fa9",
+      "bytes": 5904
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-060-1024-254220286ad08358.json": {
+      "sha256": "a99bffc1e46f3116fbabc07055e408f7bee53bb33d45c581641f624a751ab8cd",
+      "bytes": 6033
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-061-1024-254220286ad08358.json": {
+      "sha256": "63c926a26c24510ff3ff35ada13296bb69af2ff1e13c3fc696db8fe9b9b92a70",
+      "bytes": 4670
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-062-1024-254220286ad08358.json": {
+      "sha256": "33bfea533208bf00261f3cbe9f51a9ba14b57c1971eeba78c37c1eb0481b7abb",
+      "bytes": 6487
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-063-1024-254220286ad08358.json": {
+      "sha256": "e5abf3071ce58da2e44ab8c7c6a10758364f7460404f74735d0dd13e8a148bae",
+      "bytes": 4961
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-064-1024-254220286ad08358.json": {
+      "sha256": "230fb2499c76dce3b79aacb2abd88ab91bf8982e6a37d94d2cea0cd4b3fa0e74",
+      "bytes": 4781
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-065-1024-254220286ad08358.json": {
+      "sha256": "3add9b0f888082ce7769622893c42b57e930ca73bbc389b23268a7307f7fe182",
+      "bytes": 5935
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-066-1024-254220286ad08358.json": {
+      "sha256": "3455296504a76627d4c859e494314918a81435fb84f15684bd8eb3046f86ce4c",
+      "bytes": 5331
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-067-1024-254220286ad08358.json": {
+      "sha256": "2db0d094bec1801b56aaf98cdcdfbd709d7fd2b2f0e73538ccf490b68acfff14",
+      "bytes": 5129
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-068-1024-254220286ad08358.json": {
+      "sha256": "8175ac267e300d97f2320855b65f430987f732773a3680aaae73b920baa5e5b0",
+      "bytes": 4682
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-069-1024-254220286ad08358.json": {
+      "sha256": "0593c37aecac69e81861b61122a6b7cc54a24d2a772fc3474a1f90fe98828d2f",
+      "bytes": 5014
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-070-1024-254220286ad08358.json": {
+      "sha256": "adf7feb3bcdde944b0390de531afd508f0774ff8ed1833dd352cae5a6d30eefe",
+      "bytes": 6716
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-071-1024-254220286ad08358.json": {
+      "sha256": "00760bbb83ea1dc9cce0ff51c03258642411cd8efdc858d300a1dd6a075c2286",
+      "bytes": 5925
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-072-1024-254220286ad08358.json": {
+      "sha256": "c253f5c00c39179a902570e1b44aed0fcb336245232ea43c98c4b9f8942aa2ee",
+      "bytes": 6673
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-073-1024-254220286ad08358.json": {
+      "sha256": "a3b06c845caee1e1cac21531c310b967b01213524751781df492d7c2651afa9b",
+      "bytes": 6560
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-074-1024-254220286ad08358.json": {
+      "sha256": "fdf93c19572b722a0e994b7eec44acc8f71e961ad77fd5b24c04e02d8afe99d1",
+      "bytes": 6296
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-075-1024-254220286ad08358.json": {
+      "sha256": "6a923d05a83e7b587f92d1e0c38c30c0509d5901858b815083cf49c79a754013",
+      "bytes": 6547
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-076-1024-254220286ad08358.json": {
+      "sha256": "3be1909d9babf1ddb43ffbdd6fea23fbfdb3bc9ec654c829255567d3795f2cd1",
+      "bytes": 6628
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-077-1024-254220286ad08358.json": {
+      "sha256": "147157e262ec9df755245e6f4410c902cd8b07a3e4789147d0ff48246fcd202d",
+      "bytes": 5906
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-078-1024-254220286ad08358.json": {
+      "sha256": "0ed122a4cd5bd011af5991a5937f426b569330f9acbe43233b6551e5acc603b9",
+      "bytes": 6588
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-079-1024-254220286ad08358.json": {
+      "sha256": "3a90d5ddda65ee7b51fc936bb7dc1ceb293c87a5edc22efbbe5bcbfccb355c3e",
+      "bytes": 6572
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-080-1024-254220286ad08358.json": {
+      "sha256": "775b37fbe9a740e7c85bae99cd6c74d72718aca688fccc40d6b91536e0b89793",
+      "bytes": 6139
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-081-1024-254220286ad08358.json": {
+      "sha256": "eda1e4b2226ad377621c9da6a418ffca7ea9c7a5234ac64d6e0c2ba2b056db00",
+      "bytes": 6664
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-082-1024-254220286ad08358.json": {
+      "sha256": "aa6ab0bee23953eaaae6f4b5a6bd330b320a1f38ecab79781f073ae3845a60d3",
+      "bytes": 6667
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-083-1024-254220286ad08358.json": {
+      "sha256": "98b8ad39d2aa07d8bb01eb9ea21641fad255d47445f7bf1a741612829ce80246",
+      "bytes": 6656
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-084-1024-254220286ad08358.json": {
+      "sha256": "989acf51566f5dd0b2074d8d862cf8eb79f1f873e326974da6e1a5dbfac51da0",
+      "bytes": 6574
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-085-1024-254220286ad08358.json": {
+      "sha256": "5ce79cf76191b5b82f578c4a6ae2502a7891f140ff5a0b14080d3eda0ac5eb86",
+      "bytes": 6667
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-086-1024-254220286ad08358.json": {
+      "sha256": "43a6de58743c03bd97b9ede5475fcb843a8a54f1d73a34f428deaab1bcc7b4bd",
+      "bytes": 6803
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-087-1024-254220286ad08358.json": {
+      "sha256": "237bc9f8004fc58d9c5c37c524894e08c18dda90c86d42977006aec8671de998",
+      "bytes": 6638
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-088-1024-254220286ad08358.json": {
+      "sha256": "e44e77356564594656002191b6962674382ba8bea3c628bb495df3119a451ff2",
+      "bytes": 6632
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-089-1024-254220286ad08358.json": {
+      "sha256": "3d340aa731834fbb652137069b1f22dedd06e8acbf9129f91b29148149a2bde7",
+      "bytes": 6440
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-090-1024-254220286ad08358.json": {
+      "sha256": "fae0c21f90061335a0ea9d0e497d4a242f44ecdd5af9bd1795f830fb12b83c5b",
+      "bytes": 6543
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-091-1024-254220286ad08358.json": {
+      "sha256": "a9151cdefbc2436174c565931a1482d6acec8e65162ffb39ec230576533df1aa",
+      "bytes": 6298
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-092-1024-254220286ad08358.json": {
+      "sha256": "e1d84e1f70d2c542c0c2412bddb97c9e88da0a116830d0e76282529327efd628",
+      "bytes": 6808
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-093-1024-254220286ad08358.json": {
+      "sha256": "bc16ee10dfbc3506bccc99fccc333d5e596ddb0f8a84ce000fa7c2c348e557e2",
+      "bytes": 6678
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-094-1024-254220286ad08358.json": {
+      "sha256": "705ff0a86b8b6d8f3aa6a6b9fb82be8a1caaf6c85e6df9d1029d1361cf9a0fc1",
+      "bytes": 6620
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-095-1024-254220286ad08358.json": {
+      "sha256": "f18bd479c408cbe6ec10f77e8d1f12242806e88a26e41949f9efdb63f0f9d5bf",
+      "bytes": 6517
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-096-1024-254220286ad08358.json": {
+      "sha256": "e97449b65f37ecf00b35f72b19f1c60fcbbeacd46702ba218a9aaa6a0f843f5e",
+      "bytes": 6225
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-097-1024-254220286ad08358.json": {
+      "sha256": "44045cce5f9561527da0ff1dce49f04edb8a3a1ce19b76de52b6763acbfd6f3c",
+      "bytes": 6657
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-098-1024-254220286ad08358.json": {
+      "sha256": "9d6a9c48edbad6c2ec3bf53a6ee9ffd1430e237950f4a6081c65cd073f505566",
+      "bytes": 6607
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-099-1024-254220286ad08358.json": {
+      "sha256": "67e49bded1563da5b4acb4d61786e788cc9b201b650fc7b4e6c284c7841e4f0c",
+      "bytes": 6578
+    },
+    "experiments/color-search-benchmark/output/global-accuracy-cache/wallpaper-100-1024-254220286ad08358.json": {
+      "sha256": "7d4b270fdf1bc3917c35c4fc75a23172157733194aced63a96e0b2ab14c72518",
+      "bytes": 6687
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-001-042cfe6f83324594.json": {
+      "sha256": "a5c7e11bd4f774d3b3397dc85b0b07a317c1bf9fd665521332706a6f9c1879d2",
+      "bytes": 11262
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-002-042cfe6f83324594.json": {
+      "sha256": "ce3eec9a2d061709137bd5118f58646f9c4cc45f76dfef8e06d73b911b25a29a",
+      "bytes": 13044
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-003-042cfe6f83324594.json": {
+      "sha256": "e942a90bab598725b1570aae1384f682787f48be64204bf2efddc7b771bb4687",
+      "bytes": 11472
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-004-042cfe6f83324594.json": {
+      "sha256": "763724124cdb1cf6c3631532cae907e87bc0185ba6fa17e0fac1898113860e17",
+      "bytes": 13485
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-005-042cfe6f83324594.json": {
+      "sha256": "11e3a64f131a353b281623d8df0a1869291b0b737b1ae4e8dab8c01fff494715",
+      "bytes": 9475
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-006-042cfe6f83324594.json": {
+      "sha256": "27c4d4cf1c0d1b5e7d735f432831f80a4d02cc951354c497551f1e25022a32a1",
+      "bytes": 9501
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-007-042cfe6f83324594.json": {
+      "sha256": "236827e0a0e15bf89074348b366a44c9869c8291b4c4a564b1a5160ac74f02de",
+      "bytes": 11897
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-008-042cfe6f83324594.json": {
+      "sha256": "d72a917622488266b6bf908a10ced1b690806d81448bf925f0becb05722771af",
+      "bytes": 13712
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-009-042cfe6f83324594.json": {
+      "sha256": "4a267a46ad58d4d75129de1f584de332eed5ad31e2666a637fae67d319b189e0",
+      "bytes": 12224
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-010-042cfe6f83324594.json": {
+      "sha256": "6969b38cf9481653bd7b491d65d5e68d69a20fcb7df29bb150acb5bce0b2c076",
+      "bytes": 13489
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-011-042cfe6f83324594.json": {
+      "sha256": "24a0d541eb7cc5a9b78fcec79cea822fd06510f268904351e7a1b09f9e3badeb",
+      "bytes": 12754
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-012-042cfe6f83324594.json": {
+      "sha256": "58fbb2c7c802d6a13f516a98f3a999cf324c5e2bf5a3abc067d7498d78130da6",
+      "bytes": 13283
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-013-042cfe6f83324594.json": {
+      "sha256": "9fc9236ef5727144f896dcbd62d36b8b5cd99fab605d9f098c5e25441b2066bc",
+      "bytes": 13034
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-014-042cfe6f83324594.json": {
+      "sha256": "fd75494e482ad033b6b07519ce0f6f5e8fa1f5d5225a157059ac297e41c40fc1",
+      "bytes": 12293
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-015-042cfe6f83324594.json": {
+      "sha256": "75493ebb278ddecdddd7deeb8dbab98eb2b5879b393d6ac462e0f800c907158b",
+      "bytes": 13580
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-016-042cfe6f83324594.json": {
+      "sha256": "7ee4f3b19ac0ea262638bbe91f82984c6bce636e9816a0e9a74debe9c71754da",
+      "bytes": 46647
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-017-042cfe6f83324594.json": {
+      "sha256": "c05045f7f44a7cfe79b479fe56549a2f3369382d09682db5363658b759873923",
+      "bytes": 13361
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-018-042cfe6f83324594.json": {
+      "sha256": "17b3c25a9956155db6c8d76d60c64135888a4336d187c13ce3aec0e93b26dcbd",
+      "bytes": 12412
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-019-042cfe6f83324594.json": {
+      "sha256": "fd9075c61dc530966041cd91e6e98b81b73987f7d823e9919e1e01791ef5afff",
+      "bytes": 13419
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-020-042cfe6f83324594.json": {
+      "sha256": "feaf97cffd50c9adf7ca218ecaed09ca3109d27e5f9be0d27e4f99d2f6df7500",
+      "bytes": 13417
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-021-042cfe6f83324594.json": {
+      "sha256": "8ee49a2a129b1b608e29ff46123589cdf93bd9507c6d4bdde33b09a37557b507",
+      "bytes": 13514
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-022-042cfe6f83324594.json": {
+      "sha256": "629d57b10597a10f02ecc8926763cb16c24b3145557ceaba55d3e860dc27ab5c",
+      "bytes": 13395
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-023-042cfe6f83324594.json": {
+      "sha256": "7e6795dc73d6e92220d8769934459e0dcc6bfbfe1688189fdc8c8efd27cb9a83",
+      "bytes": 9472
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-024-042cfe6f83324594.json": {
+      "sha256": "f4e3fd2ad618bb69b5ecf057c1c3f92b3f4c63d8e65211783e53f041b258fdde",
+      "bytes": 13291
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-025-042cfe6f83324594.json": {
+      "sha256": "38a79e6a2d8d556dafda87dbde948819fc81cff5d2be9f8072bb949942996c8c",
+      "bytes": 13235
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-026-042cfe6f83324594.json": {
+      "sha256": "ae66eb42ce2e2e5a3e89c87561ddf3d288d2c63a34573303c9e3cbdfa64d1164",
+      "bytes": 13442
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-027-042cfe6f83324594.json": {
+      "sha256": "bfe4e389942818bfb652eb6a36e6553cdb74404879e2210c451a6df492f0eb63",
+      "bytes": 13377
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-028-042cfe6f83324594.json": {
+      "sha256": "cc8b007f5af67d21cb51983c39a375a69d14c4df75e60ba7c0b99e37054c2500",
+      "bytes": 13381
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-029-042cfe6f83324594.json": {
+      "sha256": "9bf33a4bf3d10ea62d335c2ff7f47625fbd4a8fee194acc17f45928532e9affa",
+      "bytes": 13348
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-030-042cfe6f83324594.json": {
+      "sha256": "e2bc8c3bc80ccfe5d32fdb5c0a5adfe446ca26a504a8082581d5b466bf4bc71c",
+      "bytes": 13623
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-031-042cfe6f83324594.json": {
+      "sha256": "b147c394707e29891613a76e0d4b730d7243f05c1630a4c21ed24b63bf438232",
+      "bytes": 13182
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-032-042cfe6f83324594.json": {
+      "sha256": "d4b0713d32c6cff7b2ec6a4ea21a18effe4a315a4ef2402d5e1a17ca8812352d",
+      "bytes": 11361
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-033-042cfe6f83324594.json": {
+      "sha256": "9572f72e1a5517457bc9aeee105218e762cfdf3ca611049a8857366034bd3cfa",
+      "bytes": 13513
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-034-042cfe6f83324594.json": {
+      "sha256": "d1af44fe5e1890460714aeb242ef90d132eb30d309efc89f7678e8553176f2a5",
+      "bytes": 13303
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-035-042cfe6f83324594.json": {
+      "sha256": "3b5a14d3758409fbc2fb4be63e61a8a0864a5eaaedee0681e9fca8fba4b82629",
+      "bytes": 13354
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-036-042cfe6f83324594.json": {
+      "sha256": "aef61f5bb5eb61547e272571b0822c556fe16467295f02a9c4c5a27c4c7e19db",
+      "bytes": 12888
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-037-042cfe6f83324594.json": {
+      "sha256": "64aef13ea3813575cc1eb5028a73f5a8d2368da355f3ac3d64bf9925b11254b1",
+      "bytes": 13120
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-038-042cfe6f83324594.json": {
+      "sha256": "4d884f8b81d32e6af40ba40b8410974b80a129f4186b5b0901f072bd97e04fb8",
+      "bytes": 13506
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-039-042cfe6f83324594.json": {
+      "sha256": "4da9bff1b6d026b8310077c7130d4cb145729cb09db34f238fb00992a6fa1355",
+      "bytes": 13211
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-040-042cfe6f83324594.json": {
+      "sha256": "4fa49f32f3e73df18e0a03bea6377d1bb586bcf07e12afb38fbd4d70ccaa7f93",
+      "bytes": 13368
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-041-042cfe6f83324594.json": {
+      "sha256": "4a2844805dbcec5ee2dd89b5279449d1258f3616097fa77d28844eb5722e52f2",
+      "bytes": 11747
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-042-042cfe6f83324594.json": {
+      "sha256": "d8e94e85e8fdd4883626be7d9e2a1192e7bda136e27dce319b317a2a4e2dabe2",
+      "bytes": 13259
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-043-042cfe6f83324594.json": {
+      "sha256": "14e42c6f112bb15321d131f0e53ec1d4eef7397b6e8ce554cf7a8ad1b3ee67a8",
+      "bytes": 13506
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-044-042cfe6f83324594.json": {
+      "sha256": "6282a8b4af11e7c139baf239f047f2efadf8d6251caddc5ad11c5ba37f3a901f",
+      "bytes": 13071
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-045-042cfe6f83324594.json": {
+      "sha256": "3c880332259f3bc2172fcac055749b67a4bf1bbdd9b46509f3b5990ec25258a8",
+      "bytes": 13202
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-046-042cfe6f83324594.json": {
+      "sha256": "b5e68621db9cf9ff9acd3e2f80c1d872f48f89943cffcc014ebc19cfcf96c6fa",
+      "bytes": 13558
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-047-042cfe6f83324594.json": {
+      "sha256": "156492439d99eec57570d803218f602cb37fdeb5e1b8cab01838de5d2425b11a",
+      "bytes": 13480
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-048-042cfe6f83324594.json": {
+      "sha256": "d5332e6464b8f06bfb09f720c8b2122690d65e6f7762d791233a38487c990e69",
+      "bytes": 41290
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-049-042cfe6f83324594.json": {
+      "sha256": "3c96c2e5224ffd5788b9f36a768cb9979c5056fc3cb8b0d57763f76b842238ae",
+      "bytes": 12098
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-050-042cfe6f83324594.json": {
+      "sha256": "a330b31ec7c8bc7f981ea59ca4e8f8b5b3698b41bb240c97d9ec40acccf3899c",
+      "bytes": 13546
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-051-042cfe6f83324594.json": {
+      "sha256": "1ff74da123f4d84e78b6931c69968aac6709742631a701a6168ece8c30ce2725",
+      "bytes": 9709
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-052-042cfe6f83324594.json": {
+      "sha256": "258f8e047b11998db35982dda56cbcde330382aad32629b51556ce39d6c651d8",
+      "bytes": 11105
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-053-042cfe6f83324594.json": {
+      "sha256": "dd892dd0fefbbd101e4232dbac40fb54f1bec28a44402483526bf92c45dbe860",
+      "bytes": 9427
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-054-042cfe6f83324594.json": {
+      "sha256": "247f6019c989f8d86b2a1de6fb68b1e065dac4e71ef8a1714b80daddf6fcc152",
+      "bytes": 12247
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-055-042cfe6f83324594.json": {
+      "sha256": "7c7f69b803ed51cdaf9603bb4335902952fd55c172a679bf003305d13e5a7362",
+      "bytes": 9071
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-056-042cfe6f83324594.json": {
+      "sha256": "a342993bed6c71881c0bdd0f58a9db6f199e32fce588fc2a61766ab54619bb51",
+      "bytes": 12565
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-057-042cfe6f83324594.json": {
+      "sha256": "3e6b1b5b018f82d66d1cdc7340c9754545c67150fb7f10e84fa18d8e1299ea67",
+      "bytes": 13392
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-058-042cfe6f83324594.json": {
+      "sha256": "d0f7ae6a4118bf1994d6345e5af63390510ab15849cafae540b80e71c6321c7a",
+      "bytes": 11067
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-059-042cfe6f83324594.json": {
+      "sha256": "6d7a538f44a8a4687ceef23ca64c1c2a293dc382a57c5a2b060fd4d595cf7c2c",
+      "bytes": 11931
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-060-042cfe6f83324594.json": {
+      "sha256": "3615e8080d653f5eb87cb51f0e6ef0579cab01239e65de3a9a7c78879c3e9a33",
+      "bytes": 10982
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-061-042cfe6f83324594.json": {
+      "sha256": "6efa64c85d12613ee6c0d23141dabd5ea9eb74ae323b7750b934a47ff099e852",
+      "bytes": 9503
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-062-042cfe6f83324594.json": {
+      "sha256": "4bedab7702243f44fdd5a3be5826f66c45e3faf5ca0b4bf652a320d9b656f9af",
+      "bytes": 13298
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-063-042cfe6f83324594.json": {
+      "sha256": "40742490d2bd8e425536457f63e7c63092859caf66644f9ccf55a7338a5fa9a2",
+      "bytes": 10014
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-064-042cfe6f83324594.json": {
+      "sha256": "b98eb7e6cc95cd82c0c0eaee7a04b89d843da6e283654e6452a99da48774fe71",
+      "bytes": 9106
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-065-042cfe6f83324594.json": {
+      "sha256": "5d4aa40382c6031c619dfa31c3cb27948e59bc777c3b8b228a4a8e5b92f653f7",
+      "bytes": 11733
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-066-042cfe6f83324594.json": {
+      "sha256": "9b482219627f4fe0959bee82dadd71d6ff46fb45c3da474504d16be5e835bd91",
+      "bytes": 10176
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-067-042cfe6f83324594.json": {
+      "sha256": "c9eee9be757ca5aa5e8978aab9a850caa4f4533930aff78768ddd45832f11757",
+      "bytes": 10270
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-068-042cfe6f83324594.json": {
+      "sha256": "bac6dd1374bcddea5fe55ec55c45aafa62aec9fc84e4a981b81cdd25d570d64a",
+      "bytes": 9478
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-069-042cfe6f83324594.json": {
+      "sha256": "c738123f9de95f1f422a9daa70341374622e73c5d75711bd33efe8b0b378a5b5",
+      "bytes": 10125
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-070-042cfe6f83324594.json": {
+      "sha256": "ddd9233d61e4e70fd39b5e59193330e0b876d2afbb2245ee916b5a87b79b7381",
+      "bytes": 13488
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-071-042cfe6f83324594.json": {
+      "sha256": "9ffe95c646c78444df509a3ac25c0f153e428d553a89fb4d85077b41aa5c349c",
+      "bytes": 12116
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-072-042cfe6f83324594.json": {
+      "sha256": "a77394d8594ce0422a08596d6308c6b2cfa8e047c6912058e24e9de0fec603d9",
+      "bytes": 13456
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-073-042cfe6f83324594.json": {
+      "sha256": "95a0cae76cd20eb9bd9cbbdf171f0a925b5a2a5874dee683cf8b830b42d54442",
+      "bytes": 13397
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-074-042cfe6f83324594.json": {
+      "sha256": "f4a17c548744166cddd6cc34b37467bc2d95a81133b5eff04a2de543dc628c7e",
+      "bytes": 12640
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-075-042cfe6f83324594.json": {
+      "sha256": "1b7a7c418057b78fa5cc1c8c34bebefcc603b9eb0aa22000533529b2d722ffa3",
+      "bytes": 13402
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-076-042cfe6f83324594.json": {
+      "sha256": "e3e0f0f8ee2530bc78dc1b533d2a0ded10e9b34107525a842a89ff2822d9a13d",
+      "bytes": 13257
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-077-042cfe6f83324594.json": {
+      "sha256": "0fff74c0399221736671288e823a294e35948f3eeab11895262365691c5f300b",
+      "bytes": 11488
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-078-042cfe6f83324594.json": {
+      "sha256": "707b4c0c9802f53d70ea01ec112fc064ff5f5858026b019bedb83ccd78e515db",
+      "bytes": 13254
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-079-042cfe6f83324594.json": {
+      "sha256": "ea6faecfcffe932327c9c1dcdc45a2d5555550b55f5dfa37ded408ac83158dbf",
+      "bytes": 13370
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-080-042cfe6f83324594.json": {
+      "sha256": "9a0ce59d315c115d75bb90c158d41608edadca0c2d1964583ffdad20d58396b0",
+      "bytes": 12385
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-081-042cfe6f83324594.json": {
+      "sha256": "7441fafc9fe970c24eb961615a0d96299c06d2c2cf0c1e7e79ed5bd60a345e8d",
+      "bytes": 13435
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-082-042cfe6f83324594.json": {
+      "sha256": "f000b4209b5951c97e79ff1011127c7c544fa57b6d69e0c4ec5ed760a94cec36",
+      "bytes": 13363
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-083-042cfe6f83324594.json": {
+      "sha256": "d29778b990a8f39ba2bf3ca81a0565f295a8a511f1288b3710a7b042473a04e5",
+      "bytes": 13405
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-084-042cfe6f83324594.json": {
+      "sha256": "d3e24725f4616c3993a0943d4428c9f94f241d0c4dc30d00ad3692def5a68697",
+      "bytes": 13238
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-085-042cfe6f83324594.json": {
+      "sha256": "317f4c30b84d5d6bd1ed7efa675ded5fa40310febc55c92218dd1b2b813b35e4",
+      "bytes": 13518
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-086-042cfe6f83324594.json": {
+      "sha256": "cafa67001a880ef289a03ff9afe4369edc56a7e509ce02ff93c095ebec3cfc56",
+      "bytes": 13706
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-087-042cfe6f83324594.json": {
+      "sha256": "92703ff6e7f87a6fb7a97209e7b2af7e4e01f6f5276c451add92c49136dc5fc7",
+      "bytes": 12933
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-088-042cfe6f83324594.json": {
+      "sha256": "fac04f03da05863fb960586a3a861b9b83106d4067b4817203bd74c5b2568d1b",
+      "bytes": 46304
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-089-042cfe6f83324594.json": {
+      "sha256": "4d101d8964246e50a420e41860a85419c33ace5dfa4ae45abf40c6bdc67a6a35",
+      "bytes": 12175
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-090-042cfe6f83324594.json": {
+      "sha256": "9af75b863326ad32810f12c7991e95a7eab239907a3b7306b2c2d88555a5ef66",
+      "bytes": 13277
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-091-042cfe6f83324594.json": {
+      "sha256": "bab8f5f23d02a5bd2c68c2705312010cde50455b123f6d9890da0731ac5c44bb",
+      "bytes": 12567
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-092-042cfe6f83324594.json": {
+      "sha256": "8944749a9ebb24edeb9bf8f4723ab9a10cb854a8813a97cffb249c3155a2a4ed",
+      "bytes": 12925
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-093-042cfe6f83324594.json": {
+      "sha256": "b8f4c3aec1d23ada0306736f5b4c2b22fdd79c2f0cecf097bacafa8cb6558331",
+      "bytes": 13449
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-094-042cfe6f83324594.json": {
+      "sha256": "10367e10badd1dfac629e9ff4430c24879d4d8cbd07d9a2e0da10b977741ad0b",
+      "bytes": 13395
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-095-042cfe6f83324594.json": {
+      "sha256": "1bb75e4cea6aef4597199a83080747b085f6251332e55028173a6cdbdf5acf5f",
+      "bytes": 13299
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-096-042cfe6f83324594.json": {
+      "sha256": "00b129e7724ae71a25a18051bc997c79c4fa5546db48467b839cc4232d17cde9",
+      "bytes": 12775
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-097-042cfe6f83324594.json": {
+      "sha256": "b98a69afadb639bb4dc2b3e5feef3df20b1d947a0b37be5f99374a85dfa7373e",
+      "bytes": 46786
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-098-042cfe6f83324594.json": {
+      "sha256": "d34ecbdf17b5b61161124b34e6596e95c5654a271b72cfe3c731508b248075ab",
+      "bytes": 13353
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-099-042cfe6f83324594.json": {
+      "sha256": "3012566ef86bc70f59b79efc2cbb57d35a197d1ba2422e2a39ac89f994324616",
+      "bytes": 13221
+    },
+    "experiments/color-search-benchmark/output/global-sampling-cache/wallpaper-100-042cfe6f83324594.json": {
+      "sha256": "edca936dfb3f55a4a8fcfab5aef0b8b9d86e6c5eb4d4d5d2092e1eaad980d6df",
+      "bytes": 13532
+    },
+    "experiments/color-search-benchmark/output/pipeline-evidence.json": {
+      "sha256": "e2f895a1e320af64eebe7a51e7131b24e3d9da681e066e2d0883b832ad99931a",
+      "bytes": 12401
+    },
+    "experiments/color-search-benchmark/output/proportions-palettes128.json": {
+      "sha256": "6538337036fcbcd1998c29f0048a90c5c684d64660c95dcff1b692bccbc0c3e1",
+      "bytes": 2360612
+    },
+    "experiments/color-search-benchmark/output/ranges-reference.json": {
+      "sha256": "26e192b98fca9669463bf7b4de3b776eaf1ee2dd7eef9ddb3cefb2c8f6d8da16",
+      "bytes": 1344002
+    },
+    "experiments/color-search-benchmark/pipeline-evidence.json": {
+      "sha256": "e2f895a1e320af64eebe7a51e7131b24e3d9da681e066e2d0883b832ad99931a",
+      "bytes": 12401
+    },
+    "experiments/color-search-benchmark/pipeline.ts": {
+      "sha256": "276449d122b790bffaf19e1bc6086cc387f058b643781ea89a18be660beaa585",
+      "bytes": 15625
+    },
+    "experiments/color-search-benchmark/proportions-audit.json": {
+      "sha256": "a044dd1f6db216fc4d7523eaf2e3eac7321272fa8a49793ff8e920c9fc644847",
+      "bytes": 1206
+    },
+    "experiments/color-search-benchmark/proportions-audit.mjs": {
+      "sha256": "bf149df2a5082b1542c7ad092aa3732d82f7f3382ee523be1f914ccd2ab94bf9",
+      "bytes": 8354
+    },
+    "experiments/color-search-benchmark/proportions-data.json": {
+      "sha256": "edb7f55a0fa6e9731c3701c02da4e1068b64bfec8b204949b68cf9f855ed9e6b",
+      "bytes": 585282
+    },
+    "experiments/color-search-benchmark/proportions-diagnose.mjs": {
+      "sha256": "706879c557460d8f7480270c2ae7e21ee11268708218c9a1d6b6ef06262369bb",
+      "bytes": 6491
+    },
+    "experiments/color-search-benchmark/proportions-diagnostics.json": {
+      "sha256": "482a391206a1e539daf918d1b760a2a6a1fb2f25a049e2311bd734d71d975185",
+      "bytes": 74595
+    },
+    "experiments/color-search-benchmark/proportions-evaluate.ts": {
+      "sha256": "f1e0cea5706af5807d17820babf770d55a5635d6fc8ff38892f1da3a5412ccc3",
+      "bytes": 24871
+    },
+    "experiments/color-search-benchmark/proportions-evaluation.json": {
+      "sha256": "ea92464d033c22bec690f240d637c86a50f358f6258f17d9659e254a8bd87fdd",
+      "bytes": 1753652
+    },
+    "experiments/color-search-benchmark/proportions-prepare.ts": {
+      "sha256": "8f6b42dd49e1cc0c17bd216585340fe45d3951832a8867ba39dab5c0cf006686",
+      "bytes": 5920
+    },
+    "experiments/color-search-benchmark/proportions-serve.mjs": {
+      "sha256": "efadb3e5166996bd48f997aa3bafdd42da2eb101ee9c2a74424cf51de195969e",
+      "bytes": 2373
+    },
+    "experiments/color-search-benchmark/proportions-ui.mjs": {
+      "sha256": "2d032e1aa0c94c1f6692508a124d8fb93ecefb0b8c73963617c8e6a9f8285bc5",
+      "bytes": 17221
+    },
+    "experiments/color-search-benchmark/proportions.html": {
+      "sha256": "a6cb8e8cd7170b18292da1118fd8f3109302d56972f7b661819f9ecf1af55c4b",
+      "bytes": 14636
+    },
+    "experiments/color-search-benchmark/proportions.mjs": {
+      "sha256": "fc08298787dd52e070784dad4068be9ec83be2283a1c48c43d4b5110e8fa2280",
+      "bytes": 9514
+    },
+    "experiments/color-search-benchmark/ranges-diagnose.mjs": {
+      "sha256": "6cab4c9a9ffdf7ddb42a12c45b150f8ea599b7f61b87061825e3c3828a80e205",
+      "bytes": 20397
+    },
+    "experiments/color-search-benchmark/ranges-evaluate.ts": {
+      "sha256": "4fadd1783bf8a5d6b1850252eb35f9519de7d9c1dc7a2377896c75dfbc9b8535",
+      "bytes": 16969
+    },
+    "experiments/color-search-benchmark/ranges-evaluation.json": {
+      "sha256": "b2d863f63fe267ddf5198355f2e91172ef9f3e54db6c40d5a5e0208e1304f427",
+      "bytes": 1328145
+    },
+    "experiments/color-search-benchmark/ranges-fixtures.json": {
+      "sha256": "99c40a38acfda154f3d2cae3703299a5f3e21805184ab8f5453e488086b43665",
+      "bytes": 16595
+    },
+    "experiments/color-search-benchmark/ranges-ui.mjs": {
+      "sha256": "de7dc03c83d8d0f906e4945119445c92636cff80a503d43d975d30f8bfd1f8ab",
+      "bytes": 26947
+    },
+    "experiments/color-search-benchmark/ranges.html": {
+      "sha256": "50ed02ddd8e46009773551ee963cdef0007bf62808723b34f5ba53b50b9a744a",
+      "bytes": 15619
+    },
+    "experiments/color-search-benchmark/ranges.mjs": {
+      "sha256": "96590a8416dd8c6627ff44e73d5dac2f39c48a00cd3447615b8ab763468fa776",
+      "bytes": 18692
+    },
+    "experiments/color-search-benchmark/relevance.ts": {
+      "sha256": "ceda54bc8549d21257fb908d886f93811573596a7de8223a849ee409444c6dd3",
+      "bytes": 7238
+    },
+    "experiments/color-search-benchmark/report.html": {
+      "sha256": "b18bb26e8d4e4cbecc7f1e9f54c7936bb613945bd664f94f9954137a767da058",
+      "bytes": 2885425
+    },
+    "experiments/color-search-benchmark/report.mjs": {
+      "sha256": "bd94e8debc307f666dd9ab1bceccf6c564f09836529e326bb55d8362b23ce9c4",
+      "bytes": 27969
+    },
+    "experiments/color-search-benchmark/results.json": {
+      "sha256": "3906b8cd6a92f5397bae668208cc69f2f41154f4c0a6a97255ddec412a6af179",
+      "bytes": 3878307
+    },
+    "experiments/color-search-benchmark/review-sheets.mjs": {
+      "sha256": "9693714b884ad06c8a5f81de6132857a9631bfcf5588e219bc2e79ae28284600",
+      "bytes": 3134
+    },
+    "experiments/color-search-benchmark/summary.json": {
+      "sha256": "cf8e6b0ebc73ca9149a34c64b0ae76c29a6470bf28781c714242f684fbb6ede9",
+      "bytes": 75614
+    },
+    "experiments/color-search-benchmark/tsconfig.json": {
+      "sha256": "93756f9248a9ac88c3dc4cf5b4b699d0c714a7b23ee9fb594ab01bf3eac0110e",
+      "bytes": 254
+    },
+    "package.json": {
+      "sha256": "1a877700476efd89ffab6e4706b7baf7950bc56459c14a1cf6290b3d61dbaa7f",
+      "bytes": 1492
+    },
+    "pnpm-lock.yaml": {
+      "sha256": "e5458240cb1924809ad3dd097e5a7c2ad734ee498973cc1c8c5d0053c6323473",
+      "bytes": 710785
+    },
+    "pnpm-workspace.yaml": {
+      "sha256": "d2b837e745c3b4c1aa3f75394ade2d11b5b736fa621b430e31c27fae20d6bd20",
+      "bytes": 172
+    }
+  }
+}

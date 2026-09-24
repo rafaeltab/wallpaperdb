@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "label": "Round 3: objective sensitivity sweep (development cases only)",
+  "description": "36 configurations; no held-out claim. Full palette outside penalty stays6; partial remainder penalty stays0. Compare category regressions and explicit intent diagnostics before retaining a configuration.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 2,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "feature-intent-sweep",
+      "method": "feature-intent-balanced",
+      "module": "./adapter.mjs",
+      "index": "color-exploration-real-v1",
+      "parameters": {
+        "outsidePenalty": 6
+      },
+      "sweep": {
+        "qualityPenalty": [
+          0,
+          0.1,
+          0.25
+        ],
+        "areaPower": [
+          0.5,
+          0.65,
+          0.85,
+          1
+        ],
+        "excessPenalty": [
+          1,
+          1.25,
+          1.5
+        ]
+      }
+    }
+  ]
+}

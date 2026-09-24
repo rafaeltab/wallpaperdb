@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 3,
+  "id": "vibe-grayscale-001",
+  "status": "user-judged",
+  "category": "Vibe",
+  "use": "development anchor",
+  "query": {
+    "userText": "grayscale",
+    "intent": "An overall neutral gray, black, and white appearance. This request is distinct from merely having low color or a predominantly single colored hue. Whether a faint tint remains acceptable is for human judgment.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/vibe-grayscale-001.html",
+    "presentation": "Existing JPEG whole-image thumbnails, contained without cropping on the same neutral background; originals available by clicking. Labels A–F are presentation IDs, not ranks.",
+    "selection": "Manually selected existing corpus images to discuss neutral appearance, faint tints, one-hue palettes, and low color. Not search results or a computed membership oracle.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "sourceTitlesVisible": false,
+    "randomization": "Fixed nonsorted presentation order: wallpaper-092, wallpaper-066, wallpaper-096, wallpaper-070, wallpaper-007, wallpaper-061.",
+    "judgmentFormat": "Open descriptions of match quality and any tint, optional ordering or comparisons with ties, and finer scores if the user chooses. No mandatory labels or predefined numeric scale.",
+    "requestedLabels": null,
+    "pairwiseOrdering": "Optional. Ties, acceptable alternative orders, and uncertainty should be preserved."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-092",
+      "filename": "corpus/wallpaper-092.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-092.jpg",
+      "sha256": "56283b09d526e4f07384bab7eda59157c22ece79371ce37b896b7247dbc23604",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_drawing_of_a_man_and_a_woman_lying_on_a_bed.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1693,
+      "height": 1384,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is monochromatic, so technically not grayscale, yet more grayscale than not grayscale",
+        "statedGrayscalePercentage": null,
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-066",
+      "filename": "corpus/wallpaper-066.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-066.jpg",
+      "sha256": "09e67407b86208f17e1122ca6395c02cf7e34acac3a4d468cd7a5e8eecf934c4",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_person_sitting_on_a_wall.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1920,
+      "height": 1080,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is pretty much the definition of grayscale 100% grayscale",
+        "statedGrayscalePercentage": "100% grayscale",
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-096",
+      "filename": "corpus/wallpaper-096.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-096.jpg",
+      "sha256": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_on_a_surface.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 5137,
+      "height": 3564,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is not grayscale 0% grayscale",
+        "statedGrayscalePercentage": "0% grayscale",
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-070",
+      "filename": "corpus/wallpaper-070.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-070.jpg",
+      "sha256": "926206385f2509d9e1d911668ea0109ff25654963efe6bfe4a66c89778d04849",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/looking_up_view_of_tall_buildings.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 3440,
+      "height": 1440,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is pretty much the definition of grayscale 100% grayscale",
+        "statedGrayscalePercentage": "100% grayscale",
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    },
+    {
+      "label": "E",
+      "wallpaperId": "wallpaper-007",
+      "filename": "corpus/wallpaper-007.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-007.jpg",
+      "sha256": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1920,
+      "height": 1080,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is very close to grayscale, bit hard to see in the darker parts but about 50-80% grayscale",
+        "statedGrayscalePercentage": "about 50-80% grayscale",
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    },
+    {
+      "label": "F",
+      "wallpaperId": "wallpaper-061",
+      "filename": "corpus/wallpaper-061.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-061.jpg",
+      "sha256": "c9687d1401a91e906ced6d39e5873ebc20f29a95c853959773b175bfc551904a",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_black_and_white_photo_of_clouds.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 5461,
+      "height": 3072,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is pretty much the definition of grayscale 100% grayscale",
+        "statedGrayscalePercentage": "100% grayscale",
+        "interpretation": "Subjective user description; not measured pixel coverage or a calibrated scoring target."
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "source": "user-response-001",
+      "kind": "whole-image-order",
+      "status": "confirmed",
+      "rawOrder": "A + D + F, E, A, C",
+      "confirmedOrder": [
+        [
+          "B",
+          "D",
+          "F"
+        ],
+        [
+          "E"
+        ],
+        [
+          "A"
+        ],
+        [
+          "C"
+        ]
+      ],
+      "ambiguity": "Resolved by user-response-002: the first A was a typo for B.",
+      "proposedClarification": {
+        "status": "confirmed",
+        "description": "B, D and F together first, then E, A, C.",
+        "groups": [
+          [
+            "B",
+            "D",
+            "F"
+          ],
+          [
+            "E"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ]
+      },
+      "id": "grayscale-order-001",
+      "confirmationSource": "user-response-002",
+      "confirmedWallpaperGroups": [
+        [
+          "wallpaper-066",
+          "wallpaper-070",
+          "wallpaper-061"
+        ],
+        [
+          "wallpaper-007"
+        ],
+        [
+          "wallpaper-092"
+        ],
+        [
+          "wallpaper-096"
+        ]
+      ],
+      "scope": "B, D and F share the top group; no required order within that group or equal numeric model scores. Other groups are strictly ordered. No numeric score distances inferred."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "B",
+      "over": "E",
+      "source": "grayscale-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single confirmed ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "E",
+      "source": "grayscale-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single confirmed ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "F",
+      "over": "E",
+      "source": "grayscale-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single confirmed ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "E",
+      "over": "A",
+      "source": "grayscale-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single confirmed ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "C",
+      "source": "grayscale-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single confirmed ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "text": "A this is monochromatic, so technically not grayscale, yet more grayscale than not grayscale\nB this is pretty much the definition of grayscale 100% grayscale\nC this is not grayscale 0% grayscale\nD this is pretty much the definition of grayscale 100% grayscale\nE this is very close to grayscale, bit hard to see in the darker parts but about 50-80% grayscale\nF this is pretty much the definition of grayscale 100% grayscale\n\nOrder\n\nA + D + F, E, A, C"
+    },
+    {
+      "id": "user-response-002",
+      "author": "user",
+      "text": "yep, mistyped sorry",
+      "inReplyTo": "Did you mean B, D and F together first, then E, A, C? Your written order lists A twice and omits B."
+    }
+  ],
+  "notes": [
+    "Per-image assessments and corrected order are confirmed: B/D/F together first, then E, A, C. The initial repeated A was a typo for B, confirmed by user-response-002. The raw response is preserved.",
+    "The query distinguishes neutral grayscale appearance from low color and monochromatic colored tints; it does not impose a measured saturation cutoff.",
+    "The user describes monochromatic A as technically not grayscale but more grayscale than not grayscale, and E as very close to grayscale with uncertainty in darker areas. Preserve these nuanced judgments.",
+    "Finer comparisons within a coarse quality label are supported; sharing a label does not imply equal quality. No scores or scale are inferred.",
+    "User judgments should describe appearance; they are not a pixel-membership oracle or extraction target.",
+    "Source filenames, titles, directory names, and earlier sampling labels do not define relevance.",
+    "No originals or thumbnails were altered for this case. Existing previews can differ from originals because of display size and JPEG encoding.",
+    "Any future area estimates are to be recorded separately from whole-image match ratings and ordering.",
+    "The user's percentages are subjective grayscale descriptions. Their meaning is not calibrated as area coverage versus strength of appearance; preserve the original expressions and E's range without inventing numeric targets.",
+    "The top group expresses the user's tied preference; it does not require exactly equal model scores. Derived pairwise relations belong to this single ordering judgment."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-09-23T14:13:23.319285+00:00",
+  "planSha256": "a821ef6ceb952d8ac720eaf3c501a3aab2ceba52283dbb96fcd5ce658f6877e8",
+  "phases": [
+    {
+      "id": "preserve",
+      "startedAt": "2026-09-23T14:13:23.319389+00:00",
+      "command": [
+        "make",
+        "color-favorite-real-preserve"
+      ],
+      "finishedAt": "2026-09-23T14:16:51.434721+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "restore-expanded",
+      "startedAt": "2026-09-23T14:16:51.435457+00:00",
+      "command": [
+        "make",
+        "color-favorite-real-expanded-up"
+      ],
+      "finishedAt": "2026-09-23T14:17:02.324376+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T14:17:02.324750+00:00"
+}

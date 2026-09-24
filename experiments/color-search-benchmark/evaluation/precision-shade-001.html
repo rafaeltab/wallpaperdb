@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Picked shade — evaluation case 001</title>
+<style>
+:root { color-scheme: dark; font: 16px/1.55 system-ui, sans-serif; background: #202020; color: #eee; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; padding: 24px 20px 36px; max-width: 1040px; }
+h1 { margin: 0 0 10px; font-size: 1.9rem; line-height: 1.2; }
+p { margin: 7px 0; }
+.eyebrow { color: #bbb; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+.instructions { margin: 18px 0 22px; max-width: 80ch; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+figure { margin: 0; border: 1px solid #555; border-radius: 7px; overflow: hidden; background: #282828; }
+figcaption { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 9px 12px; }
+.label { font-size: 1.2rem; font-weight: 700; }
+.reference { display: inline-flex; gap: 9px; align-items: center; font-size: .85rem; color: #ddd; }
+.swatch-frame { display: inline-flex; padding: 6px; background: #707070; }
+.swatch { display: inline-block; width: 46px; height: 24px; background: #ff2200; }
+.picture { display: block; background: #707070; }
+.picture img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+a { color: #ddd; }
+a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.full { display: block; padding: 7px 12px; font-size: .8rem; }
+footer { margin-top: 22px; color: #bbb; font-size: .9rem; }
+@media (max-width: 580px) { body { padding: 18px 12px; } .grid { grid-template-columns: 1fr; gap: 16px; } }
+</style>
+</head>
+<body>
+<header>
+<p class="eyebrow">Evaluation case · precision-shade-001</p>
+<h1>You picked this shade: #FF2200</h1>
+<p>Imagine selecting this color in the color picker. You have not requested a percentage or a subject.</p>
+<p>These are simple constructed wallpapers so we can focus on shade and amount. Each card repeats your target swatch.</p>
+</header>
+<section class="instructions" aria-label="Review instructions">
+<p><strong>Which examples match the shade closely enough for you?</strong></p>
+<p>Then, which would you prefer as search results? Give an order only if you have a clear preference.</p>
+<p>A short description for A–D is enough. Ties, uncertainty, or “these shades look the same” are useful answers. No scores or percentages needed.</p>
+</section>
+<main class="grid" aria-label="Four constructed wallpaper examples">
+<figure aria-labelledby="label-A">
+<figcaption><span class="label" id="label-A">A</span><span class="reference">Your target <span class="swatch-frame"><span class="swatch" role="img" aria-label="Target shade #FF2200"></span></span></span></figcaption>
+<a class="picture" href="fixtures/precision-shade-001-a.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example A at full size"><img src="fixtures/precision-shade-001-a.svg" alt="Constructed wallpaper A"></a>
+<a class="full" href="fixtures/precision-shade-001-a.svg" target="_blank" rel="noopener noreferrer">Open full-size A ↗</a>
+</figure>
+<figure aria-labelledby="label-B">
+<figcaption><span class="label" id="label-B">B</span><span class="reference">Your target <span class="swatch-frame"><span class="swatch" role="img" aria-label="Target shade #FF2200"></span></span></span></figcaption>
+<a class="picture" href="fixtures/precision-shade-001-b.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example B at full size"><img src="fixtures/precision-shade-001-b.svg" alt="Constructed wallpaper B"></a>
+<a class="full" href="fixtures/precision-shade-001-b.svg" target="_blank" rel="noopener noreferrer">Open full-size B ↗</a>
+</figure>
+<figure aria-labelledby="label-C">
+<figcaption><span class="label" id="label-C">C</span><span class="reference">Your target <span class="swatch-frame"><span class="swatch" role="img" aria-label="Target shade #FF2200"></span></span></span></figcaption>
+<a class="picture" href="fixtures/precision-shade-001-c.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example C at full size"><img src="fixtures/precision-shade-001-c.svg" alt="Constructed wallpaper C"></a>
+<a class="full" href="fixtures/precision-shade-001-c.svg" target="_blank" rel="noopener noreferrer">Open full-size C ↗</a>
+</figure>
+<figure aria-labelledby="label-D">
+<figcaption><span class="label" id="label-D">D</span><span class="reference">Your target <span class="swatch-frame"><span class="swatch" role="img" aria-label="Target shade #FF2200"></span></span></span></figcaption>
+<a class="picture" href="fixtures/precision-shade-001-d.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example D at full size"><img src="fixtures/precision-shade-001-d.svg" alt="Constructed wallpaper D"></a>
+<a class="full" href="fixtures/precision-shade-001-d.svg" target="_blank" rel="noopener noreferrer">Open full-size D ↗</a>
+</figure>
+</main>
+<footer><p>Your shade observations, ordering and clarification about preferring nearby colors are recorded. Reply in chat to add or revise them.</p></footer>
+</body>
+</html>

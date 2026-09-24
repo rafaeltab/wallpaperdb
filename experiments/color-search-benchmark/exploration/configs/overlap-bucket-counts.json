@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "label": "Overlapping coverage/quality: 16, 64, 256 and 1024 buckets",
+  "description": "Controlled bucket-count comparison over the full 545-asset corpus. Native scoring, fixed radius, quality influence and minimum-quality cutoff are identical. Smaller banks are nested selections of the original measured anchors. Existing single-observer development judgments; no new human labels or production-load claim.",
+  "workload": { "warmup": 1, "repeats": 5, "concurrency": 1, "limit": 20, "accuracyLimit": 1000, "timeoutMs": 10000 },
+  "candidates": [
+    { "id": "overlap-dense-buckets-16", "method": "overlap-quality-dense", "label": "Dense · 16 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 16, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-dense-buckets-64", "method": "overlap-quality-dense", "label": "Dense · 64 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 64, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-dense-buckets-256", "method": "overlap-quality-dense", "label": "Dense · 256 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 256, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-dense-buckets-1024", "method": "overlap-quality-dense", "label": "Dense · 1024 buckets (original)", "module": "./adapter.mjs", "parameters": { "bucketCount": 1024, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-hybrid-buckets-16", "method": "overlap-quality-hybrid", "label": "Named + picked · 16 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 16, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-hybrid-buckets-64", "method": "overlap-quality-hybrid", "label": "Named + picked · 64 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 64, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-hybrid-buckets-256", "method": "overlap-quality-hybrid", "label": "Named + picked · 256 buckets", "module": "./adapter.mjs", "parameters": { "bucketCount": 256, "qualityInfluence": 1, "minimumQuality": 0 } },
+    { "id": "overlap-hybrid-buckets-1024", "method": "overlap-quality-hybrid", "label": "Named + picked · 1024 buckets (original)", "module": "./adapter.mjs", "parameters": { "bucketCount": 1024, "qualityInfluence": 1, "minimumQuality": 0 } }
+  ]
+}

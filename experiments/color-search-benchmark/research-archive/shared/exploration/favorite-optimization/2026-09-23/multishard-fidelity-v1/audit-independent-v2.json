@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "multishard-execution",
+  "passed": true,
+  "experiment": "independent-multishard-file-audit",
+  "summarySha256": "fafdf5421ec89559b4ac0e1a7f0476c5c91794e8326656330119bbecb38482f9",
+  "sourceSnapshotHash": "a340c2a55c2766da2bb56cee219749634ce28925c8620977ac9f0fcdeb33a049",
+  "documents": 545,
+  "utilityFields": 189,
+  "bulk201Acknowledgements": 545,
+  "shardCounts": [
+    188,
+    186,
+    171
+  ],
+  "physicalNodeCount": 1,
+  "referenceCases": 160,
+  "referenceOracleScores": 82078,
+  "executions": 1920,
+  "executionsByMethod": {
+    "favorite-utility-numeric-docvalues": 480,
+    "favorite-utility-sorted-docvalues": 480,
+    "favorite-utility-bounded": 480,
+    "favorite-utility-maxima-bounded": 480
+  },
+  "returnedScores": 342940,
+  "positiveBoundExecutions": 760,
+  "maximaRangeExecutions": 329,
+  "duplicateFallbacks": 6,
+  "finalCandidateTotal": 687881,
+  "winningScoresRetained": 167610,
+  "checks": [
+    "archived source hash",
+    "encoded document hash",
+    "each bulk create body and201",
+    "complete disjoint shard inventory",
+    "unchanged index generations",
+    "independent stored-float32 reference oracle with preserved duplicate behavior",
+    "exact global IDs/order and float32 scores",
+    "actual final service hit transport",
+    "all global search shard success",
+    "PIT rotation and closure",
+    "unchanged score terms and metadata",
+    "final ranges retain global reference winners"
+  ],
+  "limitations": [
+    "One physical node with three logical primary shards; no multi-node failure or network test.",
+    "Correctness only, not timing or capacity.",
+    "Preserves the known duplicate-target arithmetic defect.",
+    "Uses the same saved measurements and encoded utility documents, not an independent extractor."
+  ]
+}

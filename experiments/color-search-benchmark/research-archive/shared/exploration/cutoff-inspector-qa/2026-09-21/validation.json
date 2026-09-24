@@ -1,0 +1,314 @@
+{
+  "checks": 32,
+  "rows": [
+    {
+      "axis": "lightness",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -5.818229453780077e-09,
+      "excluded": 1331,
+      "profile": "feather",
+      "score": 0.30490786
+    },
+    {
+      "axis": "saturation",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -5.818229453780077e-09,
+      "excluded": 1123,
+      "profile": "feather",
+      "score": 0.30490786
+    },
+    {
+      "axis": "lightness",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": 1.0781059822662088e-08,
+      "excluded": 1415,
+      "profile": "feather",
+      "score": 0.29085222
+    },
+    {
+      "axis": "saturation",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": 1.0781059822662088e-08,
+      "excluded": 1315,
+      "profile": "feather",
+      "score": 0.29085222
+    },
+    {
+      "axis": "lightness",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -1.1890043116746796e-09,
+      "excluded": 1465,
+      "profile": "feather",
+      "score": 0.24507655
+    },
+    {
+      "axis": "saturation",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -1.1890043116746796e-09,
+      "excluded": 1409,
+      "profile": "feather",
+      "score": 0.24507655
+    },
+    {
+      "axis": "lightness",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -1.008119129841667e-09,
+      "excluded": 1522,
+      "profile": "feather",
+      "score": 0.107138716
+    },
+    {
+      "axis": "saturation",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -1.008119129841667e-09,
+      "excluded": 1500,
+      "profile": "feather",
+      "score": 0.107138716
+    },
+    {
+      "axis": "lightness",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -6.869663893294131e-09,
+      "excluded": 1331,
+      "profile": "hard",
+      "score": 0.34279865
+    },
+    {
+      "axis": "saturation",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -6.869663893294131e-09,
+      "excluded": 1123,
+      "profile": "hard",
+      "score": 0.34279865
+    },
+    {
+      "axis": "lightness",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": -7.913620592159276e-09,
+      "excluded": 1415,
+      "profile": "hard",
+      "score": 0.36991036
+    },
+    {
+      "axis": "saturation",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": -7.913620592159276e-09,
+      "excluded": 1315,
+      "profile": "hard",
+      "score": 0.36991036
+    },
+    {
+      "axis": "lightness",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -6.150842890573216e-09,
+      "excluded": 1465,
+      "profile": "hard",
+      "score": 0.35960144
+    },
+    {
+      "axis": "saturation",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -6.150842890573216e-09,
+      "excluded": 1409,
+      "profile": "hard",
+      "score": 0.35960144
+    },
+    {
+      "axis": "lightness",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -3.965042738585112e-09,
+      "excluded": 1522,
+      "profile": "hard",
+      "score": 0.14410156
+    },
+    {
+      "axis": "saturation",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -3.965042738585112e-09,
+      "excluded": 1500,
+      "profile": "hard",
+      "score": 0.14410156
+    },
+    {
+      "axis": "lightness",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -1.7866559842705243e-08,
+      "excluded": 1331,
+      "profile": "core-halo",
+      "score": 0.3591692
+    },
+    {
+      "axis": "saturation",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -1.7866559842705243e-08,
+      "excluded": 1123,
+      "profile": "core-halo",
+      "score": 0.3591692
+    },
+    {
+      "axis": "lightness",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": 2.3195358855865322e-08,
+      "excluded": 1415,
+      "profile": "core-halo",
+      "score": 0.3613893
+    },
+    {
+      "axis": "saturation",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": 2.3195358855865322e-08,
+      "excluded": 1315,
+      "profile": "core-halo",
+      "score": 0.3613893
+    },
+    {
+      "axis": "lightness",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": 1.728912346621314e-09,
+      "excluded": 1465,
+      "profile": "core-halo",
+      "score": 0.3329545
+    },
+    {
+      "axis": "saturation",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": 1.728912346621314e-09,
+      "excluded": 1409,
+      "profile": "core-halo",
+      "score": 0.3329545
+    },
+    {
+      "axis": "lightness",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": 2.10500353259313e-09,
+      "excluded": 1522,
+      "profile": "core-halo",
+      "score": 0.13626479
+    },
+    {
+      "axis": "saturation",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": 2.10500353259313e-09,
+      "excluded": 1500,
+      "profile": "core-halo",
+      "score": 0.13626479
+    },
+    {
+      "axis": "lightness",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -1.8823440361970256e-08,
+      "excluded": 1331,
+      "profile": "consensus",
+      "score": 0.35933357
+    },
+    {
+      "axis": "saturation",
+      "count": 16,
+      "cutoff": 0,
+      "difference": -1.8823440361970256e-08,
+      "excluded": 1123,
+      "profile": "consensus",
+      "score": 0.35933357
+    },
+    {
+      "axis": "lightness",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": -1.5930739449832032e-08,
+      "excluded": 1415,
+      "profile": "consensus",
+      "score": 0.31970054
+    },
+    {
+      "axis": "saturation",
+      "count": 64,
+      "cutoff": 0.25,
+      "difference": -1.5930739449832032e-08,
+      "excluded": 1315,
+      "profile": "consensus",
+      "score": 0.31970054
+    },
+    {
+      "axis": "lightness",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -7.236366339480327e-09,
+      "excluded": 1465,
+      "profile": "consensus",
+      "score": 0.21270125
+    },
+    {
+      "axis": "saturation",
+      "count": 256,
+      "cutoff": 0.5,
+      "difference": -7.236366339480327e-09,
+      "excluded": 1409,
+      "profile": "consensus",
+      "score": 0.21270125
+    },
+    {
+      "axis": "lightness",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -3.965042738585112e-09,
+      "excluded": 1522,
+      "profile": "consensus",
+      "score": 0.14410156
+    },
+    {
+      "axis": "saturation",
+      "count": 1024,
+      "cutoff": 0.9,
+      "difference": -3.965042738585112e-09,
+      "excluded": 1500,
+      "profile": "consensus",
+      "score": 0.14410156
+    }
+  ],
+  "additionalChecks": {
+    "savedParameterSnapshots": true,
+    "rapidLiveChangesUseFinalCutoff": true,
+    "liveConsensusTargetCount": 2,
+    "liveConsensusComponentsPerTarget": [
+      3,
+      3
+    ],
+    "liveConsensusCutoff": 0.25,
+    "escapeClosesOnlyChild": true,
+    "mobileViewport": [
+      390,
+      844
+    ],
+    "mobilePageOverflow": false,
+    "screenshotsVisuallyInspected": [
+      "consensus-modal-desktop.png",
+      "consensus-modal-mobile.png"
+    ],
+    "laterMobileCenteredView": "consensus-lightness-mobile.png"
+  }
+}

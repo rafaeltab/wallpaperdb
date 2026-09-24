@@ -1,0 +1,139 @@
+// THROWAWAY PROTOTYPE. Compile native functions; OpenSearch orders every eligible document.
+// Overlapping regions are independent observations, never additive image allocations.
+import { interpretQuery, metadataFilter } from './query.mjs';
+import { OVERLAP_DEFINITION, regionFields } from './overlap-regions.mjs';
+import { OVERLAP_BUCKET_COUNTS, nearestOverlapRegionForCount } from './overlap-banks.mjs';
+
+const CONCRETE_COLORS = new Set(['red', 'orange', 'yellow', 'green', 'teal', 'cyan', 'blue', 'purple', 'pink', 'brown', 'black', 'gray', 'white']);
+const LIMITATIONS = Object.freeze([
+  'A sampled pixel may contribute to many regions. Coverage is marginal; overlapping areas must not be summed into a union or an exclusive palette.',
+  'Picked colors resolve to one nearest indexed anchor. The fixed OKLab radius is 0.12, with quality falling from 1 at the anchor to 0.5 at the edge.',
+  'Closed palettes have no separate outside-color purity penalty. Requested marginal amounts do not prove that other colors are absent.',
+  'Native functions score globally without application reranking. Query cost can still grow with eligible document count and must be measured.',
+]);
+
+export const OVERLAP_METHODS = Object.freeze([
+  { id: 'overlap-quality-dense', label: 'Overlapping 1,024 regions: coverage + quality', namedMode: 'concrete-swatches',
+    description: 'Concrete named colors and picked colors use independently measured overlapping OKLab neighborhoods; abstract vibes retain named features.' },
+  { id: 'overlap-quality-hybrid', label: 'Overlapping regions + named color families', namedMode: 'named-families',
+    description: 'Named colors and vibes retain broad named features; picked colors use the same 1,024 overlapping neighborhoods.' },
+].map(method => Object.freeze({ ...method, family: 'overlap-quality', representation: 'overlap-coverage-quality-1024', searchKind: 'overlap', approximate: false, limitations: LIMITATIONS })));
+
+function methodFor(input) {
+  const id = typeof input === 'string' ? input : input?.id;
+  const method = OVERLAP_METHODS.find(candidate => candidate.id === id);
+  if (!method) throw Error(`Unknown overlapping-region method: ${id}`);
+  return method;
+}
+
+function resolveCompiled(method, compiled, parameters) {
+  return compiled.targets.map((target, targetIndex) => {
+    const useRegion = !target.name || target.ranges.length > 0 || (method.namedMode === 'concrete-swatches' && CONCRETE_COLORS.has(target.name));
+    const region = useRegion ? nearestOverlapRegionForCount(target.lab, parameters.bucketCount) : null;
+    const fields = region ? regionFields(region.index) : { coverage: `cov_${target.name}`, quality: `quality_${target.name}` };
+    return {
+      targetIndex, kind: region ? 'region' : 'named', name: target.name ?? null, color: target.color ?? null,
+      amount: target.amount, regionIndex: region?.index ?? null, regionHex: region?.hex ?? null,
+      anchorDistance: region ? Math.hypot(...target.lab.map((value, channel) => value - region.lab[channel])) : null,
+      coverageField: fields.coverage, qualityField: fields.quality,
+    };
+  });
+}
+
+export function supportsOverlap(input, query, options = {}) {
+  const method = methodFor(input), parameters = overlapParameters(input, options.parameters), compiled = interpretQuery(query), warnings = [...LIMITATIONS];
+  if (!compiled.supported) return compiled;
+  for (const target of compiled.targets) {
+    if (Math.abs(target.edgeWeight - OVERLAP_DEFINITION.edgeWeight) > 1e-12) return { supported: false, reason: 'This indexed prototype supports edge quality 0.5 only.', warnings };
+    const needsRange = !target.name || target.explicitRanges;
+    if (needsRange && (target.ranges.length !== 1 || target.ranges[0].space !== 'oklab' || Math.abs(target.ranges[0].distance - OVERLAP_DEFINITION.radius) > 1e-12)) {
+      return { supported: false, reason: 'This indexed prototype supports one fixed OKLab distance of 0.12. Other radii and RGB/HSV/HSL channel ranges are unsupported.', warnings };
+    }
+  }
+  const names = new Set(compiled.targets.map(target => target.name));
+  const accentIntent = compiled.mode === 'vibe' && ((names.has('dark') && names.has('bright')) || (names.has('grayscale') && names.has('red')));
+  if (compiled.special || accentIntent) return { supported: false, reason: 'This prototype has no accent or relative-contrast objective. Use explicit proportions for these combinations.', warnings };
+  const targets = resolveCompiled(method, compiled, parameters);
+  if (method.namedMode === 'concrete-swatches' && targets.some(target => target.kind === 'region' && target.name)) {
+    warnings.push('Dense mode interprets concrete color names, including black, gray and white, as literal neighborhoods around their displayed swatches, not their full named color families. Dark and grayscale remain separate named vibes.');
+  }
+  if (targets.some(target => target.kind === 'region')) warnings.push('Nearest-anchor quantization is shown in the inspector. Quality is measured against that indexed anchor, rather than the exact requested hex.');
+  if (names.has('monochromatic') || names.has('rainbow')) warnings.push('Monochromatic and rainbow features describe global hue distribution, not literal area percentages.');
+  const selected = targets.filter(target => target.kind === 'region').map(target => target.regionIndex);
+  if (new Set(selected).size < selected.length) warnings.push('Several requested colors resolve to the same region. Their target terms reuse the same area and quality observations.');
+  if (compiled.subject && !options.eligibleIds) warnings.push('Subject is a mandatory indexed tag filter; images without that tag cannot match.');
+  return { supported: true, compiled, targets, warnings };
+}
+
+export function resolveOverlapTargets(input, query, options = {}) {
+  const result = supportsOverlap(input, query, options);
+  if (!result.supported) throw Error(result.reason);
+  return result;
+}
+
+export function overlapParameters(input, supplied = {}) {
+  methodFor(input);
+  if (!supplied || typeof supplied !== 'object' || Array.isArray(supplied)) throw Error('Overlapping-region parameters must be an object.');
+  const known = new Set(['areaPower', 'qualityPenalty', 'excessPenalty', 'qualityInfluence', 'minimumQuality', 'bucketCount']);
+  for (const name of Object.keys(supplied)) if (!known.has(name)) throw Error(`Unsupported overlapping-region parameter: ${name}`);
+  const parameters = { areaPower: .5, qualityPenalty: .35, excessPenalty: 1.5, qualityInfluence: 1, minimumQuality: 0, bucketCount: 1024, ...supplied };
+  if (!OVERLAP_BUCKET_COUNTS.includes(parameters.bucketCount)) throw Error('bucketCount must be 16, 64, 256 or 1024.');
+  if (![.5, 1].includes(parameters.areaPower)) throw Error('Native areaPower must be 0.5 or 1.');
+  if (!Number.isFinite(parameters.qualityPenalty) || parameters.qualityPenalty < 0 || parameters.qualityPenalty > 1) throw Error('qualityPenalty must be between 0 and 1.');
+  if (!Number.isFinite(parameters.excessPenalty) || parameters.excessPenalty < 1 || parameters.excessPenalty > 4) throw Error('excessPenalty must be between 1 and 4.');
+  if (!Number.isFinite(parameters.qualityInfluence) || parameters.qualityInfluence < 0 || parameters.qualityInfluence > 3) throw Error('qualityInfluence must be between 0 and 3.');
+  if (!Number.isFinite(parameters.minimumQuality) || parameters.minimumQuality < 0 || parameters.minimumQuality > 1) throw Error('minimumQuality must be between 0 and 1.');
+  return parameters;
+}
+
+function qualityFunctions(field, strength, directQuality = false) {
+  if (strength === 0) return [];
+  if (directQuality && strength === 1) return [{ field_value_factor: { field, modifier: 'none', missing: 0 } }];
+  // Both parameterizations produce max(0, 1 - strength * (1 - quality)).
+  // Above strength 1, vary scale so the native decay remains safely inside (0, 1).
+  return [{ linear: { [field]: { origin: 1, scale: strength <= 1 ? .5 : .5 / strength,
+    decay: strength <= 1 ? 1 - strength * .5 : .5, offset: 0 } } }];
+}
+
+function targetFunctions(target, compiled, parameters) {
+  const areaField = target.coverageField, qualityField = target.qualityField;
+  // Quality is indexed as float32. Round the inclusive boundary identically in
+  // the native range and diagnostic ledger, so e.g. an indexed 0.7 passes 70%.
+  // A failing term gets multiplied by zero; it does not filter the wallpaper or
+  // change the denominator used to average the requested target terms.
+  const gate = parameters.minimumQuality > 0 && (compiled.mode === 'vibe' || target.amount > 0)
+    ? [{ filter: { range: { [qualityField]: { lt: Math.fround(parameters.minimumQuality) } } }, weight: 0 }] : [];
+  if (compiled.mode === 'vibe') return [
+    { field_value_factor: { field: areaField, factor: .0001, modifier: parameters.areaPower === .5 ? 'sqrt' : 'none', missing: 0 } },
+    ...qualityFunctions(qualityField, parameters.qualityInfluence, true),
+    ...gate,
+  ];
+  const origin = Math.round(target.amount * 10000);
+  const area = penalty => ({ linear: { [areaField]: { origin, scale: 5000 / penalty, decay: .5, offset: 0 } } });
+  const functions = parameters.excessPenalty === 1 ? [area(1)] : [
+    { filter: { range: { [areaField]: { lte: origin } } }, ...area(1) },
+    { filter: { range: { [areaField]: { gt: origin } } }, ...area(parameters.excessPenalty) },
+  ];
+  if (target.amount > 0) functions.push(...qualityFunctions(qualityField, parameters.qualityPenalty * parameters.qualityInfluence));
+  functions.push(...gate);
+  return functions;
+}
+
+export function buildOverlapQuery({ method, query, limit = 20, eligibleIds, excludedIds, filter, parameters: supplied = {} }) {
+  const parameters = overlapParameters(method, supplied);
+  const { compiled, targets } = resolveOverlapTargets(method, query, { eligibleIds, excludedIds, parameters });
+  const requiredFields = [...new Set(targets.flatMap(target => [target.coverageField,
+    ...((parameters.qualityInfluence > 0 || parameters.minimumQuality > 0) && (compiled.mode === 'vibe' || target.amount > 0) ? [target.qualityField] : []),
+  ]))].map(field => ({ exists: { field } }));
+  return {
+    size: limit, _source: false, track_total_hits: false,
+    query: { bool: {
+      filter: [metadataFilter({ eligibleIds, excludedIds, filter, compiled }), ...requiredFields], minimum_should_match: 1,
+      should: targets.map(target => ({ function_score: {
+        query: { match_all: {} }, functions: [...targetFunctions(target, compiled, parameters), { weight: 1 / targets.length }],
+        score_mode: 'multiply', boost_mode: 'replace',
+      } })),
+    } },
+    sort: [{ _score: 'desc' }, { id: 'asc' }],
+  };
+}

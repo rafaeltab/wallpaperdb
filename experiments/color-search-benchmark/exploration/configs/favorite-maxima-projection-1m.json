@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "method": "favorite-utility-numeric-docvalues",
+      "index": "color-exploration-favorite-points-projection-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "buildFavoriteDocvalueQuery"
+      },
+      "executor": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "searchFavoriteDocvalueUtilities"
+      }
+    },
+    {
+      "id": "favorite-utility-bounded",
+      "method": "favorite-utility-bounded",
+      "index": "color-exploration-favorite-points-projection-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-bounded-utilities.mjs",
+        "export": "buildFavoriteBoundedQuery"
+      },
+      "executor": {
+        "module": "./favorite-bounded-utilities.mjs",
+        "export": "executeFavoriteBoundedUtilitySearch"
+      }
+    },
+    {
+      "id": "favorite-utility-maxima-bounded",
+      "method": "favorite-utility-maxima-bounded",
+      "index": "color-exploration-favorite-points-projection-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-maxima-bounded-utilities.mjs",
+        "export": "buildFavoriteMaximaBoundedQuery"
+      },
+      "executor": {
+        "module": "./favorite-maxima-bounded-utilities.mjs",
+        "export": "executeFavoriteMaximaBoundedUtilitySearch"
+      }
+    }
+  ]
+}

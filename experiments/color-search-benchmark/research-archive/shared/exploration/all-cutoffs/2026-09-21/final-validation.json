@@ -1,0 +1,56 @@
+{
+  "at": "2026-09-21T21:32:10.490804+00:00",
+  "status": "passed",
+  "method": "cutoff-all-levels",
+  "url": "http://zerotwo:8227/",
+  "tests": {
+    "cutoffIntegration": 43,
+    "overlapIntegration": 81,
+    "integrationSkipped": 0,
+    "httpConfigurations": 100,
+    "browserConfigurations": 12,
+    "browserErrors": []
+  },
+  "feedback": {
+    "runId": "2026-09-21T21-23-26.350Z-9d77559f",
+    "candidateCount": 49,
+    "corpusSize": 545,
+    "coveragePerCandidate": {
+      "total": 37,
+      "ok": 31,
+      "unsupported": 6,
+      "error": 0
+    },
+    "timedRequests": 4557,
+    "timedAtOrAbove1s": 0,
+    "failures": 0,
+    "candidateP95Range": [
+      1.8557789999977103,
+      5.478858999966178
+    ],
+    "maxTimedMs": 49.58555299999716
+  },
+  "summary": {
+    "methods": 52,
+    "validDefaultMethods": 52,
+    "sensitivityConfigurations": 308,
+    "warnings": 0
+  },
+  "services": {
+    "inspector8227": "active",
+    "comparison8225": "active",
+    "histogram8226": "active",
+    "reports8224": "active",
+    "opensearch19216": "green",
+    "scale19217": "stopped"
+  },
+  "http": {
+    "report": 200,
+    "findings": 200,
+    "inspectorConfig": 200
+  },
+  "indexChanges": false,
+  "imageChanges": false,
+  "commits": false,
+  "limits": "No new million-record or sustained-concurrency test. Original consensus scale failures remain relevant."
+}

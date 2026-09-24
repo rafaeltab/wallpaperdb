@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-23T19:41:08.144645+00:00",
+  "preparedOnly": true,
+  "servicesCalled": false,
+  "testsRun": false,
+  "runtimeEdits": false,
+  "sourceCandidateConfig": {
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-retry-v1-proposal/favorite-full-million-four-methods-pooled.json",
+    "sha256": "1ab237ca5d8fe6835365e21a947332866af2ca6600a0a7909360d4d204e629bd"
+  },
+  "subsetIdentity": "Exact selected candidate object copied unchanged; existing runtime validates against actual complete primary artifact before load.",
+  "pins": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-bounded-wide-stress-v1-proposal/favorite-bounded-pooled-only.json",
+      "sha256": "72a32f618f44ac2e04dddad18d0f309b9f9015be211e5f8324fa1cff396e4f79"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-bounded-wide-stress-v1-proposal/stress-plan.json",
+      "sha256": "aa5573a6443e949db726a62f86edc7e6d2bbafbf5caeb1486c48048aa4023cda"
+    }
+  ],
+  "runtimeSourcePinReference": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-retry-v1-proposal/source-config-plan-pins-v2.json",
+  "runtimePinNote": "Reference only; root/current harness must verify unchanged source graph at launch."
+}

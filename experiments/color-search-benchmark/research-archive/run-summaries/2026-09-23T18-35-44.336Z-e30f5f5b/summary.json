@@ -1,0 +1,2426 @@
+{
+  "schemaVersion": 1,
+  "id": "2026-09-23T18-35-44.336Z-e30f5f5b",
+  "createdAt": "2026-09-23T18:35:44.337Z",
+  "label": "Favorite ranking with pooled PIT cleanup",
+  "purpose": "development feedback; no method selected",
+  "configuration": {
+    "schemaVersion": 1,
+    "label": "Favorite ranking with pooled PIT cleanup",
+    "description": "Same favorite score and global ranking. Only bounded/maxima PIT cleanup transport changes; compare the saved favorite, numeric reference, and both pooled variants. Single-reviewer development feedback; no held-out or duplicate-objective evidence.",
+    "extraImageFiles": [
+      "evaluation/perceived-red-pagoda-001.json"
+    ],
+    "workload": {
+      "warmup": 1,
+      "repeats": 3,
+      "concurrency": 1,
+      "limit": 20,
+      "accuracyLimit": 1000,
+      "timeoutMs": 10000
+    },
+    "candidates": [
+      {
+        "id": "favorite-baseline256",
+        "method": "cutoff-shade-hue-all-levels",
+        "index": "color-exploration-shade-hue-256-real-v1",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./adapter.mjs"
+      },
+      {
+        "id": "favorite-utility-numeric-docvalues",
+        "method": "favorite-utility-numeric-docvalues",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-docvalue-adapter.mjs"
+      },
+      {
+        "id": "favorite-utility-bounded-pooled-delete",
+        "method": "favorite-utility-bounded-pooled-delete",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-pooled-adapter.mjs"
+      },
+      {
+        "id": "favorite-utility-maxima-bounded-pooled-delete",
+        "method": "favorite-utility-maxima-bounded-pooled-delete",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-pooled-adapter.mjs"
+      }
+    ]
+  },
+  "dataset": {
+    "hash": "e7a45108ff77ffc8ae72e41b38d948778f191af12278e280fde9313fc150a1cc",
+    "caseCount": 37,
+    "sourceHashes": {
+      "evaluation/cases.json": "6c223d0daf8fd624a7ca72663c12f92285fe33366d890114edadef8e8ffccb22",
+      "evaluation/perceived-red-001.json": "27428365299cdc9a2121f4108cd7d5a05aba7bd07a10c6a67d40c862d6dd0cd8",
+      "evaluation/vibe-grayscale-001.json": "5219b05d424e4fe97db7f188023e05cd9161dda74743545f5bf077b537303e16",
+      "evaluation/vibe-dark-001.json": "8f5b87013eeac68e8d14d77c9c0bedc7ca605e6d256cff92e2b4989b544ba403",
+      "evaluation/combination-gray-red-001.json": "4e891d27ae41d7576383a0a19421df06b50e686d30b3c8ce3aeb61c65a2cc021",
+      "evaluation/combination-gray-red-002.json": "1be26bfc44de7c76838f9dc6639db3c3c59193d99faeb9813bc7d5e4e30d3522",
+      "evaluation/precision-shade-001.json": "d2d73db4540a0e994618c8e8e154a0307315d66ca6abc71207358935d327f0b9",
+      "evaluation/semantic-red-city-001.json": "03cabaa751655b56a178bd83511292281ba55780164227fc49df7beae2937f41",
+      "evaluation/proportion-green-001.json": "cee9a143ec572e3794e9dfdffface59db51d3f74f54acecf29dbf7c43e4554cf",
+      "evaluation/proportion-green-002.json": "5f29377c1bc7196d0931553b43089fbcf5e897011a2bb45f1da3854713bf5aad",
+      "evaluation/composition-green-red-001.json": "b2db4c992da0642f83adda818b3e93c6b352997383684a43b13c7341248df696",
+      "evaluation/composition-green-red-real-001.json": "c9206ec3f20407ddfdb9a1b326101d581551d3b4578845f512ef2f4e13e9869d",
+      "evaluation/batch-001-results.json": "c7a2ddbe4c6741cc3aacc6ca35f27e595614c2cf1cdfb0fbbe17e8f8a49fe98a",
+      "evaluation/responses/30b36a99-4c94-4f15-9e18-27373dea04c5.json": "36a41bccdff3313eccbbf612ccb0057944b44e2a8b9e40524310d552592a0b76"
+    },
+    "corpusHash": "36e11c2981053129404da54867a008d24e47b18d21ce669cf0836ef1362ecb26",
+    "corpusSize": 127,
+    "evidenceContext": {
+      "reviewerCount": 1,
+      "logicalCaseCount": 37,
+      "independentSampleCount": null,
+      "quickPass": {
+        "id": "batch-001-quick-review-caveat",
+        "scope": "All24 judgments in this submission; earlier13 records retain their original qualifications.",
+        "type": "single-reviewer-quick-pass",
+        "rawUserMessage": "I have submitted the answers, I went quite quickly, so dont regard this as 100% accurate human perception preference, some of these will be ranked very differently by different people",
+        "selfReportedPace": "quick",
+        "accuracyQualification": "Provisional preference evidence; not definitive perceptual truth.",
+        "interReviewerVariation": "User expects some substantial ranking differences between people; not measured by this submission.",
+        "numericConfidence": null,
+        "numericWeight": null,
+        "groundTruthStatus": "not-universal-or-population-consensus",
+        "evaluationUse": "Development examples and discussion; no scoring rule or hard pass/fail threshold selected."
+      },
+      "notes": [
+        "Development evidence from one reviewer; related queries and repeated images are not independent samples.",
+        "Twenty-four batch rankings retain the quick-review caveat. Earlier records retain their own qualifications.",
+        "Five explicitly uncertain pairs are retained in the full score and omitted in a separate sensitivity score.",
+        "No numerical relevance grades, confidence weights, score margins or absolute acceptability thresholds are inferred.",
+        "Connected source-image and fixture-family groups are recorded for future split design; no held-out split is claimed."
+      ]
+    },
+    "accuracyPolicy": {
+      "version": 1,
+      "id": "strict-pair-query-macro-v1",
+      "higherScoresAreBetter": true,
+      "modelTieCredit": 0.5,
+      "humanTiePolicy": "no within-group ordering constraint",
+      "missingHitPolicy": "unassessed; report coverage",
+      "aggregation": "equal weight per query with at least one assessed strict pair; report coverage and complete-case score separately"
+    }
+  },
+  "environment": {
+    "node": "v22.22.3",
+    "platform": "linux",
+    "arch": "x64",
+    "cpuCount": 32,
+    "cpuModel": "AMD Ryzen 9 9955HX 16-Core Processor",
+    "totalMemoryBytes": 30637961216,
+    "hostname": "zerotwo"
+  },
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000,
+    "timingScope": "adapter-end-to-end",
+    "cacheState": "uncontrolled; explicit warmup rounds",
+    "schedule": "rotating case order per round; candidates sequential",
+    "percentiles": "nearest-rank",
+    "setupExcluded": true
+  },
+  "previousRunId": "2026-09-23T15-56-35.122Z-2025cd42",
+  "runnerSourceHashes": {
+    "evaluation/loop/runner.mjs": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+    "evaluation/loop/dataset.mjs": "9cb2e8ae1927fe4044c4d5d083f7512714d7eead77c27a67c1cc81d3a1ca5f10",
+    "evaluation/loop/metrics.mjs": "203881cc4466c53c16ccc22460f522b323fc1dc2569e83f7d1d45dee0139a69a",
+    "evaluation/loop/report.mjs": "4739672761740450a1ce9e3325e1db427cdae8dd98fcf4f17c40c85200b1d01e"
+  },
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "label": "favorite-baseline256",
+      "configuration": {
+        "id": "favorite-baseline256",
+        "method": "cutoff-shade-hue-all-levels",
+        "index": "color-exploration-shade-hue-256-real-v1",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./adapter.mjs"
+      },
+      "execution": {
+        "kind": "unknown"
+      },
+      "sourceHashes": {},
+      "summary": {
+        "accuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          }
+        },
+        "timedAccuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          },
+          "policy": "First successful measured request per case, at workload.limit; all repeated trial results preserved separately"
+        },
+        "coverage": {
+          "total": 37,
+          "ok": 0,
+          "unsupported": 0,
+          "error": 37
+        },
+        "performance": {
+          "samplesMs": [],
+          "sampleCount": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "failures": 0
+        }
+      }
+    },
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "label": "favorite-utility-numeric-docvalues",
+      "configuration": {
+        "id": "favorite-utility-numeric-docvalues",
+        "method": "favorite-utility-numeric-docvalues",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-docvalue-adapter.mjs"
+      },
+      "execution": {
+        "kind": "unknown"
+      },
+      "sourceHashes": {},
+      "summary": {
+        "accuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          }
+        },
+        "timedAccuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          },
+          "policy": "First successful measured request per case, at workload.limit; all repeated trial results preserved separately"
+        },
+        "coverage": {
+          "total": 37,
+          "ok": 0,
+          "unsupported": 0,
+          "error": 37
+        },
+        "performance": {
+          "samplesMs": [],
+          "sampleCount": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "failures": 0
+        }
+      }
+    },
+    {
+      "id": "favorite-utility-bounded-pooled-delete",
+      "label": "favorite-utility-bounded-pooled-delete",
+      "configuration": {
+        "id": "favorite-utility-bounded-pooled-delete",
+        "method": "favorite-utility-bounded-pooled-delete",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-pooled-adapter.mjs"
+      },
+      "execution": {
+        "kind": "unknown"
+      },
+      "sourceHashes": {},
+      "summary": {
+        "accuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          }
+        },
+        "timedAccuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          },
+          "policy": "First successful measured request per case, at workload.limit; all repeated trial results preserved separately"
+        },
+        "coverage": {
+          "total": 37,
+          "ok": 0,
+          "unsupported": 0,
+          "error": 37
+        },
+        "performance": {
+          "samplesMs": [],
+          "sampleCount": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "failures": 0
+        }
+      }
+    },
+    {
+      "id": "favorite-utility-maxima-bounded-pooled-delete",
+      "label": "favorite-utility-maxima-bounded-pooled-delete",
+      "configuration": {
+        "id": "favorite-utility-maxima-bounded-pooled-delete",
+        "method": "favorite-utility-maxima-bounded-pooled-delete",
+        "index": "color-exploration-favorite-points-real-v2",
+        "parameters": {
+          "bucketCount": 256,
+          "cutoffBlendExponent": 1,
+          "qualityCurve": "linear",
+          "qualityInfluence": 0.5,
+          "minimumQuality": 0,
+          "namedMode": "concrete-swatches",
+          "areaPower": 0.5,
+          "qualityPenalty": 0.35,
+          "excessPenalty": 1.5,
+          "pixelCutoff": 0
+        },
+        "module": "./favorite-pooled-adapter.mjs"
+      },
+      "execution": {
+        "kind": "unknown"
+      },
+      "sourceHashes": {},
+      "summary": {
+        "accuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          }
+        },
+        "timedAccuracy": {
+          "totalCases": 37,
+          "statusCounts": {
+            "error": 37
+          },
+          "allPairs": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 264,
+            "pairCoverage": 0
+          },
+          "withoutUncertain": {
+            "queryMacroAgreement": null,
+            "completeCaseMacroAgreement": null,
+            "assessedCases": 0,
+            "completeCases": 0,
+            "totalCases": 37,
+            "assessedPairs": 0,
+            "totalPairs": 259,
+            "pairCoverage": 0
+          },
+          "imageCoverage": {
+            "expected": 156,
+            "returned": 0,
+            "fraction": 0
+          },
+          "eligibilityViolations": 0,
+          "categories": {
+            "Combinations": {
+              "totalCases": 14,
+              "statusCounts": {
+                "error": 14
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 14,
+                "assessedPairs": 0,
+                "totalPairs": 106,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 59,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Perceived color": {
+              "totalCases": 6,
+              "statusCounts": {
+                "error": 6
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 45,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 6,
+                "assessedPairs": 0,
+                "totalPairs": 43,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 26,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Vibe": {
+              "totalCases": 9,
+              "statusCounts": {
+                "error": 9
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 9,
+                "assessedPairs": 0,
+                "totalPairs": 69,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 40,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Precision": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 16,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Semantic filtering": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 3,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 3,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Proportions": {
+              "totalCases": 3,
+              "statusCounts": {
+                "error": 3
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 18,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 3,
+                "assessedPairs": 0,
+                "totalPairs": 17,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 12,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            },
+            "Palette": {
+              "totalCases": 1,
+              "statusCounts": {
+                "error": 1
+              },
+              "allPairs": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 6,
+                "pairCoverage": 0
+              },
+              "withoutUncertain": {
+                "queryMacroAgreement": null,
+                "completeCaseMacroAgreement": null,
+                "assessedCases": 0,
+                "completeCases": 0,
+                "totalCases": 1,
+                "assessedPairs": 0,
+                "totalPairs": 5,
+                "pairCoverage": 0
+              },
+              "imageCoverage": {
+                "expected": 4,
+                "returned": 0,
+                "fraction": 0
+              },
+              "eligibilityViolations": 0
+            }
+          },
+          "policy": "First successful measured request per case, at workload.limit; all repeated trial results preserved separately"
+        },
+        "coverage": {
+          "total": 37,
+          "ok": 0,
+          "unsupported": 0,
+          "error": 37
+        },
+        "performance": {
+          "samplesMs": [],
+          "sampleCount": 0,
+          "p50Ms": null,
+          "p95Ms": null,
+          "maxMs": null,
+          "failures": 0
+        }
+      }
+    }
+  ],
+  "archiveProvenance": {
+    "source": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-23T18-35-44.336Z-e30f5f5b/run.json",
+    "sourceSha256": "6719a96aa61f79b0779b7406c6dfa556dcff229183557c736979975de98e8f49",
+    "derived": true,
+    "excluded": "Per-request and per-case raw rows, large setup/index documents, and resource traces. Full generated Markdown/HTML reports are retained separately."
+  }
+}

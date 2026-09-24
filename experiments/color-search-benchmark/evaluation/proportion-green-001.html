@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>40% green — evaluation case 001</title>
+<style>
+:root { color-scheme: dark; font: 16px/1.55 system-ui, sans-serif; background: #202020; color: #eee; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; padding: 24px 20px 36px; max-width: 1040px; }
+h1 { margin: 0 0 10px; font-size: 1.9rem; line-height: 1.2; }
+p { margin: 7px 0; }
+.eyebrow { color: #bbb; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+.instructions { margin: 18px 0 22px; max-width: 80ch; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+figure { margin: 0; border: 1px solid #555; border-radius: 7px; overflow: hidden; background: #282828; }
+figcaption { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 9px 12px; }
+.label { font-size: 1.2rem; font-weight: 700; }
+.amount { font-size: .85rem; color: #ddd; }
+.picture { display: block; background: #707070; }
+.picture img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; }
+a { color: #ddd; }
+a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.full { display: block; padding: 7px 12px; font-size: .8rem; }
+footer { margin-top: 22px; color: #bbb; font-size: .9rem; }
+@media (max-width: 580px) { body { padding: 18px 12px; } .grid { grid-template-columns: 1fr; gap: 16px; } }
+</style>
+</head>
+<body>
+<header>
+<p class="eyebrow">Evaluation case · proportion-green-001</p>
+<h1>40% green; the rest doesn’t matter</h1>
+<p>Aim close to 40% total green. No particular green shade or subject is specified.</p>
+<p>These simple constructed wallpapers vary the colored band's area and shade. Each label states the band's geometric area; you decide how well its color fits “green.”</p>
+</header>
+<section class="instructions" aria-label="Review instructions">
+<p><strong>How well does each example match this request?</strong></p>
+<p>For A–F, describe the fit and give an order if you have a preference. Mention amount, color quality, or both if helpful.</p>
+<p>Ties and uncertainty are welcome. If a shade doesn't feel green to you, say so. No numeric scores are required.</p>
+</section>
+<main class="grid" aria-label="Six constructed wallpaper examples">
+<figure aria-labelledby="label-A">
+<figcaption><span class="label" id="label-A">A</span><span class="amount">Colored band: 60% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-a.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example A at full size"><img src="fixtures/proportion-green-001-a.svg" alt="Constructed wallpaper A"></a>
+<a class="full" href="fixtures/proportion-green-001-a.svg" target="_blank" rel="noopener noreferrer">Open full-size A ↗</a>
+</figure>
+<figure aria-labelledby="label-B">
+<figcaption><span class="label" id="label-B">B</span><span class="amount">Colored band: 40% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-b.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example B at full size"><img src="fixtures/proportion-green-001-b.svg" alt="Constructed wallpaper B"></a>
+<a class="full" href="fixtures/proportion-green-001-b.svg" target="_blank" rel="noopener noreferrer">Open full-size B ↗</a>
+</figure>
+<figure aria-labelledby="label-C">
+<figcaption><span class="label" id="label-C">C</span><span class="amount">Colored band: 20% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-c.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example C at full size"><img src="fixtures/proportion-green-001-c.svg" alt="Constructed wallpaper C"></a>
+<a class="full" href="fixtures/proportion-green-001-c.svg" target="_blank" rel="noopener noreferrer">Open full-size C ↗</a>
+</figure>
+<figure aria-labelledby="label-D">
+<figcaption><span class="label" id="label-D">D</span><span class="amount">Colored band: 40% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-d.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example D at full size"><img src="fixtures/proportion-green-001-d.svg" alt="Constructed wallpaper D"></a>
+<a class="full" href="fixtures/proportion-green-001-d.svg" target="_blank" rel="noopener noreferrer">Open full-size D ↗</a>
+</figure>
+<figure aria-labelledby="label-E">
+<figcaption><span class="label" id="label-E">E</span><span class="amount">Colored band: 80% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-e.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example E at full size"><img src="fixtures/proportion-green-001-e.svg" alt="Constructed wallpaper E"></a>
+<a class="full" href="fixtures/proportion-green-001-e.svg" target="_blank" rel="noopener noreferrer">Open full-size E ↗</a>
+</figure>
+<figure aria-labelledby="label-F">
+<figcaption><span class="label" id="label-F">F</span><span class="amount">Colored band: 40% of image</span></figcaption>
+<a class="picture" href="fixtures/proportion-green-001-f.svg" target="_blank" rel="noopener noreferrer" aria-label="Open example F at full size"><img src="fixtures/proportion-green-001-f.svg" alt="Constructed wallpaper F"></a>
+<a class="full" href="fixtures/proportion-green-001-f.svg" target="_blank" rel="noopener noreferrer">Open full-size F ↗</a>
+</figure>
+</main>
+<footer><p>Your amount and shade observations, overall order and “less than half” explanation are recorded. Reply in chat to add or revise them.</p></footer>
+</body>
+</html>

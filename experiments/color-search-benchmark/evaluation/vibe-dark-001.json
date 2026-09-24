@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "vibe-dark-001",
+  "status": "user-judged",
+  "category": "Vibe",
+  "use": "development anchor",
+  "query": {
+    "userText": "dark",
+    "intent": "A wallpaper that feels dark overall. Whether bright highlights or colored areas affect that judgment is for the user to decide.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/vibe-dark-001.html",
+    "presentation": "Existing JPEG whole-image thumbnails, contained without cropping on the same neutral background; originals available by clicking. Labels A–F are presentation IDs, not ranks.",
+    "selection": "Manually selected existing corpus images to discuss overall darkness, bright highlights, colored areas, larger light areas, and midtones. These are sampling considerations, not expected relevance judgments or search results.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "sourceTitlesVisible": false,
+    "randomization": "Fixed nonsorted presentation order: wallpaper-054, wallpaper-022, wallpaper-010, wallpaper-067, wallpaper-091, wallpaper-068.",
+    "judgmentFormat": "Open descriptions of whole-image match quality, optional ordering or comparisons with ties, and finer scores if the user chooses. No mandatory labels or predefined numeric scale.",
+    "requestedLabels": null,
+    "pairwiseOrdering": "Optional. Ties, acceptable alternative orders, and uncertainty should be preserved."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-054",
+      "filename": "corpus/wallpaper-054.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-054.jpg",
+      "sha256": "2b92b1ab944cdcb6274ea959fecf9c6a62bed4062c22ba7615b4a14b82557c1e",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_landscape_of_mountains_and_a_pink_sky.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 5120,
+      "height": 2880,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Not really dark, more light, but not 0% I would say 10-20% dark from the foreground",
+        "perceivedDarkAreas": [
+          {
+            "estimatedImagePercent": null,
+            "estimatedImagePercentRange": [
+              10,
+              20
+            ],
+            "perceivedDarknessPercent": null,
+            "description": "Foreground; interpreted as an approximate area range associated with darkness. No separate darkness-strength percentage was supplied."
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-022",
+      "filename": "corpus/wallpaper-022.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-022.jpg",
+      "sha256": "544c5a8d83c439fcdda97d55f923c22ca930abe871abb5028fcd6ca1dde52078",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_city_at_night_with_many_tall_buildings.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 6512,
+      "height": 4341,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Interesting, definitely dark, but I wouldn't say maximum dark 80% area at a 70% dark",
+        "perceivedDarkAreas": [
+          {
+            "estimatedImagePercent": 80,
+            "perceivedDarknessPercent": 70
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-010",
+      "filename": "corpus/wallpaper-010.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-010.jpg",
+      "sha256": "bc9b1d219e079cc53c647266f91517cb9464ae4a6d16c9b1c653bfc64eaadc86",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_white_building_with_balconies.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1920,
+      "height": 1080,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Not dark",
+        "perceivedDarkAreas": [],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-067",
+      "filename": "corpus/wallpaper-067.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-067.jpg",
+      "sha256": "5c6c38c093055c135f55dc68c55e191606de32a63ccffd9df6733cde26df655e",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_pile_of_black_rocks.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 4031,
+      "height": 2267,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Nice and dark, I'd say 90% area at 100% dark to generalize (it's a gradient)",
+        "perceivedDarkAreas": [
+          {
+            "estimatedImagePercent": 90,
+            "perceivedDarknessPercent": 100,
+            "description": "Explicit generalization of a gradient; not a claim of uniform or exact black pixels."
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "E",
+      "wallpaperId": "wallpaper-091",
+      "filename": "corpus/wallpaper-091.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-091.jpg",
+      "sha256": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_bridge_with_a_view_of_a_city.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 2137,
+      "height": 1400,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "60% area at 100% dark",
+        "perceivedDarkAreas": [
+          {
+            "estimatedImagePercent": 60,
+            "perceivedDarknessPercent": 100
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "F",
+      "wallpaperId": "wallpaper-068",
+      "filename": "corpus/wallpaper-068.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-068.jpg",
+      "sha256": "0a4f4018a08fc37855662e2f4f59c34b6a210fc3949453eb1fe79da977daf224",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_plant_in_a_pot.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 3985,
+      "height": 2989,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "50% area at 90% dark",
+        "perceivedDarkAreas": [
+          {
+            "estimatedImagePercent": 50,
+            "perceivedDarknessPercent": 90
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "dark-order-001",
+      "source": "user-response-001",
+      "type": "overall-dark-appearance-order",
+      "orderedLabels": [
+        "D",
+        "B",
+        "E",
+        "F",
+        "A",
+        "C"
+      ],
+      "orderedWallpaperIds": [
+        "wallpaper-067",
+        "wallpaper-022",
+        "wallpaper-091",
+        "wallpaper-068",
+        "wallpaper-054",
+        "wallpaper-010"
+      ],
+      "tiesReported": false,
+      "scope": "Relative order for the general dark query. Regional amount and darkness-strength estimates are separate from whole-image ranking; no numeric whole-image scores or score distances supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "D",
+      "over": "B",
+      "source": "dark-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "B",
+      "over": "E",
+      "source": "dark-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "E",
+      "over": "F",
+      "source": "dark-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "F",
+      "over": "A",
+      "source": "dark-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "C",
+      "source": "dark-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A Not really dark, more light, but not 0% I would say 10-20% dark from the foreground\nB Interesting, definitely dark, but I wouldn't say maximum dark 80% area at a 70% dark\nC Not dark\nD Nice and dark, I'd say 90% area at 100% dark to generalize (it's a gradient)\nE 60% area at 100% dark\nF 50% area at 90% dark\n\nOrder\n\nD, B, E, F, A, C"
+    }
+  ],
+  "notes": [
+    "User regional estimates and overall order are recorded. Confirmed order: D > B > E > F > A > C.",
+    "The query concerns overall appearance. It does not specify a numerical darkness threshold, percentage, shade, or subject.",
+    "These A–F labels belong only to this case; the red and grayscale cases have different image mappings.",
+    "User judgments should describe appearance; they are not a pixel-membership oracle or extraction target.",
+    "Colorfulness, grayscale appearance, and darkness are not assumed to be equivalent. Their effect on this query is for the user to judge.",
+    "Source filenames, titles, directory names, and earlier sampling labels do not define relevance.",
+    "No originals or thumbnails were altered for this case. Existing previews can differ from originals because of display size and JPEG encoding.",
+    "Image-area estimates and perceived darkness strength are separate subjective annotations, not measured pixel coverage, a luminance definition, or whole-image numeric relevance scores.",
+    "Preserve finer comparisons, uncertainty, and acceptable alternative orders without inventing numeric scores or exact ties.",
+    "A's 10–20% foreground description is retained as an approximate range without inventing a darkness-strength value. C's 'Not dark' remains qualitative; no exact numeric 0% coverage is assigned.",
+    "Unmentioned image areas remain unannotated; do not treat them as having zero darkness.",
+    "D's 90% at 100% darkness explicitly generalizes a gradient. Preserve that approximation rather than treating 100% as exact RGB black.",
+    "B ranks above E despite B's region being described as less dark and larger. Treat that ordering as direct evidence; approximate regional estimates and unannotated remainders do not establish or refute a general scoring formula."
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "kind": "maxima-execution",
+  "auditedAt": "2026-09-23T15:58:46.655562+00:00",
+  "integrityPassed": true,
+  "experimentPassed": true,
+  "sourceSnapshotHash": "addb62a4adf3e2b502a0d7aa3ed0ba76762ac99680fc88d06e3bdca7e97a207e",
+  "summaryHash": "b8f92b7b1f705b9083dc8fe29fafcbb4702e18852251d094afbeaff7514c4c21",
+  "auditCodeHash": "b46b6a21c1545b4238dff2fc6d7ea01df930de360c57ee1a59b1fb11573da165",
+  "referenceCases": 160,
+  "fullUtilityFields": 189,
+  "executions": 626,
+  "documentScores": 83386,
+  "exactOrdersAndScores": 626,
+  "positiveBounds": 473,
+  "maximaRanges": 458,
+  "additionallyPrunedExecutions": 105,
+  "maximumAdditionalPruned": 525,
+  "winnersAndTiesChecked": 4543,
+  "duplicateFallbacks": 6,
+  "groups": {
+    "1": {
+      "executions": 420,
+      "currentCandidateVisits": 57075,
+      "proposedCandidateVisits": 57075,
+      "improvedExecutions": 0
+    },
+    "2": {
+      "executions": 161,
+      "currentCandidateVisits": 39413,
+      "proposedCandidateVisits": 25832,
+      "improvedExecutions": 102
+    },
+    "5": {
+      "executions": 45,
+      "currentCandidateVisits": 10068,
+      "proposedCandidateVisits": 10064,
+      "improvedExecutions": 3
+    }
+  },
+  "limitations": [
+    "Independent saved-evidence audit; no service calls or new relevance labels.",
+    "Known duplicate-target arithmetic defect is retained and conservatively falls back to original bounds.",
+    "Count queries occur after PIT closure and are validated against unchanged index generations and reconstructed utility eligibility."
+  ]
+}

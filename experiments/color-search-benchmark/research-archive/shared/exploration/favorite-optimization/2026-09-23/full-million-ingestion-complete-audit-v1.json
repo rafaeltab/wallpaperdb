@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "fileOnly": true,
+  "startedAt": "2026-09-23T18:04:26.097Z",
+  "scope": "receipt-source-and-all-acknowledgement-records",
+  "files": {
+    "points-full-1m-v1/index.json": {
+      "bytes": 709948,
+      "sha256": "0b86e8de49c08eb4efb64041d3693c589319e68f3974ea30d0826b85480390c9"
+    },
+    "points-full-1m-v1-audit/audit.json": {
+      "bytes": 1716,
+      "sha256": "0aba9497dd55420382cb45bccd91a86f00420630f48a0699dd4d76a546e69edc"
+    },
+    "full-million-build-v1/status.json": {
+      "bytes": 1461,
+      "sha256": "3d6d253dc2fd3bbce23744f372a30d98d4b0aaf82cf0ca6e83ea0105cc633bf9"
+    },
+    "full-million-build-v1/plan.json": {
+      "bytes": 1247,
+      "sha256": "5a3fdc4b95323a0d351ae0d29b7c9a4e20b385019f6ff1d3fa93e0153bcbd92e"
+    },
+    "points-full-1m-v1/source-snapshot.json": {
+      "bytes": 310299,
+      "sha256": "63b4ed12baf222010ddd8d2557167a6298d947fe0410b11da7c8bb73ee3e981b"
+    },
+    "points-full-1m-v1/batches.jsonl": {
+      "sha256": "24e12b52b4767510713527e8c1cbf75988b4c8f63f5f83a2772cfe6ed41ea3c6"
+    },
+    "points-full-1m-v1/retries.jsonl": {
+      "sha256": "cf61d41d24c7269c9bb4fdf822194a1d01d094ff3d9e2009df6270fce6dca5c6"
+    },
+    "points-full-1m-v1/scheduler.jsonl": {
+      "sha256": "f68179bed272de0fac79c0f4a3d19233a5fc509493e0e53e2c7e37e962f04893"
+    }
+  },
+  "checks": [
+    "Completed pipeline phases, exact million count and unchanged 29-source archive/current-file binding",
+    "Identity, mapping, 6138 numeric-point/docvalue fields and index UUID agree",
+    "Stored-value audit is finished and hash-bound: 18414 values on three sampled ordinals",
+    "Scheduler and receipt counters reconcile with no failures/retries; full per-event reconciliation is separate",
+    "All started/accepted/scheduler/batch records agree; exact consecutive million unique IDs reproduce receipt ordered-ID hash"
+  ],
+  "errors": [],
+  "complete": true,
+  "index": {
+    "index": "color-exploration-favorite-points-full-1m-v1",
+    "uuid": "LHjoEvSiR8KNe5WZv_a7iA",
+    "count": 1000000,
+    "utilities": 6138,
+    "sourceCount": 523,
+    "scope": "full",
+    "presets": "favorite",
+    "primaryShards": 1,
+    "replicas": 0
+  },
+  "cost": {
+    "indexingMs": 7170076.354318,
+    "elapsedMs": 7336452.802823,
+    "indexingStartedAt": "2026-09-23T15:55:56.036Z",
+    "indexingFinishedAt": "2026-09-23T17:55:25.954Z",
+    "finishedAt": "2026-09-23T17:58:12.331Z",
+    "primaryStoreBytes": 56048738808,
+    "segments": 66,
+    "bulkCount": 47620,
+    "bulkBytes": 247903630614,
+    "serializedDocumentBytes": 247852630614,
+    "bulkRetries": 0,
+    "documentsPerIndexingSecond": 139.4685287274207,
+    "peakInFlightBytes": 20845673,
+    "merges": {
+      "current": 0,
+      "current_docs": 0,
+      "current_size_in_bytes": 0,
+      "total": 392,
+      "total_time_in_millis": 13813418,
+      "total_docs": 2547013,
+      "total_size_in_bytes": 288597247979,
+      "total_stopped_time_in_millis": 0,
+      "total_throttled_time_in_millis": 10810483,
+      "total_auto_throttle_in_bytes": 7311653,
+      "unreferenced_file_cleanups_performed": 0
+    }
+  },
+  "storedValueAudit": {
+    "verified": true,
+    "valuesCompared": 18414,
+    "ordinals": [
+      0,
+      499999,
+      999999
+    ],
+    "notAllDocuments": true
+  },
+  "acknowledgementReconciliation": {
+    "verified": true,
+    "batches": 47620,
+    "uniqueOrderedIds": 1000000,
+    "bytes": 247903630614,
+    "retries": 0
+  },
+  "verified": true,
+  "limitations": [
+    "File-only review; no new OpenSearch requests.",
+    "Accepted bulk records contain response hashes and counters after the frozen runner validated every create status201; complete raw per-item HTTP responses were not retained, so this is reconciliation of acknowledgement evidence rather than reparsing every HTTP response.",
+    "Saved plan/documents hashes are bound through receipt/audit identity; this lightweight review does not regenerate a million utility documents.",
+    "All 18414 sampled values passed the existing service audit; values on the other999997 documents are not independently read back.",
+    "Build/storage completion does not establish query latency or concurrent-user capacity."
+  ],
+  "finishedAt": "2026-09-23T18:04:26.844Z",
+  "auditCodeSha256": "9a1c287fcd6b4a7f6fdf90eb72ee3f1c1e46dc0ff045fc44645427175749fedf"
+}

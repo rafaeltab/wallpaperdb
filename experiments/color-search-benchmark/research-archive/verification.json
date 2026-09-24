@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-09-24",
+  "passed": true,
+  "sourceRecordsVerified": 856,
+  "exactDuplicateReferencesVerified": 405,
+  "compressedTextReferencesRoundTripVerified": 58,
+  "frozenFavoriteTarball": {
+    "sha256": "25cb051d58244b05c923adf2d52fccc470cc5600af2f0b6913c7a1dfb18a6ddd",
+    "bytes": 6026994,
+    "members": 635,
+    "unsafeMembers": 0
+  },
+  "archivedRasterOrWallpaperZipFiles": [],
+  "issues": [],
+  "physicalTreeBytesBeforeVerificationRecord": 133572403,
+  "largestPhysicalFileBytes": 9632934,
+  "omittedArtifactsNote": "Only inventory/checksum status retained for excluded external data."
+}

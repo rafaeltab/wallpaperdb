@@ -1,0 +1,3127 @@
+{
+  "schemaVersion": 1,
+  "experiment": "independent-focused-pooled-resources",
+  "fileOnly": true,
+  "finishedAt": "2026-09-23T20:40:34.028412+00:00",
+  "integrityPassed": true,
+  "errors": [],
+  "checks": 2490,
+  "focusedProfiles": 6,
+  "observerPrefix": {
+    "sha256": "06af687e56b8ed814e7f43abc9c7128afe5957da2485afa5bbc9a0fd2e0dd7fd",
+    "bytes": 60352696,
+    "samples": 12748
+  },
+  "artifactBindings": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-arrival-fixed-v1/arrival.json",
+      "sha256": "7947dba06a0d5b003e8143f0e36d0dd72d6939e2af8c82ae18f62eb15b84479c"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-arrival-wide-v1/arrival.json",
+      "sha256": "c2631da24884cbae0c8919997bbd5745f85834437392d8524dcf0bb2680554d9"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/arrival.json",
+      "sha256": "f0be72728c45f622ad3d142d32a5720b8eec93b4152936aac2b3f7845306d46c"
+    }
+  ],
+  "profiles": [
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-arrival-fixed-v1/arrival.json",
+      "candidateId": "favorite-utility-maxima-bounded-pooled-delete",
+      "rate": 128,
+      "strictPassed": false,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 32.865999937057495,
+        "processCpuMilliseconds": {
+          "delta": 51770,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 1.5751840838296731,
+        "heapUsedBytes": {
+          "first": 2307454904,
+          "last": 2951512280,
+          "sampledMinimum": 877436024,
+          "sampledMaximum": 3035450232,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 216307920,
+          "last": 217513544,
+          "sampledMinimum": 216307920,
+          "sampledMaximum": 217513544,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 80,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 7,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 25,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 6598403,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 680103936,
+          "last": 666533888,
+          "sampledMinimum": 644296704,
+          "sampledMaximum": 680103936,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 210884264,
+          "last": 215511048,
+          "sampledMinimum": 151156760,
+          "sampledMaximum": 279504072,
+          "validSamples": 19,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.20076684149688945
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T19:28:47.325Z",
+          "requestedEnd": "2026-09-23T19:29:20.191Z",
+          "phaseComplete": true,
+          "samples": 13,
+          "firstObservedAt": "2026-09-23T19:28:48.577532+00:00",
+          "lastObservedAt": "2026-09-23T19:29:17.835391+00:00",
+          "observedSeconds": 29.257858991622925,
+          "requestedSeconds": 32.865999937057495,
+          "unobservedStartSeconds": 1.2525320053100586,
+          "unobservedEndSeconds": 2.3556089401245117,
+          "fractionCoveredByCounterWindow": 0.8902166082777152,
+          "maximumSampleGapSeconds": 3.8258540630340576
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 45679598,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 41263967,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 4415632,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 244,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 10,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 8049333,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 1.5612761690142443,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.19515952112678053,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.040983606557377046
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 4940599296,
+            "last": 4905529344,
+            "sampledMinimum": 4894601216,
+            "sampledMaximum": 4960227328,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1056993280,
+            "last": 1056468992,
+            "sampledMinimum": 1056432128,
+            "sampledMaximum": 1057001472,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4753522688,
+            "last": 4754432000,
+            "sampledMinimum": 4753514496,
+            "sampledMaximum": 4754468864,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 41762816,
+            "last": 8634368,
+            "sampledMinimum": 335872,
+            "sampledMaximum": 61775872,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 136790016,
+            "last": 136716288,
+            "sampledMinimum": 135528448,
+            "sampledMaximum": 136986624,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 38092800,
+            "last": 5611520,
+            "sampledMinimum": 135168,
+            "sampledMaximum": 41910272,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 45056,
+            "last": 86016,
+            "sampledMinimum": 16384,
+            "sampledMaximum": 86016,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 16384,
+            "sampledMinimum": 0,
+            "sampledMaximum": 163840,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 4788224,
+            "last": 4493312,
+            "sampledMinimum": 4456448,
+            "sampledMaximum": 4788224,
+            "validSamples": 13,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 5563,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 406531.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.013894762433450699,
+              "avg10Percent": {
+                "first": 0.99,
+                "last": 0.8,
+                "sampledMinimum": 0.24,
+                "sampledMaximum": 2.68,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 300171.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.010259499852191666,
+              "avg10Percent": {
+                "first": 0.3,
+                "last": 0.59,
+                "sampledMinimum": 0.07,
+                "sampledMaximum": 1.97,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 1959157.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.06696173498412661,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 15.75,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 15.75,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 1947855.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.06657544561130421,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 15.75,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 15.75,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 11818600.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.40394616719507354,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 55.91,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 55.91,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 11579235.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.3957649465504415,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 55.28,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 55.28,
+                "validSamples": 13,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 993759232,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 1622016,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 63581,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 175,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 993759232,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 1622016,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 63581,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 170,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 49,
+      "openContextsMaximum": 300
+    },
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-arrival-wide-v1/arrival.json",
+      "candidateId": "favorite-utility-sorted-docvalues",
+      "rate": 16,
+      "strictPassed": false,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 600.5099999904633,
+        "processCpuMilliseconds": {
+          "delta": 283440,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 0.47199880102662956,
+        "heapUsedBytes": {
+          "first": 2099938088,
+          "last": 1393566488,
+          "sampledMinimum": 784922648,
+          "sampledMaximum": 3193465992,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 214967776,
+          "last": 215134048,
+          "sampledMinimum": 214967776,
+          "sampledMaximum": 215134048,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 37,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 10,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 35,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 27665402,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 624881664,
+          "last": 535826432,
+          "sampledMinimum": 486653952,
+          "sampledMaximum": 629600256,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 188745400,
+          "last": 205511224,
+          "sampledMinimum": 188592896,
+          "sampledMaximum": 218468544,
+          "validSamples": 597,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.046069843966693905
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T19:48:25.618Z",
+          "requestedEnd": "2026-09-23T19:58:26.128Z",
+          "phaseComplete": true,
+          "samples": 298,
+          "firstObservedAt": "2026-09-23T19:48:26.675120+00:00",
+          "lastObservedAt": "2026-09-23T19:58:24.901006+00:00",
+          "observedSeconds": 598.2258858680725,
+          "requestedSeconds": 600.5099999904633,
+          "unobservedStartSeconds": 1.0571200847625732,
+          "unobservedEndSeconds": 1.2269940376281738,
+          "fractionCoveredByCounterWindow": 0.9961963762095102,
+          "maximumSampleGapSeconds": 5.9052228927612305
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 284160509,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 266055177,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 18105332,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 5966,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 0.47500537123642,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.0593756714045525,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.0
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 7807496192,
+            "last": 10901819392,
+            "sampledMinimum": 4950052864,
+            "sampledMaximum": 11111108608,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1059368960,
+            "last": 1062293504,
+            "sampledMinimum": 1059291136,
+            "sampledMaximum": 1062498304,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4752908288,
+            "last": 4750049280,
+            "sampledMinimum": 4749844480,
+            "sampledMaximum": 4752986112,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 2867519488,
+            "last": 5904883712,
+            "sampledMinimum": 978944,
+            "sampledMaximum": 6114811904,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 185094144,
+            "last": 245141504,
+            "sampledMinimum": 185094144,
+            "sampledMaximum": 245149696,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 2034954240,
+            "last": 4439986176,
+            "sampledMinimum": 712704,
+            "sampledMaximum": 4560265216,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 24576,
+            "last": 110592,
+            "sampledMinimum": 0,
+            "sampledMaximum": 110592,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 20480,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 430080,
+            "last": 536576,
+            "sampledMinimum": 417792,
+            "sampledMaximum": 1482752,
+            "validSamples": 298,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 97,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 197300.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.00032980852995637643,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.0,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 172625.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.00028856156859462484,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.0,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 2112210.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.003530790040847227,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 12.23,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 2068012.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0034569082496307443,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 11.63,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 23192879.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.03876943400124741,
+              "avg10Percent": {
+                "first": 1.87,
+                "last": 3.67,
+                "sampledMinimum": 1.38,
+                "sampledMaximum": 29.54,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 23090726.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.038598674088623816,
+              "avg10Percent": {
+                "first": 1.87,
+                "last": 3.67,
+                "sampledMinimum": 1.38,
+                "sampledMaximum": 28.94,
+                "validSamples": 298,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 71412412416,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 33173504,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 893309,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 3736,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 71412412416,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 33173504,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 893309,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 3617,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 49,
+      "openContextsMaximum": 49
+    },
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/arrival.json",
+      "candidateId": "favorite-utility-numeric-docvalues",
+      "rate": 64,
+      "strictPassed": true,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 180.56499981880188,
+        "processCpuMilliseconds": {
+          "delta": 557420,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 3.0870877554308667,
+        "heapUsedBytes": {
+          "first": 1399238408,
+          "last": 1899149752,
+          "sampledMinimum": 835906296,
+          "sampledMaximum": 3139874568,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 215368008,
+          "last": 215361536,
+          "sampledMinimum": 215360384,
+          "sampledMaximum": 215368008,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 3,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 19,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 18105511,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 680280064,
+          "last": 513957888,
+          "sampledMinimum": 509792256,
+          "sampledMaximum": 680280064,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 193168104,
+          "last": 163210496,
+          "sampledMinimum": 146647112,
+          "sampledMaximum": 204756488,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.10027143144113751
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T20:19:39.295Z",
+          "requestedEnd": "2026-09-23T20:22:39.860Z",
+          "phaseComplete": true,
+          "samples": 91,
+          "firstObservedAt": "2026-09-23T20:19:39.447331+00:00",
+          "lastObservedAt": "2026-09-23T20:22:39.522169+00:00",
+          "observedSeconds": 180.0748381614685,
+          "requestedSeconds": 180.56499981880188,
+          "unobservedStartSeconds": 0.15233087539672852,
+          "unobservedEndSeconds": 0.3378307819366455,
+          "fractionCoveredByCounterWindow": 0.9972854005049414,
+          "maximumSampleGapSeconds": 2.001250982284546
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 557569650,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 540588531,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 16981119,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 1801,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 4,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 1186816,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 3.096321816488551,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.3870402270610689,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.002220988339811216
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 8172986368,
+            "last": 11111858176,
+            "sampledMinimum": 8172986368,
+            "sampledMaximum": 11111858176,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1078956032,
+            "last": 1074991104,
+            "sampledMinimum": 1074515968,
+            "sampledMaximum": 1079050240,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4733390848,
+            "last": 4737355776,
+            "sampledMinimum": 4733296640,
+            "sampledMaximum": 4737830912,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 3188535296,
+            "last": 6121549824,
+            "sampledMinimum": 3188535296,
+            "sampledMaximum": 6121549824,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 247939072,
+            "last": 247939072,
+            "sampledMinimum": 247644160,
+            "sampledMaximum": 247967744,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 2426580992,
+            "last": 4909862912,
+            "sampledMinimum": 2426580992,
+            "sampledMaximum": 4909862912,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 28672,
+            "last": 86016,
+            "sampledMinimum": 16384,
+            "sampledMaximum": 122880,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 1146880,
+            "last": 888832,
+            "sampledMinimum": 749568,
+            "sampledMaximum": 1232896,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 2,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 193627.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0010752584979495004,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.01,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.18,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 109387.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0006074529963032119,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.01,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.18,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 721792.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.004008289038987155,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.0,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 719107.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.003993378571609184,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.0,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 8014252.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.04450511843755665,
+              "avg10Percent": {
+                "first": 1.35,
+                "last": 3.58,
+                "sampledMinimum": 1.35,
+                "sampledMaximum": 4.87,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 7980953.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.044320200875836324,
+              "avg10Percent": {
+                "first": 1.35,
+                "last": 3.58,
+                "sampledMinimum": 1.35,
+                "sampledMaximum": 4.86,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 74235109376,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 7360512,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1146301,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 474,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 74235109376,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 7360512,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1146301,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 438,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 7,
+      "openContextsMaximum": 7
+    },
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/arrival.json",
+      "candidateId": "favorite-utility-numeric-docvalues",
+      "rate": 128,
+      "strictPassed": false,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 181.5130000114441,
+        "processCpuMilliseconds": {
+          "delta": 1407940,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 7.756689603010428,
+        "heapUsedBytes": {
+          "first": 1901246904,
+          "last": 1591811448,
+          "sampledMinimum": 857984456,
+          "sampledMaximum": 3165160440,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 215361536,
+          "last": 215432512,
+          "sampledMinimum": 215361536,
+          "sampledMaximum": 215457704,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 83,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 6,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 49,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 23794000,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 643702784,
+          "last": 570011648,
+          "sampledMinimum": 518627328,
+          "sampledMaximum": 643969024,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 219061096,
+          "last": 195077000,
+          "sampledMinimum": 160413480,
+          "sampledMaximum": 250420112,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.13108702957088378
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T20:22:41.160Z",
+          "requestedEnd": "2026-09-23T20:25:42.673Z",
+          "phaseComplete": true,
+          "samples": 91,
+          "firstObservedAt": "2026-09-23T20:22:41.523030+00:00",
+          "lastObservedAt": "2026-09-23T20:25:41.610787+00:00",
+          "observedSeconds": 180.08775687217712,
+          "requestedSeconds": 181.5130000114441,
+          "unobservedStartSeconds": 0.36302995681762695,
+          "unobservedEndSeconds": 1.0622131824493408,
+          "fractionCoveredByCounterWindow": 0.9921479831241998,
+          "maximumSampleGapSeconds": 2.006186008453369
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 1406339692,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 1366317330,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 40022361,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 1801,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 1429,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 737115913,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 7.809191010126209,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.9761488762657762,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.7934480843975569
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 10716577792,
+            "last": 10961899520,
+            "sampledMinimum": 10716577792,
+            "sampledMaximum": 11310956544,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1074991104,
+            "last": 1075609600,
+            "sampledMinimum": 1074991104,
+            "sampledMaximum": 1075699712,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4737355776,
+            "last": 4736610304,
+            "sampledMinimum": 4736610304,
+            "sampledMaximum": 4737355776,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 5725679616,
+            "last": 5971111936,
+            "sampledMinimum": 5725679616,
+            "sampledMaximum": 6321004544,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 247971840,
+            "last": 248528896,
+            "sampledMinimum": 247971840,
+            "sampledMaximum": 248553472,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 4449746944,
+            "last": 4891471872,
+            "sampledMinimum": 4449746944,
+            "sampledMaximum": 5181374464,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 98304,
+            "last": 40960,
+            "sampledMinimum": 8192,
+            "sampledMaximum": 98304,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 16384,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 888832,
+            "last": 1101824,
+            "sampledMinimum": 778240,
+            "sampledMaximum": 1101824,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 424,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 27578276.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.15313798383070837,
+              "avg10Percent": {
+                "first": 0.01,
+                "last": 15.49,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 20.55,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 24541501.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.1362752328433914,
+              "avg10Percent": {
+                "first": 0.01,
+                "last": 13.81,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 18.43,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 13868666.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.07701059883734193,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 7.44,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 8.22,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 10392128.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.05770591060988191,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 5.53,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 5.98,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 114590661.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.6363045605667368,
+              "avg10Percent": {
+                "first": 3.29,
+                "last": 64.58,
+                "sampledMinimum": 3.29,
+                "sampledMaximum": 67.66,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 85456770.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.47452848258116515,
+              "avg10Percent": {
+                "first": 3.29,
+                "last": 48.4,
+                "sampledMinimum": 3.29,
+                "sampledMaximum": 51.2,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 126540722176,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 7962624,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 2068804,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 628,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 126540722176,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 7962624,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 2068804,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 593,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 49,
+      "openContextsMaximum": 49
+    },
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/arrival.json",
+      "candidateId": "favorite-utility-bounded-pooled-delete",
+      "rate": 64,
+      "strictPassed": true,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 180.45300006866455,
+        "processCpuMilliseconds": {
+          "delta": 320090,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 1.7738136793414454,
+        "heapUsedBytes": {
+          "first": 2193694072,
+          "last": 1309376616,
+          "sampledMinimum": 816602952,
+          "sampledMaximum": 3151590312,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 215434176,
+          "last": 215435712,
+          "sampledMinimum": 215434176,
+          "sampledMaximum": 215435712,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 43,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 138,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 33234711,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 682844160,
+          "last": 665915392,
+          "sampledMinimum": 592629760,
+          "sampledMaximum": 683630592,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 174495960,
+          "last": 223802056,
+          "sampledMinimum": 174495960,
+          "sampledMaximum": 315163816,
+          "validSamples": 182,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.18417377925195916
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T20:25:49.546Z",
+          "requestedEnd": "2026-09-23T20:28:49.999Z",
+          "phaseComplete": true,
+          "samples": 91,
+          "firstObservedAt": "2026-09-23T20:25:49.614000+00:00",
+          "lastObservedAt": "2026-09-23T20:28:49.718177+00:00",
+          "observedSeconds": 180.10417699813843,
+          "requestedSeconds": 180.45300006866455,
+          "unobservedStartSeconds": 0.06800007820129395,
+          "unobservedEndSeconds": 0.2808229923248291,
+          "fractionCoveredByCounterWindow": 0.9980669588735384,
+          "maximumSampleGapSeconds": 2.0377120971679688
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 320671512,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 293103124,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 27568388,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 1801,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 4,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 244415,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 1.7804779286341288,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.2225597410792661,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.002220988339811216
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 9961234432,
+            "last": 11139801088,
+            "sampledMinimum": 9961234432,
+            "sampledMaximum": 11165151232,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1075609600,
+            "last": 1080045568,
+            "sampledMinimum": 1075597312,
+            "sampledMaximum": 1080049664,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4736610304,
+            "last": 4732178432,
+            "sampledMinimum": 4732174336,
+            "sampledMaximum": 4736626688,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 4972331008,
+            "last": 6154117120,
+            "sampledMinimum": 4972331008,
+            "sampledMaximum": 6179364864,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 248049664,
+            "last": 247992320,
+            "sampledMinimum": 247668736,
+            "sampledMaximum": 248475648,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 3805487104,
+            "last": 4423909376,
+            "sampledMinimum": 3805487104,
+            "sampledMaximum": 4480598016,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 57344,
+            "last": 86016,
+            "sampledMinimum": 16384,
+            "sampledMaximum": 110592,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 1101824,
+            "last": 1609728,
+            "sampledMinimum": 1101824,
+            "sampledMaximum": 1818624,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 1294,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 124114.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0006891233844136933,
+              "avg10Percent": {
+                "first": 7.36,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 7.36,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 75401.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.00041865214486824114,
+              "avg10Percent": {
+                "first": 6.6,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 6.6,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 856470.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.004755414417783617,
+              "avg10Percent": {
+                "first": 4.04,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 4.04,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 849176.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.004714915634681683,
+              "avg10Percent": {
+                "first": 2.98,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 2.98,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 18598173.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.1032634184835826,
+              "avg10Percent": {
+                "first": 36.27,
+                "last": 10.38,
+                "sampledMinimum": 8.25,
+                "sampledMaximum": 36.27,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 18444474.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.1024100290588521,
+              "avg10Percent": {
+                "first": 27.5,
+                "last": 10.2,
+                "sampledMinimum": 8.25,
+                "sampledMaximum": 27.5,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 107631218688,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 11198464,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1504153,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 1343,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 107631218688,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 11198464,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1504153,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 1307,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 15,
+      "openContextsMaximum": 15
+    },
+    {
+      "artifact": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/arrival.json",
+      "candidateId": "favorite-utility-bounded-pooled-delete",
+      "rate": 128,
+      "strictPassed": false,
+      "node": {
+        "identityStable": true,
+        "resourceBracketSeconds": 182.2539999485016,
+        "processCpuMilliseconds": {
+          "delta": 370970,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanProcessCpuCores": 2.035456012514528,
+        "heapUsedBytes": {
+          "first": 1311473768,
+          "last": 3046105048,
+          "sampledMinimum": 833632920,
+          "sampledMaximum": 3185730168,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "heapMaxBytes": {
+          "first": 4294967296,
+          "last": 4294967296,
+          "sampledMinimum": 4294967296,
+          "sampledMaximum": 4294967296,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "nonHeapUsedBytes": {
+          "first": 215435712,
+          "last": 216043600,
+          "sampledMinimum": 215435712,
+          "sampledMaximum": 216183888,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "searchQueue": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 85,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "activeMerges": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "searchRejections": {
+          "delta": 0,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "gc": {
+          "young": {
+            "collection_count": {
+              "delta": 73,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 308,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "old": {
+            "collection_count": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "collection_time_in_millis": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "loadGenerator": {
+        "cpuMicroseconds": {
+          "delta": 63677635,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "rssBytes": {
+          "first": 806612992,
+          "last": 778072064,
+          "sampledMinimum": 699883520,
+          "sampledMaximum": 807419904,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "heapUsedBytes": {
+          "first": 186237280,
+          "last": 378031160,
+          "sampledMinimum": 186237280,
+          "sampledMaximum": 379638208,
+          "validSamples": 183,
+          "missingSamples": 0
+        },
+        "meanCpuCores": 0.34938950595319174
+      },
+      "kernel": {
+        "interval": {
+          "requestedStart": "2026-09-23T20:28:51.484Z",
+          "requestedEnd": "2026-09-23T20:31:53.738Z",
+          "phaseComplete": true,
+          "samples": 91,
+          "firstObservedAt": "2026-09-23T20:28:51.718906+00:00",
+          "lastObservedAt": "2026-09-23T20:31:53.150654+00:00",
+          "observedSeconds": 181.43174815177917,
+          "requestedSeconds": 182.2539999485016,
+          "unobservedStartSeconds": 0.23490595817565918,
+          "unobservedEndSeconds": 0.5873458385467529,
+          "fractionCoveredByCounterWindow": 0.9954884293515931,
+          "maximumSampleGapSeconds": 2.4659478664398193
+        },
+        "cgroupCpu": {
+          "usage_usec": {
+            "delta": 371425111,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "user_usec": {
+            "delta": 324815975,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "system_usec": {
+            "delta": 46609135,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_periods": {
+            "delta": 1813,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "nr_throttled": {
+            "delta": 14,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "throttled_usec": {
+            "delta": 1367647,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "meanCores": 2.047189176005069,
+          "quotaCores": 8.0,
+          "meanFractionOfQuota": 0.25589864700063364,
+          "quotaValues": [
+            "800000 100000"
+          ],
+          "throttledPeriodFraction": 0.007722007722007722
+        },
+        "cgroupMemory": {
+          "memoryChargeBytes": {
+            "first": 10179481600,
+            "last": 10470305792,
+            "sampledMinimum": 10179481600,
+            "sampledMaximum": 11162267648,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapChargeBytes": {
+            "first": 1080045568,
+            "last": 1081188352,
+            "sampledMinimum": 1079812096,
+            "sampledMaximum": 1081434112,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "limitBytes": {
+            "first": 12884901888,
+            "last": 12884901888,
+            "sampledMinimum": 12884901888,
+            "sampledMaximum": 12884901888,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "cgroupLifetimePeakBytes": {
+            "first": 12890075136,
+            "last": 12890075136,
+            "sampledMinimum": 12890075136,
+            "sampledMaximum": 12890075136,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "anonBytes": {
+            "first": 4732178432,
+            "last": 4731768832,
+            "sampledMinimum": 4731191296,
+            "sampledMaximum": 4732469248,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "fileBytes": {
+            "first": 5193867264,
+            "last": 5486702592,
+            "sampledMinimum": 5193867264,
+            "sampledMaximum": 6177234944,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "kernelBytes": {
+            "first": 247963648,
+            "last": 248659968,
+            "sampledMinimum": 247963648,
+            "sampledMaximum": 248680448,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_mappedBytes": {
+            "first": 3809861632,
+            "last": 3856465920,
+            "sampledMinimum": 3809861632,
+            "sampledMaximum": 4313276416,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_dirtyBytes": {
+            "first": 20480,
+            "last": 65536,
+            "sampledMinimum": 20480,
+            "sampledMaximum": 106496,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "file_writebackBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 229376,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "shmemBytes": {
+            "first": 0,
+            "last": 0,
+            "sampledMinimum": 0,
+            "sampledMaximum": 0,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "swapcachedBytes": {
+            "first": 1609728,
+            "last": 720896,
+            "sampledMinimum": 704512,
+            "sampledMaximum": 1609728,
+            "validSamples": 91,
+            "missingSamples": 0
+          },
+          "events": {
+            "low": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "high": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "max": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "oom_group_kill": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "sock_throttled": {
+              "delta": 3173,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        },
+        "cgroupPressure": {
+          "cpu": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 207313.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.001142650071511021,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.18,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 133200.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0007341603735668674,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 0.0,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 0.18,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "memory": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 10398218.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.05731200909391685,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 3.93,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 14.92,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 9902732.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.0545810317151094,
+              "avg10Percent": {
+                "first": 0.0,
+                "last": 3.84,
+                "sampledMinimum": 0.0,
+                "sampledMaximum": 14.4,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          },
+          "io": {
+            "some": {
+              "totalMicroseconds": {
+                "delta": 143150504.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.789004710907848,
+              "avg10Percent": {
+                "first": 9.4,
+                "last": 79.64,
+                "sampledMinimum": 8.61,
+                "sampledMaximum": 81.37,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            },
+            "full": {
+              "totalMicroseconds": {
+                "delta": 136071138.0,
+                "valid": true,
+                "missingSamples": 0,
+                "counterResets": 0
+              },
+              "fractionOfObservedWallTime": 0.7499852665596753,
+              "avg10Percent": {
+                "first": 9.26,
+                "last": 75.93,
+                "sampledMinimum": 8.48,
+                "sampledMaximum": 78.23,
+                "validSamples": 91,
+                "missingSamples": 0
+              }
+            }
+          }
+        },
+        "cgroupIoByDevice": {
+          "259:0": {
+            "rbytes": {
+              "delta": 152292225024,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 9994240,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1860784,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 976,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          },
+          "252:0": {
+            "rbytes": {
+              "delta": 152292225024,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wbytes": {
+              "delta": 9994240,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "rios": {
+              "delta": 1860784,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "wios": {
+              "delta": 939,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dbytes": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "dios": {
+              "delta": 0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            }
+          }
+        }
+      },
+      "searchActiveMaximum": 49,
+      "openContextsMaximum": 137
+    }
+  ],
+  "sourceSha256": "551063340842956477fdedd7267ffb2691efa92031357647152de583698de360",
+  "inputs": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-full-million-pooled-completed-v1/resources-summary.json",
+      "sha256": "4c513a7e11b1c641062cc4274fa7d7bc4eb4354c81d5a92f92fe68c92535d792"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-full-million-pooled-completed-v1/campaign-resource-inputs.json",
+      "sha256": "d45306360bb7e6faaac3a9a8d98d11551aebcff25bdb8496522f52da85da60fb"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-full-million-pooled-completed-v1/observer-prefix.jsonl.gz",
+      "sha256": "32111d87baac8dd7e1d4e4b82e787d1f8194f5ef6a9e990c069c9ab5eb6ada29"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-full-million-pooled-completed-v1/observer-source.py",
+      "sha256": "d0be334e4b5871c7af24be2ef4e7fc8181d8df6c90a37348412c5f3d766a9e37"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-full-million-pooled-completed-v1/observer.json",
+      "sha256": "e638bcfa6db1f26be93ea574c734d49b2d296bf92e70edecd8a11685e3efa2a4"
+    }
+  ],
+  "limitations": [
+    "No resource-helper imports or live service calls. Focused saved-resource recomputation, not a new experiment or a proof of failure causality.",
+    "Resource brackets include query instrumentation/background work; snapshot timestamps precede awaited stats reads. Kernel windows cover only samples within those brackets and retain uncovered edges.",
+    "Load-generator CPU/RSS includes evaluation scheduling, retained workload and raw evidence; it is not isolated production gateway cost.",
+    "Cgroup charge includes anonymous memory/file cache/kernel and swap; sampled component maxima need not occur together. The observed entrypoint PID is not presented as JVM RSS.",
+    "Layered-device IO counters are shown separately and must not be summed. Resource counters do not alone establish why a request failed."
+  ]
+}

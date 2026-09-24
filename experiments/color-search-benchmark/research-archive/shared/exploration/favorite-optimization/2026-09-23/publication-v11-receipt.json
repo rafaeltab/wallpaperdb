@@ -1,0 +1,15 @@
+{
+  "publication": {
+    "sourceCheckpoint": "results-checkpoint-20260923-v11.json",
+    "sourceSha256": "101c9d7733a489db9afc020d3c7c4ade5d373db7da1e358a6bae4b3afc49d12e",
+    "publishedAt": "2026-09-23T20:34:25.598637+00:00"
+  },
+  "publicSha256": "be6597211ebb58bba1a18ad73c999f2feca4d2a452eb2787a0382b75763fffbd",
+  "sourceCounts": {
+    "performance": 14,
+    "fidelity": 8,
+    "feedback": 8,
+    "indexes": 13,
+    "warnings": 0
+  }
+}

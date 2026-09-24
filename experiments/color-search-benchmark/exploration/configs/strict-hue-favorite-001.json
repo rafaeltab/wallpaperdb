@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "label": "Strong favorite snapshot 001: strict hue, linear 0.5, cutoff weighting 1",
+  "description": "Preserve the user's jointly favored 256/1024 banks with cutoff weighting 1 and Original linear penalty influence 0.5. Minimum quality, named-color handling, area power, proportion quality penalty and excess penalty are pinned inherited defaults, not additional user preferences. No single query or target proportions were selected. Evaluate both banks on the existing development feedback cases plus the separately identified pagoda follow-up; single-reviewer evidence, no held-out or million-record capacity claim.",
+  "snapshotId": "strict-hue-favorite-001",
+  "extraImageFiles": ["evaluation/perceived-red-pagoda-001.json"],
+  "parameterProvenance": {
+    "userSelected": ["bucketCount", "cutoffBlendExponent", "qualityCurve", "qualityInfluence"],
+    "jointFavoriteBucketCounts": [256, 1024],
+    "inheritedDefaults": ["minimumQuality", "namedMode", "areaPower", "qualityPenalty", "excessPenalty"],
+    "implementationNormalizedUnused": ["pixelCutoff"]
+  },
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "strict-hue-favorite-001-256",
+      "method": "cutoff-shade-hue-all-levels",
+      "label": "Favorite snapshot 001 · 256 bins · weighting 1 · linear 0.5",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      }
+    },
+    {
+      "id": "strict-hue-favorite-001-1024",
+      "method": "cutoff-shade-hue-all-levels",
+      "label": "Favorite snapshot 001 · 1,024 bins · weighting 1 · linear 0.5",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      }
+    }
+  ]
+}

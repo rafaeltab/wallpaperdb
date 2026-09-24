@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" shape-rendering="crispEdges">
+  <title>Dark saturated colors</title>
+  <rect x="0" y="0" width="250" height="600" fill="#000033"/>
+  <rect x="250" y="0" width="250" height="600" fill="#330000"/>
+  <rect x="500" y="0" width="250" height="600" fill="#003300"/>
+  <rect x="750" y="0" width="250" height="600" fill="#220033"/>
+</svg>

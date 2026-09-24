@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-numeric-index-audit",
+  "startedAt": "2026-09-23T17:58:17.114Z",
+  "verified": true,
+  "readOnly": true,
+  "index": "color-exploration-favorite-points-full-1m-v1",
+  "base": "http://127.0.0.1:19217",
+  "uuid": "LHjoEvSiR8KNe5WZv_a7iA",
+  "count": 1000000,
+  "scope": "full",
+  "presets": "favorite",
+  "numericPoints": true,
+  "receiptHash": "0b86e8de49c08eb4efb64041d3693c589319e68f3974ea30d0826b85480390c9",
+  "identityHash": "3a3e5b5c545cdf51a31ca5f8f28b2a2ca2b618c94f212f1c5542da065914fe0d",
+  "planHash": "6637b5d68ba86b3951c7da46ec37058ebe9b258ddc15553759cc4ecf05213f7f",
+  "sourceSnapshotHash": "9fc69907c5a30f29731275be3ca6bb9874e106c4f643ebe7f6990e89a0e69f46",
+  "parentSourceSnapshotHash": "63b4ed12baf222010ddd8d2557167a6298d947fe0410b11da7c8bb73ee3e981b",
+  "limitation": "Every numeric utility and metadata value is compared on three deterministic synthetic ordinals; this is not an all-document value audit.",
+  "sampleAudit": {
+    "ordinals": [
+      0,
+      499999,
+      999999
+    ],
+    "ids": [
+      "favorite-synthetic-000000000",
+      "favorite-synthetic-000499999",
+      "favorite-synthetic-000999999"
+    ],
+    "utilitiesPerSample": 6138,
+    "valuesHash": "80b037dfe9c5f8884d89838c3cc5157c474788d067bff164c9f263b1a72a47a9",
+    "valuesCompared": 18414,
+    "completedBatches": 82,
+    "encoder": "original toFavoriteUtilityDocument; numeric only",
+    "verified": true
+  },
+  "beforeFingerprintHash": "c8c9c959758d7b16ae44f52d840afb034cf9c47e3d9b064bacc5f33777a2d987",
+  "afterFingerprintHash": "c8c9c959758d7b16ae44f52d840afb034cf9c47e3d9b064bacc5f33777a2d987",
+  "elapsedMs": 3301.472627,
+  "finishedAt": "2026-09-23T17:58:20.421Z"
+}

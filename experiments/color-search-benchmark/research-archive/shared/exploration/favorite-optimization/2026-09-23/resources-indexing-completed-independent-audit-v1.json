@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "experiment": "independent-final-indexing-resource-review",
+  "passed": true,
+  "sourceSha256": "b2718010bed7438d4b9a1db08c756f27631922b0a42bdeda3674d56e7414ae7c",
+  "summarySha256": "ed6af8d7320791b17ddc49b9b5aa82846d69d01c4495ef1bd13b0ef035e848b2",
+  "archivedPrefixSha256": "0a663e71a412d55dde046c9cd97d95e33677c0cf94edf688103a13fcf4423bd2",
+  "requestedStart": "2026-09-23T15:55:51.514553+00:00",
+  "requestedEnd": "2026-09-23T17:58:12.426136+00:00",
+  "valueAuditStart": "2026-09-23T17:58:12.447416+00:00",
+  "samples": 3669,
+  "observedSeconds": 7339.526808023453,
+  "phaseComplete": true,
+  "auditAndSearchExcluded": true,
+  "meanCgroupCores": 2.3472916998091233,
+  "meanFractionOfEightCoreQuota": 0.2934114624761404,
+  "memory": {
+    "memoryChargeBytes": {
+      "first": 5416853504.0,
+      "last": 8566784000.0,
+      "sampledMinimum": 5416853504.0,
+      "sampledMaximum": 12884901888.0,
+      "validSamples": 3669,
+      "missingSamples": 0
+    },
+    "anonBytes": {
+      "first": 4648906752,
+      "last": 4807290880,
+      "sampledMinimum": 4648906752,
+      "sampledMaximum": 4948140032,
+      "validSamples": 3669,
+      "missingSamples": 0
+    },
+    "fileBytes": {
+      "first": 704688128,
+      "last": 3549786112,
+      "sampledMinimum": 704688128,
+      "sampledMaximum": 7874826240,
+      "validSamples": 3669,
+      "missingSamples": 0
+    },
+    "swapChargeBytes": {
+      "first": 1038491648.0,
+      "last": 983371776.0,
+      "sampledMinimum": 800182272.0,
+      "sampledMaximum": 1038491648.0,
+      "validSamples": 3669,
+      "missingSamples": 0
+    },
+    "cgroupLifetimePeakBytes": {
+      "first": 12194643968.0,
+      "last": 12890075136.0,
+      "sampledMinimum": 12194643968.0,
+      "sampledMaximum": 12890075136.0,
+      "validSamples": 3669,
+      "missingSamples": 0
+    }
+  },
+  "memoryEvents": {
+    "high": {
+      "delta": 0,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "low": {
+      "delta": 0,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "max": {
+      "delta": 188204,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "oom": {
+      "delta": 0,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "oom_group_kill": {
+      "delta": 0,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "oom_kill": {
+      "delta": 0,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    },
+    "sock_throttled": {
+      "delta": 1475767,
+      "valid": true,
+      "missingSamples": 0,
+      "counterResets": 0
+    }
+  },
+  "ioByDevice": {
+    "252:0": {
+      "rbytes": {
+        "delta": 210503913472.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "wbytes": {
+        "delta": 714540900352.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "rios": {
+        "delta": 1882597.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "wios": {
+        "delta": 918820.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "dbytes": {
+        "delta": 0.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "dios": {
+        "delta": 0.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      }
+    },
+    "259:0": {
+      "rbytes": {
+        "delta": 210503913472.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "wbytes": {
+        "delta": 714540900352.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "rios": {
+        "delta": 1882597.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "wios": {
+        "delta": 6090547.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "dbytes": {
+        "delta": 0.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      },
+      "dios": {
+        "delta": 0.0,
+        "valid": true,
+        "missingSamples": 0,
+        "counterResets": 0
+      }
+    }
+  },
+  "pressureFractions": {
+    "cpu": {
+      "some": 0.0036564622900024765,
+      "full": 0.0033368950942759116
+    },
+    "memory": {
+      "some": 0.0009057996753595013,
+      "full": 0.0009049767340230929
+    },
+    "io": {
+      "some": 0.010765880562439049,
+      "full": 0.010603424857706621
+    }
+  },
+  "limitations": [
+    "Temporal indexing-command attribution includes preparation, indexing, merges, refresh/finalization and container background work.",
+    "Cgroup charge, anon, file cache and swap are distinct; gauge maxima need not be simultaneous.",
+    "memory.peak is lifetime; reported per-phase peaks are sampled. Entrypoint RSS is not JVM RSS.",
+    "Layered devices may account for the same IO; never add their byte deltas.",
+    "No search capacity or per-request memory conclusion follows from indexing resources."
+  ]
+}

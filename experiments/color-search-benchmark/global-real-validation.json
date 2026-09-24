@@ -1,0 +1,1831 @@
+{
+  "generatedAt": "2026-09-16T15:12:10.057Z",
+  "dataCacheKey": "9954417388273b84089a5158df4864a952d96a3ac53eec1fe65b074a2e794073",
+  "sourceHashes": {
+    "global-evaluate.mjs": "11f7776c90492096029fb0a52717fdcfdae20d4f4367cadd35678495584aa63e",
+    "global-native.mjs": "aee4fb817d3d92a6b51423345c5c73ab6a8be43a4a403ef3eb45956898e594d2",
+    "global-bounded.mjs": "4598b2776f700b5e84086229db31315fb927aa5e4c3ee3efe543243c3282890c",
+    "global-joint.mjs": "867ea19121010e412fc6e096bcfaee0e88e0373e80c2d37a3b42977f1bbf336d",
+    "global-dynamic.mjs": "8bc4f04977858b54cf51c05145f5572d98909c22f28eafc5ff854525b4466d46",
+    "global-joint-bounded.mjs": "ae3438ab30e0fc4cb611b15dc557ecf8d87415cc848a393a9351bfec58b0adbc"
+  },
+  "environment": {
+    "name": "b667474b1007",
+    "cluster_name": "color-global-prototype",
+    "cluster_uuid": "I3AzUpo7Q3K_RgbbGsVecA",
+    "version": {
+      "distribution": "opensearch",
+      "number": "2.11.0",
+      "build_type": "tar",
+      "build_hash": "4dcad6dd1fd45b6bd91f041a041829c8687278fa",
+      "build_date": "2023-10-13T02:55:55.511945994Z",
+      "build_snapshot": false,
+      "lucene_version": "9.7.0",
+      "minimum_wire_compatibility_version": "7.10.0",
+      "minimum_index_compatibility_version": "7.0.0"
+    },
+    "tagline": "The OpenSearch Project: https://opensearch.org/"
+  },
+  "correctness": [
+    {
+      "query": "green40",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "dynamic",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "dynamic",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "dynamic",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint-bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint-bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "joint-bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "dynamic",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "dynamic",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "dynamic",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint-bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint-bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "joint-bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "dynamic",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "dynamic",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "dynamic",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint-bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint-bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "joint-bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "dynamic",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "dynamic",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "dynamic",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint-bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint-bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "joint-bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "dynamic",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "dynamic",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "dynamic",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint-bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint-bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "joint-bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "numeric",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "numeric",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "numeric",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "tokens",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "tokens",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "tokens",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "fine",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "fine",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "fine",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "bounded",
+      "filter": "all",
+      "documents": 120,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "bounded",
+      "filter": "real",
+      "documents": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "bounded",
+      "filter": "partition",
+      "documents": 12,
+      "passed": true
+    }
+  ],
+  "quality": [
+    {
+      "query": "green40",
+      "colors": [
+        {
+          "family": "green",
+          "amount": 0.4
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.06348032556669651,
+        "fineTop10MeanError": 0.06348032556669651,
+        "bucketTop10MeanError": 0.06348032556669651,
+        "fineTop10": [
+          "wallpaper-052",
+          "wallpaper-029",
+          "wallpaper-086",
+          "wallpaper-024",
+          "wallpaper-098",
+          "wallpaper-031",
+          "wallpaper-045",
+          "wallpaper-081",
+          "wallpaper-017",
+          "wallpaper-083"
+        ],
+        "bucketTop10": [
+          "wallpaper-052",
+          "wallpaper-024",
+          "wallpaper-029",
+          "wallpaper-086",
+          "wallpaper-031",
+          "wallpaper-098",
+          "wallpaper-045",
+          "wallpaper-081",
+          "wallpaper-017",
+          "wallpaper-083"
+        ],
+        "bucketTop1Regret": 0,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 5
+      },
+      "joint": {
+        "pixelTop10MeanError": 0.06348032556669651,
+        "paletteSelectedTop10PixelMeanError": 0.07256147162846553,
+        "paletteCostAbsoluteError": {
+          "samples": 100,
+          "min": 0,
+          "median": 0.00037977430555558023,
+          "p95": 0.04914981617647057,
+          "p99": 0.08132285233025394,
+          "max": 0.08927206525428144
+        },
+        "pixelTop10": [
+          "wallpaper-052",
+          "wallpaper-029",
+          "wallpaper-086",
+          "wallpaper-024",
+          "wallpaper-098",
+          "wallpaper-031",
+          "wallpaper-045",
+          "wallpaper-081",
+          "wallpaper-017",
+          "wallpaper-083"
+        ],
+        "paletteTop10": [
+          "wallpaper-052",
+          "wallpaper-083",
+          "wallpaper-098",
+          "wallpaper-086",
+          "wallpaper-031",
+          "wallpaper-045",
+          "wallpaper-024",
+          "wallpaper-017",
+          "wallpaper-029",
+          "wallpaper-071"
+        ],
+        "largestDisagreements": [
+          {
+            "id": "wallpaper-081",
+            "paletteError": 0.171829573934837,
+            "pixelError": 0.08255750868055556,
+            "difference": 0.08927206525428144
+          },
+          {
+            "id": "wallpaper-022",
+            "paletteError": 0.38116200674201867,
+            "pixelError": 0.29983915441176473,
+            "difference": 0.08132285233025394
+          },
+          {
+            "id": "wallpaper-029",
+            "paletteError": 0.12141143542582972,
+            "pixelError": 0.047619912790697716,
+            "difference": 0.073791522635132
+          },
+          {
+            "id": "wallpaper-083",
+            "paletteError": 0.026016260162601723,
+            "pixelError": 0.09606633771929829,
+            "difference": 0.07005007755669657
+          },
+          {
+            "id": "wallpaper-011",
+            "paletteError": 0.3161213563355146,
+            "pixelError": 0.2634868421052632,
+            "difference": 0.052634514230251395
+          }
+        ]
+      }
+    },
+    {
+      "query": "red50green50",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.5
+        },
+        {
+          "family": "green",
+          "amount": 0.5
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.46095373814696333,
+        "fineTop10MeanError": 0.46095373814696333,
+        "bucketTop10MeanError": 0.46095373814696333,
+        "fineTop10": [
+          "wallpaper-025",
+          "wallpaper-058",
+          "wallpaper-031",
+          "wallpaper-012",
+          "wallpaper-081",
+          "wallpaper-090",
+          "wallpaper-045",
+          "wallpaper-040",
+          "wallpaper-077",
+          "wallpaper-052"
+        ],
+        "bucketTop10": [
+          "wallpaper-025",
+          "wallpaper-058",
+          "wallpaper-012",
+          "wallpaper-031",
+          "wallpaper-081",
+          "wallpaper-090",
+          "wallpaper-040",
+          "wallpaper-045",
+          "wallpaper-052",
+          "wallpaper-077"
+        ],
+        "bucketTop1Regret": 0,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 4
+      },
+      "joint": {
+        "pixelTop10MeanError": 0.43714109136579465,
+        "paletteSelectedTop10PixelMeanError": 0.4389730026870665,
+        "paletteCostAbsoluteError": {
+          "samples": 100,
+          "min": 0,
+          "median": 0.004713990928019052,
+          "p95": 0.05263451423025145,
+          "p99": 0.08536720667837516,
+          "max": 0.11736212275480362
+        },
+        "pixelTop10": [
+          "wallpaper-025",
+          "wallpaper-058",
+          "wallpaper-012",
+          "wallpaper-090",
+          "wallpaper-031",
+          "wallpaper-081",
+          "wallpaper-003",
+          "wallpaper-046",
+          "wallpaper-050",
+          "wallpaper-100"
+        ],
+        "paletteTop10": [
+          "wallpaper-025",
+          "wallpaper-058",
+          "wallpaper-031",
+          "wallpaper-012",
+          "wallpaper-090",
+          "wallpaper-003",
+          "wallpaper-037",
+          "wallpaper-041",
+          "wallpaper-044",
+          "wallpaper-046"
+        ],
+        "largestDisagreements": [
+          {
+            "id": "wallpaper-031",
+            "paletteError": 0.3525814536340852,
+            "pixelError": 0.46994357638888884,
+            "difference": 0.11736212275480362
+          },
+          {
+            "id": "wallpaper-029",
+            "paletteError": 0.6867253098760496,
+            "pixelError": 0.6013581031976745,
+            "difference": 0.08536720667837516
+          },
+          {
+            "id": "wallpaper-022",
+            "paletteError": 0.9759071980963712,
+            "pixelError": 0.8909237132352941,
+            "difference": 0.0849834848610771
+          },
+          {
+            "id": "wallpaper-083",
+            "paletteError": 0.6260162601626017,
+            "pixelError": 0.6951069078947368,
+            "difference": 0.06909064773213514
+          },
+          {
+            "id": "wallpaper-004",
+            "paletteError": 0.7489724310776942,
+            "pixelError": 0.6943088107638888,
+            "difference": 0.05466362031380534
+          }
+        ]
+      }
+    },
+    {
+      "query": "red70dark30",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.7
+        },
+        {
+          "family": "dark",
+          "amount": 0.3
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.3222489485469414,
+        "fineTop10MeanError": 0.3222489485469414,
+        "bucketTop10MeanError": 0.3222489485469414,
+        "fineTop10": [
+          "wallpaper-100",
+          "wallpaper-046",
+          "wallpaper-077",
+          "wallpaper-087",
+          "wallpaper-037",
+          "wallpaper-092",
+          "wallpaper-040",
+          "wallpaper-003",
+          "wallpaper-044",
+          "wallpaper-094"
+        ],
+        "bucketTop10": [
+          "wallpaper-100",
+          "wallpaper-046",
+          "wallpaper-077",
+          "wallpaper-087",
+          "wallpaper-037",
+          "wallpaper-092",
+          "wallpaper-040",
+          "wallpaper-003",
+          "wallpaper-044",
+          "wallpaper-094"
+        ],
+        "bucketTop1Regret": 0,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 10
+      },
+      "joint": {
+        "pixelTop10MeanError": 0.27872387844799074,
+        "paletteSelectedTop10PixelMeanError": 0.2787238784479906,
+        "paletteCostAbsoluteError": {
+          "samples": 100,
+          "min": 0,
+          "median": 0.005432216609231433,
+          "p95": 0.03512912326388884,
+          "p99": 0.06222687251984116,
+          "max": 0.1419121615888681
+        },
+        "pixelTop10": [
+          "wallpaper-077",
+          "wallpaper-037",
+          "wallpaper-100",
+          "wallpaper-046",
+          "wallpaper-092",
+          "wallpaper-044",
+          "wallpaper-087",
+          "wallpaper-095",
+          "wallpaper-082",
+          "wallpaper-027"
+        ],
+        "paletteTop10": [
+          "wallpaper-046",
+          "wallpaper-100",
+          "wallpaper-077",
+          "wallpaper-037",
+          "wallpaper-092",
+          "wallpaper-044",
+          "wallpaper-087",
+          "wallpaper-082",
+          "wallpaper-095",
+          "wallpaper-027"
+        ],
+        "largestDisagreements": [
+          {
+            "id": "wallpaper-046",
+            "paletteError": 0.11609022556390969,
+            "pixelError": 0.2580023871527778,
+            "difference": 0.1419121615888681
+          },
+          {
+            "id": "wallpaper-094",
+            "paletteError": 0.4742857142857144,
+            "pixelError": 0.5365125868055556,
+            "difference": 0.06222687251984116
+          },
+          {
+            "id": "wallpaper-082",
+            "paletteError": 0.31173904421971044,
+            "pixelError": 0.35752923976608186,
+            "difference": 0.045790195546371426
+          },
+          {
+            "id": "wallpaper-049",
+            "paletteError": 0.7195121951219512,
+            "pixelError": 0.6752101608187134,
+            "difference": 0.04430203430323776
+          },
+          {
+            "id": "wallpaper-092",
+            "paletteError": 0.2421212121212123,
+            "pixelError": 0.2798856160287081,
+            "difference": 0.0377644039074958
+          }
+        ]
+      }
+    },
+    {
+      "query": "dark90",
+      "colors": [
+        {
+          "family": "dark",
+          "amount": 0.9
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.037304830555688284,
+        "fineTop10MeanError": 0.037304830555688284,
+        "bucketTop10MeanError": 0.037304830555688284,
+        "fineTop10": [
+          "wallpaper-065",
+          "wallpaper-023",
+          "wallpaper-011",
+          "wallpaper-007",
+          "wallpaper-067",
+          "wallpaper-079",
+          "wallpaper-001",
+          "wallpaper-005",
+          "wallpaper-063",
+          "wallpaper-022"
+        ],
+        "bucketTop10": [
+          "wallpaper-011",
+          "wallpaper-023",
+          "wallpaper-065",
+          "wallpaper-007",
+          "wallpaper-067",
+          "wallpaper-079",
+          "wallpaper-001",
+          "wallpaper-005",
+          "wallpaper-063",
+          "wallpaper-022"
+        ],
+        "bucketTop1Regret": 0.0011421783625730209,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 8
+      },
+      "joint": {
+        "pixelTop10MeanError": 0.037304830555688284,
+        "paletteSelectedTop10PixelMeanError": 0.037304830555688284,
+        "paletteCostAbsoluteError": {
+          "samples": 100,
+          "min": 0,
+          "median": 0.005459476680373387,
+          "p95": 0.028314477887893874,
+          "p99": 0.03996482906484966,
+          "max": 0.053820069550984284
+        },
+        "pixelTop10": [
+          "wallpaper-065",
+          "wallpaper-023",
+          "wallpaper-011",
+          "wallpaper-007",
+          "wallpaper-067",
+          "wallpaper-079",
+          "wallpaper-001",
+          "wallpaper-005",
+          "wallpaper-063",
+          "wallpaper-022"
+        ],
+        "paletteTop10": [
+          "wallpaper-011",
+          "wallpaper-023",
+          "wallpaper-065",
+          "wallpaper-079",
+          "wallpaper-007",
+          "wallpaper-067",
+          "wallpaper-001",
+          "wallpaper-005",
+          "wallpaper-063",
+          "wallpaper-022"
+        ],
+        "largestDisagreements": [
+          {
+            "id": "wallpaper-083",
+            "paletteError": 0.5765813999603411,
+            "pixelError": 0.5227613304093568,
+            "difference": 0.053820069550984284
+          },
+          {
+            "id": "wallpaper-024",
+            "paletteError": 0.8801503759398497,
+            "pixelError": 0.840185546875,
+            "difference": 0.03996482906484966
+          },
+          {
+            "id": "wallpaper-082",
+            "paletteError": 0.4592901050961729,
+            "pixelError": 0.423140533625731,
+            "difference": 0.0361495714704419
+          },
+          {
+            "id": "wallpaper-036",
+            "paletteError": 0.4196992481203008,
+            "pixelError": 0.4558268229166667,
+            "difference": 0.03612757479636591
+          },
+          {
+            "id": "wallpaper-042",
+            "paletteError": 0.3203846916517945,
+            "pixelError": 0.28895741959064325,
+            "difference": 0.03142727206115126
+          }
+        ]
+      }
+    },
+    {
+      "query": "grayscale40",
+      "colors": [
+        {
+          "family": "grayscale",
+          "amount": 0.4
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.1846844662036554,
+        "fineTop10MeanError": 0.1846844662036554,
+        "bucketTop10MeanError": 0.1848789220698835,
+        "fineTop10": [
+          "wallpaper-088",
+          "wallpaper-007",
+          "wallpaper-062",
+          "wallpaper-085",
+          "wallpaper-070",
+          "wallpaper-064",
+          "wallpaper-091",
+          "wallpaper-043",
+          "wallpaper-021",
+          "wallpaper-057"
+        ],
+        "bucketTop10": [
+          "wallpaper-088",
+          "wallpaper-007",
+          "wallpaper-062",
+          "wallpaper-070",
+          "wallpaper-085",
+          "wallpaper-064",
+          "wallpaper-091",
+          "wallpaper-043",
+          "wallpaper-021",
+          "wallpaper-047"
+        ],
+        "bucketTop1Regret": 0,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 7
+      },
+      "joint": {
+        "pixelTop10MeanError": 0.1846844662036554,
+        "paletteSelectedTop10PixelMeanError": 0.2329849365895984,
+        "paletteCostAbsoluteError": {
+          "samples": 100,
+          "min": 0,
+          "median": 0.0011325813609467383,
+          "p95": 0.0978908534356725,
+          "p99": 0.16457848468086728,
+          "max": 0.37637867647058826
+        },
+        "pixelTop10": [
+          "wallpaper-088",
+          "wallpaper-007",
+          "wallpaper-062",
+          "wallpaper-085",
+          "wallpaper-070",
+          "wallpaper-064",
+          "wallpaper-091",
+          "wallpaper-043",
+          "wallpaper-021",
+          "wallpaper-057"
+        ],
+        "paletteTop10": [
+          "wallpaper-007",
+          "wallpaper-062",
+          "wallpaper-085",
+          "wallpaper-064",
+          "wallpaper-070",
+          "wallpaper-021",
+          "wallpaper-025",
+          "wallpaper-074",
+          "wallpaper-043",
+          "wallpaper-067"
+        ],
+        "largestDisagreements": [
+          {
+            "id": "wallpaper-088",
+            "paletteError": 0.4,
+            "pixelError": 0.023621323529411764,
+            "difference": 0.37637867647058826
+          },
+          {
+            "id": "wallpaper-021",
+            "paletteError": 0.17255601824310934,
+            "pixelError": 0.3371345029239766,
+            "difference": 0.16457848468086728
+          },
+          {
+            "id": "wallpaper-091",
+            "paletteError": 0.4,
+            "pixelError": 0.24247116815476194,
+            "difference": 0.15752883184523808
+          },
+          {
+            "id": "wallpaper-065",
+            "paletteError": 0.58720999405116,
+            "pixelError": 0.4418539839181286,
+            "difference": 0.14535601013303145
+          },
+          {
+            "id": "wallpaper-025",
+            "paletteError": 0.26875503626107977,
+            "pixelError": 0.3776744981751825,
+            "difference": 0.10891946191410273
+          }
+        ]
+      }
+    },
+    {
+      "query": "rainbow20",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.2
+        },
+        {
+          "family": "orange",
+          "amount": 0.2
+        },
+        {
+          "family": "yellow",
+          "amount": 0.2
+        },
+        {
+          "family": "green",
+          "amount": 0.2
+        },
+        {
+          "family": "blue",
+          "amount": 0.2
+        }
+      ],
+      "marginal": {
+        "oracleTop10MeanError": 0.5494267211723943,
+        "fineTop10MeanError": 0.5494267211723944,
+        "bucketTop10MeanError": 0.5494267211723944,
+        "fineTop10": [
+          "wallpaper-040",
+          "wallpaper-027",
+          "wallpaper-031",
+          "wallpaper-019",
+          "wallpaper-093",
+          "wallpaper-099",
+          "wallpaper-095",
+          "wallpaper-026",
+          "wallpaper-084",
+          "wallpaper-088"
+        ],
+        "bucketTop10": [
+          "wallpaper-040",
+          "wallpaper-027",
+          "wallpaper-031",
+          "wallpaper-019",
+          "wallpaper-093",
+          "wallpaper-099",
+          "wallpaper-095",
+          "wallpaper-026",
+          "wallpaper-084",
+          "wallpaper-088"
+        ],
+        "bucketTop1Regret": 0,
+        "fineTop1Regret": 0,
+        "bucketFineSameTop10Positions": 10
+      }
+    }
+  ],
+  "timings": [],
+  "concurrency": [],
+  "profiles": [],
+  "failures": [],
+  "notes": [
+    "Latency includes local client JSON/network time; warm runs on a shared development host, not production capacity proof.",
+    "Synthetic scale documents are mixtures/reweighted descriptors, not independent wallpapers.",
+    "Quality uses declared area-error proxies and sampled pixels, not human relevance labels.",
+    "Native/token methods use marginal family amounts; joint/dynamic methods allocate each area once. Hard boundaries only in joint prototypes."
+  ],
+  "finishedAt": "2026-09-16T15:12:10.622Z",
+  "serviceMemory": {
+    "rss": 122056704,
+    "heapTotal": 53846016,
+    "heapUsed": 20163400,
+    "external": 7747314,
+    "arrayBuffers": 4227120
+  },
+  "node": {
+    "_nodes": {
+      "total": 1,
+      "successful": 1,
+      "failed": 0
+    },
+    "cluster_name": "color-global-prototype",
+    "nodes": {
+      "FNscoL2qQFK2L1oEORJxnQ": {
+        "timestamp": 1789571530623,
+        "name": "b667474b1007",
+        "transport_address": "172.21.0.2:9300",
+        "host": "172.21.0.2",
+        "ip": "172.21.0.2:9300",
+        "roles": [
+          "cluster_manager",
+          "data",
+          "ingest",
+          "remote_cluster_client"
+        ],
+        "attributes": {
+          "shard_indexing_pressure_enabled": "true"
+        },
+        "indices": {
+          "docs": {
+            "count": 1221953,
+            "deleted": 0
+          },
+          "store": {
+            "size_in_bytes": 10921664485,
+            "reserved_in_bytes": 0
+          },
+          "indexing": {
+            "index_total": 1223333,
+            "index_time_in_millis": 238788,
+            "index_current": 0,
+            "index_failed": 0,
+            "delete_total": 0,
+            "delete_time_in_millis": 0,
+            "delete_current": 0,
+            "noop_update_total": 0,
+            "is_throttled": false,
+            "throttle_time_in_millis": 0,
+            "doc_status": {
+              "2xx": 1223333
+            }
+          },
+          "get": {
+            "total": 1,
+            "time_in_millis": 0,
+            "exists_total": 0,
+            "exists_time_in_millis": 0,
+            "missing_total": 1,
+            "missing_time_in_millis": 0,
+            "current": 0
+          },
+          "search": {
+            "open_contexts": 0,
+            "query_total": 22989,
+            "query_time_in_millis": 424024,
+            "query_current": 0,
+            "fetch_total": 21387,
+            "fetch_time_in_millis": 7162,
+            "fetch_current": 0,
+            "scroll_total": 0,
+            "scroll_time_in_millis": 0,
+            "scroll_current": 0,
+            "point_in_time_total": 5853,
+            "point_in_time_time_in_millis": 290714,
+            "point_in_time_current": 0,
+            "suggest_total": 0,
+            "suggest_time_in_millis": 0,
+            "suggest_current": 0,
+            "request": {
+              "dfs_pre_query": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              },
+              "query": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              },
+              "fetch": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              },
+              "dfs_query": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              },
+              "expand": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              },
+              "can_match": {
+                "time_in_millis": 0,
+                "current": 0,
+                "total": 0
+              }
+            }
+          },
+          "merges": {
+            "current": 0,
+            "current_docs": 0,
+            "current_size_in_bytes": 0,
+            "total": 5,
+            "total_time_in_millis": 233344,
+            "total_docs": 568550,
+            "total_size_in_bytes": 4076623048,
+            "total_stopped_time_in_millis": 0,
+            "total_throttled_time_in_millis": 202420,
+            "total_auto_throttle_in_bytes": 1060361646,
+            "unreferenced_file_cleanups_performed": 0
+          },
+          "refresh": {
+            "total": 257,
+            "total_time_in_millis": 23208,
+            "external_total": 170,
+            "external_total_time_in_millis": 7536,
+            "listeners": 0
+          },
+          "flush": {
+            "total": 51,
+            "periodic": 51,
+            "total_time_in_millis": 6483
+          },
+          "warmer": {
+            "current": 0,
+            "total": 79,
+            "total_time_in_millis": 0
+          },
+          "query_cache": {
+            "memory_size_in_bytes": 8116832,
+            "total_count": 7970174,
+            "hit_count": 194312,
+            "miss_count": 7775862,
+            "cache_size": 4189,
+            "cache_count": 4189,
+            "evictions": 0
+          },
+          "fielddata": {
+            "memory_size_in_bytes": 0,
+            "evictions": 0
+          },
+          "completion": {
+            "size_in_bytes": 0
+          },
+          "segments": {
+            "count": 159,
+            "memory_in_bytes": 0,
+            "terms_memory_in_bytes": 0,
+            "stored_fields_memory_in_bytes": 0,
+            "term_vectors_memory_in_bytes": 0,
+            "norms_memory_in_bytes": 0,
+            "points_memory_in_bytes": 0,
+            "doc_values_memory_in_bytes": 0,
+            "index_writer_memory_in_bytes": 0,
+            "version_map_memory_in_bytes": 0,
+            "fixed_bit_set_memory_in_bytes": 0,
+            "max_unsafe_auto_id_timestamp": -1,
+            "remote_store": {
+              "upload": {
+                "total_upload_size": {
+                  "started_bytes": 0,
+                  "succeeded_bytes": 0,
+                  "failed_bytes": 0
+                },
+                "refresh_size_lag": {
+                  "total_bytes": 0,
+                  "max_bytes": 0
+                },
+                "max_refresh_time_lag_in_millis": 0,
+                "total_time_spent_in_millis": 0
+              },
+              "download": {
+                "total_download_size": {
+                  "started_bytes": 0,
+                  "succeeded_bytes": 0,
+                  "failed_bytes": 0
+                },
+                "total_time_spent_in_millis": 0
+              }
+            },
+            "segment_replication": {
+              "max_bytes_behind": "0b",
+              "total_bytes_behind": "0b",
+              "max_replication_lag": "0s"
+            },
+            "file_sizes": {}
+          },
+          "translog": {
+            "operations": 0,
+            "size_in_bytes": 1980,
+            "uncommitted_operations": 0,
+            "uncommitted_size_in_bytes": 1980,
+            "earliest_last_modified_age": 97407,
+            "remote_store": {
+              "upload": {
+                "total_uploads": {
+                  "started": 0,
+                  "failed": 0,
+                  "succeeded": 0
+                },
+                "total_upload_size": {
+                  "started_bytes": 0,
+                  "failed_bytes": 0,
+                  "succeeded_bytes": 0
+                }
+              }
+            }
+          },
+          "request_cache": {
+            "memory_size_in_bytes": 11802,
+            "evictions": 0,
+            "hit_count": 1,
+            "miss_count": 20
+          },
+          "recovery": {
+            "current_as_source": 0,
+            "current_as_target": 0,
+            "throttle_time_in_millis": 0
+          }
+        },
+        "os": {
+          "timestamp": 1789571530625,
+          "cpu": {
+            "percent": 1,
+            "load_average": {
+              "1m": 0.21,
+              "5m": 0.68,
+              "15m": 0.72
+            }
+          },
+          "mem": {
+            "total_in_bytes": 4294967296,
+            "free_in_bytes": 8863744,
+            "used_in_bytes": 4286103552,
+            "free_percent": 0,
+            "used_percent": 100
+          },
+          "swap": {
+            "total_in_bytes": 4294967296,
+            "free_in_bytes": 3861098496,
+            "used_in_bytes": 433868800
+          }
+        },
+        "process": {
+          "timestamp": 1789571530625,
+          "open_file_descriptors": 779,
+          "max_file_descriptors": 524288,
+          "cpu": {
+            "percent": 24,
+            "total_in_millis": 618760
+          },
+          "mem": {
+            "total_virtual_in_bytes": 29188165632
+          }
+        },
+        "jvm": {
+          "timestamp": 1789571530626,
+          "uptime_in_millis": 1981694,
+          "mem": {
+            "heap_used_in_bytes": 1497182376,
+            "heap_used_percent": 69,
+            "heap_committed_in_bytes": 2147483648,
+            "heap_max_in_bytes": 2147483648,
+            "non_heap_used_in_bytes": 198475696,
+            "non_heap_committed_in_bytes": 206503936,
+            "pools": {
+              "young": {
+                "used_in_bytes": 1191182328,
+                "max_in_bytes": 0,
+                "peak_used_in_bytes": 1285554176,
+                "peak_max_in_bytes": 0,
+                "last_gc_stats": {
+                  "used_in_bytes": 0,
+                  "max_in_bytes": 0,
+                  "usage_percent": -1
+                }
+              },
+              "old": {
+                "used_in_bytes": 298589176,
+                "max_in_bytes": 2147483648,
+                "peak_used_in_bytes": 1040294904,
+                "peak_max_in_bytes": 2147483648,
+                "last_gc_stats": {
+                  "used_in_bytes": 298589176,
+                  "max_in_bytes": 2147483648,
+                  "usage_percent": 13
+                }
+              },
+              "survivor": {
+                "used_in_bytes": 7410872,
+                "max_in_bytes": 0,
+                "peak_used_in_bytes": 119491152,
+                "peak_max_in_bytes": 0,
+                "last_gc_stats": {
+                  "used_in_bytes": 7410872,
+                  "max_in_bytes": 0,
+                  "usage_percent": -1
+                }
+              }
+            }
+          },
+          "threads": {
+            "count": 190,
+            "peak_count": 193
+          },
+          "gc": {
+            "collectors": {
+              "young": {
+                "collection_count": 574,
+                "collection_time_in_millis": 8072
+              },
+              "old": {
+                "collection_count": 0,
+                "collection_time_in_millis": 0
+              }
+            }
+          },
+          "buffer_pools": {
+            "mapped": {
+              "count": 184,
+              "used_in_bytes": 8541012285,
+              "total_capacity_in_bytes": 8541012285
+            },
+            "direct": {
+              "count": 176,
+              "used_in_bytes": 36716596,
+              "total_capacity_in_bytes": 36716595
+            },
+            "mapped - 'non-volatile memory'": {
+              "count": 0,
+              "used_in_bytes": 0,
+              "total_capacity_in_bytes": 0
+            }
+          },
+          "classes": {
+            "current_loaded_count": 24378,
+            "total_loaded_count": 24680,
+            "total_unloaded_count": 302
+          }
+        }
+      }
+    }
+  }
+}

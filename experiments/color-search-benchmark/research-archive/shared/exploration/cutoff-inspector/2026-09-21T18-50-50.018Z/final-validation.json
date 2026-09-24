@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-09-21T19:33:02.887633+00:00",
+  "integration": {
+    "command": "make color-cutoff-integration",
+    "passed": 31,
+    "failed": 0,
+    "skipped": 0,
+    "log": "integration-final.tap"
+  },
+  "http": [
+    {
+      "url": "http://zerotwo:8227/",
+      "status": 200
+    },
+    {
+      "url": "http://zerotwo:8225/findings",
+      "status": 200
+    },
+    {
+      "url": "http://zerotwo:8224/2026-09-21T18-52-54.244Z-1101fa3a/report.html",
+      "status": 200
+    }
+  ],
+  "services": {
+    "wallpaperdb-color-overlap-inspector.service": "active",
+    "wallpaperdb-color-exploration.service": "active",
+    "wallpaperdb-color-histogram-inspector.service": "active",
+    "wallpaperdb-color-eval.service": "active"
+  },
+  "scaleShutdownReceipt": "../../cutoff-scale/2026-09-21T19-18-49.670Z/stopped-container-state.json",
+  "completedAt": "2026-09-21T19:34:46.973838+00:00",
+  "independentScaleAudit": {
+    "reviewer": "/root/cutoff_query_integration",
+    "passed": true,
+    "discrepancies": [],
+    "mixed": {
+      "executedProfiles": 178,
+      "passedProfiles": 170,
+      "failedProfiles": 8,
+      "skippedProfiles": 14,
+      "distinctStrictFailureRequests": 19
+    },
+    "heavy": {
+      "executedProfiles": 20,
+      "passedProfiles": 14,
+      "failedProfiles": 6,
+      "skippedProfiles": 4,
+      "distinctStrictFailureRequests": 81
+    },
+    "checks": [
+      "raw rows match embedded trials",
+      "errors and >=1000ms fail",
+      "warmups included",
+      "all profile statistics and statuses",
+      "skipped-stage accounting",
+      "CUTOFF-SCALE.md agrees with artifacts"
+    ]
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "snapshotId": "strict-hue-favorite-001",
+  "runId": "2026-09-21T23-49-12.493Z-97753239",
+  "runPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-49-12.493Z-97753239/run.json",
+  "runSha256": "91f87c643751526573b34a3976a81a2277016e07c99f7d0290167353ebc8785d",
+  "dataset": {
+    "hash": "ad79fa37f9809998ef53fd2336f558bb24905c2c2cb5522980fad7d126e36815",
+    "caseCount": 38,
+    "historicalCaseCount": 37,
+    "corpusSize": 545,
+    "corpusHash": "ebb1a5d73662ba011ad04ddbc65335866d13a218e0475237df7399743f185c7b"
+  },
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000,
+    "timingScope": "adapter-end-to-end",
+    "cacheState": "uncontrolled; explicit warmup rounds",
+    "schedule": "rotating case order per round; candidates sequential",
+    "percentiles": "nearest-rank",
+    "setupExcluded": true
+  },
+  "candidates": [
+    {
+      "id": "strict-hue-favorite-001-256",
+      "bucketCount": 256,
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "coverage": {
+        "total": 38,
+        "ok": 32,
+        "unsupported": 6,
+        "error": 0
+      },
+      "all": {
+        "caseCount": 32,
+        "queryMacroAgreement": 0.6947916666666667,
+        "assessedPairs": 234,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "allReal": {
+        "caseCount": 28,
+        "queryMacroAgreement": 0.7035714285714285,
+        "assessedPairs": 184,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "historical": {
+        "caseCount": 31,
+        "queryMacroAgreement": 0.6849462365591398,
+        "assessedPairs": 233,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "historicalReal": {
+        "caseCount": 27,
+        "queryMacroAgreement": 0.6925925925925925,
+        "assessedPairs": 183,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "pagodaPair": {
+        "caseId": "perceived-red-pagoda-001",
+        "pass": true,
+        "preferredScore": 0.09721769,
+        "otherScore": 0.066583484,
+        "scope": "Selected development pair, not held-out evidence."
+      },
+      "performance": {
+        "sampleCount": 96,
+        "p50Ms": 3.353223000000071,
+        "p95Ms": 6.166220000000067,
+        "maxMs": 38.50730899999962,
+        "failures": 0
+      },
+      "timedAtOrAbove1s": 0
+    },
+    {
+      "id": "strict-hue-favorite-001-1024",
+      "bucketCount": 1024,
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "coverage": {
+        "total": 38,
+        "ok": 32,
+        "unsupported": 6,
+        "error": 0
+      },
+      "all": {
+        "caseCount": 32,
+        "queryMacroAgreement": 0.7125,
+        "assessedPairs": 234,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "allReal": {
+        "caseCount": 28,
+        "queryMacroAgreement": 0.7214285714285714,
+        "assessedPairs": 184,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "historical": {
+        "caseCount": 31,
+        "queryMacroAgreement": 0.7032258064516129,
+        "assessedPairs": 233,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "historicalReal": {
+        "caseCount": 27,
+        "queryMacroAgreement": 0.7111111111111111,
+        "assessedPairs": 183,
+        "missingImages": 0,
+        "eligibilityViolations": 0
+      },
+      "pagodaPair": {
+        "caseId": "perceived-red-pagoda-001",
+        "pass": true,
+        "preferredScore": 0.09721769,
+        "otherScore": 0.066583484,
+        "scope": "Selected development pair, not held-out evidence."
+      },
+      "performance": {
+        "sampleCount": 96,
+        "p50Ms": 3.576551999998628,
+        "p95Ms": 6.229159000002255,
+        "maxMs": 15.987068999998883,
+        "failures": 0
+      },
+      "timedAtOrAbove1s": 0
+    }
+  ],
+  "totalTimedRequests": 192,
+  "totalTimedFailures": 0,
+  "timedAtOrAbove1s": 0,
+  "sourceVerification": "All 151 exploration source snapshot files, candidate source hashes, runner sources and dataset source hashes matched archived text files. Both runtime setup receipts match the pinned metric identity, descriptor, anchors, values and complete verification flags.",
+  "limitations": [
+    "One reviewer; development cases, including quick and explicitly uncertain judgments.",
+    "Six unsupported cases remain unsupported; aggregate accuracy is over supported cases only.",
+    "Latency is adapter-end-to-end, concurrency 1, explicit warmup on 545 assets; not evidence of million-record or concurrent production capacity.",
+    "Timed top-20 queries and accuracy-limit-1000 judgments are separate; missing judged images in a timed top-20 result are not silently treated as measured ranking failures.",
+    "Both banks remain equally endorsed by the user regardless of these development aggregate differences."
+  ]
+}

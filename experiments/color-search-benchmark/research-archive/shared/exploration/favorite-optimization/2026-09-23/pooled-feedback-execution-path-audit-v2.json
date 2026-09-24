@@ -1,0 +1,58 @@
+{
+  "fileOnly": true,
+  "reviewedAt": "2026-09-23T18:47:40.732873+00:00",
+  "verified": true,
+  "runFile": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-23T18-36-10.447Z-84f622c2/run.json",
+  "runSha256": "d75abb0867e4bfb35041c900ebb6d5ec7637e71d4e0cc395767e1559f4f3ee2f",
+  "candidateSourceHashChecks": 226,
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "timedSamples": 96,
+      "timedFailures": 0,
+      "savedAccuracyExecutions": 0,
+      "nativeCleanupWitnesses": 0,
+      "reusedAccuracyCleanups": 0,
+      "requestCounts": {}
+    },
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "timedSamples": 96,
+      "timedFailures": 0,
+      "savedAccuracyExecutions": 0,
+      "nativeCleanupWitnesses": 0,
+      "reusedAccuracyCleanups": 0,
+      "requestCounts": {}
+    },
+    {
+      "id": "favorite-utility-bounded-pooled-delete",
+      "timedSamples": 96,
+      "timedFailures": 0,
+      "savedAccuracyExecutions": 32,
+      "nativeCleanupWitnesses": 32,
+      "reusedAccuracyCleanups": 31,
+      "requestCounts": {
+        "4": 25,
+        "5": 7
+      }
+    },
+    {
+      "id": "favorite-utility-maxima-bounded-pooled-delete",
+      "timedSamples": 96,
+      "timedFailures": 0,
+      "savedAccuracyExecutions": 32,
+      "nativeCleanupWitnesses": 32,
+      "reusedAccuracyCleanups": 32,
+      "requestCounts": {
+        "4": 25,
+        "5": 7
+      }
+    }
+  ],
+  "auditorHash": "c3c7880c9a15842637c917e17b5e8358b88c795ab856ce2d18348eacc83f85b8",
+  "limitations": [
+    "All32 saved accuracy calls per pooled candidate contain actual native transport witnesses. These limit1000 calls cover only545 assets and intentionally use the full-query fallback.",
+    "Each candidate has96 timed requests of up to20 hits, each matching its saved full-query prefix. Timed feedback trials omit executor-stage traces; matching frozen runner/adapter source binds the same execution path, but timed cleanup witnesses cannot be reconstructed.",
+    "Human agreement is independently audited separately in pooled-feedback-independent-audit-v1.json. These timings are feedback integration diagnostics, not capacity evidence."
+  ]
+}

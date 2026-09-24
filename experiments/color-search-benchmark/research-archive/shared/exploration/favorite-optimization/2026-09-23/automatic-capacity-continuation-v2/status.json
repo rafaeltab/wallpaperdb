@@ -1,0 +1,91 @@
+{
+  "experiment": "favorite-automatic-capacity-continuation",
+  "startedAt": "2026-09-23T16:42:13.321445+00:00",
+  "planSha256": "3c0f2808d09d2547fd62eec41fd50ead97f6f24ccfe5d94d576a020293b90b2f",
+  "budgetSeconds": 21600,
+  "status": "stopped",
+  "polls": 154,
+  "stages": [
+    {
+      "id": "screen",
+      "startedAt": "2026-09-23T17:58:46.345975+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization-pipeline",
+        "COLOR_FAVORITE_ARGS=--plan /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-comparison-v2-proposal/screen-plan.json --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-comparison-v2-auto-pipeline-v2"
+      ],
+      "exitCode": 2,
+      "measurementFinishedAt": "2026-09-23T18:01:15.927214+00:00",
+      "measurementSummary": {
+        "profiles": 11,
+        "timedRequests": 85293,
+        "timedStrictFailures": 0,
+        "warmupRequests": 4,
+        "warmupStrictFailures": 0,
+        "failedProfiles": 0,
+        "skipped": [],
+        "selectedCandidates": [],
+        "actualCoverage": []
+      },
+      "artifactSha256": "be55fa68fe513f32d005b06c2941356efcb9d2dda4d89579fb324e3d1863d068",
+      "auditExitCode": 2,
+      "audit": {
+        "schemaVersion": 1,
+        "experiment": "favorite-optimization-audit",
+        "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-four-methods-v2",
+        "auditedAt": "2026-09-23T18:01:16.997Z",
+        "complete": false,
+        "integrityPassed": true,
+        "accepted": false,
+        "errorCount": 0,
+        "errors": [],
+        "warnings": [
+          "Campaign is incomplete. Completed profiles may be audited individually; pending raw rows and stale recorder totals are retained without being called final.",
+          "Archived source hashes verified. Current worktree source is intentionally not required to remain unchanged after a completed campaign."
+        ],
+        "profileCount": 11,
+        "failedProfiles": 0,
+        "rawRequestRows": 97582,
+        "rawResourceRows": 115,
+        "pendingTimedRows": 12285,
+        "pendingWarmupRows": 0,
+        "totals": {
+          "timedRequests": 97578,
+          "warmupRequests": 4,
+          "timedErrors": 7491,
+          "timedOverOneSecond": 0,
+          "timedStrictFailures": 7491,
+          "warmupErrors": 0,
+          "warmupOverOneSecond": 0,
+          "warmupStrictFailures": 0
+        },
+        "instrumentationRoots": [],
+        "hashes": {
+          "plan": "80084eae92da008c22a42b5bf2d36ac8123707bb17e2fbe60edd5849d04890d6",
+          "benchmark": "3ba44ca649fc391b147f31bf7e1f5c12d8ee2c8e96f9248b1f37c64e16a6b0e4",
+          "archivedSources": "c24a798e4f65763d886439fe863710d557ba839919007c24c4c72f27dc095747"
+        },
+        "limitations": [
+          "Offline internal-consistency audit; no re-execution of queries or independent proof of extraction/index contents.",
+          "Latency percentiles use successful requests. Strict failures are the union of errors and requests at or above one second, including warmups.",
+          "Global ranking correctness and cross-method score fidelity require the separate real-corpus fidelity audit."
+        ]
+      },
+      "finishedAt": "2026-09-23T18:01:17.056291+00:00"
+    }
+  ],
+  "readiness": {
+    "ready": true,
+    "waiting": [],
+    "artifacts": {
+      "buildStatus": "3d6d253dc2fd3bbce23744f372a30d98d4b0aaf82cf0ca6e83ea0105cc633bf9",
+      "receipt": "0b86e8de49c08eb4efb64041d3693c589319e68f3974ea30d0826b85480390c9",
+      "numericAudit": "0aba9497dd55420382cb45bccd91a86f00420630f48a0699dd4d76a546e69edc"
+    },
+    "acknowledgedDocuments": 1000000,
+    "verifiedCount": 1000000
+  },
+  "readyAt": "2026-09-23T17:58:46.327911+00:00",
+  "stoppedAt": "2026-09-23T18:01:17.064231+00:00",
+  "error": "GateFailure('Measurement failed: screen')"
+}

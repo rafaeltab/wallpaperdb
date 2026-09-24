@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "method": "cutoff-shade-hue-all-levels",
+      "index": "color-exploration-favorite-projection-scale-v1",
+      "realIndex": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./methods-cutoff.mjs",
+        "export": "buildCutoffQuery"
+      }
+    },
+    {
+      "id": "favorite-fused-script",
+      "method": "favorite-fused-script",
+      "index": "color-exploration-favorite-projection-scale-v1",
+      "realIndex": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-optimized-scoring.mjs",
+        "export": "buildFavoriteOptimizedQuery"
+      }
+    }
+  ]
+}

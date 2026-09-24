@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "initial-existing-hsv-controls",
+	"description": "Existing HSV64 controls establish that the evaluation loop runs. This is not a shortlist or a claim of correct proportion semantics.",
+	"candidates": [
+		{
+			"id": "hsv64-cosine",
+			"label": "Current HSV64 cosine formula (local exhaustive)",
+			"module": "../adapters.mjs",
+			"execution": "local-exhaustive",
+			"metric": "cosine",
+			"queryNormalization": "none"
+		},
+		{
+			"id": "hsv64-l2-raw",
+			"label": "Existing HSV64 raw L2 alternative (local exhaustive)",
+			"module": "../adapters.mjs",
+			"execution": "local-exhaustive",
+			"metric": "l2",
+			"queryNormalization": "none"
+		},
+		{
+			"id": "hsv64-l2-unit-sum",
+			"label": "Existing HSV64 unit-sum L2 alternative (local exhaustive)",
+			"module": "../adapters.mjs",
+			"execution": "local-exhaustive",
+			"metric": "l2",
+			"queryNormalization": "unit-sum"
+		}
+	]
+}

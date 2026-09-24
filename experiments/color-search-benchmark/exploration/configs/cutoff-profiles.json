@@ -1,0 +1,2183 @@
+{
+  "schemaVersion": 1,
+  "label": "Pixel membership: 4 profiles \u00d7 5 cutoffs \u00d7 4 bucket counts \u00d7 2 named modes + original baselines",
+  "description": "All 545 assets including original corpus and all supplied archive wallpapers. Native global OpenSearch ordering. New measurements include hard physical coverage, feather/core-halo effective coverage, and weighted scores across multiple hard cutoffs. Single-observer development judgments, not a held-out human study; archive wallpapers remain unjudged. Small-corpus latency is not a million-record performance claim.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 5,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "baseline-concrete-swatches-16",
+      "method": "overlap-quality-dense",
+      "label": "Original \u00b7 concrete-swatches \u00b7 16",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q00-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q25-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q50-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q75-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q90-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q00-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q25-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q50-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q75-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q90-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q00-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q25-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q50-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q75-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q90-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q00-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q25-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q50-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q75-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q90-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-concrete-swatches-64",
+      "method": "overlap-quality-dense",
+      "label": "Original \u00b7 concrete-swatches \u00b7 64",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q00-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q25-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q50-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q75-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q90-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q00-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q25-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q50-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q75-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q90-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q00-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q25-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q50-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q75-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q90-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q00-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q25-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q50-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q75-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q90-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-concrete-swatches-256",
+      "method": "overlap-quality-dense",
+      "label": "Original \u00b7 concrete-swatches \u00b7 256",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q00-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q25-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q50-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q75-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q90-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q00-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q25-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q50-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q75-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q90-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q00-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q25-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q50-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q75-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q90-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q00-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q25-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q50-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q75-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q90-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-concrete-swatches-1024",
+      "method": "overlap-quality-dense",
+      "label": "Original \u00b7 concrete-swatches \u00b7 1024",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q00-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q25-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q50-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q75-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q90-concrete-swatches",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q00-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q25-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q50-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q75-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q90-concrete-swatches",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q00-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q25-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q50-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q75-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q90-concrete-swatches",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q00-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 0% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q25-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 25% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q50-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 50% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q75-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 75% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q90-concrete-swatches",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 90% \u00b7 concrete-swatches",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "concrete-swatches",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-named-families-16",
+      "method": "overlap-quality-hybrid",
+      "label": "Original \u00b7 named-families \u00b7 16",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q00-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q25-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q50-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q75-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-q90-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 16 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q00-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q25-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q50-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q75-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-16-q90-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 16 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q00-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q25-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q50-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q75-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-q90-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 16 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q00-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q25-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q50-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q75-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q90-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 16 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-named-families-64",
+      "method": "overlap-quality-hybrid",
+      "label": "Original \u00b7 named-families \u00b7 64",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q00-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q25-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q50-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q75-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-64-q90-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 64 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q00-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q25-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q50-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q75-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-64-q90-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 64 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q00-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q25-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q50-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q75-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-q90-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 64 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q00-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q25-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q50-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q75-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q90-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 64 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-named-families-256",
+      "method": "overlap-quality-hybrid",
+      "label": "Original \u00b7 named-families \u00b7 256",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q00-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q25-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q50-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q75-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-256-q90-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 256 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q00-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q25-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q50-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q75-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-256-q90-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 256 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q00-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q25-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q50-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q75-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-q90-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 256 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q00-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q25-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q50-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q75-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q90-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 256 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "baseline-named-families-1024",
+      "method": "overlap-quality-hybrid",
+      "label": "Original \u00b7 named-families \u00b7 1024",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q00-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q25-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q50-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q75-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-q90-named-families",
+      "method": "cutoff-hard",
+      "label": "hard \u00b7 1024 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q00-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q25-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q50-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q75-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-q90-named-families",
+      "method": "cutoff-feather",
+      "label": "feather \u00b7 1024 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q00-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q25-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q50-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q75-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-q90-named-families",
+      "method": "cutoff-core-halo",
+      "label": "core-halo \u00b7 1024 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q00-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 0% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q25-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 25% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.25,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q50-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 50% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q75-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 75% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.75,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q90-named-families",
+      "method": "cutoff-consensus",
+      "label": "consensus \u00b7 1024 \u00b7 90% \u00b7 named-families",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.9,
+        "namedMode": "named-families",
+        "qualityInfluence": 1,
+        "minimumQuality": 0
+      }
+    }
+  ]
+}

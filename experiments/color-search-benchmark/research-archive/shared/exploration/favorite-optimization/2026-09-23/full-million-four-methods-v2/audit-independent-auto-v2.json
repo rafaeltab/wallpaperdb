@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-optimization-audit",
+  "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-four-methods-v2",
+  "auditedAt": "2026-09-23T18:01:16.997Z",
+  "complete": false,
+  "integrityPassed": true,
+  "accepted": false,
+  "errorCount": 0,
+  "errors": [],
+  "warnings": [
+    "Campaign is incomplete. Completed profiles may be audited individually; pending raw rows and stale recorder totals are retained without being called final.",
+    "Archived source hashes verified. Current worktree source is intentionally not required to remain unchanged after a completed campaign."
+  ],
+  "profileCount": 11,
+  "failedProfiles": 0,
+  "rawRequestRows": 97582,
+  "rawResourceRows": 115,
+  "pendingTimedRows": 12285,
+  "pendingWarmupRows": 0,
+  "totals": {
+    "timedRequests": 97578,
+    "warmupRequests": 4,
+    "timedErrors": 7491,
+    "timedOverOneSecond": 0,
+    "timedStrictFailures": 7491,
+    "warmupErrors": 0,
+    "warmupOverOneSecond": 0,
+    "warmupStrictFailures": 0
+  },
+  "instrumentationRoots": [],
+  "hashes": {
+    "plan": "80084eae92da008c22a42b5bf2d36ac8123707bb17e2fbe60edd5849d04890d6",
+    "benchmark": "3ba44ca649fc391b147f31bf7e1f5c12d8ee2c8e96f9248b1f37c64e16a6b0e4",
+    "archivedSources": "c24a798e4f65763d886439fe863710d557ba839919007c24c4c72f27dc095747"
+  },
+  "limitations": [
+    "Offline internal-consistency audit; no re-execution of queries or independent proof of extraction/index contents.",
+    "Latency percentiles use successful requests. Strict failures are the union of errors and requests at or above one second, including warmups.",
+    "Global ranking correctness and cross-method score fidelity require the separate real-corpus fidelity audit."
+  ]
+}

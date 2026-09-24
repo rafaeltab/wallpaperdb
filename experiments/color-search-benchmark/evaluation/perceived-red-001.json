@@ -1,0 +1,298 @@
+{
+  "schemaVersion": 1,
+  "id": "perceived-red-001",
+  "status": "user-judged",
+  "category": "Perceived color",
+  "use": "development anchor",
+  "query": {
+    "userText": "red",
+    "intent": "A wallpaper whose overall color appearance feels red.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/perceived-red-001.html",
+    "presentation": "Existing JPEG whole-image thumbnails, contained without cropping on the same neutral background; originals available by clicking. Labels A–F are presentation IDs, not ranks.",
+    "selection": "Manually selected from corpus contact sheets to expose varied plausible interpretations; not results of any search algorithm.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "randomization": "A fixed nonsorted presentation order is recorded below for this review.",
+    "requestedLabels": [
+      "great",
+      "acceptable",
+      "poor",
+      "unsure"
+    ],
+    "pairwiseOrdering": "Optional, only where the user expresses a preference."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-027",
+      "filename": "corpus/wallpaper-027.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-027.jpg",
+      "sha256": "4f250c07835e1350bf69761a6f794aa39c606d59ec13ef4701197add92073b34",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_narrow_street_with_shops_and_signs.png",
+      "width": 4579,
+      "height": 2616,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "the lit part feels very red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 30,
+            "redMatchQuality": "acceptable"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-077",
+      "filename": "corpus/wallpaper-077.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-077.jpg",
+      "sha256": "d9d6c2683ed6006555e18a5cd09324d58df7a1f7297250f6de7e92306c37b35c",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_silhouette_of_trees_on_a_hill.jpg",
+      "width": 4896,
+      "height": 3264,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "the sky feels somewhat red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 50,
+            "redMatchQuality": "poor"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-060",
+      "filename": "corpus/wallpaper-060.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+      "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+      "width": 1366,
+      "height": 768,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "the leaf feels very red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 10,
+            "redMatchQuality": "great"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-082",
+      "filename": "corpus/wallpaper-082.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+      "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "width": 6000,
+      "height": 4000,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "the flowers or leaves feel very red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 40,
+            "redMatchQuality": "great"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "E",
+      "wallpaperId": "wallpaper-037",
+      "filename": "corpus/wallpaper-037.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-037.jpg",
+      "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+      "width": 1920,
+      "height": 1080,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "The sky feels extremely red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 30,
+            "redMatchQuality": "great"
+          },
+          {
+            "estimatedImagePercent": 60,
+            "redMatchQuality": "acceptable"
+          },
+          {
+            "estimatedImagePercent": 10,
+            "redMatchQuality": "poor"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "F",
+      "wallpaperId": "wallpaper-048",
+      "filename": "corpus/wallpaper-048.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-048.jpg",
+      "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+      "width": 6016,
+      "height": 4000,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "the roses feel red",
+        "perceivedColorAreas": [
+          {
+            "estimatedImagePercent": 50,
+            "redMatchQuality": "acceptable"
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "red-order-001",
+      "source": "user-response-001",
+      "type": "overall-perceived-redness-order",
+      "orderedLabels": [
+        "E",
+        "D",
+        "A",
+        "F",
+        "C",
+        "B"
+      ],
+      "orderedWallpaperIds": [
+        "wallpaper-037",
+        "wallpaper-082",
+        "wallpaper-027",
+        "wallpaper-048",
+        "wallpaper-060",
+        "wallpaper-077"
+      ],
+      "basis": "Purely based on feeling",
+      "tiesReported": false,
+      "scope": "Relative order of these six wallpapers for the general red query; no score distances or whole-image acceptability thresholds supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "E",
+      "over": "D",
+      "source": "red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "A",
+      "source": "red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "F",
+      "source": "red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation.",
+      "explanation": "red-explanation-001"
+    },
+    {
+      "preferred": "F",
+      "over": "C",
+      "source": "red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "C",
+      "over": "B",
+      "source": "red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A the lit part feels very red - 30% acceptable red\nB the sky feels somewhat red - 50% poor red\nC the leaf feels very red - 10% great red\nD the flowers or leaves feel very red - 40% great red\nE The sky feels extremely red - 30% great red 60% acceptable red 10% poor red\nF the roses feel red - 50% acceptable red\n\nI would order these from most to least red:\nE, D, A, F, C, B\n\nPurely based on feeling"
+    },
+    {
+      "id": "user-response-002",
+      "author": "user",
+      "text": "F feels like the roses are red, but it is explicitly dulled, so it feels like dulled red whereas A feels like it is shining bright red onto the street, so to me the red from A feels brighter than the red in F. I definitely see both as red, and if you ask me 'what colors are these roses' I say red. But the roses don't give a strong 'red vibe', because they're dulled.\n\nRed is a very powerful strong color, dulling it makes it feel much less red."
+    },
+    {
+      "id": "user-response-003",
+      "author": "user",
+      "text": "This is also because we only have 4 buckets to put the red in, if I had to score the reds, the red from A scores higher than the red from F, but I cant represent that with so few buckets."
+    }
+  ],
+  "notes": [
+    "Regional quality labels describe perceived red areas, not whole-image match ratings.",
+    "Percentages are the user's visual estimates, not measured pixel coverage or exact extraction targets. No numerical tolerance has been agreed.",
+    "Unmentioned image areas remain unannotated; they are not automatically non-red, irrelevant, or poor red.",
+    "The overall ranking is recorded independently of the regional descriptions; no formula is inferred from those descriptions.",
+    "No numerical score distances, whole-image acceptability thresholds, or confidence scores have been supplied.",
+    "The five adjacent pairwise relations derive from one six-image ranking; they do not constitute five independent user cases.",
+    "Source filenames/titles and sampling labels do not define user relevance.",
+    "A and F retain red color identity for the user, while A has the stronger red vibe. Original area estimates and ranking are unchanged.",
+    "The user's perceived brightness/dullness explanation is not automatically a measurement of saturation, HSV value, luminance, or any single color-space coordinate; no monotonic brightness rule is inferred.",
+    "The user explicitly clarified that A's red match quality is higher than F's within the same acceptable bucket. Equal categorical labels must not be treated as equal continuous qualities.",
+    "This clarification does not by itself establish that an additional spatial/context scoring component is required: coarse annotations lost part of the user's quality judgment. No method is selected."
+  ],
+  "caseVersion": 4,
+  "explanations": [
+    {
+      "id": "red-explanation-001",
+      "source": "user-response-002",
+      "explainsPreference": {
+        "preferred": "A",
+        "over": "F"
+      },
+      "colorIdentity": {
+        "A": "red",
+        "F": "red"
+      },
+      "perceivedStrength": {
+        "A": "Bright red appears to shine onto the street, giving a stronger red impression.",
+        "F": "The roses are recognized as red but deliberately dulled, giving a weaker red vibe."
+      },
+      "userGeneralization": "Red is a powerful, strong color; dulling it makes it feel much less red.",
+      "scope": "User explanation of this general-red comparison. No numerical definition of brightness, dullness, strength, or a scoring function is supplied."
+    },
+    {
+      "id": "red-explanation-002",
+      "source": "user-response-003",
+      "type": "annotation-resolution-limitation",
+      "statement": "The initial four-label review format cannot express the user's finer color-quality distinctions. A and F sharing acceptable does not imply equal perceived red quality.",
+      "scope": "Record the finer relative preference; no numeric score, band weights, or required new scale was provided."
+    }
+  ],
+  "regionalColorQualityPreferences": [
+    {
+      "source": "user-response-003",
+      "attribute": "perceived red match quality",
+      "preferred": {
+        "image": "A",
+        "region": "red illumination on the street"
+      },
+      "over": {
+        "image": "F",
+        "region": "red roses"
+      },
+      "numericScores": "not supplied",
+      "explanation": "Both were placed in the coarse acceptable category, but the user rates the red in A above the red in F."
+    }
+  ]
+}

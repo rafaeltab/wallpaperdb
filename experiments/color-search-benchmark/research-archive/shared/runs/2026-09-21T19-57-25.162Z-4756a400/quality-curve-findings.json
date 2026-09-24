@@ -1,0 +1,542 @@
+{
+  "runId": "2026-09-21T19-57-25.162Z-4756a400",
+  "candidateCount": 48,
+  "matchedPairs": 24,
+  "statusCounts": {
+    "{\"ok\": 31, \"unsupported\": 6}": 48
+  },
+  "timedRequests": 4464,
+  "timedAtOrAbove1s": 0,
+  "candidateP95Range": [
+    1.2731629999980214,
+    20.598337999996147
+  ],
+  "maxTimedMs": 56.245793999987654,
+  "pairedRows": [
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "pixelCutoff": null,
+      "allLinear": 0.6774193548387096,
+      "allPower": 0.7419354838709677,
+      "realLinear": 0.6876543209876543,
+      "realPower": 0.7691358024691358,
+      "vibeDelta": 0.10526315789473684,
+      "proportionsDelta": 0.0,
+      "judgedZerosLinear": 43,
+      "judgedZerosPower": 7,
+      "tiesLinear": 40,
+      "tiesPower": 6,
+      "improvedCases": 8,
+      "regressedCases": 2
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "pixelCutoff": null,
+      "allLinear": 0.6102150537634409,
+      "allPower": 0.6559139784946236,
+      "realLinear": 0.641358024691358,
+      "realPower": 0.7012345679012346,
+      "vibeDelta": 0.07456140350877194,
+      "proportionsDelta": 0.0,
+      "judgedZerosLinear": 42,
+      "judgedZerosPower": 3,
+      "tiesLinear": 46,
+      "tiesPower": 3,
+      "improvedCases": 8,
+      "regressedCases": 2
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "pixelCutoff": null,
+      "allLinear": 0.6424731182795699,
+      "allPower": 0.696236559139785,
+      "realLinear": 0.6722222222222222,
+      "realPower": 0.741358024691358,
+      "vibeDelta": 0.07894736842105265,
+      "proportionsDelta": 0.01388888888888884,
+      "judgedZerosLinear": 39,
+      "judgedZerosPower": 5,
+      "tiesLinear": 39,
+      "tiesPower": 5,
+      "improvedCases": 9,
+      "regressedCases": 3
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "pixelCutoff": null,
+      "allLinear": 0.639247311827957,
+      "allPower": 0.6725806451612903,
+      "realLinear": 0.6722222222222222,
+      "realPower": 0.7179012345679012,
+      "vibeDelta": 0.04561403508771922,
+      "proportionsDelta": 0.01388888888888884,
+      "judgedZerosLinear": 35,
+      "judgedZerosPower": 3,
+      "tiesLinear": 34,
+      "tiesPower": 1,
+      "improvedCases": 8,
+      "regressedCases": 2
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "pixelCutoff": null,
+      "allLinear": 0.6596774193548387,
+      "allPower": 0.7268817204301076,
+      "realLinear": 0.658641975308642,
+      "realPower": 0.7382716049382716,
+      "vibeDelta": 0.08508771929824566,
+      "proportionsDelta": 0.03888888888888897,
+      "judgedZerosLinear": 29,
+      "judgedZerosPower": 0,
+      "tiesLinear": 23,
+      "tiesPower": 0,
+      "improvedCases": 12,
+      "regressedCases": 3
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "pixelCutoff": null,
+      "allLinear": 0.667741935483871,
+      "allPower": 0.7268817204301076,
+      "realLinear": 0.6679012345679012,
+      "realPower": 0.7382716049382716,
+      "vibeDelta": 0.07192982456140351,
+      "proportionsDelta": 0.03888888888888897,
+      "judgedZerosLinear": 30,
+      "judgedZerosPower": 0,
+      "tiesLinear": 26,
+      "tiesPower": 0,
+      "improvedCases": 12,
+      "regressedCases": 3
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "pixelCutoff": null,
+      "allLinear": 0.6838709677419355,
+      "allPower": 0.7268817204301076,
+      "realLinear": 0.6864197530864198,
+      "realPower": 0.7382716049382716,
+      "vibeDelta": 0.04561403508771933,
+      "proportionsDelta": 0.03888888888888897,
+      "judgedZerosLinear": 26,
+      "judgedZerosPower": 0,
+      "tiesLinear": 20,
+      "tiesPower": 0,
+      "improvedCases": 11,
+      "regressedCases": 4
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "pixelCutoff": null,
+      "allLinear": 0.6811827956989247,
+      "allPower": 0.7322580645161291,
+      "realLinear": 0.6833333333333333,
+      "realPower": 0.7444444444444445,
+      "vibeDelta": 0.058771929824561364,
+      "proportionsDelta": 0.03888888888888897,
+      "judgedZerosLinear": 28,
+      "judgedZerosPower": 0,
+      "tiesLinear": 21,
+      "tiesPower": 0,
+      "improvedCases": 12,
+      "regressedCases": 3
+    },
+    {
+      "method": "cutoff-hard",
+      "bucketCount": 16,
+      "pixelCutoff": 0,
+      "allLinear": 0.5849462365591398,
+      "allPower": 0.6672043010752688,
+      "realLinear": 0.582716049382716,
+      "realPower": 0.6722222222222222,
+      "vibeDelta": 0.16228070175438603,
+      "proportionsDelta": -0.04444444444444451,
+      "judgedZerosLinear": 46,
+      "judgedZerosPower": 2,
+      "tiesLinear": 66,
+      "tiesPower": 1,
+      "improvedCases": 12,
+      "regressedCases": 4
+    },
+    {
+      "method": "cutoff-hard",
+      "bucketCount": 64,
+      "pixelCutoff": 0,
+      "allLinear": 0.5698924731182796,
+      "allPower": 0.6344086021505376,
+      "realLinear": 0.582716049382716,
+      "realPower": 0.6567901234567901,
+      "vibeDelta": 0.13157894736842113,
+      "proportionsDelta": -0.041666666666666685,
+      "judgedZerosLinear": 46,
+      "judgedZerosPower": 0,
+      "tiesLinear": 66,
+      "tiesPower": 0,
+      "improvedCases": 12,
+      "regressedCases": 5
+    },
+    {
+      "method": "cutoff-hard",
+      "bucketCount": 256,
+      "pixelCutoff": 0,
+      "allLinear": 0.5543010752688172,
+      "allPower": 0.6430107526881721,
+      "realLinear": 0.5796296296296296,
+      "realPower": 0.6814814814814815,
+      "vibeDelta": 0.14473684210526316,
+      "proportionsDelta": -5.551115123125783e-17,
+      "judgedZerosLinear": 45,
+      "judgedZerosPower": 0,
+      "tiesLinear": 63,
+      "tiesPower": 0,
+      "improvedCases": 14,
+      "regressedCases": 5
+    },
+    {
+      "method": "cutoff-hard",
+      "bucketCount": 1024,
+      "pixelCutoff": 0,
+      "allLinear": 0.5043010752688172,
+      "allPower": 0.6118279569892473,
+      "realLinear": 0.5271604938271605,
+      "realPower": 0.6506172839506172,
+      "vibeDelta": 0.1578947368421053,
+      "proportionsDelta": 0.027777777777777735,
+      "judgedZerosLinear": 46,
+      "judgedZerosPower": 0,
+      "tiesLinear": 66,
+      "tiesPower": 0,
+      "improvedCases": 13,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-feather",
+      "bucketCount": 16,
+      "pixelCutoff": 0,
+      "allLinear": 0.5741935483870968,
+      "allPower": 0.6908602150537634,
+      "realLinear": 0.582716049382716,
+      "realPower": 0.7240740740740741,
+      "vibeDelta": 0.1640350877192982,
+      "proportionsDelta": 0.04166666666666663,
+      "judgedZerosLinear": 45,
+      "judgedZerosPower": 2,
+      "tiesLinear": 64,
+      "tiesPower": 1,
+      "improvedCases": 13,
+      "regressedCases": 1
+    },
+    {
+      "method": "cutoff-feather",
+      "bucketCount": 64,
+      "pixelCutoff": 0,
+      "allLinear": 0.5811827956989247,
+      "allPower": 0.6709677419354838,
+      "realLinear": 0.5858024691358025,
+      "realPower": 0.6962962962962963,
+      "vibeDelta": 0.10263157894736841,
+      "proportionsDelta": 0.06944444444444442,
+      "judgedZerosLinear": 43,
+      "judgedZerosPower": 0,
+      "tiesLinear": 59,
+      "tiesPower": 0,
+      "improvedCases": 14,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-feather",
+      "bucketCount": 256,
+      "pixelCutoff": 0,
+      "allLinear": 0.5790322580645161,
+      "allPower": 0.6795698924731183,
+      "realLinear": 0.5981481481481481,
+      "realPower": 0.7209876543209877,
+      "vibeDelta": 0.13771929824561402,
+      "proportionsDelta": 0.04166666666666663,
+      "judgedZerosLinear": 44,
+      "judgedZerosPower": 1,
+      "tiesLinear": 61,
+      "tiesPower": 0,
+      "improvedCases": 13,
+      "regressedCases": 1
+    },
+    {
+      "method": "cutoff-feather",
+      "bucketCount": 1024,
+      "pixelCutoff": 0,
+      "allLinear": 0.5870967741935483,
+      "allPower": 0.6688172043010753,
+      "realLinear": 0.6074074074074074,
+      "realPower": 0.6987654320987654,
+      "vibeDelta": 0.11929824561403501,
+      "proportionsDelta": 0.022222222222222254,
+      "judgedZerosLinear": 42,
+      "judgedZerosPower": 0,
+      "tiesLinear": 56,
+      "tiesPower": 0,
+      "improvedCases": 14,
+      "regressedCases": 4
+    },
+    {
+      "method": "cutoff-core-halo",
+      "bucketCount": 16,
+      "pixelCutoff": 0,
+      "allLinear": 0.5795698924731183,
+      "allPower": 0.7026881720430107,
+      "realLinear": 0.5765432098765432,
+      "realPower": 0.7179012345679012,
+      "vibeDelta": 0.17456140350877192,
+      "proportionsDelta": 0.04166666666666663,
+      "judgedZerosLinear": 46,
+      "judgedZerosPower": 2,
+      "tiesLinear": 66,
+      "tiesPower": 1,
+      "improvedCases": 14,
+      "regressedCases": 1
+    },
+    {
+      "method": "cutoff-core-halo",
+      "bucketCount": 64,
+      "pixelCutoff": 0,
+      "allLinear": 0.532258064516129,
+      "allPower": 0.6333333333333333,
+      "realLinear": 0.5518518518518518,
+      "realPower": 0.6654320987654321,
+      "vibeDelta": 0.11754385964912284,
+      "proportionsDelta": 0.07500000000000001,
+      "judgedZerosLinear": 46,
+      "judgedZerosPower": 0,
+      "tiesLinear": 66,
+      "tiesPower": 0,
+      "improvedCases": 15,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-core-halo",
+      "bucketCount": 256,
+      "pixelCutoff": 0,
+      "allLinear": 0.5790322580645161,
+      "allPower": 0.678494623655914,
+      "realLinear": 0.5858024691358025,
+      "realPower": 0.7024691358024692,
+      "vibeDelta": 0.14824561403508774,
+      "proportionsDelta": 0.0222222222222222,
+      "judgedZerosLinear": 45,
+      "judgedZerosPower": 0,
+      "tiesLinear": 63,
+      "tiesPower": 0,
+      "improvedCases": 14,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-core-halo",
+      "bucketCount": 1024,
+      "pixelCutoff": 0,
+      "allLinear": 0.5586021505376344,
+      "allPower": 0.6612903225806451,
+      "realLinear": 0.567283950617284,
+      "realPower": 0.6802469135802469,
+      "vibeDelta": 0.13421052631578945,
+      "proportionsDelta": 0.05277777777777781,
+      "judgedZerosLinear": 45,
+      "judgedZerosPower": 0,
+      "tiesLinear": 63,
+      "tiesPower": 0,
+      "improvedCases": 14,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-consensus",
+      "bucketCount": 16,
+      "pixelCutoff": 0,
+      "allLinear": 0.660752688172043,
+      "allPower": 0.7403225806451613,
+      "realLinear": 0.6722222222222222,
+      "realPower": 0.7611111111111111,
+      "vibeDelta": 0.12631578947368416,
+      "proportionsDelta": 0.005555555555555536,
+      "judgedZerosLinear": 36,
+      "judgedZerosPower": 2,
+      "tiesLinear": 38,
+      "tiesPower": 1,
+      "improvedCases": 11,
+      "regressedCases": 3
+    },
+    {
+      "method": "cutoff-consensus",
+      "bucketCount": 64,
+      "pixelCutoff": 0,
+      "allLinear": 0.5854838709677419,
+      "allPower": 0.6365591397849463,
+      "realLinear": 0.6228395061728395,
+      "realPower": 0.6839506172839506,
+      "vibeDelta": 0.07807017543859651,
+      "proportionsDelta": 0.00833333333333336,
+      "judgedZerosLinear": 38,
+      "judgedZerosPower": 0,
+      "tiesLinear": 44,
+      "tiesPower": 0,
+      "improvedCases": 10,
+      "regressedCases": 3
+    },
+    {
+      "method": "cutoff-consensus",
+      "bucketCount": 256,
+      "pixelCutoff": 0,
+      "allLinear": 0.6274193548387097,
+      "allPower": 0.6978494623655914,
+      "realLinear": 0.6537037037037037,
+      "realPower": 0.7271604938271605,
+      "vibeDelta": 0.08684210526315794,
+      "proportionsDelta": 0.0444444444444444,
+      "judgedZerosLinear": 34,
+      "judgedZerosPower": 0,
+      "tiesLinear": 36,
+      "tiesPower": 0,
+      "improvedCases": 13,
+      "regressedCases": 2
+    },
+    {
+      "method": "cutoff-consensus",
+      "bucketCount": 1024,
+      "pixelCutoff": 0,
+      "allLinear": 0.6091397849462366,
+      "allPower": 0.646236559139785,
+      "realLinear": 0.6475308641975308,
+      "realPower": 0.6925925925925925,
+      "vibeDelta": 0.05526315789473679,
+      "proportionsDelta": 0.008333333333333304,
+      "judgedZerosLinear": 34,
+      "judgedZerosPower": 0,
+      "tiesLinear": 34,
+      "tiesPower": 0,
+      "improvedCases": 10,
+      "regressedCases": 5
+    }
+  ],
+  "analysisPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T19-57-25.162Z-4756a400/quality-curve-analysis.json",
+  "analysisSeconds": 0.8964351071044803,
+  "timedFailures": 0,
+  "eligibilityViolations": 0,
+  "missingSupportedJudgedEndpoints": 0,
+  "agreementGainPercentagePointRange": {
+    "all": [
+      3.3333333333333326,
+      12.31182795698924
+    ],
+    "real": [
+      4.506172839506172,
+      14.135802469135806
+    ],
+    "vibe": [
+      4.561403508771922,
+      17.45614035087719
+    ],
+    "proportions": [
+      -4.444444444444451,
+      7.500000000000001
+    ]
+  },
+  "realGainsAfterDroppingUncertainPairs": 24,
+  "zeroAndTieRanges": {
+    "judgedZeroScores": {
+      "linear": [
+        26,
+        46
+      ],
+      "power": [
+        0,
+        7
+      ]
+    },
+    "tied": {
+      "linear": [
+        20,
+        66
+      ],
+      "power": [
+        0,
+        6
+      ]
+    },
+    "allJudgedZeroCases": {
+      "linear": [
+        2,
+        10
+      ],
+      "power": [
+        0,
+        0
+      ]
+    },
+    "allRetrievedZeroCases": {
+      "linear": [
+        0,
+        5
+      ],
+      "power": [
+        0,
+        0
+      ]
+    },
+    "top20ZeroScores": {
+      "linear": [
+        5,
+        138
+      ],
+      "power": [
+        0,
+        0
+      ]
+    }
+  },
+  "denominators": {
+    "all": {
+      "cases": 31,
+      "assessedPairs": 233,
+      "judgedScoreObservations": 135
+    },
+    "real": {
+      "cases": 27,
+      "assessedPairs": 183,
+      "judgedScoreObservations": 113
+    },
+    "vibe": {
+      "cases": 19,
+      "assessedPairs": 134,
+      "judgedScoreObservations": 81
+    },
+    "proportions": {
+      "cases": 12,
+      "assessedPairs": 99,
+      "judgedScoreObservations": 54
+    },
+    "realVibe": {
+      "cases": 18,
+      "assessedPairs": 129,
+      "judgedScoreObservations": 77
+    },
+    "realProportions": {
+      "cases": 9,
+      "assessedPairs": 54,
+      "judgedScoreObservations": 36
+    }
+  },
+  "caveats": [
+    "Single observer;24 quickly judged cases; five uncertain pairs; correlated/reused images; not held-out validation.",
+    "All curves compared at influence3,minQuality0; overlap fixedpixelCutoff50%, cutoff methods pixelCutoff0%; no claim across allcutofflevels/influences.",
+    "Six unsupported cases remain: two conceptual and four accent-intent cases.",
+    "Accuracy is mean per supported query; strict-model-ties count half credit. All supported expected judgments present.",
+    "Real-only means27image-backed cases, excluding four syntheticfixture cases; retrieved-hit distributions stillinclude corpusfixtures.",
+    "Judged-zero observations count repeated query-image appearances, not unique wallpapers. Top20 results have no new relevance judgments.",
+    "Saved full retrieval accuracy, not sparse top20 timedAccuracy, determines accuracy. Small545asset latency is not million-document evidence."
+  ]
+}

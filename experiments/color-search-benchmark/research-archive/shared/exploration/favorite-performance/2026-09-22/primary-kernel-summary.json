@@ -1,0 +1,37 @@
+{
+  "window": "primary campaign including indexing and gaps",
+  "samples": 2066,
+  "containerMemoryPeakBytes": 7401119744,
+  "containerSwapPeakBytes": 167079936,
+  "initialMemoryEvents": {
+    "low": "0",
+    "high": "0",
+    "max": "0",
+    "oom": "0",
+    "oom_kill": "0",
+    "oom_group_kill": "0",
+    "sock_throttled": "0"
+  },
+  "finalMemoryEvents": {
+    "low": "0",
+    "high": "0",
+    "max": "0",
+    "oom": "0",
+    "oom_kill": "0",
+    "oom_group_kill": "0",
+    "sock_throttled": "5"
+  },
+  "cpuCounterDeltas": {
+    "usage_usec": 5849284156,
+    "user_usec": 5821057753,
+    "system_usec": 28226403,
+    "nice_usec": 0,
+    "core_sched.force_idle_usec": 0,
+    "nr_periods": 18907,
+    "nr_throttled": 3963,
+    "throttled_usec": 2589404357,
+    "nr_bursts": 0,
+    "burst_usec": 0
+  },
+  "minimumHostAvailableKiB": 13100724
+}

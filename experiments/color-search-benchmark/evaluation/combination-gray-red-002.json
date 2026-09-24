@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "combination-gray-red-002",
+  "status": "user-judged",
+  "category": "Combinations",
+  "use": "development anchor follow-up",
+  "followUpOf": "combination-gray-red-001",
+  "evaluationGroup": "grayscale-red-appearance",
+  "query": {
+    "userText": "mostly grayscale, with red accents",
+    "intent": "A mostly neutral gray, black and white wallpaper with red as the colored accent. How much tint or other color remains acceptable, and how much red feels like an accent, is for the user to judge.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/combination-gray-red-002.html",
+    "purpose": "Find a user-confirmed satisfying reference for the combined appearance after the earlier difficult six-image review.",
+    "presentation": "Three complete images contained on the same neutral #202020 background, up to 340 CSS pixels tall; source files displayed directly with no local reencoding, cropping or color changes. Click-through opens the saved source file. Different aspect ratios remain visible.",
+    "selection": "Two newly sourced published selective-color photographs chosen by visual inspection, plus the previously preferred roses as a familiar comparison. These are candidate references, not predetermined good matches or controlled variants.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "sourceTitlesVisible": false,
+    "attribution": "Author/source/license credits are available below the review, without expected judgments.",
+    "randomization": "Fixed A=telephone, B=roses, C=umbrella presentation order; no relevance ordering implied.",
+    "judgmentFormat": "First identify which, if any, actually satisfies the request, then describe what works or falls short. Optional pairwise preferences or ordering; no percentages or numeric grades requested.",
+    "pairwiseOrdering": "Optional. Preserve ties, acceptable alternatives, uncertainty and absolute acceptability separately.",
+    "requestedLabels": null
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "evaluation-gray-red-002-telephone",
+      "filename": "corpus/evaluation/gray-red-002-telephone.jpg",
+      "sha256": "c9060a015115125d20f0cc7e2008d17b571ee23ae4e7316095d3e307fd58e85b",
+      "width": 3411,
+      "height": 4557,
+      "bytes": 10165006,
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Telephone_Box_(20967124724).jpg",
+      "sourcePageRevision": "https://commons.wikimedia.org/w/index.php?title=File:Telephone_Box_(20967124724).jpg&oldid=1221177587",
+      "originalSource": "https://www.flickr.com/photos/wwarby/20967124724/",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Telephone_Box_%2820967124724%29.jpg",
+      "author": "William Warby",
+      "authorUrl": "https://www.flickr.com/people/26782864@N00",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+      "retrievedDate": "2026-09-16",
+      "rendition": "Original Wikimedia Commons JPEG file, bytes retained unchanged.",
+      "sourceEditing": "Published selective-color photograph; no local recoloring or image generation.",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Beautiful bright red with perfect grayscale, textbook example",
+        "componentDescriptions": {
+          "grayscale": "Perfect grayscale.",
+          "red": "Beautiful bright red."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": "textbook example"
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-048",
+      "filename": "corpus/wallpaper-048.png",
+      "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 6016,
+      "height": 4000,
+      "bytes": 2971577,
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+      "author": null,
+      "license": "unknown",
+      "rendition": "Existing original PNG displayed directly, instead of the JPEG thumbnail used in the earlier review.",
+      "previousPresentation": {
+        "caseId": "combination-gray-red-001",
+        "label": "F",
+        "thumbnail": "corpus/thumbnails/wallpaper-048.jpg"
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Beautiful but slightly blue-ish grayscale with reduced red",
+        "componentDescriptions": {
+          "grayscale": "Beautiful but slightly blue-ish grayscale.",
+          "red": "Reduced red."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "evaluation-gray-red-002-umbrella",
+      "filename": "corpus/evaluation/gray-red-002-umbrella.jpg",
+      "sha256": "05968ee9addc191a71564ae596e5436274a9370b223c6d75bc90eb366adeda52",
+      "width": 2560,
+      "height": 2560,
+      "bytes": 779786,
+      "sourcePage": "https://unsplash.com/photos/selective-color-photography-of-man-using-red-umbrella-surrounded-by-cars-o5Vc1Nhot94",
+      "sourceUrl": "https://images.unsplash.com/photo-1517213628252-ae2125f4f270?fm=jpg&fit=max&w=2560&q=90",
+      "author": "Deva Darshan",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license",
+      "retrievedDate": "2026-09-16",
+      "rendition": "Source CDN JPEG rendition with maximum width 2560 and quality 90. Complete square composition, no requested crop. Local bytes are preserved unchanged.",
+      "sourceEditing": "Published selective-color photograph; no local recoloring or image generation.",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Beautiful grayscale with a slightly darker but still bibrant red",
+        "componentDescriptions": {
+          "grayscale": "Beautiful grayscale.",
+          "red": "Slightly darker but still vibrant red (user wrote 'bibrant')."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "gray-red-followup-order-001",
+      "source": "user-response-001",
+      "type": "overall-grayscale-with-red-accents-order",
+      "orderedLabels": [
+        "A",
+        "C",
+        "B"
+      ],
+      "orderedWallpaperIds": [
+        "evaluation-gray-red-002-telephone",
+        "evaluation-gray-red-002-umbrella",
+        "wallpaper-048"
+      ],
+      "tiesReported": false,
+      "scope": "Relative order within this three-image follow-up. A also has an explicit qualitative 'textbook example' assessment. No numeric scores, distances or percentage estimates supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "A",
+      "over": "C",
+      "source": "gray-red-followup-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "C",
+      "over": "B",
+      "source": "gray-red-followup-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A Beautiful bright red with perfect grayscale, textbook example\nB Beautiful but slightly blue-ish grayscale with reduced red\nC Beautiful grayscale with a slightly darker but still bibrant red\n\nA, C, B"
+    }
+  ],
+  "notes": [
+    "User descriptions and order are recorded: A > C > B. A is explicitly called a textbook example and serves as the first confirmed positive reference for this query.",
+    "This follows the same query with a smaller, deliberately selected set. It is not a new independent query or held-out evaluation; keep related cases and images in the same evaluation split.",
+    "Only two additional source images were acquired. The original 100-image manifest, extraction data, OpenSearch indexes and historical benchmarks are unchanged.",
+    "Published source photographs may use selective coloring; no local image generation, recoloring, masking, cropping or resizing was performed. Browser display scaling is presentation only.",
+    "These are different scenes, not controlled variants. Any ranking does not by itself isolate the causal effect of red amount, brightness, background tone or spatial arrangement.",
+    "The roses were preferred in the previous set; that ranking does not determine their position or absolute acceptability in this set.",
+    "Source files replace JPEG previews for this review, and frames are larger than the previous page. The roses' presentation therefore changes; preserve fresh responses without assuming a perfect repeatability test.",
+    "New source files are hash-pinned under the existing ignored corpus directory. Source/license metadata is included here and linked from the review page.",
+    "Regional descriptions or amounts, if supplied, remain distinct from whole-image judgments; unmentioned parts remain unannotated.",
+    "C's darker red is still described as vibrant. Do not conflate darkness with dullness or infer that only the brightest red can fit this query.",
+    "B's slightly blue-ish grayscale and reduced red are fresh observations in this presentation. Preserve earlier descriptions rather than rewriting them; no causal explanation for the newly noticed tint has been established.",
+    "The user's positive component descriptions and relative order do not assign a calibrated whole-image grade to B or C. B is not marked unacceptable merely because it ranks last here.",
+    "No image-area percentages, exact grayscale pixel fractions, color coordinates or new general scoring rule follow from 'perfect grayscale', 'bright', 'reduced', or 'vibrant'.",
+    "The raw spelling 'bibrant' is retained; descriptive summaries read it as the evident word 'vibrant'."
+  ],
+  "positiveReference": {
+    "label": "A",
+    "wallpaperId": "evaluation-gray-red-002-telephone",
+    "source": "user-response-001",
+    "userDescription": "Beautiful bright red with perfect grayscale, textbook example",
+    "scope": "User-confirmed positive reference for this query. Qualitative, without an assigned numeric maximum score or universal shade/brightness threshold."
+  }
+}

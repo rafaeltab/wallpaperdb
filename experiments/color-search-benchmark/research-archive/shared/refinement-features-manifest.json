@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-20T01:05:42.392Z",
+  "count": 545,
+  "sampleWidth": 512,
+  "sampleHeight": 512,
+  "sourceManifestSha256": "ebb1a5d73662ba011ad04ddbc65335866d13a218e0475237df7399743f185c7b",
+  "sourceFile": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/refinement-features.mjs",
+  "sourceCodeSha256": "62f629525fc8adff1e1350e4f845ad4384514930888d1e6fb17f8b4979f82627",
+  "filename": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/refinement-features.jsonl",
+  "sha256": "27dd963af85d3667711e9ca1fe3c26987261dc0b2c585ce0efc54827552d0638",
+  "definition": {
+    "version": 1,
+    "source": "512×512 equal-area samples after orientation, conversion to sRGB, and alpha compositing on black.",
+    "lightness": "OKLab L on [0,1], computed per sampled pixel before any color quantization.",
+    "quantiles": "Linearly interpolated sample quantiles; p999 means the 99.9th percentile.",
+    "background": "The global median lightness is a robust background reference. It is not spatial scene segmentation.",
+    "thresholds": "Highlight areas count pixels at least 0.10, 0.20, or 0.30 OKLab L above the median. They do not require absolute brightness.",
+    "adaptiveTail": "When p99.9 − median >= 0.02, count pixels above median + half that span. Otherwise the adaptive tail area is zero.",
+    "darkness": "rel_dark_background = clamp((0.6 − median)/0.6); rel_dark_area50 is the fraction of pixels with L <= 0.5.",
+    "invariance": "Relative spans/areas/contrast are invariant under additive lightness shifts without clipping; absolute darkness intentionally is not.",
+    "limitations": [
+      "Global statistics do not identify where bright spots are or distinguish edges from disconnected regions.",
+      "512×512 sampling can still lose subpixel highlights. Quantiles reduce the effect of isolated extreme pixels.",
+      "The thresholds are generic experimental descriptors, not calibrated human preference boundaries.",
+      "A global median can represent a large foreground region rather than the background of a scene."
+    ]
+  },
+  "elapsedSeconds": 48.933384977
+}

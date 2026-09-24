@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Color search · performance results</title>
+  <link rel="stylesheet" href="/performance.css">
+  <script type="module" src="/performance.js"></script>
+</head>
+<body>
+  <header>
+    <div><p class="eyebrow">Favorite color search · experiment results</p><h1>Accuracy and speed</h1>
+      <p>Saved measurements, separated by corpus and index scope.</p></div>
+    <a href="/">← Try the prototypes</a>
+  </header>
+  <main>
+    <p id="snapshot" role="status">Loading the published snapshot…</p>
+    <div id="error" class="notice danger" role="alert" hidden></div>
+    <section id="results" hidden>
+      <nav id="cohorts" aria-label="Measurement scope"></nav>
+      <section class="scope-heading"><h2 id="scope-title"></h2><p id="scope-description"></p><p id="coverage" class="notice"></p></section>
+      <div id="filters" class="filters">
+        <label>Method<select id="method-filter"><option value="">All methods</option></select></label>
+        <label>Query<select id="query-filter"><option value="">All queries</option></select></label>
+        <label>Concurrent requests<select id="load-filter"><option value="">All measured loads</option></select></label>
+      </div>
+      <div id="measurements"></div>
+      <section id="feedback"></section>
+      <details id="builds"><summary>Index builds at this snapshot</summary><div id="build-details"></div></details>
+      <details><summary>How to read these results</summary><ul id="caveats"></ul></details>
+      <details><summary>Snapshot provenance and completeness</summary><div id="provenance"></div></details>
+    </section>
+  </main>
+</body>
+</html>

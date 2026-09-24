@@ -1,0 +1,765 @@
+{
+  "description": "Synthetic known-area fixtures for color-region semantics. SVG stripes and palette weights have the same fractions; no wallpaper corpus is replaced.",
+  "fixtures": [
+    {
+      "id": "range-red70-black30",
+      "title": "70% red · 30% black",
+      "filename": "ranges-fixtures/red70-black30.svg",
+      "thumbnail": "./ranges-fixtures/red70-black30.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.7
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.7
+        },
+        {
+          "color": "#000000",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-red70-darkgray30",
+      "title": "70% red · 30% dark neutral gray",
+      "filename": "ranges-fixtures/red70-darkgray30.svg",
+      "thumbnail": "./ranges-fixtures/red70-darkgray30.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.7
+        },
+        {
+          "lab": [
+            0.20019308709601014,
+            1.620618916842176e-11,
+            7.461978673850567e-9
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.7
+        },
+        {
+          "color": "#161616",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-red70-darkblue30",
+      "title": "70% red · 30% dark saturated blue",
+      "filename": "ranges-fixtures/red70-darkblue30.svg",
+      "thumbnail": "./ranges-fixtures/red70-darkblue30.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.7
+        },
+        {
+          "lab": [
+            0.1451382199167608,
+            -0.010421694551546637,
+            -0.10002935523620445
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.7
+        },
+        {
+          "color": "#000033",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-red70-midgray30",
+      "title": "70% red · 30% middle gray",
+      "filename": "ranges-fixtures/red70-midgray30.svg",
+      "thumbnail": "./ranges-fixtures/red70-midgray30.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.7
+        },
+        {
+          "lab": [
+            0.5998708017071177,
+            4.856132163055804e-11,
+            2.2359528895066205e-8
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.7
+        },
+        {
+          "color": "#808080",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-red50-black50",
+      "title": "50% red · 50% black",
+      "filename": "ranges-fixtures/red50-black50.svg",
+      "thumbnail": "./ranges-fixtures/red50-black50.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.5
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.5
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.5
+        },
+        {
+          "color": "#000000",
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "id": "range-red90-black10",
+      "title": "90% red · 10% black",
+      "filename": "ranges-fixtures/red90-black10.svg",
+      "thumbnail": "./ranges-fixtures/red90-black10.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.9
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.1
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.9
+        },
+        {
+          "color": "#000000",
+          "weight": 0.1
+        }
+      ]
+    },
+    {
+      "id": "range-red100",
+      "title": "100% red",
+      "filename": "ranges-fixtures/red100.svg",
+      "thumbnail": "./ranges-fixtures/red100.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 1
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "range-black100",
+      "title": "100% black",
+      "filename": "ranges-fixtures/black100.svg",
+      "thumbnail": "./ranges-fixtures/black100.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 1
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#000000",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "range-dark-neutrals",
+      "title": "Dark neutral shades",
+      "filename": "ranges-fixtures/dark-neutrals.svg",
+      "thumbnail": "./ranges-fixtures/dark-neutrals.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.4
+        },
+        {
+          "lab": [
+            0.17304230759282468,
+            1.4008308402146952e-11,
+            6.449963035892736e-9
+          ],
+          "weight": 0.3
+        },
+        {
+          "lab": [
+            0.21342250571902166,
+            1.7277165809126416e-11,
+            7.955090808309251e-9
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#000000",
+          "weight": 0.4
+        },
+        {
+          "color": "#101010",
+          "weight": 0.3
+        },
+        {
+          "color": "#191919",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-dark-hues",
+      "title": "Dark saturated colors",
+      "filename": "ranges-fixtures/dark-hues.svg",
+      "thumbnail": "./ranges-fixtures/dark-hues.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.1451382199167608,
+            -0.010421694551546637,
+            -0.10002935523620445
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.2016317636383908,
+            0.07220184494561485,
+            0.04040830401588191
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.2782072706396304,
+            -0.07509954852596581,
+            0.05763561766009581
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.19287513083151245,
+            0.06385273031936689,
+            -0.07291990997043657
+          ],
+          "weight": 0.25
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#000033",
+          "weight": 0.25
+        },
+        {
+          "color": "#330000",
+          "weight": 0.25
+        },
+        {
+          "color": "#003300",
+          "weight": 0.25
+        },
+        {
+          "color": "#220033",
+          "weight": 0.25
+        }
+      ]
+    },
+    {
+      "id": "range-green40-black60",
+      "title": "40% green · 60% black",
+      "filename": "ranges-fixtures/green40-black60.svg",
+      "thumbnail": "./ranges-fixtures/green40-black60.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.8664396115356694,
+            -0.23388757418790818,
+            0.17949847989672985
+          ],
+          "weight": 0.4
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.6
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#00FF00",
+          "weight": 0.4
+        },
+        {
+          "color": "#000000",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "id": "range-green20-black80",
+      "title": "20% green · 80% black",
+      "filename": "ranges-fixtures/green20-black80.svg",
+      "thumbnail": "./ranges-fixtures/green20-black80.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.8664396115356694,
+            -0.23388757418790818,
+            0.17949847989672985
+          ],
+          "weight": 0.2
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.8
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#00FF00",
+          "weight": 0.2
+        },
+        {
+          "color": "#000000",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "id": "range-green100",
+      "title": "100% green",
+      "filename": "ranges-fixtures/green100.svg",
+      "thumbnail": "./ranges-fixtures/green100.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.8664396115356694,
+            -0.23388757418790818,
+            0.17949847989672985
+          ],
+          "weight": 1
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#00FF00",
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "id": "range-hue-wrap",
+      "title": "Red shades across the hue seam",
+      "filename": "ranges-fixtures/hue-wrap.svg",
+      "thumbnail": "./ranges-fixtures/hue-wrap.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6280550774012984,
+            0.22521816561032654,
+            0.12490622926408407
+          ],
+          "weight": 0.5
+        },
+        {
+          "lab": [
+            0.6286497510078549,
+            0.2240166726590855,
+            0.12599799266341744
+          ],
+          "weight": 0.5
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0004",
+          "weight": 0.5
+        },
+        {
+          "color": "#FF0400",
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "id": "range-red-orange-overlap",
+      "title": "50% red · 50% orange",
+      "filename": "ranges-fixtures/red-orange-overlap.svg",
+      "thumbnail": "./ranges-fixtures/red-orange-overlap.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.5
+        },
+        {
+          "lab": [
+            0.7318948427227374,
+            0.11185884049227865,
+            0.14835914108139459
+          ],
+          "weight": 0.5
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.5
+        },
+        {
+          "color": "#FF8000",
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "id": "range-rainbow20",
+      "title": "Five colors · 20% each",
+      "filename": "ranges-fixtures/rainbow20.svg",
+      "thumbnail": "./ranges-fixtures/rainbow20.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.2
+        },
+        {
+          "lab": [
+            0.7318948427227374,
+            0.11185884049227865,
+            0.14835914108139459
+          ],
+          "weight": 0.2
+        },
+        {
+          "lab": [
+            0.9679827203267873,
+            -0.07136908036816808,
+            0.19856975465179516
+          ],
+          "weight": 0.2
+        },
+        {
+          "lab": [
+            0.8664396115356694,
+            -0.23388757418790818,
+            0.17949847989672985
+          ],
+          "weight": 0.2
+        },
+        {
+          "lab": [
+            0.4520137183853429,
+            -0.03245698416876397,
+            -0.3115281476783751
+          ],
+          "weight": 0.2
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.2
+        },
+        {
+          "color": "#FF8000",
+          "weight": 0.2
+        },
+        {
+          "color": "#FFFF00",
+          "weight": 0.2
+        },
+        {
+          "color": "#00FF00",
+          "weight": 0.2
+        },
+        {
+          "color": "#0000FF",
+          "weight": 0.2
+        }
+      ]
+    },
+    {
+      "id": "range-rgb-neighborhood",
+      "title": "Independent RGB channel changes",
+      "filename": "ranges-fixtures/rgb-neighborhood.svg",
+      "thumbnail": "./ranges-fixtures/rgb-neighborhood.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.5998708017071177,
+            4.856132163055804e-11,
+            2.2359528895066205e-8
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.6230890199728341,
+            0.029318094900352976,
+            0.009531873213154185
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.7171748732689706,
+            -0.07396106732972735,
+            0.05264667353386443
+          ],
+          "weight": 0.25
+        },
+        {
+          "lab": [
+            0.6317940791166298,
+            0.02482361669694738,
+            -0.11035603671270344
+          ],
+          "weight": 0.25
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#808080",
+          "weight": 0.25
+        },
+        {
+          "color": "#998080",
+          "weight": 0.25
+        },
+        {
+          "color": "#80B380",
+          "weight": 0.25
+        },
+        {
+          "color": "#8080CC",
+          "weight": 0.25
+        }
+      ]
+    },
+    {
+      "id": "range-red-shades70-black30",
+      "title": "70% nearby red shades · 30% black",
+      "filename": "ranges-fixtures/red-shades70-black30.svg",
+      "thumbnail": "./ranges-fixtures/red-shades70-black30.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.35
+        },
+        {
+          "lab": [
+            0.5354654160382164,
+            0.18709832397651988,
+            0.10185083347890506
+          ],
+          "weight": 0.35
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.3
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.35
+        },
+        {
+          "color": "#CC1010",
+          "weight": 0.35
+        },
+        {
+          "color": "#000000",
+          "weight": 0.3
+        }
+      ]
+    },
+    {
+      "id": "range-red1-black99",
+      "title": "1% red accent · 99% black",
+      "filename": "ranges-fixtures/red1-black99.svg",
+      "thumbnail": "./ranges-fixtures/red1-black99.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.6279553606145516,
+            0.22486306106597398,
+            0.1258462985307351
+          ],
+          "weight": 0.01
+        },
+        {
+          "lab": [
+            0,
+            0,
+            0
+          ],
+          "weight": 0.99
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#FF0000",
+          "weight": 0.01
+        },
+        {
+          "color": "#000000",
+          "weight": 0.99
+        }
+      ]
+    },
+    {
+      "id": "range-gray100",
+      "title": "100% middle gray",
+      "filename": "ranges-fixtures/gray100.svg",
+      "thumbnail": "./ranges-fixtures/gray100.svg",
+      "synthetic": true,
+      "palette": [
+        {
+          "lab": [
+            0.5998708017071177,
+            4.856132163055804e-11,
+            2.2359528895066205e-8
+          ],
+          "weight": 1
+        }
+      ],
+      "paletteHex": [
+        {
+          "color": "#808080",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

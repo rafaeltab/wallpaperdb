@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "favorite-utility-numeric",
+      "method": "favorite-utility-numeric",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-utilities.mjs",
+        "export": "buildFavoriteUtilityQuery"
+      }
+    },
+    {
+      "id": "favorite-utility-sorted",
+      "method": "favorite-utility-sorted",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-sorted-utilities.mjs",
+        "export": "buildFavoriteSortedQuery"
+      },
+      "executor": {
+        "module": "./favorite-sorted-utilities.mjs",
+        "export": "searchFavoriteSortedUtilities"
+      }
+    },
+    {
+      "id": "favorite-utility-sorted-scored",
+      "method": "favorite-utility-sorted-scored",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-sorted-utilities.mjs",
+        "export": "buildFavoriteSortedQuery"
+      },
+      "executor": {
+        "module": "./favorite-sorted-utilities.mjs",
+        "export": "searchFavoriteSortedUtilities"
+      }
+    },
+    {
+      "id": "favorite-utility-bounded",
+      "method": "favorite-utility-bounded",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-bounded-utilities.mjs",
+        "export": "buildFavoriteBoundedQuery"
+      },
+      "executor": {
+        "module": "./favorite-bounded-utilities.mjs",
+        "export": "executeFavoriteBoundedUtilitySearch"
+      }
+    }
+  ]
+}

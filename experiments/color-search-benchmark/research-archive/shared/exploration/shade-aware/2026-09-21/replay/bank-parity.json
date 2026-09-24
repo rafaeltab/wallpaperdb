@@ -1,0 +1,148 @@
+{
+  "groups": [
+    {
+      "method": "cutoff-all-levels",
+      "blend": 0,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-all-levels",
+      "blend": 0,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-all-levels",
+      "blend": 3,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-all-levels",
+      "blend": 3,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-all-levels",
+      "blend": 6,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-all-levels",
+      "blend": 6,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 0,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 0,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 3,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 3,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 6,
+      "influence": 1,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "method": "cutoff-shade-all-levels",
+      "blend": 6,
+      "influence": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    }
+  ]
+}

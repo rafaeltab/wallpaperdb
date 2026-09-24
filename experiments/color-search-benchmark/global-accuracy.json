@@ -1,0 +1,1100 @@
+{
+  "generatedAt": "2026-09-16T15:05:44.842Z",
+  "dataCacheKey": "9954417388273b84089a5158df4864a952d96a3ac53eec1fe65b074a2e794073",
+  "cacheKey": "254220286ad083581f015babca9e00efee4f750f5581f23bb0f7cecb5219b413",
+  "sourceHashes": {
+    "global-accuracy.ts": "acddc1281a9e0e700f0e8e9468683f70eef2b834fb174771eec2cf23a973fdfe",
+    "global-pixels.mjs": "a06f3352339281d6cb182d0cb5aa0a8026e4e30a8a9103658a82b7840a662802",
+    "global-native.mjs": "aee4fb817d3d92a6b51423345c5c73ab6a8be43a4a403ef3eb45956898e594d2",
+    "global-joint.mjs": "867ea19121010e412fc6e096bcfaee0e88e0373e80c2d37a3b42977f1bbf336d",
+    "ranges.mjs": "96590a8416dd8c6627ff44e73d5dac2f39c48a00cd3447615b8ab763468fa776"
+  },
+  "corpus": {
+    "wallpapers": 100,
+    "families": 18,
+    "smallerLongestSide": 256,
+    "denserLongestSide": 1024,
+    "originalsChecksumVerified": 100,
+    "denseRecomputed": 100
+  },
+  "predicateChecks": [
+    {
+      "family": "dark",
+      "checked": 4456,
+      "mismatches": 2
+    },
+    {
+      "family": "dark_gray",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "grayscale",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "black",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "gray",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "white",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "red",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "orange",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "yellow",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "green",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "teal",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "cyan",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "blue",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "navy",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "purple",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "pink",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "brown",
+      "checked": 4456,
+      "mismatches": 0
+    },
+    {
+      "family": "cream",
+      "checked": 4456,
+      "mismatches": 0
+    }
+  ],
+  "predicateMismatches": [
+    {
+      "rgb": [
+        0.25,
+        0.2500001,
+        0.25
+      ],
+      "family": "dark",
+      "actual": true,
+      "expected": false,
+      "distanceOutside": 2.875570976809943e-18,
+      "target": {
+        "color": "#000000",
+        "amount": 1,
+        "ranges": [
+          {
+            "space": "hsv",
+            "h": 1,
+            "s": 1,
+            "v": 0.25
+          }
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hsl": {
+          "h": null,
+          "s": 0,
+          "l": 0
+        },
+        "hsv": {
+          "h": null,
+          "s": 0,
+          "v": 0
+        },
+        "lab": [
+          0,
+          0,
+          0
+        ]
+      },
+      "point": {
+        "rgb": [
+          0.25,
+          0.2500001,
+          0.25
+        ],
+        "hsl": {
+          "h": null,
+          "s": 0,
+          "l": 0.25000005000000003
+        },
+        "hsv": {
+          "h": null,
+          "s": 0,
+          "v": 0.2500001
+        },
+        "lab": [
+          0.3705424555369473,
+          -4.519667265445726e-8,
+          4.480653376104371e-8
+        ]
+      }
+    },
+    {
+      "rgb": [
+        0.2500001,
+        0.25,
+        0.25
+      ],
+      "family": "dark",
+      "actual": true,
+      "expected": false,
+      "distanceOutside": 2.875570976809943e-18,
+      "target": {
+        "color": "#000000",
+        "amount": 1,
+        "ranges": [
+          {
+            "space": "hsv",
+            "h": 1,
+            "s": 1,
+            "v": 0.25
+          }
+        ],
+        "rgb": [
+          0,
+          0,
+          0
+        ],
+        "hsl": {
+          "h": null,
+          "s": 0,
+          "l": 0
+        },
+        "hsv": {
+          "h": null,
+          "s": 0,
+          "v": 0
+        },
+        "lab": [
+          0,
+          0,
+          0
+        ]
+      },
+      "point": {
+        "rgb": [
+          0.2500001,
+          0.25,
+          0.25
+        ],
+        "hsl": {
+          "h": null,
+          "s": 0,
+          "l": 0.25000005000000003
+        },
+        "hsv": {
+          "h": null,
+          "s": 0,
+          "v": 0.2500001
+        },
+        "lab": [
+          0.3705424169153034,
+          3.3127068366223256e-8,
+          2.4030488487980506e-8
+        ]
+      }
+    }
+  ],
+  "predicateComparisons": 80208,
+  "familyErrors": [
+    {
+      "family": "dark",
+      "meanAbsoluteError": 0.009211949789070464,
+      "p95AbsoluteError": 0.033626980251736105,
+      "maxAbsoluteError": 0.0709131993931934,
+      "signedBias256Minus1024": -0.007116359488525652,
+      "worst": {
+        "id": "wallpaper-048",
+        "sampled256": 0.09657628676470588,
+        "sampled1024": 0.02566308737151248
+      }
+    },
+    {
+      "family": "dark_gray",
+      "meanAbsoluteError": 0.0018877148536358148,
+      "p95AbsoluteError": 0.010710710408066731,
+      "maxAbsoluteError": 0.04257371690538203,
+      "signedBias256Minus1024": -0.0017881132086771012,
+      "worst": {
+        "id": "wallpaper-005",
+        "sampled256": 0.9315592447916666,
+        "sampled1024": 0.9741329616970487
+      }
+    },
+    {
+      "family": "grayscale",
+      "meanAbsoluteError": 0.002663450034305287,
+      "p95AbsoluteError": 0.01240416140854403,
+      "maxAbsoluteError": 0.031397501627604164,
+      "signedBias256Minus1024": 0.00013808718499017626,
+      "worst": {
+        "id": "wallpaper-004",
+        "sampled256": 0.027642144097222224,
+        "sampled1024": 0.05903964572482639
+      }
+    },
+    {
+      "family": "black",
+      "meanAbsoluteError": 0.003978958075829303,
+      "p95AbsoluteError": 0.018475512632392332,
+      "maxAbsoluteError": 0.048914591471354185,
+      "signedBias256Minus1024": -0.0027098210613179774,
+      "worst": {
+        "id": "wallpaper-085",
+        "sampled256": 0.1208767361111111,
+        "sampled1024": 0.1697913275824653
+      }
+    },
+    {
+      "family": "gray",
+      "meanAbsoluteError": 0.008844539538260605,
+      "p95AbsoluteError": 0.03589884440104163,
+      "maxAbsoluteError": 0.09406751336898389,
+      "signedBias256Minus1024": 0.00801137080109541,
+      "worst": {
+        "id": "wallpaper-097",
+        "sampled256": 0.766015625,
+        "sampled1024": 0.6719481116310161
+      }
+    },
+    {
+      "family": "white",
+      "meanAbsoluteError": 0.0022457461437695747,
+      "p95AbsoluteError": 0.009911397743611522,
+      "maxAbsoluteError": 0.028454250759548605,
+      "signedBias256Minus1024": -0.0016175153993141195,
+      "worst": {
+        "id": "wallpaper-004",
+        "sampled256": 0.0712619357638889,
+        "sampled1024": 0.0997161865234375
+      }
+    },
+    {
+      "family": "red",
+      "meanAbsoluteError": 0.0038759339434699613,
+      "p95AbsoluteError": 0.01676432291666663,
+      "maxAbsoluteError": 0.03492228190104166,
+      "signedBias256Minus1024": -0.0005516062665392492,
+      "worst": {
+        "id": "wallpaper-019",
+        "sampled256": 0.1841091579861111,
+        "sampled1024": 0.14918687608506945
+      }
+    },
+    {
+      "family": "orange",
+      "meanAbsoluteError": 0.0031853406783167565,
+      "p95AbsoluteError": 0.013968186301384591,
+      "maxAbsoluteError": 0.03470450896736177,
+      "signedBias256Minus1024": -0.0014162178538314268,
+      "worst": {
+        "id": "wallpaper-092",
+        "sampled256": 0.2521306818181818,
+        "sampled1024": 0.2868351907855436
+      }
+    },
+    {
+      "family": "yellow",
+      "meanAbsoluteError": 0.0019892563331340225,
+      "p95AbsoluteError": 0.009992513798451008,
+      "maxAbsoluteError": 0.01874520705521472,
+      "signedBias256Minus1024": -0.000977890907617047,
+      "worst": {
+        "id": "wallpaper-093",
+        "sampled256": 0.0341796875,
+        "sampled1024": 0.05292489455521472
+      }
+    },
+    {
+      "family": "green",
+      "meanAbsoluteError": 0.00445433310948238,
+      "p95AbsoluteError": 0.02265443063222357,
+      "maxAbsoluteError": 0.05236206054687499,
+      "signedBias256Minus1024": -0.0015983708836500104,
+      "worst": {
+        "id": "wallpaper-062",
+        "sampled256": 0.0924560546875,
+        "sampled1024": 0.144818115234375
+      }
+    },
+    {
+      "family": "teal",
+      "meanAbsoluteError": 0.0058255094909151,
+      "p95AbsoluteError": 0.035925971137152776,
+      "maxAbsoluteError": 0.06463351560024999,
+      "signedBias256Minus1024": -0.004132481443503071,
+      "worst": {
+        "id": "wallpaper-011",
+        "sampled256": 0.8240588450292398,
+        "sampled1024": 0.7594253294289898
+      }
+    },
+    {
+      "family": "cyan",
+      "meanAbsoluteError": 0.005696373152345251,
+      "p95AbsoluteError": 0.02659437391493058,
+      "maxAbsoluteError": 0.08009995741331721,
+      "signedBias256Minus1024": 0.0021788937390323907,
+      "worst": {
+        "id": "wallpaper-016",
+        "sampled256": 0.40197610294117647,
+        "sampled1024": 0.32187614552785926
+      }
+    },
+    {
+      "family": "blue",
+      "meanAbsoluteError": 0.005327113499900759,
+      "p95AbsoluteError": 0.02689446343315971,
+      "maxAbsoluteError": 0.07208865779174578,
+      "signedBias256Minus1024": 0.00043078051857573153,
+      "worst": {
+        "id": "wallpaper-016",
+        "sampled256": 0.7428768382352942,
+        "sampled1024": 0.6707881804435484
+      }
+    },
+    {
+      "family": "navy",
+      "meanAbsoluteError": 0.005587576311542843,
+      "p95AbsoluteError": 0.02502080161635145,
+      "maxAbsoluteError": 0.07428826226128471,
+      "signedBias256Minus1024": -0.002013320117921726,
+      "worst": {
+        "id": "wallpaper-004",
+        "sampled256": 0.3254123263888889,
+        "sampled1024": 0.3997005886501736
+      }
+    },
+    {
+      "family": "purple",
+      "meanAbsoluteError": 0.0006201015120887142,
+      "p95AbsoluteError": 0.0031636555989583703,
+      "maxAbsoluteError": 0.00953335232204866,
+      "signedBias256Minus1024": -0.00006626486661504058,
+      "worst": {
+        "id": "wallpaper-036",
+        "sampled256": 0.6918402777777778,
+        "sampled1024": 0.6823069254557291
+      }
+    },
+    {
+      "family": "pink",
+      "meanAbsoluteError": 0.001179876379276369,
+      "p95AbsoluteError": 0.0038774278428819753,
+      "maxAbsoluteError": 0.02996826171875,
+      "signedBias256Minus1024": -0.0008241925820134734,
+      "worst": {
+        "id": "wallpaper-003",
+        "sampled256": 0.4572211371527778,
+        "sampled1024": 0.4871893988715278
+      }
+    },
+    {
+      "family": "brown",
+      "meanAbsoluteError": 0.006308412706247821,
+      "p95AbsoluteError": 0.02884954420364637,
+      "maxAbsoluteError": 0.05713072893443488,
+      "signedBias256Minus1024": 0.005899233771025684,
+      "worst": {
+        "id": "wallpaper-092",
+        "sampled256": 0.47174043062200954,
+        "sampled1024": 0.41460970168757466
+      }
+    },
+    {
+      "family": "cream",
+      "meanAbsoluteError": 0.001915579281310652,
+      "p95AbsoluteError": 0.008146497938368054,
+      "maxAbsoluteError": 0.041984070553083175,
+      "signedBias256Minus1024": -0.0016205046247337312,
+      "worst": {
+        "id": "wallpaper-092",
+        "sampled256": 0.10640325956937799,
+        "sampled1024": 0.14838733012246116
+      }
+    }
+  ],
+  "queries": [
+    {
+      "id": "green40",
+      "colors": [
+        {
+          "family": "green",
+          "amount": 0.4
+        }
+      ],
+      "top10Shared": 9,
+      "top10SamePositions": 2,
+      "meanTop10RankDisplacement": 1.2,
+      "denseMeanErrorOfCoarseTop10": 0.07157618340482026,
+      "denseMeanErrorOfDenseTop10": 0.06949960452977591,
+      "top10MeanSelectionRegret": 0.002076578875044352,
+      "top1Regret": 0,
+      "coarseTop10": [
+        {
+          "id": "wallpaper-052",
+          "error256": 0.004839409722222188,
+          "error1024": 0.010079956054687478,
+          "rank1024": 1
+        },
+        {
+          "id": "wallpaper-029",
+          "error256": 0.047619912790697716,
+          "error1024": 0.053123299165457216,
+          "rank1024": 3
+        },
+        {
+          "id": "wallpaper-086",
+          "error256": 0.04803059895833334,
+          "error1024": 0.06586981879340281,
+          "rank1024": 4
+        },
+        {
+          "id": "wallpaper-024",
+          "error256": 0.05144856770833334,
+          "error1024": 0.03860066731770834,
+          "rank1024": 2
+        },
+        {
+          "id": "wallpaper-098",
+          "error256": 0.06681305473372784,
+          "error1024": 0.07259047267355984,
+          "rank1024": 6
+        },
+        {
+          "id": "wallpaper-031",
+          "error256": 0.06886393229166671,
+          "error1024": 0.06751098632812502,
+          "rank1024": 5
+        },
+        {
+          "id": "wallpaper-045",
+          "error256": 0.08204049556213017,
+          "error1024": 0.09135353290929199,
+          "rank1024": 8
+        },
+        {
+          "id": "wallpaper-081",
+          "error256": 0.08255750868055556,
+          "error1024": 0.1237596299913194,
+          "rank1024": 11
+        },
+        {
+          "id": "wallpaper-017",
+          "error256": 0.08652343750000002,
+          "error1024": 0.08328857421875002,
+          "rank1024": 7
+        },
+        {
+          "id": "wallpaper-083",
+          "error256": 0.09606633771929829,
+          "error1024": 0.10958489659590048,
+          "rank1024": 10
+        }
+      ],
+      "denseTop10": [
+        {
+          "id": "wallpaper-052",
+          "error1024": 0.010079956054687478
+        },
+        {
+          "id": "wallpaper-024",
+          "error1024": 0.03860066731770834
+        },
+        {
+          "id": "wallpaper-029",
+          "error1024": 0.053123299165457216
+        },
+        {
+          "id": "wallpaper-086",
+          "error1024": 0.06586981879340281
+        },
+        {
+          "id": "wallpaper-031",
+          "error1024": 0.06751098632812502
+        },
+        {
+          "id": "wallpaper-098",
+          "error1024": 0.07259047267355984
+        },
+        {
+          "id": "wallpaper-017",
+          "error1024": 0.08328857421875002
+        },
+        {
+          "id": "wallpaper-045",
+          "error1024": 0.09135353290929199
+        },
+        {
+          "id": "wallpaper-025",
+          "error1024": 0.10299384124087585
+        },
+        {
+          "id": "wallpaper-083",
+          "error1024": 0.10958489659590048
+        }
+      ]
+    },
+    {
+      "id": "red70-dark30",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.7
+        },
+        {
+          "family": "dark",
+          "amount": 0.3
+        }
+      ],
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanTop10RankDisplacement": 0,
+      "denseMeanErrorOfCoarseTop10": 0.28001735493426555,
+      "denseMeanErrorOfDenseTop10": 0.28001735493426555,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "coarseTop10": [
+        {
+          "id": "wallpaper-077",
+          "error256": 0.18476334064327493,
+          "error1024": 0.18513852031478772,
+          "rank1024": 1
+        },
+        {
+          "id": "wallpaper-037",
+          "error256": 0.19152018229166667,
+          "error1024": 0.19198472764756946,
+          "rank1024": 2
+        },
+        {
+          "id": "wallpaper-100",
+          "error256": 0.20456271701388895,
+          "error1024": 0.21066114637586808,
+          "rank1024": 3
+        },
+        {
+          "id": "wallpaper-046",
+          "error256": 0.2580023871527778,
+          "error1024": 0.25743442111545134,
+          "rank1024": 4
+        },
+        {
+          "id": "wallpaper-092",
+          "error256": 0.2798856160287081,
+          "error1024": 0.2684683486409797,
+          "rank1024": 5
+        },
+        {
+          "id": "wallpaper-044",
+          "error256": 0.2809163411458334,
+          "error1024": 0.2799969991048178,
+          "rank1024": 6
+        },
+        {
+          "id": "wallpaper-087",
+          "error256": 0.3027457967836258,
+          "error1024": 0.3035207723279648,
+          "rank1024": 7
+        },
+        {
+          "id": "wallpaper-095",
+          "error256": 0.35019415680473376,
+          "error1024": 0.3539833926590237,
+          "rank1024": 8
+        },
+        {
+          "id": "wallpaper-082",
+          "error256": 0.35752923976608186,
+          "error1024": 0.36154030929721814,
+          "rank1024": 9
+        },
+        {
+          "id": "wallpaper-027",
+          "error256": 0.3771190068493151,
+          "error1024": 0.38744491185897445,
+          "rank1024": 10
+        }
+      ],
+      "denseTop10": [
+        {
+          "id": "wallpaper-077",
+          "error1024": 0.18513852031478772
+        },
+        {
+          "id": "wallpaper-037",
+          "error1024": 0.19198472764756946
+        },
+        {
+          "id": "wallpaper-100",
+          "error1024": 0.21066114637586808
+        },
+        {
+          "id": "wallpaper-046",
+          "error1024": 0.25743442111545134
+        },
+        {
+          "id": "wallpaper-092",
+          "error1024": 0.2684683486409797
+        },
+        {
+          "id": "wallpaper-044",
+          "error1024": 0.2799969991048178
+        },
+        {
+          "id": "wallpaper-087",
+          "error1024": 0.3035207723279648
+        },
+        {
+          "id": "wallpaper-095",
+          "error1024": 0.3539833926590237
+        },
+        {
+          "id": "wallpaper-082",
+          "error1024": 0.36154030929721814
+        },
+        {
+          "id": "wallpaper-027",
+          "error1024": 0.38744491185897445
+        }
+      ]
+    },
+    {
+      "id": "red50-green50",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.5
+        },
+        {
+          "family": "green",
+          "amount": 0.5
+        }
+      ],
+      "top10Shared": 9,
+      "top10SamePositions": 3,
+      "meanTop10RankDisplacement": 0.9,
+      "denseMeanErrorOfCoarseTop10": 0.4334008335907854,
+      "denseMeanErrorOfDenseTop10": 0.4325330615375472,
+      "top10MeanSelectionRegret": 0.0008677720532381805,
+      "top1Regret": 0,
+      "coarseTop10": [
+        {
+          "id": "wallpaper-025",
+          "error256": 0.2921133667883211,
+          "error1024": 0.30004348197992703,
+          "rank1024": 1
+        },
+        {
+          "id": "wallpaper-058",
+          "error256": 0.3443739149305556,
+          "error1024": 0.34550815158420134,
+          "rank1024": 2
+        },
+        {
+          "id": "wallpaper-012",
+          "error256": 0.3938648897058823,
+          "error1024": 0.3948505658907625,
+          "rank1024": 4
+        },
+        {
+          "id": "wallpaper-090",
+          "error256": 0.39523940058479534,
+          "error1024": 0.38680453879941434,
+          "rank1024": 3
+        },
+        {
+          "id": "wallpaper-031",
+          "error256": 0.46994357638888884,
+          "error1024": 0.46825832790798616,
+          "rank1024": 6
+        },
+        {
+          "id": "wallpaper-081",
+          "error256": 0.4823133680555556,
+          "error1024": 0.4507819281684028,
+          "rank1024": 5
+        },
+        {
+          "id": "wallpaper-003",
+          "error256": 0.49460177951388884,
+          "error1024": 0.4902191162109375,
+          "rank1024": 7
+        },
+        {
+          "id": "wallpaper-046",
+          "error256": 0.49959309895833337,
+          "error1024": 0.4991777208116319,
+          "rank1024": 10
+        },
+        {
+          "id": "wallpaper-050",
+          "error256": 0.49961165935672514,
+          "error1024": 0.4996682833089312,
+          "rank1024": 11
+        },
+        {
+          "id": "wallpaper-100",
+          "error256": 0.499755859375,
+          "error1024": 0.4986962212456597,
+          "rank1024": 9
+        }
+      ],
+      "denseTop10": [
+        {
+          "id": "wallpaper-025",
+          "error1024": 0.30004348197992703
+        },
+        {
+          "id": "wallpaper-058",
+          "error1024": 0.34550815158420134
+        },
+        {
+          "id": "wallpaper-090",
+          "error1024": 0.38680453879941434
+        },
+        {
+          "id": "wallpaper-012",
+          "error1024": 0.3948505658907625
+        },
+        {
+          "id": "wallpaper-081",
+          "error1024": 0.4507819281684028
+        },
+        {
+          "id": "wallpaper-031",
+          "error1024": 0.46825832790798616
+        },
+        {
+          "id": "wallpaper-003",
+          "error1024": 0.4902191162109375
+        },
+        {
+          "id": "wallpaper-045",
+          "error1024": 0.49099056277654873
+        },
+        {
+          "id": "wallpaper-100",
+          "error1024": 0.4986962212456597
+        },
+        {
+          "id": "wallpaper-046",
+          "error1024": 0.4991777208116319
+        }
+      ]
+    },
+    {
+      "id": "dark90",
+      "colors": [
+        {
+          "family": "dark",
+          "amount": 0.9
+        }
+      ],
+      "top10Shared": 10,
+      "top10SamePositions": 8,
+      "meanTop10RankDisplacement": 0.2,
+      "denseMeanErrorOfCoarseTop10": 0.03551313850190505,
+      "denseMeanErrorOfDenseTop10": 0.03551313850190505,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "coarseTop10": [
+        {
+          "id": "wallpaper-065",
+          "error256": 0.0029788011695907057,
+          "error1024": 0.000748936218887275,
+          "rank1024": 1
+        },
+        {
+          "id": "wallpaper-023",
+          "error256": 0.003325737847222232,
+          "error1024": 0.004053073459201362,
+          "rank1024": 2
+        },
+        {
+          "id": "wallpaper-011",
+          "error256": 0.004120979532163727,
+          "error1024": 0.011511141105417289,
+          "rank1024": 3
+        },
+        {
+          "id": "wallpaper-007",
+          "error256": 0.012489149305555558,
+          "error1024": 0.013196139865451317,
+          "rank1024": 4
+        },
+        {
+          "id": "wallpaper-067",
+          "error256": 0.014035373263888817,
+          "error1024": 0.014545694986979107,
+          "rank1024": 5
+        },
+        {
+          "id": "wallpaper-079",
+          "error256": 0.027766927083333393,
+          "error1024": 0.03139851888020839,
+          "rank1024": 6
+        },
+        {
+          "id": "wallpaper-001",
+          "error256": 0.039754011824324365,
+          "error1024": 0.03641079521500845,
+          "rank1024": 7
+        },
+        {
+          "id": "wallpaper-005",
+          "error256": 0.07460937499999998,
+          "error1024": 0.07959560818142364,
+          "rank1024": 9
+        },
+        {
+          "id": "wallpaper-063",
+          "error256": 0.08548909023668638,
+          "error1024": 0.07712942477876106,
+          "rank1024": 8
+        },
+        {
+          "id": "wallpaper-022",
+          "error256": 0.10847886029411768,
+          "error1024": 0.08654205232771262,
+          "rank1024": 10
+        }
+      ],
+      "denseTop10": [
+        {
+          "id": "wallpaper-065",
+          "error1024": 0.000748936218887275
+        },
+        {
+          "id": "wallpaper-023",
+          "error1024": 0.004053073459201362
+        },
+        {
+          "id": "wallpaper-011",
+          "error1024": 0.011511141105417289
+        },
+        {
+          "id": "wallpaper-007",
+          "error1024": 0.013196139865451317
+        },
+        {
+          "id": "wallpaper-067",
+          "error1024": 0.014545694986979107
+        },
+        {
+          "id": "wallpaper-079",
+          "error1024": 0.03139851888020839
+        },
+        {
+          "id": "wallpaper-001",
+          "error1024": 0.03641079521500845
+        },
+        {
+          "id": "wallpaper-063",
+          "error1024": 0.07712942477876106
+        },
+        {
+          "id": "wallpaper-005",
+          "error1024": 0.07959560818142364
+        },
+        {
+          "id": "wallpaper-022",
+          "error1024": 0.08654205232771262
+        }
+      ]
+    },
+    {
+      "id": "grayscale40",
+      "colors": [
+        {
+          "family": "grayscale",
+          "amount": 0.4
+        }
+      ],
+      "top10Shared": 10,
+      "top10SamePositions": 5,
+      "meanTop10RankDisplacement": 0.8,
+      "denseMeanErrorOfCoarseTop10": 0.18707208800789576,
+      "denseMeanErrorOfDenseTop10": 0.18707208800789576,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "coarseTop10": [
+        {
+          "id": "wallpaper-088",
+          "error256": 0.023621323529411764,
+          "error1024": 0.006031272843567248,
+          "rank1024": 1
+        },
+        {
+          "id": "wallpaper-007",
+          "error256": 0.026112196180555602,
+          "error1024": 0.0356489393446181,
+          "rank1024": 2
+        },
+        {
+          "id": "wallpaper-062",
+          "error256": 0.125732421875,
+          "error1024": 0.1569091796875,
+          "rank1024": 6
+        },
+        {
+          "id": "wallpaper-085",
+          "error256": 0.1357855902777778,
+          "error1024": 0.1472144232855903,
+          "rank1024": 4
+        },
+        {
+          "id": "wallpaper-070",
+          "error256": 0.13990216121495325,
+          "error1024": 0.13376083551864804,
+          "rank1024": 3
+        },
+        {
+          "id": "wallpaper-064",
+          "error256": 0.14766710069444444,
+          "error1024": 0.15525218588082904,
+          "rank1024": 5
+        },
+        {
+          "id": "wallpaper-091",
+          "error256": 0.24247116815476194,
+          "error1024": 0.23917572885618482,
+          "rank1024": 7
+        },
+        {
+          "id": "wallpaper-043",
+          "error256": 0.33064692982456145,
+          "error1024": 0.32949618512426904,
+          "rank1024": 8
+        },
+        {
+          "id": "wallpaper-021",
+          "error256": 0.3371345029239766,
+          "error1024": 0.33757006085285507,
+          "rank1024": 10
+        },
+        {
+          "id": "wallpaper-057",
+          "error256": 0.3377712673611111,
+          "error1024": 0.32966206868489584,
+          "rank1024": 9
+        }
+      ],
+      "denseTop10": [
+        {
+          "id": "wallpaper-088",
+          "error1024": 0.006031272843567248
+        },
+        {
+          "id": "wallpaper-007",
+          "error1024": 0.0356489393446181
+        },
+        {
+          "id": "wallpaper-070",
+          "error1024": 0.13376083551864804
+        },
+        {
+          "id": "wallpaper-085",
+          "error1024": 0.1472144232855903
+        },
+        {
+          "id": "wallpaper-064",
+          "error1024": 0.15525218588082904
+        },
+        {
+          "id": "wallpaper-062",
+          "error1024": 0.1569091796875
+        },
+        {
+          "id": "wallpaper-091",
+          "error1024": 0.23917572885618482
+        },
+        {
+          "id": "wallpaper-043",
+          "error1024": 0.32949618512426904
+        },
+        {
+          "id": "wallpaper-057",
+          "error1024": 0.32966206868489584
+        },
+        {
+          "id": "wallpaper-021",
+          "error1024": 0.33757006085285507
+        }
+      ]
+    }
+  ],
+  "grayscale088": {
+    "id": "wallpaper-088",
+    "definition": {
+      "id": "grayscale",
+      "label": "Grayscale, strict neutral",
+      "color": "#000000",
+      "ranges": [
+        {
+          "space": "hsl",
+          "h": 1,
+          "s": 0.02,
+          "l": 1
+        }
+      ]
+    },
+    "palette32Coverage": 0,
+    "sampled256Coverage": 0.37637867647058826,
+    "sampled1024Coverage": 0.3939687271564328,
+    "absoluteSamplingDifference": 0.017590050685844516
+  },
+  "notes": [
+    "Sampling convergence, not human relevance accuracy or full-resolution ground truth.",
+    "Both resolutions use the same region definitions and measureFamilies implementation; separate predicate checks compare two implementations while sharing coordinate conversion.",
+    "Resize interpolation changes boundary colors as well as sampling density.",
+    "Joint rankings use native float32 score order with ID ties; regret is measured in denser-sample double area error.",
+    "Raw dense descriptors are regenerable ignored output artifacts; the tracked report contains aggregate/error/ranking evidence."
+  ]
+}

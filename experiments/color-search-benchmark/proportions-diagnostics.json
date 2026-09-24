@@ -1,0 +1,3379 @@
+{
+  "generatedAt": "2026-09-16T13:35:53.287Z",
+  "cases": [
+    {
+      "name": "green fraction sweep",
+      "rows": [
+        {
+          "green": 0,
+          "cost": 0.4000000004627114
+        },
+        {
+          "green": 0.2,
+          "cost": 0.20000000092542267
+        },
+        {
+          "green": 0.4,
+          "cost": 1.3881340840454995e-9
+        },
+        {
+          "green": 0.8,
+          "cost": 0.4000000004627114
+        },
+        {
+          "green": 1,
+          "cost": 0.6
+        }
+      ]
+    },
+    {
+      "name": "40% green prefers the requested fraction over 0%, 20%, 80% and 100%",
+      "passed": true
+    },
+    {
+      "name": "40% green with different sufficiently distant remainder colors ties closely",
+      "passed": true
+    },
+    {
+      "name": "Minimum mode allows extra green, exact mode penalizes it",
+      "passed": true
+    },
+    {
+      "name": "50% green + 50% red beats 80/20, reversed ratio and missing red",
+      "passed": true
+    },
+    {
+      "name": "80% red + 20% black distinguishes 20/80 and 50/50",
+      "passed": true
+    },
+    {
+      "name": "Five colors at 20% each beats unequal and absent components",
+      "passed": true
+    },
+    {
+      "name": "Duplicate target colors merge; partial fractions are never normalized to 100%",
+      "passed": true
+    },
+    {
+      "name": "Overflow, missing colors and invalid amounts are rejected",
+      "passed": true
+    },
+    {
+      "name": "Palette and request order do not change transport cost",
+      "passed": true
+    },
+    {
+      "name": "Residual rerouting finds the optimum where greedy assignment fails",
+      "passed": true
+    },
+    {
+      "name": "Source mass cannot be counted toward multiple requested colors",
+      "passed": true
+    },
+    {
+      "name": "Single fully specified color reduces to mean color affinity",
+      "passed": true
+    }
+  ],
+  "queries": [
+    {
+      "id": "green40",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 0.4
+        }
+      ]
+    },
+    {
+      "id": "green-red50",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 0.5
+        },
+        {
+          "color": "#E03030",
+          "amount": 0.5
+        }
+      ]
+    },
+    {
+      "id": "red-black80",
+      "colors": [
+        {
+          "color": "#E03030",
+          "amount": 0.8
+        },
+        {
+          "color": "#101010",
+          "amount": 0.2
+        }
+      ]
+    },
+    {
+      "id": "rainbow20",
+      "colors": [
+        {
+          "color": "#E03030",
+          "amount": 0.2
+        },
+        {
+          "color": "#F08020",
+          "amount": 0.2
+        },
+        {
+          "color": "#F0D030",
+          "amount": 0.2
+        },
+        {
+          "color": "#008040",
+          "amount": 0.2
+        },
+        {
+          "color": "#2060D0",
+          "amount": 0.2
+        }
+      ]
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "green40-black60",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 0.4
+        },
+        {
+          "color": "#101010",
+          "amount": 0.6
+        }
+      ]
+    },
+    {
+      "id": "green80-black20",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 0.8
+        },
+        {
+          "color": "#101010",
+          "amount": 0.2
+        }
+      ]
+    },
+    {
+      "id": "green100",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "green50-red50",
+      "colors": [
+        {
+          "color": "#008040",
+          "amount": 0.5
+        },
+        {
+          "color": "#E03030",
+          "amount": 0.5
+        }
+      ]
+    },
+    {
+      "id": "red80-black20",
+      "colors": [
+        {
+          "color": "#E03030",
+          "amount": 0.8
+        },
+        {
+          "color": "#101010",
+          "amount": 0.2
+        }
+      ]
+    },
+    {
+      "id": "red20-black80",
+      "colors": [
+        {
+          "color": "#E03030",
+          "amount": 0.2
+        },
+        {
+          "color": "#101010",
+          "amount": 0.8
+        }
+      ]
+    },
+    {
+      "id": "rainbow20",
+      "colors": [
+        {
+          "color": "#E03030",
+          "amount": 0.2
+        },
+        {
+          "color": "#F08020",
+          "amount": 0.2
+        },
+        {
+          "color": "#F0D030",
+          "amount": 0.2
+        },
+        {
+          "color": "#008040",
+          "amount": 0.2
+        },
+        {
+          "color": "#2060D0",
+          "amount": 0.2
+        }
+      ]
+    }
+  ],
+  "rankings": {
+    "green40": {
+      "legacy": [
+        {
+          "id": "green100",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            1
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.19999999953728864,
+          "score": 0.8000000004627114,
+          "observed": [
+            0.8000000004627114
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.49999964627208304,
+          "score": 0.500000353727917,
+          "observed": [
+            0.500000353727917
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.5999999986118658,
+          "score": 0.4000000013881342,
+          "observed": [
+            0.40000000138813413
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.7999863610203982,
+          "score": 0.20001363897960178,
+          "observed": [
+            0.20001363897960178
+          ],
+          "other": 0.7999863610203982,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.9999994335726216,
+          "score": 5.664273784455887e-7,
+          "observed": [
+            5.664273784242649e-7
+          ],
+          "other": 0.9999994335726217,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.9999998566579877,
+          "score": 1.4334201225985055e-7,
+          "observed": [
+            1.4334201221112313e-7
+          ],
+          "other": 0.9999998566579879,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        }
+      ],
+      "coverage": [
+        {
+          "id": "green40-black60",
+          "cost": 1.3881340799049013e-9,
+          "score": 0.999999998611866,
+          "observed": [
+            0.40000000138813413
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.10000035372791691,
+          "score": 0.8999996462720831,
+          "observed": [
+            0.500000353727917
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.19998636102039824,
+          "score": 0.8000136389796018,
+          "observed": [
+            0.20001363897960178
+          ],
+          "other": 0.7999863610203982,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.39999943357262163,
+          "score": 0.6000005664273784,
+          "observed": [
+            5.664273784242649e-7
+          ],
+          "other": 0.9999994335726217,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.3999998566579879,
+          "score": 0.6000001433420121,
+          "observed": [
+            1.4334201221112313e-7
+          ],
+          "other": 0.9999998566579879,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.40000000046271134,
+          "score": 0.5999999995372887,
+          "observed": [
+            0.8000000004627114
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.6,
+          "score": 0.4,
+          "observed": [
+            1
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        }
+      ],
+      "transport": [
+        {
+          "id": "green40-black60",
+          "cost": 1.3881340840454995e-9,
+          "score": 0.999999998611866,
+          "observed": [
+            0.40000000138813413
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0.4
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.4,
+              0
+            ],
+            [
+              0,
+              0.6
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.1000003537279169,
+          "score": 0.8999996462720831,
+          "observed": [
+            0.500000353727917
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0.4
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.4,
+              0.09999999999999998
+            ],
+            [
+              0,
+              0.5
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.19998848129405644,
+          "score": 0.8000115187059436,
+          "observed": [
+            0.20001363897960178
+          ],
+          "other": 0.7999863610203982,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0.20001257884277265
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0,
+              0.2
+            ],
+            [
+              0,
+              0.19999999999999996
+            ],
+            [
+              0,
+              0.2
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              0.19999999999999996,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.3999998594342559,
+          "score": 0.600000140565744,
+          "observed": [
+            1.4334201221112313e-7
+          ],
+          "other": 0.9999998566579879,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            1.419538781270776e-7
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.2,
+              0
+            ],
+            [
+              0.19999999999999996,
+              0.6
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.4000000004627113,
+          "score": 0.5999999995372887,
+          "observed": [
+            0.8000000004627114
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0.4
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.4,
+              0.3999999999999999
+            ],
+            [
+              0,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.4000000004627114,
+          "score": 0.5999999995372887,
+          "observed": [
+            5.664273784242649e-7
+          ],
+          "other": 0.9999994335726217,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            2.829823335314582e-7
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.4,
+              0.39999999999999997
+            ],
+            [
+              0,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.6,
+          "score": 0.4,
+          "observed": [
+            1
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.4
+            }
+          ],
+          "matched": [
+            0.4
+          ],
+          "requested": 0.4,
+          "remainder": 0.6,
+          "plan": [
+            [
+              0.4,
+              0.6
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        }
+      ]
+    },
+    "green-red50": {
+      "legacy": [
+        {
+          "id": "green50-red50",
+          "cost": 0.49999964627208304,
+          "score": 0.500000353727917,
+          "observed": [
+            0.5,
+            0.5
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.7966682095937496,
+          "score": 0.20333179040625038,
+          "observed": [
+            0.20001257884277265,
+            0.2067048444880774
+          ],
+          "other": 0.59328257666915,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.9991588960624105,
+          "score": 0.0008411039375895157,
+          "observed": [
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.9993268418441856,
+          "score": 0.0006731581558143684,
+          "observed": [
+            4.6271136134849983e-10,
+            0.8
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.9993271168434953,
+          "score": 0.0006728831565047111,
+          "observed": [
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.9996635584056649,
+          "score": 0.0003364415943351018,
+          "observed": [
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.9998306825394644,
+          "score": 0.0001693174605356118,
+          "observed": [
+            1.8508454453939993e-9,
+            0.2
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        }
+      ],
+      "coverage": [
+        {
+          "id": "green50-red50",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.5,
+            0.5
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.49999999953728863,
+          "score": 0.5000000004627114,
+          "observed": [
+            4.6271136134849983e-10,
+            0.8
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.5,
+          "score": 0.5,
+          "observed": [
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.5,
+          "score": 0.5,
+          "observed": [
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.5932825766691499,
+          "score": 0.40671742333085015,
+          "observed": [
+            0.20001257884277265,
+            0.2067048444880774
+          ],
+          "other": 0.59328257666915,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.5999999986118658,
+          "score": 0.4000000013881342,
+          "observed": [
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.7999999981491546,
+          "score": 0.20000000185084543,
+          "observed": [
+            1.8508454453939993e-9,
+            0.2
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        }
+      ],
+      "transport": [
+        {
+          "id": "green50-red50",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.5,
+            0.5
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0.5,
+            0.5
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.5,
+              0
+            ],
+            [
+              0,
+              0.5
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.4999996462720831,
+          "score": 0.500000353727917,
+          "observed": [
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0.5,
+            3.5372791691432277e-7
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.5,
+              0.5
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.4999997873005385,
+          "score": 0.5000002126994615,
+          "observed": [
+            4.6271136134849983e-10,
+            0.8
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            2.1269946150994218e-7,
+            0.5
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.30000000000000004,
+              0.5
+            ],
+            [
+              0.19999999999999996,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.4999997877632394,
+          "score": 0.5000002122367606,
+          "observed": [
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0.5,
+            2.1223676064306919e-7
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.5,
+              0.30000000000000004
+            ],
+            [
+              0,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.5932825811568694,
+          "score": 0.4067174188431306,
+          "observed": [
+            0.20001257884277265,
+            0.2067048444880774
+          ],
+          "other": 0.59328257666915,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0.20001257989450644,
+            0.20670483894862415
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0,
+              0.2
+            ],
+            [
+              0,
+              0.2
+            ],
+            [
+              0.09999999999999998,
+              0.09999999999999998
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              0.2,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.5999999997686181,
+          "score": 0.40000000023138194,
+          "observed": [
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            0.4000000002313557,
+            2.6236188750601882e-14
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.4,
+              0
+            ],
+            [
+              0.09999999999999998,
+              0.5
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.7999999988432058,
+          "score": 0.20000000115679417,
+          "observed": [
+            1.8508454453939993e-9,
+            0.2
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#008040",
+              "amount": 0.5
+            },
+            {
+              "color": "#E03030",
+              "amount": 0.5
+            }
+          ],
+          "matched": [
+            1.1567784033712496e-9,
+            0.20000000000001575
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0,
+              0.2
+            ],
+            [
+              0.5,
+              0.3
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        }
+      ]
+    },
+    "red-black80": {
+      "legacy": [
+        {
+          "id": "red80-black20",
+          "cost": 0.3937133733958089,
+          "score": 0.6062866266041911,
+          "observed": [
+            0.8,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.7360984178453762,
+          "score": 0.2639015821546238,
+          "observed": [
+            0.2,
+            0.8
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.9906280868866256,
+          "score": 0.009371913113374375,
+          "observed": [
+            0.500000353727917,
+            0
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.9959628897695313,
+          "score": 0.00403711023046871,
+          "observed": [
+            0.2067049887234328,
+            0
+          ],
+          "other": 0.7932950112765673,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.999992714867387,
+          "score": 0.00000728513261305519,
+          "observed": [
+            5.659646670629165e-7,
+            0.2
+          ],
+          "other": 0.799999434035333,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.9999947875998609,
+          "score": 0.00000521240013906521,
+          "observed": [
+            2.829823335314582e-7,
+            0.6
+          ],
+          "other": 0.3999997170176665,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.9999997747755686,
+          "score": 2.2522443143824233e-7,
+          "observed": [
+            7.074558338286455e-7,
+            0
+          ],
+          "other": 0.9999992925441662,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        }
+      ],
+      "coverage": [
+        {
+          "id": "red80-black20",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.8,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.4999996462720831,
+          "score": 0.500000353727917,
+          "observed": [
+            0.500000353727917,
+            0
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.6000000000000001,
+          "score": 0.3999999999999999,
+          "observed": [
+            0.2,
+            0.8
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.7932950112765673,
+          "score": 0.20670498872343268,
+          "observed": [
+            0.2067049887234328,
+            0
+          ],
+          "other": 0.7932950112765673,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.799999434035333,
+          "score": 0.20000056596466698,
+          "observed": [
+            5.659646670629165e-7,
+            0.2
+          ],
+          "other": 0.799999434035333,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.7999997170176665,
+          "score": 0.20000028298233352,
+          "observed": [
+            2.829823335314582e-7,
+            0.6
+          ],
+          "other": 0.3999997170176665,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.9999992925441663,
+          "score": 7.07455833692805e-7,
+          "observed": [
+            7.074558338286455e-7,
+            0
+          ],
+          "other": 0.9999992925441662,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        }
+      ],
+      "transport": [
+        {
+          "id": "red80-black20",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.8,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.8,
+            0.19999999999999996
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.8,
+              0
+            ],
+            [
+              0,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.4999997873005385,
+          "score": 0.5000002126994615,
+          "observed": [
+            0.500000353727917,
+            0
+          ],
+          "other": 0.4999996462720831,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.5000002122367502,
+            4.627113613484997e-10
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.30000000000000004,
+              0.19999999999999996
+            ],
+            [
+              0.5,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.5999999999999684,
+          "score": 0.40000000000003155,
+          "observed": [
+            0.2,
+            0.8
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.20000000000003149,
+            0.2
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0
+            ],
+            [
+              0.6,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "rainbow20",
+          "cost": 0.7932950138960572,
+          "score": 0.20670498610394283,
+          "observed": [
+            0.2067049887234328,
+            0
+          ],
+          "other": 0.7932950112765673,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.20670498597924417,
+            1.2469878866932166e-10
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              0.2,
+              0
+            ],
+            [
+              5.551115123125783e-17,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.799999434035333,
+          "score": 0.20000056596466698,
+          "observed": [
+            5.659646670629165e-7,
+            0.2
+          ],
+          "other": 0.799999434035333,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            5.659646670629165e-7,
+            0.2
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.8,
+              0
+            ],
+            [
+              0,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.7999997170176454,
+          "score": 0.20000028298235462,
+          "observed": [
+            2.829823335314582e-7,
+            0.6
+          ],
+          "other": 0.3999997170176665,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            2.8298235452040923e-7,
+            0.2
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.4,
+              0
+            ],
+            [
+              0.3999999999999999,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.9999994335726217,
+          "score": 5.664273783345664e-7,
+          "observed": [
+            7.074558338286455e-7,
+            0
+          ],
+          "other": 0.9999992925441662,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.8
+            },
+            {
+              "color": "#101010",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            5.659646670629165e-7,
+            4.627113613484997e-10
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.8,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        }
+      ]
+    },
+    "rainbow20": {
+      "legacy": [
+        {
+          "id": "rainbow20",
+          "cost": 0.7968409273911163,
+          "score": 0.20315907260888366,
+          "observed": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.998658510085237,
+          "score": 0.0013414899147630166,
+          "observed": [
+            0.5,
+            0,
+            0,
+            0.5,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.9999773366666805,
+          "score": 0.000022663333319461465,
+          "observed": [
+            0.8,
+            0,
+            0,
+            4.6271136134849983e-10,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.9999815384711152,
+          "score": 0.000018461528884849976,
+          "observed": [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.999985230769515,
+          "score": 0.000014769230485045526,
+          "observed": [
+            0,
+            0,
+            0,
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.9999926153663148,
+          "score": 0.000007384633685214581,
+          "observed": [
+            0,
+            0,
+            0,
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.9999941406879014,
+          "score": 0.000005859312098621672,
+          "observed": [
+            0.2,
+            0,
+            0,
+            1.8508454453939993e-9,
+            0
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "legacy",
+          "tolerance": 0.06
+        }
+      ],
+      "coverage": [
+        {
+          "id": "rainbow20",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.6,
+          "score": 0.4,
+          "observed": [
+            0.5,
+            0,
+            0,
+            0.5,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.7999999981491546,
+          "score": 0.20000000185084543,
+          "observed": [
+            0.2,
+            0,
+            0,
+            1.8508454453939993e-9,
+            0
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.7999999995372886,
+          "score": 0.20000000046271138,
+          "observed": [
+            0.8,
+            0,
+            0,
+            4.6271136134849983e-10,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.8,
+          "score": 0.19999999999999996,
+          "observed": [
+            0,
+            0,
+            0,
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.8,
+          "score": 0.19999999999999996,
+          "observed": [
+            0,
+            0,
+            0,
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.8,
+          "score": 0.19999999999999996,
+          "observed": [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": null,
+          "mode": "target",
+          "method": "coverage",
+          "tolerance": 0.06
+        }
+      ],
+      "transport": [
+        {
+          "id": "rainbow20",
+          "cost": 0,
+          "score": 1,
+          "observed": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.19999999999999996
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0.2,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0.2,
+              0,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0.2,
+              0
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green50-red50",
+          "cost": 0.5932825811568694,
+          "score": 0.4067174188431306,
+          "observed": [
+            0.5,
+            0,
+            0,
+            0.5,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.2,
+            0.006704833409170887,
+            6.591187048000553e-9,
+            0.2,
+            0.000012578842772633277
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0,
+              0,
+              0.09999999999999998,
+              0.2,
+              0.2
+            ],
+            [
+              0.2,
+              0.2,
+              0.09999999999999998,
+              0,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red80-black20",
+          "cost": 0.793295013896057,
+          "score": 0.20670498610394294,
+          "observed": [
+            0.8,
+            0,
+            0,
+            4.6271136134849983e-10,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.2,
+            0.006704833409170887,
+            1.1078906513602885e-8,
+            1.414911667657291e-7,
+            1.246987886693224e-10
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0.2,
+              0.2,
+              0.2,
+              5.551115123125783e-17
+            ],
+            [
+              0,
+              0,
+              0,
+              0,
+              0.19999999999999996
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green100",
+          "cost": 0.7999863610203982,
+          "score": 0.20001363897960178,
+          "observed": [
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "other": 0,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            1.414911667657291e-7,
+            9.165421947910136e-7,
+            2.1034675823982244e-9,
+            0.2,
+            0.000012578842772633277
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0.2,
+              0.19999999999999996,
+              0.2,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green80-black20",
+          "cost": 0.7999863631238658,
+          "score": 0.20001363687613416,
+          "observed": [
+            0,
+            0,
+            0,
+            0.8000000004627114,
+            0
+          ],
+          "other": 0.19999999953728864,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            1.414911667657291e-7,
+            9.165421947910136e-7,
+            5.838296906352213e-25,
+            0.2,
+            0.000012578842772633277
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0.2,
+              5.551115123125783e-17,
+              0.2,
+              0.2
+            ],
+            [
+              0,
+              0,
+              0.19999999999999996,
+              0,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "green40-black60",
+          "cost": 0.7999874211572168,
+          "score": 0.20001257884278323,
+          "observed": [
+            0,
+            0,
+            0,
+            0.40000000138813413,
+            0
+          ],
+          "other": 0.5999999986118659,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            1.0494475500240754e-14,
+            1.146344789575638e-20,
+            1.5525244058188759e-31,
+            0.2,
+            0.000012578842772633277
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0,
+              0,
+              0,
+              0.2,
+              0.2
+            ],
+            [
+              0.2,
+              0.2,
+              0.19999999999999996,
+              0,
+              0
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        },
+        {
+          "id": "red20-black80",
+          "cost": 0.7999999994125899,
+          "score": 0.20000000058741008,
+          "observed": [
+            0.2,
+            0,
+            0,
+            1.8508454453939993e-9,
+            0
+          ],
+          "other": 0.7999999981491546,
+          "targets": [
+            {
+              "color": "#E03030",
+              "amount": 0.2
+            },
+            {
+              "color": "#F08020",
+              "amount": 0.2
+            },
+            {
+              "color": "#F0D030",
+              "amount": 0.2
+            },
+            {
+              "color": "#008040",
+              "amount": 0.2
+            },
+            {
+              "color": "#2060D0",
+              "amount": 0.2
+            }
+          ],
+          "matched": [
+            0.2,
+            1.146344789575638e-20,
+            1.5525244058188759e-31,
+            4.6271136134849983e-10,
+            1.246987886693217e-10
+          ],
+          "requested": 1,
+          "remainder": 0,
+          "plan": [
+            [
+              0.2,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              0,
+              0.2,
+              0.19999999999999996,
+              0.2,
+              0.2
+            ]
+          ],
+          "mode": "target",
+          "method": "transport",
+          "tolerance": 0.06
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-09-23T14:44:44.917128+00:00",
+  "planSha256": "b752d3a89c021a68dc141882fe7f2671addf6e13cbd283fada59b21d1987e850",
+  "phases": [
+    {
+      "id": "points-projection-1m-index",
+      "startedAt": "2026-09-23T14:44:44.917222+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode scale --scope projection --count 1000000 --presets favorite --encodings numeric --numeric-points true --source false --index color-exploration-favorite-points-projection-1m-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-projection-1m-v1"
+      ],
+      "finishedAt": "2026-09-23T14:45:17.571910+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "precision-projection-1m-index",
+      "startedAt": "2026-09-23T14:45:17.572250+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode scale --scope projection --count 1000000 --presets favorite --encodings rank18,rank27 --source false --index color-exploration-favorite-precision-projection-1m-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/precision-projection-1m-v1"
+      ],
+      "finishedAt": "2026-09-23T14:46:07.969068+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T14:46:07.969386+00:00"
+}

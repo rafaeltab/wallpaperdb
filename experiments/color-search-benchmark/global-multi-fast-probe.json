@@ -1,0 +1,490 @@
+{
+  "generatedAt": "2026-09-16T15:36:07.634Z",
+  "index": "color-global-multi-real-v1",
+  "dataCacheKey": "789da7256e972ef46e5699713a46c2bf95dc8d22f356e2566ca93fa0aaab3352",
+  "indexFingerprint": "27002cb17d3a5b085b05a3cc0e357eb10fa61c1e532dc4bf43f3e5e8be210a8f",
+  "originalSourceHash": "0fe176e08217049b4135b56695fa660df5234e3b7d40ec30e5fed10bf94fe30f",
+  "fastSourceHash": "5a233ffa4122ab8c131bd021dd5c5a2884f19a8858bd5f6e6e9d574353e3466e",
+  "checks": [
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 24,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 25,
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 3,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 73,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 3,
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "regions": 2,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 73,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 7,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 18,
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "regions": 1,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 1,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 26,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 1,
+      "passed": true
+    },
+    {
+      "query": "warm30_30_40",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 26,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 12,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 79,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 12,
+      "passed": true
+    },
+    {
+      "query": "dark40blue30navy30",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 79,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 1,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 76,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 1,
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 76,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 25,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 73,
+      "passed": true
+    },
+    {
+      "query": "partial_three",
+      "regions": 3,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 21,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 99,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 40,
+      "passed": true
+    },
+    {
+      "query": "partial_four",
+      "regions": 4,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 9,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 97,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 33,
+      "passed": true
+    },
+    {
+      "query": "partial_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.25,
+      "hits": 12,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "target",
+      "maxError": 0.8,
+      "hits": 63,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": null,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.25,
+      "hits": 100,
+      "passed": true
+    },
+    {
+      "query": "zero_five",
+      "regions": 5,
+      "mode": "minimum",
+      "maxError": 0.8,
+      "hits": 100,
+      "passed": true
+    }
+  ]
+}

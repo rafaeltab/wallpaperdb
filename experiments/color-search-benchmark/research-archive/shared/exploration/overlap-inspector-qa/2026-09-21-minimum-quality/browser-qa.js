@@ -1,0 +1,60 @@
+(async () => {
+  const $ = id => document.getElementById(id), checks = [], requests = [];
+  const check = (name, ok) => { if (!ok) throw Error(name); checks.push(name); };
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const wait = async predicate => { for (let n = 0; n < 240; n++) { if (predicate()) return; await sleep(25); } throw Error('UI did not settle'); };
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (url, options) => { if (String(url).startsWith('/api/')) requests.push({ url, body: options?.body ? JSON.parse(options.body) : null }); return nativeFetch(url, options); };
+  const searches = () => requests.filter(r => r.url === '/api/search');
+  const input = (id, value) => { $(id).value = String(value); $(id).dispatchEvent(new Event('input')); };
+  const toggle = (id, value) => { $(id).checked = value; $(id).dispatchEvent(new Event('change')); };
+  const settled = async count => { await wait(() => searches().length >= count && !$('search').disabled); check('query succeeds', !$('search-status').classList.contains('error')); };
+  const inspect = async card => { card.click(); await wait(() => !$('inspection-content').hidden); return JSON.parse($('formula-json').textContent); };
+  try {
+    check('cutoff initially off', $('minimum-quality').value === '0' && $('minimum-quality-value').value === '0%' && $('reset-minimum-quality').disabled);
+    input('minimum-quality', 80); await sleep(450);
+    check('manual cutoff edit only updates control', searches().length === 0 && $('minimum-quality-value').value === '80%');
+    let diagnostic = await inspect(document.querySelector('.result-card'));
+    check('old result inspection keeps original cutoff', diagnostic.parameters.minimumQuality === 0 && requests.at(-1).body.parameters.minimumQuality === 0);
+    $('close-inspector').click();
+    input('minimum-quality', 100); $('query-form').requestSubmit(); await settled(1);
+    check('cutoff sent to OpenSearch independently of influence', searches().at(-1).body.parameters.minimumQuality === 1 && searches().at(-1).body.parameters.qualityInfluence === 1);
+    check('result caption records cutoff', $('query-caption').textContent.includes('minimum quality 100%'));
+    const zeroResult = [...document.querySelectorAll('.result-card')].find(card => Number(card.querySelector('.result-score').textContent) === 0);
+    check('zero-score results remain inspectable', !!zeroResult);
+    input('minimum-quality', 20);
+    diagnostic = await inspect(zeroResult);
+    check('edited controls cannot alter a saved cutoff', diagnostic.parameters.minimumQuality === 1 && $('inspection-query').textContent.includes('minimum quality 100%'));
+    const term = diagnostic.score.terms[0];
+    check('below-cutoff term is gated to zero', term.conditionalQuality < 1 && term.passesMinimumQuality === false && term.qualityGateFactor === 0 && term.scoreContribution === 0);
+    check('cutoff explanation is visible', $('target-summary').textContent.includes('Below minimum') && $('bin-detail').textContent.includes('below the 100% minimum'));
+    check('gated regions shrink in score grid', [...document.querySelectorAll('.bin-cell')].every(cell => +cell.dataset.contribution === 0 && cell.firstChild.style.transform === 'scale(0.22)'));
+    check('diagnostic and native scores agree', Math.abs(diagnostic.score.difference) < 2e-6);
+    $('close-inspector').click();
+    let count = searches().length;
+    toggle('live-update', true);
+    for (const value of [30, 50, 75]) { input('minimum-quality', value); await sleep(20); }
+    await settled(count + 1); await sleep(100);
+    check('cutoff slider burst debounces to one request', searches().length === count + 1 && searches().at(-1).body.parameters.minimumQuality === .75);
+    count = searches().length;
+    input('minimum-quality', 85); toggle('live-update', false); await sleep(450);
+    check('live off cancels queued cutoff update', searches().length === count);
+    $('reset-minimum-quality').click();
+    check('reset clears cutoff without changing influence', $('minimum-quality').value === '0' && $('quality-influence').value === '1');
+    input('quality-influence', 0); input('minimum-quality', 100); $('query-form').requestSubmit(); await settled(count + 1);
+    diagnostic = await inspect([...document.querySelectorAll('.result-card')].find(card => Number(card.querySelector('.result-score').textContent) === 0));
+    check('cutoff still works when quality influence is zero', diagnostic.score.terms[0].qualityFactor === 1 && diagnostic.score.terms[0].qualityGateFactor === 0 && diagnostic.score.terms[0].scoreContribution === 0);
+    $('close-inspector').click();
+    toggle('use-json', true);
+    input('query-json', JSON.stringify({ mode: 'proportions', targets: [{ color: '#ff0000', percent: 0 }, { color: '#209040', percent: 40 }] }));
+    $('query-form').requestSubmit(); await settled(count + 2);
+    diagnostic = await inspect(document.querySelector('.result-card'));
+    const absent = diagnostic.score.terms[0];
+    check('zero-percent target is exempt in real query', absent.amount === 0 && absent.qualityThresholdApplies === false && absent.qualityGateFactor === 1 && absent.scoreContribution > 0);
+    check('zero-percent exemption is visible', $('target-summary').textContent.includes('Exempt (0% target)'));
+    check('multi-target contribution ledger matches OpenSearch', Math.abs(diagnostic.score.difference) < 2e-6);
+    $('close-inspector').click();
+    check('desktop has no horizontal overflow', document.documentElement.scrollWidth <= innerWidth);
+    return { status: 'passed', checksPassed: checks.length, checks, requests };
+  } finally { window.fetch = nativeFetch; }
+})()

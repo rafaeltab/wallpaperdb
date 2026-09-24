@@ -1,0 +1,49 @@
+{
+  "files": [
+    {
+      "name:f": "desktop.json",
+      "bytes": 5156,
+      "sha256": "b3a510003f4ccf117ba326fcf147b9b9a356ecc0fe6c2ec889f378c4dc00b606"
+    },
+    {
+      "name:f": "desktop.png",
+      "bytes": 139290,
+      "sha256": "0f9a574ade150e18be6e7af9dfc1d7fb0e4ba004e4588f8c79195317736c3224"
+    },
+    {
+      "name:f": "lab.json",
+      "bytes": 14490,
+      "sha256": "07e36a1f83e3d6758ff60939e67df5874d6b551164f61fcbb7a75297af4c25bb"
+    },
+    {
+      "name:f": "mobile-filtered-complete.json",
+      "bytes": 1449,
+      "sha256": "3f0423fe4033ba989a23a3e2b1b8bf34f1281c25132c55e55253f65ea057eb59"
+    },
+    {
+      "name:f": "mobile-filtered-complete.png",
+      "bytes": 77464,
+      "sha256": "35eea0592c13e8ce82c846e3bcb8fb31db81e7f2f27401cf5d0a4549b0ffa078"
+    },
+    {
+      "name:f": "mobile-filtered.json",
+      "bytes": 143,
+      "sha256": "1578f8577fcfd06c579b4e08128235729816a5b68f9f97f701ff83cc68dc2151"
+    },
+    {
+      "name:f": "mobile-filtered.png",
+      "bytes": 76210,
+      "sha256": "c1078fba2d22bc22b0a0a87a707acc6bd78cd0d75c26b791e2f5b0c633f8d846"
+    },
+    {
+      "name:f": "publication.json",
+      "bytes": 658,
+      "sha256": "7882d0bb4c3c8c5e3f6356d140244d8e1f39c9eaeede559c5ec9f40c9cb4be70"
+    },
+    {
+      "name:f": "summary.json",
+      "bytes": 1098,
+      "sha256": "3e445777f04ef117daa8e729457e8cb86197aa32baf97130b1d5eebd35a2bd7b"
+    }
+  ]
+}

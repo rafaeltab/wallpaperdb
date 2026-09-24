@@ -1,0 +1,152 @@
+{
+  "kind": "fetch-transport",
+  "auditedAt": "2026-09-23T15:40:40.306896+00:00",
+  "integrityPassed": true,
+  "experimentPassed": true,
+  "sourceSnapshotHash": "fc4f4fd201bfeecf6f37ef4ba6fe892ff09d2b6acad93a2a863e951269cdd956",
+  "summaryHash": "212d3c0f1bc80e75fba071f811fc7a6c5af730493e3877476c3bfcc1484361f1",
+  "auditCodeHash": "f8acd10ea73ac8441812dfa1c8372e11f9005cf833b093fe6103bb433266508c",
+  "comparisons": 432,
+  "documentScores": 235440,
+  "methods": {
+    "favorite-utility-numeric-docvalues": {
+      "comparisons": 144,
+      "documentScores": 78480,
+      "identicalOrdersAndFloat32Scores": 144,
+      "identicalRawScores": 144
+    },
+    "favorite-utility-rank27-docvalues": {
+      "comparisons": 144,
+      "documentScores": 78480,
+      "identicalOrdersAndFloat32Scores": 144,
+      "identicalRawScores": 144
+    },
+    "favorite-utility-sorted-docvalues": {
+      "comparisons": 144,
+      "documentScores": 78480,
+      "identicalOrdersAndFloat32Scores": 144,
+      "identicalRawScores": 144
+    }
+  },
+  "pairedDiagnostics": 24,
+  "diagnosticGroups": [
+    {
+      "method": "favorite-utility-numeric-docvalues",
+      "limit": 20,
+      "returned": 20,
+      "pairs": 4,
+      "stored": {
+        "minMs": 4.255893000000015,
+        "medianMs": 5.958088000000316,
+        "maxMs": 11.864458000000013,
+        "atLeastOneSecond": 0
+      },
+      "docvalues": {
+        "minMs": 0.9635419999999613,
+        "medianMs": 3.3601334999993924,
+        "maxMs": 52.418862999998964,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 3
+    },
+    {
+      "method": "favorite-utility-numeric-docvalues",
+      "limit": 1000,
+      "returned": 545,
+      "pairs": 4,
+      "stored": {
+        "minMs": 5674.800416,
+        "medianMs": 5925.489071500001,
+        "maxMs": 5992.910754999997,
+        "atLeastOneSecond": 4
+      },
+      "docvalues": {
+        "minMs": 2.295195999999578,
+        "medianMs": 3.6908449999991717,
+        "maxMs": 6.3605289999977686,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 4
+    },
+    {
+      "method": "favorite-utility-rank27-docvalues",
+      "limit": 20,
+      "returned": 20,
+      "pairs": 4,
+      "stored": {
+        "minMs": 5.271051999996416,
+        "medianMs": 7.101016999996318,
+        "maxMs": 18.23825299999953,
+        "atLeastOneSecond": 0
+      },
+      "docvalues": {
+        "minMs": 1.4478429999999207,
+        "medianMs": 6.732554000000164,
+        "maxMs": 21.971052000000782,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 2
+    },
+    {
+      "method": "favorite-utility-rank27-docvalues",
+      "limit": 1000,
+      "returned": 545,
+      "pairs": 4,
+      "stored": {
+        "minMs": 3458.3964799999994,
+        "medianMs": 3740.801101500003,
+        "maxMs": 4091.935856,
+        "atLeastOneSecond": 4
+      },
+      "docvalues": {
+        "minMs": 2.9356100000004517,
+        "medianMs": 6.385436500000651,
+        "maxMs": 13.113507000001846,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 4
+    },
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "limit": 20,
+      "returned": 20,
+      "pairs": 4,
+      "stored": {
+        "minMs": 5.5739509999984875,
+        "medianMs": 9.219280000000253,
+        "maxMs": 11.540680000005523,
+        "atLeastOneSecond": 0
+      },
+      "docvalues": {
+        "minMs": 1.428234999999404,
+        "medianMs": 3.2706749999979365,
+        "maxMs": 8.418368999999075,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 3
+    },
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "limit": 1000,
+      "returned": 545,
+      "pairs": 4,
+      "stored": {
+        "minMs": 1779.7800580000003,
+        "medianMs": 1796.7049065000028,
+        "maxMs": 1844.2458220000008,
+        "atLeastOneSecond": 4
+      },
+      "docvalues": {
+        "minMs": 2.3742350000029546,
+        "medianMs": 3.6376499999987573,
+        "maxMs": 4.415592999997898,
+        "atLeastOneSecond": 0
+      },
+      "docvaluesFasterPairs": 4
+    }
+  ],
+  "limitations": [
+    "Independent audit of saved responses, body identity and source/reference hashes; no service calls.",
+    "Four query shapes and one alternating pair per shape/limit/method; diagnostics are not capacity or representative latency percentiles."
+  ]
+}

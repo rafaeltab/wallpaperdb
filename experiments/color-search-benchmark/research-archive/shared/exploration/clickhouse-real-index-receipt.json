@@ -1,0 +1,37 @@
+{
+  "table": "color_exploration_real_v1",
+  "count": 545,
+  "createdAt": "2026-09-20T02:38:56.000Z",
+  "indexMs": 446.095369,
+  "descriptorHashes": {
+    "sourceFeatures": "424e78bb42994021cb50ee3d254a777680f432be89bc66e9217307a6123be680",
+    "clickhouseDocuments": "18e2668a821f0ae0fb1ece76410d21ca2777964ff3a247015ea7b121e53b57c4",
+    "colorTransform": "eb24a0e60cef33d643506bd88021fa2e3020d8e9f2cdde9de14d5187a3667fc8"
+  },
+  "sourceHashes": {
+    "clickhouse-service.mjs": "4fcc5d49cabbf7f2f0ffe7273bfee1119ba869e920f70d6ad94af5c4b6763083",
+    "methods-clickhouse.mjs": "1bd48e5d108e31deea420a1879160d8e1fb3216f6549536a510a64a98621f0e4",
+    "clickhouse-index.mjs": "89e434e4339b97da3e2793fc92936f42980f74b5f0e007b7a575235a8786368e",
+    "corpus-colors.mjs": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad"
+  },
+  "version": "26.3.9.8",
+  "hostname": "d96044c4ca3a",
+  "parts": {
+    "rows": 545,
+    "bytesOnDisk": 454061,
+    "uncompressedBytes": 575890,
+    "activeParts": 1
+  },
+  "metrics": {
+    "CGroupMaxCPU": 8,
+    "OSSystemTime": 0.14999175045372506,
+    "CGroupMemoryUsed": 245444552,
+    "MemoryResident": 751566848,
+    "OSUserTime": 2.3598702071386075
+  },
+  "containerLimits": {
+    "cpus": 8,
+    "memoryBytes": 12884901888,
+    "source": "clickhouse-compose.yml; compare with observed metrics"
+  }
+}

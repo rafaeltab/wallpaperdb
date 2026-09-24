@@ -1,0 +1,235 @@
+{
+  "checks": [
+    "default quality and manual mode retained",
+    "manual slider edits do not search",
+    "inspection retains original result parameters after slider edit",
+    "query completed without an error",
+    "manual search submits quality influence",
+    "OpenSearch result scores or ordering change",
+    "reset returns to original quality",
+    "query completed without an error",
+    "slider burst debounces to one real search",
+    "live update waits for adjustment pause",
+    "query completed without an error",
+    "presets update live",
+    "query completed without an error",
+    "percentage edits update live",
+    "invalid color pauses live requests",
+    "query completed without an error",
+    "valid hex resumes live search",
+    "invalid advanced JSON does not search",
+    "query completed without an error",
+    "valid advanced query updates live",
+    "turning live off cancels queued search",
+    "manual mode remains manual after live off",
+    "query completed without an error",
+    "query completed without an error",
+    "late superseded response cannot replace current results",
+    "desktop controls fit horizontally"
+  ],
+  "checksPassed": 26,
+  "requests": [
+    {
+      "body": {
+        "id": "madness-wallhaven-rqqjrj",
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "areaPower": 0.5,
+          "excessPenalty": 1.5,
+          "qualityInfluence": 1,
+          "qualityPenalty": 0.35
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/inspect"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.4
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.4
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#209040",
+              "name": "green",
+              "percent": 40
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.4
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#209040",
+              "name": "green",
+              "percent": 30
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.4
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#20b8d0",
+              "percent": 30
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.4
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#101010",
+              "name": "dark"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 1.8
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#101010",
+              "name": "dark"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 2.85
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#101010",
+              "name": "dark"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "qualityInfluence": 1.25
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#101010",
+              "name": "dark"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    }
+  ],
+  "status": "passed"
+}

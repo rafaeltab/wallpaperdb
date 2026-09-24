@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" shape-rendering="crispEdges">
+  <title>Dark neutral shades</title>
+  <rect x="0" y="0" width="400" height="600" fill="#000000"/>
+  <rect x="400" y="0" width="300" height="600" fill="#101010"/>
+  <rect x="700" y="0" width="300" height="600" fill="#191919"/>
+</svg>

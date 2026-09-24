@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "kind": "execution",
+  "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/execution-fidelity",
+  "auditedAt": "2026-09-23T15:33:03.312145+00:00",
+  "integrityPassed": true,
+  "experimentPassed": false,
+  "sourceSnapshotHash": "cf2961278dccab660a53dce5882493e70ad9e5f7d777316dafa3c7745ad7accb",
+  "summaryHash": "713335ff39d17b1c4b709ddbbb5254a6da35e89f75a64696c8560cedff4dd1db",
+  "auditCodeHash": "fba963e4ffc9b3da9422a7732699d55744751666c38ea24c40508bb57348cfec",
+  "referenceQueries": 160,
+  "executions": 1878,
+  "methods": {
+    "favorite-utility-sorted": {
+      "executions": 626,
+      "documents": 83386,
+      "identicalOrders": 626,
+      "float32ScoresIdentical": 626,
+      "exactTransportScores": 626,
+      "positiveBounds": 0,
+      "actuallyPruned": 0,
+      "maximumPruned": 0,
+      "maximumTransportDelta": 0
+    },
+    "favorite-utility-sorted-scored": {
+      "executions": 626,
+      "documents": 83386,
+      "identicalOrders": 626,
+      "float32ScoresIdentical": 626,
+      "exactTransportScores": 626,
+      "positiveBounds": 0,
+      "actuallyPruned": 0,
+      "maximumPruned": 0,
+      "maximumTransportDelta": 0
+    },
+    "favorite-utility-bounded": {
+      "executions": 626,
+      "documents": 83386,
+      "identicalOrders": 626,
+      "float32ScoresIdentical": 626,
+      "exactTransportScores": 626,
+      "positiveBounds": 473,
+      "actuallyPruned": 467,
+      "maximumPruned": 544,
+      "maximumTransportDelta": 0
+    }
+  },
+  "intendedArithmeticPassed": false,
+  "duplicateDiagnostics": [
+    {
+      "queryId": "duplicate-identical-red",
+      "resolvedUtilityKeys": [
+        "r0004_p050_q050_w1",
+        "r0004_p050_q050_w1"
+      ],
+      "intendedNumericOraclePassed": false,
+      "maximumIntendedNumericOracleError": 0.4940831918495178,
+      "numericRepeatedVersusSingle": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": false,
+        "maximumScoreError": 0.4940832,
+        "meanScoreError": 0.226174319357798,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      },
+      "nativeRepeatedVersusSingle": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": false,
+        "maximumScoreError": 0.4940832,
+        "meanScoreError": 0.226174319357798,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      },
+      "nativeVersusNumeric": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": true,
+        "maximumScoreError": 0,
+        "meanScoreError": 0,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      }
+    },
+    {
+      "queryId": "duplicate-nearby-red-anchor",
+      "resolvedUtilityKeys": [
+        "r0004_p050_q050_w1",
+        "r0004_p050_q050_w1"
+      ],
+      "intendedNumericOraclePassed": false,
+      "maximumIntendedNumericOracleError": 0.4940831918495178,
+      "numericRepeatedVersusSingle": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": false,
+        "maximumScoreError": 0.4940832,
+        "meanScoreError": 0.226174319357798,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      },
+      "nativeRepeatedVersusSingle": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": false,
+        "maximumScoreError": 0.4940832,
+        "meanScoreError": 0.226174319357798,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      },
+      "nativeVersusNumeric": {
+        "count": 545,
+        "identicalIds": true,
+        "identicalScores": true,
+        "maximumScoreError": 0,
+        "meanScoreError": 0,
+        "top20Overlap": 20,
+        "maxRankChange": 0,
+        "inversions": 0,
+        "meaningfulInversions": 0,
+        "meaningfulGapThreshold": 1e-06,
+        "largestInversionScoreGap": 0
+      }
+    }
+  ],
+  "limitations": [
+    "Independent consistency audit of saved responses/oracles and source hashes; no service re-execution or new relevance labels."
+  ]
+}

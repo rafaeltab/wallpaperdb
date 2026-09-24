@@ -1,0 +1,6455 @@
+{
+  "at": "2026-09-23T22:49:37.628Z",
+  "banks": [
+    {
+      "available": true,
+      "id": "linked-3"
+    },
+    {
+      "available": true,
+      "id": "linked-5"
+    }
+  ],
+  "desktop": {
+    "pageWidth": 1440,
+    "width": 1440
+  },
+  "errors": [],
+  "failedImages": [],
+  "manual": {
+    "manual": true,
+    "noAuto": true,
+    "stale": true,
+    "status": "Showing 523 of 523 real wallpapers · 12 ms. Click a wallpaper to see the full image."
+  },
+  "oldMethodCount": 19,
+  "rapid": {
+    "errors": [],
+    "header": "48 wallpapers · Combined slider · 5 choices · Stricter",
+    "level": 3,
+    "newRequests": 1,
+    "pair": "Quality influence 1 · cutoff weighting 1",
+    "status": "Showing 48 of 523 real wallpapers · 6 ms. Click a wallpaper to see the full image."
+  },
+  "requests": [
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "elapsedMs": 7.532288000002154,
+      "hits": [
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.3922644
+        },
+        {
+          "id": "wallpaper-037",
+          "score": 0.357516
+        },
+        {
+          "id": "madness-wallhaven-rqqjrj",
+          "score": 0.34977913
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.33212072
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.30737215
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.2994342
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "score": 0.2829422
+        },
+        {
+          "id": "madness-wallhaven-gwwlm3",
+          "score": 0.2716273
+        },
+        {
+          "id": "madness-wallhaven-j5eqpw",
+          "score": 0.24890596
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.24286649
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "score": 0.23992094
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.23002744
+        },
+        {
+          "id": "madness-wallhaven-k9m277",
+          "score": 0.22888021
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.2262979
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.21048686
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.210296
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.2081539
+        },
+        {
+          "id": "madness-wallhaven-e88v9o",
+          "score": 0.2080894
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.20550203
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.1997388
+        },
+        {
+          "id": "madness-wallhaven-vmwlmm",
+          "score": 0.18827772
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.18443313
+        },
+        {
+          "id": "madness-wallhaven-1qqlew",
+          "score": 0.18313055
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.18292056
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.18247402
+        },
+        {
+          "id": "madness-wallhaven-95jgkk",
+          "score": 0.17961036
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.17203583
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.17137855
+        },
+        {
+          "id": "madness-wallhaven-mdoqxy",
+          "score": 0.16949995
+        },
+        {
+          "id": "madness-wallhaven-poo7gj",
+          "score": 0.1690116
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.16038074
+        },
+        {
+          "id": "wallpaper-082",
+          "score": 0.16031748
+        },
+        {
+          "id": "madness-wallhaven-v9qkgm",
+          "score": 0.15998477
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.15908718
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.15823291
+        },
+        {
+          "id": "madness-wallhaven-gwwxpl",
+          "score": 0.1529119
+        },
+        {
+          "id": "madness-wallhaven-lyydwl",
+          "score": 0.15276799
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.14767423
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.1468845
+        },
+        {
+          "id": "madness-wallhaven-vppd75",
+          "score": 0.14673594
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.14289933
+        },
+        {
+          "id": "madness-wallhaven-qrroml",
+          "score": 0.14179412
+        },
+        {
+          "id": "madness-wallhaven-e8865l",
+          "score": 0.14138994
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.14120021
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.13628705
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.13127683
+        },
+        {
+          "id": "madness-wallhaven-ymg9kx",
+          "score": 0.13003296
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.12991044
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "parameters": {
+          "cutoffBlendExponent": 1,
+          "qualityInfluence": 0.5
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "original"
+      },
+      "elapsedMs": 12.866996000011568,
+      "hits": [
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.3922644
+        },
+        {
+          "id": "wallpaper-037",
+          "score": 0.357516
+        },
+        {
+          "id": "madness-wallhaven-rqqjrj",
+          "score": 0.34977913
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.33212072
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.30737215
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.2994342
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "score": 0.2829422
+        },
+        {
+          "id": "madness-wallhaven-gwwlm3",
+          "score": 0.2716273
+        },
+        {
+          "id": "madness-wallhaven-j5eqpw",
+          "score": 0.24890596
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.24286649
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "score": 0.23992094
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.23002744
+        },
+        {
+          "id": "madness-wallhaven-k9m277",
+          "score": 0.22888021
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.2262979
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.21048686
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.210296
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.2081539
+        },
+        {
+          "id": "madness-wallhaven-e88v9o",
+          "score": 0.2080894
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.20550203
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.1997388
+        },
+        {
+          "id": "madness-wallhaven-vmwlmm",
+          "score": 0.18827772
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.18443313
+        },
+        {
+          "id": "madness-wallhaven-1qqlew",
+          "score": 0.18313055
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.18292056
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.18247402
+        },
+        {
+          "id": "madness-wallhaven-95jgkk",
+          "score": 0.17961036
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.17203583
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.17137855
+        },
+        {
+          "id": "madness-wallhaven-mdoqxy",
+          "score": 0.16949995
+        },
+        {
+          "id": "madness-wallhaven-poo7gj",
+          "score": 0.1690116
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.16038074
+        },
+        {
+          "id": "wallpaper-082",
+          "score": 0.16031748
+        },
+        {
+          "id": "madness-wallhaven-v9qkgm",
+          "score": 0.15998477
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.15908718
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.15823291
+        },
+        {
+          "id": "madness-wallhaven-gwwxpl",
+          "score": 0.1529119
+        },
+        {
+          "id": "madness-wallhaven-lyydwl",
+          "score": 0.15276799
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.14767423
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.1468845
+        },
+        {
+          "id": "madness-wallhaven-vppd75",
+          "score": 0.14673594
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.14289933
+        },
+        {
+          "id": "madness-wallhaven-qrroml",
+          "score": 0.14179412
+        },
+        {
+          "id": "madness-wallhaven-e8865l",
+          "score": 0.14138994
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.14120021
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.13628705
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.13127683
+        },
+        {
+          "id": "madness-wallhaven-ymg9kx",
+          "score": 0.13003296
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.12991044
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "parameters": {
+          "cutoffBlendExponent": 3,
+          "qualityInfluence": 1
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#22cc44",
+              "percent": 40
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "original"
+      },
+      "elapsedMs": 12.53622500000347,
+      "hits": [
+        {
+          "id": "madness-wallhaven-ogg6zm",
+          "score": 0.620555
+        },
+        {
+          "id": "madness-wallhaven-po9eop",
+          "score": 0.6014558
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.57002884
+        },
+        {
+          "id": "madness-wallhaven-211d1x",
+          "score": 0.56958187
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.56859475
+        },
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.56641155
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.5604856
+        },
+        {
+          "id": "madness-wallhaven-gww9yl",
+          "score": 0.4994988
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.48497877
+        },
+        {
+          "id": "wallpaper-057",
+          "score": 0.47391725
+        },
+        {
+          "id": "madness-wallhaven-gwwv23",
+          "score": 0.47305268
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.47225577
+        },
+        {
+          "id": "madness-wallhaven-mll1mm",
+          "score": 0.46948114
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.4687747
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.4677882
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.46581638
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.46512452
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.4647064
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.46392742
+        },
+        {
+          "id": "madness-wallhaven-7jp81o",
+          "score": 0.46274808
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.4377622
+        },
+        {
+          "id": "madness-wallhaven-e88pr8",
+          "score": 0.43489498
+        },
+        {
+          "id": "madness-wallhaven-d88mmj",
+          "score": 0.42993352
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.42931235
+        },
+        {
+          "id": "madness-wallhaven-ogg6q7",
+          "score": 0.42733517
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.4259964
+        },
+        {
+          "id": "wallpaper-086",
+          "score": 0.4242308
+        },
+        {
+          "id": "madness-wallhaven-5yyme5",
+          "score": 0.42387456
+        },
+        {
+          "id": "madness-wallhaven-qrrkor",
+          "score": 0.42353916
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.4226029
+        },
+        {
+          "id": "madness-wallhaven-k88291",
+          "score": 0.42221788
+        },
+        {
+          "id": "wallpaper-050",
+          "score": 0.42204455
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.42133972
+        },
+        {
+          "id": "madness-wallhaven-3qqvk9",
+          "score": 0.4210223
+        },
+        {
+          "id": "madness-wallhaven-ogge85",
+          "score": 0.42096564
+        },
+        {
+          "id": "madness-wallhaven-k88jv6",
+          "score": 0.4205381
+        },
+        {
+          "id": "madness-wallhaven-yqqvv7",
+          "score": 0.41927904
+        },
+        {
+          "id": "madness-wallhaven-rqqwpw",
+          "score": 0.41780707
+        },
+        {
+          "id": "wallpaper-098",
+          "score": 0.41656163
+        },
+        {
+          "id": "madness-wallhaven-7jj7ey",
+          "score": 0.41634604
+        },
+        {
+          "id": "madness-wallhaven-lyyr9r",
+          "score": 0.4153937
+        },
+        {
+          "id": "madness-wallhaven-gwpo6e",
+          "score": 0.41530985
+        },
+        {
+          "id": "madness-wallhaven-e881lw",
+          "score": 0.41516924
+        },
+        {
+          "id": "madness-wallhaven-d88k3m",
+          "score": 0.41505367
+        },
+        {
+          "id": "madness-wallhaven-w55dp6",
+          "score": 0.41479492
+        },
+        {
+          "id": "madness-wallhaven-ml91l9",
+          "score": 0.41476935
+        },
+        {
+          "id": "madness-wallhaven-5yy6r9",
+          "score": 0.4147167
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.41458586
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "parameters": {
+          "cutoffBlendExponent": 3,
+          "qualityInfluence": 1
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#22cc44",
+              "percent": 45
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "original"
+      },
+      "elapsedMs": 12.53426099999342,
+      "hits": [
+        {
+          "id": "madness-wallhaven-ogg6zm",
+          "score": 0.596692
+        },
+        {
+          "id": "madness-wallhaven-po9eop",
+          "score": 0.55704236
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.52313524
+        },
+        {
+          "id": "madness-wallhaven-211d1x",
+          "score": 0.5224631
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.52150613
+        },
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.51926047
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.5139132
+        },
+        {
+          "id": "madness-wallhaven-gww9yl",
+          "score": 0.46891585
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.44640464
+        },
+        {
+          "id": "wallpaper-057",
+          "score": 0.43505773
+        },
+        {
+          "id": "madness-wallhaven-gwwv23",
+          "score": 0.43445423
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.433331
+        },
+        {
+          "id": "madness-wallhaven-mll1mm",
+          "score": 0.43066257
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.43020478
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.42897063
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.42751482
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.42656273
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.42603266
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.42538476
+        },
+        {
+          "id": "madness-wallhaven-7jp81o",
+          "score": 0.42428538
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.40383908
+        },
+        {
+          "id": "madness-wallhaven-e88pr8",
+          "score": 0.40065268
+        },
+        {
+          "id": "madness-wallhaven-d88mmj",
+          "score": 0.39787105
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.397335
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.39399675
+        },
+        {
+          "id": "madness-wallhaven-ogg6q7",
+          "score": 0.39311403
+        },
+        {
+          "id": "wallpaper-086",
+          "score": 0.3922447
+        },
+        {
+          "id": "madness-wallhaven-5yyme5",
+          "score": 0.39191484
+        },
+        {
+          "id": "wallpaper-050",
+          "score": 0.39012215
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.38940635
+        },
+        {
+          "id": "madness-wallhaven-qrrkor",
+          "score": 0.3891909
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.38890666
+        },
+        {
+          "id": "madness-wallhaven-k88291",
+          "score": 0.387822
+        },
+        {
+          "id": "madness-wallhaven-3qqvk9",
+          "score": 0.38680145
+        },
+        {
+          "id": "madness-wallhaven-ogge85",
+          "score": 0.3867408
+        },
+        {
+          "id": "madness-wallhaven-k88jv6",
+          "score": 0.38636363
+        },
+        {
+          "id": "madness-wallhaven-yqqvv7",
+          "score": 0.38573575
+        },
+        {
+          "id": "madness-wallhaven-rqqwpw",
+          "score": 0.38365275
+        },
+        {
+          "id": "madness-wallhaven-w55dp6",
+          "score": 0.38292605
+        },
+        {
+          "id": "wallpaper-098",
+          "score": 0.38240913
+        },
+        {
+          "id": "madness-wallhaven-7jj7ey",
+          "score": 0.3823074
+        },
+        {
+          "id": "wallpaper-041",
+          "score": 0.38119578
+        },
+        {
+          "id": "madness-wallhaven-gwpo6e",
+          "score": 0.3811617
+        },
+        {
+          "id": "madness-wallhaven-lyyr9r",
+          "score": 0.3811573
+        },
+        {
+          "id": "madness-wallhaven-e881lw",
+          "score": 0.38096276
+        },
+        {
+          "id": "madness-wallhaven-d88k3m",
+          "score": 0.38094938
+        },
+        {
+          "id": "madness-wallhaven-ml91l9",
+          "score": 0.3806605
+        },
+        {
+          "id": "madness-wallhaven-5yy6r9",
+          "score": 0.3805244
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#22cc44",
+              "percent": 50
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "elapsedMs": 4.898687999986578,
+      "hits": [
+        {
+          "id": "madness-wallhaven-ogg6zm",
+          "score": 0.6399512
+        },
+        {
+          "id": "madness-wallhaven-gww9yl",
+          "score": 0.5693659
+        },
+        {
+          "id": "madness-wallhaven-po9eop",
+          "score": 0.5670639
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.52013916
+        },
+        {
+          "id": "madness-wallhaven-d88mmj",
+          "score": 0.51012635
+        },
+        {
+          "id": "madness-wallhaven-e88pr8",
+          "score": 0.509022
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.5088373
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.50843257
+        },
+        {
+          "id": "madness-wallhaven-5yyme5",
+          "score": 0.501639
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.49753436
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.49705344
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.49382645
+        },
+        {
+          "id": "wallpaper-086",
+          "score": 0.4937948
+        },
+        {
+          "id": "madness-wallhaven-ogg6q7",
+          "score": 0.4904338
+        },
+        {
+          "id": "madness-wallhaven-211d1x",
+          "score": 0.48982817
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.48533064
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.48532692
+        },
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.48113444
+        },
+        {
+          "id": "wallpaper-050",
+          "score": 0.47992256
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.4779078
+        },
+        {
+          "id": "madness-wallhaven-gwwv23",
+          "score": 0.4764614
+        },
+        {
+          "id": "madness-wallhaven-w55dp6",
+          "score": 0.47581303
+        },
+        {
+          "id": "madness-wallhaven-gwwq27",
+          "score": 0.4754611
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.47226495
+        },
+        {
+          "id": "wallpaper-052",
+          "score": 0.4708225
+        },
+        {
+          "id": "wallpaper-057",
+          "score": 0.47037908
+        },
+        {
+          "id": "madness-wallhaven-k88jv6",
+          "score": 0.47028637
+        },
+        {
+          "id": "madness-wallhaven-ogge85",
+          "score": 0.4691091
+        },
+        {
+          "id": "madness-wallhaven-yqqvv7",
+          "score": 0.46857482
+        },
+        {
+          "id": "madness-wallhaven-mll1mm",
+          "score": 0.46809015
+        },
+        {
+          "id": "madness-wallhaven-3qqvk9",
+          "score": 0.46748874
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.46671495
+        },
+        {
+          "id": "madness-wallhaven-qrrkor",
+          "score": 0.46588188
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.4642779
+        },
+        {
+          "id": "madness-wallhaven-1qqwq3",
+          "score": 0.46166468
+        },
+        {
+          "id": "wallpaper-041",
+          "score": 0.4612963
+        },
+        {
+          "id": "madness-wallhaven-7jj7ey",
+          "score": 0.46124378
+        },
+        {
+          "id": "madness-wallhaven-6llmg7",
+          "score": 0.46084294
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.4598188
+        },
+        {
+          "id": "madness-wallhaven-rqqwpw",
+          "score": 0.45916724
+        },
+        {
+          "id": "madness-wallhaven-k88291",
+          "score": 0.45913473
+        },
+        {
+          "id": "madness-wallhaven-2115ky",
+          "score": 0.45710135
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.4562577
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.45604348
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.45583057
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.455701
+        },
+        {
+          "id": "wallpaper-098",
+          "score": 0.45503867
+        },
+        {
+          "id": "madness-wallhaven-gwpo6e",
+          "score": 0.45481402
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "name": "grayscale",
+              "percent": 80
+            },
+            {
+              "color": "#ff0000",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "elapsedMs": 6.336060000001453,
+      "hits": [
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.87760913
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.8598788
+        },
+        {
+          "id": "madness-wallhaven-d8pk8m",
+          "score": 0.8531316
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.8477446
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.8475216
+        },
+        {
+          "id": "madness-wallhaven-9ooez8",
+          "score": 0.8432448
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.84133947
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.8396951
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.8364936
+        },
+        {
+          "id": "madness-wallhaven-3qqv1d",
+          "score": 0.8325262
+        },
+        {
+          "id": "wallpaper-043",
+          "score": 0.83183205
+        },
+        {
+          "id": "wallpaper-029",
+          "score": 0.8302968
+        },
+        {
+          "id": "madness-wallhaven-rqq1mm",
+          "score": 0.829566
+        },
+        {
+          "id": "madness-wallhaven-wqvoxr",
+          "score": 0.82824993
+        },
+        {
+          "id": "wallpaper-042",
+          "score": 0.8274811
+        },
+        {
+          "id": "madness-wallhaven-rqqw2q",
+          "score": 0.8267274
+        },
+        {
+          "id": "madness-wallhaven-w5eq57",
+          "score": 0.8233175
+        },
+        {
+          "id": "wallpaper-016",
+          "score": 0.82242906
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.81833833
+        },
+        {
+          "id": "madness-wallhaven-jeerzw",
+          "score": 0.8180918
+        },
+        {
+          "id": "madness-wallhaven-zppd8y",
+          "score": 0.81696355
+        },
+        {
+          "id": "madness-wallhaven-6llp5q",
+          "score": 0.8152129
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.8123093
+        },
+        {
+          "id": "madness-wallhaven-9oog5d",
+          "score": 0.81011695
+        },
+        {
+          "id": "madness-wallhaven-8ggwyj",
+          "score": 0.8099051
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.806878
+        },
+        {
+          "id": "madness-wallhaven-m9vqy9",
+          "score": 0.8063154
+        },
+        {
+          "id": "madness-wallhaven-gww69l",
+          "score": 0.8034513
+        },
+        {
+          "id": "madness-wallhaven-rqqe7q",
+          "score": 0.80341977
+        },
+        {
+          "id": "madness-wallhaven-8ggwro",
+          "score": 0.80044365
+        },
+        {
+          "id": "wallpaper-047",
+          "score": 0.7990996
+        },
+        {
+          "id": "madness-wallhaven-zppv8g",
+          "score": 0.7989383
+        },
+        {
+          "id": "madness-wallhaven-21127y",
+          "score": 0.79790175
+        },
+        {
+          "id": "madness-wallhaven-jeel8q",
+          "score": 0.7973969
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.7972596
+        },
+        {
+          "id": "madness-wallhaven-rqqoem",
+          "score": 0.79689634
+        },
+        {
+          "id": "madness-wallhaven-j52vqm",
+          "score": 0.79583573
+        },
+        {
+          "id": "madness-wallhaven-lyyxqy",
+          "score": 0.7955886
+        },
+        {
+          "id": "evaluation-gray-red-002-telephone",
+          "score": 0.79410386
+        },
+        {
+          "id": "madness-wallhaven-gww16q",
+          "score": 0.79359293
+        },
+        {
+          "id": "madness-wallhaven-x8359z",
+          "score": 0.7933096
+        },
+        {
+          "id": "madness-wallhaven-1qqer1",
+          "score": 0.7929758
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.7913625
+        },
+        {
+          "id": "wallpaper-097",
+          "score": 0.7905676
+        },
+        {
+          "id": "madness-wallhaven-d88qeo",
+          "score": 0.79015195
+        },
+        {
+          "id": "wallpaper-085",
+          "score": 0.7895086
+        },
+        {
+          "id": "madness-wallhaven-d88z63",
+          "score": 0.78877664
+        },
+        {
+          "id": "madness-wallhaven-yqxzqx",
+          "score": 0.7879987
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "name": "grayscale",
+              "percent": 80
+            },
+            {
+              "color": "#ff0000",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "error": "AbortError: signal is aborted without reason"
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 523,
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "name": "dark"
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "elapsedMs": 12.642324000014924,
+      "hits": [
+        {
+          "id": "madness-wallhaven-jeerxp",
+          "score": 0.9984685
+        },
+        {
+          "id": "madness-wallhaven-w55vwr",
+          "score": 0.9970921
+        },
+        {
+          "id": "madness-wallhaven-211wjx",
+          "score": 0.9967508
+        },
+        {
+          "id": "madness-wallhaven-5yyj69",
+          "score": 0.9964621
+        },
+        {
+          "id": "madness-wallhaven-yqq3wd",
+          "score": 0.9958512
+        },
+        {
+          "id": "madness-wallhaven-vppv3l",
+          "score": 0.99556875
+        },
+        {
+          "id": "madness-wallhaven-gwwvpe",
+          "score": 0.9945142
+        },
+        {
+          "id": "madness-wallhaven-3qqygv",
+          "score": 0.9936626
+        },
+        {
+          "id": "madness-wallhaven-d88jym",
+          "score": 0.992316
+        },
+        {
+          "id": "madness-wallhaven-rqqw7q",
+          "score": 0.99223846
+        },
+        {
+          "id": "madness-wallhaven-oggw5p",
+          "score": 0.99192053
+        },
+        {
+          "id": "madness-wallhaven-1qqrev",
+          "score": 0.990542
+        },
+        {
+          "id": "madness-wallhaven-6ll7dx",
+          "score": 0.9900233
+        },
+        {
+          "id": "madness-wallhaven-w55gjr",
+          "score": 0.9886163
+        },
+        {
+          "id": "madness-wallhaven-lyyp9y",
+          "score": 0.9840741
+        },
+        {
+          "id": "madness-wallhaven-e873x8",
+          "score": 0.9806913
+        },
+        {
+          "id": "madness-wallhaven-d88253",
+          "score": 0.97994167
+        },
+        {
+          "id": "madness-wallhaven-mllr38",
+          "score": 0.9767828
+        },
+        {
+          "id": "madness-wallhaven-gwwdeq",
+          "score": 0.96977985
+        },
+        {
+          "id": "madness-wallhaven-yqqv3x",
+          "score": 0.9663297
+        },
+        {
+          "id": "madness-wallhaven-e88r8o",
+          "score": 0.96616614
+        },
+        {
+          "id": "madness-wallhaven-7jj1p3",
+          "score": 0.9657057
+        },
+        {
+          "id": "madness-wallhaven-211986",
+          "score": 0.965222
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.9630354
+        },
+        {
+          "id": "madness-wallhaven-zppd8y",
+          "score": 0.9618688
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.9565084
+        },
+        {
+          "id": "madness-wallhaven-w55lqx",
+          "score": 0.95556855
+        },
+        {
+          "id": "madness-wallhaven-vppy93",
+          "score": 0.9547521
+        },
+        {
+          "id": "madness-wallhaven-ml3jm8",
+          "score": 0.9457186
+        },
+        {
+          "id": "madness-wallhaven-8g5qr2",
+          "score": 0.9442635
+        },
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.93481094
+        },
+        {
+          "id": "madness-wallhaven-jeewoy",
+          "score": 0.9339211
+        },
+        {
+          "id": "madness-wallhaven-8ggm6k",
+          "score": 0.93187314
+        },
+        {
+          "id": "madness-wallhaven-d882g3",
+          "score": 0.9313009
+        },
+        {
+          "id": "wallpaper-001",
+          "score": 0.92956436
+        },
+        {
+          "id": "madness-wallhaven-9ooez8",
+          "score": 0.9144419
+        },
+        {
+          "id": "wallpaper-005",
+          "score": 0.90973026
+        },
+        {
+          "id": "madness-wallhaven-d88vyl",
+          "score": 0.9082445
+        },
+        {
+          "id": "madness-wallhaven-k88kzd",
+          "score": 0.9038102
+        },
+        {
+          "id": "wallpaper-065",
+          "score": 0.9002207
+        },
+        {
+          "id": "madness-wallhaven-qrrlq7",
+          "score": 0.8997482
+        },
+        {
+          "id": "madness-wallhaven-8ggrqy",
+          "score": 0.89915997
+        },
+        {
+          "id": "wallpaper-011",
+          "score": 0.898976
+        },
+        {
+          "id": "madness-wallhaven-lyyker",
+          "score": 0.8978913
+        },
+        {
+          "id": "madness-wallhaven-w55mgq",
+          "score": 0.8971084
+        },
+        {
+          "id": "madness-wallhaven-gwwxwl",
+          "score": 0.8959389
+        },
+        {
+          "id": "madness-wallhaven-lyyj52",
+          "score": 0.89520955
+        },
+        {
+          "id": "madness-wallhaven-rqqw2q",
+          "score": 0.89441574
+        },
+        {
+          "id": "madness-wallhaven-9oo2dk",
+          "score": 0.89368993
+        },
+        {
+          "id": "madness-wallhaven-9oow31",
+          "score": 0.8936582
+        },
+        {
+          "id": "madness-wallhaven-rqqgkq",
+          "score": 0.89084655
+        },
+        {
+          "id": "madness-wallhaven-5yyy85",
+          "score": 0.8883729
+        },
+        {
+          "id": "madness-wallhaven-gwwm6d",
+          "score": 0.8877269
+        },
+        {
+          "id": "madness-wallhaven-oggvw9",
+          "score": 0.88610744
+        },
+        {
+          "id": "madness-wallhaven-yqqqrg",
+          "score": 0.8827801
+        },
+        {
+          "id": "madness-wallhaven-rqqygw",
+          "score": 0.882191
+        },
+        {
+          "id": "madness-wallhaven-gwpo6e",
+          "score": 0.8808164
+        },
+        {
+          "id": "madness-wallhaven-yqq3px",
+          "score": 0.8798083
+        },
+        {
+          "id": "madness-wallhaven-3qqv1d",
+          "score": 0.87621784
+        },
+        {
+          "id": "wallpaper-023",
+          "score": 0.8751388
+        },
+        {
+          "id": "madness-wallhaven-rqqy5m",
+          "score": 0.8721145
+        },
+        {
+          "id": "wallpaper-067",
+          "score": 0.87132776
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.87124944
+        },
+        {
+          "id": "madness-wallhaven-d88d53",
+          "score": 0.87062913
+        },
+        {
+          "id": "madness-wallhaven-poo1kp",
+          "score": 0.8702331
+        },
+        {
+          "id": "wallpaper-079",
+          "score": 0.86995953
+        },
+        {
+          "id": "madness-wallhaven-2119yx",
+          "score": 0.8692
+        },
+        {
+          "id": "madness-wallhaven-xee36v",
+          "score": 0.8680091
+        },
+        {
+          "id": "madness-wallhaven-jeeq3q",
+          "score": 0.8676969
+        },
+        {
+          "id": "madness-wallhaven-zppq2j",
+          "score": 0.86756456
+        },
+        {
+          "id": "madness-wallhaven-6llemx",
+          "score": 0.86453503
+        },
+        {
+          "id": "madness-wallhaven-d88q5g",
+          "score": 0.8643895
+        },
+        {
+          "id": "madness-wallhaven-vpp6d5",
+          "score": 0.86302215
+        },
+        {
+          "id": "madness-wallhaven-jeerzw",
+          "score": 0.86008537
+        },
+        {
+          "id": "madness-wallhaven-d88z63",
+          "score": 0.8600775
+        },
+        {
+          "id": "madness-wallhaven-6o2qd7",
+          "score": 0.8590166
+        },
+        {
+          "id": "madness-wallhaven-jee8ry",
+          "score": 0.85573417
+        },
+        {
+          "id": "madness-wallhaven-5yy8v1",
+          "score": 0.85314894
+        },
+        {
+          "id": "wallpaper-008",
+          "score": 0.85182726
+        },
+        {
+          "id": "madness-wallhaven-gwwdpe",
+          "score": 0.8505594
+        },
+        {
+          "id": "madness-wallhaven-7jjo5e",
+          "score": 0.850035
+        },
+        {
+          "id": "madness-wallhaven-k881gm",
+          "score": 0.8470125
+        },
+        {
+          "id": "madness-wallhaven-vpprr8",
+          "score": 0.8457714
+        },
+        {
+          "id": "madness-wallhaven-5yymk9",
+          "score": 0.8457594
+        },
+        {
+          "id": "madness-wallhaven-3qqgo3",
+          "score": 0.84437263
+        },
+        {
+          "id": "madness-wallhaven-e88v9o",
+          "score": 0.8440139
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.84334177
+        },
+        {
+          "id": "madness-wallhaven-d8pk8m",
+          "score": 0.8424843
+        },
+        {
+          "id": "evaluation-gray-red-002-umbrella",
+          "score": 0.8423011
+        },
+        {
+          "id": "madness-wallhaven-w55m8x",
+          "score": 0.84045815
+        },
+        {
+          "id": "wallpaper-041",
+          "score": 0.8402773
+        },
+        {
+          "id": "wallpaper-053",
+          "score": 0.83913153
+        },
+        {
+          "id": "madness-wallhaven-lyyk7y",
+          "score": 0.83897823
+        },
+        {
+          "id": "wallpaper-007",
+          "score": 0.83875936
+        },
+        {
+          "id": "madness-wallhaven-7jjkde",
+          "score": 0.83863544
+        },
+        {
+          "id": "madness-wallhaven-mllw39",
+          "score": 0.83783644
+        },
+        {
+          "id": "wallpaper-016",
+          "score": 0.8355777
+        },
+        {
+          "id": "madness-wallhaven-yqqvv7",
+          "score": 0.8340639
+        },
+        {
+          "id": "madness-wallhaven-3qq8jd",
+          "score": 0.83225536
+        },
+        {
+          "id": "wallpaper-022",
+          "score": 0.82842034
+        },
+        {
+          "id": "madness-wallhaven-8ggwro",
+          "score": 0.82793623
+        },
+        {
+          "id": "madness-wallhaven-211jgy",
+          "score": 0.8273654
+        },
+        {
+          "id": "madness-wallhaven-poo7gj",
+          "score": 0.8265671
+        },
+        {
+          "id": "madness-wallhaven-yqqkdg",
+          "score": 0.82637554
+        },
+        {
+          "id": "wallpaper-091",
+          "score": 0.8254179
+        },
+        {
+          "id": "wallpaper-027",
+          "score": 0.8249911
+        },
+        {
+          "id": "madness-wallhaven-xee33d",
+          "score": 0.8229553
+        },
+        {
+          "id": "madness-wallhaven-zppqdv",
+          "score": 0.82273954
+        },
+        {
+          "id": "madness-wallhaven-gwwlm3",
+          "score": 0.8221468
+        },
+        {
+          "id": "madness-wallhaven-6lly96",
+          "score": 0.8219771
+        },
+        {
+          "id": "madness-wallhaven-xee3kz",
+          "score": 0.82141894
+        },
+        {
+          "id": "madness-wallhaven-5yypm9",
+          "score": 0.82128084
+        },
+        {
+          "id": "wallpaper-025",
+          "score": 0.8210278
+        },
+        {
+          "id": "madness-wallhaven-3qq5j3",
+          "score": 0.8200433
+        },
+        {
+          "id": "madness-wallhaven-jeej1q",
+          "score": 0.81935424
+        },
+        {
+          "id": "madness-wallhaven-gww69l",
+          "score": 0.8191079
+        },
+        {
+          "id": "madness-wallhaven-gwweme",
+          "score": 0.817255
+        },
+        {
+          "id": "wallpaper-047",
+          "score": 0.8171713
+        },
+        {
+          "id": "madness-wallhaven-2112dx",
+          "score": 0.8158403
+        },
+        {
+          "id": "wallpaper-074",
+          "score": 0.8153952
+        },
+        {
+          "id": "wallpaper-063",
+          "score": 0.81534636
+        },
+        {
+          "id": "madness-wallhaven-9oor8k",
+          "score": 0.8144218
+        },
+        {
+          "id": "madness-wallhaven-gwwv9e",
+          "score": 0.81401527
+        },
+        {
+          "id": "wallpaper-015",
+          "score": 0.8132983
+        },
+        {
+          "id": "madness-wallhaven-6llm17",
+          "score": 0.8129792
+        },
+        {
+          "id": "madness-wallhaven-3qlxjy",
+          "score": 0.812844
+        },
+        {
+          "id": "madness-wallhaven-vmwlmm",
+          "score": 0.81191546
+        },
+        {
+          "id": "madness-wallhaven-qrr3m5",
+          "score": 0.81171924
+        },
+        {
+          "id": "madness-wallhaven-yqqe27",
+          "score": 0.8113952
+        },
+        {
+          "id": "madness-wallhaven-w5eq57",
+          "score": 0.81119317
+        },
+        {
+          "id": "wallpaper-043",
+          "score": 0.808222
+        },
+        {
+          "id": "wallpaper-089",
+          "score": 0.80772996
+        },
+        {
+          "id": "madness-wallhaven-qrre3d",
+          "score": 0.8049975
+        },
+        {
+          "id": "madness-wallhaven-9oo7od",
+          "score": 0.8021521
+        },
+        {
+          "id": "madness-wallhaven-yqqewx",
+          "score": 0.80202466
+        },
+        {
+          "id": "wallpaper-095",
+          "score": 0.8015187
+        },
+        {
+          "id": "madness-wallhaven-lyyxqy",
+          "score": 0.80140615
+        },
+        {
+          "id": "madness-wallhaven-8gg61j",
+          "score": 0.8006429
+        },
+        {
+          "id": "madness-wallhaven-1qqlq1",
+          "score": 0.79823834
+        },
+        {
+          "id": "madness-wallhaven-xee7dd",
+          "score": 0.7974383
+        },
+        {
+          "id": "madness-wallhaven-rqqxew",
+          "score": 0.7959832
+        },
+        {
+          "id": "madness-wallhaven-ml3ke9",
+          "score": 0.7956659
+        },
+        {
+          "id": "madness-wallhaven-mllvky",
+          "score": 0.79519105
+        },
+        {
+          "id": "madness-wallhaven-jeew7y",
+          "score": 0.7947422
+        },
+        {
+          "id": "madness-wallhaven-ogge85",
+          "score": 0.7937949
+        },
+        {
+          "id": "madness-wallhaven-vpplmp",
+          "score": 0.7875114
+        },
+        {
+          "id": "madness-wallhaven-e8891l",
+          "score": 0.78728074
+        },
+        {
+          "id": "wallpaper-090",
+          "score": 0.7860839
+        },
+        {
+          "id": "madness-wallhaven-5yyrx5",
+          "score": 0.78572094
+        },
+        {
+          "id": "wallpaper-071",
+          "score": 0.7843199
+        },
+        {
+          "id": "madness-wallhaven-k88g21",
+          "score": 0.78218555
+        },
+        {
+          "id": "wallpaper-045",
+          "score": 0.7809764
+        },
+        {
+          "id": "madness-wallhaven-mllvr9",
+          "score": 0.78083557
+        },
+        {
+          "id": "madness-wallhaven-zppjyg",
+          "score": 0.7797256
+        },
+        {
+          "id": "madness-wallhaven-jeeypy",
+          "score": 0.7791739
+        },
+        {
+          "id": "wallpaper-076",
+          "score": 0.7771279
+        },
+        {
+          "id": "madness-wallhaven-1qqwq3",
+          "score": 0.7759921
+        },
+        {
+          "id": "madness-wallhaven-xee3wz",
+          "score": 0.77378297
+        },
+        {
+          "id": "wallpaper-042",
+          "score": 0.7733441
+        },
+        {
+          "id": "madness-wallhaven-ml91l9",
+          "score": 0.7731685
+        },
+        {
+          "id": "madness-wallhaven-oggv5m",
+          "score": 0.7727566
+        },
+        {
+          "id": "madness-wallhaven-vppry3",
+          "score": 0.77275556
+        },
+        {
+          "id": "madness-wallhaven-d88w2l",
+          "score": 0.76964045
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.76809734
+        },
+        {
+          "id": "madness-wallhaven-6ll7pq",
+          "score": 0.7671333
+        },
+        {
+          "id": "madness-wallhaven-w55dp6",
+          "score": 0.76668334
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "score": 0.7637942
+        },
+        {
+          "id": "madness-wallhaven-w556l7",
+          "score": 0.76357555
+        },
+        {
+          "id": "madness-wallhaven-6ll2zw",
+          "score": 0.7624966
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.7623968
+        },
+        {
+          "id": "madness-wallhaven-7jjom3",
+          "score": 0.7623178
+        },
+        {
+          "id": "madness-wallhaven-jeevkm",
+          "score": 0.7619388
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.7612925
+        },
+        {
+          "id": "madness-wallhaven-6llp5q",
+          "score": 0.76113117
+        },
+        {
+          "id": "madness-wallhaven-j52vqm",
+          "score": 0.76028454
+        },
+        {
+          "id": "wallpaper-033",
+          "score": 0.7599373
+        },
+        {
+          "id": "madness-wallhaven-5yyme5",
+          "score": 0.7567039
+        },
+        {
+          "id": "wallpaper-048",
+          "score": 0.75640386
+        },
+        {
+          "id": "wallpaper-002",
+          "score": 0.75557524
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.7542003
+        },
+        {
+          "id": "madness-wallhaven-k88291",
+          "score": 0.752294
+        },
+        {
+          "id": "madness-wallhaven-w55mqx",
+          "score": 0.74966514
+        },
+        {
+          "id": "madness-wallhaven-jee1rw",
+          "score": 0.7485421
+        },
+        {
+          "id": "madness-wallhaven-7jp81o",
+          "score": 0.7478034
+        },
+        {
+          "id": "wallpaper-032",
+          "score": 0.7459674
+        },
+        {
+          "id": "madness-wallhaven-6llzrw",
+          "score": 0.74548376
+        },
+        {
+          "id": "wallpaper-068",
+          "score": 0.7451339
+        },
+        {
+          "id": "madness-wallhaven-po9eop",
+          "score": 0.74410003
+        },
+        {
+          "id": "madness-wallhaven-lyyjvy",
+          "score": 0.7438325
+        },
+        {
+          "id": "wallpaper-029",
+          "score": 0.74301046
+        },
+        {
+          "id": "madness-wallhaven-8ggwyj",
+          "score": 0.7426664
+        },
+        {
+          "id": "madness-wallhaven-6llmg7",
+          "score": 0.74211335
+        },
+        {
+          "id": "madness-wallhaven-7jje13",
+          "score": 0.7415014
+        },
+        {
+          "id": "madness-wallhaven-xee72o",
+          "score": 0.73857903
+        },
+        {
+          "id": "wallpaper-036",
+          "score": 0.73591614
+        },
+        {
+          "id": "madness-wallhaven-gwwxpl",
+          "score": 0.7351966
+        },
+        {
+          "id": "madness-wallhaven-gww16q",
+          "score": 0.7334828
+        },
+        {
+          "id": "madness-wallhaven-vpp2g5",
+          "score": 0.7330558
+        },
+        {
+          "id": "madness-wallhaven-mllg19",
+          "score": 0.73199975
+        },
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.7308779
+        },
+        {
+          "id": "wallpaper-017",
+          "score": 0.729912
+        },
+        {
+          "id": "madness-wallhaven-jeeoxq",
+          "score": 0.7287501
+        },
+        {
+          "id": "madness-wallhaven-1qqxlv",
+          "score": 0.7278902
+        },
+        {
+          "id": "madness-wallhaven-jeev6q",
+          "score": 0.7247833
+        },
+        {
+          "id": "madness-wallhaven-211519",
+          "score": 0.7241259
+        },
+        {
+          "id": "madness-wallhaven-qrrlzr",
+          "score": 0.72374177
+        },
+        {
+          "id": "madness-wallhaven-6llg7q",
+          "score": 0.7228909
+        },
+        {
+          "id": "madness-wallhaven-yqqwvd",
+          "score": 0.7222148
+        },
+        {
+          "id": "wallpaper-086",
+          "score": 0.72031844
+        },
+        {
+          "id": "wallpaper-082",
+          "score": 0.71786505
+        },
+        {
+          "id": "madness-wallhaven-qrrkor",
+          "score": 0.71691185
+        },
+        {
+          "id": "madness-wallhaven-w55lz6",
+          "score": 0.71688175
+        },
+        {
+          "id": "madness-wallhaven-zppv8g",
+          "score": 0.7165989
+        },
+        {
+          "id": "wallpaper-070",
+          "score": 0.71509206
+        },
+        {
+          "id": "wallpaper-030",
+          "score": 0.7136076
+        },
+        {
+          "id": "madness-wallhaven-jeer9q",
+          "score": 0.7135494
+        },
+        {
+          "id": "wallpaper-100",
+          "score": 0.7131424
+        },
+        {
+          "id": "madness-wallhaven-mllrdk",
+          "score": 0.7121186
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.7114233
+        },
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "score": 0.71084785
+        },
+        {
+          "id": "madness-wallhaven-3qqgrv",
+          "score": 0.70970285
+        },
+        {
+          "id": "wallpaper-092",
+          "score": 0.7060686
+        },
+        {
+          "id": "madness-wallhaven-vppo6p",
+          "score": 0.70516735
+        },
+        {
+          "id": "madness-wallhaven-jeelj5",
+          "score": 0.704253
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.7014461
+        },
+        {
+          "id": "madness-wallhaven-e88q7k",
+          "score": 0.7012931
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.70078117
+        },
+        {
+          "id": "madness-wallhaven-21yp59",
+          "score": 0.69738156
+        },
+        {
+          "id": "evaluation-green-red-leaves",
+          "score": 0.694649
+        },
+        {
+          "id": "madness-wallhaven-zpp3mg",
+          "score": 0.69418234
+        },
+        {
+          "id": "madness-wallhaven-zpp5yy",
+          "score": 0.6923378
+        },
+        {
+          "id": "madness-wallhaven-7jjwp3",
+          "score": 0.6922946
+        },
+        {
+          "id": "madness-wallhaven-8gg1do",
+          "score": 0.6905922
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.6881601
+        },
+        {
+          "id": "madness-wallhaven-jexkwm",
+          "score": 0.68668693
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.6827665
+        },
+        {
+          "id": "wallpaper-061",
+          "score": 0.6825631
+        },
+        {
+          "id": "madness-wallhaven-lyypwr",
+          "score": 0.6793057
+        },
+        {
+          "id": "madness-wallhaven-211er6",
+          "score": 0.6791196
+        },
+        {
+          "id": "madness-wallhaven-lyy22q",
+          "score": 0.6781934
+        },
+        {
+          "id": "madness-wallhaven-e88pxk",
+          "score": 0.6748119
+        },
+        {
+          "id": "wallpaper-031",
+          "score": 0.6732843
+        },
+        {
+          "id": "madness-wallhaven-1qqmk3",
+          "score": 0.6718456
+        },
+        {
+          "id": "madness-wallhaven-3qq7j9",
+          "score": 0.67135113
+        },
+        {
+          "id": "madness-wallhaven-6ll5z7",
+          "score": 0.67101616
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.6686343
+        },
+        {
+          "id": "madness-wallhaven-gwwdm3",
+          "score": 0.6684144
+        },
+        {
+          "id": "madness-wallhaven-jeeqxq",
+          "score": 0.6681398
+        },
+        {
+          "id": "wallpaper-050",
+          "score": 0.6671638
+        },
+        {
+          "id": "wallpaper-046",
+          "score": 0.666912
+        },
+        {
+          "id": "madness-wallhaven-vpp1vl",
+          "score": 0.66671765
+        },
+        {
+          "id": "madness-wallhaven-8ggdxo",
+          "score": 0.665597
+        },
+        {
+          "id": "madness-wallhaven-qrrejd",
+          "score": 0.6653565
+        },
+        {
+          "id": "madness-wallhaven-yqxzqx",
+          "score": 0.6629324
+        },
+        {
+          "id": "madness-wallhaven-95jgkk",
+          "score": 0.6614085
+        },
+        {
+          "id": "madness-wallhaven-w55kvr",
+          "score": 0.6612546
+        },
+        {
+          "id": "wallpaper-062",
+          "score": 0.65896845
+        },
+        {
+          "id": "madness-wallhaven-mlly98",
+          "score": 0.65784854
+        },
+        {
+          "id": "madness-wallhaven-yqqrgl",
+          "score": 0.6578194
+        },
+        {
+          "id": "madness-wallhaven-yqqw7g",
+          "score": 0.6559037
+        },
+        {
+          "id": "madness-wallhaven-poojxm",
+          "score": 0.6555627
+        },
+        {
+          "id": "madness-wallhaven-9oo2k1",
+          "score": 0.6553453
+        },
+        {
+          "id": "madness-wallhaven-lyyx5q",
+          "score": 0.6538527
+        },
+        {
+          "id": "madness-wallhaven-poowxp",
+          "score": 0.65330046
+        },
+        {
+          "id": "wallpaper-018",
+          "score": 0.652957
+        },
+        {
+          "id": "madness-wallhaven-zpp5ww",
+          "score": 0.6520505
+        },
+        {
+          "id": "madness-wallhaven-rqq1mm",
+          "score": 0.64961773
+        },
+        {
+          "id": "madness-wallhaven-k883md",
+          "score": 0.6491154
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.6481929
+        },
+        {
+          "id": "madness-wallhaven-mll1ry",
+          "score": 0.6469933
+        },
+        {
+          "id": "madness-wallhaven-gwwv23",
+          "score": 0.6467184
+        },
+        {
+          "id": "madness-wallhaven-6llzxw",
+          "score": 0.6457757
+        },
+        {
+          "id": "madness-wallhaven-lyydwl",
+          "score": 0.6453021
+        },
+        {
+          "id": "madness-wallhaven-6llrk7",
+          "score": 0.64447886
+        },
+        {
+          "id": "madness-wallhaven-lyyko2",
+          "score": 0.6418584
+        },
+        {
+          "id": "madness-wallhaven-1qqdgw",
+          "score": 0.63512313
+        },
+        {
+          "id": "madness-wallhaven-lql7vp",
+          "score": 0.6329304
+        },
+        {
+          "id": "madness-wallhaven-qr27rq",
+          "score": 0.63081115
+        },
+        {
+          "id": "wallpaper-057",
+          "score": 0.6305385
+        },
+        {
+          "id": "madness-wallhaven-mll1mm",
+          "score": 0.62874246
+        },
+        {
+          "id": "madness-wallhaven-5ygeg7",
+          "score": 0.6267306
+        },
+        {
+          "id": "wallpaper-077",
+          "score": 0.6258943
+        },
+        {
+          "id": "madness-wallhaven-w55rr7",
+          "score": 0.6255477
+        },
+        {
+          "id": "madness-wallhaven-5yyq53",
+          "score": 0.6248388
+        },
+        {
+          "id": "madness-wallhaven-rqqoem",
+          "score": 0.62371683
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "score": 0.6211862
+        },
+        {
+          "id": "madness-wallhaven-e8865l",
+          "score": 0.616838
+        },
+        {
+          "id": "wallpaper-013",
+          "score": 0.616364
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.61561924
+        },
+        {
+          "id": "wallpaper-019",
+          "score": 0.61532664
+        },
+        {
+          "id": "madness-wallhaven-jee15p",
+          "score": 0.6142181
+        },
+        {
+          "id": "madness-wallhaven-211xrg",
+          "score": 0.6122926
+        },
+        {
+          "id": "madness-wallhaven-mllv3k",
+          "score": 0.6117072
+        },
+        {
+          "id": "madness-wallhaven-9oolmx",
+          "score": 0.6111177
+        },
+        {
+          "id": "madness-wallhaven-yqqww7",
+          "score": 0.6108752
+        },
+        {
+          "id": "madness-wallhaven-lyy7kp",
+          "score": 0.6063124
+        },
+        {
+          "id": "madness-wallhaven-d88mmj",
+          "score": 0.6053781
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.6051851
+        },
+        {
+          "id": "wallpaper-021",
+          "score": 0.6049246
+        },
+        {
+          "id": "madness-wallhaven-e882dk",
+          "score": 0.6045539
+        },
+        {
+          "id": "wallpaper-087",
+          "score": 0.6039934
+        },
+        {
+          "id": "madness-wallhaven-xee7jd",
+          "score": 0.60387224
+        },
+        {
+          "id": "madness-wallhaven-poov9e",
+          "score": 0.60319275
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.6026907
+        },
+        {
+          "id": "madness-wallhaven-gwwkoq",
+          "score": 0.60126185
+        },
+        {
+          "id": "madness-wallhaven-xeeomd",
+          "score": 0.59974754
+        },
+        {
+          "id": "madness-wallhaven-1qqe13",
+          "score": 0.59894454
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.5983905
+        },
+        {
+          "id": "madness-wallhaven-2115ky",
+          "score": 0.5970181
+        },
+        {
+          "id": "madness-wallhaven-8ggwl1",
+          "score": 0.59560406
+        },
+        {
+          "id": "wallpaper-014",
+          "score": 0.5931916
+        },
+        {
+          "id": "madness-wallhaven-mllykm",
+          "score": 0.5925426
+        },
+        {
+          "id": "madness-wallhaven-qrrey5",
+          "score": 0.5919256
+        },
+        {
+          "id": "madness-wallhaven-e88vyk",
+          "score": 0.59174025
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.5904014
+        },
+        {
+          "id": "madness-wallhaven-qrroml",
+          "score": 0.5883899
+        },
+        {
+          "id": "madness-wallhaven-k88jld",
+          "score": 0.5880541
+        },
+        {
+          "id": "madness-wallhaven-e88qdr",
+          "score": 0.58644307
+        },
+        {
+          "id": "madness-wallhaven-gww9yl",
+          "score": 0.5852855
+        },
+        {
+          "id": "madness-wallhaven-7jj1qo",
+          "score": 0.58423126
+        },
+        {
+          "id": "madness-wallhaven-jeekjy",
+          "score": 0.58320063
+        },
+        {
+          "id": "wallpaper-024",
+          "score": 0.5828339
+        },
+        {
+          "id": "madness-wallhaven-jeeokp",
+          "score": 0.58206457
+        },
+        {
+          "id": "madness-wallhaven-rqqj61",
+          "score": 0.57906395
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.5772954
+        },
+        {
+          "id": "madness-wallhaven-d88qeo",
+          "score": 0.57537943
+        },
+        {
+          "id": "madness-wallhaven-3qqrp3",
+          "score": 0.5749836
+        },
+        {
+          "id": "madness-wallhaven-vpp19p",
+          "score": 0.5733789
+        },
+        {
+          "id": "wallpaper-075",
+          "score": 0.57312435
+        },
+        {
+          "id": "wallpaper-085",
+          "score": 0.5726552
+        },
+        {
+          "id": "madness-wallhaven-6lle7l",
+          "score": 0.5704932
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.5704371
+        },
+        {
+          "id": "madness-wallhaven-w557rr",
+          "score": 0.57002616
+        },
+        {
+          "id": "madness-wallhaven-yqq21g",
+          "score": 0.5695158
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.5688568
+        },
+        {
+          "id": "madness-wallhaven-qrrldr",
+          "score": 0.5685423
+        },
+        {
+          "id": "madness-wallhaven-e88pr8",
+          "score": 0.5682421
+        },
+        {
+          "id": "madness-wallhaven-j3511m",
+          "score": 0.5677315
+        },
+        {
+          "id": "madness-wallhaven-6lle1w",
+          "score": 0.5674871
+        },
+        {
+          "id": "madness-wallhaven-gwwqvq",
+          "score": 0.5663322
+        },
+        {
+          "id": "madness-wallhaven-13qmlw",
+          "score": 0.5648497
+        },
+        {
+          "id": "madness-wallhaven-w55re6",
+          "score": 0.56455415
+        },
+        {
+          "id": "madness-wallhaven-d882yl",
+          "score": 0.5628038
+        },
+        {
+          "id": "wallpaper-035",
+          "score": 0.56035095
+        },
+        {
+          "id": "madness-wallhaven-21127y",
+          "score": 0.5503052
+        },
+        {
+          "id": "madness-wallhaven-211d1x",
+          "score": 0.5473881
+        },
+        {
+          "id": "madness-wallhaven-8gg6eo",
+          "score": 0.54692554
+        },
+        {
+          "id": "wallpaper-080",
+          "score": 0.5468083
+        },
+        {
+          "id": "madness-wallhaven-6llpwq",
+          "score": 0.5459968
+        },
+        {
+          "id": "madness-wallhaven-zppz3w",
+          "score": 0.5450061
+        },
+        {
+          "id": "madness-wallhaven-k88jv6",
+          "score": 0.54147243
+        },
+        {
+          "id": "wallpaper-098",
+          "score": 0.53846264
+        },
+        {
+          "id": "madness-wallhaven-w55mzq",
+          "score": 0.5353968
+        },
+        {
+          "id": "evaluation-gray-red-002-telephone",
+          "score": 0.5313276
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.52435946
+        },
+        {
+          "id": "madness-wallhaven-6llgd6",
+          "score": 0.5237536
+        },
+        {
+          "id": "madness-wallhaven-jeeozw",
+          "score": 0.52352303
+        },
+        {
+          "id": "madness-wallhaven-lmk37p",
+          "score": 0.52230424
+        },
+        {
+          "id": "wallpaper-099",
+          "score": 0.5217083
+        },
+        {
+          "id": "madness-wallhaven-1qqer1",
+          "score": 0.52155775
+        },
+        {
+          "id": "madness-wallhaven-qrrmp5",
+          "score": 0.5203991
+        },
+        {
+          "id": "madness-wallhaven-3qqem9",
+          "score": 0.5203391
+        },
+        {
+          "id": "madness-wallhaven-gwwq8e",
+          "score": 0.51992863
+        },
+        {
+          "id": "wallpaper-012",
+          "score": 0.5195801
+        },
+        {
+          "id": "madness-wallhaven-rqqjrj",
+          "score": 0.51739687
+        },
+        {
+          "id": "madness-wallhaven-gww9kd",
+          "score": 0.51662904
+        },
+        {
+          "id": "wallpaper-078",
+          "score": 0.5154518
+        },
+        {
+          "id": "madness-wallhaven-9oopek",
+          "score": 0.51504695
+        },
+        {
+          "id": "wallpaper-034",
+          "score": 0.5149178
+        },
+        {
+          "id": "madness-wallhaven-m9vqy9",
+          "score": 0.51378274
+        },
+        {
+          "id": "madness-wallhaven-3qq6m3",
+          "score": 0.5136847
+        },
+        {
+          "id": "madness-wallhaven-8ggez2",
+          "score": 0.5118262
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.51121145
+        },
+        {
+          "id": "madness-wallhaven-xl57go",
+          "score": 0.5094136
+        },
+        {
+          "id": "madness-wallhaven-9ooe9k",
+          "score": 0.50705457
+        },
+        {
+          "id": "madness-wallhaven-vppyjp",
+          "score": 0.50640786
+        },
+        {
+          "id": "madness-wallhaven-211lky",
+          "score": 0.5042311
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.50402457
+        },
+        {
+          "id": "madness-wallhaven-jeedjw",
+          "score": 0.503557
+        },
+        {
+          "id": "wallpaper-072",
+          "score": 0.5030737
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.5021026
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.4949216
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.49469897
+        },
+        {
+          "id": "wallpaper-026",
+          "score": 0.49319994
+        },
+        {
+          "id": "wallpaper-054",
+          "score": 0.4928165
+        },
+        {
+          "id": "wallpaper-064",
+          "score": 0.4910329
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.49098045
+        },
+        {
+          "id": "wallpaper-020",
+          "score": 0.4907882
+        },
+        {
+          "id": "madness-wallhaven-7jjm3v",
+          "score": 0.48991814
+        },
+        {
+          "id": "madness-wallhaven-p8jqem",
+          "score": 0.48985854
+        },
+        {
+          "id": "madness-wallhaven-oggl19",
+          "score": 0.4883053
+        },
+        {
+          "id": "madness-wallhaven-qrrox7",
+          "score": 0.48282927
+        },
+        {
+          "id": "wallpaper-037",
+          "score": 0.48254195
+        },
+        {
+          "id": "madness-wallhaven-r7kpmm",
+          "score": 0.4790524
+        },
+        {
+          "id": "madness-wallhaven-xe6qdv",
+          "score": 0.47808424
+        },
+        {
+          "id": "wallpaper-039",
+          "score": 0.4776072
+        },
+        {
+          "id": "madness-wallhaven-vppdjm",
+          "score": 0.47700444
+        },
+        {
+          "id": "madness-wallhaven-7jj7ey",
+          "score": 0.4762697
+        },
+        {
+          "id": "madness-wallhaven-yq8k2d",
+          "score": 0.4712558
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.4668084
+        },
+        {
+          "id": "madness-wallhaven-poog2e",
+          "score": 0.46619064
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.4640938
+        },
+        {
+          "id": "madness-wallhaven-w55w3r",
+          "score": 0.4639749
+        },
+        {
+          "id": "madness-wallhaven-gwwmxq",
+          "score": 0.46052396
+        },
+        {
+          "id": "madness-wallhaven-6llrl7",
+          "score": 0.46042678
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.45864892
+        },
+        {
+          "id": "madness-wallhaven-rqqwpw",
+          "score": 0.4584324
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.4561094
+        },
+        {
+          "id": "madness-wallhaven-ogg6q7",
+          "score": 0.45409563
+        },
+        {
+          "id": "madness-wallhaven-73og6v",
+          "score": 0.45362797
+        },
+        {
+          "id": "madness-wallhaven-d88k3m",
+          "score": 0.45186785
+        },
+        {
+          "id": "madness-wallhaven-5yy3d3",
+          "score": 0.44702658
+        },
+        {
+          "id": "madness-wallhaven-vppd75",
+          "score": 0.44661725
+        },
+        {
+          "id": "madness-wallhaven-lyyr9r",
+          "score": 0.4453756
+        },
+        {
+          "id": "madness-wallhaven-gwwdrd",
+          "score": 0.4423714
+        },
+        {
+          "id": "wallpaper-004",
+          "score": 0.4423454
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.4396744
+        },
+        {
+          "id": "madness-wallhaven-5yymd3",
+          "score": 0.4388427
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.43834117
+        },
+        {
+          "id": "madness-wallhaven-rqqe7q",
+          "score": 0.43553397
+        },
+        {
+          "id": "madness-wallhaven-e881lw",
+          "score": 0.43351555
+        },
+        {
+          "id": "madness-wallhaven-poopke",
+          "score": 0.4330175
+        },
+        {
+          "id": "madness-wallhaven-9oog5d",
+          "score": 0.43292037
+        },
+        {
+          "id": "madness-wallhaven-k885z7",
+          "score": 0.43221873
+        },
+        {
+          "id": "madness-wallhaven-ogg1wl",
+          "score": 0.43169937
+        },
+        {
+          "id": "madness-wallhaven-mdvo1y",
+          "score": 0.43106103
+        },
+        {
+          "id": "madness-wallhaven-jeey2y",
+          "score": 0.4301967
+        },
+        {
+          "id": "madness-wallhaven-poo99j",
+          "score": 0.42792848
+        },
+        {
+          "id": "wallpaper-059",
+          "score": 0.42673516
+        },
+        {
+          "id": "madness-wallhaven-1qqlew",
+          "score": 0.4228895
+        },
+        {
+          "id": "madness-wallhaven-jeed6q",
+          "score": 0.4226471
+        },
+        {
+          "id": "madness-wallhaven-mllm61",
+          "score": 0.42112282
+        },
+        {
+          "id": "madness-wallhaven-5yy6r9",
+          "score": 0.41738084
+        },
+        {
+          "id": "wallpaper-056",
+          "score": 0.41538078
+        },
+        {
+          "id": "madness-wallhaven-1qqx1g",
+          "score": 0.4118182
+        },
+        {
+          "id": "wallpaper-073",
+          "score": 0.41095465
+        },
+        {
+          "id": "madness-wallhaven-gwwq27",
+          "score": 0.4078171
+        },
+        {
+          "id": "madness-wallhaven-zpproy",
+          "score": 0.4060572
+        },
+        {
+          "id": "madness-wallhaven-6llwv6",
+          "score": 0.4054384
+        },
+        {
+          "id": "madness-wallhaven-8gge6y",
+          "score": 0.40499803
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.4042266
+        },
+        {
+          "id": "madness-wallhaven-jeekxm",
+          "score": 0.4040688
+        },
+        {
+          "id": "madness-wallhaven-k88ld6",
+          "score": 0.4001313
+        },
+        {
+          "id": "madness-wallhaven-k881zd",
+          "score": 0.39917582
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.39325738
+        },
+        {
+          "id": "madness-wallhaven-yqqemd",
+          "score": 0.39038584
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.3886064
+        },
+        {
+          "id": "madness-wallhaven-j5eqpw",
+          "score": 0.3840654
+        },
+        {
+          "id": "madness-wallhaven-lyyg8p",
+          "score": 0.38267013
+        },
+        {
+          "id": "madness-wallhaven-poomw3",
+          "score": 0.38047537
+        },
+        {
+          "id": "madness-wallhaven-ogg1kp",
+          "score": 0.37902355
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.3768967
+        },
+        {
+          "id": "madness-wallhaven-9oop2d",
+          "score": 0.3762743
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.37580106
+        },
+        {
+          "id": "madness-wallhaven-d88v53",
+          "score": 0.37549976
+        },
+        {
+          "id": "madness-wallhaven-zpp6mw",
+          "score": 0.37251198
+        },
+        {
+          "id": "madness-wallhaven-r7kqj1",
+          "score": 0.37148544
+        },
+        {
+          "id": "madness-wallhaven-9oow11",
+          "score": 0.36911333
+        },
+        {
+          "id": "madness-wallhaven-kwxod1",
+          "score": 0.3661273
+        },
+        {
+          "id": "wallpaper-051",
+          "score": 0.3622348
+        },
+        {
+          "id": "madness-wallhaven-yqq5rg",
+          "score": 0.3617198
+        },
+        {
+          "id": "madness-wallhaven-mllw19",
+          "score": 0.35206002
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.35166222
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.3487176
+        },
+        {
+          "id": "madness-wallhaven-3qqvk9",
+          "score": 0.3471042
+        },
+        {
+          "id": "madness-wallhaven-vppedl",
+          "score": 0.34428185
+        },
+        {
+          "id": "madness-wallhaven-rqqop1",
+          "score": 0.34421223
+        },
+        {
+          "id": "wallpaper-097",
+          "score": 0.3421574
+        },
+        {
+          "id": "madness-wallhaven-mllr61",
+          "score": 0.3391551
+        },
+        {
+          "id": "madness-wallhaven-1qqok3",
+          "score": 0.33454403
+        },
+        {
+          "id": "madness-wallhaven-poo5pj",
+          "score": 0.33253625
+        },
+        {
+          "id": "madness-wallhaven-jeepkq",
+          "score": 0.3307361
+        },
+        {
+          "id": "madness-wallhaven-lyywml",
+          "score": 0.3254614
+        },
+        {
+          "id": "madness-wallhaven-9ooe6d",
+          "score": 0.32274997
+        },
+        {
+          "id": "wallpaper-049",
+          "score": 0.31824246
+        },
+        {
+          "id": "madness-wallhaven-d8gygl",
+          "score": 0.31371418
+        },
+        {
+          "id": "madness-wallhaven-jeek6q",
+          "score": 0.30945164
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.30489838
+        },
+        {
+          "id": "madness-wallhaven-jeey9q",
+          "score": 0.30421215
+        },
+        {
+          "id": "madness-wallhaven-jeeoym",
+          "score": 0.3036925
+        },
+        {
+          "id": "madness-wallhaven-8gg1g2",
+          "score": 0.3000798
+        },
+        {
+          "id": "madness-wallhaven-k9m277",
+          "score": 0.29410464
+        },
+        {
+          "id": "madness-wallhaven-mdoqxy",
+          "score": 0.29319918
+        },
+        {
+          "id": "wallpaper-044",
+          "score": 0.29152286
+        },
+        {
+          "id": "madness-wallhaven-xeezqv",
+          "score": 0.28430688
+        },
+        {
+          "id": "madness-wallhaven-yqq68g",
+          "score": 0.27580833
+        },
+        {
+          "id": "madness-wallhaven-5gk313",
+          "score": 0.27540082
+        },
+        {
+          "id": "madness-wallhaven-jeel8q",
+          "score": 0.26235235
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.25818253
+        },
+        {
+          "id": "wallpaper-028",
+          "score": 0.25787416
+        },
+        {
+          "id": "madness-wallhaven-v9qkgm",
+          "score": 0.25456765
+        },
+        {
+          "id": "madness-wallhaven-1j9v7w",
+          "score": 0.23737225
+        },
+        {
+          "id": "wallpaper-006",
+          "score": 0.23530626
+        },
+        {
+          "id": "madness-wallhaven-w5531x",
+          "score": 0.2317361
+        },
+        {
+          "id": "madness-wallhaven-x8359z",
+          "score": 0.22958155
+        },
+        {
+          "id": "madness-wallhaven-vmwp58",
+          "score": 0.22452836
+        },
+        {
+          "id": "madness-wallhaven-jeejqm",
+          "score": 0.22175996
+        },
+        {
+          "id": "madness-wallhaven-6ll2dq",
+          "score": 0.2027134
+        },
+        {
+          "id": "madness-wallhaven-k88z5m",
+          "score": 0.20036964
+        },
+        {
+          "id": "madness-wallhaven-ogg6zm",
+          "score": 0.18218243
+        },
+        {
+          "id": "madness-wallhaven-vppd8p",
+          "score": 0.18120374
+        },
+        {
+          "id": "wallpaper-096",
+          "score": 0.15166484
+        },
+        {
+          "id": "madness-wallhaven-211dyx",
+          "score": 0.14186957
+        },
+        {
+          "id": "wallpaper-055",
+          "score": 0.1334626
+        },
+        {
+          "id": "madness-wallhaven-eojxrr",
+          "score": 0.12645024
+        },
+        {
+          "id": "madness-wallhaven-ymg9kx",
+          "score": 0.11055934
+        },
+        {
+          "id": "madness-wallhaven-lyykvy",
+          "score": 0.092296675
+        },
+        {
+          "id": "madness-wallhaven-jeek5p",
+          "score": 0.089629404
+        },
+        {
+          "id": "madness-wallhaven-xeejw3",
+          "score": 0.080461934
+        },
+        {
+          "id": "madness-wallhaven-e88rok",
+          "score": 0.07831634
+        },
+        {
+          "id": "madness-wallhaven-jeep8w",
+          "score": 0.056935597
+        },
+        {
+          "id": "madness-wallhaven-qrrv3r",
+          "score": 0.051227268
+        },
+        {
+          "id": "wallpaper-010",
+          "score": 0.043750968
+        },
+        {
+          "id": "wallpaper-003",
+          "score": 0.042359903
+        },
+        {
+          "id": "wallpaper-009",
+          "score": 0.03231306
+        },
+        {
+          "id": "madness-wallhaven-2116k9",
+          "score": 0.029339245
+        },
+        {
+          "id": "madness-wallhaven-y89mld",
+          "score": 0.023984456
+        },
+        {
+          "id": "madness-wallhaven-6ll57w",
+          "score": 0.010651239
+        },
+        {
+          "id": "madness-wallhaven-lmmxol",
+          "score": 0.0077210995
+        },
+        {
+          "id": "wallpaper-060",
+          "score": 0.007563778
+        },
+        {
+          "id": "madness-wallhaven-wqvoxr",
+          "score": 0
+        },
+        {
+          "id": "wallpaper-052",
+          "score": 0
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 1,
+        "limit": 523,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "name": "grayscale",
+              "percent": 80
+            },
+            {
+              "color": "#ff0000",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 3,
+        "variant": "linked"
+      },
+      "elapsedMs": 12.131563999981154,
+      "hits": [
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.87760913
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.8598788
+        },
+        {
+          "id": "madness-wallhaven-d8pk8m",
+          "score": 0.8531316
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.8477446
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.8475216
+        },
+        {
+          "id": "madness-wallhaven-9ooez8",
+          "score": 0.8432448
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.84133947
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.8396951
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.8364936
+        },
+        {
+          "id": "madness-wallhaven-3qqv1d",
+          "score": 0.8325262
+        },
+        {
+          "id": "wallpaper-043",
+          "score": 0.83183205
+        },
+        {
+          "id": "wallpaper-029",
+          "score": 0.8302968
+        },
+        {
+          "id": "madness-wallhaven-rqq1mm",
+          "score": 0.829566
+        },
+        {
+          "id": "madness-wallhaven-wqvoxr",
+          "score": 0.82824993
+        },
+        {
+          "id": "wallpaper-042",
+          "score": 0.8274811
+        },
+        {
+          "id": "madness-wallhaven-rqqw2q",
+          "score": 0.8267274
+        },
+        {
+          "id": "madness-wallhaven-w5eq57",
+          "score": 0.8233175
+        },
+        {
+          "id": "wallpaper-016",
+          "score": 0.82242906
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.81833833
+        },
+        {
+          "id": "madness-wallhaven-jeerzw",
+          "score": 0.8180918
+        },
+        {
+          "id": "madness-wallhaven-zppd8y",
+          "score": 0.81696355
+        },
+        {
+          "id": "madness-wallhaven-6llp5q",
+          "score": 0.8152129
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.8123093
+        },
+        {
+          "id": "madness-wallhaven-9oog5d",
+          "score": 0.81011695
+        },
+        {
+          "id": "madness-wallhaven-8ggwyj",
+          "score": 0.8099051
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.806878
+        },
+        {
+          "id": "madness-wallhaven-m9vqy9",
+          "score": 0.8063154
+        },
+        {
+          "id": "madness-wallhaven-gww69l",
+          "score": 0.8034513
+        },
+        {
+          "id": "madness-wallhaven-rqqe7q",
+          "score": 0.80341977
+        },
+        {
+          "id": "madness-wallhaven-8ggwro",
+          "score": 0.80044365
+        },
+        {
+          "id": "wallpaper-047",
+          "score": 0.7990996
+        },
+        {
+          "id": "madness-wallhaven-zppv8g",
+          "score": 0.7989383
+        },
+        {
+          "id": "madness-wallhaven-21127y",
+          "score": 0.79790175
+        },
+        {
+          "id": "madness-wallhaven-jeel8q",
+          "score": 0.7973969
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.7972596
+        },
+        {
+          "id": "madness-wallhaven-rqqoem",
+          "score": 0.79689634
+        },
+        {
+          "id": "madness-wallhaven-j52vqm",
+          "score": 0.79583573
+        },
+        {
+          "id": "madness-wallhaven-lyyxqy",
+          "score": 0.7955886
+        },
+        {
+          "id": "evaluation-gray-red-002-telephone",
+          "score": 0.79410386
+        },
+        {
+          "id": "madness-wallhaven-gww16q",
+          "score": 0.79359293
+        },
+        {
+          "id": "madness-wallhaven-x8359z",
+          "score": 0.7933096
+        },
+        {
+          "id": "madness-wallhaven-1qqer1",
+          "score": 0.7929758
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.7913625
+        },
+        {
+          "id": "wallpaper-097",
+          "score": 0.7905676
+        },
+        {
+          "id": "madness-wallhaven-d88qeo",
+          "score": 0.79015195
+        },
+        {
+          "id": "wallpaper-085",
+          "score": 0.7895086
+        },
+        {
+          "id": "madness-wallhaven-d88z63",
+          "score": 0.78877664
+        },
+        {
+          "id": "madness-wallhaven-yqxzqx",
+          "score": 0.7879987
+        },
+        {
+          "id": "madness-wallhaven-yqqww7",
+          "score": 0.78755903
+        },
+        {
+          "id": "madness-wallhaven-w55re6",
+          "score": 0.7870904
+        },
+        {
+          "id": "madness-wallhaven-lyyker",
+          "score": 0.7853924
+        },
+        {
+          "id": "madness-wallhaven-vppry3",
+          "score": 0.7853061
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.7847226
+        },
+        {
+          "id": "madness-wallhaven-vpp19p",
+          "score": 0.7842423
+        },
+        {
+          "id": "madness-wallhaven-qrrlzr",
+          "score": 0.78419715
+        },
+        {
+          "id": "madness-wallhaven-8gg1g2",
+          "score": 0.78356993
+        },
+        {
+          "id": "madness-wallhaven-3qqem9",
+          "score": 0.78333884
+        },
+        {
+          "id": "madness-wallhaven-5yyy85",
+          "score": 0.7822825
+        },
+        {
+          "id": "madness-wallhaven-yqqqrg",
+          "score": 0.7809341
+        },
+        {
+          "id": "madness-wallhaven-qrrmp5",
+          "score": 0.77955925
+        },
+        {
+          "id": "wallpaper-048",
+          "score": 0.77926385
+        },
+        {
+          "id": "wallpaper-075",
+          "score": 0.77874506
+        },
+        {
+          "id": "wallpaper-026",
+          "score": 0.77865595
+        },
+        {
+          "id": "madness-wallhaven-poopke",
+          "score": 0.7786137
+        },
+        {
+          "id": "madness-wallhaven-r7kpmm",
+          "score": 0.77793455
+        },
+        {
+          "id": "madness-wallhaven-1qqlq1",
+          "score": 0.77615374
+        },
+        {
+          "id": "wallpaper-003",
+          "score": 0.77383554
+        },
+        {
+          "id": "madness-wallhaven-jeek5p",
+          "score": 0.77338946
+        },
+        {
+          "id": "madness-wallhaven-5yyq53",
+          "score": 0.7725551
+        },
+        {
+          "id": "madness-wallhaven-zpproy",
+          "score": 0.7721904
+        },
+        {
+          "id": "wallpaper-015",
+          "score": 0.7719035
+        },
+        {
+          "id": "madness-wallhaven-lyyk7y",
+          "score": 0.77185655
+        },
+        {
+          "id": "wallpaper-045",
+          "score": 0.7717534
+        },
+        {
+          "id": "madness-wallhaven-6llzxw",
+          "score": 0.77143836
+        },
+        {
+          "id": "madness-wallhaven-yqq21g",
+          "score": 0.77057576
+        },
+        {
+          "id": "madness-wallhaven-211lky",
+          "score": 0.7692072
+        },
+        {
+          "id": "madness-wallhaven-zppjyg",
+          "score": 0.76877797
+        },
+        {
+          "id": "madness-wallhaven-jee15p",
+          "score": 0.7682913
+        },
+        {
+          "id": "madness-wallhaven-yqqkdg",
+          "score": 0.7681902
+        },
+        {
+          "id": "madness-wallhaven-5yy8v1",
+          "score": 0.76817083
+        },
+        {
+          "id": "madness-wallhaven-vpprr8",
+          "score": 0.7667797
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.76625097
+        },
+        {
+          "id": "madness-wallhaven-5yyrx5",
+          "score": 0.7641618
+        },
+        {
+          "id": "madness-wallhaven-rqqygw",
+          "score": 0.762558
+        },
+        {
+          "id": "madness-wallhaven-yqqw7g",
+          "score": 0.7588951
+        },
+        {
+          "id": "madness-wallhaven-xl57go",
+          "score": 0.75876963
+        },
+        {
+          "id": "madness-wallhaven-eojxrr",
+          "score": 0.75826085
+        },
+        {
+          "id": "madness-wallhaven-3qqgo3",
+          "score": 0.7567582
+        },
+        {
+          "id": "wallpaper-073",
+          "score": 0.7564525
+        },
+        {
+          "id": "madness-wallhaven-1qqrev",
+          "score": 0.75581723
+        },
+        {
+          "id": "madness-wallhaven-w55dp6",
+          "score": 0.7553382
+        },
+        {
+          "id": "madness-wallhaven-ogg1kp",
+          "score": 0.7549337
+        },
+        {
+          "id": "madness-wallhaven-oggvw9",
+          "score": 0.7542465
+        },
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.75376517
+        },
+        {
+          "id": "madness-wallhaven-6llm17",
+          "score": 0.75376123
+        },
+        {
+          "id": "madness-wallhaven-xeezqv",
+          "score": 0.7534069
+        },
+        {
+          "id": "madness-wallhaven-7jjm3v",
+          "score": 0.75329816
+        },
+        {
+          "id": "wallpaper-082",
+          "score": 0.75267476
+        },
+        {
+          "id": "madness-wallhaven-1qqmk3",
+          "score": 0.7526206
+        },
+        {
+          "id": "madness-wallhaven-ml3ke9",
+          "score": 0.7524251
+        },
+        {
+          "id": "madness-wallhaven-yqq3wd",
+          "score": 0.7513052
+        },
+        {
+          "id": "madness-wallhaven-d882g3",
+          "score": 0.75115263
+        },
+        {
+          "id": "madness-wallhaven-jeevkm",
+          "score": 0.7506813
+        },
+        {
+          "id": "wallpaper-027",
+          "score": 0.7496431
+        },
+        {
+          "id": "madness-wallhaven-9ooe6d",
+          "score": 0.7494921
+        },
+        {
+          "id": "madness-wallhaven-vpp6d5",
+          "score": 0.74908376
+        },
+        {
+          "id": "madness-wallhaven-6lle1w",
+          "score": 0.74896836
+        },
+        {
+          "id": "madness-wallhaven-oggl19",
+          "score": 0.7486887
+        },
+        {
+          "id": "madness-wallhaven-8gg61j",
+          "score": 0.74843407
+        },
+        {
+          "id": "madness-wallhaven-gwwdrd",
+          "score": 0.7475833
+        },
+        {
+          "id": "madness-wallhaven-gwwdm3",
+          "score": 0.7473147
+        },
+        {
+          "id": "madness-wallhaven-e8865l",
+          "score": 0.7468544
+        },
+        {
+          "id": "madness-wallhaven-yqqemd",
+          "score": 0.7466574
+        },
+        {
+          "id": "madness-wallhaven-d88mmj",
+          "score": 0.74611485
+        },
+        {
+          "id": "madness-wallhaven-yqqv3x",
+          "score": 0.7457366
+        },
+        {
+          "id": "wallpaper-019",
+          "score": 0.74535066
+        },
+        {
+          "id": "wallpaper-018",
+          "score": 0.74386513
+        },
+        {
+          "id": "madness-wallhaven-jee8ry",
+          "score": 0.743237
+        },
+        {
+          "id": "madness-wallhaven-d88v53",
+          "score": 0.7430186
+        },
+        {
+          "id": "madness-wallhaven-mllvr9",
+          "score": 0.7418331
+        },
+        {
+          "id": "madness-wallhaven-k88kzd",
+          "score": 0.7417815
+        },
+        {
+          "id": "wallpaper-011",
+          "score": 0.74086756
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.7408286
+        },
+        {
+          "id": "madness-wallhaven-qrrlq7",
+          "score": 0.74059904
+        },
+        {
+          "id": "madness-wallhaven-k881gm",
+          "score": 0.7402217
+        },
+        {
+          "id": "madness-wallhaven-5yypm9",
+          "score": 0.7400832
+        },
+        {
+          "id": "madness-wallhaven-jeewoy",
+          "score": 0.7398102
+        },
+        {
+          "id": "wallpaper-076",
+          "score": 0.7388578
+        },
+        {
+          "id": "madness-wallhaven-mll1ry",
+          "score": 0.73861074
+        },
+        {
+          "id": "wallpaper-071",
+          "score": 0.73707986
+        },
+        {
+          "id": "madness-wallhaven-yqq3px",
+          "score": 0.736822
+        },
+        {
+          "id": "madness-wallhaven-qrre3d",
+          "score": 0.7366469
+        },
+        {
+          "id": "madness-wallhaven-9oor8k",
+          "score": 0.7357918
+        },
+        {
+          "id": "madness-wallhaven-9oo2dk",
+          "score": 0.7353382
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.7345766
+        },
+        {
+          "id": "madness-wallhaven-d88253",
+          "score": 0.7344999
+        },
+        {
+          "id": "madness-wallhaven-y89mld",
+          "score": 0.7323507
+        },
+        {
+          "id": "madness-wallhaven-yqqvv7",
+          "score": 0.73140895
+        },
+        {
+          "id": "madness-wallhaven-ml91l9",
+          "score": 0.7311528
+        },
+        {
+          "id": "madness-wallhaven-zpp6mw",
+          "score": 0.729741
+        },
+        {
+          "id": "madness-wallhaven-1j9v7w",
+          "score": 0.7287591
+        },
+        {
+          "id": "madness-wallhaven-vppedl",
+          "score": 0.72850144
+        },
+        {
+          "id": "madness-wallhaven-21yp59",
+          "score": 0.72837776
+        },
+        {
+          "id": "madness-wallhaven-zppqdv",
+          "score": 0.72832173
+        },
+        {
+          "id": "madness-wallhaven-xee33d",
+          "score": 0.7279574
+        },
+        {
+          "id": "madness-wallhaven-d88k3m",
+          "score": 0.7276985
+        },
+        {
+          "id": "wallpaper-022",
+          "score": 0.72608507
+        },
+        {
+          "id": "madness-wallhaven-gwwqvq",
+          "score": 0.72481406
+        },
+        {
+          "id": "madness-wallhaven-w55mzq",
+          "score": 0.7232843
+        },
+        {
+          "id": "madness-wallhaven-jeev6q",
+          "score": 0.72314966
+        },
+        {
+          "id": "wallpaper-017",
+          "score": 0.72263837
+        },
+        {
+          "id": "madness-wallhaven-jeeypy",
+          "score": 0.7223358
+        },
+        {
+          "id": "evaluation-gray-red-002-umbrella",
+          "score": 0.72137654
+        },
+        {
+          "id": "madness-wallhaven-211519",
+          "score": 0.7211033
+        },
+        {
+          "id": "madness-wallhaven-poojxm",
+          "score": 0.7207077
+        },
+        {
+          "id": "madness-wallhaven-5gk313",
+          "score": 0.7203506
+        },
+        {
+          "id": "madness-wallhaven-mllykm",
+          "score": 0.72001696
+        },
+        {
+          "id": "madness-wallhaven-e88qdr",
+          "score": 0.7199437
+        },
+        {
+          "id": "madness-wallhaven-jeeoym",
+          "score": 0.7187991
+        },
+        {
+          "id": "madness-wallhaven-d88w2l",
+          "score": 0.7184092
+        },
+        {
+          "id": "wallpaper-095",
+          "score": 0.7179997
+        },
+        {
+          "id": "madness-wallhaven-3qq8jd",
+          "score": 0.71795636
+        },
+        {
+          "id": "madness-wallhaven-jeey9q",
+          "score": 0.7177733
+        },
+        {
+          "id": "madness-wallhaven-rqqxew",
+          "score": 0.7170846
+        },
+        {
+          "id": "madness-wallhaven-lyydwl",
+          "score": 0.7170695
+        },
+        {
+          "id": "madness-wallhaven-gwwv9e",
+          "score": 0.7166256
+        },
+        {
+          "id": "madness-wallhaven-xeejw3",
+          "score": 0.7153249
+        },
+        {
+          "id": "madness-wallhaven-lql7vp",
+          "score": 0.7149981
+        },
+        {
+          "id": "madness-wallhaven-6o2qd7",
+          "score": 0.71366477
+        },
+        {
+          "id": "madness-wallhaven-6ll7dx",
+          "score": 0.71345574
+        },
+        {
+          "id": "wallpaper-078",
+          "score": 0.71159685
+        },
+        {
+          "id": "madness-wallhaven-1qqxlv",
+          "score": 0.71159476
+        },
+        {
+          "id": "wallpaper-060",
+          "score": 0.7114339
+        },
+        {
+          "id": "madness-wallhaven-mllg19",
+          "score": 0.71087515
+        },
+        {
+          "id": "madness-wallhaven-6ll57w",
+          "score": 0.70990026
+        },
+        {
+          "id": "madness-wallhaven-zpp5ww",
+          "score": 0.70987785
+        },
+        {
+          "id": "madness-wallhaven-mlly98",
+          "score": 0.7096207
+        },
+        {
+          "id": "madness-wallhaven-3qq5j3",
+          "score": 0.7094803
+        },
+        {
+          "id": "madness-wallhaven-7jje13",
+          "score": 0.70940167
+        },
+        {
+          "id": "madness-wallhaven-gwwdeq",
+          "score": 0.70935243
+        },
+        {
+          "id": "madness-wallhaven-k88z5m",
+          "score": 0.7088547
+        },
+        {
+          "id": "madness-wallhaven-e873x8",
+          "score": 0.7081108
+        },
+        {
+          "id": "madness-wallhaven-rqqop1",
+          "score": 0.7080917
+        },
+        {
+          "id": "madness-wallhaven-kwxod1",
+          "score": 0.70795405
+        },
+        {
+          "id": "wallpaper-041",
+          "score": 0.7079121
+        },
+        {
+          "id": "madness-wallhaven-vmwlmm",
+          "score": 0.7035378
+        },
+        {
+          "id": "madness-wallhaven-gwwdpe",
+          "score": 0.70264804
+        },
+        {
+          "id": "madness-wallhaven-oggw5p",
+          "score": 0.7023287
+        },
+        {
+          "id": "madness-wallhaven-poog2e",
+          "score": 0.70105577
+        },
+        {
+          "id": "madness-wallhaven-211d1x",
+          "score": 0.70021534
+        },
+        {
+          "id": "wallpaper-090",
+          "score": 0.69966686
+        },
+        {
+          "id": "madness-wallhaven-d88vyl",
+          "score": 0.6988363
+        },
+        {
+          "id": "wallpaper-020",
+          "score": 0.6984192
+        },
+        {
+          "id": "madness-wallhaven-k881zd",
+          "score": 0.6982316
+        },
+        {
+          "id": "madness-wallhaven-vppyjp",
+          "score": 0.6961262
+        },
+        {
+          "id": "madness-wallhaven-vppv3l",
+          "score": 0.6955007
+        },
+        {
+          "id": "madness-wallhaven-w55gjr",
+          "score": 0.6950326
+        },
+        {
+          "id": "madness-wallhaven-qrrldr",
+          "score": 0.69481504
+        },
+        {
+          "id": "madness-wallhaven-73og6v",
+          "score": 0.69169766
+        },
+        {
+          "id": "madness-wallhaven-xee3kz",
+          "score": 0.691231
+        },
+        {
+          "id": "wallpaper-007",
+          "score": 0.6898786
+        },
+        {
+          "id": "madness-wallhaven-xee7dd",
+          "score": 0.6898268
+        },
+        {
+          "id": "madness-wallhaven-5yymk9",
+          "score": 0.68811774
+        },
+        {
+          "id": "madness-wallhaven-mllw19",
+          "score": 0.68768954
+        },
+        {
+          "id": "madness-wallhaven-w55vwr",
+          "score": 0.6871738
+        },
+        {
+          "id": "madness-wallhaven-mdoqxy",
+          "score": 0.6865809
+        },
+        {
+          "id": "madness-wallhaven-7jjo5e",
+          "score": 0.6864621
+        },
+        {
+          "id": "madness-wallhaven-6llpwq",
+          "score": 0.68639064
+        },
+        {
+          "id": "madness-wallhaven-gwpo6e",
+          "score": 0.686033
+        },
+        {
+          "id": "madness-wallhaven-6llemx",
+          "score": 0.685336
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.6852994
+        },
+        {
+          "id": "wallpaper-089",
+          "score": 0.6844276
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "score": 0.68382835
+        },
+        {
+          "id": "madness-wallhaven-jeedjw",
+          "score": 0.6818071
+        },
+        {
+          "id": "madness-wallhaven-poo1kp",
+          "score": 0.6815586
+        },
+        {
+          "id": "madness-wallhaven-gww9kd",
+          "score": 0.68128324
+        },
+        {
+          "id": "madness-wallhaven-d882yl",
+          "score": 0.6810296
+        },
+        {
+          "id": "madness-wallhaven-gwwxwl",
+          "score": 0.6807138
+        },
+        {
+          "id": "madness-wallhaven-poo99j",
+          "score": 0.68033564
+        },
+        {
+          "id": "madness-wallhaven-yqqe27",
+          "score": 0.6801661
+        },
+        {
+          "id": "madness-wallhaven-lyyjvy",
+          "score": 0.6801545
+        },
+        {
+          "id": "madness-wallhaven-d88jym",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-e88r8o",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-gwwm6d",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-gwwvpe",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-lyyj52",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-ml3jm8",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-rqqw7q",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-vppy93",
+          "score": 0.68
+        },
+        {
+          "id": "wallpaper-005",
+          "score": 0.68
+        },
+        {
+          "id": "wallpaper-023",
+          "score": 0.68
+        },
+        {
+          "id": "wallpaper-053",
+          "score": 0.68
+        },
+        {
+          "id": "wallpaper-061",
+          "score": 0.68
+        },
+        {
+          "id": "wallpaper-068",
+          "score": 0.68
+        },
+        {
+          "id": "madness-wallhaven-1qqx1g",
+          "score": 0.67999995
+        },
+        {
+          "id": "wallpaper-006",
+          "score": 0.67999995
+        },
+        {
+          "id": "madness-wallhaven-rqqy5m",
+          "score": 0.6799998
+        },
+        {
+          "id": "madness-wallhaven-3qqygv",
+          "score": 0.67999905
+        },
+        {
+          "id": "wallpaper-066",
+          "score": 0.6799985
+        },
+        {
+          "id": "madness-wallhaven-mllr38",
+          "score": 0.67999697
+        },
+        {
+          "id": "wallpaper-063",
+          "score": 0.6799958
+        },
+        {
+          "id": "madness-wallhaven-lyyp9y",
+          "score": 0.6799611
+        },
+        {
+          "id": "madness-wallhaven-jeerxp",
+          "score": 0.67995673
+        },
+        {
+          "id": "madness-wallhaven-211wjx",
+          "score": 0.6799513
+        },
+        {
+          "id": "wallpaper-069",
+          "score": 0.67990124
+        },
+        {
+          "id": "madness-wallhaven-5yyj69",
+          "score": 0.6798961
+        },
+        {
+          "id": "madness-wallhaven-211986",
+          "score": 0.6798469
+        },
+        {
+          "id": "wallpaper-001",
+          "score": 0.6796959
+        },
+        {
+          "id": "madness-wallhaven-w55lqx",
+          "score": 0.6796924
+        },
+        {
+          "id": "wallpaper-065",
+          "score": 0.6793786
+        },
+        {
+          "id": "madness-wallhaven-9oop2d",
+          "score": 0.6787406
+        },
+        {
+          "id": "madness-wallhaven-9oow31",
+          "score": 0.67869186
+        },
+        {
+          "id": "madness-wallhaven-8g5qr2",
+          "score": 0.6785982
+        },
+        {
+          "id": "madness-wallhaven-yqq68g",
+          "score": 0.6774268
+        },
+        {
+          "id": "wallpaper-064",
+          "score": 0.67735386
+        },
+        {
+          "id": "madness-wallhaven-2119yx",
+          "score": 0.6772708
+        },
+        {
+          "id": "madness-wallhaven-6llrl7",
+          "score": 0.67726284
+        },
+        {
+          "id": "wallpaper-086",
+          "score": 0.67705286
+        },
+        {
+          "id": "wallpaper-070",
+          "score": 0.6769018
+        },
+        {
+          "id": "madness-wallhaven-po9eop",
+          "score": 0.67680025
+        },
+        {
+          "id": "wallpaper-025",
+          "score": 0.6766552
+        },
+        {
+          "id": "wallpaper-067",
+          "score": 0.6764326
+        },
+        {
+          "id": "madness-wallhaven-rqqgkq",
+          "score": 0.6763973
+        },
+        {
+          "id": "wallpaper-062",
+          "score": 0.67637646
+        },
+        {
+          "id": "madness-wallhaven-8ggrqy",
+          "score": 0.67612
+        },
+        {
+          "id": "madness-wallhaven-95jgkk",
+          "score": 0.6760981
+        },
+        {
+          "id": "madness-wallhaven-d88q5g",
+          "score": 0.6759693
+        },
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "score": 0.6756841
+        },
+        {
+          "id": "madness-wallhaven-7jj1p3",
+          "score": 0.6756549
+        },
+        {
+          "id": "madness-wallhaven-9oopek",
+          "score": 0.67481077
+        },
+        {
+          "id": "madness-wallhaven-xee7jd",
+          "score": 0.67404354
+        },
+        {
+          "id": "wallpaper-051",
+          "score": 0.6732228
+        },
+        {
+          "id": "madness-wallhaven-ogge85",
+          "score": 0.67296696
+        },
+        {
+          "id": "madness-wallhaven-vpplmp",
+          "score": 0.67282856
+        },
+        {
+          "id": "madness-wallhaven-poowxp",
+          "score": 0.6724365
+        },
+        {
+          "id": "madness-wallhaven-w55kvr",
+          "score": 0.6723063
+        },
+        {
+          "id": "madness-wallhaven-k88jld",
+          "score": 0.6707304
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.6696731
+        },
+        {
+          "id": "madness-wallhaven-vppd8p",
+          "score": 0.669019
+        },
+        {
+          "id": "madness-wallhaven-8ggm6k",
+          "score": 0.66848785
+        },
+        {
+          "id": "wallpaper-074",
+          "score": 0.66844475
+        },
+        {
+          "id": "madness-wallhaven-2115ky",
+          "score": 0.66799223
+        },
+        {
+          "id": "madness-wallhaven-8ggdxo",
+          "score": 0.6673153
+        },
+        {
+          "id": "wallpaper-079",
+          "score": 0.6668149
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "score": 0.6652452
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.66484445
+        },
+        {
+          "id": "madness-wallhaven-211jgy",
+          "score": 0.6646595
+        },
+        {
+          "id": "madness-wallhaven-6llrk7",
+          "score": 0.66424084
+        },
+        {
+          "id": "wallpaper-072",
+          "score": 0.6628583
+        },
+        {
+          "id": "madness-wallhaven-k88291",
+          "score": 0.6628413
+        },
+        {
+          "id": "madness-wallhaven-mllvky",
+          "score": 0.66025466
+        },
+        {
+          "id": "madness-wallhaven-vpp2g5",
+          "score": 0.6602001
+        },
+        {
+          "id": "madness-wallhaven-mllw39",
+          "score": 0.6585343
+        },
+        {
+          "id": "madness-wallhaven-k883md",
+          "score": 0.65750027
+        },
+        {
+          "id": "madness-wallhaven-1qqok3",
+          "score": 0.65710735
+        },
+        {
+          "id": "madness-wallhaven-e88pxk",
+          "score": 0.65541065
+        },
+        {
+          "id": "madness-wallhaven-6ll5z7",
+          "score": 0.6550739
+        },
+        {
+          "id": "wallpaper-092",
+          "score": 0.6528877
+        },
+        {
+          "id": "madness-wallhaven-jeew7y",
+          "score": 0.6523205
+        },
+        {
+          "id": "madness-wallhaven-vppdjm",
+          "score": 0.6505809
+        },
+        {
+          "id": "madness-wallhaven-6llmg7",
+          "score": 0.6482067
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.6481269
+        },
+        {
+          "id": "madness-wallhaven-lyy22q",
+          "score": 0.6473843
+        },
+        {
+          "id": "wallpaper-021",
+          "score": 0.64542186
+        },
+        {
+          "id": "madness-wallhaven-2116k9",
+          "score": 0.64472127
+        },
+        {
+          "id": "madness-wallhaven-8gg1do",
+          "score": 0.64427614
+        },
+        {
+          "id": "madness-wallhaven-jeed6q",
+          "score": 0.6441223
+        },
+        {
+          "id": "madness-wallhaven-w55lz6",
+          "score": 0.6415014
+        },
+        {
+          "id": "wallpaper-081",
+          "score": 0.64045995
+        },
+        {
+          "id": "madness-wallhaven-7jj1qo",
+          "score": 0.63816035
+        },
+        {
+          "id": "madness-wallhaven-3qq6m3",
+          "score": 0.6376391
+        },
+        {
+          "id": "madness-wallhaven-1qqdgw",
+          "score": 0.63694775
+        },
+        {
+          "id": "madness-wallhaven-5ygeg7",
+          "score": 0.63677
+        },
+        {
+          "id": "madness-wallhaven-gwwq8e",
+          "score": 0.6366228
+        },
+        {
+          "id": "madness-wallhaven-yqqewx",
+          "score": 0.63408285
+        },
+        {
+          "id": "wallpaper-093",
+          "score": 0.6336297
+        },
+        {
+          "id": "evaluation-green-red-leaves",
+          "score": 0.6329321
+        },
+        {
+          "id": "madness-wallhaven-jeejqm",
+          "score": 0.6319133
+        },
+        {
+          "id": "madness-wallhaven-p8jqem",
+          "score": 0.63099754
+        },
+        {
+          "id": "wallpaper-050",
+          "score": 0.63031447
+        },
+        {
+          "id": "madness-wallhaven-mllr61",
+          "score": 0.6293381
+        },
+        {
+          "id": "madness-wallhaven-k88ld6",
+          "score": 0.6283754
+        },
+        {
+          "id": "madness-wallhaven-j5eqpw",
+          "score": 0.62807536
+        },
+        {
+          "id": "madness-wallhaven-jeeqxq",
+          "score": 0.6265948
+        },
+        {
+          "id": "madness-wallhaven-yqqrgl",
+          "score": 0.6263547
+        },
+        {
+          "id": "madness-wallhaven-xee36v",
+          "score": 0.6258147
+        },
+        {
+          "id": "madness-wallhaven-jeepkq",
+          "score": 0.6246799
+        },
+        {
+          "id": "madness-wallhaven-k885z7",
+          "score": 0.62297964
+        },
+        {
+          "id": "madness-wallhaven-qr27rq",
+          "score": 0.6219392
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.62094283
+        },
+        {
+          "id": "wallpaper-056",
+          "score": 0.6202991
+        },
+        {
+          "id": "wallpaper-096",
+          "score": 0.61844015
+        },
+        {
+          "id": "madness-wallhaven-w556l7",
+          "score": 0.61805594
+        },
+        {
+          "id": "madness-wallhaven-xeeomd",
+          "score": 0.6130564
+        },
+        {
+          "id": "wallpaper-010",
+          "score": 0.61147785
+        },
+        {
+          "id": "madness-wallhaven-e88rok",
+          "score": 0.6112267
+        },
+        {
+          "id": "madness-wallhaven-1qqwq3",
+          "score": 0.61030805
+        },
+        {
+          "id": "madness-wallhaven-3qqgrv",
+          "score": 0.6078491
+        },
+        {
+          "id": "madness-wallhaven-8gge6y",
+          "score": 0.605942
+        },
+        {
+          "id": "madness-wallhaven-qrrox7",
+          "score": 0.6033381
+        },
+        {
+          "id": "madness-wallhaven-zppz3w",
+          "score": 0.6032331
+        },
+        {
+          "id": "madness-wallhaven-3qlxjy",
+          "score": 0.6024114
+        },
+        {
+          "id": "madness-wallhaven-qrrejd",
+          "score": 0.6020993
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.6013154
+        },
+        {
+          "id": "madness-wallhaven-lyywml",
+          "score": 0.598757
+        },
+        {
+          "id": "madness-wallhaven-1qqlew",
+          "score": 0.598414
+        },
+        {
+          "id": "madness-wallhaven-qrrey5",
+          "score": 0.597636
+        },
+        {
+          "id": "madness-wallhaven-e88q7k",
+          "score": 0.59750533
+        },
+        {
+          "id": "madness-wallhaven-k88g21",
+          "score": 0.5963559
+        },
+        {
+          "id": "madness-wallhaven-jeeozw",
+          "score": 0.5957285
+        },
+        {
+          "id": "wallpaper-013",
+          "score": 0.5954634
+        },
+        {
+          "id": "madness-wallhaven-e88vyk",
+          "score": 0.59491813
+        },
+        {
+          "id": "madness-wallhaven-ogg6q7",
+          "score": 0.5942471
+        },
+        {
+          "id": "madness-wallhaven-jeekxm",
+          "score": 0.5941006
+        },
+        {
+          "id": "madness-wallhaven-yqqwvd",
+          "score": 0.5925542
+        },
+        {
+          "id": "madness-wallhaven-mllv3k",
+          "score": 0.59178895
+        },
+        {
+          "id": "madness-wallhaven-e88v9o",
+          "score": 0.5909026
+        },
+        {
+          "id": "madness-wallhaven-9oolmx",
+          "score": 0.5888262
+        },
+        {
+          "id": "wallpaper-012",
+          "score": 0.5887236
+        },
+        {
+          "id": "wallpaper-099",
+          "score": 0.58814883
+        },
+        {
+          "id": "madness-wallhaven-lyyg8p",
+          "score": 0.5865816
+        },
+        {
+          "id": "madness-wallhaven-lmk37p",
+          "score": 0.5860071
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.583307
+        },
+        {
+          "id": "madness-wallhaven-211dyx",
+          "score": 0.58311146
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.5821742
+        },
+        {
+          "id": "madness-wallhaven-6llgd6",
+          "score": 0.58152986
+        },
+        {
+          "id": "wallpaper-046",
+          "score": 0.58108544
+        },
+        {
+          "id": "madness-wallhaven-jexkwm",
+          "score": 0.5788554
+        },
+        {
+          "id": "madness-wallhaven-mllm61",
+          "score": 0.57792705
+        },
+        {
+          "id": "madness-wallhaven-w55m8x",
+          "score": 0.5758766
+        },
+        {
+          "id": "madness-wallhaven-gwwkoq",
+          "score": 0.57548153
+        },
+        {
+          "id": "madness-wallhaven-8ggwl1",
+          "score": 0.5742442
+        },
+        {
+          "id": "madness-wallhaven-v9qkgm",
+          "score": 0.5717609
+        },
+        {
+          "id": "madness-wallhaven-8gg6eo",
+          "score": 0.57176036
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.5706049
+        },
+        {
+          "id": "madness-wallhaven-2112dx",
+          "score": 0.56833816
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.56694627
+        },
+        {
+          "id": "madness-wallhaven-e882dk",
+          "score": 0.56562555
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.5652397
+        },
+        {
+          "id": "madness-wallhaven-zpp5yy",
+          "score": 0.5643218
+        },
+        {
+          "id": "madness-wallhaven-6llwv6",
+          "score": 0.56373125
+        },
+        {
+          "id": "wallpaper-091",
+          "score": 0.56354177
+        },
+        {
+          "id": "madness-wallhaven-13qmlw",
+          "score": 0.56300294
+        },
+        {
+          "id": "wallpaper-083",
+          "score": 0.56280625
+        },
+        {
+          "id": "madness-wallhaven-k88jv6",
+          "score": 0.56152564
+        },
+        {
+          "id": "madness-wallhaven-9oo7od",
+          "score": 0.56091386
+        },
+        {
+          "id": "wallpaper-054",
+          "score": 0.5604402
+        },
+        {
+          "id": "madness-wallhaven-mdvo1y",
+          "score": 0.5594847
+        },
+        {
+          "id": "wallpaper-002",
+          "score": 0.5565345
+        },
+        {
+          "id": "wallpaper-098",
+          "score": 0.5548928
+        },
+        {
+          "id": "wallpaper-057",
+          "score": 0.55373114
+        },
+        {
+          "id": "wallpaper-034",
+          "score": 0.5529983
+        },
+        {
+          "id": "madness-wallhaven-d8gygl",
+          "score": 0.5529369
+        },
+        {
+          "id": "madness-wallhaven-qrr3m5",
+          "score": 0.5505693
+        },
+        {
+          "id": "madness-wallhaven-j3511m",
+          "score": 0.54942745
+        },
+        {
+          "id": "madness-wallhaven-r7kqj1",
+          "score": 0.54912263
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.5470537
+        },
+        {
+          "id": "madness-wallhaven-vpp1vl",
+          "score": 0.5415545
+        },
+        {
+          "id": "madness-wallhaven-6ll2dq",
+          "score": 0.54056025
+        },
+        {
+          "id": "madness-wallhaven-6llzrw",
+          "score": 0.5402975
+        },
+        {
+          "id": "wallpaper-024",
+          "score": 0.5390744
+        },
+        {
+          "id": "madness-wallhaven-9oow11",
+          "score": 0.53814197
+        },
+        {
+          "id": "madness-wallhaven-mllrdk",
+          "score": 0.536736
+        },
+        {
+          "id": "wallpaper-080",
+          "score": 0.53672796
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.5328083
+        },
+        {
+          "id": "madness-wallhaven-rqqwpw",
+          "score": 0.5321966
+        },
+        {
+          "id": "madness-wallhaven-poo7gj",
+          "score": 0.5320579
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.5298917
+        },
+        {
+          "id": "madness-wallhaven-9oo2k1",
+          "score": 0.5289359
+        },
+        {
+          "id": "madness-wallhaven-poomw3",
+          "score": 0.52836204
+        },
+        {
+          "id": "madness-wallhaven-oggv5m",
+          "score": 0.52652615
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.52544767
+        },
+        {
+          "id": "madness-wallhaven-mll1mm",
+          "score": 0.52492607
+        },
+        {
+          "id": "madness-wallhaven-lyy7kp",
+          "score": 0.52433217
+        },
+        {
+          "id": "madness-wallhaven-k9m277",
+          "score": 0.5229855
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.522207
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.5221336
+        },
+        {
+          "id": "madness-wallhaven-9ooe9k",
+          "score": 0.52105016
+        },
+        {
+          "id": "madness-wallhaven-jeek6q",
+          "score": 0.520186
+        },
+        {
+          "id": "madness-wallhaven-e8891l",
+          "score": 0.51893115
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.5182602
+        },
+        {
+          "id": "madness-wallhaven-poov9e",
+          "score": 0.51676553
+        },
+        {
+          "id": "madness-wallhaven-qrrkor",
+          "score": 0.5165125
+        },
+        {
+          "id": "madness-wallhaven-6lly96",
+          "score": 0.5161171
+        },
+        {
+          "id": "wallpaper-004",
+          "score": 0.5158782
+        },
+        {
+          "id": "madness-wallhaven-gwwxpl",
+          "score": 0.5157713
+        },
+        {
+          "id": "madness-wallhaven-vmwp58",
+          "score": 0.51278305
+        },
+        {
+          "id": "madness-wallhaven-1qqe13",
+          "score": 0.5123088
+        },
+        {
+          "id": "madness-wallhaven-lyyko2",
+          "score": 0.5118258
+        },
+        {
+          "id": "madness-wallhaven-211xrg",
+          "score": 0.5104632
+        },
+        {
+          "id": "madness-wallhaven-qrrv3r",
+          "score": 0.5080636
+        },
+        {
+          "id": "madness-wallhaven-w55mgq",
+          "score": 0.5079932
+        },
+        {
+          "id": "madness-wallhaven-e88pr8",
+          "score": 0.5079017
+        },
+        {
+          "id": "madness-wallhaven-3qqvk9",
+          "score": 0.50780725
+        },
+        {
+          "id": "madness-wallhaven-gww9yl",
+          "score": 0.5070435
+        },
+        {
+          "id": "wallpaper-100",
+          "score": 0.5060154
+        },
+        {
+          "id": "madness-wallhaven-6lle7l",
+          "score": 0.5060121
+        },
+        {
+          "id": "madness-wallhaven-3qq7j9",
+          "score": 0.5057305
+        },
+        {
+          "id": "madness-wallhaven-jeeoxq",
+          "score": 0.5049387
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.50445676
+        },
+        {
+          "id": "madness-wallhaven-lmmxol",
+          "score": 0.50307083
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.50304425
+        },
+        {
+          "id": "madness-wallhaven-3qqrp3",
+          "score": 0.50257003
+        },
+        {
+          "id": "madness-wallhaven-yqq5rg",
+          "score": 0.5022675
+        },
+        {
+          "id": "wallpaper-087",
+          "score": 0.5005237
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.49808484
+        },
+        {
+          "id": "madness-wallhaven-yq8k2d",
+          "score": 0.49807984
+        },
+        {
+          "id": "madness-wallhaven-lyyr9r",
+          "score": 0.49770582
+        },
+        {
+          "id": "madness-wallhaven-w5531x",
+          "score": 0.49540234
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.49429327
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.49360606
+        },
+        {
+          "id": "wallpaper-031",
+          "score": 0.49179667
+        },
+        {
+          "id": "wallpaper-009",
+          "score": 0.4910766
+        },
+        {
+          "id": "wallpaper-014",
+          "score": 0.49057734
+        },
+        {
+          "id": "madness-wallhaven-gwwlm3",
+          "score": 0.48993936
+        },
+        {
+          "id": "madness-wallhaven-zppq2j",
+          "score": 0.48853993
+        },
+        {
+          "id": "madness-wallhaven-poo5pj",
+          "score": 0.48737672
+        },
+        {
+          "id": "madness-wallhaven-xee72o",
+          "score": 0.48627266
+        },
+        {
+          "id": "madness-wallhaven-rqqjrj",
+          "score": 0.48606735
+        },
+        {
+          "id": "madness-wallhaven-xe6qdv",
+          "score": 0.48377597
+        },
+        {
+          "id": "madness-wallhaven-lyyx5q",
+          "score": 0.48346418
+        },
+        {
+          "id": "madness-wallhaven-5yyme5",
+          "score": 0.48329574
+        },
+        {
+          "id": "madness-wallhaven-6ll2zw",
+          "score": 0.48295927
+        },
+        {
+          "id": "madness-wallhaven-lyypwr",
+          "score": 0.48146713
+        },
+        {
+          "id": "madness-wallhaven-xee3wz",
+          "score": 0.4807678
+        },
+        {
+          "id": "wallpaper-030",
+          "score": 0.48056647
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.47771266
+        },
+        {
+          "id": "wallpaper-044",
+          "score": 0.47754735
+        },
+        {
+          "id": "madness-wallhaven-vppo6p",
+          "score": 0.4764791
+        },
+        {
+          "id": "madness-wallhaven-jee1rw",
+          "score": 0.47549894
+        },
+        {
+          "id": "madness-wallhaven-jeej1q",
+          "score": 0.47523302
+        },
+        {
+          "id": "madness-wallhaven-gwwq27",
+          "score": 0.47458196
+        },
+        {
+          "id": "madness-wallhaven-7jp81o",
+          "score": 0.4738161
+        },
+        {
+          "id": "madness-wallhaven-w55w3r",
+          "score": 0.471745
+        },
+        {
+          "id": "madness-wallhaven-ogg1wl",
+          "score": 0.47087213
+        },
+        {
+          "id": "wallpaper-049",
+          "score": 0.46928477
+        },
+        {
+          "id": "madness-wallhaven-gwwmxq",
+          "score": 0.46905476
+        },
+        {
+          "id": "wallpaper-036",
+          "score": 0.46767262
+        },
+        {
+          "id": "wallpaper-028",
+          "score": 0.4659434
+        },
+        {
+          "id": "madness-wallhaven-6llg7q",
+          "score": 0.4625788
+        },
+        {
+          "id": "wallpaper-052",
+          "score": 0.4616732
+        },
+        {
+          "id": "madness-wallhaven-5yy6r9",
+          "score": 0.46122488
+        },
+        {
+          "id": "madness-wallhaven-rqqj61",
+          "score": 0.4587385
+        },
+        {
+          "id": "madness-wallhaven-7jj7ey",
+          "score": 0.45618147
+        },
+        {
+          "id": "madness-wallhaven-ogg6zm",
+          "score": 0.45587224
+        },
+        {
+          "id": "madness-wallhaven-jeeokp",
+          "score": 0.45558104
+        },
+        {
+          "id": "wallpaper-059",
+          "score": 0.45333275
+        },
+        {
+          "id": "madness-wallhaven-e881lw",
+          "score": 0.45231757
+        },
+        {
+          "id": "madness-wallhaven-lyykvy",
+          "score": 0.45138222
+        },
+        {
+          "id": "wallpaper-055",
+          "score": 0.44925767
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.44809937
+        },
+        {
+          "id": "wallpaper-035",
+          "score": 0.44764057
+        },
+        {
+          "id": "madness-wallhaven-jeekjy",
+          "score": 0.4468105
+        },
+        {
+          "id": "wallpaper-037",
+          "score": 0.44644397
+        },
+        {
+          "id": "madness-wallhaven-jeeq3q",
+          "score": 0.445037
+        },
+        {
+          "id": "madness-wallhaven-gwwv23",
+          "score": 0.44249517
+        },
+        {
+          "id": "madness-wallhaven-jeelj5",
+          "score": 0.44191223
+        },
+        {
+          "id": "wallpaper-038",
+          "score": 0.44168663
+        },
+        {
+          "id": "madness-wallhaven-7jjkde",
+          "score": 0.44034174
+        },
+        {
+          "id": "madness-wallhaven-d88d53",
+          "score": 0.43949792
+        },
+        {
+          "id": "wallpaper-039",
+          "score": 0.43600833
+        },
+        {
+          "id": "madness-wallhaven-vppd75",
+          "score": 0.43487865
+        },
+        {
+          "id": "madness-wallhaven-jeer9q",
+          "score": 0.43450946
+        },
+        {
+          "id": "madness-wallhaven-gwweme",
+          "score": 0.4344781
+        },
+        {
+          "id": "madness-wallhaven-5yymd3",
+          "score": 0.43338257
+        },
+        {
+          "id": "madness-wallhaven-211er6",
+          "score": 0.43072787
+        },
+        {
+          "id": "wallpaper-033",
+          "score": 0.43044412
+        },
+        {
+          "id": "madness-wallhaven-8ggez2",
+          "score": 0.4303628
+        },
+        {
+          "id": "madness-wallhaven-zpp3mg",
+          "score": 0.43010414
+        },
+        {
+          "id": "wallpaper-008",
+          "score": 0.43009442
+        },
+        {
+          "id": "madness-wallhaven-6ll7pq",
+          "score": 0.42923605
+        },
+        {
+          "id": "madness-wallhaven-5yy3d3",
+          "score": 0.42628372
+        },
+        {
+          "id": "madness-wallhaven-w55mqx",
+          "score": 0.42618665
+        },
+        {
+          "id": "madness-wallhaven-w557rr",
+          "score": 0.4257254
+        },
+        {
+          "id": "madness-wallhaven-7jjwp3",
+          "score": 0.42544016
+        },
+        {
+          "id": "madness-wallhaven-ymg9kx",
+          "score": 0.4252639
+        },
+        {
+          "id": "madness-wallhaven-qrroml",
+          "score": 0.4211853
+        },
+        {
+          "id": "madness-wallhaven-jeey2y",
+          "score": 0.4187023
+        },
+        {
+          "id": "madness-wallhaven-w55rr7",
+          "score": 0.41758677
+        },
+        {
+          "id": "wallpaper-032",
+          "score": 0.4132498
+        },
+        {
+          "id": "madness-wallhaven-jeep8w",
+          "score": 0.41250962
+        },
+        {
+          "id": "madness-wallhaven-7jjom3",
+          "score": 0.41250002
+        },
+        {
+          "id": "wallpaper-077",
+          "score": 0.41091576
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 2,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "name": "grayscale",
+              "percent": 80
+            },
+            {
+              "color": "#ff0000",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 5,
+        "variant": "linked"
+      },
+      "elapsedMs": 6.0398130000103265,
+      "hits": [
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.87760913
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.8598788
+        },
+        {
+          "id": "madness-wallhaven-d8pk8m",
+          "score": 0.8531316
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.8477446
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.8475216
+        },
+        {
+          "id": "madness-wallhaven-9ooez8",
+          "score": 0.8432448
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.84133947
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.8396951
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.8364936
+        },
+        {
+          "id": "madness-wallhaven-3qqv1d",
+          "score": 0.8325262
+        },
+        {
+          "id": "wallpaper-043",
+          "score": 0.83183205
+        },
+        {
+          "id": "wallpaper-029",
+          "score": 0.8302968
+        },
+        {
+          "id": "madness-wallhaven-rqq1mm",
+          "score": 0.829566
+        },
+        {
+          "id": "madness-wallhaven-wqvoxr",
+          "score": 0.82824993
+        },
+        {
+          "id": "wallpaper-042",
+          "score": 0.8274811
+        },
+        {
+          "id": "madness-wallhaven-rqqw2q",
+          "score": 0.8267274
+        },
+        {
+          "id": "madness-wallhaven-w5eq57",
+          "score": 0.8233175
+        },
+        {
+          "id": "wallpaper-016",
+          "score": 0.82242906
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.81833833
+        },
+        {
+          "id": "madness-wallhaven-jeerzw",
+          "score": 0.8180918
+        },
+        {
+          "id": "madness-wallhaven-zppd8y",
+          "score": 0.81696355
+        },
+        {
+          "id": "madness-wallhaven-6llp5q",
+          "score": 0.8152129
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.8123093
+        },
+        {
+          "id": "madness-wallhaven-9oog5d",
+          "score": 0.81011695
+        },
+        {
+          "id": "madness-wallhaven-8ggwyj",
+          "score": 0.8099051
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.806878
+        },
+        {
+          "id": "madness-wallhaven-m9vqy9",
+          "score": 0.8063154
+        },
+        {
+          "id": "madness-wallhaven-gww69l",
+          "score": 0.8034513
+        },
+        {
+          "id": "madness-wallhaven-rqqe7q",
+          "score": 0.80341977
+        },
+        {
+          "id": "madness-wallhaven-8ggwro",
+          "score": 0.80044365
+        },
+        {
+          "id": "wallpaper-047",
+          "score": 0.7990996
+        },
+        {
+          "id": "madness-wallhaven-zppv8g",
+          "score": 0.7989383
+        },
+        {
+          "id": "madness-wallhaven-21127y",
+          "score": 0.79790175
+        },
+        {
+          "id": "madness-wallhaven-jeel8q",
+          "score": 0.7973969
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.7972596
+        },
+        {
+          "id": "madness-wallhaven-rqqoem",
+          "score": 0.79689634
+        },
+        {
+          "id": "madness-wallhaven-j52vqm",
+          "score": 0.79583573
+        },
+        {
+          "id": "madness-wallhaven-lyyxqy",
+          "score": 0.7955886
+        },
+        {
+          "id": "evaluation-gray-red-002-telephone",
+          "score": 0.79410386
+        },
+        {
+          "id": "madness-wallhaven-gww16q",
+          "score": 0.79359293
+        },
+        {
+          "id": "madness-wallhaven-x8359z",
+          "score": 0.7933096
+        },
+        {
+          "id": "madness-wallhaven-1qqer1",
+          "score": 0.7929758
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.7913625
+        },
+        {
+          "id": "wallpaper-097",
+          "score": 0.7905676
+        },
+        {
+          "id": "madness-wallhaven-d88qeo",
+          "score": 0.79015195
+        },
+        {
+          "id": "wallpaper-085",
+          "score": 0.7895086
+        },
+        {
+          "id": "madness-wallhaven-d88z63",
+          "score": 0.78877664
+        },
+        {
+          "id": "madness-wallhaven-yqxzqx",
+          "score": 0.7879987
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 3,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "name": "grayscale",
+              "percent": 80
+            },
+            {
+              "color": "#ff0000",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 5,
+        "variant": "linked"
+      },
+      "elapsedMs": 5.970092000003206,
+      "hits": [
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.85822326
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.83417284
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.8303207
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.8273328
+        },
+        {
+          "id": "madness-wallhaven-d8pk8m",
+          "score": 0.81604546
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.81188613
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.8072889
+        },
+        {
+          "id": "wallpaper-029",
+          "score": 0.8020715
+        },
+        {
+          "id": "madness-wallhaven-9ooez8",
+          "score": 0.7810848
+        },
+        {
+          "id": "madness-wallhaven-zppd8y",
+          "score": 0.78000295
+        },
+        {
+          "id": "wallpaper-016",
+          "score": 0.77370274
+        },
+        {
+          "id": "madness-wallhaven-3qqv1d",
+          "score": 0.77209103
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.76684856
+        },
+        {
+          "id": "madness-wallhaven-w5eq57",
+          "score": 0.7641468
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.76366353
+        },
+        {
+          "id": "madness-wallhaven-9oog5d",
+          "score": 0.76279163
+        },
+        {
+          "id": "madness-wallhaven-wqvoxr",
+          "score": 0.76217306
+        },
+        {
+          "id": "wallpaper-043",
+          "score": 0.75981826
+        },
+        {
+          "id": "madness-wallhaven-rqqw2q",
+          "score": 0.75875795
+        },
+        {
+          "id": "madness-wallhaven-rqq1mm",
+          "score": 0.75722253
+        },
+        {
+          "id": "wallpaper-042",
+          "score": 0.75219697
+        },
+        {
+          "id": "madness-wallhaven-jeerzw",
+          "score": 0.7515141
+        },
+        {
+          "id": "madness-wallhaven-w55re6",
+          "score": 0.7446158
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.74368227
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.74251366
+        },
+        {
+          "id": "madness-wallhaven-8ggwyj",
+          "score": 0.74161595
+        },
+        {
+          "id": "wallpaper-088",
+          "score": 0.74065673
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.7395538
+        },
+        {
+          "id": "evaluation-gray-red-002-telephone",
+          "score": 0.7394566
+        },
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.7391645
+        },
+        {
+          "id": "madness-wallhaven-6llp5q",
+          "score": 0.7364391
+        },
+        {
+          "id": "madness-wallhaven-yqq3wd",
+          "score": 0.73214483
+        },
+        {
+          "id": "madness-wallhaven-j52vqm",
+          "score": 0.7310711
+        },
+        {
+          "id": "madness-wallhaven-jeel8q",
+          "score": 0.7283951
+        },
+        {
+          "id": "madness-wallhaven-d882g3",
+          "score": 0.72835124
+        },
+        {
+          "id": "madness-wallhaven-rqqwgj",
+          "score": 0.7267308
+        },
+        {
+          "id": "madness-wallhaven-gww69l",
+          "score": 0.72566605
+        },
+        {
+          "id": "madness-wallhaven-3qq589",
+          "score": 0.725312
+        },
+        {
+          "id": "madness-wallhaven-3qqgo3",
+          "score": 0.72452307
+        },
+        {
+          "id": "madness-wallhaven-m9vqy9",
+          "score": 0.72434664
+        },
+        {
+          "id": "madness-wallhaven-zppv8g",
+          "score": 0.72262824
+        },
+        {
+          "id": "madness-wallhaven-8ggwro",
+          "score": 0.7208263
+        },
+        {
+          "id": "madness-wallhaven-k88kzd",
+          "score": 0.71922505
+        },
+        {
+          "id": "wallpaper-047",
+          "score": 0.71702766
+        },
+        {
+          "id": "madness-wallhaven-rqqe7q",
+          "score": 0.7168716
+        },
+        {
+          "id": "madness-wallhaven-1qqer1",
+          "score": 0.7163594
+        },
+        {
+          "id": "madness-wallhaven-vppry3",
+          "score": 0.7162006
+        },
+        {
+          "id": "madness-wallhaven-3qqem9",
+          "score": 0.7144009
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 3,
+        "limit": 48,
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#ff2200",
+              "percent": 20
+            },
+            {
+              "color": "#ff8800",
+              "percent": 20
+            },
+            {
+              "color": "#ffff00",
+              "percent": 20
+            },
+            {
+              "color": "#22cc44",
+              "percent": 20
+            },
+            {
+              "color": "#2266ff",
+              "percent": 20
+            }
+          ]
+        },
+        "steps": 5,
+        "variant": "linked"
+      },
+      "elapsedMs": 5.473547999979928,
+      "hits": [
+        {
+          "id": "madness-wallhaven-3qq5lv",
+          "score": 0.7079159
+        },
+        {
+          "id": "madness-wallhaven-ogg23p",
+          "score": 0.6828741
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.6791885
+        },
+        {
+          "id": "madness-wallhaven-k88zgm",
+          "score": 0.67439926
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.67066455
+        },
+        {
+          "id": "madness-wallhaven-lyyxjp",
+          "score": 0.66962385
+        },
+        {
+          "id": "madness-wallhaven-3qq6m3",
+          "score": 0.66625535
+        },
+        {
+          "id": "madness-wallhaven-k88ld6",
+          "score": 0.66581005
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.665631
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.66439396
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.6601836
+        },
+        {
+          "id": "madness-wallhaven-d88v3o",
+          "score": 0.654051
+        },
+        {
+          "id": "madness-wallhaven-oggv5m",
+          "score": 0.65320307
+        },
+        {
+          "id": "madness-wallhaven-9oo8k1",
+          "score": 0.6521499
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.6477405
+        },
+        {
+          "id": "madness-wallhaven-vpqk88",
+          "score": 0.64577997
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.64394087
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.64264685
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.64169556
+        },
+        {
+          "id": "madness-wallhaven-mllrdk",
+          "score": 0.641613
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.6414714
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.6407596
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.6406082
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.638645
+        },
+        {
+          "id": "madness-wallhaven-yqqe27",
+          "score": 0.6356105
+        },
+        {
+          "id": "madness-wallhaven-13qmlw",
+          "score": 0.63530093
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.63371193
+        },
+        {
+          "id": "madness-wallhaven-jeevkm",
+          "score": 0.63236916
+        },
+        {
+          "id": "wallpaper-040",
+          "score": 0.631893
+        },
+        {
+          "id": "madness-wallhaven-1qqe13",
+          "score": 0.63058114
+        },
+        {
+          "id": "madness-wallhaven-2119jg",
+          "score": 0.6294338
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.6276082
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.625496
+        },
+        {
+          "id": "madness-wallhaven-7jp81o",
+          "score": 0.62394464
+        },
+        {
+          "id": "madness-wallhaven-6lly96",
+          "score": 0.62231284
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.6212447
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.6206824
+        },
+        {
+          "id": "madness-wallhaven-poov9e",
+          "score": 0.61921465
+        },
+        {
+          "id": "madness-wallhaven-w553y6",
+          "score": 0.6172083
+        },
+        {
+          "id": "wallpaper-034",
+          "score": 0.61696225
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.61586845
+        },
+        {
+          "id": "madness-wallhaven-gwwq27",
+          "score": 0.615633
+        },
+        {
+          "id": "madness-wallhaven-lyyx7l",
+          "score": 0.6146329
+        },
+        {
+          "id": "madness-wallhaven-poowxp",
+          "score": 0.61378217
+        },
+        {
+          "id": "wallpaper-035",
+          "score": 0.613721
+        },
+        {
+          "id": "madness-wallhaven-mllelk",
+          "score": 0.6135648
+        },
+        {
+          "id": "wallpaper-031",
+          "score": 0.61351305
+        },
+        {
+          "id": "madness-wallhaven-gwwmxq",
+          "score": 0.6118259
+        }
+      ],
+      "status": 200
+    },
+    {
+      "body": {
+        "level": 2,
+        "limit": 48,
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        },
+        "steps": 5,
+        "variant": "linked"
+      },
+      "elapsedMs": 5.7666999999783,
+      "hits": [
+        {
+          "id": "madness-wallhaven-rqq1ww",
+          "score": 0.3922644
+        },
+        {
+          "id": "wallpaper-037",
+          "score": 0.357516
+        },
+        {
+          "id": "madness-wallhaven-rqqjrj",
+          "score": 0.34977913
+        },
+        {
+          "id": "madness-wallhaven-w55xgp",
+          "score": 0.33212072
+        },
+        {
+          "id": "evaluation-green-red-tulip-field",
+          "score": 0.30737215
+        },
+        {
+          "id": "evaluation-green-red-tulips",
+          "score": 0.2994342
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "score": 0.2829422
+        },
+        {
+          "id": "madness-wallhaven-gwwlm3",
+          "score": 0.2716273
+        },
+        {
+          "id": "madness-wallhaven-j5eqpw",
+          "score": 0.24890596
+        },
+        {
+          "id": "madness-wallhaven-xeewg3",
+          "score": 0.24286649
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "score": 0.23992094
+        },
+        {
+          "id": "madness-wallhaven-gwwvqe",
+          "score": 0.23002744
+        },
+        {
+          "id": "madness-wallhaven-k9m277",
+          "score": 0.22888021
+        },
+        {
+          "id": "madness-wallhaven-qrre8l",
+          "score": 0.2262979
+        },
+        {
+          "id": "madness-wallhaven-9639xx",
+          "score": 0.21048686
+        },
+        {
+          "id": "madness-wallhaven-6llzk6",
+          "score": 0.210296
+        },
+        {
+          "id": "madness-wallhaven-yqqoek",
+          "score": 0.2081539
+        },
+        {
+          "id": "madness-wallhaven-e88v9o",
+          "score": 0.2080894
+        },
+        {
+          "id": "madness-wallhaven-gwwkql",
+          "score": 0.20550203
+        },
+        {
+          "id": "madness-wallhaven-lyyv8r",
+          "score": 0.1997388
+        },
+        {
+          "id": "madness-wallhaven-vmwlmm",
+          "score": 0.18827772
+        },
+        {
+          "id": "madness-wallhaven-rqqjl7",
+          "score": 0.18443313
+        },
+        {
+          "id": "madness-wallhaven-1qqlew",
+          "score": 0.18313055
+        },
+        {
+          "id": "madness-wallhaven-gww27e",
+          "score": 0.18292056
+        },
+        {
+          "id": "madness-wallhaven-d88evl",
+          "score": 0.18247402
+        },
+        {
+          "id": "madness-wallhaven-95jgkk",
+          "score": 0.17961036
+        },
+        {
+          "id": "madness-wallhaven-7j3lve",
+          "score": 0.17203583
+        },
+        {
+          "id": "madness-wallhaven-qrrq67",
+          "score": 0.17137855
+        },
+        {
+          "id": "madness-wallhaven-mdoqxy",
+          "score": 0.16949995
+        },
+        {
+          "id": "madness-wallhaven-poo7gj",
+          "score": 0.1690116
+        },
+        {
+          "id": "madness-wallhaven-8368k1",
+          "score": 0.16038074
+        },
+        {
+          "id": "wallpaper-082",
+          "score": 0.16031748
+        },
+        {
+          "id": "madness-wallhaven-v9qkgm",
+          "score": 0.15998477
+        },
+        {
+          "id": "madness-wallhaven-9mrgk1",
+          "score": 0.15908718
+        },
+        {
+          "id": "madness-wallhaven-9oozpx",
+          "score": 0.15823291
+        },
+        {
+          "id": "madness-wallhaven-gwwxpl",
+          "score": 0.1529119
+        },
+        {
+          "id": "madness-wallhaven-lyydwl",
+          "score": 0.15276799
+        },
+        {
+          "id": "madness-wallhaven-ox2ool",
+          "score": 0.14767423
+        },
+        {
+          "id": "wallpaper-094",
+          "score": 0.1468845
+        },
+        {
+          "id": "madness-wallhaven-vppd75",
+          "score": 0.14673594
+        },
+        {
+          "id": "wallpaper-084",
+          "score": 0.14289933
+        },
+        {
+          "id": "madness-wallhaven-qrroml",
+          "score": 0.14179412
+        },
+        {
+          "id": "madness-wallhaven-e8865l",
+          "score": 0.14138994
+        },
+        {
+          "id": "madness-wallhaven-xeejzz",
+          "score": 0.14120021
+        },
+        {
+          "id": "madness-wallhaven-q625eq",
+          "score": 0.13628705
+        },
+        {
+          "id": "madness-wallhaven-yqqrp7",
+          "score": 0.13127683
+        },
+        {
+          "id": "madness-wallhaven-ymg9kx",
+          "score": 0.13003296
+        },
+        {
+          "id": "wallpaper-058",
+          "score": 0.12991044
+        }
+      ],
+      "status": 200
+    }
+  ],
+  "url": "http://zerotwo:8228/strictness.html"
+}

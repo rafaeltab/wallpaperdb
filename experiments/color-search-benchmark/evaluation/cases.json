@@ -1,0 +1,70 @@
+{
+  "format_version": 1,
+  "format_status": "proposed minimal case record; not an implementation query language",
+  "scope": "Case authoring and human judgments are authorized; search method, evaluation harness, score formula, and implementation experiments are not selected.",
+  "definition_status": "Practical definitions of grayscale, red, and blue remain undecided.",
+  "cases": [
+    {
+      "id": "composition-001",
+      "version": 1,
+      "category": "Combinations",
+      "status": "user_confirmed",
+      "query": "80% grayscale 20% red",
+      "intent": "Find wallpapers matching the requested grayscale and red composition; the requested proportions total 100%.",
+      "example_type": "conceptual_composition",
+      "examples": [
+        {
+          "id": "A",
+          "composition_percent": { "grayscale": 90, "red": 10 }
+        },
+        {
+          "id": "B",
+          "composition_percent": { "grayscale": 80, "red": 18, "blue": 2 }
+        }
+      ],
+      "judgments": {
+        "preferred": "A",
+        "over": "B",
+        "absolute_relevance": "not supplied"
+      },
+      "origin": {
+        "judge": "user",
+        "source": "Explicit comparison in this conversation",
+        "statement": "The wallpaper with 10% red and 90% grayscale should score higher than the wallpaper with 80% grayscale, 18% red, and 2% blue."
+      },
+      "limits": "This particular ordering does not establish a universal priority for palette purity or a hard exclusion of blue."
+    },
+    {
+      "id": "composition-002",
+      "version": 1,
+      "category": "Combinations",
+      "status": "user_confirmed",
+      "query": "80% grayscale 10% red",
+      "intent": "Find wallpapers matching the requested grayscale and red composition; the remaining 10% is unspecified.",
+      "example_type": "conceptual_composition",
+      "examples": [
+        {
+          "id": "A",
+          "composition_percent": { "grayscale": 90, "red": 10 }
+        },
+        {
+          "id": "B",
+          "composition_percent": { "grayscale": 80, "red": 18, "blue": 2 }
+        }
+      ],
+      "judgments": {
+        "absolute_relevance": { "A": "good", "B": "good" },
+        "order": "unconstrained",
+        "interpretation": "Both should score highly. Either order is acceptable; equal numerical scores are not required."
+      },
+      "origin": {
+        "judge": "user",
+        "source": "Explicit comparison and subsequent correction in this conversation",
+        "statement": "Both wallpapers should score highly, with no required winner.",
+        "correction": "The user corrected B from 1% red to 18% red. Both cases compare the same complete wallpaper compositions.",
+        "tentative_comment": "The user thought B might win from a technical standpoint but accepted either ordering. This is not a mandatory preference."
+      },
+      "limits": "Leaving 10% unspecified does not establish that arbitrary amounts of outside colors are acceptable."
+    }
+  ]
+}

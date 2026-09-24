@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Color match strictness · Prototype</title>
+  <link rel="stylesheet" href="/strictness.css">
+  <script type="module" src="/strictness.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div><p class="eyebrow">Color search experiment</p><h1>Color match strictness</h1>
+      <p>Try your original controls, or combine them into one slider.</p></div>
+    <nav aria-label="Other experiments"><a class="button secondary" href="/">All 19 prototypes</a><a class="button secondary" href="/performance.html">Performance results</a></nav>
+  </header>
+  <main>
+    <form id="strictness-form" novalidate>
+      <div class="tabs" role="tablist" aria-label="Color controls">
+        <button type="button" role="tab" id="tab-original" aria-controls="panel-original" aria-selected="false" tabindex="-1" data-variant="original">Original controls</button>
+        <button type="button" role="tab" id="tab-linked" aria-controls="panel-linked" aria-selected="true" tabindex="0" data-variant="linked">Combined slider</button>
+      </div>
+      <section id="panel-original" role="tabpanel" aria-labelledby="tab-original" hidden class="control-panel">
+        <div class="panel-heading"><div><h2>Adjust each control separately</h2><p>Keep quality influence and cutoff weighting independent.</p></div><span class="tag">5% area steps</span></div>
+        <div class="toolbar">
+          <label>Quality influence<select id="original-quality"><option value="0">0 · coverage only</option><option value="0.5" selected>0.5 · favorite balance</option><option value="1">1 · full quality influence</option></select></label>
+          <label>Cutoff weighting<select id="original-cutoff"><option value="0">0 · equal layers</option><option value="1" selected>1 · favorite weighting</option><option value="3">3 · stricter layers</option></select></label>
+          <button type="button" class="secondary reset-control" id="reset-original">Use saved favorite</button>
+        </div>
+        <p class="control-note">These use the original linear quality curve. The saved favorite is quality 0.5 and cutoff weighting 1.</p>
+      </section>
+      <section id="panel-linked" role="tabpanel" aria-labelledby="tab-linked" class="control-panel">
+        <div class="panel-heading"><div><h2>One slider, a few useful choices</h2><p>Move from broader color matches toward closer ones.</p></div><span class="tag">10% area steps</span></div>
+        <div class="linked-heading"><label>Number of choices<select id="linked-steps"><option value="3">3 choices</option><option value="5" selected>5 choices</option></select></label>
+          <div class="current-level"><label for="linked-level">Match strictness</label><output id="level-label" for="linked-level">Favorite balance</output></div>
+          <button type="button" class="secondary" id="reset-linked">Use saved favorite</button></div>
+        <input type="range" id="linked-level" min="0" max="4" step="1" value="2" aria-describedby="level-description level-pair">
+        <div id="level-ticks" class="level-ticks" aria-hidden="true"></div>
+        <p id="level-description" class="level-description">Your saved balance between quality and coverage.</p>
+        <p id="level-pair" class="control-note">Quality influence 0.5 · cutoff weighting 1</p>
+      </section>
+      <section class="query-panel" aria-labelledby="query-heading">
+        <div class="query-heading"><div><h2 id="query-heading">What should the wallpaper feel like?</h2><p id="query-state-note">Each tab keeps its own query and settings.</p></div><button type="button" class="secondary" id="copy-query">Use Original query</button></div>
+        <div class="toolbar">
+          <label>Query mode<select id="query-mode"><option value="vibe">Overall color vibe</option><option value="proportions">Target proportions</option></select></label>
+          <label>Try a query<select id="query-preset"><option value="custom">Custom query</option><option value="red" selected>Feels red</option><option value="green40">40% green · rest free</option><option value="redgreen">50% red · 50% green</option><option value="rainbow">Five colors · 20% each</option><option value="grayred">80% grayscale · 20% red</option><option value="dark">Dark</option><option value="grayscale">Grayscale</option><option value="trans">Pink · white · sky blue</option></select></label>
+          <label>Show results<select id="result-limit"><option value="24">24</option><option value="48" selected>48</option><option value="96">96</option><option value="523">All 523</option></select></label>
+        </div>
+        <div id="query-targets" class="targets" aria-label="Requested colors"></div>
+        <div class="query-actions"><button type="button" class="secondary" id="add-color">+ Add color</button><span id="area-remainder" class="muted"></span><span class="spacer"></span><label class="check"><input id="live-update" type="checkbox" checked> Update live</label><button type="submit" id="run-search">Search wallpapers</button></div>
+        <p id="query-validation" class="validation" role="status" aria-live="polite"></p>
+      </section>
+    </form>
+    <div class="results-heading"><div><h2 id="results-title">Wallpapers</h2><p id="results-description" class="muted">Loading available choices…</p></div><span id="corpus-count" class="tag">Real wallpapers only</span></div>
+    <p id="search-status" role="status" aria-live="polite">Loading prototype…</p>
+    <div id="wallpaper-grid" class="wallpaper-grid" aria-label="Ranked wallpapers" aria-busy="false"></div>
+  </main>
+  <dialog id="wallpaper-dialog" aria-labelledby="wallpaper-title">
+    <div class="dialog-heading"><h2 id="wallpaper-title">Wallpaper</h2><button type="button" id="close-wallpaper" class="secondary">Close</button></div>
+    <img id="wallpaper-image" alt="">
+    <div class="dialog-footer"><p id="wallpaper-details"></p><div class="dialog-links"><a id="wallpaper-full" target="_blank" rel="noopener">Full image ↗</a><a id="wallpaper-source" target="_blank" rel="noopener">Source ↗</a></div></div>
+  </dialog>
+  <dialog id="adjustment-dialog" aria-labelledby="adjustment-title" aria-describedby="adjustment-description">
+    <div class="dialog-heading"><h2 id="adjustment-title">Adjust to 10% steps?</h2><button type="button" id="cancel-adjustment-top" class="secondary" aria-label="Close percentage adjustment">Close</button></div>
+    <div class="adjustment-content"><p id="adjustment-description">The Combined slider uses 10% area steps. Review this adjustment before copying. Your Original query stays unchanged.</p><div id="adjustment-preview"></div><p id="adjustment-total"></p></div>
+    <div class="dialog-actions"><button type="button" id="cancel-adjustment" class="secondary">Keep current query</button><button type="button" id="accept-adjustment">Use adjusted query</button></div>
+  </dialog>
+</body>
+</html>

@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "method": "favorite-utility-numeric-docvalues",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "buildFavoriteDocvalueQuery"
+      },
+      "executor": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "searchFavoriteDocvalueUtilities"
+      }
+    },
+    {
+      "id": "favorite-utility-sorted-docvalues",
+      "method": "favorite-utility-sorted-docvalues",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "buildFavoriteDocvalueQuery"
+      },
+      "executor": {
+        "module": "./favorite-docvalue-fetch.mjs",
+        "export": "searchFavoriteDocvalueUtilities"
+      }
+    },
+    {
+      "id": "favorite-utility-bounded-pooled-delete",
+      "method": "favorite-utility-bounded-pooled-delete",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-pooled-utilities.mjs",
+        "export": "buildFavoritePooledQuery"
+      },
+      "executor": {
+        "module": "./favorite-pooled-utilities.mjs",
+        "export": "executeFavoritePooledUtilitySearch"
+      }
+    },
+    {
+      "id": "favorite-utility-maxima-bounded-pooled-delete",
+      "method": "favorite-utility-maxima-bounded-pooled-delete",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "realIndex": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "builder": {
+        "module": "./favorite-pooled-utilities.mjs",
+        "export": "buildFavoritePooledQuery"
+      },
+      "executor": {
+        "module": "./favorite-pooled-utilities.mjs",
+        "export": "executeFavoritePooledUtilitySearch"
+      }
+    }
+  ]
+}

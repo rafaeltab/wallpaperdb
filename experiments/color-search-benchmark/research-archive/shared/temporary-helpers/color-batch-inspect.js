@@ -1,0 +1,30 @@
+(async () => {
+  const check = (condition, label) => { if (!condition) throw new Error(label); };
+  const pick = label => document.querySelector(`figure[data-label="${label}"] .pick-image`).click();
+  const note = text => { const el = document.querySelector('#case-notes'); el.value = text; el.dispatchEvent(new Event('input', {bubbles: true})); };
+  const caseButtons = [...document.querySelectorAll('#case-list button')];
+  check(caseButtons.length === 24, '24 comparisons');
+  await Promise.all([...document.querySelectorAll('.photo-card img')].map(img => img.decode()));
+  check([...document.querySelectorAll('.photo-card img')].every(img => img.naturalWidth > 0 && getComputedStyle(img).objectFit === 'contain'), 'complete source images');
+  check(document.documentElement.scrollWidth <= innerWidth, 'no desktop overflow');
+  pick('B');
+  let tie = document.querySelector('#tie-next'); tie.checked = true; tie.dispatchEvent(new Event('change', {bubbles:true}));
+  pick('A');
+  tie = document.querySelector('#tie-next'); tie.checked = false; tie.dispatchEvent(new Event('change', {bubbles:true}));
+  pick('D');
+  note('QA only — ties B=A > D; C unjudged. Café 🌈');
+  [...document.querySelectorAll('.status-options button')].find(b => b.textContent === 'None fits well').click();
+  caseButtons[1].click(); note('QA notes without a judgment.');
+  caseButtons[2].click(); [...document.querySelectorAll('.status-options button')].find(b => b.textContent === 'Skip for now').click();
+  caseButtons[3].click(); [...document.querySelectorAll('.status-options button')].find(b => b.textContent === 'I’m unsure').click();
+  caseButtons[0].click();
+  const key = 'wallpaperdb:color-review:color-review-batch-001:v1';
+  const state = JSON.parse(localStorage.getItem(key));
+  const answers = Object.values(state.answers);
+  check(answers.length === 4, 'four answer states');
+  check(JSON.stringify(answers[0].ranking) === JSON.stringify([['B','A'],['D']]), 'tied partial order');
+  check(answers[0].status === 'none-match', 'explicit mismatch with relative order');
+  check(answers[1].status === 'notes-only', 'notes without invented uncertainty');
+  check(answers[2].status === 'skipped' && answers[3].status === 'unsure', 'skip vs unsure');
+  return {secureContext: isSecureContext, randomUUIDAvailable: typeof crypto.randomUUID === 'function', cases: caseButtons.length, answerStatuses: answers.map(a => a.status), ranking: answers[0].ranking, progress: document.querySelector('#progress-count').textContent, overflow: document.documentElement.scrollWidth > innerWidth};
+})()

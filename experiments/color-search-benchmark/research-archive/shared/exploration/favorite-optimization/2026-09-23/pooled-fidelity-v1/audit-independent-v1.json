@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "fileOnly": true,
+  "reviewedAt": "2026-09-23T18:46:37.056550+00:00",
+  "integrityPassed": true,
+  "experimentPassed": true,
+  "errors": [],
+  "totals": {
+    "executions": 2504,
+    "returnedScores": 333544,
+    "positiveBounds": 1892,
+    "maximaRangeExecutions": 916,
+    "duplicateFallbacks": 12,
+    "nativeCleanups": 2504,
+    "reusedCleanups": 2503,
+    "serviceStages": 13256
+  },
+  "byIndexAndMethod": {
+    "color-exploration-favorite-points-real-v2 / favorite-utility-bounded-pooled-delete": {
+      "executions": 626,
+      "returnedScores": 83386,
+      "positiveBounds": 473,
+      "maximaRangeExecutions": 0,
+      "duplicateFallbacks": 0,
+      "nativeCleanups": 626,
+      "reusedCleanups": 625,
+      "serviceStages": 3314
+    },
+    "color-exploration-favorite-points-real-v2 / favorite-utility-maxima-bounded-pooled-delete": {
+      "executions": 626,
+      "returnedScores": 83386,
+      "positiveBounds": 473,
+      "maximaRangeExecutions": 458,
+      "duplicateFallbacks": 6,
+      "nativeCleanups": 626,
+      "reusedCleanups": 626,
+      "serviceStages": 3314
+    },
+    "color-exploration-favorite-multishard-real-v1 / favorite-utility-bounded-pooled-delete": {
+      "executions": 626,
+      "returnedScores": 83386,
+      "positiveBounds": 473,
+      "maximaRangeExecutions": 0,
+      "duplicateFallbacks": 0,
+      "nativeCleanups": 626,
+      "reusedCleanups": 626,
+      "serviceStages": 3314
+    },
+    "color-exploration-favorite-multishard-real-v1 / favorite-utility-maxima-bounded-pooled-delete": {
+      "executions": 626,
+      "returnedScores": 83386,
+      "positiveBounds": 473,
+      "maximaRangeExecutions": 458,
+      "duplicateFallbacks": 6,
+      "nativeCleanups": 626,
+      "reusedCleanups": 626,
+      "serviceStages": 3314
+    }
+  },
+  "sourcesVerified": 34,
+  "indexGenerations": {
+    "color-exploration-favorite-points-real-v2": {
+      "count": 545,
+      "uuid": "DV5g9x4cR4CUMQw3mhKeIg",
+      "mappingHash": "971c97aa2e2aa0e6929e2bbfe9dac4018e39f0cf298abcb00770937f52728ef6",
+      "settingsHash": "5690b1b46d02cdb0ee4f5f763b6e0817ea632d984b96ef25573de7551317f913",
+      "docs": {
+        "count": 545,
+        "deleted": 0
+      },
+      "indexingTotal": 545,
+      "deleteTotal": 0
+    },
+    "color-exploration-favorite-multishard-real-v1": {
+      "count": 545,
+      "uuid": "cE_vSU6BSuiOb28lDrTysg",
+      "mappingHash": "988c239fabbef25b471ab56762d6ebdf9f1e26156e12467e20c749cd163def6f",
+      "settingsHash": "a13c14e7aadc292d8a1d0a140e1d3ad3e594d5ba79206da0ca9c98d9f88dc3b3",
+      "docs": {
+        "count": 545,
+        "deleted": 0
+      },
+      "indexingTotal": 545,
+      "deleteTotal": 0
+    }
+  },
+  "referenceJobs": 160,
+  "presets": 9,
+  "hashes": {
+    "fidelity.json": "91fa06f43d0a9cdbc48bc292329eea74504016cf731aa1a444e0117085928e95",
+    "jobs.json": "8a230dc0ce5b3ac2487ca5132fbded8e7cd9ff61795d9f8b091fdf84c598cb59",
+    "source-snapshot.json": "f11c35bac0e8ab62a108a0c4414e2195f5e2c65ebdbf276bb5652b49b49d289d",
+    "index-before.json": "ef363b796470deca6b31009783e8f9938d1c0096ec613937f8952d60189d9d8c",
+    "index-after.json": "ef363b796470deca6b31009783e8f9938d1c0096ec613937f8952d60189d9d8c",
+    "references.jsonl": "7cbaea73937768f46ca35471e64af7adfe6c30dd84f549188e507c0c115850cc",
+    "service-traces.jsonl": "1200f19c264dad1c12ddaec9f22cfde49cfb77df8b375f390be46e7b3009d587"
+  },
+  "auditorHash": "2c6944fdd39b6081cd548f58ad560fd5e77b9b405929c17225be14c62512243d",
+  "limitations": [
+    "File-only re-evaluation of saved complete rankings and HTTP-stage traces, not a new service run or independent reimplementation of color extraction.",
+    "Same preserved numeric objective including its known duplicate-target arithmetic defect; duplicate tests verify transport/fallback parity, not a correction.",
+    "545 assets (523 real and 22 synthetic); three primaries share one physical node. No million-document capacity or multi-node claim.",
+    "Pool snapshot precedes finally-close and reports one idle HTTP socket; every created/rotated PIT has a successful DELETE acknowledgement."
+  ]
+}

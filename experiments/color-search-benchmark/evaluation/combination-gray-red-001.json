@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "combination-gray-red-001",
+  "status": "user-judged",
+  "category": "Combinations",
+  "use": "development anchor",
+  "query": {
+    "userText": "mostly grayscale, with red accents",
+    "intent": "A mostly neutral gray, black and white wallpaper with red as the colored accent. How much tint or other color remains acceptable, and how much red feels like an accent, is for the user to judge.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/combination-gray-red-001.html",
+    "presentation": "Existing JPEG whole-image thumbnails, contained without cropping on the same neutral background; originals available by clicking. Labels A–F are presentation IDs, not ranks.",
+    "selection": "Manually selected existing corpus images to discuss neutral areas with red, background tints, additional accent hues, extensive red, and neutral appearance without an apparent red accent. These are sampling hypotheses, not expected relevance judgments or search results.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "sourceTitlesVisible": false,
+    "randomization": "Fixed nonsorted presentation order: wallpaper-042, wallpaper-060, wallpaper-037, wallpaper-065, wallpaper-029, wallpaper-048.",
+    "judgmentFormat": "Open descriptions of whole-image match quality, optional ordering or comparisons with ties, and finer scores if the user chooses. No mandatory labels or predefined numeric scale. The user may judge none of the examples a good match.",
+    "requestedLabels": null,
+    "pairwiseOrdering": "Optional. Ties, acceptable alternative orders, and uncertainty should be preserved."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-042",
+      "filename": "corpus/wallpaper-042.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-042.jpg",
+      "sha256": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 4100,
+      "height": 2730,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "I don't know how to grade this tbh. The red doesnt pop out, and the grayscale isnt very grayscale. I'd grade this above C but I feel angry while doing so.",
+        "componentDescriptions": {
+          "grayscale": "Not very grayscale.",
+          "red": "Does not pop out."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null,
+        "gradingDifficulty": "User does not know how to grade this, explicitly prefers it over C but expresses frustration doing so."
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-060",
+      "filename": "corpus/wallpaper-060.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+      "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1366,
+      "height": 768,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Good red, I guess the white is grayscale, but it doesn't feel like grayscale with red, it feels like white with red",
+        "componentDescriptions": {
+          "grayscale": "White is tentatively recognized as grayscale, but the image feels like white with red, not the requested grayscale-with-red appearance.",
+          "red": "Good red."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-037",
+      "filename": "corpus/wallpaper-037.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-037.jpg",
+      "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 1920,
+      "height": 1080,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "no grayscale, but good red",
+        "componentDescriptions": {
+          "grayscale": "No grayscale.",
+          "red": "Good red."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-065",
+      "filename": "corpus/wallpaper-065.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-065.jpg",
+      "sha256": "7e2854092b4a06212c9944f14e8e1d158bc71b964ce9d539b5fd60b911d3ce76",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_pair_of_playing_cards_on_a_black_surface.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 5583,
+      "height": 3722,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Perfect grayscale, but no red so uh...",
+        "componentDescriptions": {
+          "grayscale": "Perfect grayscale.",
+          "red": "No red."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "E",
+      "wallpaperId": "wallpaper-029",
+      "filename": "corpus/wallpaper-029.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-029.jpg",
+      "sha256": "08e7badf417a6017f3e7443a150e8e2f910ab2188a779ff8cb74b910fd321789",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_red_sign_on_a_building.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 4423,
+      "height": 2975,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This has red, but not really grayscale so I'd say like 30% grayscale area with decent quality on the buildings? The red is really good though.",
+        "componentDescriptions": {
+          "grayscale": "Not really grayscale overall; around 30% grayscale area of decent quality on the buildings.",
+          "red": "Really good red."
+        },
+        "perceivedColorAreas": [
+          {
+            "color": "grayscale",
+            "estimatedImagePercent": 30,
+            "matchQuality": "decent",
+            "region": "buildings",
+            "qualification": "Approximate and tentative user visual estimate ('I'd say like ...?'), not measured coverage."
+          }
+        ],
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "F",
+      "wallpaperId": "wallpaper-048",
+      "filename": "corpus/wallpaper-048.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-048.jpg",
+      "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 6016,
+      "height": 4000,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This is the best match, it has grayscale background, with red roses, but as we established earlier they're not bright red",
+        "componentDescriptions": {
+          "grayscale": "Grayscale background.",
+          "red": "Red roses, not bright red; the user references the earlier dull-red discussion."
+        },
+        "perceivedColorAreas": [],
+        "wholeImageMatchRating": null,
+        "relativeAssessment": "Best of the six examples; no perfect-match label or calibrated absolute grade supplied."
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "gray-red-order-001",
+      "source": "user-response-001",
+      "type": "overall-grayscale-with-red-accents-order",
+      "orderedLabels": [
+        "F",
+        "E",
+        "A",
+        "B",
+        "D",
+        "C"
+      ],
+      "orderedWallpaperIds": [
+        "wallpaper-048",
+        "wallpaper-029",
+        "wallpaper-042",
+        "wallpaper-060",
+        "wallpaper-065",
+        "wallpaper-037"
+      ],
+      "tiesReported": false,
+      "scope": "Explicit relative order for this query, retained alongside the user's reported grading difficulty. No numeric score distances, absolute whole-image grades or general component weights supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "F",
+      "over": "E",
+      "source": "gray-red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "E",
+      "over": "A",
+      "source": "gray-red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "B",
+      "source": "gray-red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "B",
+      "over": "D",
+      "source": "gray-red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "C",
+      "source": "gray-red-order-001",
+      "derivation": "Adjacent relation derived from the user's single explicit ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A I don't know how to grade this tbh. The red doesnt pop out, and the grayscale isnt very grayscale. I'd grade this above C but I feel angry while doing so.\nB Good red, I guess the white is grayscale, but it doesn't feel like grayscale with red, it feels like white with red\nC no grayscale, but good red\nD Perfect grayscale, but no red so uh...\nE This has red, but not really grayscale so I'd say like 30% grayscale area with decent quality on the buildings? The red is really good though.\nF This is the best match, it has grayscale background, with red roses, but as we established earlier they're not bright red\n\nF, E, A, B, D, C\n\nthis one was hard for me"
+    }
+  ],
+  "notes": [
+    "User descriptions, approximate regional annotation for E, review difficulty and explicit overall order are recorded. Confirmed order: F > E > A > B > D > C.",
+    "The query concerns a combination of mostly neutral appearance and red accents. It does not specify exact percentages, shade, a numerical neutrality cutoff, or a subject.",
+    "These A–F labels belong only to this case; earlier cases have different image mappings.",
+    "Some images were seen in the perceived-red case. Only the user's explicit reference to the roses not being bright red is carried into the descriptive explanation; no prior percentages, scores or ranking are transferred.",
+    "User judgments should describe appearance; they are not a pixel-membership oracle or extraction target.",
+    "No ideal reference has been confirmed. The user calls F the best match among these, with a limitation that the red roses are not bright red. This does not establish that F is perfect or that all six are unacceptable.",
+    "Tinted backgrounds, additional colors, and the amount of red are considerations for discussion, not predetermined penalties or relevance labels.",
+    "Source filenames, titles, directory names, and earlier sampling labels do not define relevance.",
+    "No originals or thumbnails were altered for this case. Existing previews can differ from originals because of display size and JPEG encoding.",
+    "Any future area estimates are to be recorded separately from whole-image match ratings and ordering.",
+    "Preserve finer comparisons, uncertainty, and acceptable alternative orders without inventing numeric scores or exact ties.",
+    "B's distinction between white-with-red and grayscale-with-red concerns the perceived combination in this image. It does not exclude white from grayscale, require a specific background tone or establish a universal tonal-distribution rule.",
+    "E's 30% grayscale estimate applies to the buildings, with decent local grayscale quality; preserve this separately from the whole image's relevance. Unmentioned regions and red amounts remain unannotated.",
+    "D > C compares these particular examples missing different requested components; it does not establish that grayscale always outweighs red.",
+    "The user's difficulty grading A and this case does not invalidate the supplied ranking or establish numerical confidence or score gaps."
+  ],
+  "judgmentContext": {
+    "source": "user-response-001",
+    "reportedDifficulty": "this one was hard for me",
+    "interpretation": "Review difficulty and A-specific reluctance are preserved without replacing the explicit order with ties, inventing confidence values, or treating ranked examples as good matches."
+  }
+}

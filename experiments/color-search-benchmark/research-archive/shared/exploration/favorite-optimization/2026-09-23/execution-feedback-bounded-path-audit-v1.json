@@ -1,0 +1,693 @@
+{
+  "reviewedAt": "2026-09-23T15:37:55.144136+00:00",
+  "runFile": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-23T15-32-41.534Z-1d889ffc/run.json",
+  "runSha256": "da39048fc11ad43d470dd29451d8a0bbb13609fc0d446534ff5f3f1a32caffcd",
+  "fileOnly": true,
+  "actualBoundedExecutorConfirmedForSavedAccuracyCalls": true,
+  "timedPathConfirmedByMatchingSource": true,
+  "timedStageTracesRetained": false,
+  "recomputedTimedDistribution": {
+    "sampleCount": 96,
+    "p50Ms": 3.842464999994263,
+    "p95Ms": 5.44826400000602,
+    "maxMs": 6.5143280000193045
+  },
+  "sourceProof": [
+    {
+      "source": "exploration/adapter.mjs",
+      "sha256": "9da9b0ceb50e33cf0ac8a268fe446ca113ebeca6927b8e29fce228a51def6a2a",
+      "matchesRecorded": true
+    },
+    {
+      "source": "exploration/registry.mjs",
+      "sha256": "64d7e366a66af6d382a908f055cd59ca1e8bf8ec8842dda82838aa38c32ca57a",
+      "matchesRecorded": true
+    },
+    {
+      "source": "exploration/favorite-bounded-utilities.mjs",
+      "sha256": "a3627a0e2cffc8b057e04694ea55fc1a6c3e3baf7d2ab6ef7ad76e94768005d9",
+      "matchesRecorded": true
+    },
+    {
+      "source": "evaluation/loop/runner.mjs",
+      "sha256": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+      "matchesRecorded": true
+    }
+  ],
+  "accuracyExecutionProof": [
+    {
+      "caseId": "perceived-red-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 8.87427599998773,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-grayscale-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 8.513477000000421,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-dark-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 9.170463000016753,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "precision-shade-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 7.106171999999788,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "semantic-red-city-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 3.8293699999921955,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 3,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "proportion-green-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 6.923989000002621,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "proportion-green-002",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.157016000011936,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-green-red-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 9.400404999993043,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-green-red-real-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 7.1277720000070985,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-green-red-real-002",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 7.392179999995278,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-red-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 6.2668439999979455,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-orange-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 6.757615999988047,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-pink-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 6.665343000000576,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-green-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 6.003278000018327,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-blue-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.543323000019882,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "proportion-green-real-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.008277000015369,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "proportion-green-real-batch-002",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.319531999994069,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "proportion-red-real-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.161915999982739,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-dark-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 4.945288999995682,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-light-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 4.899391999992076,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-vivid-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 4.887088999996195,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-strict-grayscale-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.674800000007963,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-near-neutral-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 7.558342000003904,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "vibe-monochromatic-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.379764999990584,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-gray-red-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 8.76026200002525,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-gray-red-batch-002",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 8.87759200000437,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-blue-orange-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 6.83418000000529,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "composition-blue-orange-batch-002",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "seed-1",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 5,
+      "elapsedMs": 8.495494000002509,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 2,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "precision-warm-red-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 8.343308000010438,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "precision-muted-green-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.997337000007974,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "palette-rainbow-batch-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.124345000018366,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    },
+    {
+      "caseId": "perceived-red-pagoda-001",
+      "stages": [
+        "pit-open",
+        "seed-0",
+        "global-final",
+        "pit-close"
+      ],
+      "requestCount": 4,
+      "elapsedMs": 5.3733829999982845,
+      "globalBounds": {
+        "threshold": null,
+        "kthSeedScore": null,
+        "seedUnionCount": 545,
+        "targetCount": 1,
+        "completeCandidateCoverage": true,
+        "consistency": "point-in-time",
+        "fallback": "fewer-than-limit-seeds"
+      }
+    }
+  ],
+  "conclusions": [
+    "All32 saved accuracy calls have actual PIT multistage executor evidence; no numeric reference-builder substitution.",
+    "Matching runner/adapter/registry sources show accuracy and timed calls use the same candidate.search route and elapsed time wraps the awaited result, including PIT cleanup.",
+    "Timing samples record top20 hits and wall time, but discard their returned per-stage evidence. Exact timed request-count reconstruction is therefore unavailable from this feedback artifact.",
+    "Accuracy calls request1000 hits from545 documents, so all32 use the correct fewer-than-limit-seeds fallback. This saved trace does not demonstrate positive pruning for timed top20 calls.",
+    "Bounded search already uses stored_fields:_none_ and keyword ID doc values for every stage. Small loopback warm-query timings are plausible; they are not million-record or concurrent-load measurements."
+  ]
+}

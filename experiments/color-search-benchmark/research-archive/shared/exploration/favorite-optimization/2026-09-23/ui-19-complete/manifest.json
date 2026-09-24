@@ -1,0 +1,16 @@
+{
+  "capture.js": "700f106df9aed1f27b1cb6e09aa1c4477acc65d32ea04599a3d6114ccc337dfc",
+  "cutoff-modal.png": "c1cabab256a8c51b0f05656e4a5360bd1a91e055493ead1de2f423f9175d6ed7",
+  "desktop-performance-corrected.png": "236c5fefa37bc317ff8a00e90c798bba076ed1528fefb4a2d9da98e43ad1ad87",
+  "desktop-performance-filtered.png": "87400e58619039ed1d77ff443f70fcf7035bbb56a6ead489621a71566d8aa55a",
+  "desktop-red.png": "183e669a36823f76debac53ab48a86da03abb66fa83fae9747657d0fa3de6cc9",
+  "inspector-responses.json": "9e3f842a5b81e9a3feff7177dc479db7c6b6612842e58ad924fae6940d246901",
+  "lab-responses.json": "bcb6f6efb091af18353909e5fa7763cdc7f2173889548f7edf310553cd79f966",
+  "mobile-detail.png": "cd0db51106672670c2e3da7597d6e350545c6f15e10f5d8cd5c3d072edba354f",
+  "mobile-performance-corrected.png": "1891b212eca70b79bf1b8b2c4cad470ff8b5ebd2dc0ad1aea79532591e5cc85f",
+  "mobile-performance.png": "0cc540ca200c9e3f5b1e91645be8430ae18343429289779e6e6ac02fc3fc96a2",
+  "performance-corrected-responses.json": "f65447bb7b1c4d11dc2c1db277e336390afb22681d43f3bb6dc2f4db500cd87c",
+  "performance-responses.json": "9e20d087b95ad91589fe8beab9621a0a4d5767fd57ce5db2637031dc3eddd42d",
+  "plan.json": "bf5309e63bd76a167037f464195a45370532f45b8f28944fd2165158d16526c9",
+  "summary.json": "11272e0dfdced9379200a7ec436125677cb77e5b340468ee519efadc9a5e95e5"
+}

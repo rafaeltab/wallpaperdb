@@ -1,0 +1,132 @@
+{
+  "fileOnly": true,
+  "reviewedAt": "2026-09-23T15:38:39.995209+00:00",
+  "runFile": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-23T15-36-43.348Z-5fdd65e8/run.json",
+  "runSha256": "ebb89d9ed2d776e2dc32cda48802a181b7437e0f78ca65c6fa15d22b53626077",
+  "verified": true,
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "distribution": {
+        "sampleCount": 96,
+        "p50Ms": 3.4487850000004983,
+        "p95Ms": 6.387340000000222,
+        "maxMs": 46.67470200000025
+      },
+      "distributionVerified": true
+    },
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "distribution": {
+        "sampleCount": 96,
+        "p50Ms": 0.8036409999995158,
+        "p95Ms": 1.2063790000001973,
+        "maxMs": 1.795205000000351
+      },
+      "distributionVerified": true,
+      "savedAccuracyExecutions": 32,
+      "parentMethod": "favorite-utility-numeric",
+      "scoreSources": {
+        "opensearch-score": 32
+      },
+      "sourceProof": [
+        {
+          "source": "exploration/adapter.mjs",
+          "sha256": "9da9b0ceb50e33cf0ac8a268fe446ca113ebeca6927b8e29fce228a51def6a2a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/registry.mjs",
+          "sha256": "64d7e366a66af6d382a908f055cd59ca1e8bf8ec8842dda82838aa38c32ca57a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/favorite-docvalue-fetch.mjs",
+          "sha256": "462adfa32b68adf279881f39a155ebfdc020bdf8dc92fac1cee57bff80d127ab",
+          "matchesRecorded": true
+        },
+        {
+          "source": "evaluation/loop/runner.mjs",
+          "sha256": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+          "matchesRecorded": true
+        }
+      ]
+    },
+    {
+      "id": "favorite-utility-rank27-docvalues",
+      "distribution": {
+        "sampleCount": 96,
+        "p50Ms": 0.9574400000001333,
+        "p95Ms": 1.737557000000379,
+        "maxMs": 1.9717069999996966
+      },
+      "distributionVerified": true,
+      "savedAccuracyExecutions": 32,
+      "parentMethod": "favorite-utility-rank27",
+      "scoreSources": {
+        "opensearch-score": 32
+      },
+      "sourceProof": [
+        {
+          "source": "exploration/adapter.mjs",
+          "sha256": "9da9b0ceb50e33cf0ac8a268fe446ca113ebeca6927b8e29fce228a51def6a2a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/registry.mjs",
+          "sha256": "64d7e366a66af6d382a908f055cd59ca1e8bf8ec8842dda82838aa38c32ca57a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/favorite-docvalue-fetch.mjs",
+          "sha256": "462adfa32b68adf279881f39a155ebfdc020bdf8dc92fac1cee57bff80d127ab",
+          "matchesRecorded": true
+        },
+        {
+          "source": "evaluation/loop/runner.mjs",
+          "sha256": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+          "matchesRecorded": true
+        }
+      ]
+    },
+    {
+      "id": "favorite-utility-sorted-docvalues",
+      "distribution": {
+        "sampleCount": 96,
+        "p50Ms": 0.8285379999997531,
+        "p95Ms": 1.160171999999875,
+        "maxMs": 1.7164670000001934
+      },
+      "distributionVerified": true,
+      "savedAccuracyExecutions": 32,
+      "parentMethod": "favorite-utility-sorted",
+      "scoreSources": {
+        "opensearch-sort-value": 25,
+        "opensearch-score": 7
+      },
+      "sourceProof": [
+        {
+          "source": "exploration/adapter.mjs",
+          "sha256": "9da9b0ceb50e33cf0ac8a268fe446ca113ebeca6927b8e29fce228a51def6a2a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/registry.mjs",
+          "sha256": "64d7e366a66af6d382a908f055cd59ca1e8bf8ec8842dda82838aa38c32ca57a",
+          "matchesRecorded": true
+        },
+        {
+          "source": "exploration/favorite-docvalue-fetch.mjs",
+          "sha256": "462adfa32b68adf279881f39a155ebfdc020bdf8dc92fac1cee57bff80d127ab",
+          "matchesRecorded": true
+        },
+        {
+          "source": "evaluation/loop/runner.mjs",
+          "sha256": "9d55c383e554bc2ee2785303f2c596774cce280a95ee2873c5f5c4d96290fb74",
+          "matchesRecorded": true
+        }
+      ]
+    }
+  ],
+  "boundary": "Saved searchEvidence describes accuracy calls. Matching runner source routes timed calls through the same adapter, but timed feedback rows retain hits/elapsed only. Small545-document loopback timings are not million-record throughput measurements."
+}

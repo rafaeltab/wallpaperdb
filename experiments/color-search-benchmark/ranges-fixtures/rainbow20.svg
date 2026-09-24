@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" shape-rendering="crispEdges">
+  <title>Five colors · 20% each</title>
+  <rect x="0" y="0" width="200" height="600" fill="#FF0000"/>
+  <rect x="200" y="0" width="200" height="600" fill="#FF8000"/>
+  <rect x="400" y="0" width="200" height="600" fill="#FFFF00"/>
+  <rect x="600" y="0" width="200" height="600" fill="#00FF00"/>
+  <rect x="800" y="0" width="200" height="600" fill="#0000FF"/>
+</svg>

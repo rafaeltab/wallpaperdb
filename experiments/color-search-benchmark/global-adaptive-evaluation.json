@@ -1,0 +1,2344 @@
+{
+  "generatedAt": "2026-09-16T15:09:05.963Z",
+  "index": "color-global-native-1000000-v1",
+  "model": "Same declared objectives and same existing million-parent index as global-evaluation.json. No token seed; start at1pp error, double until a complete globally certified page is available.",
+  "correctness": [
+    {
+      "query": "green40",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "passed": true
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "passed": true
+    }
+  ],
+  "timings": [
+    {
+      "query": "green40",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 4.207788000000022,
+        "median": 5.426868999999982,
+        "p95": 14.41950899999999,
+        "p99": 14.41950899999999,
+        "max": 14.41950899999999
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 20,
+          "wallMs": 3.810781999999989,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 3.541345000000007,
+        "median": 4.09275199999999,
+        "p95": 7.373828000000003,
+        "p99": 7.373828000000003,
+        "max": 7.373828000000003
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 0.0000298919293548584,
+          "wallMs": 2.2963049999999896,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 3.219169000000022,
+        "median": 4.027399000000003,
+        "p95": 5.900739999999985,
+        "p99": 5.900739999999985,
+        "max": 5.900739999999985
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 20,
+          "wallMs": 1.8609870000000228,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 3.321461999999997,
+        "median": 4.067183,
+        "p95": 5.548057000000028,
+        "p99": 5.548057000000028,
+        "max": 5.548057000000028
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 0.003030747375216675,
+          "wallMs": 2.1180400000000077,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 6.784731000000079,
+        "median": 8.496016999999938,
+        "p95": 14.701148999999987,
+        "p99": 14.701148999999987,
+        "max": 14.701148999999987
+      },
+      "threshold": 800,
+      "requests": 6,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 19900,
+          "hits": 1,
+          "wallMs": 1.8823380000000043,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 19800,
+          "hits": 1,
+          "wallMs": 1.7451899999999796,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 400,
+          "minScore": 19600,
+          "hits": 4,
+          "wallMs": 2.055654000000004,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 800,
+          "minScore": 19200,
+          "hits": 20,
+          "wallMs": 2.0212889999999675,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 8.22890499999994,
+        "median": 9.737600999999927,
+        "p95": 25.14728100000002,
+        "p99": 25.14728100000002,
+        "max": 25.14728100000002
+      },
+      "threshold": 0.08,
+      "requests": 6,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 1,
+          "tieThreshold": 0.0017401280018951417,
+          "wallMs": 1.8989690000000792,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.02,
+          "minScore": 0.9799999999,
+          "hits": 2,
+          "tieThreshold": 0.012993425330844115,
+          "wallMs": 2.1099249999999756,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.04,
+          "minScore": 0.9599999999,
+          "hits": 6,
+          "tieThreshold": 0.03754320760699768,
+          "wallMs": 1.9762439999999515,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.08,
+          "minScore": 0.9199999999,
+          "hits": 20,
+          "tieThreshold": 0.06965187211963196,
+          "wallMs": 2.758483999999953,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 9.186885999999959,
+        "median": 13.551567999999975,
+        "p95": 18.61489400000005,
+        "p99": 18.61489400000005,
+        "max": 18.61489400000005
+      },
+      "threshold": 3200,
+      "requests": 8,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 19900,
+          "hits": 0,
+          "wallMs": 1.3778389999999945,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 19800,
+          "hits": 0,
+          "wallMs": 2.496401999999989,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 400,
+          "minScore": 19600,
+          "hits": 0,
+          "wallMs": 1.585480000000075,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 800,
+          "minScore": 19200,
+          "hits": 1,
+          "wallMs": 2.596188999999981,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 1600,
+          "minScore": 18400,
+          "hits": 1,
+          "wallMs": 2.0236130000000685,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 3200,
+          "minScore": 16800,
+          "hits": 20,
+          "wallMs": 3.199153000000024,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red50green50",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 9.00602600000002,
+        "median": 12.545507000000043,
+        "p95": 21.7802029999998,
+        "p99": 21.7802029999998,
+        "max": 21.7802029999998
+      },
+      "threshold": 0.32,
+      "requests": 8,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 0,
+          "tieThreshold": null,
+          "wallMs": 1.4775359999998727,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.02,
+          "minScore": 0.9799999999,
+          "hits": 0,
+          "tieThreshold": null,
+          "wallMs": 1.1741559999998117,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.04,
+          "minScore": 0.9599999999,
+          "hits": 0,
+          "tieThreshold": null,
+          "wallMs": 1.7651080000000547,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.08,
+          "minScore": 0.9199999999,
+          "hits": 1,
+          "tieThreshold": 0.07167342325183411,
+          "wallMs": 2.22559299999989,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.16,
+          "minScore": 0.8399999999,
+          "hits": 2,
+          "tieThreshold": 0.13902029415103453,
+          "wallMs": 2.5604420000001937,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.32,
+          "minScore": 0.6799999998999999,
+          "hits": 20,
+          "tieThreshold": 0.22896614690753478,
+          "wallMs": 3.13461099999995,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.672162000000071,
+        "median": 3.422311000000036,
+        "p95": 5.1333770000001095,
+        "p99": 5.1333770000001095,
+        "max": 5.1333770000001095
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 19900,
+          "hits": 20,
+          "wallMs": 2.433512999999948,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.6769110000000182,
+        "median": 3.235631000000012,
+        "p95": 4.8559150000000955,
+        "p99": 4.8559150000000955,
+        "max": 4.8559150000000955
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 3.0002322387695314e-8,
+          "wallMs": 1.813698999999815,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 10.527585000000045,
+        "median": 12.685259999999971,
+        "p95": 14.670741000000135,
+        "p99": 14.670741000000135,
+        "max": 14.670741000000135
+      },
+      "threshold": 1600,
+      "requests": 7,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 19900,
+          "hits": 1,
+          "wallMs": 1.450294999999869,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 19800,
+          "hits": 1,
+          "wallMs": 1.464482000000089,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 400,
+          "minScore": 19600,
+          "hits": 2,
+          "wallMs": 2.949873999999909,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 800,
+          "minScore": 19200,
+          "hits": 17,
+          "wallMs": 2.1389200000000983,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 1600,
+          "minScore": 18400,
+          "hits": 20,
+          "wallMs": 1.6731339999998909,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 10.024940000000015,
+        "median": 13.389704000000165,
+        "p95": 54.97875399999998,
+        "p99": 54.97875399999998,
+        "max": 54.97875399999998
+      },
+      "threshold": 0.16,
+      "requests": 7,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 1,
+          "tieThreshold": 0.007634133300509644,
+          "wallMs": 1.4282140000000254,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.02,
+          "minScore": 0.9799999999,
+          "hits": 2,
+          "tieThreshold": 0.01837119480105896,
+          "wallMs": 2.1959269999999833,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.04,
+          "minScore": 0.9599999999,
+          "hits": 2,
+          "tieThreshold": 0.01837119480105896,
+          "wallMs": 2.456277,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.08,
+          "minScore": 0.9199999999,
+          "hits": 14,
+          "tieThreshold": 0.07265159507724304,
+          "wallMs": 2.8565389999998843,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.16,
+          "minScore": 0.8399999999,
+          "hits": 20,
+          "tieThreshold": 0.08369120975467224,
+          "wallMs": 2.6677839999999833,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.9180539999999837,
+        "median": 3.4418880000000627,
+        "p95": 4.712797000000137,
+        "p99": 4.712797000000137,
+        "max": 4.712797000000137
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 20,
+          "wallMs": 1.8957430000000386,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.8391860000001543,
+        "median": 3.5632960000000367,
+        "p95": 6.239616000000069,
+        "p99": 6.239616000000069,
+        "max": 6.239616000000069
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 0.00013557096454162596,
+          "wallMs": 2.4042289999999866,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 4.054529999999886,
+        "median": 5.192076999999699,
+        "p95": 6.547516000000087,
+        "p99": 6.547516000000087,
+        "max": 6.547516000000087
+      },
+      "threshold": 200,
+      "requests": 4,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 11,
+          "wallMs": 1.7767890000002353,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 9800,
+          "hits": 20,
+          "wallMs": 1.9196680000000015,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 3.569108000000142,
+        "median": 4.714940999999726,
+        "p95": 7.68748800000003,
+        "p99": 7.68748800000003,
+        "max": 7.68748800000003
+      },
+      "threshold": 0.02,
+      "requests": 4,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 11,
+          "tieThreshold": 0.009439081153598022,
+          "wallMs": 1.7199820000000727,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.02,
+          "minScore": 0.9799999999,
+          "hits": 20,
+          "tieThreshold": 0.015059322318759154,
+          "wallMs": 4.488165000000208,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.5632879999998295,
+        "median": 3.3875769999999648,
+        "p95": 4.777517999999873,
+        "p99": 4.777517999999873,
+        "max": 4.777517999999873
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 20,
+          "wallMs": 2.108723000000282,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-joint",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.8332640000003266,
+        "median": 3.3486539999998968,
+        "p95": 4.777628999999706,
+        "p99": 4.777628999999706,
+        "max": 4.777628999999706
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 0.000013679465975952149,
+          "wallMs": 2.747262999999748,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.4051899999999478,
+        "median": 3.140421999999944,
+        "p95": 4.190295999999762,
+        "p99": 4.190295999999762,
+        "max": 4.190295999999762
+      },
+      "threshold": 100,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 9900,
+          "hits": 20,
+          "wallMs": 1.8230659999999261,
+          "took": 1,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "method": "adaptive-joint",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 2.4457760000000235,
+        "median": 2.811142999999902,
+        "p95": 4.077413000000433,
+        "p99": 4.077413000000433,
+        "max": 4.077413000000433
+      },
+      "threshold": 0.01,
+      "requests": 3,
+      "iterations": [
+        {
+          "threshold": 0.01,
+          "minScore": 0.9899999999,
+          "hits": 20,
+          "tieThreshold": 0.0013430418584014893,
+          "wallMs": 1.5178229999996802,
+          "took": 0,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive-fine",
+      "selectivity": "all",
+      "wallMs": {
+        "samples": 15,
+        "min": 9.762416999999914,
+        "median": 12.690309999999954,
+        "p95": 20.575788999999986,
+        "p99": 20.575788999999986,
+        "max": 20.575788999999986
+      },
+      "threshold": 800,
+      "requests": 6,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 49900,
+          "hits": 0,
+          "wallMs": 2.7022189999997863,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 49800,
+          "hits": 0,
+          "wallMs": 3.3865139999998064,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 400,
+          "minScore": 49600,
+          "hits": 2,
+          "wallMs": 3.4559150000000045,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 800,
+          "minScore": 49200,
+          "hits": 20,
+          "wallMs": 5.013241000000107,
+          "took": 4,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive-fine",
+      "selectivity": "one_percent",
+      "wallMs": {
+        "samples": 15,
+        "min": 15.252295000000231,
+        "median": 18.622759000000315,
+        "p95": 22.536023000000114,
+        "p99": 22.536023000000114,
+        "max": 22.536023000000114
+      },
+      "threshold": 3200,
+      "requests": 8,
+      "iterations": [
+        {
+          "threshold": 100,
+          "minScore": 49900,
+          "hits": 0,
+          "wallMs": 1.6430569999997715,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 200,
+          "minScore": 49800,
+          "hits": 0,
+          "wallMs": 2.2581840000002558,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 400,
+          "minScore": 49600,
+          "hits": 0,
+          "wallMs": 3.294952000000194,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 800,
+          "minScore": 49200,
+          "hits": 1,
+          "wallMs": 3.001090000000204,
+          "took": 2,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 1600,
+          "minScore": 48400,
+          "hits": 4,
+          "wallMs": 2.4024349999999686,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 3200,
+          "minScore": 46800,
+          "hits": 20,
+          "wallMs": 3.902133000000049,
+          "took": 2,
+          "boundedTotal": null
+        }
+      ]
+    }
+  ],
+  "concurrency": [
+    {
+      "query": "green40",
+      "method": "adaptive-fine",
+      "inFlight": 4,
+      "wallMs": {
+        "samples": 40,
+        "min": 2.8430530000000545,
+        "median": 4.512781999999788,
+        "p95": 6.1501680000001215,
+        "p99": 6.90391499999987,
+        "max": 6.90391499999987
+      },
+      "elapsedMs": 48.00900599999977,
+      "serviceCpuMicroseconds": {
+        "user": 67619,
+        "system": 2112
+      },
+      "serviceMemory": {
+        "rss": 138252288,
+        "heapTotal": 69050368,
+        "heapUsed": 33242744,
+        "external": 11250379,
+        "arrayBuffers": 7730185
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571348944,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571348994,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "green40",
+      "method": "adaptive-joint",
+      "inFlight": 4,
+      "wallMs": {
+        "samples": 40,
+        "min": 3.582231999999749,
+        "median": 4.710222000000158,
+        "p95": 6.066620999999941,
+        "p99": 6.469188000000031,
+        "max": 6.469188000000031
+      },
+      "elapsedMs": 47.87948200000028,
+      "serviceCpuMicroseconds": {
+        "user": 67150,
+        "system": 2002
+      },
+      "serviceMemory": {
+        "rss": 138514432,
+        "heapTotal": 69050368,
+        "heapUsed": 38601808,
+        "external": 13469592,
+        "arrayBuffers": 9949358
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571348995,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349044,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-fine",
+      "inFlight": 4,
+      "wallMs": {
+        "samples": 40,
+        "min": 3.00698199999988,
+        "median": 4.78870999999981,
+        "p95": 6.463737999999921,
+        "p99": 7.1297990000002756,
+        "max": 7.1297990000002756
+      },
+      "elapsedMs": 49.69598599999972,
+      "serviceCpuMicroseconds": {
+        "user": 92453,
+        "system": 4906
+      },
+      "serviceMemory": {
+        "rss": 139300864,
+        "heapTotal": 69050368,
+        "heapUsed": 36921736,
+        "external": 15134427,
+        "arrayBuffers": 11614193
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349045,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349095,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive-joint",
+      "inFlight": 4,
+      "wallMs": {
+        "samples": 40,
+        "min": 3.3475109999999404,
+        "median": 4.2830800000001545,
+        "p95": 5.841048000000228,
+        "p99": 7.708035999999993,
+        "max": 7.708035999999993
+      },
+      "elapsedMs": 45.95494499999995,
+      "serviceCpuMicroseconds": {
+        "user": 59970,
+        "system": 2018
+      },
+      "serviceMemory": {
+        "rss": 141660160,
+        "heapTotal": 71147520,
+        "heapUsed": 42608408,
+        "external": 17290159,
+        "arrayBuffers": 13769925
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349096,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349143,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive-fine",
+      "inFlight": 4,
+      "wallMs": {
+        "samples": 40,
+        "min": 10.279357999999775,
+        "median": 14.014778999999635,
+        "p95": 55.31723000000011,
+        "p99": 56.04691199999979,
+        "max": 56.04691199999979
+      },
+      "elapsedMs": 212.524719,
+      "serviceCpuMicroseconds": {
+        "user": 138128,
+        "system": 8252
+      },
+      "serviceMemory": {
+        "rss": 146116608,
+        "heapTotal": 75079680,
+        "heapUsed": 21594944,
+        "external": 6735829,
+        "arrayBuffers": 3215595
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349144,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789571349357,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789571348945,
+              "open_file_descriptors": 779,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 44,
+                "total_in_millis": 615830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 29188165632
+              }
+            },
+            "jvm": {
+              "timestamp": 1789571348945,
+              "uptime_in_millis": 1800013,
+              "mem": {
+                "heap_used_in_bytes": 744127560,
+                "heap_used_percent": 34,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 198128000,
+                "non_heap_committed_in_bytes": 206176256,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 438304768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 298589176,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1040294904,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 298589176,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 7233616,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 7233616,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 192,
+                "peak_count": 193
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 573,
+                    "collection_time_in_millis": 8070
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 184,
+                  "used_in_bytes": 8541012285,
+                  "total_capacity_in_bytes": 8541012285
+                },
+                "direct": {
+                  "count": 178,
+                  "used_in_bytes": 36749364,
+                  "total_capacity_in_bytes": 36749363
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24377,
+                "total_loaded_count": 24679,
+                "total_unloaded_count": 302
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "completedAt": "2026-09-16T15:09:09.358Z"
+}

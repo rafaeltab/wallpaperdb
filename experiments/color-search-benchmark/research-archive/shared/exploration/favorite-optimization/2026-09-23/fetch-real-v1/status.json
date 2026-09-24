@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-09-23T15:35:53.949618+00:00",
+  "planSha256": "862fe28bc01dfa4d11c0b89b7c87f0219050c5ecf4356cdf19efcb945a8d8b18",
+  "phases": [
+    {
+      "id": "fetch-fidelity",
+      "startedAt": "2026-09-23T15:35:53.949722+00:00",
+      "command": [
+        "make",
+        "color-favorite-docvalue-fetch-fidelity",
+        "COLOR_FAVORITE_ARGS=--directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-fidelity-v1 --numeric-reference /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fidelity-v3/rankings.jsonl --precision-reference /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/precision-fidelity/rankings.jsonl"
+      ],
+      "finishedAt": "2026-09-23T15:36:43.189985+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "fetch-feedback",
+      "startedAt": "2026-09-23T15:36:43.190306+00:00",
+      "command": [
+        "make",
+        "color-exploration-evaluate",
+        "COLOR_EXP_ARGS=--config /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-refinement-v1-proposal/configs/favorite-docvalue-feedback.json"
+      ],
+      "finishedAt": "2026-09-23T15:36:49.979040+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T15:36:49.979524+00:00"
+}

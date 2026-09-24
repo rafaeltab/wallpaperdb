@@ -1,0 +1,1185 @@
+{
+  "candidateCount": 168,
+  "coverageCounts": {
+    "{'total': 37, 'ok': 31, 'unsupported': 6, 'error': 0}": 168
+  },
+  "timedSamples": 26040,
+  "timedFailures": 0,
+  "eligibilityViolations": 0,
+  "accuracyRange": [
+    0.5849462365591398,
+    0.7505376344086021
+  ],
+  "p95Range": [
+    1.0149979999987409,
+    6.244746999989729
+  ],
+  "maxSingleMs": 55.13696399999026,
+  "setupSumMs": 56075.72978299951,
+  "measurementBlockSumMs": 74546.60856199953,
+  "timedSumMs": 60732.88398100272,
+  "setupReuseCounts": {
+    "None": 12,
+    "True": 156
+  },
+  "topSetup": [
+    {
+      "id": "cutoff-hard-1024-q00-concrete-swatches",
+      "all": 0.6623655913978495,
+      "affected": 0.5984848484848485,
+      "real": 0.7086419753086419,
+      "affectedReal": 0.6537037037037037,
+      "precision": 0.7333333333333334,
+      "ties": 0,
+      "p95": 4.045624000020325,
+      "setupMs": 32513.108127999993,
+      "reused": null
+    },
+    {
+      "id": "cutoff-hard-256-q00-concrete-swatches",
+      "all": 0.6419354838709678,
+      "affected": 0.5696969696969697,
+      "real": 0.6777777777777778,
+      "affectedReal": 0.6074074074074074,
+      "precision": 0.6777777777777778,
+      "ties": 0,
+      "p95": 4.187290000001667,
+      "setupMs": 8858.005301999998,
+      "reused": null
+    },
+    {
+      "id": "cutoff-hard-64-q00-concrete-swatches",
+      "all": 0.6526881720430108,
+      "affected": 0.5848484848484848,
+      "real": 0.6777777777777778,
+      "affectedReal": 0.6074074074074074,
+      "precision": 0.6222222222222222,
+      "ties": 0,
+      "p95": 3.337273000001005,
+      "setupMs": 3055.845722,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-256",
+      "all": 0.7387096774193548,
+      "affected": 0.6777777777777778,
+      "real": 0.7567901234567901,
+      "affectedReal": 0.9166666666666667,
+      "precision": 0.6777777777777778,
+      "ties": 0,
+      "p95": 2.020708000054583,
+      "setupMs": 2186.273555999971,
+      "reused": null
+    },
+    {
+      "id": "baseline-concrete-swatches-256",
+      "all": 0.6704301075268817,
+      "affected": 0.6098484848484849,
+      "real": 0.7043209876543209,
+      "affectedReal": 0.6472222222222223,
+      "precision": 0.6777777777777778,
+      "ties": 5,
+      "p95": 1.394311000003654,
+      "setupMs": 2168.7895480000007,
+      "reused": null
+    },
+    {
+      "id": "cutoff-hard-16-q00-concrete-swatches",
+      "all": 0.6586021505376344,
+      "affected": 0.5931818181818181,
+      "real": 0.6623456790123456,
+      "affectedReal": 0.5842592592592593,
+      "precision": 0.7333333333333334,
+      "ties": 1,
+      "p95": 2.5150469999998677,
+      "setupMs": 1555.981101,
+      "reused": null
+    },
+    {
+      "id": "baseline-concrete-swatches-64",
+      "all": 0.6559139784946236,
+      "affected": 0.5893939393939394,
+      "real": 0.7012345679012346,
+      "affectedReal": 0.6425925925925926,
+      "precision": 0.6222222222222222,
+      "ties": 3,
+      "p95": 1.6067089999996824,
+      "setupMs": 1306.20248,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-64",
+      "all": 0.7333333333333333,
+      "affected": 0.6222222222222222,
+      "real": 0.7506172839506173,
+      "affectedReal": 0.8333333333333333,
+      "precision": 0.6222222222222222,
+      "ties": 0,
+      "p95": 1.5585890000220388,
+      "setupMs": 1304.3727649999782,
+      "reused": null
+    }
+  ],
+  "baselines": [
+    {
+      "id": "baseline-concrete-swatches-16",
+      "all": 0.7247311827956989,
+      "affected": 0.6863636363636364,
+      "real": 0.7444444444444445,
+      "affectedReal": 0.7074074074074074,
+      "precision": 0.7333333333333334,
+      "ties": 6,
+      "p95": 1.7286489999999048,
+      "setupMs": 1160.5362539999999,
+      "reused": null
+    },
+    {
+      "id": "baseline-concrete-swatches-64",
+      "all": 0.6559139784946236,
+      "affected": 0.5893939393939394,
+      "real": 0.7012345679012346,
+      "affectedReal": 0.6425925925925926,
+      "precision": 0.6222222222222222,
+      "ties": 3,
+      "p95": 1.6067089999996824,
+      "setupMs": 1306.20248,
+      "reused": null
+    },
+    {
+      "id": "baseline-concrete-swatches-256",
+      "all": 0.6704301075268817,
+      "affected": 0.6098484848484849,
+      "real": 0.7043209876543209,
+      "affectedReal": 0.6472222222222223,
+      "precision": 0.6777777777777778,
+      "ties": 5,
+      "p95": 1.394311000003654,
+      "setupMs": 2168.7895480000007,
+      "reused": null
+    },
+    {
+      "id": "baseline-concrete-swatches-1024",
+      "all": 0.6639784946236559,
+      "affected": 0.6007575757575757,
+      "real": 0.7080246913580247,
+      "affectedReal": 0.6527777777777778,
+      "precision": 0.7333333333333334,
+      "ties": 1,
+      "p95": 3.0409959999960847,
+      "setupMs": 223.50279100000625,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-16",
+      "all": 0.7440860215053764,
+      "affected": 0.7333333333333334,
+      "real": 0.762962962962963,
+      "affectedReal": 1,
+      "precision": 0.7333333333333334,
+      "ties": 0,
+      "p95": 1.0149979999987409,
+      "setupMs": 1113.332614999963,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-64",
+      "all": 0.7333333333333333,
+      "affected": 0.6222222222222222,
+      "real": 0.7506172839506173,
+      "affectedReal": 0.8333333333333333,
+      "precision": 0.6222222222222222,
+      "ties": 0,
+      "p95": 1.5585890000220388,
+      "setupMs": 1304.3727649999782,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-256",
+      "all": 0.7387096774193548,
+      "affected": 0.6777777777777778,
+      "real": 0.7567901234567901,
+      "affectedReal": 0.9166666666666667,
+      "precision": 0.6777777777777778,
+      "ties": 0,
+      "p95": 2.020708000054583,
+      "setupMs": 2186.273555999971,
+      "reused": null
+    },
+    {
+      "id": "baseline-named-families-1024",
+      "all": 0.7440860215053764,
+      "affected": 0.7333333333333334,
+      "real": 0.762962962962963,
+      "affectedReal": 1,
+      "precision": 0.7333333333333334,
+      "ties": 0,
+      "p95": 2.9073240000288934,
+      "setupMs": 243.91179699997883,
+      "reused": null
+    }
+  ],
+  "concrete-swatches": {
+    "topOverall": [
+      {
+        "id": "cutoff-consensus-16-q50-concrete-swatches",
+        "all": 0.7365591397849462,
+        "affected": 0.703030303030303,
+        "real": 0.7506172839506173,
+        "affectedReal": 0.7166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 6,
+        "p95": 1.8816970000007132,
+        "setupMs": 1.9923650000000634,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q50-concrete-swatches",
+        "all": 0.7247311827956989,
+        "affected": 0.6863636363636364,
+        "real": 0.7444444444444445,
+        "affectedReal": 0.7074074074074074,
+        "precision": 0.7333333333333334,
+        "ties": 6,
+        "p95": 2.2457109999995737,
+        "setupMs": 1.6144439999998212,
+        "reused": true
+      },
+      {
+        "id": "cutoff-core-halo-16-q50-concrete-swatches",
+        "all": 0.7247311827956989,
+        "affected": 0.6863636363636364,
+        "real": 0.7444444444444445,
+        "affectedReal": 0.7074074074074074,
+        "precision": 0.6777777777777778,
+        "ties": 6,
+        "p95": 1.8807440000000497,
+        "setupMs": 1.7636549999988347,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-256-q50-concrete-swatches",
+        "all": 0.7166666666666667,
+        "affected": 0.675,
+        "real": 0.7475308641975309,
+        "affectedReal": 0.712037037037037,
+        "precision": 0.7444444444444445,
+        "ties": 5,
+        "p95": 3.5607920000038575,
+        "setupMs": 1.730041999995592,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-16-q25-concrete-swatches",
+        "all": 0.7102150537634409,
+        "affected": 0.6659090909090909,
+        "real": 0.7240740740740741,
+        "affectedReal": 0.6768518518518518,
+        "precision": 0.6777777777777778,
+        "ties": 1,
+        "p95": 1.7913769999995566,
+        "setupMs": 1.6071499999998196,
+        "reused": true
+      },
+      {
+        "id": "cutoff-feather-16-q50-concrete-swatches",
+        "all": 0.703763440860215,
+        "affected": 0.6568181818181819,
+        "real": 0.7475308641975309,
+        "affectedReal": 0.712037037037037,
+        "precision": 0.6777777777777778,
+        "ties": 7,
+        "p95": 2.534683999999288,
+        "setupMs": 3.10092799999984,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-256-q25-concrete-swatches",
+        "all": 0.7010752688172043,
+        "affected": 0.6530303030303031,
+        "real": 0.7209876543209877,
+        "affectedReal": 0.6722222222222223,
+        "precision": 0.6777777777777778,
+        "ties": 0,
+        "p95": 4.244988000005833,
+        "setupMs": 1.7960859999875538,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-256-q75-concrete-swatches",
+        "all": 0.6978494623655914,
+        "affected": 0.6484848484848484,
+        "real": 0.7296296296296296,
+        "affectedReal": 0.6851851851851852,
+        "precision": 0.65,
+        "ties": 57,
+        "p95": 3.8628999999928055,
+        "setupMs": 2.7511799999920186,
+        "reused": true
+      }
+    ],
+    "topReal": [
+      {
+        "id": "cutoff-consensus-16-q50-concrete-swatches",
+        "all": 0.7365591397849462,
+        "affected": 0.703030303030303,
+        "real": 0.7506172839506173,
+        "affectedReal": 0.7166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 6,
+        "p95": 1.8816970000007132,
+        "setupMs": 1.9923650000000634,
+        "reused": true
+      },
+      {
+        "id": "cutoff-feather-16-q50-concrete-swatches",
+        "all": 0.703763440860215,
+        "affected": 0.6568181818181819,
+        "real": 0.7475308641975309,
+        "affectedReal": 0.712037037037037,
+        "precision": 0.6777777777777778,
+        "ties": 7,
+        "p95": 2.534683999999288,
+        "setupMs": 3.10092799999984,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-256-q50-concrete-swatches",
+        "all": 0.7166666666666667,
+        "affected": 0.675,
+        "real": 0.7475308641975309,
+        "affectedReal": 0.712037037037037,
+        "precision": 0.7444444444444445,
+        "ties": 5,
+        "p95": 3.5607920000038575,
+        "setupMs": 1.730041999995592,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q50-concrete-swatches",
+        "all": 0.7247311827956989,
+        "affected": 0.6863636363636364,
+        "real": 0.7444444444444445,
+        "affectedReal": 0.7074074074074074,
+        "precision": 0.7333333333333334,
+        "ties": 6,
+        "p95": 2.2457109999995737,
+        "setupMs": 1.6144439999998212,
+        "reused": true
+      }
+    ],
+    "bestPerCount": [
+      {
+        "id": "cutoff-consensus-16-q50-concrete-swatches",
+        "all": 0.7365591397849462,
+        "affected": 0.703030303030303,
+        "real": 0.7506172839506173,
+        "affectedReal": 0.7166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 6,
+        "p95": 1.8816970000007132,
+        "setupMs": 1.9923650000000634,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-concrete-swatches-16",
+          "deltas": {
+            "all": 0.011827956989247324,
+            "affected": 0.016666666666666607,
+            "real": 0.006172839506172867,
+            "affectedReal": 0.0092592592592593,
+            "precision": 0.011111111111111072,
+            "invariant": 0.0
+          },
+          "improvedCases": 3,
+          "regressedCases": 1,
+          "unchangedCases": 27,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-gray-red-batch-001",
+              "delta": 0.16666666666666669,
+              "before": 0.3333333333333333,
+              "after": 0.5,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-gray-red-batch-002",
+              "delta": 0.16666666666666663,
+              "before": 0.5,
+              "after": 0.6666666666666666,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "precision-muted-green-batch-001",
+              "delta": -0.16666666666666663,
+              "before": 1,
+              "after": 0.8333333333333334,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-feather-64-q00-concrete-swatches",
+        "all": 0.6795698924731183,
+        "affected": 0.6227272727272727,
+        "real": 0.6987654320987654,
+        "affectedReal": 0.6388888888888888,
+        "precision": 0.6222222222222222,
+        "ties": 0,
+        "p95": 3.348072000000684,
+        "setupMs": 1.448101999998471,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-concrete-swatches-64",
+          "deltas": {
+            "all": 0.023655913978494647,
+            "affected": 0.033333333333333326,
+            "real": -0.0024691358024692134,
+            "affectedReal": -0.0037037037037037646,
+            "precision": 0.0,
+            "invariant": 0.0
+          },
+          "improvedCases": 5,
+          "regressedCases": 2,
+          "unchangedCases": 24,
+          "caseChanges": [
+            {
+              "caseId": "perceived-red-001",
+              "delta": 0.09999999999999998,
+              "before": 0.9,
+              "after": 1,
+              "beforeTies": 1,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-green-001",
+              "delta": 0.36666666666666664,
+              "before": 0.36666666666666664,
+              "after": 0.7333333333333333,
+              "beforeTies": 1,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-green-002",
+              "delta": 0.3,
+              "before": 0.3,
+              "after": 0.6,
+              "beforeTies": 1,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-green-red-001",
+              "delta": 0.1333333333333333,
+              "before": 0.5333333333333333,
+              "after": 0.6666666666666666,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-green-red-real-001",
+              "delta": -0.16666666666666669,
+              "before": 0.5,
+              "after": 0.3333333333333333,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-green-red-real-002",
+              "delta": 0.16666666666666666,
+              "before": 0.16666666666666666,
+              "after": 0.3333333333333333,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-red-real-batch-001",
+              "delta": -0.16666666666666663,
+              "before": 0.6666666666666666,
+              "after": 0.5,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-consensus-256-q50-concrete-swatches",
+        "all": 0.7166666666666667,
+        "affected": 0.675,
+        "real": 0.7475308641975309,
+        "affectedReal": 0.712037037037037,
+        "precision": 0.7444444444444445,
+        "ties": 5,
+        "p95": 3.5607920000038575,
+        "setupMs": 1.730041999995592,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-concrete-swatches-256",
+          "deltas": {
+            "all": 0.04623655913978497,
+            "affected": 0.06515151515151518,
+            "real": 0.04320987654320996,
+            "affectedReal": 0.06481481481481477,
+            "precision": 0.06666666666666665,
+            "invariant": 0.0
+          },
+          "improvedCases": 7,
+          "regressedCases": 0,
+          "unchangedCases": 24,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-green-red-001",
+              "delta": 0.06666666666666665,
+              "before": 0.5333333333333333,
+              "after": 0.6,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "perceived-green-batch-001",
+              "delta": 0.16666666666666674,
+              "before": 0.6666666666666666,
+              "after": 0.8333333333333334,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-gray-red-batch-001",
+              "delta": 0.16666666666666669,
+              "before": 0.3333333333333333,
+              "after": 0.5,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-gray-red-batch-002",
+              "delta": 0.16666666666666663,
+              "before": 0.5,
+              "after": 0.6666666666666666,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-blue-orange-batch-001",
+              "delta": 0.33333333333333337,
+              "before": 0.5,
+              "after": 0.8333333333333334,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-blue-orange-batch-002",
+              "delta": 0.33333333333333337,
+              "before": 0.6666666666666666,
+              "after": 1,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-core-halo-1024-q25-concrete-swatches",
+        "all": 0.6956989247311828,
+        "affected": 0.6454545454545455,
+        "real": 0.7024691358024692,
+        "affectedReal": 0.6444444444444445,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 3.8595039999927394,
+        "setupMs": 2.1034929999732412,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-concrete-swatches-1024",
+          "deltas": {
+            "all": 0.0317204301075269,
+            "affected": 0.04469696969696979,
+            "real": -0.005555555555555536,
+            "affectedReal": -0.008333333333333304,
+            "precision": 0.0,
+            "invariant": 0.0
+          },
+          "improvedCases": 4,
+          "regressedCases": 3,
+          "unchangedCases": 24,
+          "caseChanges": [
+            {
+              "caseId": "perceived-red-001",
+              "delta": -0.06666666666666665,
+              "before": 1,
+              "after": 0.9333333333333333,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-green-001",
+              "delta": 0.20000000000000007,
+              "before": 0.6,
+              "after": 0.8,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-green-002",
+              "delta": 0.8666666666666667,
+              "before": 0.06666666666666667,
+              "after": 0.9333333333333333,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-green-red-001",
+              "delta": 0.06666666666666665,
+              "before": 0.6,
+              "after": 0.6666666666666666,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "perceived-blue-batch-001",
+              "delta": 0.25,
+              "before": 0.75,
+              "after": 1,
+              "beforeTies": 1,
+              "afterTies": 0
+            },
+            {
+              "caseId": "proportion-green-real-batch-002",
+              "delta": -0.16666666666666674,
+              "before": 0.8333333333333334,
+              "after": 0.6666666666666666,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "composition-blue-orange-batch-002",
+              "delta": -0.16666666666666663,
+              "before": 0.6666666666666666,
+              "after": 0.5,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      }
+    ],
+    "profileRanges": {
+      "hard": {
+        "all": [
+          0.5876344086021505,
+          0.7247311827956989
+        ],
+        "affected": [
+          0.49318181818181817,
+          0.6863636363636364
+        ]
+      },
+      "feather": {
+        "all": [
+          0.5849462365591398,
+          0.703763440860215
+        ],
+        "affected": [
+          0.4893939393939394,
+          0.6568181818181819
+        ]
+      },
+      "core-halo": {
+        "all": [
+          0.5897849462365592,
+          0.7247311827956989
+        ],
+        "affected": [
+          0.4962121212121212,
+          0.6863636363636364
+        ]
+      },
+      "consensus": {
+        "all": [
+          0.5876344086021505,
+          0.7365591397849462
+        ],
+        "affected": [
+          0.49318181818181817,
+          0.703030303030303
+        ]
+      }
+    }
+  },
+  "named-families": {
+    "topOverall": [
+      {
+        "id": "cutoff-consensus-1024-q50-named-families",
+        "all": 0.7505376344086021,
+        "affected": 0.8,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.8,
+        "ties": 0,
+        "p95": 3.9232240000274032,
+        "setupMs": 2.3452880000695586,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-16-q50-named-families",
+        "all": 0.7451612903225806,
+        "affected": 0.7444444444444445,
+        "real": 0.7567901234567901,
+        "affectedReal": 0.9166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 0,
+        "p95": 1.5056300000287592,
+        "setupMs": 1.7564209999982268,
+        "reused": true
+      },
+      {
+        "id": "cutoff-consensus-256-q50-named-families",
+        "all": 0.7451612903225806,
+        "affected": 0.7444444444444445,
+        "real": 0.7567901234567901,
+        "affectedReal": 0.9166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 0,
+        "p95": 3.481943999999203,
+        "setupMs": 2.7613199999323115,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q00-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.2758880000328645,
+        "setupMs": 2.1725030000088736,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q25-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.7512510000960901,
+        "setupMs": 2.1587170000420883,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q50-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.585558999911882,
+        "setupMs": 1.8048120000166818,
+        "reused": true
+      },
+      {
+        "id": "cutoff-feather-16-q00-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.2773509999969974,
+        "setupMs": 1.9419599999673665,
+        "reused": true
+      },
+      {
+        "id": "cutoff-feather-16-q25-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.2833420000970364,
+        "setupMs": 1.2710189999779686,
+        "reused": true
+      }
+    ],
+    "topReal": [
+      {
+        "id": "cutoff-hard-16-q00-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.2758880000328645,
+        "setupMs": 2.1725030000088736,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q25-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.7512510000960901,
+        "setupMs": 2.1587170000420883,
+        "reused": true
+      },
+      {
+        "id": "cutoff-hard-16-q50-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.585558999911882,
+        "setupMs": 1.8048120000166818,
+        "reused": true
+      },
+      {
+        "id": "cutoff-feather-16-q00-named-families",
+        "all": 0.7440860215053764,
+        "affected": 0.7333333333333334,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.7333333333333334,
+        "ties": 0,
+        "p95": 1.2773509999969974,
+        "setupMs": 1.9419599999673665,
+        "reused": true
+      }
+    ],
+    "bestPerCount": [
+      {
+        "id": "cutoff-consensus-16-q50-named-families",
+        "all": 0.7451612903225806,
+        "affected": 0.7444444444444445,
+        "real": 0.7567901234567901,
+        "affectedReal": 0.9166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 0,
+        "p95": 1.5056300000287592,
+        "setupMs": 1.7564209999982268,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-named-families-16",
+          "deltas": {
+            "all": 0.0010752688172042113,
+            "affected": 0.011111111111111072,
+            "real": -0.006172839506172867,
+            "affectedReal": -0.08333333333333326,
+            "precision": 0.011111111111111072,
+            "invariant": 0.0
+          },
+          "improvedCases": 1,
+          "regressedCases": 1,
+          "unchangedCases": 29,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            },
+            {
+              "caseId": "precision-muted-green-batch-001",
+              "delta": -0.16666666666666663,
+              "before": 1,
+              "after": 0.8333333333333334,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-consensus-64-q50-named-families",
+        "all": 0.7397849462365591,
+        "affected": 0.6888888888888889,
+        "real": 0.7506172839506173,
+        "affectedReal": 0.8333333333333333,
+        "precision": 0.6888888888888889,
+        "ties": 0,
+        "p95": 2.809389999951236,
+        "setupMs": 2.616376999998465,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-named-families-64",
+          "deltas": {
+            "all": 0.006451612903225823,
+            "affected": 0.06666666666666665,
+            "real": 0.0,
+            "affectedReal": 0.0,
+            "precision": 0.06666666666666665,
+            "invariant": 0.0
+          },
+          "improvedCases": 1,
+          "regressedCases": 0,
+          "unchangedCases": 30,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-consensus-256-q50-named-families",
+        "all": 0.7451612903225806,
+        "affected": 0.7444444444444445,
+        "real": 0.7567901234567901,
+        "affectedReal": 0.9166666666666667,
+        "precision": 0.7444444444444445,
+        "ties": 0,
+        "p95": 3.481943999999203,
+        "setupMs": 2.7613199999323115,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-named-families-256",
+          "deltas": {
+            "all": 0.006451612903225823,
+            "affected": 0.06666666666666665,
+            "real": 0.0,
+            "affectedReal": 0.0,
+            "precision": 0.06666666666666665,
+            "invariant": 0.0
+          },
+          "improvedCases": 1,
+          "regressedCases": 0,
+          "unchangedCases": 30,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "cutoff-consensus-1024-q50-named-families",
+        "all": 0.7505376344086021,
+        "affected": 0.8,
+        "real": 0.762962962962963,
+        "affectedReal": 1,
+        "precision": 0.8,
+        "ties": 0,
+        "p95": 3.9232240000274032,
+        "setupMs": 2.3452880000695586,
+        "reused": true,
+        "baseline": {
+          "id": "baseline-named-families-1024",
+          "deltas": {
+            "all": 0.006451612903225712,
+            "affected": 0.06666666666666665,
+            "real": 0.0,
+            "affectedReal": 0,
+            "precision": 0.06666666666666665,
+            "invariant": 0.0
+          },
+          "improvedCases": 1,
+          "regressedCases": 0,
+          "unchangedCases": 30,
+          "caseChanges": [
+            {
+              "caseId": "precision-shade-001",
+              "delta": 0.2,
+              "before": 0.2,
+              "after": 0.4,
+              "beforeTies": 0,
+              "afterTies": 0
+            }
+          ]
+        }
+      }
+    ],
+    "profileRanges": {
+      "hard": {
+        "all": [
+          0.7091397849462365,
+          0.7440860215053764
+        ],
+        "affected": [
+          0.37222222222222223,
+          0.7333333333333334
+        ]
+      },
+      "feather": {
+        "all": [
+          0.7102150537634409,
+          0.7440860215053764
+        ],
+        "affected": [
+          0.38333333333333336,
+          0.7333333333333334
+        ]
+      },
+      "core-halo": {
+        "all": [
+          0.703763440860215,
+          0.7440860215053764
+        ],
+        "affected": [
+          0.31666666666666665,
+          0.7333333333333334
+        ]
+      },
+      "consensus": {
+        "all": [
+          0.7102150537634409,
+          0.7505376344086021
+        ],
+        "affected": [
+          0.38333333333333336,
+          0.8
+        ]
+      }
+    }
+  },
+  "fullAccuracyRetrieval": {
+    "capturedRequests": 5208,
+    "sumHttpMs": 883941.0051260015,
+    "sumServiceTookMs": 868665,
+    "medianHttpMs": 32.496680499985814,
+    "p95HttpMs": 602.6698460000334,
+    "maxHttpMs": 691.9921480000485,
+    "sumHttpMinusServiceTookMs": 15276.005126001546,
+    "wallUntilRawFileWrittenMs": 1019129.0171146393,
+    "accountedSetupAccuracyAndMeasurementBlockMs": 1014563.3434710006,
+    "unattributedWallMs": 4565.673643638729,
+    "largestAccuracyTotals": [
+      {
+        "id": "cutoff-consensus-1024-q00-concrete-swatches",
+        "count": 31,
+        "sumHttpMs": 18296.68544900004,
+        "sumServiceTookMs": 18176,
+        "medianHttpMs": 601.0108379999874,
+        "p95HttpMs": 663.9685310000204,
+        "maxHttpMs": 686.7975549999974
+      },
+      {
+        "id": "cutoff-feather-1024-q25-named-families",
+        "count": 31,
+        "sumHttpMs": 18137.808234999655,
+        "sumServiceTookMs": 18031,
+        "medianHttpMs": 599.2753370000282,
+        "p95HttpMs": 647.5437619999284,
+        "maxHttpMs": 649.0757810000796
+      },
+      {
+        "id": "cutoff-consensus-1024-q75-named-families",
+        "count": 31,
+        "sumHttpMs": 18134.799873999902,
+        "sumServiceTookMs": 18019,
+        "medianHttpMs": 600.4109300000127,
+        "p95HttpMs": 640.5080489999382,
+        "maxHttpMs": 640.7385609999765
+      },
+      {
+        "id": "cutoff-feather-1024-q00-concrete-swatches",
+        "count": 31,
+        "sumHttpMs": 18132.65941799988,
+        "sumServiceTookMs": 18029,
+        "medianHttpMs": 600.7069680000131,
+        "p95HttpMs": 642.5725689999817,
+        "maxHttpMs": 654.9040150000073
+      },
+      {
+        "id": "cutoff-consensus-1024-q25-named-families",
+        "count": 31,
+        "sumHttpMs": 18114.226367000374,
+        "sumServiceTookMs": 17984,
+        "medianHttpMs": 599.016719999956,
+        "p95HttpMs": 633.4913330000127,
+        "maxHttpMs": 691.9921480000485
+      },
+      {
+        "id": "cutoff-feather-1024-q90-concrete-swatches",
+        "count": 31,
+        "sumHttpMs": 18103.73051200004,
+        "sumServiceTookMs": 17991,
+        "medianHttpMs": 598.1980620000395,
+        "p95HttpMs": 636.3652630000142,
+        "maxHttpMs": 639.0590659999871
+      },
+      {
+        "id": "cutoff-hard-1024-q90-named-families",
+        "count": 31,
+        "sumHttpMs": 18100.39556500048,
+        "sumServiceTookMs": 18000,
+        "medianHttpMs": 598.0974420000566,
+        "p95HttpMs": 647.2447600000305,
+        "maxHttpMs": 649.1926519999979
+      },
+      {
+        "id": "cutoff-feather-1024-q75-concrete-swatches",
+        "count": 31,
+        "sumHttpMs": 18090.092023000063,
+        "sumServiceTookMs": 17981,
+        "medianHttpMs": 598.8081180000445,
+        "p95HttpMs": 649.8818160000374,
+        "maxHttpMs": 659.5933080000104
+      }
+    ],
+    "byCount": {
+      "16": {
+        "candidates": 40,
+        "accuracyHttpTotalMs": 11272.987567000404,
+        "accuracyServiceTookTotalMs": 8466,
+        "accuracyMaxHttpMs": 33.81878799991682
+      },
+      "64": {
+        "candidates": 40,
+        "accuracyHttpTotalMs": 37683.22498200076,
+        "accuracyServiceTookTotalMs": 34382,
+        "accuracyMaxHttpMs": 86.86203900002874
+      },
+      "256": {
+        "candidates": 40,
+        "accuracyHttpTotalMs": 140199.73295200005,
+        "accuracyServiceTookTotalMs": 136150,
+        "accuracyMaxHttpMs": 170.7959039999405
+      },
+      "1024": {
+        "candidates": 40,
+        "accuracyHttpTotalMs": 691359.8451409993,
+        "accuracyServiceTookTotalMs": 686841,
+        "accuracyMaxHttpMs": 691.9921480000485
+      }
+    }
+  }
+}

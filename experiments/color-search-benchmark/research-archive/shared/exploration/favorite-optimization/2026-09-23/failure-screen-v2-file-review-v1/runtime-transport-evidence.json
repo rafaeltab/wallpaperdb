@@ -1,0 +1,192 @@
+{
+  "at": "2026-09-23T18:07:24.518Z",
+  "node": "v22.22.3",
+  "undici": "6.24.1",
+  "source": "process.binding(natives)[internal/deps/undici/undici]",
+  "sha256": "590b397c3ef9b1310b17214196319ede352f8c782ddfb6f3d1635f8b6d65445c",
+  "excerpts": [
+    {
+      "startLine": 6540,
+      "text": "    __name(shouldSendContentLength, \"shouldSendContentLength\");\n    function writeH1(client, request) {\n      const { method, path, host, upgrade, blocking, reset } = request;\n      let { body, headers, contentLength } = request;\n      const expectsPayload = method === \"PUT\" || method === \"POST\" || method === \"PATCH\" || method === \"QUERY\" || method === \"PROPFIND\" || method === \"PROPPATCH\";\n      if (util.isFormDataLike(body)) {\n        if (!extractBody) {\n          extractBody = require_body().extractBody;\n        }\n        const [bodyStream, contentType] = extractBody(body);\n        if (request.contentType == null) {\n          headers.push(\"content-type\", contentType);\n        }\n        body = bodyStream.stream;\n        contentLength = bodyStream.length;\n      } else if (util.isBlobLike(body) && request.contentType == null && body.type) {\n        headers.push(\"content-type\", body.type);\n      }\n      if (body && typeof body.read === \"function\") {\n        body.read(0);\n      }\n      const bodyLength = util.bodyLength(body);\n      contentLength = bodyLength ?? contentLength;\n      if (contentLength === null) {\n        contentLength = request.contentLength;\n      }\n      if (contentLength === 0 && !expectsPayload) {\n        contentLength = null;\n      }\n      if (shouldSendContentLength(method) && contentLength > 0 && request.contentLength !== null && request.contentLength !== contentLength) {\n        if (client[kStrictContentLength]) {\n          util.errorRequest(client, request, new RequestContentLengthMismatchError());\n          return false;\n        }\n        process.emitWarning(new RequestContentLengthMismatchError());\n      }\n      const socket = client[kSocket];"
+    },
+    {
+      "startLine": 6760,
+      "text": "      } catch (err) {\n        abort(err);\n      }\n    }\n    __name(writeBuffer, \"writeBuffer\");\n    async function writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload) {\n      assert(contentLength === body.size, \"blob body must have content length\");\n      try {\n        if (contentLength != null && contentLength !== body.size) {\n          throw new RequestContentLengthMismatchError();\n        }\n        const buffer = Buffer.from(await body.arrayBuffer());\n        socket.cork();\n        socket.write(`${header}content-length: ${contentLength}\\r\n\\r\n`, \"latin1\");\n        socket.write(buffer);\n        socket.uncork();\n        request.onBodySent(buffer);\n        request.onRequestSent();\n        if (!expectsPayload && request.reset !== false) {\n          socket[kReset] = true;\n        }\n        client[kResume]();\n      } catch (err) {\n        abort(err);\n      }\n    }"
+    },
+    {
+      "startLine": 2105,
+      "text": "        this.completed = false;\n        this.aborted = false;\n        this.upgrade = upgrade || null;\n        this.path = query ? buildURL(path, query) : path;\n        this.origin = origin;\n        this.idempotent = idempotent == null ? method === \"HEAD\" || method === \"GET\" : idempotent;\n        this.blocking = blocking == null ? false : blocking;\n        this.reset = reset == null ? null : reset;\n        this.host = null;\n        this.contentLength = null;\n        this.contentType = null;\n        this.headers = [];\n        this.expectContinue = expectContinue != null ? expectContinue : false;\n        if (Array.isArray(headers)) {\n          if (headers.length % 2 !== 0) {\n            throw new InvalidArgumentError(\"headers array must be even\");"
+    }
+  ],
+  "relatedMatches": [
+    {
+      "line": 954,
+      "text": "          this[kQueue].push({ opts, handler });\n          this[kQueued]++;\n        } else if (!dispatcher.dispatch(opts, handler)) {\n          dispatcher[kNeedDrain] = true;\n          this[kNeedDrain] = !this[kGetDispatcher]();\n        }"
+    },
+    {
+      "line": 2112,
+      "text": "        this.idempotent = idempotent == null ? method === \"HEAD\" || method === \"GET\" : idempotent;\n        this.blocking = blocking == null ? false : blocking;\n        this.reset = reset == null ? null : reset;\n        this.host = null;\n        this.contentLength = null;\n        this.contentType = null;"
+    },
+    {
+      "line": 2315,
+      "text": "        }\n        if (value === \"close\") {\n          request.reset = true;\n        }\n      } else if (headerName === \"expect\") {\n        throw new NotSupportedError(\"expect header not supported\");"
+    },
+    {
+      "line": 6544,
+      "text": "      const { method, path, host, upgrade, blocking, reset } = request;\n      let { body, headers, contentLength } = request;\n      const expectsPayload = method === \"PUT\" || method === \"POST\" || method === \"PATCH\" || method === \"QUERY\" || method === \"PROPFIND\" || method === \"PROPPATCH\";\n      if (util.isFormDataLike(body)) {\n        if (!extractBody) {\n          extractBody = require_body().extractBody;"
+    },
+    {
+      "line": 6566,
+      "text": "        contentLength = request.contentLength;\n      }\n      if (contentLength === 0 && !expectsPayload) {\n        contentLength = null;\n      }\n      if (shouldSendContentLength(method) && contentLength > 0 && request.contentLength !== null && request.contentLength !== contentLength) {"
+    },
+    {
+      "line": 6644,
+      "text": "      }\n      if (!body || bodyLength === 0) {\n        writeBuffer(abort, null, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isBuffer(body)) {\n        writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isBlobLike(body)) {"
+    },
+    {
+      "line": 6646,
+      "text": "        writeBuffer(abort, null, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isBuffer(body)) {\n        writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isBlobLike(body)) {\n        if (typeof body.stream === \"function\") {\n          writeIterable(abort, body.stream(), client, request, socket, contentLength, header, expectsPayload);"
+    },
+    {
+      "line": 6649,
+      "text": "      } else if (util.isBlobLike(body)) {\n        if (typeof body.stream === \"function\") {\n          writeIterable(abort, body.stream(), client, request, socket, contentLength, header, expectsPayload);\n        } else {\n          writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload);\n        }"
+    },
+    {
+      "line": 6651,
+      "text": "          writeIterable(abort, body.stream(), client, request, socket, contentLength, header, expectsPayload);\n        } else {\n          writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload);\n        }\n      } else if (util.isStream(body)) {\n        writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload);"
+    },
+    {
+      "line": 6654,
+      "text": "        }\n      } else if (util.isStream(body)) {\n        writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isIterable(body)) {\n        writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else {"
+    },
+    {
+      "line": 6656,
+      "text": "        writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else if (util.isIterable(body)) {\n        writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload);\n      } else {\n        assert(false);\n      }"
+    },
+    {
+      "line": 6663,
+      "text": "    }\n    __name(writeH1, \"writeH1\");\n    function writeStream(abort, body, client, request, socket, contentLength, header, expectsPayload) {\n      assert(contentLength !== 0 || client[kRunning] === 0, \"stream body cannot be pipelined\");\n      let finished = false;\n      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });"
+    },
+    {
+      "line": 6666,
+      "text": "      assert(contentLength !== 0 || client[kRunning] === 0, \"stream body cannot be pipelined\");\n      let finished = false;\n      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });\n      const onData = /* @__PURE__ */ __name(function(chunk) {\n        if (finished) {\n          return;"
+    },
+    {
+      "line": 6733,
+      "text": "    }\n    __name(writeStream, \"writeStream\");\n    function writeBuffer(abort, body, client, request, socket, contentLength, header, expectsPayload) {\n      try {\n        if (!body) {\n          if (contentLength === 0) {"
+    },
+    {
+      "line": 6754,
+      "text": "          socket.uncork();\n          request.onBodySent(body);\n          if (!expectsPayload && request.reset !== false) {\n            socket[kReset] = true;\n          }\n        }"
+    },
+    {
+      "line": 6765,
+      "text": "    }\n    __name(writeBuffer, \"writeBuffer\");\n    async function writeBlob(abort, body, client, request, socket, contentLength, header, expectsPayload) {\n      assert(contentLength === body.size, \"blob body must have content length\");\n      try {\n        if (contentLength != null && contentLength !== body.size) {"
+    },
+    {
+      "line": 6780,
+      "text": "        request.onBodySent(buffer);\n        request.onRequestSent();\n        if (!expectsPayload && request.reset !== false) {\n          socket[kReset] = true;\n        }\n        client[kResume]();"
+    },
+    {
+      "line": 6789,
+      "text": "    }\n    __name(writeBlob, \"writeBlob\");\n    async function writeIterable(abort, body, client, request, socket, contentLength, header, expectsPayload) {\n      assert(contentLength !== 0 || client[kRunning] === 0, \"iterator body cannot be pipelined\");\n      let callback = null;\n      function onDrain() {"
+    },
+    {
+      "line": 6809,
+      "text": "      }), \"waitForDrain\");\n      socket.on(\"close\", onDrain).on(\"drain\", onDrain);\n      const writer = new AsyncWriter({ abort, socket, request, contentLength, client, expectsPayload, header });\n      try {\n        for await (const chunk of body) {\n          if (socket[kError]) {"
+    },
+    {
+      "line": 6831,
+      "text": "        __name(this, \"AsyncWriter\");\n      }\n      constructor({ abort, socket, request, contentLength, client, expectsPayload, header }) {\n        this.socket = socket;\n        this.request = request;\n        this.contentLength = contentLength;"
+    },
+    {
+      "line": 6837,
+      "text": "        this.client = client;\n        this.bytesWritten = 0;\n        this.expectsPayload = expectsPayload;\n        this.header = header;\n        this.abort = abort;\n        socket[kWriting] = true;"
+    },
+    {
+      "line": 6843,
+      "text": "      }\n      write(chunk) {\n        const { socket, request, contentLength, client, bytesWritten, expectsPayload, header } = this;\n        if (socket[kError]) {\n          throw socket[kError];\n        }"
+    },
+    {
+      "line": 6862,
+      "text": "        socket.cork();\n        if (bytesWritten === 0) {\n          if (!expectsPayload && request.reset !== false) {\n            socket[kReset] = true;\n          }\n          if (contentLength === null) {"
+    },
+    {
+      "line": 6893,
+      "text": "      }\n      end() {\n        const { socket, contentLength, client, bytesWritten, expectsPayload, header, request } = this;\n        request.onRequestSent();\n        socket[kWriting] = false;\n        if (socket[kError]) {"
+    },
+    {
+      "line": 6903,
+      "text": "        }\n        if (bytesWritten === 0) {\n          if (expectsPayload) {\n            socket.write(`${header}content-length: 0\\r\n\\r\n`, \"latin1\");"
+    },
+    {
+      "line": 7221,
+      "text": "      headers[HTTP2_HEADER_PATH] = path;\n      headers[HTTP2_HEADER_SCHEME] = \"https\";\n      const expectsPayload = method === \"PUT\" || method === \"POST\" || method === \"PATCH\";\n      if (body && typeof body.read === \"function\") {\n        body.read(0);\n      }"
+    },
+    {
+      "line": 7236,
+      "text": "        contentLength = request.contentLength;\n      }\n      if (contentLength === 0 || !expectsPayload) {\n        contentLength = null;\n      }\n      if (shouldSendContentLength(method) && contentLength > 0 && request.contentLength != null && request.contentLength !== contentLength) {"
+    },
+    {
+      "line": 7317,
+      "text": "            client[kSocket],\n            contentLength,\n            expectsPayload\n          );\n        } else if (util.isBuffer(body)) {\n          writeBuffer("
+    },
+    {
+      "line": 7328,
+      "text": "            client[kSocket],\n            contentLength,\n            expectsPayload\n          );\n        } else if (util.isBlobLike(body)) {\n          if (typeof body.stream === \"function\") {"
+    },
+    {
+      "line": 7340,
+      "text": "              client[kSocket],\n              contentLength,\n              expectsPayload\n            );\n          } else {\n            writeBlob("
+    },
+    {
+      "line": 7351,
+      "text": "              client[kSocket],\n              contentLength,\n              expectsPayload\n            );\n          }\n        } else if (util.isStream(body)) {"
+    },
+    {
+      "line": 7358,
+      "text": "            abort,\n            client[kSocket],\n            expectsPayload,\n            stream,\n            body,\n            client,"
+    },
+    {
+      "line": 7374,
+      "text": "            client[kSocket],\n            contentLength,\n            expectsPayload\n          );\n        } else {\n          assert(false);"
+    },
+    {
+      "line": 7383,
+      "text": "    }\n    __name(writeH2, \"writeH2\");\n    function writeBuffer(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {\n      try {\n        if (body != null && util.isBuffer(body)) {\n          assert(contentLength === body.byteLength, \"buffer body must have content length\");"
+    },
+    {
+      "line": 7393,
+      "text": "          request.onBodySent(body);\n        }\n        if (!expectsPayload) {\n          socket[kReset] = true;\n        }\n        request.onRequestSent();"
+    },
+    {
+      "line": 7403,
+      "text": "    }\n    __name(writeBuffer, \"writeBuffer\");\n    function writeStream(abort, socket, expectsPayload, h2stream, body, client, request, contentLength) {\n      assert(contentLength !== 0 || client[kRunning] === 0, \"stream body cannot be pipelined\");\n      const pipe = pipeline(\n        body,"
+    },
+    {
+      "line": 7415,
+      "text": "            util.removeAllListeners(pipe);\n            request.onRequestSent();\n            if (!expectsPayload) {\n              socket[kReset] = true;\n            }\n            client[kResume]();"
+    },
+    {
+      "line": 7429,
+      "text": "    }\n    __name(writeStream, \"writeStream\");\n    async function writeBlob(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {\n      assert(contentLength === body.size, \"blob body must have content length\");\n      try {\n        if (contentLength != null && contentLength !== body.size) {"
+    },
+    {
+      "line": 7442,
+      "text": "        request.onBodySent(buffer);\n        request.onRequestSent();\n        if (!expectsPayload) {\n          socket[kReset] = true;\n        }\n        client[kResume]();"
+    },
+    {
+      "line": 7451,
+      "text": "    }\n    __name(writeBlob, \"writeBlob\");\n    async function writeIterable(abort, h2stream, body, client, request, socket, contentLength, expectsPayload) {\n      assert(contentLength !== 0 || client[kRunning] === 0, \"iterator body cannot be pipelined\");\n      let callback = null;\n      function onDrain() {"
+    },
+    {
+      "line": 7484,
+      "text": "        h2stream.end();\n        request.onRequestSent();\n        if (!expectsPayload) {\n          socket[kReset] = true;\n        }\n        client[kResume]();"
+    },
+    {
+      "line": 8372,
+      "text": "          this[kClients].set(key, dispatcher);\n        }\n        return dispatcher.dispatch(opts, handler);\n      }\n      async [kClose]() {\n        const closePromises = [];"
+    }
+  ],
+  "interpretation": "PIT DELETE cleanup sends a body; default writeH1 expectsPayload excludes DELETE and resets such sockets unless reset:false. This establishes a churn mechanism, not the precise transport-error cause."
+}

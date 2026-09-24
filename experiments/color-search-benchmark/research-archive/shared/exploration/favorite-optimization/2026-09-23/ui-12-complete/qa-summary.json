@@ -1,0 +1,39 @@
+{
+  "url": "http://zerotwo:8228/",
+  "purpose": "Functional browser QA; UI timings are not performance evidence.",
+  "registeredAndAvailableMethods": 12,
+  "realWallpapers": 523,
+  "allMethodComparisons": [
+    { "query": "red vibe", "quality": 0.5, "cutoffWeight": 1, "methods": 12, "hitsPerMethod": 24, "passed": true },
+    { "query": "five colors,20%each", "quality": 0.5, "cutoffWeight": 1, "methods": 12, "hitsPerMethod": 24, "numericSortedAndBoundedHitsExactlyEqual": true },
+    { "query": "80%grayscale,20%red", "quality": 0.5, "cutoffWeight": 1, "methods": 12, "hitsPerMethod": 24, "numericSortedAndBoundedHitsExactlyEqual": true },
+    { "query": "red vibe,final recovery comparison", "quality": 0.5, "cutoffWeight": 1, "methods": 12, "hitsPerMethod": 24, "passed": true }
+  ],
+  "matrixMethods": ["Precomputed float", "Indexed split27-bit", "Native numeric sort", "Globally bounded float"],
+  "matrix": [
+    { "quality": 0, "cutoffWeight": 0, "query": "red" },
+    { "quality": 0, "cutoffWeight": 1, "query": "green40" },
+    { "quality": 0, "cutoffWeight": 3, "query": "redgreen" },
+    { "quality": 0.5, "cutoffWeight": 0, "query": "rainbow" },
+    { "quality": 0.5, "cutoffWeight": 1, "query": "grayred" },
+    { "quality": 0.5, "cutoffWeight": 3, "query": "dark" },
+    { "quality": 1, "cutoffWeight": 0, "query": "trans" },
+    { "quality": 1, "cutoffWeight": 1, "query": "redgreen" },
+    { "quality": 1, "cutoffWeight": 3, "query": "rainbow" }
+  ],
+  "matrixResult": { "eachHttpStatus": 200, "eachHitCount": 24, "allNumericSortedBoundedHitsExactlyEqual": true },
+  "fixtureCheck": { "knownFixtureIds": 22, "capturedSuccessfulApiResponses": 77, "hitOccurrencesChecked": 1848, "fixtureLeaks": 0, "allScoresFinite": true },
+  "detailModal": { "fullImageHttpStatus": 200, "loadedImageWidth": 7680, "loadedImageHeight": 4320, "mobileDialogWidth": 366.59375, "mobileViewportWidth": 390, "escapeCloses": true, "missingSourceLinkHidden": true },
+  "sourceModal": { "wallpaper": "wallpaper-037", "loadedImageWidth": 1920, "sourceVisible": true, "sourceUrl": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png" },
+  "mobile": { "width": 390, "height": 844, "documentWidth": 390, "pageOverflow": false, "resultStripScrolls": true },
+  "desktop": { "width": 1440, "height": 1000, "documentWidth": 1440, "pageOverflow": false },
+  "cancellation": { "actualFetchAbortObserved": true, "staleResultsMarked": true, "loadingCleared": true, "changedQueryRecovers": true },
+  "failureRecovery": { "failureInjectedInBrowser": true, "injectedHttpStatus": 503, "displayedError": "Intentional QA service failure", "recoveryHitCount": 24 },
+  "liveUpdate": { "queryAfterDebounce": { "mode": "proportions", "targets": [{ "color": "#22cc44", "percent": 40 }] }, "completed": true },
+  "boundedTiming": "Verified OpenSearch total label and5/6/9request counts for one/two/five targets. API timing covers whole API request.",
+  "pageErrors": [],
+  "consoleLogs": [],
+  "screenshots": ["desktop-red.png", "desktop-new-methods.png", "mobile-five-colors.png", "mobile-bounded-results.png", "mobile-modal.png", "mobile-source-modal.png"],
+  "evidenceBoundary": "Summary of browser assertions plus screenshots. Runtime response buffers were compared exactly but not exported; raw ranking fidelity is recorded by the separate correctness campaign.",
+  "cleanup": { "liveUpdateDisabled": true, "namedBrowserClosed": true, "serviceRestarted": false, "frozenBackendEdited": false }
+}

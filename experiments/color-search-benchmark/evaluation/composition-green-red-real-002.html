@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>40% green, 40% red — photographs</title>
+<style>
+:root { color-scheme: dark; font: 16px/1.55 system-ui, sans-serif; background: #202020; color: #eee; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; padding: 24px 20px 36px; max-width: 1120px; }
+h1 { margin: 0 0 10px; font-size: 1.9rem; line-height: 1.2; }
+p { margin: 7px 0; }
+.eyebrow { color: #bbb; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
+.instructions { margin: 18px 0 22px; max-width: 84ch; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+figure { margin: 0; border: 1px solid #555; border-radius: 7px; overflow: hidden; background: #282828; }
+figcaption { padding: 9px 12px; }
+.label { font-size: 1.2rem; font-weight: 700; }
+.picture { display: block; background: #707070; }
+.picture img { display: block; width: 100%; height: 340px; object-fit: contain; }
+a { color: #ddd; }
+a:focus-visible, summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.full { display: block; padding: 7px 12px; font-size: .8rem; }
+footer { margin-top: 22px; color: #bbb; font-size: .9rem; }
+footer li { margin: 8px 0; }
+summary { cursor: pointer; }
+@media (max-width: 580px) { body { padding: 18px 12px; } .grid { grid-template-columns: 1fr; gap: 16px; } .picture img { height: 240px; } }
+</style>
+</head>
+<body>
+<header>
+<p class="eyebrow">Natural-image comparison</p>
+<h1>40% green, 40% red</h1>
+<p><strong>The remaining 20% is unspecified.</strong></p>
+<p>Imagine this is your search request. Aim close to both requested amounts across the whole image; no exact shades or subject are specified.</p>
+</header>
+<section class="instructions" aria-label="Review instructions">
+<p><strong>How well does each photograph fit?</strong> Give a brief impression for A–D and your preferred order.</p>
+<p>Ties and uncertainty are welcome. If none is a good match, say so. You do not need to estimate percentages.</p>
+<p>The examples are shuffled. Click an image to view it at full size.</p>
+</section>
+<main class="grid" aria-label="Four wallpaper photographs">
+<figure aria-labelledby="label-A">
+<figcaption><span class="label" id="label-A">A</span></figcaption>
+<a class="picture" href="../corpus/evaluation/green-red-real-leaves.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open example A at full size"><img src="../corpus/evaluation/green-red-real-leaves.jpg" alt="Wallpaper example A"></a>
+<a class="full" href="../corpus/evaluation/green-red-real-leaves.jpg" target="_blank" rel="noopener noreferrer">Open full-size A ↗</a>
+</figure>
+<figure aria-labelledby="label-B">
+<figcaption><span class="label" id="label-B">B</span></figcaption>
+<a class="picture" href="../corpus/wallpaper-082.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open example B at full size"><img src="../corpus/wallpaper-082.jpg" alt="Wallpaper example B"></a>
+<a class="full" href="../corpus/wallpaper-082.jpg" target="_blank" rel="noopener noreferrer">Open full-size B ↗</a>
+</figure>
+<figure aria-labelledby="label-C">
+<figcaption><span class="label" id="label-C">C</span></figcaption>
+<a class="picture" href="../corpus/evaluation/green-red-real-tulip-field.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open example C at full size"><img src="../corpus/evaluation/green-red-real-tulip-field.jpg" alt="Wallpaper example C"></a>
+<a class="full" href="../corpus/evaluation/green-red-real-tulip-field.jpg" target="_blank" rel="noopener noreferrer">Open full-size C ↗</a>
+</figure>
+<figure aria-labelledby="label-D">
+<figcaption><span class="label" id="label-D">D</span></figcaption>
+<a class="picture" href="../corpus/evaluation/green-red-real-tulips.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open example D at full size"><img src="../corpus/evaluation/green-red-real-tulips.jpg" alt="Wallpaper example D"></a>
+<a class="full" href="../corpus/evaluation/green-red-real-tulips.jpg" target="_blank" rel="noopener noreferrer">Open full-size D ↗</a>
+</figure>
+</main>
+<footer>
+<details><summary>Image sources and attribution</summary><ul>
+<li>A: <a href="https://commons.wikimedia.org/wiki/File:Red_and_green_leaves.jpg">Source photograph</a> — Iwanjayz. License: <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>. Source image shown unchanged.</li>
+<li>B: <a href="https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg">Source photograph</a> — original author unknown. License: unknown. Source image shown unchanged.</li>
+<li>C: <a href="https://commons.wikimedia.org/wiki/File:Red_Tulips_(205290827).jpeg">Source photograph</a> — Dana Hutchinson. License: <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>. Source image shown unchanged.</li>
+<li>D: <a href="https://commons.wikimedia.org/wiki/File:Redtulips.jpg">Source photograph</a> — Evil Erin. License: <a href="https://creativecommons.org/licenses/by/2.0/">CC BY 2.0</a>. Source image shown unchanged.</li>
+</ul></details>
+</footer>
+</body>
+</html>

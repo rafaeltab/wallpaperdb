@@ -1,0 +1,11 @@
+{
+  "at": "2026-09-21T20:09:14Z",
+  "rawRequests": 528,
+  "profiles": 32,
+  "allProfileCountersAndPercentilesMatch": true,
+  "mismatches": [],
+  "timedRequests": 512,
+  "warmupRequests": 16,
+  "failedRequests": 0,
+  "incorrectSlowFlags": 0
+}

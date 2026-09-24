@@ -1,0 +1,26 @@
+{
+  "at": "2026-09-23T20:37:13.617863+00:00",
+  "passed": true,
+  "browserClosed": true,
+  "scope": "Targeted v11 dashboard smoke; no repetition of prior 19-method search suite.",
+  "publication": {
+    "apiStatus": 200,
+    "publishedAt": "2026-09-23T20:34:25.598637+00:00",
+    "sourceCheckpoint": "results-checkpoint-20260923-v11.json",
+    "sourceSha256": "101c9d7733a489db9afc020d3c7c4ade5d373db7da1e358a6bae4b3afc49d12e",
+    "summarySha256": "be6597211ebb58bba1a18ad73c999f2feca4d2a452eb2787a0382b75763fffbd",
+    "warnings": []
+  },
+  "checks": {
+    "stressFourRows": true,
+    "numeric128Failures": 9465,
+    "bounded128Failures": 6368,
+    "historicalPendingFailures": 7491,
+    "pendingFailureStillVisibleWithNoCompletedRows": true,
+    "desktopNoOverflow": true,
+    "mobileNoOverflow": true,
+    "labMethodCount": 19,
+    "browserErrorsObserved": []
+  },
+  "automationNote": "An initial selector command lost its unquoted # to the recipe shell. The filtered assertion failed until the selector was quoted; original unfiltered capture is retained. No application change was needed."
+}

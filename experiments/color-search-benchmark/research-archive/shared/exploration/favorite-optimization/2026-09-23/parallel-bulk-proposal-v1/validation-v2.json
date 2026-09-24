@@ -1,0 +1,11 @@
+{
+  "schedulerTestsPassed": 8,
+  "servicesCalled": false,
+  "integrationPatchApplied": false,
+  "note": "Final edge-case hardening preserves both failed batch ordinals when an executor reuses one Error instance. Existing proposal/patch remain immutable.",
+  "sourceHashes": {
+    "favorite-bulk-scheduler.mjs": "6b3bf416f52a2ed078f584b27c90661be616eb06a54cea6527770e0bbf41686c",
+    "favorite-bulk-scheduler.test.mjs": "d6e5942f8238b234784258ff9e9f8fc5c6bdf5f1480bc17c58f2a6442d294616",
+    "favorite-compiled-index.mjs": "ea94248f75414644a3c6e24a400e6a5116400f045304c7aedbae26b7b42eb7ca"
+  }
+}

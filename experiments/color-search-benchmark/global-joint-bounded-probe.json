@@ -1,0 +1,219 @@
+{
+  "generatedAt": "2026-09-16T15:05:30.487Z",
+  "version": {
+    "distribution": "opensearch",
+    "number": "2.11.0",
+    "build_type": "tar",
+    "build_hash": "4dcad6dd1fd45b6bd91f041a041829c8687278fa",
+    "build_date": "2023-10-13T02:55:55.511945994Z",
+    "build_snapshot": false,
+    "lucene_version": "9.7.0",
+    "minimum_wire_compatibility_version": "7.10.0",
+    "minimum_index_compatibility_version": "7.0.0"
+  },
+  "documents": 430,
+  "shards": 3,
+  "checks": [
+    {
+      "name": "Correct joint winner outside marginal token seed is recovered globally",
+      "passes": true,
+      "threshold": 0.4000000061604645
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "target",
+      "filter": [],
+      "passes": true,
+      "hits": 20
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "target",
+      "filter": [
+        {
+          "term": {
+            "cohort": "odd"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 20
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "target",
+      "filter": [
+        {
+          "term": {
+            "cohort": "few"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 7
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "target",
+      "filter": [
+        {
+          "term": {
+            "cohort": "absent"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 0
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "minimum",
+      "filter": [],
+      "passes": true,
+      "hits": 20
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "minimum",
+      "filter": [
+        {
+          "term": {
+            "cohort": "odd"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 20
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "minimum",
+      "filter": [
+        {
+          "term": {
+            "cohort": "few"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 7
+    },
+    {
+      "name": "Seeded first page matches full eligible joint oracle",
+      "mode": "minimum",
+      "filter": [
+        {
+          "term": {
+            "cohort": "absent"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 0
+    },
+    {
+      "name": "Cost outside initial threshold but tied float32 score keeps earlier id",
+      "passes": true,
+      "iterations": [
+        {
+          "threshold": 0.2,
+          "minScore": 0.7999999999,
+          "hits": 1,
+          "tieThreshold": 0.20000001808139342,
+          "wallMs": 1.2266250000000127,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 0.20000001808139342,
+          "minScore": 0.7999999818186065,
+          "hits": 1,
+          "tieThreshold": 0.20000001808139342,
+          "wallMs": 1.3361810000000105,
+          "took": 0,
+          "boundedTotal": null
+        }
+      ]
+    },
+    {
+      "name": "Float32 score ties paginate by id without omission",
+      "passes": true
+    },
+    {
+      "name": "Threshold-zero pagination covers complete global joint order",
+      "mode": "target",
+      "passes": true,
+      "documents": 430,
+      "pages": 26,
+      "widenings": 21
+    },
+    {
+      "name": "Threshold-zero pagination covers complete global joint order",
+      "mode": "minimum",
+      "passes": true,
+      "documents": 430,
+      "pages": 26,
+      "widenings": 22
+    },
+    {
+      "name": "PIT excludes new perfect joint match until a new snapshot",
+      "passes": true
+    },
+    {
+      "name": "Unsafe joint cursor reuse rejected",
+      "passes": true
+    }
+  ],
+  "exampleDiagnostics": {
+    "seedCount": 20,
+    "seedThreshold": 0.4000000061604645,
+    "seedMaxCost": 0.4,
+    "seedIds": [
+      "a-overlap-00",
+      "a-overlap-01",
+      "a-overlap-02",
+      "a-overlap-03",
+      "a-overlap-04",
+      "a-overlap-05",
+      "a-overlap-06",
+      "a-overlap-07",
+      "a-overlap-08",
+      "a-overlap-09",
+      "a-overlap-10",
+      "a-overlap-11",
+      "a-overlap-12",
+      "a-overlap-13",
+      "a-overlap-14",
+      "a-overlap-15",
+      "a-overlap-16",
+      "a-overlap-17",
+      "a-overlap-18",
+      "a-overlap-19"
+    ],
+    "iterations": [
+      {
+        "threshold": 0.4000000061604645,
+        "minScore": 0.5999999937395355,
+        "hits": 20,
+        "tieThreshold": 0.01624968667956848,
+        "wallMs": 4.839244000000008,
+        "took": 1,
+        "boundedTotal": null
+      }
+    ],
+    "maximumThreshold": 1,
+    "eligibleTotalKnown": false
+  },
+  "exampleTiming": {
+    "pitMs": 3.499758000000014,
+    "seedMs": 5.701484999999991,
+    "finalMs": 4.839244000000008,
+    "totalMs": 19.215652999999975,
+    "requests": 3
+  },
+  "limitations": [
+    "Exact global float32 score/id order for indexed hard-membership joint model with at most two families.",
+    "Fixed families and sampled pixels remain model limitations.",
+    "Correctness probe is not a production performance benchmark."
+  ]
+}

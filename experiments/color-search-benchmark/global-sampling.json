@@ -1,0 +1,6091 @@
+{
+  "generatedAt": "2026-09-16T15:12:51.102Z",
+  "samplerVersion": "original-rgba-continuous-strata-xorshift32-v1",
+  "cacheKey": "042cfe6f83324594c7fd20045ca13940e790ba8b9b0696a8421d7ed301e94daa",
+  "sourceHashes": {
+    "global-sampling.ts": "dfd2f29e90e0fe5f3603d32c225fcd66b81cc8a58fef671e5934a140c68f40e1",
+    "global-pixels.mjs": "a06f3352339281d6cb182d0cb5aa0a8026e4e30a8a9103658a82b7840a662802",
+    "global-native.mjs": "aee4fb817d3d92a6b51423345c5c73ab6a8be43a4a403ef3eb45956898e594d2",
+    "global-joint.mjs": "867ea19121010e412fc6e096bcfaee0e88e0373e80c2d37a3b42977f1bbf336d",
+    "ranges.mjs": "96590a8416dd8c6627ff44e73d5dac2f39c48a00cd3447615b8ab763468fa776"
+  },
+  "dataCacheKey": "9954417388273b84089a5158df4864a952d96a3ac53eec1fe65b074a2e794073",
+  "resizeAuditCacheKey": "254220286ad083581f015babca9e00efee4f750f5581f23bb0f7cecb5219b413",
+  "corpus": {
+    "wallpapers": 100,
+    "originalsChecksumVerified": 100,
+    "levels": [
+      65536,
+      262144
+    ],
+    "exactIds": [
+      "wallpaper-088",
+      "wallpaper-097",
+      "wallpaper-016",
+      "wallpaper-048"
+    ],
+    "originalHashes": {
+      "wallpaper-001": "8e238767a4feb0fe2cc74fb73b72a4344d43020e36437f2604aecddb21fbe2b1",
+      "wallpaper-002": "a6a8e4fb3b9201cbd360717bb8f9dffb6b88160e25ed66b3e9f1b3394543c052",
+      "wallpaper-003": "51b86d67a86428504a6570a1f36e40f230dda0228a74f574d0feedcaead6c444",
+      "wallpaper-004": "8ce0380d95f76c457eec19a2fae02756f38bc5a4ab6ea3de24ccb37124a254da",
+      "wallpaper-005": "9a01e9fd40cb21e830cbb37f9a8a91596a80e095df869ed73d87a7b46aa9b834",
+      "wallpaper-006": "9a5e61d0dd5f09bd39339c8d24408030dba26aed0419ae547dc7465c7bc3e45e",
+      "wallpaper-007": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850",
+      "wallpaper-008": "3ebefaf297de677354aecfb5121d42753a49ccf69a4bd3a615ebb34d3cf00f78",
+      "wallpaper-009": "c12284f866aef429bb3f94335c86d57034ca91f52a699b9a88b2d66323006266",
+      "wallpaper-010": "bc9b1d219e079cc53c647266f91517cb9464ae4a6d16c9b1c653bfc64eaadc86",
+      "wallpaper-011": "37b91fdcb3c15dda5f3189bcde76003ed79a10d4c732ded256d62d519fcf8687",
+      "wallpaper-012": "5b7a292dbebab79a1048e50af0b51e9c447354a04425e48d05bddc5092edd7d5",
+      "wallpaper-013": "cca6d88bb995a01c20de6b9d2268fd78695c3a880b66fb6556195dbf9bf5e82d",
+      "wallpaper-014": "9abb89f50a56d46fe18c1fd1a173f26c3344d8beac96cc129fe4835aa2c70eb2",
+      "wallpaper-015": "c4632e9000ac1a44db4f052dc076eef0bcb9b069f7aebaabc407b01bb38baf63",
+      "wallpaper-016": "605192277535a41444da9d9799d7ca14747edcaf3584a647ee757ff8514563e2",
+      "wallpaper-017": "0e934c206b35e4961a8704a1ded9eb2ec7de7f5c8d8cc5cba4ea284de7b38731",
+      "wallpaper-018": "ae5e7ad347d5c4b7cd45072c77e1ad2272b78151c08ef2d2fb2824a6cd47a7e4",
+      "wallpaper-019": "a9c5d0168a6b1bc237a4493e854b9c7bb2c372e5d327fedf6819af086a04610b",
+      "wallpaper-020": "50bd820e3bab78dacbf07148f326bc175d2fc9d62689650098250d4a3e7f93c9",
+      "wallpaper-021": "a7c6133fe9bca18af06f72e9c04ae4a7d6056b72e13698ae21ebd0ae29534ce7",
+      "wallpaper-022": "544c5a8d83c439fcdda97d55f923c22ca930abe871abb5028fcd6ca1dde52078",
+      "wallpaper-023": "c32bac3e4759b19aba99eb87f1bfa41fb9a25e0a0887d66a9b58a9e760714f0c",
+      "wallpaper-024": "324e306648a1542c958a162b8f05a7b6962c3dbf048cbc8be6664ca0966ccde0",
+      "wallpaper-025": "7da47db9d5edef90337692fff05c2b44e0ae58c216836f496f68ea10a1d02078",
+      "wallpaper-026": "fba61179b4233a83b83c0fe51e89358cbaa363bb65f9c14c0d99f66ab8665d05",
+      "wallpaper-027": "4f250c07835e1350bf69761a6f794aa39c606d59ec13ef4701197add92073b34",
+      "wallpaper-028": "61d582fcf6ec24e701945813806ddf31d1dc2699d9aa0cc7fd1bc26ac7ac44b0",
+      "wallpaper-029": "08e7badf417a6017f3e7443a150e8e2f910ab2188a779ff8cb74b910fd321789",
+      "wallpaper-030": "01ec9dd89ce75f4b0d5135aa94543d71f8a710319fabb882ecaef104bc589c8c",
+      "wallpaper-031": "7ad700c6e4bfb0799eda39221bf0c0738650c5a891056d36956bb46788b8496a",
+      "wallpaper-032": "80a85e97c8b63311543a59403c1266310df73b27ce0c491561ca69e5b309ce3e",
+      "wallpaper-033": "658622e9ff70054352b980612e80a92445fc834a9c74d241f3f01b684c7993d9",
+      "wallpaper-034": "59739ecbfd398cbe2885153d216a70fdeb398cc1b059f423aad6788ca63c3020",
+      "wallpaper-035": "4a0286d3dd224b1c0e3c2187ff63833dbc1edbbe598b9934f9de47b28d2637b7",
+      "wallpaper-036": "59d5b727605c6d21ac18cd81b2b7169fdaeb2f6cce315625e9d8de614c2dab8b",
+      "wallpaper-037": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643",
+      "wallpaper-038": "21fdd745fca388e787ea6018417a0289809e67a9d3ffa4611287f40c461f729a",
+      "wallpaper-039": "b1f9e273f464a532ee6157131fce11e4593b77a0f2047610401bd36dc0183b4b",
+      "wallpaper-040": "61386230f9a8a65935d65efd0e8ff19344b3637959bcfd237c670176576d694f",
+      "wallpaper-041": "dc61731c8667df6d6d0c53d1d578ec6832df8c534c91d901ed7264bc18896304",
+      "wallpaper-042": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd",
+      "wallpaper-043": "de8abcc47ebdff74c7e3fad550922e74edb91594e48a3fb6e383aa5c7a679c6b",
+      "wallpaper-044": "cf2cfddbfc8185367d85e1d99d695106ded3459ab4cea2d0c980f4dc72ca05e4",
+      "wallpaper-045": "ee41a691b0c243035acd4abd54150da570df1626425e5509053b45bc69690204",
+      "wallpaper-046": "746ea33448f91eb907960138e1e79528830ca2828fcee444078371c054867d2c",
+      "wallpaper-047": "85b8ca0b004b0a5d353892e3ec38fe5e3aeb252f041808e884e13e97fa194b5d",
+      "wallpaper-048": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+      "wallpaper-049": "2d3e1aa665c29b04cf38a779ad94634cc608b1c7306d33ce4d00b9a1c5fc3500",
+      "wallpaper-050": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a",
+      "wallpaper-051": "d8848bb5111f77a6a3bb9e9a8888cde7794b17376fac379cdeb99a11fbab2434",
+      "wallpaper-052": "41bc0c2b2054edfa77c1b8a806b45276bcc2361032b84ac49005cb7828ee7491",
+      "wallpaper-053": "c7b8054711c71d262a8e47c589d7dfd8a45ef03db607a9a38e386216cdc991aa",
+      "wallpaper-054": "2b92b1ab944cdcb6274ea959fecf9c6a62bed4062c22ba7615b4a14b82557c1e",
+      "wallpaper-055": "c791dc7491dd41a2bd92caffa292a3a91d9c3c7f99080e676aeb92f82137d0ff",
+      "wallpaper-056": "09c2751ac218a0ab91125254ab209f3adcec509402188b8f67f2007956a1f03f",
+      "wallpaper-057": "1ab56e32c7916925061b4f79dc79aa14f8bd7d6d624a78c919891d127cefeca4",
+      "wallpaper-058": "8b044243052afc50f72aa7c6fffd8c37b4c679fbc51a97bcdc725c89833efb11",
+      "wallpaper-059": "e0110e351e3f6240143c4da69ae843fa454b7e8eafa66eb510c23c7222c872e3",
+      "wallpaper-060": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+      "wallpaper-061": "c9687d1401a91e906ced6d39e5873ebc20f29a95c853959773b175bfc551904a",
+      "wallpaper-062": "e8293bebb250e93ce70991219f9d25b20fe553699732e55259b67465339decdd",
+      "wallpaper-063": "f8205c8f54b5f11b2579985ba5eb32450932f066f609fb731d160ba36ebc3b01",
+      "wallpaper-064": "fc0762887aa8151784b0cf233504bb599d0885a6a42e69c7b02551b7a4954b48",
+      "wallpaper-065": "7e2854092b4a06212c9944f14e8e1d158bc71b964ce9d539b5fd60b911d3ce76",
+      "wallpaper-066": "09e67407b86208f17e1122ca6395c02cf7e34acac3a4d468cd7a5e8eecf934c4",
+      "wallpaper-067": "5c6c38c093055c135f55dc68c55e191606de32a63ccffd9df6733cde26df655e",
+      "wallpaper-068": "0a4f4018a08fc37855662e2f4f59c34b6a210fc3949453eb1fe79da977daf224",
+      "wallpaper-069": "f68cc0d202ceef50350b89a199d3bd8c4c9c9a25dfb087230143e5fc4036757d",
+      "wallpaper-070": "926206385f2509d9e1d911668ea0109ff25654963efe6bfe4a66c89778d04849",
+      "wallpaper-071": "ad846eb13081bfcd675e000ecb66a7a2cfe5cfc3e97eb9ce966f7e922ed6698f",
+      "wallpaper-072": "b428bccc2f49b823675d51b892b3e9a536fbafd6ab515e3e98c9ca6614dca9ab",
+      "wallpaper-073": "b90dcdd5341762ee4968c5fcc543be23d5d6d102c0f9ba3f97219e36752a9c29",
+      "wallpaper-074": "cc77826b9a52b64510a9a9d4570c3728c7a1a20e6d497adf10a3e07747ea80c1",
+      "wallpaper-075": "0182b8ae436cf426ed0ac727e9e2a69e3086d01b9508e4d27a208324002d12a3",
+      "wallpaper-076": "107b5fadc845eb5d31a6a36994ee9254fd76ea97b18e2536a03df6cf8333f63c",
+      "wallpaper-077": "d9d6c2683ed6006555e18a5cd09324d58df7a1f7297250f6de7e92306c37b35c",
+      "wallpaper-078": "b5c3150c7b1299c8d3ac717acce4ef10bbb99afa48214df50172aa4033b25869",
+      "wallpaper-079": "7e96fd38762f4fe359f88519097fc260b15867e98b8906be41660ad23d68d908",
+      "wallpaper-080": "ce3974b7ff0b7d735322c66d0723352dccddc269b4b4766ce745cfb1a9e2cba2",
+      "wallpaper-081": "ff9c795cef947e59970f87f08ed81df4d58f4c61ac28300fa44d253c8a2425b3",
+      "wallpaper-082": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+      "wallpaper-083": "f3382e02c83f83332d5ad90ed2bebce4e88601a52c9e8595a92818e00b544057",
+      "wallpaper-084": "1729194d2b7593b21fac2427eb30d3d173549217a85981ed87186647659784ed",
+      "wallpaper-085": "8db651b20ef6565584a80951ceaf70aacd53202534e31dfe1b30d760ff5d05b7",
+      "wallpaper-086": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9",
+      "wallpaper-087": "1284682ec29fa65a71ea7ecc1f1d5b8c06bdd1918eeb40b5fb826957cc5c6429",
+      "wallpaper-088": "f2868aad3a75ed42289467b969b37348c8ad49727db93e830023f4684ac10df6",
+      "wallpaper-089": "6c5508b97fc7af730886cbb67073ec781d2290f20a66c760c4de5597d869a700",
+      "wallpaper-090": "0f78ea66504b0f71182665a003280c0cb0879c7834c09c37cf130bdc63841049",
+      "wallpaper-091": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052",
+      "wallpaper-092": "56283b09d526e4f07384bab7eda59157c22ece79371ce37b896b7247dbc23604",
+      "wallpaper-093": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8",
+      "wallpaper-094": "d2f9075c0b13ae2e16bfff1972dcc8f0574cf363e6f4056aabe80abce230f64a",
+      "wallpaper-095": "bee0e7c41b884a45525586f5471555a3d0c2f1ca410c7b8f86e56e0f0fdbfa9c",
+      "wallpaper-096": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f",
+      "wallpaper-097": "a1a9b461afdf023d895129670009167af0cddbb7c0c22a3b82afde967dd4b907",
+      "wallpaper-098": "a8187d04f47f3c9193c9746362fc779d489533138b3c60fbb2adc43158d9632e",
+      "wallpaper-099": "83d3b357e907016fdc1dcfcff5fd0ba22850859ecc87f96d2123772a69ef11c7",
+      "wallpaper-100": "2fe2123e4b85553ff9226940157359beb46f0308e0ea6c1bd1f57a3b491fbd20"
+    }
+  },
+  "sampling": [
+    {
+      "id": "wallpaper-001",
+      "width": 2763,
+      "height": 1600,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 336,
+          "rows": 195,
+          "fullImage": false,
+          "seed": 1987803595
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 672,
+          "rows": 390,
+          "fullImage": false,
+          "seed": 2295919425
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-002",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3521836378
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2519839848
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-003",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2500440334
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 399718382
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-004",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 337282368
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2934476399
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-005",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2508046746
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3429891534
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-006",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1364584369
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2631871843
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-007",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2812715934
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1889132895
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-008",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3321032494
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2073887321
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-009",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1492689555
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1814088702
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-010",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2468291466
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1688801544
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-011",
+      "width": 5760,
+      "height": 3840,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2539796805
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 2381834624
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-012",
+      "width": 1920,
+      "height": 1279,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 1328669888
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 1366728009
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-013",
+      "width": 3728,
+      "height": 2097,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2164885332
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1962538067
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-014",
+      "width": 5464,
+      "height": 3640,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3520160893
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 4032950178
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-015",
+      "width": 2000,
+      "height": 1123,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2554243043
+        },
+        {
+          "requested": 262144,
+          "actual": 261972,
+          "columns": 684,
+          "rows": 383,
+          "fullImage": false,
+          "seed": 154485495
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-016",
+      "width": 2000,
+      "height": 1333,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3677363074
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 4036895420
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-017",
+      "width": 4000,
+      "height": 2250,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 655239638
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2137645368
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-018",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1351471295
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2186127133
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-019",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3360417878
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2858568107
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-020",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1741216857
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3683311272
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-021",
+      "width": 1920,
+      "height": 1280,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 1694495655
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 220588484
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-022",
+      "width": 6512,
+      "height": 4341,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 168910969
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 4132516056
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-023",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2813247427
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1204724706
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-024",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3206715302
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1705418021
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-025",
+      "width": 3998,
+      "height": 2140,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65450,
+          "columns": 350,
+          "rows": 187,
+          "fullImage": false,
+          "seed": 1265418458
+        },
+        {
+          "requested": 262144,
+          "actual": 262125,
+          "columns": 699,
+          "rows": 375,
+          "fullImage": false,
+          "seed": 1314957701
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-026",
+      "width": 2947,
+      "height": 3684,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65436,
+          "columns": 228,
+          "rows": 287,
+          "fullImage": false,
+          "seed": 2168658377
+        },
+        {
+          "requested": 262144,
+          "actual": 261861,
+          "columns": 457,
+          "rows": 573,
+          "fullImage": false,
+          "seed": 504738671
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-027",
+      "width": 4579,
+      "height": 2616,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65427,
+          "columns": 339,
+          "rows": 193,
+          "fullImage": false,
+          "seed": 2264515027
+        },
+        {
+          "requested": 262144,
+          "actual": 261999,
+          "columns": 677,
+          "rows": 387,
+          "fullImage": false,
+          "seed": 1704973249
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-028",
+      "width": 4000,
+      "height": 6000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 209,
+          "rows": 313,
+          "fullImage": false,
+          "seed": 675932637
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 418,
+          "rows": 627,
+          "fullImage": false,
+          "seed": 2542258544
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-029",
+      "width": 4423,
+      "height": 2975,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 312,
+          "rows": 210,
+          "fullImage": false,
+          "seed": 384984649
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 624,
+          "rows": 420,
+          "fullImage": false,
+          "seed": 3586734735
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-030",
+      "width": 3200,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65436,
+          "columns": 228,
+          "rows": 287,
+          "fullImage": false,
+          "seed": 27558196
+        },
+        {
+          "requested": 262144,
+          "actual": 261861,
+          "columns": 457,
+          "rows": 573,
+          "fullImage": false,
+          "seed": 1115076620
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-031",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2938323460
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2768428617
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-032",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1352445344
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3367249556
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-033",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3821829805
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1108635737
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-034",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 304480219
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1204635313
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-035",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 787167990
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1578469283
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-036",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1574371015
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 576593261
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-037",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2592697385
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 4204226210
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-038",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2031890859
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 717696654
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-039",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1561475582
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3142690033
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-040",
+      "width": 3840,
+      "height": 2160,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 442523909
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1150463575
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-041",
+      "width": 6720,
+      "height": 4480,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 1123993157
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 935030846
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-042",
+      "width": 4100,
+      "height": 2730,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2947650462
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3580874174
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-043",
+      "width": 4096,
+      "height": 2734,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3879273855
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 733460195
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-044",
+      "width": 2447,
+      "height": 3260,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65416,
+          "columns": 221,
+          "rows": 296,
+          "fullImage": false,
+          "seed": 2737515270
+        },
+        {
+          "requested": 262144,
+          "actual": 261813,
+          "columns": 443,
+          "rows": 591,
+          "fullImage": false,
+          "seed": 539594196
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-045",
+      "width": 3000,
+      "height": 1987,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 315,
+          "rows": 208,
+          "fullImage": false,
+          "seed": 2815140711
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 630,
+          "rows": 416,
+          "fullImage": false,
+          "seed": 684419482
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-046",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3160864455
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2556850268
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-047",
+      "width": 5238,
+      "height": 3492,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 439786345
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 2973368963
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-048",
+      "width": 6016,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 1750795270
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 237069240
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-049",
+      "width": 4768,
+      "height": 3179,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3725443125
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 2471100354
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-050",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2590813325
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 153689254
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-051",
+      "width": 5120,
+      "height": 2880,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2525948907
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 118512818
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-052",
+      "width": 5120,
+      "height": 2880,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2129474164
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 470052024
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-053",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 516135927
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2233320514
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-054",
+      "width": 5120,
+      "height": 2880,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3104300582
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3223141185
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-055",
+      "width": 2560,
+      "height": 1440,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2643347363
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 2327489946
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-056",
+      "width": 5120,
+      "height": 2880,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1665547768
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 657031637
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-057",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1769750805
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1577310405
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-058",
+      "width": 5120,
+      "height": 2880,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2692027363
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1906331679
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-059",
+      "width": 2400,
+      "height": 1400,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 336,
+          "rows": 195,
+          "fullImage": false,
+          "seed": 2574642608
+        },
+        {
+          "requested": 262144,
+          "actual": 261970,
+          "columns": 670,
+          "rows": 391,
+          "fullImage": false,
+          "seed": 3349089408
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-060",
+      "width": 1366,
+      "height": 768,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1753462303
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1302727674
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-061",
+      "width": 5461,
+      "height": 3072,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3218324377
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3487333523
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-062",
+      "width": 3840,
+      "height": 2400,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65448,
+          "columns": 324,
+          "rows": 202,
+          "fullImage": false,
+          "seed": 3606429957
+        },
+        {
+          "requested": 262144,
+          "actual": 262035,
+          "columns": 647,
+          "rows": 405,
+          "fullImage": false,
+          "seed": 3590544551
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-063",
+      "width": 4896,
+      "height": 3244,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 315,
+          "rows": 208,
+          "fullImage": false,
+          "seed": 2109672196
+        },
+        {
+          "requested": 262144,
+          "actual": 261876,
+          "columns": 628,
+          "rows": 417,
+          "fullImage": false,
+          "seed": 1505932825
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-064",
+      "width": 4000,
+      "height": 2261,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3586339522
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1255809789
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-065",
+      "width": 5583,
+      "height": 3722,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 357940651
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3564382117
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-066",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 34888043
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1731672692
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-067",
+      "width": 4031,
+      "height": 2267,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 228103407
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1730011605
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-068",
+      "width": 3985,
+      "height": 2989,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65490,
+          "columns": 295,
+          "rows": 222,
+          "fullImage": false,
+          "seed": 3647477595
+        },
+        {
+          "requested": 262144,
+          "actual": 261813,
+          "columns": 591,
+          "rows": 443,
+          "fullImage": false,
+          "seed": 1511519347
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-069",
+      "width": 5727,
+      "height": 3631,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65484,
+          "columns": 321,
+          "rows": 204,
+          "fullImage": false,
+          "seed": 2553603674
+        },
+        {
+          "requested": 262144,
+          "actual": 262108,
+          "columns": 644,
+          "rows": 407,
+          "fullImage": false,
+          "seed": 4097201399
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-070",
+      "width": 3440,
+      "height": 1440,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65505,
+          "columns": 397,
+          "rows": 165,
+          "fullImage": false,
+          "seed": 2632233217
+        },
+        {
+          "requested": 262144,
+          "actual": 261821,
+          "columns": 791,
+          "rows": 331,
+          "fullImage": false,
+          "seed": 1767636970
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-071",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 734689139
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 1356874715
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-072",
+      "width": 5410,
+      "height": 3604,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3338079362
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3003284773
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-073",
+      "width": 8256,
+      "height": 5504,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2227049681
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 1383938739
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-074",
+      "width": 3000,
+      "height": 2000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 4240947619
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 403095822
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-075",
+      "width": 6016,
+      "height": 4016,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 740650467
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 1130581391
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-076",
+      "width": 3992,
+      "height": 2992,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65490,
+          "columns": 295,
+          "rows": 222,
+          "fullImage": false,
+          "seed": 2019436007
+        },
+        {
+          "requested": 262144,
+          "actual": 261813,
+          "columns": 591,
+          "rows": 443,
+          "fullImage": false,
+          "seed": 1333710054
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-077",
+      "width": 4896,
+      "height": 3264,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2095643935
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 2062701642
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-078",
+      "width": 4352,
+      "height": 2904,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3798408079
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 4253196549
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-079",
+      "width": 5472,
+      "height": 3078,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1535714414
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 4149437574
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-080",
+      "width": 4896,
+      "height": 3264,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 536336659
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 706649107
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-081",
+      "width": 3376,
+      "height": 6000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 192,
+          "rows": 341,
+          "fullImage": false,
+          "seed": 1788964168
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 384,
+          "rows": 682,
+          "fullImage": false,
+          "seed": 775981441
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-082",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 3792886524
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3465974705
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-083",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 731733358
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 925977465
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-084",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 966909700
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 323420280
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-085",
+      "width": 2560,
+      "height": 1440,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2709776186
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 119004026
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-086",
+      "width": 2560,
+      "height": 1440,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 1556831217
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1063587792
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-087",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 453952825
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3237208885
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-088",
+      "width": 4000,
+      "height": 2670,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2182401773
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 757517848
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-089",
+      "width": 1920,
+      "height": 1271,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 315,
+          "rows": 208,
+          "fullImage": false,
+          "seed": 686309681
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 630,
+          "rows": 416,
+          "fullImage": false,
+          "seed": 1504720929
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-090",
+      "width": 6000,
+      "height": 4000,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65417,
+          "columns": 313,
+          "rows": 209,
+          "fullImage": false,
+          "seed": 2361838744
+        },
+        {
+          "requested": 262144,
+          "actual": 262086,
+          "columns": 627,
+          "rows": 418,
+          "fullImage": false,
+          "seed": 3219476005
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-091",
+      "width": 2137,
+      "height": 1400,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65412,
+          "columns": 316,
+          "rows": 207,
+          "fullImage": false,
+          "seed": 327562894
+        },
+        {
+          "requested": 262144,
+          "actual": 262062,
+          "columns": 633,
+          "rows": 414,
+          "fullImage": false,
+          "seed": 3677497373
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-092",
+      "width": 1693,
+      "height": 1384,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65373,
+          "columns": 283,
+          "rows": 231,
+          "fullImage": false,
+          "seed": 2934508403
+        },
+        {
+          "requested": 262144,
+          "actual": 262058,
+          "columns": 566,
+          "rows": 463,
+          "fullImage": false,
+          "seed": 1840437707
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-093",
+      "width": 4096,
+      "height": 3259,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65494,
+          "columns": 286,
+          "rows": 229,
+          "fullImage": false,
+          "seed": 2339400984
+        },
+        {
+          "requested": 262144,
+          "actual": 261861,
+          "columns": 573,
+          "rows": 457,
+          "fullImage": false,
+          "seed": 443124644
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-094",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 3502634153
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 873305334
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-095",
+      "width": 3000,
+      "height": 1980,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 315,
+          "rows": 208,
+          "fullImage": false,
+          "seed": 3934391128
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 630,
+          "rows": 416,
+          "fullImage": false,
+          "seed": 24343935
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-096",
+      "width": 5137,
+      "height": 3564,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65391,
+          "columns": 307,
+          "rows": 213,
+          "fullImage": false,
+          "seed": 1983321614
+        },
+        {
+          "requested": 262144,
+          "actual": 261990,
+          "columns": 615,
+          "rows": 426,
+          "fullImage": false,
+          "seed": 4093848306
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-097",
+      "width": 3840,
+      "height": 2103,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65394,
+          "columns": 346,
+          "rows": 189,
+          "fullImage": false,
+          "seed": 2413728914
+        },
+        {
+          "requested": 262144,
+          "actual": 261889,
+          "columns": 691,
+          "rows": 379,
+          "fullImage": false,
+          "seed": 1040336107
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-098",
+      "width": 2560,
+      "height": 1692,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65520,
+          "columns": 315,
+          "rows": 208,
+          "fullImage": false,
+          "seed": 1667384119
+        },
+        {
+          "requested": 262144,
+          "actual": 262080,
+          "columns": 630,
+          "rows": 416,
+          "fullImage": false,
+          "seed": 99807742
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-099",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 2910794346
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 3481427960
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-100",
+      "width": 1920,
+      "height": 1080,
+      "levels": [
+        {
+          "requested": 65536,
+          "actual": 65472,
+          "columns": 341,
+          "rows": 192,
+          "fullImage": false,
+          "seed": 4031941687
+        },
+        {
+          "requested": 262144,
+          "actual": 261888,
+          "columns": 682,
+          "rows": 384,
+          "fullImage": false,
+          "seed": 1172227540
+        }
+      ]
+    }
+  ],
+  "aggregateErrors": [
+    {
+      "method": "resize256",
+      "mean": 0.00701206471320886,
+      "p95": 0.032825816761363646,
+      "max": 0.3579921728626996
+    },
+    {
+      "method": "resize1024",
+      "mean": 0.0032921820881766707,
+      "p95": 0.012417815395619064,
+      "max": 0.33374087077936626
+    },
+    {
+      "method": "jitter65536",
+      "mean": 0.000241702507728926,
+      "p95": 0.0010521873670273907,
+      "max": 0.0030187515699490186
+    }
+  ],
+  "familyErrors": [
+    {
+      "method": "resize256",
+      "family": "dark",
+      "absoluteError": {
+        "mean": 0.015165551038237492,
+        "p95": 0.05213463475171188,
+        "max": 0.1361014377647442
+      },
+      "signedBias": -0.011847895527735559,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.1361014377647442
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "dark_gray",
+      "absoluteError": {
+        "mean": 0.0034107520945111753,
+        "p95": 0.021291239179014862,
+        "max": 0.05982310951049152
+      },
+      "signedBias": -0.0030877449636061787,
+      "worst": {
+        "id": "wallpaper-065",
+        "difference": -0.05982310951049152
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "grayscale",
+      "absoluteError": {
+        "mean": 0.004895689412404967,
+        "p95": 0.02105249351343097,
+        "max": 0.0760627316511893
+      },
+      "signedBias": -0.0015110750540008736,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.0760627316511893
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "black",
+      "absoluteError": {
+        "mean": 0.010169428196666124,
+        "p95": 0.042636905884101906,
+        "max": 0.3058062988758553
+      },
+      "signedBias": -0.007984671994904609,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.3058062988758553
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "gray",
+      "absoluteError": {
+        "mean": 0.015569997981230228,
+        "p95": 0.05459753668643119,
+        "max": 0.3579921728626996
+      },
+      "signedBias": 0.014445657723141247,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.3579921728626996
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "white",
+      "absoluteError": {
+        "mean": 0.003088393163082439,
+        "p95": 0.016559036953467915,
+        "max": 0.0353288078626863
+      },
+      "signedBias": -0.002061405949396763,
+      "worst": {
+        "id": "wallpaper-012",
+        "difference": 0.0353288078626863
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "red",
+      "absoluteError": {
+        "mean": 0.005998908165457189,
+        "p95": 0.02722833509957598,
+        "max": 0.05553256544782503
+      },
+      "signedBias": -0.0000465171783685743,
+      "worst": {
+        "id": "wallpaper-100",
+        "difference": 0.05553256544782503
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "orange",
+      "absoluteError": {
+        "mean": 0.004918607988701938,
+        "p95": 0.020120989384424765,
+        "max": 0.053465603616813295
+      },
+      "signedBias": -0.0022790233411757546,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.053465603616813295
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "yellow",
+      "absoluteError": {
+        "mean": 0.0025118249711061635,
+        "p95": 0.01390201472894266,
+        "max": 0.027708107933455156
+      },
+      "signedBias": -0.001242958580568412,
+      "worst": {
+        "id": "wallpaper-093",
+        "difference": -0.027708107933455156
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "green",
+      "absoluteError": {
+        "mean": 0.008072780005184615,
+        "p95": 0.03649140135935025,
+        "max": 0.17793084319526628
+      },
+      "signedBias": -0.001215993678272729,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.17793084319526628
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "teal",
+      "absoluteError": {
+        "mean": 0.008089600933641581,
+        "p95": 0.05205654505264179,
+        "max": 0.08559895018556252
+      },
+      "signedBias": -0.005426069410932505,
+      "worst": {
+        "id": "wallpaper-011",
+        "difference": 0.08559895018556252
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "cyan",
+      "absoluteError": {
+        "mean": 0.008177766953975688,
+        "p95": 0.029046927185158,
+        "max": 0.12932824387151304
+      },
+      "signedBias": 0.005476016962286975,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.12932824387151304
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "blue",
+      "absoluteError": {
+        "mean": 0.007876550269331074,
+        "p95": 0.03973756593149236,
+        "max": 0.09375784675921384
+      },
+      "signedBias": 0.002125490208912258,
+      "worst": {
+        "id": "wallpaper-016",
+        "difference": 0.09375784675921384
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "navy",
+      "absoluteError": {
+        "mean": 0.010871262241562747,
+        "p95": 0.029140057092455374,
+        "max": 0.1667668405866216
+      },
+      "signedBias": -0.0007591898320567914,
+      "worst": {
+        "id": "wallpaper-048",
+        "difference": -0.1667668405866216
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "purple",
+      "absoluteError": {
+        "mean": 0.0010226985832149844,
+        "p95": 0.006141204734334951,
+        "max": 0.0111765334799609
+      },
+      "signedBias": -0.0002846079389187171,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.0111765334799609
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "pink",
+      "absoluteError": {
+        "mean": 0.0030036037988417402,
+        "p95": 0.007565256903714568,
+        "max": 0.09378506037224647
+      },
+      "signedBias": -0.002476990234671191,
+      "worst": {
+        "id": "wallpaper-048",
+        "difference": -0.09378506037224647
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "brown",
+      "absoluteError": {
+        "mean": 0.010524784124135577,
+        "p95": 0.0466617249867628,
+        "max": 0.11949001099706744
+      },
+      "signedBias": 0.010117676073789068,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.11949001099706744
+      }
+    },
+    {
+      "method": "resize256",
+      "family": "cream",
+      "absoluteError": {
+        "mean": 0.002848964916473849,
+        "p95": 0.01441525475734428,
+        "max": 0.045463884345327915
+      },
+      "signedBias": -0.002543418924092953,
+      "worst": {
+        "id": "wallpaper-092",
+        "difference": -0.045463884345327915
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "dark",
+      "absoluteError": {
+        "mean": 0.006191571496795303,
+        "p95": 0.02547157499509889,
+        "max": 0.1172941325347095
+      },
+      "signedBias": -0.004731536039209912,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.1172941325347095
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "dark_gray",
+      "absoluteError": {
+        "mean": 0.0016360460986412488,
+        "p95": 0.007172023640194758,
+        "max": 0.06198988708384778
+      },
+      "signedBias": -0.0012996317549290783,
+      "worst": {
+        "id": "wallpaper-065",
+        "difference": -0.06198988708384778
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "grayscale",
+      "absoluteError": {
+        "mean": 0.0029894106053818164,
+        "p95": 0.008867874297050049,
+        "max": 0.07822778427705737
+      },
+      "signedBias": -0.0016491622389910505,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.07822778427705737
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "black",
+      "absoluteError": {
+        "mean": 0.006719484761975052,
+        "p95": 0.014887204643770802,
+        "max": 0.2833996148480775
+      },
+      "signedBias": -0.0052748509335866335,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.2833996148480775
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "gray",
+      "absoluteError": {
+        "mean": 0.007426591053916597,
+        "p95": 0.0244376591806421,
+        "max": 0.33374087077936626
+      },
+      "signedBias": 0.0064342869220458294,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.33374087077936626
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "white",
+      "absoluteError": {
+        "mean": 0.0011493006314347554,
+        "p95": 0.005216118841757947,
+        "max": 0.015776365597290398
+      },
+      "signedBias": -0.00044389055008264394,
+      "worst": {
+        "id": "wallpaper-012",
+        "difference": 0.015776365597290398
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "red",
+      "absoluteError": {
+        "mean": 0.0023464395759563283,
+        "p95": 0.009594288040116389,
+        "max": 0.0387682425311584
+      },
+      "signedBias": 0.0005050890881706752,
+      "worst": {
+        "id": "wallpaper-100",
+        "difference": 0.0387682425311584
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "orange",
+      "absoluteError": {
+        "mean": 0.002079760017491962,
+        "p95": 0.009411290672617562,
+        "max": 0.05345373566976468
+      },
+      "signedBias": -0.0008628054873443273,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.05345373566976468
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "yellow",
+      "absoluteError": {
+        "mean": 0.0007700228693705053,
+        "p95": 0.003676672096786921,
+        "max": 0.009539621899437967
+      },
+      "signedBias": -0.0002650676729513651,
+      "worst": {
+        "id": "wallpaper-055",
+        "difference": 0.009539621899437967
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "green",
+      "absoluteError": {
+        "mean": 0.004056198681565437,
+        "p95": 0.009801159633823713,
+        "max": 0.13761033139749262
+      },
+      "signedBias": 0.0003823772053772812,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.13761033139749262
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "teal",
+      "absoluteError": {
+        "mean": 0.002915396234472206,
+        "p95": 0.012614011842212447,
+        "max": 0.064663303257399
+      },
+      "signedBias": -0.0012935879674294362,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": -0.064663303257399
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "cyan",
+      "absoluteError": {
+        "mean": 0.00388222357172618,
+        "p95": 0.008363660984530341,
+        "max": 0.09877552187165711
+      },
+      "signedBias": 0.0032971232232545857,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.09877552187165711
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "blue",
+      "absoluteError": {
+        "mean": 0.003313744081722099,
+        "p95": 0.015497504978663618,
+        "max": 0.08880392572490187
+      },
+      "signedBias": 0.0016947096903365264,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.08880392572490187
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "navy",
+      "absoluteError": {
+        "mean": 0.005768941792299011,
+        "p95": 0.01030674272812554,
+        "max": 0.1418575710720486
+      },
+      "signedBias": 0.001254130285864934,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.1418575710720486
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "purple",
+      "absoluteError": {
+        "mean": 0.00044199098751040745,
+        "p95": 0.0020760406890223404,
+        "max": 0.011137538796801178
+      },
+      "signedBias": -0.00021834307230367658,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.011137538796801178
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "pink",
+      "absoluteError": {
+        "mean": 0.0019350023135676197,
+        "p95": 0.0033209071403297076,
+        "max": 0.08116286563807526
+      },
+      "signedBias": -0.001652797652657717,
+      "worst": {
+        "id": "wallpaper-048",
+        "difference": -0.08116286563807526
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "brown",
+      "absoluteError": {
+        "mean": 0.004410699183152126,
+        "p95": 0.015137539115003373,
+        "max": 0.08572231080175494
+      },
+      "signedBias": 0.004218442302763384,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.08572231080175494
+      }
+    },
+    {
+      "method": "resize1024",
+      "family": "cream",
+      "absoluteError": {
+        "mean": 0.0012264536302014377,
+        "p95": 0.00588605873853322,
+        "max": 0.021103314086492922
+      },
+      "signedBias": -0.0009229142993592215,
+      "worst": {
+        "id": "wallpaper-049",
+        "difference": -0.021103314086492922
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "dark",
+      "absoluteError": {
+        "mean": 0.00044290279120780463,
+        "p95": 0.0011760752688171894,
+        "max": 0.0028006715506715407
+      },
+      "signedBias": -0.00007667838752746621,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.0028006715506715407
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "dark_gray",
+      "absoluteError": {
+        "mean": 0.00012515005925823992,
+        "p95": 0.0005112942612942595,
+        "max": 0.0024017900782012935
+      },
+      "signedBias": -0.00003195759604421797,
+      "worst": {
+        "id": "wallpaper-023",
+        "difference": -0.0024017900782012935
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "grayscale",
+      "absoluteError": {
+        "mean": 0.000149569940594693,
+        "p95": 0.0006512141869682124,
+        "max": 0.0014586388074291218
+      },
+      "signedBias": -0.00004140711099717801,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": -0.0014586388074291218
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "black",
+      "absoluteError": {
+        "mean": 0.0003159752250707429,
+        "p95": 0.0014363580261080866,
+        "max": 0.0028006715506715407
+      },
+      "signedBias": -0.0000442610649839426,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": 0.0028006715506715407
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "gray",
+      "absoluteError": {
+        "mean": 0.0004193370084300064,
+        "p95": 0.001281260828390196,
+        "max": 0.0022127824344856245
+      },
+      "signedBias": -0.000006352359113368537,
+      "worst": {
+        "id": "wallpaper-021",
+        "difference": 0.0022127824344856245
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "white",
+      "absoluteError": {
+        "mean": 0.00015549559237280908,
+        "p95": 0.0007140456989247305,
+        "max": 0.0011035251710654892
+      },
+      "signedBias": 0.000009430629918901294,
+      "worst": {
+        "id": "wallpaper-064",
+        "difference": 0.0011035251710654892
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "red",
+      "absoluteError": {
+        "mean": 0.00029074391954544195,
+        "p95": 0.001015701368523969,
+        "max": 0.0022643267350928725
+      },
+      "signedBias": -0.00004605655985211958,
+      "worst": {
+        "id": "wallpaper-018",
+        "difference": 0.0022643267350928725
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "orange",
+      "absoluteError": {
+        "mean": 0.00022315372348602543,
+        "p95": 0.0010004276637341214,
+        "max": 0.001403212051236502
+      },
+      "signedBias": -0.000026541994606336136,
+      "worst": {
+        "id": "wallpaper-092",
+        "difference": -0.001403212051236502
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "yellow",
+      "absoluteError": {
+        "mean": 0.00014859846312627274,
+        "p95": 0.000630040322580655,
+        "max": 0.0011984701068417092
+      },
+      "signedBias": 0.00002524954323368825,
+      "worst": {
+        "id": "wallpaper-049",
+        "difference": 0.0011984701068417092
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "green",
+      "absoluteError": {
+        "mean": 0.00019264679517714569,
+        "p95": 0.0007293657407139165,
+        "max": 0.0012982649071358598
+      },
+      "signedBias": -0.00003678255296527423,
+      "worst": {
+        "id": "wallpaper-017",
+        "difference": -0.0012982649071358598
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "teal",
+      "absoluteError": {
+        "mean": 0.0002580986235599059,
+        "p95": 0.0012486253665689173,
+        "max": 0.0030187515699490186
+      },
+      "signedBias": -0.00006245537136394301,
+      "worst": {
+        "id": "wallpaper-022",
+        "difference": -0.0030187515699490186
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "cyan",
+      "absoluteError": {
+        "mean": 0.00026196416581654805,
+        "p95": 0.0011349955879906282,
+        "max": 0.0014804639804640307
+      },
+      "signedBias": -0.000023434557284764955,
+      "worst": {
+        "id": "wallpaper-089",
+        "difference": -0.0014804639804640307
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "blue",
+      "absoluteError": {
+        "mean": 0.00034393454873764024,
+        "p95": 0.0012658942596678324,
+        "max": 0.0020227733456951724
+      },
+      "signedBias": -0.000051944417546313046,
+      "worst": {
+        "id": "wallpaper-078",
+        "difference": -0.0020227733456951724
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "navy",
+      "absoluteError": {
+        "mean": 0.0003370921044144888,
+        "p95": 0.0016348832001163438,
+        "max": 0.002390334799608984
+      },
+      "signedBias": -0.0000529935515921895,
+      "worst": {
+        "id": "wallpaper-057",
+        "difference": -0.002390334799608984
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "purple",
+      "absoluteError": {
+        "mean": 0.00008669454833856179,
+        "p95": 0.0003932978983381963,
+        "max": 0.0009393328445747723
+      },
+      "signedBias": -0.000014509387168444146,
+      "worst": {
+        "id": "wallpaper-040",
+        "difference": -0.0009393328445747723
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "pink",
+      "absoluteError": {
+        "mean": 0.0001610432644845435,
+        "p95": 0.0007070820033489439,
+        "max": 0.0017817481513945355
+      },
+      "signedBias": -0.000041244827533778976,
+      "worst": {
+        "id": "wallpaper-048",
+        "difference": -0.0017817481513945355
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "brown",
+      "absoluteError": {
+        "mean": 0.0003231788658419276,
+        "p95": 0.001315471918236527,
+        "max": 0.001780262483985301
+      },
+      "signedBias": -0.000011421452922838497,
+      "worst": {
+        "id": "wallpaper-093",
+        "difference": 0.001780262483985301
+      }
+    },
+    {
+      "method": "jitter65536",
+      "family": "cream",
+      "absoluteError": {
+        "mean": 0.00011506549965786812,
+        "p95": 0.00040093475073321727,
+        "max": 0.000825895794878042
+      },
+      "signedBias": 0.00002078110423199068,
+      "worst": {
+        "id": "wallpaper-097",
+        "difference": 0.000825895794878042
+      }
+    }
+  ],
+  "rankings": [
+    {
+      "query": "green40",
+      "colors": [
+        {
+          "family": "green",
+          "amount": 0.4
+        }
+      ],
+      "method": "resize256",
+      "top10Shared": 9,
+      "top10SamePositions": 3,
+      "meanRankDisplacement": 1.4,
+      "top10MeanSelectionRegret": 0.0018061375121140866,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-052",
+          "methodError": 0.004839409722222188,
+          "referenceError": 0.0109619379276637,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-029",
+          "methodError": 0.047619912790697716,
+          "referenceError": 0.059745115995116005,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-086",
+          "methodError": 0.04803059895833334,
+          "referenceError": 0.07474645650048878,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-024",
+          "methodError": 0.05144856770833334,
+          "referenceError": 0.03691730816226785,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-098",
+          "methodError": 0.06681305473372784,
+          "referenceError": 0.07329441391941394,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.06886393229166671,
+          "referenceError": 0.06737307551319649,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-045",
+          "methodError": 0.08204049556213017,
+          "referenceError": 0.0953525641025641,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-081",
+          "methodError": 0.08255750868055556,
+          "referenceError": 0.12041330645161286,
+          "referenceRank": 11
+        },
+        {
+          "id": "wallpaper-017",
+          "methodError": 0.08652343750000002,
+          "referenceError": 0.0831469941348974,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-083",
+          "methodError": 0.09606633771929829,
+          "referenceError": 0.11046526712605786,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-052",
+          "cost": 0.0109619379276637
+        },
+        {
+          "id": "wallpaper-024",
+          "cost": 0.03691730816226785
+        },
+        {
+          "id": "wallpaper-029",
+          "cost": 0.059745115995116005
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.06737307551319649
+        },
+        {
+          "id": "wallpaper-098",
+          "cost": 0.07329441391941394
+        },
+        {
+          "id": "wallpaper-086",
+          "cost": 0.07474645650048878
+        },
+        {
+          "id": "wallpaper-017",
+          "cost": 0.0831469941348974
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.0953525641025641
+        },
+        {
+          "id": "wallpaper-025",
+          "cost": 0.10235193133047205
+        },
+        {
+          "id": "wallpaper-083",
+          "cost": 0.11046526712605786
+        }
+      ]
+    },
+    {
+      "query": "green40",
+      "colors": [
+        {
+          "family": "green",
+          "amount": 0.4
+        }
+      ],
+      "method": "resize1024",
+      "top10Shared": 10,
+      "top10SamePositions": 7,
+      "meanRankDisplacement": 0.4,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-052",
+          "methodError": 0.010079956054687478,
+          "referenceError": 0.0109619379276637,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-024",
+          "methodError": 0.03860066731770834,
+          "referenceError": 0.03691730816226785,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-029",
+          "methodError": 0.053123299165457216,
+          "referenceError": 0.059745115995116005,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-086",
+          "methodError": 0.06586981879340281,
+          "referenceError": 0.07474645650048878,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.06751098632812502,
+          "referenceError": 0.06737307551319649,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-098",
+          "methodError": 0.07259047267355984,
+          "referenceError": 0.07329441391941394,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-017",
+          "methodError": 0.08328857421875002,
+          "referenceError": 0.0831469941348974,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-045",
+          "methodError": 0.09135353290929199,
+          "referenceError": 0.0953525641025641,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-025",
+          "methodError": 0.10299384124087585,
+          "referenceError": 0.10235193133047205,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-083",
+          "methodError": 0.10958489659590048,
+          "referenceError": 0.11046526712605786,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-052",
+          "cost": 0.0109619379276637
+        },
+        {
+          "id": "wallpaper-024",
+          "cost": 0.03691730816226785
+        },
+        {
+          "id": "wallpaper-029",
+          "cost": 0.059745115995116005
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.06737307551319649
+        },
+        {
+          "id": "wallpaper-098",
+          "cost": 0.07329441391941394
+        },
+        {
+          "id": "wallpaper-086",
+          "cost": 0.07474645650048878
+        },
+        {
+          "id": "wallpaper-017",
+          "cost": 0.0831469941348974
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.0953525641025641
+        },
+        {
+          "id": "wallpaper-025",
+          "cost": 0.10235193133047205
+        },
+        {
+          "id": "wallpaper-083",
+          "cost": 0.11046526712605786
+        }
+      ]
+    },
+    {
+      "query": "green40",
+      "colors": [
+        {
+          "family": "green",
+          "amount": 0.4
+        }
+      ],
+      "method": "jitter65536",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-052",
+          "methodError": 0.011275048875855287,
+          "referenceError": 0.0109619379276637,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-024",
+          "methodError": 0.037295332355816224,
+          "referenceError": 0.03691730816226785,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-029",
+          "methodError": 0.06001221001221002,
+          "referenceError": 0.059745115995116005,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.06747617302052789,
+          "referenceError": 0.06737307551319649,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-098",
+          "methodError": 0.07385531135531137,
+          "referenceError": 0.07329441391941394,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-086",
+          "methodError": 0.07427297165200392,
+          "referenceError": 0.07474645650048878,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-017",
+          "methodError": 0.08444525904203326,
+          "referenceError": 0.0831469941348974,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-045",
+          "methodError": 0.09513125763125763,
+          "referenceError": 0.0953525641025641,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-025",
+          "methodError": 0.10238349885408704,
+          "referenceError": 0.10235193133047205,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-083",
+          "methodError": 0.11013650885855358,
+          "referenceError": 0.11046526712605786,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-052",
+          "cost": 0.0109619379276637
+        },
+        {
+          "id": "wallpaper-024",
+          "cost": 0.03691730816226785
+        },
+        {
+          "id": "wallpaper-029",
+          "cost": 0.059745115995116005
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.06737307551319649
+        },
+        {
+          "id": "wallpaper-098",
+          "cost": 0.07329441391941394
+        },
+        {
+          "id": "wallpaper-086",
+          "cost": 0.07474645650048878
+        },
+        {
+          "id": "wallpaper-017",
+          "cost": 0.0831469941348974
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.0953525641025641
+        },
+        {
+          "id": "wallpaper-025",
+          "cost": 0.10235193133047205
+        },
+        {
+          "id": "wallpaper-083",
+          "cost": 0.11046526712605786
+        }
+      ]
+    },
+    {
+      "query": "red70-dark30",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.7
+        },
+        {
+          "family": "dark",
+          "amount": 0.3
+        }
+      ],
+      "method": "resize256",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-077",
+          "methodError": 0.18476334064327493,
+          "referenceError": 0.1850812328777578,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-037",
+          "methodError": 0.19152018229166667,
+          "referenceError": 0.19195763074291305,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.20456271701388895,
+          "referenceError": 0.2333745723362659,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.2580023871527778,
+          "referenceError": 0.2579576001955034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-092",
+          "methodError": 0.2798856160287081,
+          "referenceError": 0.26563585160536984,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-044",
+          "methodError": 0.2809163411458334,
+          "referenceError": 0.2798520317936849,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-087",
+          "methodError": 0.3027457967836258,
+          "referenceError": 0.3046366459864319,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-095",
+          "methodError": 0.35019415680473376,
+          "referenceError": 0.35705891330891326,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-082",
+          "methodError": 0.35752923976608186,
+          "referenceError": 0.36143937486168665,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-027",
+          "methodError": 0.3771190068493151,
+          "referenceError": 0.39497211821419165,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-077",
+          "cost": 0.1850812328777578
+        },
+        {
+          "id": "wallpaper-037",
+          "cost": 0.19195763074291305
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.2333745723362659
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.2579576001955034
+        },
+        {
+          "id": "wallpaper-092",
+          "cost": 0.26563585160536984
+        },
+        {
+          "id": "wallpaper-044",
+          "cost": 0.2798520317936849
+        },
+        {
+          "id": "wallpaper-087",
+          "cost": 0.3046366459864319
+        },
+        {
+          "id": "wallpaper-095",
+          "cost": 0.35705891330891326
+        },
+        {
+          "id": "wallpaper-082",
+          "cost": 0.36143937486168665
+        },
+        {
+          "id": "wallpaper-027",
+          "cost": 0.39497211821419165
+        }
+      ]
+    },
+    {
+      "query": "red70-dark30",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.7
+        },
+        {
+          "family": "dark",
+          "amount": 0.3
+        }
+      ],
+      "method": "resize1024",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-077",
+          "methodError": 0.18513852031478772,
+          "referenceError": 0.1850812328777578,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-037",
+          "methodError": 0.19198472764756946,
+          "referenceError": 0.19195763074291305,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.21066114637586808,
+          "referenceError": 0.2333745723362659,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.25743442111545134,
+          "referenceError": 0.2579576001955034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-092",
+          "methodError": 0.2684683486409797,
+          "referenceError": 0.26563585160536984,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-044",
+          "methodError": 0.2799969991048178,
+          "referenceError": 0.2798520317936849,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-087",
+          "methodError": 0.3035207723279648,
+          "referenceError": 0.3046366459864319,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-095",
+          "methodError": 0.3539833926590237,
+          "referenceError": 0.35705891330891326,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-082",
+          "methodError": 0.36154030929721814,
+          "referenceError": 0.36143937486168665,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-027",
+          "methodError": 0.38744491185897445,
+          "referenceError": 0.39497211821419165,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-077",
+          "cost": 0.1850812328777578
+        },
+        {
+          "id": "wallpaper-037",
+          "cost": 0.19195763074291305
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.2333745723362659
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.2579576001955034
+        },
+        {
+          "id": "wallpaper-092",
+          "cost": 0.26563585160536984
+        },
+        {
+          "id": "wallpaper-044",
+          "cost": 0.2798520317936849
+        },
+        {
+          "id": "wallpaper-087",
+          "cost": 0.3046366459864319
+        },
+        {
+          "id": "wallpaper-095",
+          "cost": 0.35705891330891326
+        },
+        {
+          "id": "wallpaper-082",
+          "cost": 0.36143937486168665
+        },
+        {
+          "id": "wallpaper-027",
+          "cost": 0.39497211821419165
+        }
+      ]
+    },
+    {
+      "query": "red70-dark30",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.7
+        },
+        {
+          "family": "dark",
+          "amount": 0.3
+        }
+      ],
+      "method": "jitter65536",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-077",
+          "methodError": 0.1851491202592599,
+          "referenceError": 0.1850812328777578,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-037",
+          "methodError": 0.19190799120234603,
+          "referenceError": 0.19195763074291305,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.23261852394916915,
+          "referenceError": 0.2333745723362659,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.25769794721407624,
+          "referenceError": 0.2579576001955034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-092",
+          "methodError": 0.26553776023740694,
+          "referenceError": 0.26563585160536984,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-044",
+          "methodError": 0.27963800904977376,
+          "referenceError": 0.2798520317936849,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-087",
+          "methodError": 0.3040341195713653,
+          "referenceError": 0.3046366459864319,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-095",
+          "methodError": 0.3557081807081808,
+          "referenceError": 0.35705891330891326,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-082",
+          "methodError": 0.361295993396212,
+          "referenceError": 0.36143937486168665,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-027",
+          "methodError": 0.3946062023323704,
+          "referenceError": 0.39497211821419165,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-077",
+          "cost": 0.1850812328777578
+        },
+        {
+          "id": "wallpaper-037",
+          "cost": 0.19195763074291305
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.2333745723362659
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.2579576001955034
+        },
+        {
+          "id": "wallpaper-092",
+          "cost": 0.26563585160536984
+        },
+        {
+          "id": "wallpaper-044",
+          "cost": 0.2798520317936849
+        },
+        {
+          "id": "wallpaper-087",
+          "cost": 0.3046366459864319
+        },
+        {
+          "id": "wallpaper-095",
+          "cost": 0.35705891330891326
+        },
+        {
+          "id": "wallpaper-082",
+          "cost": 0.36143937486168665
+        },
+        {
+          "id": "wallpaper-027",
+          "cost": 0.39497211821419165
+        }
+      ]
+    },
+    {
+      "query": "red50-green50",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.5
+        },
+        {
+          "family": "green",
+          "amount": 0.5
+        }
+      ],
+      "method": "resize256",
+      "top10Shared": 9,
+      "top10SamePositions": 2,
+      "meanRankDisplacement": 1,
+      "top10MeanSelectionRegret": 0.0013190635891152658,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-025",
+          "methodError": 0.2921133667883211,
+          "referenceError": 0.3023500238435861,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-058",
+          "methodError": 0.3443739149305556,
+          "referenceError": 0.3454682917888563,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-012",
+          "methodError": 0.3938648897058823,
+          "referenceError": 0.39817846050533034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-090",
+          "methodError": 0.39523940058479534,
+          "referenceError": 0.3881779263295254,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.46994357638888884,
+          "referenceError": 0.46893328445747806,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-081",
+          "methodError": 0.4823133680555556,
+          "referenceError": 0.45043682795698925,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-003",
+          "methodError": 0.49460177951388884,
+          "referenceError": 0.489522238514174,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.49959309895833337,
+          "referenceError": 0.4993432306940372,
+          "referenceRank": 10
+        },
+        {
+          "id": "wallpaper-050",
+          "methodError": 0.49961165935672514,
+          "referenceError": 0.4996909411414574,
+          "referenceRank": 11
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.499755859375,
+          "referenceError": 0.49674670087976536,
+          "referenceRank": 9
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-025",
+          "cost": 0.3023500238435861
+        },
+        {
+          "id": "wallpaper-058",
+          "cost": 0.3454682917888563
+        },
+        {
+          "id": "wallpaper-090",
+          "cost": 0.3881779263295254
+        },
+        {
+          "id": "wallpaper-012",
+          "cost": 0.39817846050533034
+        },
+        {
+          "id": "wallpaper-081",
+          "cost": 0.45043682795698925
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.46893328445747806
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.4865003052503052
+        },
+        {
+          "id": "wallpaper-003",
+          "cost": 0.489522238514174
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.49674670087976536
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.4993432306940372
+        }
+      ]
+    },
+    {
+      "query": "red50-green50",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.5
+        },
+        {
+          "family": "green",
+          "amount": 0.5
+        }
+      ],
+      "method": "resize1024",
+      "top10Shared": 10,
+      "top10SamePositions": 8,
+      "meanRankDisplacement": 0.2,
+      "top10MeanSelectionRegret": 5.551115123125783e-17,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-025",
+          "methodError": 0.30004348197992703,
+          "referenceError": 0.3023500238435861,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-058",
+          "methodError": 0.34550815158420134,
+          "referenceError": 0.3454682917888563,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-090",
+          "methodError": 0.38680453879941434,
+          "referenceError": 0.3881779263295254,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-012",
+          "methodError": 0.3948505658907625,
+          "referenceError": 0.39817846050533034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-081",
+          "methodError": 0.4507819281684028,
+          "referenceError": 0.45043682795698925,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.46825832790798616,
+          "referenceError": 0.46893328445747806,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-003",
+          "methodError": 0.4902191162109375,
+          "referenceError": 0.489522238514174,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-045",
+          "methodError": 0.49099056277654873,
+          "referenceError": 0.4865003052503052,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.4986962212456597,
+          "referenceError": 0.49674670087976536,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.4991777208116319,
+          "referenceError": 0.4993432306940372,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-025",
+          "cost": 0.3023500238435861
+        },
+        {
+          "id": "wallpaper-058",
+          "cost": 0.3454682917888563
+        },
+        {
+          "id": "wallpaper-090",
+          "cost": 0.3881779263295254
+        },
+        {
+          "id": "wallpaper-012",
+          "cost": 0.39817846050533034
+        },
+        {
+          "id": "wallpaper-081",
+          "cost": 0.45043682795698925
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.46893328445747806
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.4865003052503052
+        },
+        {
+          "id": "wallpaper-003",
+          "cost": 0.489522238514174
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.49674670087976536
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.4993432306940372
+        }
+      ]
+    },
+    {
+      "query": "red50-green50",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.5
+        },
+        {
+          "family": "green",
+          "amount": 0.5
+        }
+      ],
+      "method": "jitter65536",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-025",
+          "methodError": 0.3020626432391138,
+          "referenceError": 0.3023500238435861,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-058",
+          "methodError": 0.3456897605083089,
+          "referenceError": 0.3454682917888563,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-090",
+          "methodError": 0.3877203173487014,
+          "referenceError": 0.3881779263295254,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-012",
+          "methodError": 0.39780943791369217,
+          "referenceError": 0.39817846050533034,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-081",
+          "methodError": 0.4502688172043011,
+          "referenceError": 0.45043682795698925,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-031",
+          "methodError": 0.46884164222873903,
+          "referenceError": 0.46893328445747806,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-045",
+          "methodError": 0.4871794871794871,
+          "referenceError": 0.4865003052503052,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-003",
+          "methodError": 0.4893236803519062,
+          "referenceError": 0.489522238514174,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-100",
+          "methodError": 0.49680779569892475,
+          "referenceError": 0.49674670087976536,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-046",
+          "methodError": 0.49923631476050834,
+          "referenceError": 0.4993432306940372,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-025",
+          "cost": 0.3023500238435861
+        },
+        {
+          "id": "wallpaper-058",
+          "cost": 0.3454682917888563
+        },
+        {
+          "id": "wallpaper-090",
+          "cost": 0.3881779263295254
+        },
+        {
+          "id": "wallpaper-012",
+          "cost": 0.39817846050533034
+        },
+        {
+          "id": "wallpaper-081",
+          "cost": 0.45043682795698925
+        },
+        {
+          "id": "wallpaper-031",
+          "cost": 0.46893328445747806
+        },
+        {
+          "id": "wallpaper-045",
+          "cost": 0.4865003052503052
+        },
+        {
+          "id": "wallpaper-003",
+          "cost": 0.489522238514174
+        },
+        {
+          "id": "wallpaper-100",
+          "cost": 0.49674670087976536
+        },
+        {
+          "id": "wallpaper-046",
+          "cost": 0.4993432306940372
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "colors": [
+        {
+          "family": "dark",
+          "amount": 0.9
+        }
+      ],
+      "method": "resize256",
+      "top10Shared": 10,
+      "top10SamePositions": 6,
+      "meanRankDisplacement": 0.6,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-065",
+          "methodError": 0.0029788011695907057,
+          "referenceError": 0.0007264790946482913,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-023",
+          "methodError": 0.003325737847222232,
+          "referenceError": 0.006935025659824068,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-011",
+          "methodError": 0.004120979532163727,
+          "referenceError": 0.009570904207016007,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.012489149305555558,
+          "referenceError": 0.012836785190615818,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-067",
+          "methodError": 0.014035373263888817,
+          "referenceError": 0.02074856427174976,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-079",
+          "methodError": 0.027766927083333393,
+          "referenceError": 0.03238483626588462,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-001",
+          "methodError": 0.039754011824324365,
+          "referenceError": 0.026320207570207588,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-005",
+          "methodError": 0.07460937499999998,
+          "referenceError": 0.08362277003910068,
+          "referenceRank": 10
+        },
+        {
+          "id": "wallpaper-063",
+          "methodError": 0.08548909023668638,
+          "referenceError": 0.07381508805694303,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-022",
+          "methodError": 0.10847886029411768,
+          "referenceError": 0.07372160283265805,
+          "referenceRank": 8
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-065",
+          "cost": 0.0007264790946482913
+        },
+        {
+          "id": "wallpaper-023",
+          "cost": 0.006935025659824068
+        },
+        {
+          "id": "wallpaper-011",
+          "cost": 0.009570904207016007
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.012836785190615818
+        },
+        {
+          "id": "wallpaper-067",
+          "cost": 0.02074856427174976
+        },
+        {
+          "id": "wallpaper-001",
+          "cost": 0.026320207570207588
+        },
+        {
+          "id": "wallpaper-079",
+          "cost": 0.03238483626588462
+        },
+        {
+          "id": "wallpaper-022",
+          "cost": 0.07372160283265805
+        },
+        {
+          "id": "wallpaper-063",
+          "cost": 0.07381508805694303
+        },
+        {
+          "id": "wallpaper-005",
+          "cost": 0.08362277003910068
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "colors": [
+        {
+          "family": "dark",
+          "amount": 0.9
+        }
+      ],
+      "method": "resize1024",
+      "top10Shared": 10,
+      "top10SamePositions": 5,
+      "meanRankDisplacement": 0.6,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-065",
+          "methodError": 0.000748936218887275,
+          "referenceError": 0.0007264790946482913,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-023",
+          "methodError": 0.004053073459201362,
+          "referenceError": 0.006935025659824068,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-011",
+          "methodError": 0.011511141105417289,
+          "referenceError": 0.009570904207016007,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.013196139865451317,
+          "referenceError": 0.012836785190615818,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-067",
+          "methodError": 0.014545694986979107,
+          "referenceError": 0.02074856427174976,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-079",
+          "methodError": 0.03139851888020839,
+          "referenceError": 0.03238483626588462,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-001",
+          "methodError": 0.03641079521500845,
+          "referenceError": 0.026320207570207588,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-063",
+          "methodError": 0.07712942477876106,
+          "referenceError": 0.07381508805694303,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-005",
+          "methodError": 0.07959560818142364,
+          "referenceError": 0.08362277003910068,
+          "referenceRank": 10
+        },
+        {
+          "id": "wallpaper-022",
+          "methodError": 0.08654205232771262,
+          "referenceError": 0.07372160283265805,
+          "referenceRank": 8
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-065",
+          "cost": 0.0007264790946482913
+        },
+        {
+          "id": "wallpaper-023",
+          "cost": 0.006935025659824068
+        },
+        {
+          "id": "wallpaper-011",
+          "cost": 0.009570904207016007
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.012836785190615818
+        },
+        {
+          "id": "wallpaper-067",
+          "cost": 0.02074856427174976
+        },
+        {
+          "id": "wallpaper-001",
+          "cost": 0.026320207570207588
+        },
+        {
+          "id": "wallpaper-079",
+          "cost": 0.03238483626588462
+        },
+        {
+          "id": "wallpaper-022",
+          "cost": 0.07372160283265805
+        },
+        {
+          "id": "wallpaper-063",
+          "cost": 0.07381508805694303
+        },
+        {
+          "id": "wallpaper-005",
+          "cost": 0.08362277003910068
+        }
+      ]
+    },
+    {
+      "query": "dark90",
+      "colors": [
+        {
+          "family": "dark",
+          "amount": 0.9
+        }
+      ],
+      "method": "jitter65536",
+      "top10Shared": 10,
+      "top10SamePositions": 8,
+      "meanRankDisplacement": 0.2,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-065",
+          "methodError": 0.0005701881773850781,
+          "referenceError": 0.0007264790946482913,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-023",
+          "methodError": 0.007190860215053774,
+          "referenceError": 0.006935025659824068,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-011",
+          "methodError": 0.008427472981029416,
+          "referenceError": 0.009570904207016007,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.012649682306940302,
+          "referenceError": 0.012836785190615818,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-067",
+          "methodError": 0.01996578690127071,
+          "referenceError": 0.02074856427174976,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-001",
+          "methodError": 0.026831501831501847,
+          "referenceError": 0.026320207570207588,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-079",
+          "methodError": 0.03227028347996097,
+          "referenceError": 0.03238483626588462,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-063",
+          "methodError": 0.07385531135531143,
+          "referenceError": 0.07381508805694303,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-022",
+          "methodError": 0.07496980907103656,
+          "referenceError": 0.07372160283265805,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-005",
+          "methodError": 0.08399315738025415,
+          "referenceError": 0.08362277003910068,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-065",
+          "cost": 0.0007264790946482913
+        },
+        {
+          "id": "wallpaper-023",
+          "cost": 0.006935025659824068
+        },
+        {
+          "id": "wallpaper-011",
+          "cost": 0.009570904207016007
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.012836785190615818
+        },
+        {
+          "id": "wallpaper-067",
+          "cost": 0.02074856427174976
+        },
+        {
+          "id": "wallpaper-001",
+          "cost": 0.026320207570207588
+        },
+        {
+          "id": "wallpaper-079",
+          "cost": 0.03238483626588462
+        },
+        {
+          "id": "wallpaper-022",
+          "cost": 0.07372160283265805
+        },
+        {
+          "id": "wallpaper-063",
+          "cost": 0.07381508805694303
+        },
+        {
+          "id": "wallpaper-005",
+          "cost": 0.08362277003910068
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "colors": [
+        {
+          "family": "grayscale",
+          "amount": 0.4
+        }
+      ],
+      "method": "resize256",
+      "top10Shared": 8,
+      "top10SamePositions": 5,
+      "meanRankDisplacement": 1.2,
+      "top10MeanSelectionRegret": 0.0069588047142492004,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-088",
+          "methodError": 0.023621323529411764,
+          "referenceError": 0.003923902841052207,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.026112196180555602,
+          "referenceError": 0.038490499755620744,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-062",
+          "methodError": 0.125732421875,
+          "referenceError": 0.16479096303928867,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-085",
+          "methodError": 0.1357855902777778,
+          "referenceError": 0.14893465909090914,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-070",
+          "methodError": 0.13990216121495325,
+          "referenceError": 0.12489296122159799,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-064",
+          "methodError": 0.14766710069444444,
+          "referenceError": 0.1594124205767351,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-091",
+          "methodError": 0.24247116815476194,
+          "referenceError": 0.23733238699239115,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-043",
+          "methodError": 0.33064692982456145,
+          "referenceError": 0.333788908984074,
+          "referenceRank": 11
+        },
+        {
+          "id": "wallpaper-021",
+          "methodError": 0.3371345029239766,
+          "referenceError": 0.3385621513548988,
+          "referenceRank": 12
+        },
+        {
+          "id": "wallpaper-057",
+          "methodError": 0.3377712673611111,
+          "referenceError": 0.33036336143695016,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-088",
+          "cost": 0.003923902841052207
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.038490499755620744
+        },
+        {
+          "id": "wallpaper-070",
+          "cost": 0.12489296122159799
+        },
+        {
+          "id": "wallpaper-085",
+          "cost": 0.14893465909090914
+        },
+        {
+          "id": "wallpaper-064",
+          "cost": 0.1594124205767351
+        },
+        {
+          "id": "wallpaper-062",
+          "cost": 0.16479096303928867
+        },
+        {
+          "id": "wallpaper-091",
+          "cost": 0.23733238699239115
+        },
+        {
+          "id": "wallpaper-018",
+          "cost": 0.2765197336265885
+        },
+        {
+          "id": "wallpaper-004",
+          "cost": 0.3262432795698925
+        },
+        {
+          "id": "wallpaper-057",
+          "cost": 0.33036336143695016
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "colors": [
+        {
+          "family": "grayscale",
+          "amount": 0.4
+        }
+      ],
+      "method": "resize1024",
+      "top10Shared": 8,
+      "top10SamePositions": 7,
+      "meanRankDisplacement": 0.6,
+      "top10MeanSelectionRegret": 0.0069588047142492004,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-088",
+          "methodError": 0.006031272843567248,
+          "referenceError": 0.003923902841052207,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.0356489393446181,
+          "referenceError": 0.038490499755620744,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-070",
+          "methodError": 0.13376083551864804,
+          "referenceError": 0.12489296122159799,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-085",
+          "methodError": 0.1472144232855903,
+          "referenceError": 0.14893465909090914,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-064",
+          "methodError": 0.15525218588082904,
+          "referenceError": 0.1594124205767351,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-062",
+          "methodError": 0.1569091796875,
+          "referenceError": 0.16479096303928867,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-091",
+          "methodError": 0.23917572885618482,
+          "referenceError": 0.23733238699239115,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-043",
+          "methodError": 0.32949618512426904,
+          "referenceError": 0.333788908984074,
+          "referenceRank": 11
+        },
+        {
+          "id": "wallpaper-057",
+          "methodError": 0.32966206868489584,
+          "referenceError": 0.33036336143695016,
+          "referenceRank": 10
+        },
+        {
+          "id": "wallpaper-021",
+          "methodError": 0.33757006085285507,
+          "referenceError": 0.3385621513548988,
+          "referenceRank": 12
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-088",
+          "cost": 0.003923902841052207
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.038490499755620744
+        },
+        {
+          "id": "wallpaper-070",
+          "cost": 0.12489296122159799
+        },
+        {
+          "id": "wallpaper-085",
+          "cost": 0.14893465909090914
+        },
+        {
+          "id": "wallpaper-064",
+          "cost": 0.1594124205767351
+        },
+        {
+          "id": "wallpaper-062",
+          "cost": 0.16479096303928867
+        },
+        {
+          "id": "wallpaper-091",
+          "cost": 0.23733238699239115
+        },
+        {
+          "id": "wallpaper-018",
+          "cost": 0.2765197336265885
+        },
+        {
+          "id": "wallpaper-004",
+          "cost": 0.3262432795698925
+        },
+        {
+          "id": "wallpaper-057",
+          "cost": 0.33036336143695016
+        }
+      ]
+    },
+    {
+      "query": "grayscale40",
+      "colors": [
+        {
+          "family": "grayscale",
+          "amount": 0.4
+        }
+      ],
+      "method": "jitter65536",
+      "top10Shared": 10,
+      "top10SamePositions": 10,
+      "meanRankDisplacement": 0,
+      "top10MeanSelectionRegret": 0,
+      "top1Regret": 0,
+      "top10": [
+        {
+          "id": "wallpaper-088",
+          "methodError": 0.003298836693825802,
+          "referenceError": 0.003923902841052207,
+          "referenceRank": 1
+        },
+        {
+          "id": "wallpaper-007",
+          "methodError": 0.03815065982404692,
+          "referenceError": 0.038490499755620744,
+          "referenceRank": 2
+        },
+        {
+          "id": "wallpaper-070",
+          "methodError": 0.12483016563621097,
+          "referenceError": 0.12489296122159799,
+          "referenceRank": 3
+        },
+        {
+          "id": "wallpaper-085",
+          "methodError": 0.14946542033235583,
+          "referenceError": 0.14893465909090914,
+          "referenceRank": 4
+        },
+        {
+          "id": "wallpaper-064",
+          "methodError": 0.16015701368523952,
+          "referenceError": 0.1594124205767351,
+          "referenceRank": 5
+        },
+        {
+          "id": "wallpaper-062",
+          "methodError": 0.16396528541743066,
+          "referenceError": 0.16479096303928867,
+          "referenceRank": 6
+        },
+        {
+          "id": "wallpaper-091",
+          "methodError": 0.23741515318290224,
+          "referenceError": 0.23733238699239115,
+          "referenceRank": 7
+        },
+        {
+          "id": "wallpaper-018",
+          "methodError": 0.27797837243401763,
+          "referenceError": 0.2765197336265885,
+          "referenceRank": 8
+        },
+        {
+          "id": "wallpaper-004",
+          "methodError": 0.32605999511241446,
+          "referenceError": 0.3262432795698925,
+          "referenceRank": 9
+        },
+        {
+          "id": "wallpaper-057",
+          "methodError": 0.33047409579667647,
+          "referenceError": 0.33036336143695016,
+          "referenceRank": 10
+        }
+      ],
+      "referenceTop10": [
+        {
+          "id": "wallpaper-088",
+          "cost": 0.003923902841052207
+        },
+        {
+          "id": "wallpaper-007",
+          "cost": 0.038490499755620744
+        },
+        {
+          "id": "wallpaper-070",
+          "cost": 0.12489296122159799
+        },
+        {
+          "id": "wallpaper-085",
+          "cost": 0.14893465909090914
+        },
+        {
+          "id": "wallpaper-064",
+          "cost": 0.1594124205767351
+        },
+        {
+          "id": "wallpaper-062",
+          "cost": 0.16479096303928867
+        },
+        {
+          "id": "wallpaper-091",
+          "cost": 0.23733238699239115
+        },
+        {
+          "id": "wallpaper-018",
+          "cost": 0.2765197336265885
+        },
+        {
+          "id": "wallpaper-004",
+          "cost": 0.3262432795698925
+        },
+        {
+          "id": "wallpaper-057",
+          "cost": 0.33036336143695016
+        }
+      ]
+    }
+  ],
+  "exactChecks": [
+    {
+      "id": "wallpaper-016",
+      "originalPixels": 2666000,
+      "visibleWeight": 2666000,
+      "exactFeatures": {
+        "dark": 0.7880011252813204,
+        "dark_gray": 0.000028507126781695422,
+        "grayscale": 0.0006556639159789947,
+        "black": 0.0017865716429107277,
+        "gray": 0.05389422355588897,
+        "white": 0.0020367591897974494,
+        "red": 0.003759939984996249,
+        "orange": 0.0012936984246061515,
+        "yellow": 0.0008432108027006752,
+        "green": 0.04979894973743436,
+        "teal": 0.7920832708177045,
+        "cyan": 0.3162726931732933,
+        "blue": 0.6504752438109528,
+        "navy": 0.8509047261815453,
+        "purple": 0.0011346586646661665,
+        "pink": 0.0018499624906226557,
+        "brown": 0.0036301575393848464,
+        "cream": 0.0017801950487621905
+      },
+      "errors": [
+        {
+          "method": "resize256",
+          "absoluteError": {
+            "mean": 0.015301276835753065,
+            "p95": 0.09240159442434137,
+            "max": 0.09240159442434137
+          },
+          "familyDifferences": {
+            "dark": -0.04441197086955573,
+            "dark_gray": -0.000028507126781695422,
+            "grayscale": 0.0008379022604915934,
+            "black": 0.0005801562982657427,
+            "gray": 0.004056144091169854,
+            "white": -0.0007499944839150965,
+            "red": -0.0013932120438197785,
+            "orange": -0.0007192498951943868,
+            "yellow": -0.0004985416850536164,
+            "green": -0.0006491335609637716,
+            "teal": -0.016256064935351477,
+            "cyan": 0.08570340976788315,
+            "blue": 0.09240159442434137,
+            "navy": 0.02319913411257235,
+            "purple": -0.0008589233705485194,
+            "pink": -0.0004483080788579498,
+            "brown": 0.0012411659900269183,
+            "cream": -0.0013895700487621906
+          }
+        },
+        {
+          "method": "resize1024",
+          "absoluteError": {
+            "mean": 0.0033152456260371987,
+            "p95": 0.02031293663259559,
+            "max": 0.02031293663259559
+          },
+          "familyDifferences": {
+            "dark": -0.009796797477068186,
+            "dark_gray": 0.000014450167939712205,
+            "grayscale": 0.0005858019014696856,
+            "black": 0.000006179456796017065,
+            "gray": 0.003661391821677011,
+            "white": 0.0007812393439268909,
+            "red": -0.00008422746666780301,
+            "orange": -0.00004507305803723655,
+            "yellow": -0.00008286668613176026,
+            "green": 0.009527938092477664,
+            "teal": -0.0038655976138921577,
+            "cyan": 0.005603452354565941,
+            "blue": 0.02031293663259559,
+            "navy": 0.004183135805258198,
+            "purple": -0.00017098335308258876,
+            "pink": 0.0000014969118700130114,
+            "brown": 0.0005896807120814294,
+            "cream": -0.00036117241313169193
+          }
+        },
+        {
+          "method": "jitter65536",
+          "absoluteError": {
+            "mean": 0.0002609681106754803,
+            "p95": 0.0012097623611767583,
+            "max": 0.0012097623611767583
+          },
+          "familyDifferences": {
+            "dark": -0.0008509961100040542,
+            "dark_gray": -0.000013220580471103373,
+            "grayscale": 0.000047517214308239516,
+            "black": 0.00012424664591327832,
+            "gray": -0.00002443435736259464,
+            "white": -0.000018935076799298997,
+            "red": -0.0002134612409388937,
+            "orange": -0.00007077471975878774,
+            "yellow": -0.000002450755618112546,
+            "green": -0.00008710113538901859,
+            "teal": -0.001050358883497804,
+            "cyan": -0.00025392129442392,
+            "blue": -0.0012097623611767583,
+            "navy": -0.00025428363602963966,
+            "purple": -0.00006460042292472318,
+            "pink": 0.00006085579820135035,
+            "brown": -0.00003781915639571509,
+            "cream": -0.00031268660294535397
+          },
+          "seed": 3677363074,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144",
+          "absoluteError": {
+            "mean": 0.00020317463818640759,
+            "p95": 0.0013562523348724653,
+            "max": 0.0013562523348724653
+          },
+          "familyDifferences": {
+            "dark": -0.0006526976659574357,
+            "dark_gray": -0.000009429419464250004,
+            "grayscale": -0.00003373065743027411,
+            "black": -0.00002379148677877094,
+            "gray": -0.0001370598767912734,
+            "white": -0.000018337755611724012,
+            "red": -0.000024524892240435775,
+            "orange": -0.000004045409946841277,
+            "yellow": 0.00006870360707321584,
+            "green": -0.0002732215413460484,
+            "teal": -0.00022487319249742121,
+            "cyan": -0.00030388904029882147,
+            "blue": -0.0013562523348724653,
+            "navy": -0.00026791231128897586,
+            "purple": 0.00005197473047893861,
+            "pink": 0.000019652826486995373,
+            "brown": 0.0001434129680058572,
+            "cream": 0.000043633770785591556
+          },
+          "seed": 4036895420,
+          "samples": 262086
+        },
+        {
+          "method": "jitter65536-replicate1",
+          "absoluteError": {
+            "mean": 0.00031390470890979235,
+            "p95": 0.0012290624401059547,
+            "max": 0.0012290624401059547
+          },
+          "familyDifferences": {
+            "dark": 0.00028020831697972426,
+            "dark_gray": -0.000013220580471103373,
+            "grayscale": 0.00006280376061883154,
+            "black": -0.0001356246413667865,
+            "gray": 0.0012290624401059547,
+            "white": -0.0000036485304887069747,
+            "red": -0.00016760160200711763,
+            "orange": 0.00006680419703654068,
+            "yellow": 0.00010455506855603183,
+            "green": -0.000897288089850394,
+            "teal": 0.0006770208495990859,
+            "cyan": -0.0004373598501510312,
+            "blue": -0.0005983005087530913,
+            "navy": -0.00043772219175675087,
+            "purple": -0.0000798869692353152,
+            "pink": -0.00013786930383634637,
+            "brown": -0.0002824038973651879,
+            "cream": 0.000038903962198263194
+          },
+          "seed": 1207602296,
+          "samples": 65417
+        },
+        {
+          "method": "jitter65536-replicate2",
+          "absoluteError": {
+            "mean": 0.00027286932789955486,
+            "p95": 0.0013651207641172253,
+            "max": 0.0013651207641172253
+          },
+          "familyDifferences": {
+            "dark": 0.00009676976125261305,
+            "dark_gray": 0.0000020659658394886767,
+            "grayscale": 0.00010866339955060771,
+            "black": -0.00024263046554093086,
+            "gray": 0.000021425281569183163,
+            "white": 0.000057497654753661115,
+            "red": -0.00009116887045415752,
+            "orange": 0.000127950382278909,
+            "yellow": 0.00010455506855603183,
+            "green": 0.0013651207641172253,
+            "teal": 0.0006158746643567525,
+            "cyan": 0.00012824236334091355,
+            "blue": 0.001037359946480243,
+            "navy": 0.0005864764110529164,
+            "purple": -0.00004931387661413116,
+            "pink": -0.00018372894276812244,
+            "brown": 0.00008447321408902109,
+            "cream": 0.00000833086957707915
+          },
+          "seed": 1926395646,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144-replicate1",
+          "absoluteError": {
+            "mean": 0.0001470285788495489,
+            "p95": 0.0007693850988444995,
+            "max": 0.0007693850988444995
+          },
+          "familyDifferences": {
+            "dark": -2.4007570087469787e-7,
+            "dark_gray": 0.00001727937078017358,
+            "grayscale": 0.00008455112793788759,
+            "black": 0.000029626093710076202,
+            "gray": 0.00014529019150692074,
+            "white": 0.000023633200486655823,
+            "red": 0.00004797039556585659,
+            "orange": 0.00002266338029758251,
+            "yellow": 0.0000152860265843687,
+            "green": -0.00001758026329228002,
+            "teal": 0.000358904651416303,
+            "cyan": -0.0007693850988444995,
+            "blue": -0.0003718426372922856,
+            "navy": -0.0004205339698285515,
+            "purple": 0.00009013014511382949,
+            "pink": -0.00009099787595418809,
+            "brown": -0.00004736410516859675,
+            "cream": 0.00009323580981094952
+          },
+          "seed": 2165032971,
+          "samples": 262086
+        },
+        {
+          "method": "jitter262144-replicate2",
+          "absoluteError": {
+            "mean": 0.00014686581485398944,
+            "p95": 0.0006618237885174238,
+            "max": 0.0006618237885174238
+          },
+          "familyDifferences": {
+            "dark": -0.00026732797814510434,
+            "dark_gray": 0.000002017204926217249,
+            "grayscale": 0.00011507545964580023,
+            "black": 0.00007541259127194521,
+            "gray": -0.0002934970767943246,
+            "white": 0.000008371034632699559,
+            "red": -0.000020709350776946817,
+            "orange": -0.000034569741654753806,
+            "yellow": 0.0000267326509748359,
+            "green": 0.00013504139524728176,
+            "teal": -0.00028973739737681026,
+            "cyan": -0.00005969438663550042,
+            "blue": -0.0006618237885174238,
+            "navy": -0.000412902886901545,
+            "purple": -0.00005104488903526672,
+            "pink": -0.00011770666619861166,
+            "brown": -0.000058810729559064055,
+            "cream": 0.00001310943907767881
+          },
+          "seed": 3135321832,
+          "samples": 262086
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-048",
+      "originalPixels": 24064000,
+      "visibleWeight": 24064000,
+      "exactFeatures": {
+        "dark": 0,
+        "dark_gray": 0,
+        "grayscale": 0,
+        "black": 0,
+        "gray": 0.03159532912234043,
+        "white": 0,
+        "red": 0.21030049035904255,
+        "orange": 0.0007672041223404255,
+        "yellow": 0.000015375664893617022,
+        "green": 0,
+        "teal": 0,
+        "cyan": 0.00049609375,
+        "blue": 0.00049609375,
+        "navy": 0.7556079621010638,
+        "purple": 0.0003349817154255319,
+        "pink": 0.20988364361702128,
+        "brown": 0,
+        "cream": 0.000015375664893617022
+      },
+      "errors": [
+        {
+          "method": "resize256",
+          "absoluteError": {
+            "mean": 0.028001192354157975,
+            "p95": 0.16684417533635798,
+            "max": 0.16684417533635798
+          },
+          "familyDifferences": {
+            "dark": 0.09657628676470588,
+            "dark_gray": 0,
+            "grayscale": 0.000022977941176470588,
+            "black": 0,
+            "gray": 0.036695112054130154,
+            "white": 0,
+            "red": 0.026418259640957453,
+            "orange": -0.0007672041223404255,
+            "yellow": -0.000015375664893617022,
+            "green": 0,
+            "teal": 0.000505514705882353,
+            "cyan": 0.01710500919117647,
+            "blue": 0.04706824448529411,
+            "navy": -0.16684417533635798,
+            "purple": -0.0003349817154255319,
+            "pink": -0.09368419508760951,
+            "brown": 0.01796875,
+            "cream": -0.000015375664893617022
+          }
+        },
+        {
+          "method": "resize1024",
+          "absoluteError": {
+            "mean": 0.018975118520623092,
+            "p95": 0.14182337372000653,
+            "max": 0.14182337372000653
+          },
+          "familyDifferences": {
+            "dark": 0.02566308737151248,
+            "dark_gray": 0,
+            "grayscale": 0.000012906112334801762,
+            "black": 0,
+            "gray": 0.04219465114564782,
+            "white": 0,
+            "red": 0.023607021571941306,
+            "orange": -0.0007098436230746399,
+            "yellow": -0.000015375664893617022,
+            "green": 0.000005736049926578561,
+            "teal": 0.000011472099853157121,
+            "cyan": 0.0019402934563142438,
+            "blue": 0.011271412674375918,
+            "navy": -0.14182337372000653,
+            "purple": -0.0003349817154255319,
+            "pink": -0.0810620003534383,
+            "brown": 0.012884602147577093,
+            "cream": -0.000015375664893617022
+          }
+        },
+        {
+          "method": "jitter65536",
+          "absoluteError": {
+            "mean": 0.0003294251349649767,
+            "p95": 0.0017639748572191305,
+            "max": 0.0017639748572191305
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": 0.00026183338893340236,
+            "white": 0,
+            "red": -0.0017614255899458253,
+            "orange": -0.00003344989943200724,
+            "yellow": -8.911858302497295e-8,
+            "green": 0,
+            "teal": 0,
+            "cyan": -0.00019036282378815907,
+            "blue": -0.00019036282378815907,
+            "navy": 0.0017639748572191305,
+            "purple": 0.000047181942339269314,
+            "pink": -0.001680882866757577,
+            "brown": 0,
+            "cream": -8.911858302497295e-8
+          },
+          "seed": 1750795270,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144",
+          "absoluteError": {
+            "mean": 0.000028422499777717224,
+            "p95": 0.00013471368803479045,
+            "max": 0.00013471368803479045
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": 0.00013471368803479045,
+            "white": 0,
+            "red": 0.00006175714750109029,
+            "orange": -0.00008422220037587953,
+            "yellow": -1.1349903966068682e-7,
+            "green": 0,
+            "teal": 0,
+            "cyan": 0.000003742181717069932,
+            "blue": 0.000003742181717069932,
+            "navy": -0.00007733474973636856,
+            "purple": -0.000045000564200361516,
+            "pink": 0.00010086528463695843,
+            "brown": 0,
+            "cream": -1.1349903966068682e-7
+          },
+          "seed": 237069240,
+          "samples": 262086
+        },
+        {
+          "method": "jitter65536-replicate1",
+          "absoluteError": {
+            "mean": 0.00029562475862367335,
+            "p95": 0.001800339700422121,
+            "max": 0.001800339700422121
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": -0.0002426226393161396,
+            "white": 0,
+            "red": 0.001800339700422121,
+            "orange": 0.00011941556367391331,
+            "yellow": 0.000015197427727567077,
+            "green": 0,
+            "teal": 0,
+            "cyan": 0.0000083622782495376,
+            "blue": 0.0000083622782495376,
+            "navy": -0.0014156267753839824,
+            "purple": -0.00002925078921369096,
+            "pink": 0.0016668707752620637,
+            "brown": 0,
+            "cream": 0.000015197427727567077
+          },
+          "seed": 696285685,
+          "samples": 65417
+        },
+        {
+          "method": "jitter65536-replicate2",
+          "absoluteError": {
+            "mean": 0.0001427542424225897,
+            "p95": 0.0007484035418114654,
+            "max": 0.0007484035418114654
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": -0.0000897571762102159,
+            "white": 0,
+            "red": -0.0006455077092726025,
+            "orange": 0.000012409739499768938,
+            "yellow": -0.000015375664893617022,
+            "green": 0,
+            "teal": 0,
+            "cyan": -0.0001139300922351988,
+            "blue": -0.0001139300922351988,
+            "navy": 0.0007397762544094633,
+            "purple": -0.00007511042814546708,
+            "pink": -0.0007484035418114654,
+            "brown": 0,
+            "cream": -0.000015375664893617022
+          },
+          "seed": 2185877508,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144-replicate1",
+          "absoluteError": {
+            "mean": 0.00006045119165110061,
+            "p95": 0.0003576369771013388,
+            "max": 0.0003576369771013388
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": -0.000006461346114303157,
+            "white": 0,
+            "red": -0.00031979699884779333,
+            "orange": -0.00001554245403307601,
+            "yellow": -1.1349903966068682e-7,
+            "green": 0,
+            "teal": 0,
+            "cyan": -0.000042044315844799024,
+            "blue": -0.000042044315844799024,
+            "navy": 0.0003576369771013388,
+            "purple": 0.00003512580653290925,
+            "pink": -0.0002692422373214709,
+            "brown": 0,
+            "cream": -1.1349903966068682e-7
+          },
+          "seed": 2106688503,
+          "samples": 262086
+        },
+        {
+          "method": "jitter262144-replicate2",
+          "absoluteError": {
+            "mean": 0.00005831772608168873,
+            "p95": 0.00033410644220080443,
+            "max": 0.00033410644220080443
+          },
+          "familyDifferences": {
+            "dark": 0,
+            "dark_gray": 0,
+            "grayscale": 0,
+            "black": 0,
+            "gray": 0.0002606265563299334,
+            "white": 0,
+            "red": -0.0002854571256764027,
+            "orange": 0.0000035352532843694294,
+            "yellow": 0.0000037020424238283962,
+            "green": 0,
+            "teal": 0,
+            "cyan": -0.0000038889012099082,
+            "blue": -0.0000038889012099082,
+            "navy": 0.00010199569904756345,
+            "purple": -0.000048816105663850636,
+            "pink": -0.00033410644220080443,
+            "brown": 0,
+            "cream": 0.0000037020424238283962
+          },
+          "seed": 517245421,
+          "samples": 262086
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-088",
+      "originalPixels": 10680000,
+      "visibleWeight": 10680000,
+      "exactFeatures": {
+        "dark": 0.15796610486891385,
+        "dark_gray": 0.050691011235955055,
+        "grayscale": 0.39630065543071163,
+        "black": 0.05104775280898877,
+        "gray": 0.02389681647940075,
+        "white": 0.36006067415730336,
+        "red": 0.12000168539325842,
+        "orange": 0.08741544943820224,
+        "yellow": 0.008910955056179776,
+        "green": 0.026755992509363297,
+        "teal": 0.006121067415730337,
+        "cyan": 0.032128558052434454,
+        "blue": 0.0860814606741573,
+        "navy": 0.008477808988764044,
+        "purple": 0.0009830524344569289,
+        "pink": 0.004041479400749064,
+        "brown": 0.0621058988764045,
+        "cream": 0.04525758426966292
+      },
+      "errors": [
+        {
+          "method": "resize256",
+          "absoluteError": {
+            "mean": 0.01010206818682529,
+            "p95": 0.035228659947124916,
+            "max": 0.035228659947124916
+          },
+          "familyDifferences": {
+            "dark": -0.01623816369244327,
+            "dark_gray": -0.012593584765366816,
+            "grayscale": -0.019921978960123377,
+            "black": -0.01060657633840053,
+            "gray": 0.0021142129323639576,
+            "white": -0.003810674157303351,
+            "red": 0.009065410194976864,
+            "orange": -0.007957728849966955,
+            "yellow": -0.0004780506444150706,
+            "green": -0.009545514568186825,
+            "teal": -0.001180810062789161,
+            "cyan": 0.00819772871227143,
+            "blue": 0.02768232609054859,
+            "navy": -0.0042958236946463975,
+            "purple": -0.0008911406697510465,
+            "pink": -0.001421994106631417,
+            "brown": 0.035228659947124916,
+            "cream": -0.010606848975545272
+          }
+        },
+        {
+          "method": "resize1024",
+          "absoluteError": {
+            "mean": 0.004170477629616854,
+            "p95": 0.017334223719117553,
+            "max": 0.017334223719117553
+          },
+          "familyDifferences": {
+            "dark": -0.005051265687627315,
+            "dark_gray": -0.001882874357300085,
+            "grayscale": -0.0023319282742788605,
+            "black": -0.0012245049105969533,
+            "gray": -0.006482879619020634,
+            "white": 0.004781077030562131,
+            "red": 0.003146557936419936,
+            "orange": 0.006010457451417636,
+            "yellow": 0.00196686612437578,
+            "green": 0.0026722330023326094,
+            "teal": -0.0002616924157303373,
+            "cyan": 0.007223769707068471,
+            "blue": 0.017334223719117553,
+            "navy": -0.0036149846101090734,
+            "purple": 0.00018625266422728172,
+            "pink": 0.00046584196255502943,
+            "brown": 0.006379115743478547,
+            "cream": -0.004052072116885144
+          }
+        },
+        {
+          "method": "jitter65536",
+          "absoluteError": {
+            "mean": 0.0002934320410692679,
+            "p95": 0.0010630806075045268,
+            "max": 0.0010630806075045268
+          },
+          "familyDifferences": {
+            "dark": -0.0002700931288462938,
+            "dark_gray": 0.0004119130803541607,
+            "grayscale": 0.0004005078754625857,
+            "black": 0.0003609024335322897,
+            "gray": -0.0002332427906042607,
+            "white": 0.00013621655917706033,
+            "red": 0.0002575744321692136,
+            "orange": 0.0010630806075045268,
+            "yellow": 0.0005667036563872935,
+            "green": -0.00021854811417550135,
+            "teal": -0.00018988744722062308,
+            "cyan": 0.0001107681166041749,
+            "blue": 0.0004251048974830973,
+            "navy": -0.00014664124949137838,
+            "purple": -0.00011171929475318218,
+            "pink": 0.00023875356621670934,
+            "brown": -0.00002723430909019192,
+            "cream": 0.00011288518017427834
+          },
+          "seed": 2182401773,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144",
+          "absoluteError": {
+            "mean": 0.0001482911235367274,
+            "p95": 0.0006038258348511905,
+            "max": 0.0006038258348511905
+          },
+          "familyDifferences": {
+            "dark": 0.00003546713416910374,
+            "dark_gray": -0.00023429092277540975,
+            "grayscale": -0.00022455827176381948,
+            "black": -0.00013698306165392526,
+            "gray": -0.0003625567326000813,
+            "white": 0.0001722264936280249,
+            "red": -0.00009829490311397127,
+            "orange": -0.0000967830462545588,
+            "yellow": 0.00012806267082586358,
+            "green": 0.00009397276920938488,
+            "teal": -0.000058172030246183594,
+            "cyan": -0.00007800975912614777,
+            "blue": 0.0006038258348511905,
+            "navy": 0.0000308484748166131,
+            "purple": 0.0000013572631232547459,
+            "pink": 0.0000029945505493648647,
+            "brown": -0.00008427238738944326,
+            "cream": -0.00022656391756475242
+          },
+          "seed": 757517848,
+          "samples": 262086
+        },
+        {
+          "method": "jitter65536-replicate1",
+          "absoluteError": {
+            "mean": 0.00033729004862183856,
+            "p95": 0.0014004829045743336,
+            "max": 0.0014004829045743336
+          },
+          "familyDifferences": {
+            "dark": 0.00014264362153970644,
+            "dark_gray": 0.00018261488569527862,
+            "grayscale": 0.0003240751439096412,
+            "black": 0.00011631769256281732,
+            "gray": -0.000003944595945378632,
+            "white": 0.0005336667632524494,
+            "red": -0.00020102195714853666,
+            "orange": -0.001336907163258419,
+            "yellow": -0.00022819675176349342,
+            "green": -0.0001879750215543173,
+            "teal": 0.00014641657161240228,
+            "cyan": -0.00005738389281233908,
+            "blue": -0.0004156551495994587,
+            "navy": 0.00022023586196283015,
+            "purple": 0.00016343853883747476,
+            "pink": 0.00022346701990611732,
+            "brown": 0.00018677733925809986,
+            "cream": -0.0014004829045743336
+          },
+          "seed": 389045379,
+          "samples": 65417
+        },
+        {
+          "method": "jitter65536-replicate2",
+          "absoluteError": {
+            "mean": 0.00039646174596493996,
+            "p95": 0.0012336737853307425,
+            "max": 0.0012336737853307425
+          },
+          "familyDifferences": {
+            "dark": -0.0005299644161263495,
+            "dark_gray": -0.0003065545962436661,
+            "grayscale": 0.000048917310318974394,
+            "black": -0.0003728517893761274,
+            "gray": -0.000003944595945378632,
+            "white": 0.0008088245968431163,
+            "red": 0.0003034340711009914,
+            "orange": 0.0006962034960503183,
+            "yellow": -0.00030462948331645354,
+            "green": 0.0012336737853307425,
+            "teal": 0.00017698966423358633,
+            "cyan": 0.0002789201260206889,
+            "blue": -0.0005838071590159727,
+            "navy": 0.0001743762230310541,
+            "purple": 0.00011757889990569848,
+            "pink": -0.00000583117475276302,
+            "brown": 0.0010581104789618434,
+            "cream": -0.00013169956079519402
+          },
+          "seed": 1685693394,
+          "samples": 65417
+        },
+        {
+          "method": "jitter262144-replicate1",
+          "absoluteError": {
+            "mean": 0.0001579440235392518,
+            "p95": 0.0005518590025385822,
+            "max": 0.0005518590025385822
+          },
+          "familyDifferences": {
+            "dark": -0.00009426127558953556,
+            "dark_gray": -0.00010456251301678432,
+            "grayscale": -0.0003237623498145159,
+            "black": -0.00011027427140949952,
+            "gray": -0.000049682332593975476,
+            "white": -0.00042299797467626465,
+            "red": 0.0002412882871365568,
+            "orange": 0.0005518590025385822,
+            "yellow": -0.00012376306576441544,
+            "green": 0.000071079520428452,
+            "teal": 0.000060109755121978,
+            "cyan": -0.000005514471319856273,
+            "blue": -0.00009823379443080205,
+            "navy": 0.0002674120455529363,
+            "purple": -0.000006273819803723386,
+            "pink": -0.00004279194701250436,
+            "brown": 0.00015610672481037452,
+            "cream": 0.00011301927268577566
+          },
+          "seed": 1409980316,
+          "samples": 262086
+        },
+        {
+          "method": "jitter262144-replicate2",
+          "absoluteError": {
+            "mean": 0.00023137261327044984,
+            "p95": 0.0007748853922809676,
+            "max": 0.0007748853922809676
+          },
+          "familyDifferences": {
+            "dark": 0.0004170212805180151,
+            "dark_gray": -0.0003602037910705527,
+            "grayscale": -0.00011772311078611652,
+            "black": -0.0003849932567807149,
+            "gray": -0.00007257558137491182,
+            "white": 0.00014170216192010976,
+            "red": -0.00038446051287564786,
+            "orange": 0.0004297616757069356,
+            "yellow": 0.00004030521716561451,
+            "green": 0.0004526336667773599,
+            "teal": -0.00004672540585571629,
+            "cyan": -0.00002840772010079262,
+            "blue": 0.000012416908010390304,
+            "navy": 0.000133868094330818,
+            "purple": 0.000039512677758145624,
+            "pink": -0.000046607488475992886,
+            "brown": -0.0007748853922809676,
+            "cream": 0.000280903097079295
+          },
+          "seed": 3442998210,
+          "samples": 262086
+        }
+      ]
+    },
+    {
+      "id": "wallpaper-097",
+      "originalPixels": 8075520,
+      "visibleWeight": 8075520,
+      "exactFeatures": {
+        "dark": 0.05724399171818038,
+        "dark_gray": 0.000015355048343636075,
+        "grayscale": 0.0028356068711364716,
+        "black": 0.007149756300523062,
+        "gray": 0.634742530511967,
+        "white": 0.0005089455539705183,
+        "red": 0.14008249623553654,
+        "orange": 0.033576537486130924,
+        "yellow": 0.0034338346013631322,
+        "green": 0.001247969171025519,
+        "teal": 0.0014906779996829926,
+        "cyan": 0.039602527143762875,
+        "blue": 0.043819097717546364,
+        "navy": 0.04744412743699477,
+        "purple": 0.000059191234744016485,
+        "pink": 0.009524340228245365,
+        "brown": 0.47912023002853066,
+        "cream": 0.010105726937708037
+      },
+      "errors": [
+        {
+          "method": "resize256",
+          "absoluteError": {
+            "mean": 0.019840101800117995,
+            "p95": 0.13127309448803293,
+            "max": 0.13127309448803293
+          },
+          "familyDifferences": {
+            "dark": -0.051747339932466094,
+            "dark_gray": -0.000015355048343636075,
+            "grayscale": 0.002354125271720671,
+            "black": -0.0070660509433802055,
+            "gray": 0.13127309448803293,
+            "white": -0.0005089455539705183,
+            "red": -0.027247674806965105,
+            "orange": -0.007237251771845209,
+            "yellow": -0.003071111387077418,
+            "green": -0.0011084602424540906,
+            "teal": -0.0004304101425401355,
+            "cyan": -0.015830205715191448,
+            "blue": -0.018874901288974934,
+            "navy": -0.0108648863655662,
+            "purple": -0.000059191234744016485,
+            "pink": -0.0031627330853882217,
+            "brown": 0.06719673425718364,
+            "cream": -0.009073360866279466
+          }
+        },
+        {
+          "method": "resize1024",
+          "absoluteError": {
+            "mean": 0.008622940140630971,
+            "p95": 0.037205581119049036,
+            "max": 0.037205581119049036
+          },
+          "familyDifferences": {
+            "dark": -0.02377975375026594,
+            "dark_gray": -0.000015355048343636075,
+            "grayscale": 0.00037260112797226274,
+            "black": -0.004860665948473151,
+            "gray": 0.037205581119049036,
+            "white": -0.0004897972696567928,
+            "red": -0.028824001360313725,
+            "orange": -0.002007979665275307,
+            "yellow": -0.0025077539418265904,
+            "green": -0.0008858925221841643,
+            "teal": -0.0003417809408594631,
+            "cyan": -0.003513233471748617,
+            "blue": -0.0053293054938386986,
+            "navy": -0.002809476701700654,
+            "purple": -0.000059191234744016485,
+            "pink": -0.0017797295999031184,
+            "brown": 0.03370912046166541,
+            "cream": -0.006721702873536914
+          }
+        },
+        {
+          "method": "jitter65536",
+          "absoluteError": {
+            "mean": 0.0003395826725981664,
+            "p95": 0.0013393645530371673,
+            "max": 0.0013393645530371673
+          },
+          "familyDifferences": {
+            "dark": 0.0013393645530371673,
+            "dark_gray": 0.000015228797269111272,
+            "grayscale": -0.000021893074763715877,
+            "black": -0.00010017988678479896,
+            "gray": 0.0010038682402120358,
+            "white": -0.00006547979258568183,
+            "red": -0.0006048683186022641,
+            "orange": -0.00007193461736620249,
+            "yellow": 0.00017505918094105465,
+            "green": -0.00008578303774111999,
+            "teal": -0.00016028071552848288,
+            "cyan": 0.00027880753525966195,
+            "blue": 0.000038136891133334905,
+            "navy": 0.0005725101750185674,
+            "purple": -0.000028607389131269137,
+            "pink": -0.00030331077600203975,
+            "brown": 0.0008320591723134374,
+            "cream": 0.0004151159530770502
+          },
+          "seed": 2413728914,
+          "samples": 65394
+        },
+        {
+          "method": "jitter262144",
+          "absoluteError": {
+            "mean": 0.00013771878699743478,
+            "p95": 0.0005472468180865442,
+            "max": 0.0005472468180865442
+          },
+          "familyDifferences": {
+            "dark": 0.0003872948192457856,
+            "dark_gray": 0.000011373832976312452,
+            "grayscale": -0.000025255920924740615,
+            "black": -0.0001773366876336325,
+            "gray": -0.00039744538048003264,
+            "white": 0.00005236095374840078,
+            "red": -0.000019339707389126604,
+            "orange": -0.00010434125032109803,
+            "yellow": -0.000012537792409720704,
+            "green": 0.00005792760203482319,
+            "teal": -0.000009134292234417056,
+            "cyan": -0.000043782790239053904,
+            "blue": 0.000020086058786360217,
+            "navy": 0.00008746037310798649,
+            "purple": 0.000005721762747287079,
+            "pink": 0.00010951228178751257,
+            "brown": -0.0005472468180865442,
+            "cream": -0.00041077984180099177
+          },
+          "seed": 1040336107,
+          "samples": 261889
+        },
+        {
+          "method": "jitter65536-replicate1",
+          "absoluteError": {
+            "mean": 0.0004317595228564734,
+            "p95": 0.002058084924936726,
+            "max": 0.002058084924936726
+          },
+          "familyDifferences": {
+            "dark": 0.002058084924936726,
+            "dark_gray": 0.00003052072007548494,
+            "grayscale": 0.00016160999891276853,
+            "black": 0.00017507472372992744,
+            "gray": 0.0003921913279570921,
+            "white": 0.0000721475126716812,
+            "red": -0.0012930048448890619,
+            "orange": 0.00023390383876126936,
+            "yellow": -0.00013077927518641893,
+            "green": -0.00020811842019210938,
+            "teal": 0.00022201735463085888,
+            "cyan": 0.0005540621457743936,
+            "blue": 0.0004357268840990483,
+            "navy": 0.00032783941011658296,
+            "purple": 0.00007843607051334658,
+            "pink": 0.00018603075380191868,
+            "brown": 0.0010002703231835608,
+            "cream": -0.00021185288198427056
+          },
+          "seed": 2755018884,
+          "samples": 65394
+        },
+        {
+          "method": "jitter65536-replicate2",
+          "absoluteError": {
+            "mean": 0.00024007831768323783,
+            "p95": 0.00085005233638763,
+            "max": 0.00085005233638763
+          },
+          "familyDifferences": {
+            "dark": 0.00016188649694639373,
+            "dark_gray": -6.312553726240156e-8,
+            "grayscale": 0.00016160999891276853,
+            "black": -0.00017663950081666692,
+            "gray": 0.00016281248586147434,
+            "white": -0.00014193940661755017,
+            "red": 0.0004196905094247805,
+            "orange": -0.00025543769104269254,
+            "yellow": 0.00005272379849006548,
+            "green": 0.0000977200359353642,
+            "teal": 0.000007930435341627507,
+            "cyan": -0.0006081239875100064,
+            "blue": -0.0004053288702515062,
+            "navy": 0.00014433633644009985,
+            "purple": 0.000017268379287851884,
+            "pink": 0.00009427921696367539,
+            "brown": -0.00085005233638763,
+            "cream": -0.0005635671065308649
+          },
+          "seed": 2476608944,
+          "samples": 65394
+        },
+        {
+          "method": "jitter262144-replicate1",
+          "absoluteError": {
+            "mean": 0.000106021486285993,
+            "p95": 0.0005960027845710592,
+            "max": 0.0005960027845710592
+          },
+          "familyDifferences": {
+            "dark": -0.0001052802793646973,
+            "dark_gray": -0.000007718225109365067,
+            "grayscale": -0.000013800686073334005,
+            "black": -0.000024600222948211597,
+            "gray": -0.0005960027845710592,
+            "white": 0.00003326889566272317,
+            "red": 0.00006466534818785896,
+            "orange": 0.0002584078533067746,
+            "yellow": 0.00004473838184731191,
+            "green": 0.0000999301298233138,
+            "teal": -0.00003204476193723006,
+            "cyan": 0.00006695114665787594,
+            "blue": -0.000025734880619271427,
+            "navy": -0.00007291291481170692,
+            "purple": 0.00002481382083296461,
+            "pink": -0.0001157740036234825,
+            "brown": 0.0002087986821062704,
+            "cream": -0.0001129437356644225
+          },
+          "seed": 72389425,
+          "samples": 261889
+        },
+        {
+          "method": "jitter262144-replicate2",
+          "absoluteError": {
+            "mean": 0.00017922906267340446,
+            "p95": 0.0006656175782177587,
+            "max": 0.0006656175782177587
+          },
+          "familyDifferences": {
+            "dark": 0.0004369341702685492,
+            "dark_gray": 0.0000037370097420414444,
+            "grayscale": -0.000013800686073334005,
+            "black": 0.00015486512305715704,
+            "gray": -0.00007288039302355553,
+            "white": -0.00002018886697717384,
+            "red": -0.0005271884524681303,
+            "orange": 0.00033859449726662133,
+            "yellow": 0.00006764885155012513,
+            "green": -0.00013299297882195184,
+            "teal": -0.00008932093619426268,
+            "cyan": 0.00004785908857219551,
+            "blue": -0.000010461234150729859,
+            "navy": 0.0002134679564734579,
+            "purple": -0.00000955188372125493,
+            "pink": 0.00023933827677011937,
+            "brown": -0.0006656175782177587,
+            "cream": -0.0001816751447728613
+          },
+          "seed": 948782434,
+          "samples": 261889
+        }
+      ]
+    }
+  ],
+  "grayscale088": {
+    "palette32": 0,
+    "resize256": 0.37637867647058826,
+    "resize1024": 0.3939687271564328,
+    "jitter65536": 0.3967011633061742,
+    "jitter262144": 0.3960760971589478,
+    "exact": 0.39630065543071163
+  },
+  "notes": [
+    "262,144-target jittered samples are a statistical reference, not exact counts except where fullImage is true.",
+    "Original RGBA pixels are copied without interpolation; alpha remains the original byte and area fractions are alpha-weighted.",
+    "Equal continuous strata plus deterministic pseudorandom jitter avoid unequal-integer-cell weighting and regular-grid aliasing.",
+    "Exact counts on four diagnostics distinguish sample fluctuation from resize color mixing, but do not prove whole-corpus error limits.",
+    "Three seeds per level on the exact subset provide a limited variability check; they do not establish a universal confidence interval.",
+    "All measurements use the same declared family predicates; this is pixel-area accuracy, not human assessment of family definitions."
+  ]
+}

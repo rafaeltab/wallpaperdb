@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overlapping color regions</title>
+  <link rel="stylesheet" href="/assets/overlap-inspector.css">
+  <script type="module" src="/assets/overlap-inspector.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div><p class="eyebrow">Color search · experimental workbench</p><h1>Overlapping color regions</h1><p id="corpus-summary" class="muted">Loading the shared wallpaper corpus…</p></div>
+    <nav aria-label="Related experiments"><a href="http://zerotwo:8225/">Compare all methods ↗</a><a href="http://zerotwo:8226/">Histogram inspector ↗</a><a href="http://zerotwo:8225/findings">Saved findings ↗</a></nav>
+  </header>
+  <main class="workspace">
+    <aside class="query-panel" aria-labelledby="query-heading">
+      <h2 id="query-heading">Describe the colors</h2>
+      <p id="bucket-description" class="muted">1,024 overlapping color regions, each with its own coverage and match quality. A pixel can belong to several regions.</p>
+      <form id="query-form">
+        <label class="field method-field">Color buckets<select id="bucket-count"></select></label>
+        <p class="hint">The same anchor colors are shared across bucket counts. Compare them with any membership profile below.</p>
+        <label class="field method-field">Query method<select id="method"></select></label>
+        <p id="method-help" class="hint"></p>
+        <section id="cutoff-controls" class="quality-controls" hidden>
+          <label id="pixel-cutoff-field" class="field">Pixel cutoff · how close a color must be<select id="pixel-cutoff"></select></label>
+          <p id="cutoff-help" class="hint"></p>
+          <div id="cutoff-blend-controls" role="group" aria-labelledby="cutoff-blend-label" hidden>
+            <div class="quality-heading"><label id="cutoff-blend-label" for="cutoff-blend-exponent">Cutoff weighting</label><output id="cutoff-blend-value" for="cutoff-blend-exponent">0.0</output></div>
+            <input id="cutoff-blend-exponent" type="range" min="0" max="6" step="0.1" value="0" aria-describedby="cutoff-blend-help">
+            <div class="quality-scale" aria-hidden="true"><span>Equal weights</span><span>Favor stricter cutoffs</span></div>
+            <p id="cutoff-blend-help" class="hint">Every cutoff participates. At 0, each gets 20% weight. Moving right increases the weights exponentially toward 90%; the other levels always retain some weight.</p>
+            <div id="cutoff-blend-weights" class="cutoff-blend-weights" role="group" aria-label="Score blend weights for each cutoff"></div>
+            <p class="hint">These weights blend the five cutoff scores. Quality influence, below, changes how each score rewards its average color quality.</p>
+          </div>
+          <label class="field">Named color handling<select id="named-mode"><option value="concrete-swatches">Use nearby anchors for color names</option><option value="named-families">Keep broad named color families</option></select></label>
+          <p class="hint">Cutoff changes apply to anchored colors. Abstract vibes such as dark and grayscale keep their broad definitions.</p>
+        </section>
+        <p id="coverage-semantics" class="notice" hidden></p>
+        <fieldset id="natural-controls">
+          <label class="field">Start with a query<select id="preset"></select></label>
+          <div class="mode-switch" role="group" aria-label="Query mode"><button type="button" id="mode-vibe" aria-pressed="true">Overall vibe</button><button type="button" id="mode-proportions" aria-pressed="false">Target proportions</button></div>
+          <p id="mode-help" class="hint"></p>
+          <div id="targets"></div>
+          <button id="add-target" type="button" class="secondary full">+ Add a color or vibe</button>
+          <p id="remainder" class="notice" hidden></p>
+        </fieldset>
+        <section class="quality-controls" aria-labelledby="quality-label">
+          <label class="field">Quality curve<select id="quality-curve" aria-describedby="quality-help"><option value="power" selected>Smooth power</option><option value="linear">Original linear penalty</option></select></label>
+          <div class="quality-heading"><label id="quality-label" for="quality-influence">Quality influence</label><output id="quality-value" for="quality-influence">1.00×</output></div>
+          <input id="quality-influence" type="range" min="0" max="3" step="0.05" value="1" aria-describedby="quality-help" list="quality-ticks">
+          <datalist id="quality-ticks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist>
+          <div class="quality-scale" aria-hidden="true"><span>0× · Ignore quality</span><span>3× · Stronger preference</span></div>
+          <p id="quality-help" class="hint">Smooth power gradually reduces weaker matches. Both curves match the original scoring at 1×.</p>
+          <button id="reset-quality" type="button" class="secondary">Reset to 1×</button>
+        </section>
+        <section class="quality-controls" aria-labelledby="minimum-quality-label">
+          <div class="quality-heading"><label id="minimum-quality-label" for="minimum-quality">Minimum average quality</label><output id="minimum-quality-value" for="minimum-quality">0%</output></div>
+          <input id="minimum-quality" type="range" min="0" max="100" step="1" value="0" aria-describedby="minimum-quality-help">
+          <div class="quality-scale" aria-hidden="true"><span>0% · No cutoff</span><span>100% · Perfect quality</span></div>
+          <p id="minimum-quality-help" class="hint">A requested color contributes only when its average match quality reaches this minimum. Quality influence still applies above the cutoff. Targets requesting 0% are exempt.</p>
+          <button id="reset-minimum-quality" type="button" class="secondary">Reset to 0%</button>
+        </section>
+        <p id="range-help" class="hint">Picked colors resolve to their nearest stored anchor.</p>
+        <details class="advanced"><summary>Advanced query JSON</summary><label class="check"><input id="use-json" type="checkbox">Use this JSON instead of the controls</label><textarea id="query-json" rows="12" readonly spellcheck="false" aria-label="Advanced query JSON"></textarea></details>
+        <div class="search-options"><label class="field">Results<select id="result-limit"><option>12</option><option selected>24</option><option>48</option><option>100</option></select></label></div>
+        <label class="check live-update"><input id="live-update" type="checkbox">Update live as I change the query</label>
+        <p class="hint">Live updates run after a brief pause while you adjust the controls.</p>
+        <button id="search" type="submit" class="primary full">Search wallpapers</button>
+        <button id="cancel-search" type="button" class="secondary full" hidden>Cancel search</button>
+        <p id="search-status" role="status" aria-live="polite"></p>
+      </form>
+    </aside>
+    <section class="results-panel" aria-labelledby="results-heading">
+      <div class="section-heading"><div><h2 id="results-heading">Wallpapers</h2><p id="results-summary" class="muted">Results keep the order returned by OpenSearch.</p></div><span id="method-tag" class="method-tag">overlap-quality-dense</span></div>
+      <p id="query-caption" class="query-caption" hidden></p>
+      <div id="search-warnings" class="notice" hidden></div>
+      <div id="gallery" class="gallery"><div class="empty-state"><h3>See coverage and quality separately</h3><p>Choose a query and open any result to explore its overlapping regions.</p></div></div>
+    </section>
+  </main>
+  <dialog id="inspector" aria-labelledby="inspector-title">
+    <div class="dialog-shell">
+      <header class="dialog-header"><div><p class="eyebrow">Wallpaper diagnosis</p><h2 id="inspector-title">Overlapping region inspection</h2></div><button id="close-inspector" class="secondary" type="button" autofocus>Close <span aria-hidden="true">×</span></button></header>
+      <div class="dialog-content">
+        <p id="inspection-status" role="status" aria-live="polite"></p>
+        <div id="inspection-content" hidden>
+          <section class="inspection-overview" aria-label="Wallpaper and score">
+            <div class="image-wrap"><img id="inspection-image" alt="Selected wallpaper"><a id="original-link" target="_blank" rel="noopener">Open original image ↗</a></div>
+            <div><p id="inspection-query" class="query-caption"></p><div id="score-cards" class="score-cards"></div><p class="hint">Scoring formula</p><p id="score-formula" class="score-formula"></p><p class="hint">The score and its target contributions are computed by OpenSearch. The diagnostic ledger inspects this one wallpaper; it does not reorder search results.</p><details class="formula-details"><summary>Full parameters and service evidence</summary><pre id="formula-json"></pre></details></div>
+          </section>
+          <section aria-labelledby="target-summary-heading"><div class="section-heading"><h3 id="target-summary-heading">Which fields contributed to the score?</h3><span id="region-summary" class="muted"></span></div><div id="target-summary" class="target-summary"></div></section>
+          <section class="bin-section" aria-labelledby="bin-heading">
+            <div class="section-heading"><div><h3 id="bin-heading">All 1,024 overlapping regions</h3><p id="bin-coverage-help" class="hint"></p></div></div>
+            <div class="notice"><strong>These coverages overlap.</strong> They can add to more than 100%. A region’s area is not a disjoint share of the image, and unused regions make no direct contribution to this query. Multiple target amounts are scored independently; this prototype does not measure the union or enforce full-palette purity.</div>
+            <div class="bin-controls"><label class="field">Square size shows<select id="grid-metric"><option value="score">Score contribution</option><option value="coverage">Image coverage</option><option value="quality">Conditional color quality</option><option value="color">All anchor colors · equal size</option></select></label></div>
+            <p id="grid-legend" class="hint"></p>
+            <div class="bin-layout"><div><div id="grid-axis" class="grid-axis" aria-hidden="true"><span>Near-grays · Red</span><span>Yellow · Green · Blue · Purple · Pink →</span></div><div id="bin-grid" class="bin-grid" role="group" aria-label="Overlapping color regions, grouped by hue from left to right and dark to light from top to bottom. Use arrow keys to move."></div><p class="hint">Dark → light from top to bottom within each hue group. White borders mark regions read by the query, even when their score contribution is zero. Click any square, including a tiny one, to inspect it. Arrow keys follow the visible grid; Enter selects. Region IDs stay the same for shared colors across bucket counts.</p></div><aside id="bin-detail" class="bin-detail" aria-live="polite" aria-label="Selected region details"></aside></div>
+            <div class="table-controls"><label class="check"><input id="present-only" type="checkbox" checked>Only regions with matching image pixels</label><label class="field">Find a region<input id="bin-search" type="search" placeholder="Region number or hex" autocomplete="off"></label><label class="field">Sort regions by<select id="bin-sort"><option value="coverage">Image coverage</option><option value="quality">Conditional quality</option><option value="used">Used in this query</option><option value="index">Region number</option></select></label><label class="field">Order<select id="sort-direction"><option value="desc">Highest first</option><option value="asc">Lowest first</option></select></label></div>
+            <div class="table-scroll"><table class="bin-table"><caption>Stored coverage and quality for this wallpaper</caption><thead><tr><th scope="col">Region / anchor</th><th scope="col">Image coverage</th><th scope="col">Conditional quality</th><th scope="col">Quality mass</th><th scope="col">Query targets</th></tr></thead><tbody id="bin-rows"></tbody></table></div>
+            <div class="pagination"><span id="table-count" role="status"></span><label class="field">Rows<select id="page-size"><option selected>64</option><option>128</option><option value="all">All</option></select></label><button id="previous-page" class="secondary" type="button">Previous</button><button id="next-page" class="secondary" type="button">Next</button></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </dialog>
+  <dialog id="color-dialog" aria-labelledby="color-dialog-title">
+    <div class="dialog-shell">
+      <header class="dialog-header"><div><p class="eyebrow">Bin color range</p><h2 id="color-dialog-title">Colors that match this bin</h2></div><button id="close-color-dialog" class="secondary" type="button" autofocus>Close <span aria-hidden="true">×</span></button></header>
+      <div class="dialog-content">
+        <div id="color-layer-controls" class="color-layer-controls" hidden>
+          <label class="field">Cutoff layer<select id="color-layer" aria-describedby="color-layer-help"></select></label>
+          <p id="color-layer-help" class="hint"></p>
+        </div>
+        <p id="matching-status" class="hint" role="status"></p>
+        <div class="color-tabs" role="tablist" aria-label="Color grid axes">
+          <button id="color-tab-lightness" type="button" role="tab" aria-selected="true" aria-controls="matching-panel">Hue × Lightness</button>
+          <button id="color-tab-saturation" type="button" role="tab" aria-selected="false" aria-controls="matching-panel" tabindex="-1">Hue × Saturation</button>
+        </div>
+        <section id="matching-panel" role="tabpanel" aria-labelledby="color-tab-lightness">
+          <div id="matching-colors"></div>
+        </section>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

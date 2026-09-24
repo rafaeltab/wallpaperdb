@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-09-23T20:19:30.422141+00:00",
+  "planSha256": "7266bfda14c4163d3d558426f41b107cffd9bb22522df1d923207433eb2c15f2",
+  "phases": [
+    {
+      "id": "wide-two-methods-64-128",
+      "startedAt": "2026-09-23T20:19:30.422253+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization-arrival",
+        "COLOR_FAVORITE_ARGS=--config /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1-proposal/favorite-numeric-and-bounded-pooled.json --artifact /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-four-methods-pooled-v1/benchmark.json --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1 --workload wide --rates 64,128 --duration-seconds 180"
+      ],
+      "finishedAt": "2026-09-23T20:31:56.763252+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "wide-two-methods-stress-audit",
+      "startedAt": "2026-09-23T20:31:56.763956+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization-arrival-audit",
+        "COLOR_FAVORITE_ARGS=--directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1 --output /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1/audit-independent-v1.json"
+      ],
+      "finishedAt": "2026-09-23T20:32:03.412060+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T20:32:03.412318+00:00"
+}

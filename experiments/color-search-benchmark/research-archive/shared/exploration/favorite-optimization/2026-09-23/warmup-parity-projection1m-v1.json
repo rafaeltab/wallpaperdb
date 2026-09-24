@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-warmup-cross-method-parity",
+  "fileOnly": true,
+  "auditedAt": "2026-09-23T16:57:44.268Z",
+  "configuration": {
+    "count": 1000000,
+    "scope": "projection",
+    "methods": [
+      "favorite-utility-numeric-docvalues",
+      "favorite-utility-sorted-docvalues",
+      "favorite-utility-bounded"
+    ],
+    "selectivities": [
+      "all"
+    ],
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1",
+    "receipt": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-projection-1m-v1/index.json",
+    "audit": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/audit-independent-v1.json",
+    "output": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/warmup-parity-projection1m-v1.json"
+  },
+  "rows": [
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "queryId": "picked-one-vibe",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": true,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-bounded",
+      "queryId": "picked-one-vibe",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "queryId": "picked-one-green40",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": true,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-bounded",
+      "queryId": "picked-one-green40",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "queryId": "picked-two-portions",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-bounded",
+      "queryId": "picked-two-portions",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-sorted-docvalues",
+      "queryId": "picked-five-portions",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    },
+    {
+      "method": "favorite-utility-bounded",
+      "queryId": "picked-five-portions",
+      "selectivity": "all",
+      "status": "match",
+      "count": 20,
+      "identicalIds": true,
+      "float32ScoresIdentical": true,
+      "rawScoresIdentical": true,
+      "sortTransportAllowed": false,
+      "maximumRawScoreDelta": 0,
+      "referenceStrictPerformanceFailure": false,
+      "candidateStrictPerformanceFailure": false
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "limitations": [
+    "Saved top20 warmups only, not every timed request, every query or a new all-document score proof.",
+    "Cross-method parity is relative to the numeric OpenSearch service; shared baseline mistakes remain possible.",
+    "Executor warmups retain stage/bound summaries, not each actual stage request body. Reference query/filter bindings and archived executor sources are verified; separate real-corpus trace proofs remain necessary.",
+    "Single-target direct sort may serialize the same float32 utility differently. Raw score differences are recorded separately.",
+    "Strict latency failures remain visible and are not cleared by ranking agreement. This adds no new performance measurement."
+  ],
+  "capacityEvidenceAccepted": true,
+  "index": {
+    "index": "color-exploration-favorite-points-projection-1m-v1",
+    "count": 1000000,
+    "scope": "projection",
+    "uuid": "rqcawVGDT-WOSJ0k09FseA",
+    "utilityCount": 9
+  },
+  "indexGenerationVerified": true,
+  "coverage": {
+    "expectedWarmups": 12,
+    "observedWarmups": 12,
+    "completeHitLists": 12,
+    "warmupErrors": 0,
+    "strictWarmupFailures": 0,
+    "expectedComparisons": 8,
+    "compared": 8,
+    "unavailable": 0
+  },
+  "complete": true,
+  "completeHitEvidence": true,
+  "controlParameters": {
+    "bucketCount": 256,
+    "cutoffBlendExponent": 1,
+    "qualityCurve": "linear",
+    "qualityInfluence": 0.5,
+    "minimumQuality": 0,
+    "namedMode": "concrete-swatches",
+    "areaPower": 0.5,
+    "qualityPenalty": 0.35,
+    "excessPenalty": 1.5,
+    "pixelCutoff": 0
+  },
+  "integrityPassed": true,
+  "mismatches": 0,
+  "parityPassed": true,
+  "rawScoresIdentical": true,
+  "maximumRawScoreDelta": 0,
+  "files": {
+    "plan": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/plan.json",
+      "sha256": "f39533c07d937ce8f97128750ff0177f98da5ed4e55576788c0c56e3787edbb5"
+    },
+    "benchmark": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/benchmark.json",
+      "sha256": "b40216cd6c48b5de6a2c1b13d55830a0b52f5bcbc26b08d134557864bd5a68cd"
+    },
+    "sources": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/source-snapshot.json",
+      "sha256": "f23a6e085e7c2bf4f3fb4ff2366184477d52f82b87515bd9494137b5da4add4d"
+    },
+    "receipt": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-projection-1m-v1/index.json",
+      "sha256": "8b0c7751cd8bdfbe33e9fc41cdf181fb36b3598e1d5914d070bb3bc4c6551168"
+    },
+    "capacityAudit": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/audit-independent-v1.json",
+      "sha256": "0aec0ec5e50e4ab1e067e01acf6366c0b5d8240b6205370be3c69f3b4731d160"
+    },
+    "requests": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/fetch-points-projection-c1-v1/requests.jsonl",
+      "sha256": "635c777ac8a73559bf67ee82ecc83d8379b6430629d606fad0597398b6e958df",
+      "bytes": 35789067
+    }
+  },
+  "auditCodeSha256": "46c647c9033de35481eb39f2356f03ba710b3ed94740c89721a30b563580e851"
+}

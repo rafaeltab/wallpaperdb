@@ -1,0 +1,87 @@
+{
+  "createdAt": "2026-09-20T21:51:42.105Z",
+  "inspector": "http://127.0.0.1:8226",
+  "comparison": "http://127.0.0.1:8225",
+  "corpus": {
+    "total": 545,
+    "real": 523,
+    "fixtures": 22
+  },
+  "method": "histogram-intent-balanced",
+  "checks": [
+    {
+      "label": "Feels red",
+      "id": "wallpaper-037",
+      "score": 0.7167626,
+      "occupiedBins": 163,
+      "scoreDifference": -2.0450086402057366e-8,
+      "searchMs": 34.0145739999989,
+      "inspectionMs": 12.662626999999702
+    },
+    {
+      "label": "40% green, rest free",
+      "id": "madness-wallhaven-w55mqx",
+      "score": 0.97817117,
+      "occupiedBins": 102,
+      "scoreDifference": -4.223699945349324e-9,
+      "searchMs": 22.34269900000072,
+      "inspectionMs": 9.5464209999991
+    },
+    {
+      "label": "80% grayscale + 20% red",
+      "id": "madness-wallhaven-lyyker",
+      "score": 0.93048245,
+      "occupiedBins": 86,
+      "scoreDifference": 1.7712280309112316e-8,
+      "searchMs": 20.400888999998642,
+      "inspectionMs": 6.97505799999999
+    },
+    {
+      "label": "80% grayscale + 10% red, rest free",
+      "id": "madness-wallhaven-yqqvv7",
+      "score": 0.9699337,
+      "occupiedBins": 205,
+      "scoreDifference": -4.644874040948821e-9,
+      "searchMs": 26.77837499999987,
+      "inspectionMs": 9.984824999999546
+    },
+    {
+      "label": "Precise orange-red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.3590824,
+      "occupiedBins": 661,
+      "scoreDifference": 3.055372621574293e-11,
+      "searchMs": 9.696223000000828,
+      "inspectionMs": 8.881061000000045
+    },
+    {
+      "label": "Dark grayscale · HSL range",
+      "id": "madness-wallhaven-vppy93",
+      "score": 0.85294116,
+      "occupiedBins": 1,
+      "scoreDifference": 1.647058833764703e-8,
+      "searchMs": 7.777006000000256,
+      "inspectionMs": 4.333945000000313
+    },
+    {
+      "label": "Dark with bright spots",
+      "id": "madness-wallhaven-2119yx",
+      "score": 0.95721436,
+      "occupiedBins": 33,
+      "scoreDifference": -4.531250041850399e-9,
+      "searchMs": 21.5701169999993,
+      "inspectionMs": 7.1361309999992955
+    },
+    {
+      "label": "Grayscale with red accents",
+      "id": "wallpaper-007",
+      "score": 0.7357668,
+      "occupiedBins": 61,
+      "scoreDifference": 4.918381291130203e-8,
+      "searchMs": 18.93915299999935,
+      "inspectionMs": 6.072721999998976
+    }
+  ],
+  "status": "passed",
+  "note": "Read-only score and interface validation; no relevance judgments or production performance claims."
+}

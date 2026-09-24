@@ -1,0 +1,1116 @@
+{
+  "generatedAt": "2026-09-16T15:40:37.496Z",
+  "index": "color-global-multi-1000000-v1",
+  "dataCacheKey": "789da7256e972ef46e5699713a46c2bf95dc8d22f356e2566ca93fa0aaab3352",
+  "scriptVariant": "typed",
+  "blockSeconds": 8,
+  "inFlight": 4,
+  "notes": [
+    "Each measured block lasts at least8seconds;1.2seconds idle before and after lets cached process counters refresh.",
+    "CPU includes node background/GC activity in the block; shared-host contention remains possible.",
+    "This measures a prototype coordinator and OpenSearch. Image extraction, production gateway logic and remote-user network latency are excluded."
+  ],
+  "rows": [
+    {
+      "query": "red70dark30",
+      "method": "exhaustive",
+      "requests": 307,
+      "elapsedMs": 8071.973245,
+      "wallMs": {
+        "samples": 307,
+        "min": 32.07234000000062,
+        "median": 101.80496200000016,
+        "p95": 169.9817809999986,
+        "p99": 176.02249400000073,
+        "max": 185.8460670000004
+      },
+      "queriesPerSecond": 38.03283171065565,
+      "openSearchCpuMs": 32550,
+      "openSearchCpuMsPerQuery": 106.02605863192183,
+      "serviceCpu": {
+        "user": 457530,
+        "system": 29591
+      },
+      "serviceCpuMsPerQuery": 1.58671335504886,
+      "serviceMemory": {
+        "rss": 94728192,
+        "heapTotal": 28418048,
+        "heapUsed": 14211128,
+        "external": 5303644,
+        "arrayBuffers": 1812575
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573238751,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573238755,
+              "open_file_descriptors": 819,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1530380
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573238756,
+              "uptime_in_millis": 3689824,
+              "mem": {
+                "heap_used_in_bytes": 1083349216,
+                "heap_used_percent": 50,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201444824,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 764411896,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 313832952,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 313513976,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 14
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 5104368,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 5104368,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 909,
+                    "collection_time_in_millis": 11778
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24410,
+                "total_loaded_count": 24815,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573248034,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573248035,
+              "open_file_descriptors": 822,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1562930
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573248036,
+              "uptime_in_millis": 3699104,
+              "mem": {
+                "heap_used_in_bytes": 399501104,
+                "heap_used_percent": 18,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201478872,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 87031808,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 307838456,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 307838456,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 14
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 4630840,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 4630840,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 911,
+                    "collection_time_in_millis": 11785
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24410,
+                "total_loaded_count": 24815,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "red70dark30",
+      "method": "adaptive",
+      "requests": 7804,
+      "elapsedMs": 8002.348424999998,
+      "wallMs": {
+        "samples": 7804,
+        "min": 1.615376000001561,
+        "median": 3.3146800000031362,
+        "p95": 6.88869700000032,
+        "p99": 16.944987999999285,
+        "max": 72.45599199999924
+      },
+      "queriesPerSecond": 975.2137229640813,
+      "openSearchCpuMs": 30030,
+      "openSearchCpuMsPerQuery": 3.8480266529984624,
+      "serviceCpu": {
+        "user": 8494454,
+        "system": 798121
+      },
+      "serviceCpuMsPerQuery": 1.1907451307022041,
+      "serviceMemory": {
+        "rss": 164986880,
+        "heapTotal": 73506816,
+        "heapUsed": 19113912,
+        "external": 6553332,
+        "arrayBuffers": 3066700
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573249250,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573249251,
+              "open_file_descriptors": 822,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1562940
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573249252,
+              "uptime_in_millis": 3700319,
+              "mem": {
+                "heap_used_in_bytes": 403695408,
+                "heap_used_percent": 18,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201480664,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 91226112,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1285554176,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 307838456,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 307838456,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 14
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 4630840,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 4630840,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 911,
+                    "collection_time_in_millis": 11785
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24410,
+                "total_loaded_count": 24815,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573258458,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573258459,
+              "open_file_descriptors": 820,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1592970
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573258460,
+              "uptime_in_millis": 3709527,
+              "mem": {
+                "heap_used_in_bytes": 1349674752,
+                "heap_used_percent": 62,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201042120,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 1052770304,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1286602752,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 293950968,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 293898232,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 2953480,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 2953480,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 944,
+                    "collection_time_in_millis": 11891
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24411,
+                "total_loaded_count": 24816,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "rainbow20",
+      "method": "exhaustive",
+      "requests": 36,
+      "elapsedMs": 8519.976103999998,
+      "wallMs": {
+        "samples": 36,
+        "min": 812.0290779999996,
+        "median": 905.1332970000003,
+        "p95": 1099.3999409999997,
+        "p99": 1113.6296759999968,
+        "max": 1113.6296759999968
+      },
+      "queriesPerSecond": 4.225363963532545,
+      "openSearchCpuMs": 34170,
+      "openSearchCpuMsPerQuery": 949.1666666666666,
+      "serviceCpu": {
+        "user": 41776,
+        "system": 1859
+      },
+      "serviceCpuMsPerQuery": 1.2120833333333332,
+      "serviceMemory": {
+        "rss": 164986880,
+        "heapTotal": 73506816,
+        "heapUsed": 24958456,
+        "external": 7619006,
+        "arrayBuffers": 4132374
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573259943,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573259943,
+              "open_file_descriptors": 820,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1593830
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573259944,
+              "uptime_in_millis": 3711011,
+              "mem": {
+                "heap_used_in_bytes": 341494208,
+                "heap_used_percent": 15,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201042120,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 45088768,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1286602752,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 293963768,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 293898232,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 2441672,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 2441672,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 945,
+                    "collection_time_in_millis": 11893
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24411,
+                "total_loaded_count": 24816,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573269667,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573269668,
+              "open_file_descriptors": 822,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1628000
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573269669,
+              "uptime_in_millis": 3720736,
+              "mem": {
+                "heap_used_in_bytes": 1106344368,
+                "heap_used_percent": 51,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201042120,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 813694976,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1286602752,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 292013560,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 291994616,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 635832,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 635832,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 954,
+                    "collection_time_in_millis": 11911
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24411,
+                "total_loaded_count": 24816,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "query": "rainbow20",
+      "method": "adaptive",
+      "requests": 829,
+      "elapsedMs": 8010.284540000001,
+      "wallMs": {
+        "samples": 829,
+        "min": 12.647681000002194,
+        "median": 19.51888599999802,
+        "p95": 82.93906399999833,
+        "p99": 98.43730299999879,
+        "max": 107.63953800000309
+      },
+      "queriesPerSecond": 103.49195410728817,
+      "openSearchCpuMs": 31890,
+      "openSearchCpuMsPerQuery": 38.468033775633295,
+      "serviceCpu": {
+        "user": 2847414,
+        "system": 172395
+      },
+      "serviceCpuMsPerQuery": 3.6427129071170086,
+      "serviceMemory": {
+        "rss": 139726848,
+        "heapTotal": 51486720,
+        "heapUsed": 22894016,
+        "external": 6408118,
+        "arrayBuffers": 2921486
+      },
+      "nodeBefore": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573270903,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573270903,
+              "open_file_descriptors": 822,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1628050
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573270904,
+              "uptime_in_millis": 3721972,
+              "mem": {
+                "heap_used_in_bytes": 1146190256,
+                "heap_used_percent": 53,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201042120,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 853540864,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1286602752,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 292013560,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 291994616,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 635832,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 635832,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 954,
+                    "collection_time_in_millis": 11911
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24411,
+                "total_loaded_count": 24816,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      },
+      "nodeAfter": {
+        "_nodes": {
+          "total": 1,
+          "successful": 1,
+          "failed": 0
+        },
+        "cluster_name": "color-global-prototype",
+        "nodes": {
+          "FNscoL2qQFK2L1oEORJxnQ": {
+            "timestamp": 1789573280119,
+            "name": "b667474b1007",
+            "transport_address": "172.21.0.2:9300",
+            "host": "172.21.0.2",
+            "ip": "172.21.0.2:9300",
+            "roles": [
+              "cluster_manager",
+              "data",
+              "ingest",
+              "remote_cluster_client"
+            ],
+            "attributes": {
+              "shard_indexing_pressure_enabled": "true"
+            },
+            "process": {
+              "timestamp": 1789573280119,
+              "open_file_descriptors": 819,
+              "max_file_descriptors": 524288,
+              "cpu": {
+                "percent": 0,
+                "total_in_millis": 1659940
+              },
+              "mem": {
+                "total_virtual_in_bytes": 38077464576
+              }
+            },
+            "jvm": {
+              "timestamp": 1789573280120,
+              "uptime_in_millis": 3731188,
+              "mem": {
+                "heap_used_in_bytes": 1009310552,
+                "heap_used_percent": 46,
+                "heap_committed_in_bytes": 2147483648,
+                "heap_max_in_bytes": 2147483648,
+                "non_heap_used_in_bytes": 201077472,
+                "non_heap_committed_in_bytes": 210501632,
+                "pools": {
+                  "young": {
+                    "used_in_bytes": 718274560,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 1286602752,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 0,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  },
+                  "old": {
+                    "used_in_bytes": 289344504,
+                    "max_in_bytes": 2147483648,
+                    "peak_used_in_bytes": 1107836920,
+                    "peak_max_in_bytes": 2147483648,
+                    "last_gc_stats": {
+                      "used_in_bytes": 289289720,
+                      "max_in_bytes": 2147483648,
+                      "usage_percent": 13
+                    }
+                  },
+                  "survivor": {
+                    "used_in_bytes": 1691488,
+                    "max_in_bytes": 0,
+                    "peak_used_in_bytes": 119491152,
+                    "peak_max_in_bytes": 0,
+                    "last_gc_stats": {
+                      "used_in_bytes": 1691488,
+                      "max_in_bytes": 0,
+                      "usage_percent": -1
+                    }
+                  }
+                }
+              },
+              "threads": {
+                "count": 190,
+                "peak_count": 194
+              },
+              "gc": {
+                "collectors": {
+                  "young": {
+                    "collection_count": 984,
+                    "collection_time_in_millis": 12243
+                  },
+                  "old": {
+                    "collection_count": 0,
+                    "collection_time_in_millis": 0
+                  }
+                }
+              },
+              "buffer_pools": {
+                "mapped": {
+                  "count": 332,
+                  "used_in_bytes": 17429989971,
+                  "total_capacity_in_bytes": 17429989971
+                },
+                "direct": {
+                  "count": 171,
+                  "used_in_bytes": 36507047,
+                  "total_capacity_in_bytes": 36507046
+                },
+                "mapped - 'non-volatile memory'": {
+                  "count": 0,
+                  "used_in_bytes": 0,
+                  "total_capacity_in_bytes": 0
+                }
+              },
+              "classes": {
+                "current_loaded_count": 24411,
+                "total_loaded_count": 24816,
+                "total_unloaded_count": 405
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "completedAt": "2026-09-16T15:41:20.123Z"
+}

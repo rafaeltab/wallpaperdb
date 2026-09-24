@@ -1,0 +1,143 @@
+{
+  "auditedAt": "2026-09-22T23:23:10.417999+00:00",
+  "auditor": "independent favorite_perf_audit filesystem-only",
+  "passed": true,
+  "checks": 7144,
+  "errors": [],
+  "artifacts": {
+    "arrival.json": "d1f1fd9ceb082f7c73f235fded853daaf324736a572a0c41e2fabf215f8f6a22",
+    "plan.json": "20642a68ddd033715c353db604d93f2f89104b6cdc04b54224e3607e01d22678",
+    "source-snapshot.json": "367b595476e77e7055db04bf2ae8a105d0e55b1ffc39172f71d006402e82ad1b",
+    "requests.jsonl": "f0b94266fc55d0923269e9310dc2cd340bb79ffcf3ae39c47deae55fe94b25dc",
+    "resources.jsonl": "d5ce43983bca6bfd93add12db30e500772267b5dc8a28311ee40f7a51a12b00c"
+  },
+  "primaryArtifactSha256": "a55de34251457f0f3e7c497206a63f529bc5c0195d9560facaf63ab17ad4e833",
+  "sourceSnapshotHash": "f22818a2e2ce5ad2434dc440c3bb0755e9b2cd93b9c67143ce8a4730cd3d5fee",
+  "auditScriptSha256": "5a2ecf8a5357288ab9a4192217391a06647c643d38b7be407caf0e0bb00edaa7",
+  "profiles": 8,
+  "warmups": 2,
+  "rawRequests": 1742,
+  "rawResources": 236,
+  "timed": {
+    "requests": 1740,
+    "errors": 0,
+    "slow": 0,
+    "failureUnion": 0,
+    "clientRejected": 0
+  },
+  "warmupFailureUnion": 0,
+  "indexAuditUnchanged": true,
+  "results": [
+    {
+      "caseId": "strict-hue-favorite-001-256:picked-one-vibe",
+      "rate": 1,
+      "requests": 30,
+      "p50Ms": 255.94353400000546,
+      "p95Ms": 260.9038479999981,
+      "p99Ms": 261.51543599999786,
+      "maxMs": 261.51543599999786,
+      "maximumSchedulerDelayMs": 1.8935089999995398,
+      "throughputPerSecond": 0.9999872546624456,
+      "peakInFlight": 1,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-256:picked-one-vibe",
+      "rate": 4,
+      "requests": 120,
+      "p50Ms": 243.27705299999798,
+      "p95Ms": 248.9454390000028,
+      "p99Ms": 256.34089700000186,
+      "maxMs": 268.69050499999867,
+      "maximumSchedulerDelayMs": 2.1355040000053123,
+      "throughputPerSecond": 4,
+      "peakInFlight": 2,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-256:picked-one-vibe",
+      "rate": 8,
+      "requests": 240,
+      "p50Ms": 243.79266999999527,
+      "p95Ms": 251.4627990000008,
+      "p99Ms": 253.26746199998888,
+      "maxMs": 261.3354709999985,
+      "maximumSchedulerDelayMs": 1.7107879999966826,
+      "throughputPerSecond": 7.969017396191884,
+      "peakInFlight": 3,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-256:picked-one-vibe",
+      "rate": 16,
+      "requests": 480,
+      "p50Ms": 245.3612770000036,
+      "p95Ms": 253.13776500000677,
+      "p99Ms": 258.18265899999824,
+      "maxMs": 276.5099380000029,
+      "maximumSchedulerDelayMs": 1.374731999996584,
+      "throughputPerSecond": 15.903201294481933,
+      "peakInFlight": 5,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-1024:picked-one-vibe",
+      "rate": 1,
+      "requests": 30,
+      "p50Ms": 256.70377200000803,
+      "p95Ms": 260.11102500002016,
+      "p99Ms": 260.1176560000167,
+      "maxMs": 260.1176560000167,
+      "maximumSchedulerDelayMs": 1.4677770000125747,
+      "throughputPerSecond": 0.9999943769649519,
+      "peakInFlight": 1,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-1024:picked-one-vibe",
+      "rate": 4,
+      "requests": 120,
+      "p50Ms": 242.4001430000062,
+      "p95Ms": 246.79461700000684,
+      "p99Ms": 249.07960900000762,
+      "maxMs": 260.8260129999835,
+      "maximumSchedulerDelayMs": 1.213320000009844,
+      "throughputPerSecond": 4,
+      "peakInFlight": 2,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-1024:picked-one-vibe",
+      "rate": 8,
+      "requests": 240,
+      "p50Ms": 243.7972299999965,
+      "p95Ms": 249.7498599999817,
+      "p99Ms": 253.9196879999945,
+      "maxMs": 270.358218999987,
+      "maximumSchedulerDelayMs": 2.6524159999971744,
+      "throughputPerSecond": 7.968087773672458,
+      "peakInFlight": 3,
+      "viableAtTestedLoad": true
+    },
+    {
+      "caseId": "strict-hue-favorite-001-1024:picked-one-vibe",
+      "rate": 16,
+      "requests": 480,
+      "p50Ms": 244.52713000000222,
+      "p95Ms": 253.3672759999754,
+      "p99Ms": 259.83749799997895,
+      "maxMs": 270.6113189999887,
+      "maximumSchedulerDelayMs": 1.816393999994034,
+      "throughputPerSecond": 15.902862025793823,
+      "peakInFlight": 5,
+      "viableAtTestedLoad": true
+    }
+  ],
+  "limitations": [
+    "Only two unrestricted single-color cases qualified; five-color cases were omitted because primary C1 failed. One/two-color proportion cases are outside this representative arrival subset.",
+    "Both banks share a projected70-color-field sourceOFF million-mixture index; this is not full-schema capacity.",
+    "All-request scheduled-to-completion percentiles include scheduler delay; offered rates are fixed, achieved throughput includes full30-second window and drain.",
+    "Eight30-second profiles support the measured host/workload conditions, not universal production concurrency guarantees.",
+    "Index stability was checked from captured UUID/mapping/count and3 sample-value audits before/after; this independent audit issues no new service queries."
+  ]
+}

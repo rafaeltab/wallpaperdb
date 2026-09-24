@@ -1,0 +1,40 @@
+{
+  "runId": "2026-09-21T23-14-33.424Z-046c06d3",
+  "sourceRun": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-14-33.424Z-046c06d3/run.json",
+  "sourceRunSha256": "0c691c3ea16ce923cfac382bc6e013a2e86be2204b51fc2df783707419736975",
+  "sourceSnapshot": {
+    "sha256": "8c4a14310ac168211860c4e2f4cb25c4b39426eb92b19efb4ae17a6f2c3d195a",
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/source-snapshots/8c4a14310ac168211860c4e2f4cb25c4b39426eb92b19efb4ae17a6f2c3d195a.json"
+  },
+  "datasetFingerprint": "e7a45108ff77ffc8ae72e41b38d948778f191af12278e280fde9313fc150a1cc",
+  "canonicalChecks": [
+    {
+      "id": "cutoff-shade-all-levels",
+      "primaryId": "cutoff-shade-all-levels-1024-blend0-i1",
+      "historicalResultsIdentical": true,
+      "performance": {
+        "sampleCount": 93,
+        "p50Ms": 3.6086130000003322,
+        "p95Ms": 4.831971999999951,
+        "maxMs": 5.916932000000088,
+        "failures": 0
+      },
+      "timedAtOrAbove1s": 0
+    },
+    {
+      "id": "cutoff-shade-hue-all-levels",
+      "primaryId": "cutoff-shade-hue-all-levels",
+      "historicalResultsIdentical": true,
+      "performance": {
+        "sampleCount": 93,
+        "p50Ms": 3.2775709999987157,
+        "p95Ms": 4.888618999997561,
+        "maxMs": 6.160729999999603,
+        "failures": 0
+      },
+      "timedAtOrAbove1s": 0
+    }
+  ],
+  "timedRequests": 186,
+  "note": "Separate historical37-case canonical run. Its timing samples are not added to the main38-case sweep."
+}

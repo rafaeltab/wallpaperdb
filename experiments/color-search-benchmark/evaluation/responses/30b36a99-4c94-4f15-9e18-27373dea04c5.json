@@ -1,0 +1,2550 @@
+{
+  "schemaVersion": 1,
+  "savedAt": "2026-09-19T22:42:19.251Z",
+  "fingerprint": "1214b8ffe84b40130566806ce76da5bcc0b0b4604b62143cb96499d605665ae7",
+  "batchSha256": "d64f71e2629819aeb41a0193afa16de37fe69db8f1d04bc99fd62e9c606b294f",
+  "submission": {
+    "batchId": "color-review-batch-001",
+    "batchVersion": 1,
+    "answers": [
+      {
+        "caseId": "composition-green-red-real-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:29:00.066Z"
+      },
+      {
+        "caseId": "perceived-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "pink doesnt feel red at all",
+        "updatedAt": "2026-09-19T22:29:25.297Z"
+      },
+      {
+        "caseId": "perceived-orange-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "Rock doesnt feel orange",
+        "updatedAt": "2026-09-19T22:29:44.160Z"
+      },
+      {
+        "caseId": "perceived-pink-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "The roses  don't feel pink",
+        "updatedAt": "2026-09-19T22:30:13.765Z"
+      },
+      {
+        "caseId": "perceived-green-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "Not sure about A and B order",
+        "updatedAt": "2026-09-19T22:30:41.964Z"
+      },
+      {
+        "caseId": "perceived-blue-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "Not sure about B and D order. \n\nA feels very brightly blue, C has a lot of less bright blue, B doesnt feel as convincingly blue as D, maybe because D has the blue as the focus point?",
+        "updatedAt": "2026-09-19T22:31:49.693Z"
+      },
+      {
+        "caseId": "proportion-green-real-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "not sure about B and D order",
+        "updatedAt": "2026-09-19T22:32:15.440Z"
+      },
+      {
+        "caseId": "proportion-green-real-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "A isn't very green. C doesnt have enough green",
+        "updatedAt": "2026-09-19T22:32:54.041Z"
+      },
+      {
+        "caseId": "proportion-red-real-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "B feels more red than A. C feels like it has too much red. D definitely has too much red.",
+        "updatedAt": "2026-09-19T22:33:32.444Z"
+      },
+      {
+        "caseId": "vibe-dark-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:33:41.790Z"
+      },
+      {
+        "caseId": "vibe-light-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:33:58.603Z"
+      },
+      {
+        "caseId": "vibe-vivid-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:09.469Z"
+      },
+      {
+        "caseId": "vibe-strict-grayscale-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:24.822Z"
+      },
+      {
+        "caseId": "vibe-near-neutral-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "those flowers dont feel close to grayscale",
+        "updatedAt": "2026-09-19T22:34:43.636Z"
+      },
+      {
+        "caseId": "vibe-monochromatic-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:58.628Z"
+      },
+      {
+        "caseId": "combination-gray-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:35:12.781Z"
+      },
+      {
+        "caseId": "composition-gray-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "white just isn't grayscale, its just white. I mean technically it isnt, but when you search for grayscale you're not looking for white, you're looking for grayscale. I dont know why I put C above B, but it definitely feels better.",
+        "updatedAt": "2026-09-19T22:37:47.946Z"
+      },
+      {
+        "caseId": "composition-gray-red-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "with this percentage, the roses just have too much red to justify. ",
+        "updatedAt": "2026-09-19T22:38:18.865Z"
+      },
+      {
+        "caseId": "vibe-dark-accents-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "B has a dark vibe. I wouldn't necessarily describe black as dark, so maybe it should be lower ranked?",
+        "updatedAt": "2026-09-19T22:39:07.758Z"
+      },
+      {
+        "caseId": "composition-blue-orange-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:39:54.264Z"
+      },
+      {
+        "caseId": "composition-blue-orange-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:40:03.336Z"
+      },
+      {
+        "caseId": "precision-warm-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:40:27.908Z"
+      },
+      {
+        "caseId": "precision-muted-green-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "not sure about the last two",
+        "updatedAt": "2026-09-19T22:40:53.462Z"
+      },
+      {
+        "caseId": "palette-rainbow-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "Not sure about the last two",
+        "updatedAt": "2026-09-19T22:42:17.495Z"
+      }
+    ],
+    "submissionId": "30b36a99-4c94-4f15-9e18-27373dea04c5"
+  },
+  "batchSnapshot": {
+    "schemaVersion": 1,
+    "id": "color-review-batch-001",
+    "version": 1,
+    "title": "Color preferences — 24 comparisons",
+    "createdDate": "2026-09-18",
+    "status": "awaiting-user-judgments",
+    "use": "development preference elicitation",
+    "caseCount": 24,
+    "sourceCatalog": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/catalog.json",
+    "reviewInstructions": {
+      "rank": "Order the images by how well they match the request. Ties and uncertainty are welcome.",
+      "notes": "Notes are optional. You can flag that none matches well or skip a difficult comparison.",
+      "amounts": "Percentage targets refer to the whole image, and are targets rather than minimums. Unspecified remainder is unrestricted.",
+      "presentation": "Show complete original images in neutral, equal frames using object-fit: contain. Do not crop or show source titles, candidate amounts, computed scores or prior judgments."
+    },
+    "cases": [
+      {
+        "id": "composition-green-red-real-002",
+        "sequence": 1,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "40% green, 40% red; the remaining 20% is unspecified",
+          "detail": "Aim close to 40% green and 40% red across the whole image. The remaining 20% can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "green",
+              "targetImagePercent": 40
+            },
+            {
+              "colorName": "red",
+              "targetImagePercent": 40
+            }
+          ],
+          "unspecifiedRemainderPercent": 20
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "evaluation-green-red-leaves",
+            "filename": "corpus/evaluation/green-red-real-leaves.jpg",
+            "sha256": "3ae3e24af1783fac04adf4eb03facf448503ae589f0dbda57329bee50db9ee1c",
+            "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_and_green_leaves.jpg",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Red_and_green_leaves.jpg",
+            "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_and_green_leaves.jpg&oldid=700850586",
+            "author": "Iwanjayz",
+            "license": "CC BY-SA 4.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+            "width": 3456,
+            "height": 2304,
+            "bytes": 3485161,
+            "format": "jpeg",
+            "modifications": "None; original source bytes.",
+            "retrievedDate": "2026-09-16"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-082",
+            "filename": "corpus/wallpaper-082.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+            "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_close_up_of_red_leaves.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2193246,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "evaluation-green-red-tulip-field",
+            "filename": "corpus/evaluation/green-red-real-tulip-field.jpg",
+            "sha256": "ef3133f273312d74c57492947d8a97475be2e5ee7d726c4791afa6c75d7445da",
+            "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_Tulips_(205290827).jpeg",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/11/Red_Tulips_%28205290827%29.jpeg",
+            "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_Tulips_(205290827).jpeg&oldid=1164769766",
+            "author": "Dana Hutchinson",
+            "license": "CC BY 3.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+            "width": 2048,
+            "height": 1365,
+            "bytes": 1137255,
+            "format": "jpeg",
+            "modifications": "None; original source bytes.",
+            "retrievedDate": "2026-09-16"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "evaluation-green-red-tulips",
+            "filename": "corpus/evaluation/green-red-real-tulips.jpg",
+            "sha256": "75dd9cb3844694f97ac67041eb3335b7206226f4bd20db1197b00a57008973e3",
+            "sourcePage": "https://commons.wikimedia.org/wiki/File:Redtulips.jpg",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Redtulips.jpg",
+            "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Redtulips.jpg&oldid=1116964383",
+            "originalPublication": "https://www.flickr.com/photos/evilerin/3472825850",
+            "author": "Evil Erin",
+            "license": "CC BY 2.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+            "width": 3008,
+            "height": 2000,
+            "bytes": 2700033,
+            "format": "jpeg",
+            "modifications": "None; original source bytes.",
+            "retrievedDate": "2026-09-16"
+          }
+        ],
+        "evaluationGroup": "green-red-specified-remainder",
+        "relatedCases": [
+          "composition-green-red-real-001",
+          "composition-green-red-001",
+          "proportion-green-001",
+          "proportion-green-002",
+          "perceived-red-001"
+        ],
+        "originCase": "composition-green-red-real-002",
+        "preservedPresentationVersion": 1
+      },
+      {
+        "id": "perceived-red-batch-001",
+        "sequence": 2,
+        "status": "awaiting-user-judgment",
+        "category": "Perceived color",
+        "query": {
+          "text": "Red",
+          "detail": "A wallpaper that feels red."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-084",
+            "filename": "corpus/wallpaper-084.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-084.jpg",
+            "sha256": "1729194d2b7593b21fac2427eb30d3d173549217a85981ed87186647659784ed",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2105430,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-095",
+            "filename": "corpus/wallpaper-095.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-095.jpg",
+            "sha256": "bee0e7c41b884a45525586f5471555a3d0c2f1ca410c7b8f86e56e0f0fdbfa9c",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "license": "unknown",
+            "width": 3000,
+            "height": 1980,
+            "bytes": 782090,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-037",
+            "filename": "corpus/wallpaper-037.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-037.jpg",
+            "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_red_and_orange_sky_with_clouds.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1742302,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-044",
+            "filename": "corpus/wallpaper-044.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-044.jpg",
+            "sha256": "cf2cfddbfc8185367d85e1d99d695106ded3459ab4cea2d0c980f4dc72ca05e4",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "license": "unknown",
+            "width": 2447,
+            "height": 3260,
+            "bytes": 842408,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "perceived-orange-batch-001",
+        "sequence": 3,
+        "status": "awaiting-user-judgment",
+        "category": "Perceived color",
+        "query": {
+          "text": "Orange",
+          "detail": "A wallpaper that feels orange."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-046",
+            "filename": "corpus/wallpaper-046.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-046.jpg",
+            "sha256": "746ea33448f91eb907960138e1e79528830ca2828fcee444078371c054867d2c",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 141610,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-031",
+            "filename": "corpus/wallpaper-031.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-031.jpg",
+            "sha256": "7ad700c6e4bfb0799eda39221bf0c0738650c5a891056d36956bb46788b8496a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_on_a_road_with_orange_clouds_in_the_sky.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_on_a_road_with_orange_clouds_in_the_sky.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_car_on_a_road_with_orange_clouds_in_the_sky.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 130316,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-087",
+            "filename": "corpus/wallpaper-087.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-087.jpg",
+            "sha256": "1284682ec29fa65a71ea7ecc1f1d5b8c06bdd1918eeb40b5fb826957cc5c6429",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_large_rocks_in_a_desert.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_large_rocks_in_a_desert.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_large_rocks_in_a_desert.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2902314,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-036",
+            "filename": "corpus/wallpaper-036.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-036.jpg",
+            "sha256": "59d5b727605c6d21ac18cd81b2b7169fdaeb2f6cce315625e9d8de614c2dab8b",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_group_of_people_standing_on_a_mountain.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_group_of_people_standing_on_a_mountain.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_group_of_people_standing_on_a_mountain.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1348681,
+            "format": "png"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "perceived-pink-batch-001",
+        "sequence": 4,
+        "status": "awaiting-user-judgment",
+        "category": "Perceived color",
+        "query": {
+          "text": "Pink",
+          "detail": "A wallpaper that feels pink."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-033",
+            "filename": "corpus/wallpaper-033.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-033.jpg",
+            "sha256": "658622e9ff70054352b980612e80a92445fc834a9c74d241f3f01b684c7993d9",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_with_trees_on_it.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_with_trees_on_it.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_car_with_trees_on_it.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1188121,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-044",
+            "filename": "corpus/wallpaper-044.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-044.jpg",
+            "sha256": "cf2cfddbfc8185367d85e1d99d695106ded3459ab4cea2d0c980f4dc72ca05e4",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_close_up_of_a_tree_with_pink_flowers_01.jpg",
+            "license": "unknown",
+            "width": 2447,
+            "height": 3260,
+            "bytes": 842408,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-048",
+            "filename": "corpus/wallpaper-048.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-048.jpg",
+            "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_group_of_roses_on_a_dark_background.png",
+            "license": "unknown",
+            "width": 6016,
+            "height": 4000,
+            "bytes": 2971577,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-039",
+            "filename": "corpus/wallpaper-039.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-039.jpg",
+            "sha256": "b1f9e273f464a532ee6157131fce11e4593b77a0f2047610401bd36dc0183b4b",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/hot_air_balloons_in_the_sky.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/hot_air_balloons_in_the_sky.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/hot_air_balloons_in_the_sky.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1659560,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "perceived-green-batch-001",
+        "sequence": 5,
+        "status": "awaiting-user-judgment",
+        "category": "Perceived color",
+        "query": {
+          "text": "Green",
+          "detail": "A wallpaper that feels green."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-083",
+            "filename": "corpus/wallpaper-083.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-083.jpg",
+            "sha256": "f3382e02c83f83332d5ad90ed2bebce4e88601a52c9e8595a92818e00b544057",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_bamboo_trees.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_bamboo_trees.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_group_of_bamboo_trees.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 3219951,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-093",
+            "filename": "corpus/wallpaper-093.jpeg",
+            "thumbnail": "corpus/thumbnails/wallpaper-093.jpg",
+            "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "license": "unknown",
+            "width": 4096,
+            "height": 3259,
+            "bytes": 4819900,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-050",
+            "filename": "corpus/wallpaper-050.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-050.jpg",
+            "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 3885287,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-086",
+            "filename": "corpus/wallpaper-086.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-086.jpg",
+            "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_lake_with_trees_and_clouds.png",
+            "license": "unknown",
+            "width": 2560,
+            "height": 1440,
+            "bytes": 6952430,
+            "format": "png"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "perceived-blue-batch-001",
+        "sequence": 6,
+        "status": "awaiting-user-judgment",
+        "category": "Perceived color",
+        "query": {
+          "text": "Blue",
+          "detail": "A wallpaper that feels blue."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-091",
+            "filename": "corpus/wallpaper-091.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-091.jpg",
+            "sha256": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_bridge_with_a_view_of_a_city.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_bridge_with_a_view_of_a_city.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_bridge_with_a_view_of_a_city.jpg",
+            "license": "unknown",
+            "width": 2137,
+            "height": 1400,
+            "bytes": 312404,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-010",
+            "filename": "corpus/wallpaper-010.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-010.jpg",
+            "sha256": "bc9b1d219e079cc53c647266f91517cb9464ae4a6d16c9b1c653bfc64eaadc86",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_white_building_with_balconies.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_white_building_with_balconies.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_white_building_with_balconies.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 289023,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-030",
+            "filename": "corpus/wallpaper-030.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-030.jpg",
+            "sha256": "01ec9dd89ce75f4b0d5135aa94543d71f8a710319fabb882ecaef104bc589c8c",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_white_tower_with_a_blue_sky.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_white_tower_with_a_blue_sky.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "architecture/a_white_tower_with_a_blue_sky.jpg",
+            "license": "unknown",
+            "width": 3200,
+            "height": 4000,
+            "bytes": 374332,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-047",
+            "filename": "corpus/wallpaper-047.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-047.jpg",
+            "sha256": "85b8ca0b004b0a5d353892e3ec38fe5e3aeb252f041808e884e13e97fa194b5d",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_blue_flowers.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_blue_flowers.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_group_of_blue_flowers.jpg",
+            "license": "unknown",
+            "width": 5238,
+            "height": 3492,
+            "bytes": 1593029,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "proportion-green-real-batch-001",
+        "sequence": 7,
+        "status": "awaiting-user-judgment",
+        "category": "Proportions",
+        "query": {
+          "text": "40% green; the remaining 60% is unspecified",
+          "detail": "Aim close to 40% green across the whole image. The rest can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "green",
+              "targetImagePercent": 40
+            }
+          ],
+          "unspecifiedRemainderPercent": 60
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-093",
+            "filename": "corpus/wallpaper-093.jpeg",
+            "thumbnail": "corpus/thumbnails/wallpaper-093.jpg",
+            "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "license": "unknown",
+            "width": 4096,
+            "height": 3259,
+            "bytes": 4819900,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-083",
+            "filename": "corpus/wallpaper-083.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-083.jpg",
+            "sha256": "f3382e02c83f83332d5ad90ed2bebce4e88601a52c9e8595a92818e00b544057",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_bamboo_trees.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_bamboo_trees.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_group_of_bamboo_trees.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 3219951,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-081",
+            "filename": "corpus/wallpaper-081.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-081.jpg",
+            "sha256": "ff9c795cef947e59970f87f08ed81df4d58f4c61ac28300fa44d253c8a2425b3",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_building_in_the_woods.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_building_in_the_woods.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_building_in_the_woods.jpg",
+            "license": "unknown",
+            "width": 3376,
+            "height": 6000,
+            "bytes": 4451457,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-050",
+            "filename": "corpus/wallpaper-050.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-050.jpg",
+            "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 3885287,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "proportion-green-real-batch-002",
+        "sequence": 8,
+        "status": "awaiting-user-judgment",
+        "category": "Proportions",
+        "query": {
+          "text": "70% green; the remaining 30% is unspecified",
+          "detail": "Aim close to 70% green across the whole image. The rest can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "green",
+              "targetImagePercent": 70
+            }
+          ],
+          "unspecifiedRemainderPercent": 30
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-090",
+            "filename": "corpus/wallpaper-090.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-090.jpg",
+            "sha256": "0f78ea66504b0f71182665a003280c0cb0879c7834c09c37cf130bdc63841049",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_stream_in_the_woods.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_stream_in_the_woods.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_stream_in_the_woods.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 5303655,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-050",
+            "filename": "corpus/wallpaper-050.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-050.jpg",
+            "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_purple_flowers_growing_out_of_lily_pads_in_a_pond.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 3885287,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-012",
+            "filename": "corpus/wallpaper-012.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-012.jpg",
+            "sha256": "5b7a292dbebab79a1048e50af0b51e9c447354a04425e48d05bddc5092edd7d5",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_rocky_beach_with_trees_and_water.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_rocky_beach_with_trees_and_water.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "aerial/a_rocky_beach_with_trees_and_water.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1279,
+            "bytes": 1587379,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-086",
+            "filename": "corpus/wallpaper-086.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-086.jpg",
+            "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_lake_with_trees_and_clouds.png",
+            "license": "unknown",
+            "width": 2560,
+            "height": 1440,
+            "bytes": 6952430,
+            "format": "png"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "proportion-red-real-batch-001",
+        "sequence": 9,
+        "status": "awaiting-user-judgment",
+        "category": "Proportions",
+        "query": {
+          "text": "20% red; the remaining 80% is unspecified",
+          "detail": "Aim close to 20% red across the whole image. The rest can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "red",
+              "targetImagePercent": 20
+            }
+          ],
+          "unspecifiedRemainderPercent": 80
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-060",
+            "filename": "corpus/wallpaper-060.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+            "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_tree_with_pink_leaves.jpg",
+            "license": "unknown",
+            "width": 1366,
+            "height": 768,
+            "bytes": 160374,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-029",
+            "filename": "corpus/wallpaper-029.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-029.jpg",
+            "sha256": "08e7badf417a6017f3e7443a150e8e2f910ab2188a779ff8cb74b910fd321789",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_red_sign_on_a_building.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_red_sign_on_a_building.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "architecture/a_red_sign_on_a_building.jpg",
+            "license": "unknown",
+            "width": 4423,
+            "height": 2975,
+            "bytes": 1782019,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-084",
+            "filename": "corpus/wallpaper-084.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-084.jpg",
+            "sha256": "1729194d2b7593b21fac2427eb30d3d173549217a85981ed87186647659784ed",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_group_of_fish_swimming_in_a_pond.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2105430,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-082",
+            "filename": "corpus/wallpaper-082.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+            "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_close_up_of_red_leaves.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2193246,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-dark-batch-001",
+        "sequence": 10,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Dark",
+          "detail": "A wallpaper that feels dark."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-067",
+            "filename": "corpus/wallpaper-067.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-067.jpg",
+            "sha256": "5c6c38c093055c135f55dc68c55e191606de32a63ccffd9df6733cde26df655e",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_pile_of_black_rocks.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_pile_of_black_rocks.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "monochrome/a_pile_of_black_rocks.jpg",
+            "license": "unknown",
+            "width": 4031,
+            "height": 2267,
+            "bytes": 1198844,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-011",
+            "filename": "corpus/wallpaper-011.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-011.jpg",
+            "sha256": "37b91fdcb3c15dda5f3189bcde76003ed79a10d4c732ded256d62d519fcf8687",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_close_up_of_water_01.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_close_up_of_water_01.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "aerial/a_close_up_of_water_01.jpg",
+            "license": "unknown",
+            "width": 5760,
+            "height": 3840,
+            "bytes": 2683798,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-075",
+            "filename": "corpus/wallpaper-075.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-075.jpg",
+            "sha256": "0182b8ae436cf426ed0ac727e9e2a69e3086d01b9508e4d27a208324002d12a3",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_river_in_a_snowy_landscape.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_river_in_a_snowy_landscape.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "mountain/a_river_in_a_snowy_landscape.jpg",
+            "license": "unknown",
+            "width": 6016,
+            "height": 4016,
+            "bytes": 1360274,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-079",
+            "filename": "corpus/wallpaper-079.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-079.jpg",
+            "sha256": "7e96fd38762f4fe359f88519097fc260b15867e98b8906be41660ad23d68d908",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_snowy_mountain_top_with_dark_sky.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_snowy_mountain_top_with_dark_sky.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "mountain/a_snowy_mountain_top_with_dark_sky.jpg",
+            "license": "unknown",
+            "width": 5472,
+            "height": 3078,
+            "bytes": 466676,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-light-batch-001",
+        "sequence": 11,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Light",
+          "detail": "A wallpaper that feels light."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-073",
+            "filename": "corpus/wallpaper-073.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-073.jpg",
+            "sha256": "b90dcdd5341762ee4968c5fcc543be23d5d6d102c0f9ba3f97219e36752a9c29",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_large_rock_formation_on_a_beach.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_large_rock_formation_on_a_beach.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "mountain/a_large_rock_formation_on_a_beach.jpg",
+            "license": "unknown",
+            "width": 8256,
+            "height": 5504,
+            "bytes": 4053634,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-051",
+            "filename": "corpus/wallpaper-051.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-051.jpg",
+            "sha256": "d8848bb5111f77a6a3bb9e9a8888cde7794b17376fac379cdeb99a11fbab2434",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_blue_and_pink_sky_over_a_mountain_range.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_blue_and_pink_sky_over_a_mountain_range.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_blue_and_pink_sky_over_a_mountain_range.png",
+            "license": "unknown",
+            "width": 5120,
+            "height": 2880,
+            "bytes": 5504378,
+            "format": "png"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-096",
+            "filename": "corpus/wallpaper-096.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-096.jpg",
+            "sha256": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_on_a_surface.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_on_a_surface.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_flowers_on_a_surface.jpg",
+            "license": "unknown",
+            "width": 5137,
+            "height": 3564,
+            "bytes": 5539616,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-088",
+            "filename": "corpus/wallpaper-088.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-088.jpg",
+            "sha256": "f2868aad3a75ed42289467b969b37348c8ad49727db93e830023f4684ac10df6",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_pile_of_logs_in_a_snowy_field.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_pile_of_logs_in_a_snowy_field.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_pile_of_logs_in_a_snowy_field.jpg",
+            "license": "unknown",
+            "width": 4000,
+            "height": 2670,
+            "bytes": 1981907,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-vivid-batch-001",
+        "sequence": 12,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Bright, vivid colors",
+          "detail": "A colorful wallpaper with a bright, vivid feel."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-032",
+            "filename": "corpus/wallpaper-032.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-032.jpg",
+            "sha256": "80a85e97c8b63311543a59403c1266310df73b27ce0c491561ca69e5b309ce3e",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1430803,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-094",
+            "filename": "corpus/wallpaper-094.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-094.jpg",
+            "sha256": "d2f9075c0b13ae2e16bfff1972dcc8f0574cf363e6f4056aabe80abce230f64a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 350496,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-052",
+            "filename": "corpus/wallpaper-052.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-052.jpg",
+            "sha256": "41bc0c2b2054edfa77c1b8a806b45276bcc2361032b84ac49005cb7828ee7491",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_colorful_snow_covered_land.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_colorful_snow_covered_land.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_colorful_snow_covered_land.png",
+            "license": "unknown",
+            "width": 5120,
+            "height": 2880,
+            "bytes": 2329280,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-098",
+            "filename": "corpus/wallpaper-098.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-098.jpg",
+            "sha256": "a8187d04f47f3c9193c9746362fc779d489533138b3c60fbb2adc43158d9632e",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_pool_with_chairs_and_palm_trees.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_pool_with_chairs_and_palm_trees.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_pool_with_chairs_and_palm_trees.jpg",
+            "license": "unknown",
+            "width": 2560,
+            "height": 1692,
+            "bytes": 920836,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-strict-grayscale-batch-001",
+        "sequence": 13,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Grayscale",
+          "detail": "Specifically black, white and gray; colored tints are not the goal."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-071",
+            "filename": "corpus/wallpaper-071.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-071.jpg",
+            "sha256": "ad846eb13081bfcd675e000ecb66a7a2cfe5cfc3e97eb9ce966f7e922ed6698f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_close_up_of_rocks.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_close_up_of_rocks.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "mountain/a_close_up_of_rocks.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 1219090,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-068",
+            "filename": "corpus/wallpaper-068.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-068.jpg",
+            "sha256": "0a4f4018a08fc37855662e2f4f59c34b6a210fc3949453eb1fe79da977daf224",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_plant_in_a_pot.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_plant_in_a_pot.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "monochrome/a_plant_in_a_pot.jpg",
+            "license": "unknown",
+            "width": 3985,
+            "height": 2989,
+            "bytes": 2445267,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-070",
+            "filename": "corpus/wallpaper-070.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-070.jpg",
+            "sha256": "926206385f2509d9e1d911668ea0109ff25654963efe6bfe4a66c89778d04849",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/looking_up_view_of_tall_buildings.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/looking_up_view_of_tall_buildings.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "monochrome/looking_up_view_of_tall_buildings.jpg",
+            "license": "unknown",
+            "width": 3440,
+            "height": 1440,
+            "bytes": 781408,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-007",
+            "filename": "corpus/wallpaper-007.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-007.jpg",
+            "sha256": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 853499,
+            "format": "png"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-near-neutral-batch-001",
+        "sequence": 14,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Almost grayscale",
+          "detail": "Very little color overall; a subtle warm or cool tint is fine."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-062",
+            "filename": "corpus/wallpaper-062.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-062.jpg",
+            "sha256": "e8293bebb250e93ce70991219f9d25b20fe553699732e55259b67465339decdd",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_black_sand_with_white_foamy_waves.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_black_sand_with_white_foamy_waves.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "monochrome/a_black_sand_with_white_foamy_waves.png",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2400,
+            "bytes": 13263705,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-096",
+            "filename": "corpus/wallpaper-096.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-096.jpg",
+            "sha256": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_on_a_surface.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_on_a_surface.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_flowers_on_a_surface.jpg",
+            "license": "unknown",
+            "width": 5137,
+            "height": 3564,
+            "bytes": 5539616,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-007",
+            "filename": "corpus/wallpaper-007.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-007.jpg",
+            "sha256": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_painting_of_a_man_with_a_face_on_his_head.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 853499,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-071",
+            "filename": "corpus/wallpaper-071.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-071.jpg",
+            "sha256": "ad846eb13081bfcd675e000ecb66a7a2cfe5cfc3e97eb9ce966f7e922ed6698f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_close_up_of_rocks.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/mountain/a_close_up_of_rocks.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "mountain/a_close_up_of_rocks.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 1219090,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "vibe-monochromatic-batch-001",
+        "sequence": 15,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "One hue overall",
+          "detail": "A monochromatic feel: shades of one color. It does not have to be gray."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-008",
+            "filename": "corpus/wallpaper-008.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-008.jpg",
+            "sha256": "3ebefaf297de677354aecfb5121d42753a49ccf69a4bd3a615ebb34d3cf00f78",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_skeleton_standing_on_a_pile_of_skulls.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_skeleton_standing_on_a_pile_of_skulls.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_skeleton_standing_on_a_pile_of_skulls.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1356060,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-091",
+            "filename": "corpus/wallpaper-091.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-091.jpg",
+            "sha256": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_bridge_with_a_view_of_a_city.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_bridge_with_a_view_of_a_city.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_bridge_with_a_view_of_a_city.jpg",
+            "license": "unknown",
+            "width": 2137,
+            "height": 1400,
+            "bytes": 312404,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-009",
+            "filename": "corpus/wallpaper-009.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-009.jpg",
+            "sha256": "c12284f866aef429bb3f94335c86d57034ca91f52a699b9a88b2d66323006266",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_statue_of_a_woman_with_wings_and_wings.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_statue_of_a_woman_with_wings_and_wings.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_statue_of_a_woman_with_wings_and_wings.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 2237826,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-004",
+            "filename": "corpus/wallpaper-004.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-004.jpg",
+            "sha256": "8ce0380d95f76c457eec19a2fae02756f38bc5a4ab6ea3de24ccb37124a254da",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_swirls_of_paint.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_swirls_of_paint.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_colorful_swirls_of_paint.jpg",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 1956245,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "combination-gray-red-batch-001",
+        "sequence": 16,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "Grayscale with red accents",
+          "detail": "A mostly grayscale feel, with red as the color that stands out."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-095",
+            "filename": "corpus/wallpaper-095.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-095.jpg",
+            "sha256": "bee0e7c41b884a45525586f5471555a3d0c2f1ca410c7b8f86e56e0f0fdbfa9c",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_flowers_and_a_glass_of_wine.jpg",
+            "license": "unknown",
+            "width": 3000,
+            "height": 1980,
+            "bytes": 782090,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-060",
+            "filename": "corpus/wallpaper-060.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+            "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_tree_with_pink_leaves.jpg",
+            "license": "unknown",
+            "width": 1366,
+            "height": 768,
+            "bytes": 160374,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "evaluation-gray-red-002-telephone",
+            "filename": "corpus/evaluation/gray-red-002-telephone.jpg",
+            "sha256": "c9060a015115125d20f0cc7e2008d17b571ee23ae4e7316095d3e307fd58e85b",
+            "sourcePage": "https://commons.wikimedia.org/wiki/File:Telephone_Box_(20967124724).jpg",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Telephone_Box_%2820967124724%29.jpg",
+            "sourcePageRevision": "https://commons.wikimedia.org/w/index.php?title=File:Telephone_Box_(20967124724).jpg&oldid=1221177587",
+            "originalSource": "https://www.flickr.com/photos/wwarby/20967124724/",
+            "author": "William Warby",
+            "authorUrl": "https://www.flickr.com/people/26782864@N00",
+            "license": "CC BY 2.0",
+            "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+            "width": 3411,
+            "height": 4557,
+            "bytes": 10165006,
+            "rendition": "Original Wikimedia Commons JPEG file, bytes retained unchanged.",
+            "sourceEditing": "Published selective-color photograph; no local recoloring or image generation.",
+            "retrievedDate": "2026-09-16"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-063",
+            "filename": "corpus/wallpaper-063.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-063.jpg",
+            "sha256": "f8205c8f54b5f11b2579985ba5eb32450932f066f609fb731d160ba36ebc3b01",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_building_with_many_square_windows.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/monochrome/a_building_with_many_square_windows.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "monochrome/a_building_with_many_square_windows.jpg",
+            "license": "unknown",
+            "width": 4896,
+            "height": 3244,
+            "bytes": 1285054,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "composition-gray-red-batch-001",
+        "sequence": 17,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "80% grayscale, 20% red",
+          "detail": "Aim close to these shares of the whole image.",
+          "colorTargets": [
+            {
+              "colorName": "grayscale",
+              "targetImagePercent": 80
+            },
+            {
+              "colorName": "red",
+              "targetImagePercent": 20
+            }
+          ],
+          "unspecifiedRemainderPercent": 0
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "evaluation-gray-red-002-umbrella",
+            "filename": "corpus/evaluation/gray-red-002-umbrella.jpg",
+            "sha256": "05968ee9addc191a71564ae596e5436274a9370b223c6d75bc90eb366adeda52",
+            "sourcePage": "https://unsplash.com/photos/selective-color-photography-of-man-using-red-umbrella-surrounded-by-cars-o5Vc1Nhot94",
+            "sourceUrl": "https://images.unsplash.com/photo-1517213628252-ae2125f4f270?fm=jpg&fit=max&w=2560&q=90",
+            "author": "Deva Darshan",
+            "license": "Unsplash License",
+            "licenseUrl": "https://unsplash.com/license",
+            "width": 2560,
+            "height": 2560,
+            "bytes": 779786,
+            "rendition": "Source CDN JPEG rendition with maximum width 2560 and quality 90. Complete square composition, no requested crop. Local bytes are preserved unchanged.",
+            "sourceEditing": "Published selective-color photograph; no local recoloring or image generation.",
+            "retrievedDate": "2026-09-16"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-042",
+            "filename": "corpus/wallpaper-042.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-042.jpg",
+            "sha256": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "license": "unknown",
+            "width": 4100,
+            "height": 2730,
+            "bytes": 2125386,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-048",
+            "filename": "corpus/wallpaper-048.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-048.jpg",
+            "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_group_of_roses_on_a_dark_background.png",
+            "license": "unknown",
+            "width": 6016,
+            "height": 4000,
+            "bytes": 2971577,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-060",
+            "filename": "corpus/wallpaper-060.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+            "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_tree_with_pink_leaves.jpg",
+            "license": "unknown",
+            "width": 1366,
+            "height": 768,
+            "bytes": 160374,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "batch-gray-red-composition"
+      },
+      {
+        "id": "composition-gray-red-batch-002",
+        "sequence": 18,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "80% grayscale, 10% red; the remaining 10% is unspecified",
+          "detail": "Aim close to these shares of the whole image. The remaining 10% can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "grayscale",
+              "targetImagePercent": 80
+            },
+            {
+              "colorName": "red",
+              "targetImagePercent": 10
+            }
+          ],
+          "unspecifiedRemainderPercent": 10
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-048",
+            "filename": "corpus/wallpaper-048.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-048.jpg",
+            "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_group_of_roses_on_a_dark_background.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_group_of_roses_on_a_dark_background.png",
+            "license": "unknown",
+            "width": 6016,
+            "height": 4000,
+            "bytes": 2971577,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-042",
+            "filename": "corpus/wallpaper-042.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-042.jpg",
+            "sha256": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_bouquet_of_flowers_on_a_cloth.jpg",
+            "license": "unknown",
+            "width": 4100,
+            "height": 2730,
+            "bytes": 2125386,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-060",
+            "filename": "corpus/wallpaper-060.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-060.jpg",
+            "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_tree_with_pink_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_tree_with_pink_leaves.jpg",
+            "license": "unknown",
+            "width": 1366,
+            "height": 768,
+            "bytes": 160374,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "evaluation-gray-red-002-umbrella",
+            "filename": "corpus/evaluation/gray-red-002-umbrella.jpg",
+            "sha256": "05968ee9addc191a71564ae596e5436274a9370b223c6d75bc90eb366adeda52",
+            "sourcePage": "https://unsplash.com/photos/selective-color-photography-of-man-using-red-umbrella-surrounded-by-cars-o5Vc1Nhot94",
+            "sourceUrl": "https://images.unsplash.com/photo-1517213628252-ae2125f4f270?fm=jpg&fit=max&w=2560&q=90",
+            "author": "Deva Darshan",
+            "license": "Unsplash License",
+            "licenseUrl": "https://unsplash.com/license",
+            "width": 2560,
+            "height": 2560,
+            "bytes": 779786,
+            "rendition": "Source CDN JPEG rendition with maximum width 2560 and quality 90. Complete square composition, no requested crop. Local bytes are preserved unchanged.",
+            "sourceEditing": "Published selective-color photograph; no local recoloring or image generation.",
+            "retrievedDate": "2026-09-16"
+          }
+        ],
+        "evaluationGroup": "batch-gray-red-composition"
+      },
+      {
+        "id": "vibe-dark-accents-batch-001",
+        "sequence": 19,
+        "status": "awaiting-user-judgment",
+        "category": "Vibe",
+        "query": {
+          "text": "Mostly dark, with small bright areas",
+          "detail": "A dark overall feel, with bright spots that stand out."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-005",
+            "filename": "corpus/wallpaper-005.jpeg",
+            "thumbnail": "corpus/thumbnails/wallpaper-005.jpg",
+            "sha256": "9a01e9fd40cb21e830cbb37f9a8a91596a80e095df869ed73d87a7b46aa9b834",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_group_of_white_lines_on_a_black_background.jpeg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_group_of_white_lines_on_a_black_background.jpeg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_group_of_white_lines_on_a_black_background.jpeg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 105593,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-032",
+            "filename": "corpus/wallpaper-032.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-032.jpg",
+            "sha256": "80a85e97c8b63311543a59403c1266310df73b27ce0c491561ca69e5b309ce3e",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_car_parked_in_a_field_with_trees_and_a_crescent_moon_in_the_sky.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1430803,
+            "format": "png"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-022",
+            "filename": "corpus/wallpaper-022.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-022.jpg",
+            "sha256": "544c5a8d83c439fcdda97d55f923c22ca930abe871abb5028fcd6ca1dde52078",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_city_at_night_with_many_tall_buildings.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_city_at_night_with_many_tall_buildings.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "architecture/a_city_at_night_with_many_tall_buildings.jpg",
+            "license": "unknown",
+            "width": 6512,
+            "height": 4341,
+            "bytes": 5229480,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-015",
+            "filename": "corpus/wallpaper-015.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-015.jpg",
+            "sha256": "c4632e9000ac1a44db4f052dc076eef0bcb9b069f7aebaabc407b01bb38baf63",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_swimming_pool_on_a_rocky_island.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_swimming_pool_on_a_rocky_island.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "aerial/a_swimming_pool_on_a_rocky_island.jpg",
+            "license": "unknown",
+            "width": 2000,
+            "height": 1123,
+            "bytes": 328578,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "composition-blue-orange-batch-001",
+        "sequence": 20,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "50% blue, 50% orange",
+          "detail": "Aim close to these shares of the whole image.",
+          "colorTargets": [
+            {
+              "colorName": "blue",
+              "targetImagePercent": 50
+            },
+            {
+              "colorName": "orange",
+              "targetImagePercent": 50
+            }
+          ],
+          "unspecifiedRemainderPercent": 0
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-057",
+            "filename": "corpus/wallpaper-057.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-057.jpg",
+            "sha256": "1ab56e32c7916925061b4f79dc79aa14f8bd7d6d624a78c919891d127cefeca4",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_pool_and_a_house.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_pool_and_a_house.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_pool_and_a_house.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 196612,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-002",
+            "filename": "corpus/wallpaper-002.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-002.jpg",
+            "sha256": "a6a8e4fb3b9201cbd360717bb8f9dffb6b88160e25ed66b3e9f1b3394543c052",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_blue_and_orange_background.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_blue_and_orange_background.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_blue_and_orange_background.jpg",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 6026713,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-058",
+            "filename": "corpus/wallpaper-058.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-058.jpg",
+            "sha256": "8b044243052afc50f72aa7c6fffd8c37b4c679fbc51a97bcdc725c89833efb11",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_snow_covered_mountains_and_sky.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_snow_covered_mountains_and_sky.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_snow_covered_mountains_and_sky.png",
+            "license": "unknown",
+            "width": 5120,
+            "height": 2880,
+            "bytes": 2275095,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-040",
+            "filename": "corpus/wallpaper-040.webp",
+            "thumbnail": "corpus/thumbnails/wallpaper-040.jpg",
+            "sha256": "61386230f9a8a65935d65efd0e8ff19344b3637959bcfd237c670176576d694f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/s61f586j38aa1.webp",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/s61f586j38aa1.webp",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/s61f586j38aa1.webp",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 957872,
+            "format": "webp"
+          }
+        ],
+        "evaluationGroup": "batch-blue-orange-composition"
+      },
+      {
+        "id": "composition-blue-orange-batch-002",
+        "sequence": 21,
+        "status": "awaiting-user-judgment",
+        "category": "Combinations",
+        "query": {
+          "text": "40% blue, 40% orange; the remaining 20% is unspecified",
+          "detail": "Aim close to these shares of the whole image. The remaining 20% can be any color.",
+          "colorTargets": [
+            {
+              "colorName": "blue",
+              "targetImagePercent": 40
+            },
+            {
+              "colorName": "orange",
+              "targetImagePercent": 40
+            }
+          ],
+          "unspecifiedRemainderPercent": 20
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-040",
+            "filename": "corpus/wallpaper-040.webp",
+            "thumbnail": "corpus/thumbnails/wallpaper-040.jpg",
+            "sha256": "61386230f9a8a65935d65efd0e8ff19344b3637959bcfd237c670176576d694f",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/s61f586j38aa1.webp",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/s61f586j38aa1.webp",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/s61f586j38aa1.webp",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 957872,
+            "format": "webp"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-058",
+            "filename": "corpus/wallpaper-058.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-058.jpg",
+            "sha256": "8b044243052afc50f72aa7c6fffd8c37b4c679fbc51a97bcdc725c89833efb11",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_snow_covered_mountains_and_sky.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_snow_covered_mountains_and_sky.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_snow_covered_mountains_and_sky.png",
+            "license": "unknown",
+            "width": 5120,
+            "height": 2880,
+            "bytes": 2275095,
+            "format": "png"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-057",
+            "filename": "corpus/wallpaper-057.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-057.jpg",
+            "sha256": "1ab56e32c7916925061b4f79dc79aa14f8bd7d6d624a78c919891d127cefeca4",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_pool_and_a_house.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_pool_and_a_house.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_pool_and_a_house.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 196612,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-002",
+            "filename": "corpus/wallpaper-002.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-002.jpg",
+            "sha256": "a6a8e4fb3b9201cbd360717bb8f9dffb6b88160e25ed66b3e9f1b3394543c052",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_blue_and_orange_background.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_blue_and_orange_background.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_blue_and_orange_background.jpg",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 6026713,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "batch-blue-orange-composition"
+      },
+      {
+        "id": "precision-warm-red-batch-001",
+        "sequence": 22,
+        "status": "awaiting-user-judgment",
+        "category": "Precision",
+        "query": {
+          "text": "Close to #FF2200",
+          "detail": "Find a wallpaper whose colors feel close to this selected shade. Exact equality is not required.",
+          "swatchHex": "#FF2200"
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-046",
+            "filename": "corpus/wallpaper-046.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-046.jpg",
+            "sha256": "746ea33448f91eb907960138e1e79528830ca2828fcee444078371c054867d2c",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "flowers/a_flower_bed_with_yellow_flowers.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 141610,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-082",
+            "filename": "corpus/wallpaper-082.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+            "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_close_up_of_red_leaves.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2193246,
+            "format": "jpeg"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-087",
+            "filename": "corpus/wallpaper-087.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-087.jpg",
+            "sha256": "1284682ec29fa65a71ea7ecc1f1d5b8c06bdd1918eeb40b5fb826957cc5c6429",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_large_rocks_in_a_desert.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_large_rocks_in_a_desert.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_large_rocks_in_a_desert.jpg",
+            "license": "unknown",
+            "width": 6000,
+            "height": 4000,
+            "bytes": 2902314,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-037",
+            "filename": "corpus/wallpaper-037.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-037.jpg",
+            "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_red_and_orange_sky_with_clouds.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1742302,
+            "format": "png"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "precision-muted-green-batch-001",
+        "sequence": 23,
+        "status": "awaiting-user-judgment",
+        "category": "Precision",
+        "query": {
+          "text": "Close to #4C8C72",
+          "detail": "Find a wallpaper whose colors feel close to this selected shade. Exact equality is not required.",
+          "swatchHex": "#4C8C72"
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-086",
+            "filename": "corpus/wallpaper-086.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-086.jpg",
+            "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_lake_with_trees_and_clouds.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "nature/a_lake_with_trees_and_clouds.png",
+            "license": "unknown",
+            "width": 2560,
+            "height": 1440,
+            "bytes": 6952430,
+            "format": "png"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-052",
+            "filename": "corpus/wallpaper-052.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-052.jpg",
+            "sha256": "41bc0c2b2054edfa77c1b8a806b45276bcc2361032b84ac49005cb7828ee7491",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_colorful_snow_covered_land.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/minimal/a_colorful_snow_covered_land.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "minimal/a_colorful_snow_covered_land.png",
+            "license": "unknown",
+            "width": 5120,
+            "height": 2880,
+            "bytes": 2329280,
+            "format": "png"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-093",
+            "filename": "corpus/wallpaper-093.jpeg",
+            "thumbnail": "corpus/thumbnails/wallpaper-093.jpg",
+            "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_a_garden_with_a_house_and_trees.jpeg",
+            "license": "unknown",
+            "width": 4096,
+            "height": 3259,
+            "bytes": 4819900,
+            "format": "jpeg"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-013",
+            "filename": "corpus/wallpaper-013.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-013.jpg",
+            "sha256": "cca6d88bb995a01c20de6b9d2268fd78695c3a880b66fb6556195dbf9bf5e82d",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_rocky_shore_with_waves_crashing.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/aerial/a_rocky_shore_with_waves_crashing.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "aerial/a_rocky_shore_with_waves_crashing.jpg",
+            "license": "unknown",
+            "width": 3728,
+            "height": 2097,
+            "bytes": 863513,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      },
+      {
+        "id": "palette-rainbow-batch-001",
+        "sequence": 24,
+        "status": "awaiting-user-judgment",
+        "category": "Palette",
+        "query": {
+          "text": "Rainbow-like colors",
+          "detail": "Bright colors across many hues. It does not need to contain a literal rainbow."
+        },
+        "examples": [
+          {
+            "label": "A",
+            "wallpaperId": "wallpaper-094",
+            "filename": "corpus/wallpaper-094.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-094.jpg",
+            "sha256": "d2f9075c0b13ae2e16bfff1972dcc8f0574cf363e6f4056aabe80abce230f64a",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "painting/a_painting_of_a_landscape_with_trees_and_houses.jpg",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 350496,
+            "format": "jpeg"
+          },
+          {
+            "label": "B",
+            "wallpaperId": "wallpaper-034",
+            "filename": "corpus/wallpaper-034.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-034.jpg",
+            "sha256": "59739ecbfd398cbe2885153d216a70fdeb398cc1b059f423aad6788ca63c3020",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_cartoon_of_a_woman_sitting_on_a_plane.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_cartoon_of_a_woman_sitting_on_a_plane.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "digital/a_cartoon_of_a_woman_sitting_on_a_plane.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 2763775,
+            "format": "png"
+          },
+          {
+            "label": "C",
+            "wallpaperId": "wallpaper-003",
+            "filename": "corpus/wallpaper-003.png",
+            "thumbnail": "corpus/thumbnails/wallpaper-003.jpg",
+            "sha256": "51b86d67a86428504a6570a1f36e40f230dda0228a74f574d0feedcaead6c444",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_background_with_different_shapes_and_patterns.png",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_background_with_different_shapes_and_patterns.png",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_colorful_background_with_different_shapes_and_patterns.png",
+            "license": "unknown",
+            "width": 1920,
+            "height": 1080,
+            "bytes": 1061915,
+            "format": "png"
+          },
+          {
+            "label": "D",
+            "wallpaperId": "wallpaper-004",
+            "filename": "corpus/wallpaper-004.jpg",
+            "thumbnail": "corpus/thumbnails/wallpaper-004.jpg",
+            "sha256": "8ce0380d95f76c457eec19a2fae02756f38bc5a4ab6ea3de24ccb37124a254da",
+            "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_swirls_of_paint.jpg",
+            "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/abstract/a_colorful_swirls_of_paint.jpg",
+            "sourceRepository": "https://github.com/dharmx/walls",
+            "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+            "sourcePath": "abstract/a_colorful_swirls_of_paint.jpg",
+            "license": "unknown",
+            "width": 3840,
+            "height": 2160,
+            "bytes": 1956245,
+            "format": "jpeg"
+          }
+        ],
+        "evaluationGroup": "color-development-corpus"
+      }
+    ]
+  }
+}

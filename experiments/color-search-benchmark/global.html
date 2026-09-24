@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Global color search · WallpaperDB experiment</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e9edf4;background:#0c1018;font-synthesis:none;--muted:#aab6c9;--line:#2b3547;--panel:#141c29;--accent:#a7d9b2}*{box-sizing:border-box}body{margin:0}a{color:#b6d3ff;text-underline-offset:3px}button,input,select{font:inherit}button,select,input{border:1px solid #55637a;border-radius:7px;background:#182233;color:inherit;min-height:42px;padding:8px 11px}button{cursor:pointer}button:hover{background:#26364b}button:disabled{opacity:.45;cursor:default}input[type=number]{width:100%}button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #a7d9b2;outline-offset:3px}.skip{position:absolute;top:-60px;left:15px;padding:12px;background:#182233;z-index:10}.skip:focus{top:10px}main,header,footer{max-width:1500px;margin:auto;padding:24px 30px}header{padding-bottom:12px}nav{display:flex;flex-wrap:wrap;gap:18px;font-size:.9rem}h1{font-size:clamp(1.9rem,4vw,2.7rem);letter-spacing:-.04em;margin:22px 0 10px}h2{font-size:1.15rem;margin:0 0 14px}p{line-height:1.55}.lead{max-width:970px;color:#c8d2e2;margin:0 0 15px}.badge{display:inline-block;border:1px solid #31543e;color:#b4e9bc;background:#13271b;font-size:.75rem;font-weight:700;letter-spacing:.06em;padding:5px 8px;border-radius:5px}.muted,.help{color:var(--muted)}.help{font-size:.86rem;line-height:1.5;margin:8px 0}.controls{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px}.presets{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 20px}.presets button{font-size:.84rem;min-height:36px}.form-grid{display:grid;grid-template-columns:minmax(350px,1.1fr) minmax(350px,1fr);gap:32px}.color-row{display:grid;grid-template-columns:26px 1fr 100px 44px;gap:9px;align-items:center;margin-bottom:10px}.color-row select{width:100%;min-width:0}.swatch{width:23px;height:23px;border-radius:50%;border:1px solid #8993a4;display:inline-block;flex-shrink:0}.row-labels{display:grid;grid-template-columns:35px 1fr 100px 44px;font-size:.77rem;color:var(--muted);margin-bottom:7px}.remove{padding:5px;min-width:40px}.add-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px}.total{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.86rem}.total.invalid{color:#ffb8b0}.options{display:grid;grid-template-columns:1fr 1fr;gap:12px}label.field{display:grid;gap:7px;font-size:.83rem;color:#cad4e3}.field select{width:100%;min-width:0}.submit-row{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin-top:18px}.primary{background:#a7d9b2;color:#102218;border-color:#a7d9b2;font-weight:700}.primary:hover{background:#c2edcb}.status{font-size:.86rem;color:var(--muted)}.error{color:#ffc2b7}.notice{border-left:3px solid #bc9252;padding:4px 14px;color:#cfbfaa;font-size:.87rem;margin:18px 0 0;line-height:1.5}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:25px;align-items:start}.panel{min-width:0}.panel-head{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:12px}.panel-title{font-size:1.1rem;margin:0 0 8px}.panel-description{font-size:.86rem;color:#bdc9da;line-height:1.5;margin:0}.stats{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}.stat{background:#0c1421;border:1px solid #334059;border-radius:5px;padding:6px 8px;font-size:.76rem}.stat strong{color:#eff4ff}details{margin-top:12px}summary{cursor:pointer;font-size:.82rem;color:#bbd0ec;line-height:1.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.7rem;background:#090e17;padding:12px;max-height:270px;overflow:auto;border-radius:6px}.list{display:grid;gap:12px;margin:0;padding:0;list-style:none;counter-reset:results}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;overflow:hidden;display:grid;grid-template-columns:minmax(145px,44%) 1fr;min-height:150px}.image-link{display:block;min-height:150px;background:#070a10}.thumb{display:block;width:100%;height:100%;min-height:150px;max-height:205px;object-fit:contain}.card-info{padding:13px;min-width:0}.rank{font-size:.74rem;color:#a8b8cd}.card h3{font-size:.88rem;line-height:1.35;margin:6px 0 9px;overflow-wrap:anywhere}.coverage{margin:7px 0 0;padding:0;list-style:none;display:flex;gap:6px 10px;flex-wrap:wrap;font-size:.8rem}.coverage li{display:flex;gap:5px;align-items:center}.coverage .swatch{width:9px;height:9px}.metric{font-size:.79rem;color:#c5d2e6;margin-top:8px}.card-links{display:flex;gap:10px;margin-top:9px;font-size:.75rem}.empty{padding:30px;border:1px dashed #39465d;border-radius:9px;color:var(--muted);line-height:1.5}.loading{opacity:.6}.methods{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}.methods p,.methods li{font-size:.87rem;color:#bdc9da;line-height:1.6}.methods ul{padding-left:21px}.method-item{margin:12px 0}.method-item strong{color:#f1f4fa}.region-list{display:grid;gap:6px;font-size:.77rem}.region-item{padding:7px;background:#101724;border-radius:5px;overflow-wrap:anywhere}footer{font-size:.82rem;color:var(--muted);padding-top:10px}#global-error:empty{display:none}#global-error{margin-top:16px}.skeleton{height:180px;border-radius:9px;background:linear-gradient(100deg,#131d2c,#1b2a3d,#131d2c);margin-top:12px}.only-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(min-width:1300px){.card{grid-template-columns:47% 1fr}.thumb{max-height:210px}}
+    @media(max-width:850px){main,header,footer{padding-left:18px;padding-right:18px}.form-grid{grid-template-columns:1fr;gap:22px}.comparison{gap:13px}.card{grid-template-columns:1fr}.thumb{height:175px;min-height:0}.image-link{min-height:0}.card-info{padding:12px}}
+    @media(max-width:570px){main,header,footer{padding-left:12px;padding-right:12px}.controls{padding:14px}.comparison{grid-template-columns:1fr}.options{gap:10px}.color-row{grid-template-columns:19px 1fr 75px 38px;gap:7px}.row-labels{grid-template-columns:26px 1fr 75px 38px}.color-row .swatch{width:18px;height:18px}.remove{min-width:36px}.card{grid-template-columns:43% 1fr}.thumb{height:100%;max-height:200px;min-height:155px}.card h3{font-size:.84rem}.presets{gap:6px}.presets button{padding:7px 9px}.panel-head{padding:15px}.options label{font-size:.8rem}.field select{font-size:.85rem;padding:8px}nav{gap:12px}}
+  </style>
+</head>
+<body>
+<a class="skip" href="#query-form">Skip to search controls</a>
+<header>
+  <nav aria-label="Experiment navigation"><a href="./GLOBAL-OPTIONS.md">Options &amp; tradeoffs</a><a href="./GLOBAL-UI.md">How to reproduce</a><a href="./ranges.html">Range editor</a><a href="./report.html">Earlier comparison</a></nav>
+  <h1>Global color search</h1>
+  <p class="lead">Compare the actual OpenSearch results for the same requested colors and amounts. The methods differ in precision, whether overlapping colors share area, and how much work the search engine does.</p>
+  <span class="badge">LIVE OPENSEARCH 2.11 · EXPERIMENT</span>
+</header>
+<main>
+  <form class="controls" id="query-form">
+    <h2>What should the image contain?</h2>
+    <div class="presets" aria-label="Example queries">
+      <button type="button" data-preset="green">40% green</button>
+      <button type="button" data-preset="redgreen">50% red + 50% green</button>
+      <button type="button" data-preset="reddark">70% red + 30% dark</button>
+      <button type="button" data-preset="darkgray">70% dark gray</button>
+      <button type="button" data-preset="rainbow">Five colors · 20% each</button>
+    </div>
+    <div class="form-grid">
+      <section aria-label="Requested color amounts">
+        <div class="row-labels" aria-hidden="true"><span></span><span>Color region</span><span>Amount %</span><span></span></div>
+        <div id="color-rows"></div>
+        <div class="add-row"><button type="button" id="add-color">+ Add color</button><span class="total" id="total">40% requested</span></div>
+        <p class="help">Original-pixel joint and independent coverage support up to five regions; older joint methods support two. Amounts may total less than 100%. Targets penalize excess as well as missing color.</p>
+        <details><summary>See the actual color-region definitions</summary><div class="region-list" id="regions"></div></details>
+      </section>
+      <section aria-label="Comparison settings">
+        <div class="options">
+          <label class="field">Left method<select id="left" name="left"></select></label>
+          <label class="field">Right method<select id="right" name="right"></select></label>
+          <label class="field">Collection<select id="cohort"><option value="real">100 real wallpapers</option><option value="fixture">Known color fixtures</option></select></label>
+          <label class="field">Results per method<select id="limit"><option value="5">5</option><option value="10">10</option><option value="20" selected>20</option></select></label>
+        </div>
+        <div class="submit-row"><button class="primary" id="search" type="submit">Compare in OpenSearch</button><span class="status" id="status" role="status" aria-live="polite">Loading experiment…</span></div>
+        <p class="notice">“Global” means best for that method's indexed model, across the eligible collection. Pixel samples, amount rounding, and palette compression can still affect color accuracy. This page measures a small experiment, not production speed.</p>
+      </section>
+    </div>
+    <p class="error" id="global-error" role="alert"></p>
+  </form>
+  <div class="comparison" id="comparison" aria-label="Search result comparison">
+    <section class="panel" id="left-panel" aria-labelledby="left-title"><h2 class="only-sr" id="left-title">Left results</h2><div class="empty">Choose a query, then compare the actual search results.</div></section>
+    <section class="panel" id="right-panel" aria-labelledby="right-title"><h2 class="only-sr" id="right-title">Right results</h2><div class="empty">Each column keeps the order returned by OpenSearch.</div></section>
+  </div>
+  <section class="methods" aria-labelledby="reading-title">
+    <h2 id="reading-title">How to read the comparison</h2>
+    <p><strong>Independent coverage</strong> counts each selected region separately. <strong>Joint composition</strong> assigns each unit of image area to at most one requested portion. A dark-red pixel may qualify as both red and dark, so the two models can rank images differently.</p>
+    <p>The amounts beside thumbnails are measured from each method's pixel sample for each family, with overlap allowed. They are available color area, not the final non-overlapping assignment. Check the sampling note in each column: resizing can change narrow color membership. Method errors use each method's own representation and are not human relevance scores.</p>
+    <p>These live methods currently compare hard color membership and target amounts. They do not apply the earlier editor's graded core-to-edge preference. A perfect amount score is not a guarantee that the picture looks right.</p>
+    <p>The color-family bank is experimental and untuned: some “red” matches look pink or brown. Exact ordering for the stored model does not mean the families have been visually validated.</p>
+    <details><summary>Method details and limitations</summary><div id="method-details"></div></details>
+  </section>
+</main>
+<footer><p id="data-version">Preparing data…</p><p>No application candidate reranking. Every search is generated by fixed experiment query builders; the browser cannot send arbitrary OpenSearch requests.</p></footer>
+<script type="module">
+const $ = id => document.getElementById(id);
+const presets = {green:[{family:'green',amount:.4}],redgreen:[{family:'red',amount:.5},{family:'green',amount:.5}],reddark:[{family:'red',amount:.7},{family:'dark',amount:.3}],darkgray:[{family:'dark_gray',amount:.7}],rainbow:['red','orange','yellow','green','blue'].map(family=>({family,amount:.2}))};
+let config;
+let colors = structuredClone(presets.green);
+let busy = false;
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct = amount => Number.isFinite(amount) ? (amount * 100).toFixed(2).replace(/\.00$/, '') + '%' : 'unknown';
+const ms = value => Number.isFinite(value) ? value.toFixed(1) + ' ms' : 'not reported';
+const family = id => config.families.find(f => f.id === id);
+const safePath = value => {if(typeof value!=='string')return null;const path=value.replace(/^\.\//,'');return /^(corpus|fixtures|ranges-fixtures|output)\/[a-zA-Z0-9_./-]+$/.test(path)&&!path.includes('..')?'./'+path:null;};
+const safeSource = value => {try {const u=new URL(value);return u.protocol==='https:' ? u.href : null;}catch{return null;}};
+function showError(message){$('global-error').textContent=message;}
+function updateTotal(){const sum=colors.reduce((total,c)=>total+c.amount,0);$('total').textContent=pct(sum)+' requested';$('total').classList.toggle('invalid',sum>1+1e-10);$('add-color').disabled=busy||colors.length>=5;renderRegions();}
+function renderRegions(){ $('regions').innerHTML=colors.map(c=>{const f=family(c.family);return '<div class="region-item"><strong>'+esc(f.label)+'</strong> · center '+esc(f.color)+'<br>'+esc(JSON.stringify(f.ranges))+'</div>';}).join(''); }
+function renderRows(){
+ $('color-rows').innerHTML=colors.map((c,i)=>'<div class="color-row"><span class="swatch" style="background:'+esc(family(c.family).color)+'" aria-hidden="true"></span><label class="only-sr" for="family-'+i+'">Color region '+(i+1)+'</label><select id="family-'+i+'" data-index="'+i+'" data-field="family">'+config.families.map(f=>'<option value="'+esc(f.id)+'"'+(f.id===c.family?' selected':'')+'>'+esc(f.label)+'</option>').join('')+'</select><label class="only-sr" for="amount-'+i+'">Amount percent '+(i+1)+'</label><input id="amount-'+i+'" type="number" min="0" max="100" step="0.01" value="'+Number((c.amount*100).toFixed(4))+'" data-index="'+i+'" data-field="amount" required><button type="button" class="remove" data-remove="'+i+'" aria-label="Remove color '+(i+1)+'"'+(colors.length===1?' disabled':'')+'>×</button></div>').join('');
+ updateTotal();
+}
+function pending(side){$(side+'-panel').setAttribute('aria-busy','true');$(side+'-panel').innerHTML='<div class="panel-head"><h2 class="panel-title" id="'+side+'-title">'+esc(config.methods.find(m=>m.id===$(side).value).label)+'</h2><p class="panel-description">Searching OpenSearch…</p></div><div class="skeleton" aria-hidden="true"></div>';}
+function renderPanel(side,result,elapsed){
+ const method=config.methods.find(m=>m.id===result.method);
+ const requested=result.colors.map(c=>pct(c.amount)+' '+family(c.family).label).join(' + ');
+ const count=result.diagnostics.queryCount;
+ const requests=result.diagnostics.requestCount;
+ const threshold=Number.isFinite(result.diagnostics.threshold)?result.diagnostics.threshold*(result.model==='joint'?100:.01):null;
+ const items=result.hits.map((hit,i)=>{
+  const image=safePath(hit.thumbnail),original=safePath(hit.filename),source=safeSource(hit.sourcePage);
+  const media=image?'<img class="thumb" loading="'+(i<5?'eager':'lazy')+'" src="'+esc(image)+'" alt="'+esc(hit.title)+'">':'<div class="empty">Preview unavailable</div>';
+  const metric=hit.error===null?'':(result.model==='marginal'?'Summed amount error: ':'Joint area error: ')+(hit.error*100).toFixed(2)+' '+(result.model==='marginal'?'pp':'percentage points');
+  return '<li class="card">'+(original?'<a class="image-link" href="'+esc(original)+'" target="_blank" rel="noopener">'+media+'</a>':'<div class="image-link">'+media+'</div>')+'<div class="card-info"><div class="rank">#'+(i+1)+' · '+esc(hit.id)+'</div><h3>'+esc(hit.title)+'</h3><div class="help">Available pixel area</div><ul class="coverage">'+hit.coverage.map(c=>'<li><span class="swatch" style="background:'+esc(family(c.family).color)+'" aria-hidden="true"></span>'+esc(family(c.family).label)+': <strong>'+pct(c.amount)+'</strong></li>').join('')+'</ul><div class="metric">'+esc(metric)+'</div><div class="card-links">'+(original?'<a href="'+esc(original)+'" target="_blank" rel="noopener">Full image</a>':'')+(source?'<a href="'+esc(source)+'" target="_blank" rel="noopener">Source</a>':'')+'</div></div></li>';
+ }).join('');
+ $(side+'-panel').innerHTML='<div class="panel-head"><h2 class="panel-title" id="'+side+'-title">'+esc(method.label)+'</h2><p class="panel-description">'+esc(result.description)+'</p><div class="stats"><span class="stat"><strong>'+result.hits.length+'</strong> results / '+result.eligibleDocuments+' eligible</span><span class="stat">Browser <strong>'+ms(elapsed)+'</strong></span><span class="stat">Server <strong>'+ms(result.wallMs)+'</strong></span>'+(result.opensearchMs!==null?'<span class="stat">OpenSearch <strong>'+ms(result.opensearchMs)+'</strong></span>':'')+(count?'<span class="stat">'+count+' search query</span>':requests?'<span class="stat">'+requests+' OpenSearch requests</span>':'')+(Number.isFinite(threshold)?'<span class="stat">Safe error bound '+threshold.toFixed(2)+' pp</span>':'')+'</div><details><summary>Query and execution details</summary><p class="help">Timings are one observation and include warm-cache effects. Query cost and amount precision differ between methods.</p><pre>'+esc(JSON.stringify({diagnostics:result.diagnostics,request:result.request},null,2))+'</pre></details></div>'+(items?'<ol class="list">'+items+'</ol>':'<div class="empty">No eligible results returned.</div>');
+ $(side+'-panel').querySelector('.panel-description').insertAdjacentHTML('afterend','<p class="help"><strong>Requested:</strong> '+esc(requested)+'</p><p class="help">'+esc(result.coverageSource)+'</p>');
+ $(side+'-panel').setAttribute('aria-busy','false');
+}
+function saveUrl(){const params=new URLSearchParams({colors:colors.map(c=>c.family+':'+Number((c.amount*100).toFixed(4))).join(','),left:$('left').value,right:$('right').value,cohort:$('cohort').value,limit:$('limit').value});history.replaceState(null,'','?'+params);}
+async function compare(){
+ if(busy)return;
+ showError('');
+ if(colors.some(c=>!Number.isFinite(c.amount)||c.amount<0||c.amount>1)){showError('Enter an amount from 0 to 100% for every region.');return;}
+ if(new Set(colors.map(c=>c.family)).size!==colors.length){showError('Choose distinct color regions.');return;}
+ if(colors.reduce((sum,c)=>sum+c.amount,0)>1+1e-10){showError('Requested amounts must add up to at most 100%.');return;}
+ busy=true;$('search').disabled=true;$('status').textContent='Running two OpenSearch comparisons…';updateTotal();saveUrl();
+ const requestColors=structuredClone(colors),cohort=$('cohort').value,limit=Number($('limit').value);
+ let failed=0;
+ await Promise.all(['left','right'].map(async side=>{
+  const method=$(side).value;pending(side);const start=performance.now();
+  try{const response=await fetch('/api/search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({method,colors:requestColors,cohort,limit}),signal:AbortSignal.timeout(65000)});const data=await response.json();if(!response.ok)throw new Error(data.error||'Search failed.');renderPanel(side,data,performance.now()-start);}
+  catch(error){failed++;$(side+'-panel').innerHTML='<div class="panel-head"><h2 id="'+side+'-title">'+esc(config.methods.find(m=>m.id===method).label)+'</h2><p class="error" role="alert">'+esc(error.name==='TimeoutError'?'This request took too long. Try again after the benchmark finishes.':error.message)+'</p><p class="help">No partial or locally reranked results are shown.</p></div>';$(side+'-panel').setAttribute('aria-busy','false');}
+ }));
+ busy=false;$('search').disabled=false;updateTotal();$('status').textContent=failed?'Comparison finished with '+failed+' method error'+(failed===1?'':'s')+'.':'Both searches complete. Change the query or inspect the results.';
+}
+$('query-form').addEventListener('submit',event=>{event.preventDefault();compare();});
+$('query-form').addEventListener('change',()=>{if(!busy)$('status').textContent='Settings changed. Submit to refresh the results.';});
+$('color-rows').addEventListener('input',event=>{const i=Number(event.target.dataset.index);if(event.target.dataset.field==='amount'){colors[i].amount=event.target.value===''?NaN:Number(event.target.value)/100;updateTotal();}});
+$('color-rows').addEventListener('change',event=>{if(event.target.dataset.field==='family'){colors[Number(event.target.dataset.index)].family=event.target.value;renderRows();}});
+$('color-rows').addEventListener('click',event=>{const remove=event.target.closest('[data-remove]');if(remove&&colors.length>1){colors.splice(Number(remove.dataset.remove),1);renderRows();}});
+$('add-color').addEventListener('click',()=>{const unused=config.families.find(f=>!colors.some(c=>c.family===f.id));if(unused&&colors.length<5){colors.push({family:unused.id,amount:0});renderRows();$('family-'+(colors.length-1)).focus();}});
+document.querySelectorAll('[data-preset]').forEach(button=>button.addEventListener('click',()=>{const next=presets[button.dataset.preset];if(next.every(c=>family(c.family))){colors=structuredClone(next);renderRows();showError('');$('status').textContent='Preset selected. Compare to run the searches.';}else showError('This preset needs the latest regenerated color features. Refresh when the experiment is ready.');}));
+try{
+ const response=await fetch('/api/config');config=await response.json();if(!response.ok)throw new Error(config.error);
+ for(const side of ['left','right'])$(side).innerHTML=config.methods.map(m=>'<option value="'+esc(m.id)+'"'+(!m.available?' disabled':'')+'>'+esc(m.label)+(!m.available?' (preparing)':'')+'</option>').join('');
+ const originalReady=config.methods.find(m=>m.id==='multi')?.available&&config.methods.find(m=>m.id==='adaptive-multi')?.available;
+ $('left').value=originalReady?'multi':config.methods.find(m=>m.id==='joint')?.available?'joint':'native';$('right').value=originalReady?'adaptive-multi':config.methods.find(m=>m.id==='adaptive-joint')?.available?'adaptive-joint':'tokens';
+ const params=new URLSearchParams(location.search);
+ for(const side of ['left','right'])if(config.methods.some(m=>m.id===params.get(side)&&m.available))$(side).value=params.get(side);
+ if(['real','fixture'].includes(params.get('cohort')))$('cohort').value=params.get('cohort');
+ if(['5','10','20'].includes(params.get('limit')))$('limit').value=params.get('limit');
+ if(params.has('colors')){const parsed=params.get('colors').split(',').map(s=>{const [id,n]=s.split(':');return {family:id,amount:Number(n)/100};});if(parsed.length&&parsed.length<=5&&parsed.every(c=>family(c.family)&&Number.isFinite(c.amount)&&c.amount>=0&&c.amount<=1))colors=parsed;}
+ if(colors.length>2&&!originalReady){if(!params.has('left'))$('left').value='native';if(!params.has('right'))$('right').value=config.methods.find(m=>m.id==='adaptive-fine')?.available?'adaptive-fine':'tokens';}
+ $('cohort').options[0].textContent=config.realCount+' real wallpapers';$('cohort').options[1].textContent=config.fixtureCount+' known color fixtures';
+ $('method-details').innerHTML=config.methods.map(m=>'<p class="method-item"><strong>'+esc(m.label)+'</strong><br>'+esc(m.description)+'</p>').join('');
+ $('data-version').textContent=(config.originalGeneratedAt?'Original-pixel features generated '+new Date(config.originalGeneratedAt).toLocaleString()+'. ':'')+'Historical resized features generated '+new Date(config.generatedAt).toLocaleString()+'. '+config.realCount+' real wallpapers and '+config.fixtureCount+' synthetic correctness fixtures.';
+ renderRows();$('status').textContent='Ready. Submit to query OpenSearch.';
+}catch(error){showError(error.message||'Could not load the experiment.');$('status').textContent='Experiment unavailable.';$('search').disabled=true;$('add-color').disabled=true;}
+</script>
+</body>
+</html>

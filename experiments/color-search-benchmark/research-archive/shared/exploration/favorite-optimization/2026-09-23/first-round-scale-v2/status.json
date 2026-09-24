@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-09-23T13:49:03.906641+00:00",
+  "planSha256": "bebc1f51ec64c6fddab88f0d2646c4c774ba57e440f3bd1156d6cc9306b1f221",
+  "phases": [
+    {
+      "id": "projection-100k",
+      "startedAt": "2026-09-23T13:49:03.906756+00:00",
+      "command": [
+        "make",
+        "color-favorite-utility-index",
+        "COLOR_FAVORITE_ARGS=--mode scale --scope projection --count 100000 --index color-exploration-favorite-opt-projection-100k-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/projection-100k"
+      ],
+      "finishedAt": "2026-09-23T13:49:15.780342+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "screen-100k",
+      "startedAt": "2026-09-23T13:49:15.780619+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization",
+        "COLOR_FAVORITE_ARGS=--config experiments/color-search-benchmark/exploration/configs/favorite-optimization-100k.json --count 100000 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/screen-100k --concurrency 1 --selectivity all --instrument"
+      ],
+      "finishedAt": "2026-09-23T13:56:00.485565+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "projection-1m",
+      "startedAt": "2026-09-23T13:56:00.485881+00:00",
+      "command": [
+        "make",
+        "color-favorite-utility-index",
+        "COLOR_FAVORITE_ARGS=--mode scale --scope projection --count 1000000 --index color-exploration-favorite-opt-projection-1m-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/projection-1m"
+      ],
+      "finishedAt": "2026-09-23T13:56:56.401573+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "screen-1m",
+      "startedAt": "2026-09-23T13:56:56.401893+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization",
+        "COLOR_FAVORITE_ARGS=--config experiments/color-search-benchmark/exploration/configs/favorite-optimization-1m.json --count 1000000 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/screen-1m --concurrency 1 --selectivity all --instrument"
+      ],
+      "finishedAt": "2026-09-23T14:05:54.890086+00:00",
+      "exitCode": 0
+    }
+  ],
+  "finishedAt": "2026-09-23T14:05:54.890405+00:00"
+}

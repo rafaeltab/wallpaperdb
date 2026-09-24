@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "label": "Preserved favorite and optimization prototypes \u2014 development feedback",
+  "description": "Same545assets. GlobalOpenSearch ranking. Single-observer development evidence, not held-out population validation. Numeric variants preserve the mathematical formula at supported presets; feature encodings alter numeric precision.",
+  "extraImageFiles": [
+    "evaluation/perceived-red-pagoda-001.json"
+  ],
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "method": "cutoff-shade-hue-all-levels",
+      "index": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-fused-script",
+      "method": "favorite-fused-script",
+      "index": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-typed-script",
+      "method": "favorite-typed-script",
+      "index": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-numeric",
+      "method": "favorite-utility-numeric",
+      "index": "color-exploration-favorite-opt-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-rank8",
+      "method": "favorite-utility-rank8",
+      "index": "color-exploration-favorite-opt-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-rank16",
+      "method": "favorite-utility-rank16",
+      "index": "color-exploration-favorite-opt-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-rankfloat",
+      "method": "favorite-utility-rankfloat",
+      "index": "color-exploration-favorite-opt-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    }
+  ]
+}

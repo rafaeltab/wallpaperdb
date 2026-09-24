@@ -1,0 +1,15 @@
+{
+  "createdAt": "2026-09-20T00:49:34.478Z",
+  "documents": 545,
+  "priorIdsPreserved": 127,
+  "archiveImages": 418,
+  "allThumbnailsPresent": true,
+  "allMassPreserved": true,
+  "allImagePathsExternal": true,
+  "hsv64Parity": {
+    "available": true,
+    "documents": 127,
+    "maxDifference": 0,
+    "referenceFilename": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-20T00-04-40.946Z-4f7c77ee/hsv64-cosine.descriptors.json"
+  }
+}

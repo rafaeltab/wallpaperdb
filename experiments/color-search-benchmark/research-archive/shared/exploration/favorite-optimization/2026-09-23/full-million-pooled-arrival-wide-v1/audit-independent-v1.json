@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-optimization-arrival-audit",
+  "complete": true,
+  "integrityPassed": true,
+  "accepted": true,
+  "errorCount": 0,
+  "errors": [],
+  "profileCount": 4,
+  "failedProfiles": 1,
+  "rawRequestRows": 38656,
+  "pendingRawRows": 0,
+  "incompleteResourceProfiles": 0,
+  "hashes": {
+    "plan": "169a11f946d9acd765f93419a5c844b95deba601061672c9927d7b5a41121cb0",
+    "result": "78b30857b2b4a1c295a2ef9a4ddaf4a7fd9463ec7e96e8be73b6dace5946074b",
+    "archivedSources": "aac0b80bf91e3a05c2e8895d6eec289b3ea6915286d8bba00be3984a4510c755",
+    "primary": "9c7f147f0d517d72a8436f0bab42a0e1057ba95c5e9d03ea46eba7ab481bb6e0"
+  },
+  "limitations": [
+    "Offline internal-consistency audit; no service queries or independent re-execution of ranking.",
+    "Source hashes and recursive local import bindings are checked against the archived primary artifact; current worktree changes are irrelevant.",
+    "Successful coverage proves which compiled fields were requested in returned rankings, not how many documents or posting blocks OpenSearch visited.",
+    "Incomplete campaigns are never accepted. Failed performance profiles can still have accepted, fully preserved evidence."
+  ],
+  "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-arrival-wide-v1",
+  "auditedAt": "2026-09-23T20:18:51.657Z"
+}

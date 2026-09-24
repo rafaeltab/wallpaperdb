@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "presentationVersion": 1,
+  "id": "composition-green-red-real-002",
+  "status": "user-judged",
+  "category": [
+    "Combinations",
+    "Perceived color"
+  ],
+  "use": "related development follow-up",
+  "exampleType": "natural-photographs",
+  "evaluationGroup": "green-red-specified-remainder",
+  "relatedCases": [
+    "composition-green-red-real-001",
+    "composition-green-red-001",
+    "proportion-green-001",
+    "proportion-green-002",
+    "perceived-red-001"
+  ],
+  "query": {
+    "userText": "40% green, 40% red; the remaining 20% is unspecified",
+    "intent": "Find close matches to both whole-image named-color amount targets, with the remainder unrestricted. The targets remain40% each, not a normalized50/50 split.",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 40
+      },
+      {
+        "colorName": "red",
+        "targetImagePercent": 40
+      }
+    ],
+    "unspecifiedRemainderPercent": 20,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/composition-green-red-real-002.html",
+    "presentation": "Four complete original photographs, unchanged source bytes, equal neutral frames with object-fit: contain and maximum height340px. No cropping; browser scaling only.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": false,
+    "randomization": "One Python secrets.SystemRandom sample of the same four stable image IDs, required to differ from the preceding complete mapping; persisted in examples and stable on refresh. No expected relevance order used.",
+    "judgmentFormat": "Brief impressions for A–D and preferred order; ties, uncertainty and none matching well are welcome. No numeric score or percentage estimate required.",
+    "selection": "Reuse all four unchanged source photographs from the50/50 case. No computed proportions, expected order or expected improvement assigned.",
+    "validation": "Source IDs and SHA256 hashes match the prior four-photo case; bytes verified. Shuffled labels, alt text and full-size links match the persisted mapping. New query and unspecified20% are displayed; no previous judgments or candidate percentages. Page HTTP200 through local zerotwo hostname; all four imageURLsHTTP200. Desktop1280x1400/mobile390x844: four loaded original-size sources, object-fit:contain, uniform frames and no horizontal overflow. Desktop screenshot inspected; browser closed. No independent remote-machine connectivity check."
+  },
+  "examples": [
+    {
+      "filename": "corpus/evaluation/green-red-real-leaves.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_and_green_leaves.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Red_and_green_leaves.jpg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_and_green_leaves.jpg&oldid=700850586",
+      "title": "Red and green leaves",
+      "author": "Iwanjayz",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "3ae3e24af1783fac04adf4eb03facf448503ae589f0dbda57329bee50db9ee1c",
+      "width": 3456,
+      "height": 2304,
+      "bytes": 3485161,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "A",
+      "wallpaperId": "evaluation-green-red-leaves",
+      "judgment": null,
+      "previousPresentation": {
+        "caseId": "composition-green-red-real-001",
+        "label": "B"
+      }
+    },
+    {
+      "filename": "corpus/wallpaper-082.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourceRepository": "https://github.com/dharmx/walls",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "sourcePath": "nature/a_close_up_of_red_leaves.jpg",
+      "category": "nature",
+      "title": "a close up of red leaves",
+      "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+      "width": 6000,
+      "height": 4000,
+      "bytes": 2193246,
+      "format": "jpeg",
+      "license": "unknown",
+      "label": "B",
+      "wallpaperId": "wallpaper-082",
+      "judgment": null,
+      "author": null,
+      "previousPresentation": {
+        "caseId": "composition-green-red-real-001",
+        "label": "D"
+      }
+    },
+    {
+      "filename": "corpus/evaluation/green-red-real-tulip-field.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_Tulips_(205290827).jpeg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/11/Red_Tulips_%28205290827%29.jpeg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_Tulips_(205290827).jpeg&oldid=1164769766",
+      "title": "Red Tulips",
+      "author": "Dana Hutchinson",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sha256": "ef3133f273312d74c57492947d8a97475be2e5ee7d726c4791afa6c75d7445da",
+      "width": 2048,
+      "height": 1365,
+      "bytes": 1137255,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "C",
+      "wallpaperId": "evaluation-green-red-tulip-field",
+      "judgment": null,
+      "previousPresentation": {
+        "caseId": "composition-green-red-real-001",
+        "label": "C"
+      }
+    },
+    {
+      "filename": "corpus/evaluation/green-red-real-tulips.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Redtulips.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Redtulips.jpg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Redtulips.jpg&oldid=1116964383",
+      "originalPublication": "https://www.flickr.com/photos/evilerin/3472825850",
+      "title": "Red tulips on a field at the Skagit Valley Tulip Festival",
+      "author": "Evil Erin",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+      "sha256": "75dd9cb3844694f97ac67041eb3335b7206226f4bd20db1197b00a57008973e3",
+      "width": 3008,
+      "height": 2000,
+      "bytes": 2700033,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "D",
+      "wallpaperId": "evaluation-green-red-tulips",
+      "judgment": null,
+      "previousPresentation": {
+        "caseId": "composition-green-red-real-001",
+        "label": "A"
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "partial-natural-green-red-order-001",
+      "sourceSubmissionId": "30b36a99-4c94-4f15-9e18-27373dea04c5",
+      "type": "whole-image-composition-order",
+      "orderedLabels": [
+        "A",
+        "B",
+        "D",
+        "C"
+      ],
+      "orderedWallpaperIds": [
+        "evaluation-green-red-leaves",
+        "wallpaper-082",
+        "evaluation-green-red-tulips",
+        "evaluation-green-red-tulip-field"
+      ],
+      "status": "reported-with-batch-quick-review-caveat",
+      "tiesReported": false,
+      "scope": "One quick reviewer order under40%green40%red with unspecified20%; no per-image descriptions, exact areas or calibrated grades were supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "A",
+      "over": "B",
+      "preferredWallpaperId": "evaluation-green-red-leaves",
+      "overWallpaperId": "wallpaper-082",
+      "specificUserUncertainty": false,
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+    },
+    {
+      "preferred": "B",
+      "over": "D",
+      "preferredWallpaperId": "wallpaper-082",
+      "overWallpaperId": "evaluation-green-red-tulips",
+      "specificUserUncertainty": false,
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+    },
+    {
+      "preferred": "D",
+      "over": "C",
+      "preferredWallpaperId": "evaluation-green-red-tulips",
+      "overWallpaperId": "evaluation-green-red-tulip-field",
+      "specificUserUncertainty": false,
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+    }
+  ],
+  "rawUserResponses": [],
+  "notes": [
+    "This adapts the previously authorized partial-composition review to natural photographs after the user questioned the realism of pure color bands. The separate stripe follow-up remains deferred.",
+    "Prior query judgments remain in their original record; do not transfer absolute match labels, positivity, mismatch or rankings into this query.",
+    "The target percentages refer to total image amounts. Do not normalize40%green40%red to50%green50%red or treat them as minimums.",
+    "Candidate percentages, method names, computed scores, old labels and previous user judgments are not displayed on the sheet.",
+    "Record fresh descriptions and ordering without expecting a change, extra-color tolerance or a particular candidate to improve.",
+    "Related development evidence using repeated photographs, not an independent held-out or fully blind test. Keep overlapping images and related cases in one later evaluation split.",
+    "No measured candidate color percentages, expected ranking, match grade or numeric score assigned.",
+    "Same original image bytes and contain display as the preceding case. No image editing, crop or local resampling.",
+    "No search-method prototype, harness, benchmark, OpenSearch change or architecture selection accompanies this review.",
+    "Batch submission records A>B>D>C with no case-specific note. Preserve the entire batch quick-review caveat and expected differences between people; no confidence number or perfect match is assigned."
+  ],
+  "queryComparison": {
+    "previousCaseId": "composition-green-red-real-001",
+    "changed": [
+      "Green whole-image target changes from50% to40%.",
+      "Red whole-image target changes from50% to40%.",
+      "Unspecified remainder changes from0% to20%."
+    ],
+    "limitations": [
+      "Any preference change may involve target amounts and/or remainder flexibility; this pair does not isolate a remainder flag.",
+      "Same images reduce scene differences across queries, but recognition and prior judgments can carry over. Shuffling is not independent blinding.",
+      "No change in order would also be valid evidence. No candidate is expected to improve."
+    ]
+  },
+  "submissionRef": {
+    "id": "30b36a99-4c94-4f15-9e18-27373dea04c5",
+    "caseId": "composition-green-red-real-002",
+    "resultRecord": "batch-001-results.json",
+    "sameLogicalCase": true
+  },
+  "evidenceContext": {
+    "id": "batch-001-quick-review-caveat",
+    "scope": "All24 judgments in this submission; earlier13 records retain their original qualifications.",
+    "type": "single-reviewer-quick-pass",
+    "rawUserMessage": "I have submitted the answers, I went quite quickly, so dont regard this as 100% accurate human perception preference, some of these will be ranked very differently by different people",
+    "selfReportedPace": "quick",
+    "accuracyQualification": "Provisional preference evidence; not definitive perceptual truth.",
+    "interReviewerVariation": "User expects some substantial ranking differences between people; not measured by this submission.",
+    "numericConfidence": null,
+    "numericWeight": null,
+    "groundTruthStatus": "not-universal-or-population-consensus",
+    "evaluationUse": "Development examples and discussion; no scoring rule or hard pass/fail threshold selected."
+  },
+  "rawBatchAnswers": [
+    {
+      "caseId": "composition-green-red-real-002",
+      "status": "ranked",
+      "ranking": [
+        [
+          "A"
+        ],
+        [
+          "B"
+        ],
+        [
+          "D"
+        ],
+        [
+          "C"
+        ]
+      ],
+      "notes": "",
+      "updatedAt": "2026-09-19T22:29:00.066Z"
+    }
+  ]
+}

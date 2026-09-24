@@ -1,0 +1,18 @@
+{
+  "startedAt": "2026-09-23T17:58:46.408492+00:00",
+  "planSha256": "2818da3256db5a007a531f3a0b58b77133269a3e860b954495e4534349ff4e56",
+  "phases": [
+    {
+      "id": "full-1m-four-methods",
+      "startedAt": "2026-09-23T17:58:46.408622+00:00",
+      "command": [
+        "make",
+        "color-favorite-optimization",
+        "COLOR_FAVORITE_ARGS=--config /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-comparison-v2-proposal/favorite-full-million-four-methods.json --count 1000000 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-four-methods-v2 --concurrency 1,4,16 --selectivity all,partition10,tag1"
+      ],
+      "finishedAt": "2026-09-23T18:01:15.862163+00:00",
+      "exitCode": 2
+    }
+  ],
+  "stoppedAt": "2026-09-23T18:01:15.862465+00:00"
+}

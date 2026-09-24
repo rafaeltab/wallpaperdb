@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-09-23T16:18:41.742227+00:00",
+  "url": "http://zerotwo:8228/performance.html",
+  "endpoint": "/api/performance",
+  "sourceCheckpoint": "results-checkpoint-20260923-v5.json",
+  "publicFile": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/favorite-performance-public-summary.json",
+  "publicationContract": "Original result aggregator schema plus publication:{sourceCheckpoint,publishedAt,sourceSha256}; replace fixed file atomically after audit.",
+  "sourceHashes": {
+    "favorite-performance.mjs": "beaa54433f8d8bd0bdb2994a58ee4f559ca61f3b6ba37bb142af3ddca4d632c7",
+    "favorite-performance.test.mjs": "636f0df2f5b86697dde3b995c7b9c47bcf15fef765ea0b1bffb92c0a10b93f15",
+    "web/favorite-lab/performance.html": "3606fc24e48f7c1b69414641dbda0ddc488c268dff04240f8ed1d4603e256597",
+    "web/favorite-lab/performance.js": "4ad1dd6d7913113f12d6e087cbb39e908073fe3798b7475dd904331080fca08e",
+    "web/favorite-lab/performance.css": "7c5eb136e7b369f1ed036fda23d220f0df76da59f31d2d5978609bd8753685a6",
+    "FAVORITE-PERFORMANCE-PAGE.md": "8e0e00c46753b1f9e64ce33f590ddc7682ecc5b6ea9f3f86b56aad49270cca59"
+  },
+  "tests": {
+    "performanceUnit": 8,
+    "labIntegrationSuite": 17
+  },
+  "review": "optimization_completion read-only review; corrected corpus label523real+22synthetic and scoped one-primary caveat to scale campaigns.",
+  "browserQA": {
+    "agent": "optimization_ui_finish",
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/ui-17-complete",
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "overflow": false,
+    "consoleErrors": false,
+    "requests": "Initial CSS/JS/api/performance only; scope/filter interactions make no requests; zero OpenSearch calls.",
+    "finalApiEvidence": "performance-after-label-fix.json"
+  },
+  "limitations": [
+    "Snapshot freshness shown; incomplete full-million build is not query capacity evidence.",
+    "Page reads files only, no service traffic, benchmark or indexing side effects."
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "completedAt": "2026-09-21T20:11:25.502216+00:00",
+  "passed": true,
+  "integration": {
+    "overlapPassed": 81,
+    "cutoffPassed": 34,
+    "skipped": 0,
+    "scaleHelperPassed": 4
+  },
+  "browser": {
+    "matrixCases": 48,
+    "savedCurveReplay": true,
+    "liveSelection": true,
+    "mobileDocumentWidth": 390,
+    "mobileViewportWidth": 390,
+    "consoleErrors": 0,
+    "sessionClosed": true
+  },
+  "feedbackRun": "2026-09-21T19-57-25.162Z-4756a400",
+  "feedback": {
+    "configurations": 48,
+    "matchedPairs": 24,
+    "timedRequests": 4464,
+    "failures": 0,
+    "supportedPerConfiguration": 31,
+    "unsupportedPerConfiguration": 6
+  },
+  "scale": {
+    "directory": "../../quality-curve-scale/2026-09-21T20-04-25.158Z",
+    "profilesPassed": 32,
+    "timedRequests": 512,
+    "warmups": 16,
+    "failures": 0,
+    "maxTimedMs": 445.63,
+    "projectionNumericFields": 180,
+    "documents": 1000000,
+    "concurrency": [
+      1,
+      4
+    ],
+    "independentRawAuditPassed": true,
+    "scaleNodeStopped": true
+  },
+  "liveReproduction": "final-api-comparison.json",
+  "liveServicesActive": [
+    "wallpaperdb-color-overlap-inspector.service",
+    "wallpaperdb-color-exploration.service",
+    "wallpaperdb-color-histogram-inspector.service",
+    "wallpaperdb-color-eval.service"
+  ]
+}

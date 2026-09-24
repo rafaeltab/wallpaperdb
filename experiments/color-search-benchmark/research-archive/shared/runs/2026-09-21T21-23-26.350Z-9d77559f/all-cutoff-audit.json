@@ -1,0 +1,14 @@
+{
+  "runId": "2026-09-21T21-23-26.350Z-9d77559f",
+  "candidates": 49,
+  "consistentCandidateSourceHashes": true,
+  "candidateSourceFilesVerifiedAgainstWorkspace": 36,
+  "sourceSnapshotHashVerified": true,
+  "sourceSnapshotMatchesCandidateQuerySources": true,
+  "newBlendHelperCaptured": true,
+  "sourceSnapshotSha256": "7705159c447af10a4a3b9b4efbdde120d4305319bf1fb8aa2b86a51a1d5b4603",
+  "timedTrials": 4557,
+  "timedErrors": 0,
+  "timedAtOrAbove1s": 0,
+  "maxTimedMs": 49.58555299999716
+}

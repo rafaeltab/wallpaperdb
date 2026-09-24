@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Color query lab</title>
+  <link rel="stylesheet" href="/assets/browser.css">
+  <script type="module" src="/assets/browser.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div><p class="eyebrow">WallpaperDB · prototype exploration</p><h1>Color query lab</h1><p id="corpus-summary" class="muted">Loading the shared wallpaper corpus…</p></div>
+    <nav><a id="findings-link" hidden target="_blank" rel="noreferrer">Latest findings ↗</a><a id="evaluation-link" href="http://zerotwo:8224/latest" target="_blank" rel="noreferrer">Evaluation reports ↗</a><button id="copy-link" class="quiet">Copy this query</button><button id="search-top" class="primary" disabled>Compare selected</button></nav>
+  </header>
+  <main class="workspace">
+    <aside class="controls">
+      <section>
+        <h2>1. Describe the colors</h2>
+        <label class="field">Start with a query<select id="preset"></select></label>
+        <div class="segmented" role="group" aria-label="Query intent"><button id="mode-vibe" aria-pressed="true">Overall vibe</button><button id="mode-proportions" aria-pressed="false">Target proportions</button></div>
+        <p id="mode-help" class="hint">Find wallpapers that feel like your chosen colors.</p>
+        <div id="targets"></div>
+        <button id="add-target" class="quiet full">+ Add a color or vibe</button>
+        <p id="remainder" class="remainder" hidden></p>
+      </section>
+      <section>
+        <h2>2. Compare methods</h2>
+        <p class="hint">Each column asks its search service to filter and rank the wallpapers. Scores are specific to each method.</p>
+        <div class="method-tools"><button id="select-default" class="text-button">Suggested mix</button><button id="select-all" class="text-button">All</button><button id="select-none" class="text-button">None</button></div>
+        <label class="field method-search-label">Find a method<input id="method-search" type="search" placeholder="L2, palette, hybrid…" autocomplete="off"></label>
+        <div class="method-tools"><button id="expand-methods" class="text-button">Expand families</button><button id="collapse-methods" class="text-button">Collapse families</button></div>
+        <p id="method-count" class="hint"></p>
+        <div id="methods" class="method-list"></div>
+        <label class="field compact">Results per method<select id="result-count"><option>12</option><option selected>24</option><option>48</option><option>100</option></select></label>
+        <label class="range-toggle"><input id="include-fixtures" type="checkbox"><span id="fixtures-label">Include controlled test swatches</span></label>
+      </section>
+      <section class="search-actions"><button id="search" class="primary full">Compare wallpapers</button><button id="cancel" class="quiet full" hidden>Cancel pending queries</button><p id="status" class="hint" role="status" aria-live="polite"></p></section>
+      <details class="query-details"><summary>Query sent to the service</summary><pre id="query-preview"></pre></details>
+    </aside>
+    <div class="results-area">
+      <div class="results-heading"><div><h2>Compare the results</h2><p id="comparison-summary" class="muted">Pick a query and a few methods, then compare their first results.</p></div><label class="field compact">Image size<select id="image-size"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label></div>
+      <p class="notice">The one-second limit applies to search time. These live timings cover this corpus and current server load; use the saved scale benchmarks to assess a million wallpapers.</p>
+      <div id="results" class="results-grid"><div class="empty-state"><div class="color-dots"><span></span><span></span><span></span></div><h3>Same intent. Different search methods.</h3><p>Try a red vibe, an exact color, or a mix such as 80% grayscale and 20% red. Click any wallpaper to inspect the original.</p></div></div>
+    </div>
+  </main>
+  <dialog id="lightbox"><button id="close-lightbox" class="lightbox-close" aria-label="Close image">×</button><img id="lightbox-image" alt="Selected wallpaper"><div class="lightbox-footer"><p id="lightbox-caption"></p><a id="lightbox-original" target="_blank" rel="noreferrer">Open original ↗</a></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

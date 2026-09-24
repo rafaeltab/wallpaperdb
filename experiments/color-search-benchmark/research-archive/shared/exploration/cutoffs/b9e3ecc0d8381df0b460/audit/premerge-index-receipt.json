@@ -1,0 +1,155 @@
+{
+  "experiment": "multi-cutoff-overlapping-coverage-quality",
+  "schemaVersion": 1,
+  "bucketCount": 1024,
+  "count": 545,
+  "identityHash": "b9e3ecc0d8381df0b46048888213062c3b3b45213005405cc18b905fd2ef890d",
+  "descriptorHash": "3224808060eb6df68da3cda1213b2e19dae25772c4023da114fffe5e88bdd312",
+  "sourceHashes": {
+    "cutoff-definition.mjs": "2ddb90e261cb03e94e66fc9ccae720e284c690ace8ae19f579fc53a283514ab4",
+    "cutoff-index.mjs": "a6ba4b7eee7e4ea7799840beb51b9d727acf60533c0f3094f19e244fa574f045",
+    "overlap-regions.mjs": "fa1b265e0f5a7c06624df04e08061ecd9b6b80267e9639f00e0dfe42394b5906",
+    "overlap-banks.mjs": "661284ebe268353c5337877cc34f38bf9b84ceab17cfb58d87da077d71fb8018",
+    "overlap-index.mjs": "8113de104d7e8079aac0d973b3c8feb44718ba2be7091ff3087a77fa34d40194",
+    "corpus-colors.mjs": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad"
+  },
+  "anchorsHash": "42005e159a9bd674118b0a567dfcb605c27775d66c58a6155d7704e3540be014",
+  "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/cutoffs/b9e3ecc0d8381df0b460",
+  "hard50ParityVerified": true,
+  "index": "color-exploration-cutoff-1024-real-v1",
+  "completeIdsVerified": true,
+  "allValuesVerified": true,
+  "valuesHash": "1f171f40fbfadeebc7d3b887298ff1321ab5981db4eba3d8e11e7632aa23eecf",
+  "indexMetadata": {
+    "schemaVersion": 1,
+    "sourceHashes": {
+      "overlap-banks.mjs": "661284ebe268353c5337877cc34f38bf9b84ceab17cfb58d87da077d71fb8018",
+      "corpus-colors.mjs": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad",
+      "cutoff-index.mjs": "a6ba4b7eee7e4ea7799840beb51b9d727acf60533c0f3094f19e244fa574f045",
+      "overlap-index.mjs": "8113de104d7e8079aac0d973b3c8feb44718ba2be7091ff3087a77fa34d40194",
+      "overlap-regions.mjs": "fa1b265e0f5a7c06624df04e08061ecd9b6b80267e9639f00e0dfe42394b5906",
+      "cutoff-definition.mjs": "2ddb90e261cb03e94e66fc9ccae720e284c690ace8ae19f579fc53a283514ab4"
+    },
+    "experiment": "multi-cutoff-overlapping-coverage-quality",
+    "identityHash": "b9e3ecc0d8381df0b46048888213062c3b3b45213005405cc18b905fd2ef890d",
+    "hard50ParityVerified": true,
+    "anchorsHash": "42005e159a9bd674118b0a567dfcb605c27775d66c58a6155d7704e3540be014",
+    "bucketCount": 1024,
+    "count": 545,
+    "descriptorHash": "3224808060eb6df68da3cda1213b2e19dae25772c4023da114fffe5e88bdd312",
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/cutoffs/b9e3ecc0d8381df0b460"
+  },
+  "recovered": true,
+  "existingVerified": 350,
+  "inserted": 195,
+  "recoveredAt": "2026-09-21T18:49:52.823Z",
+  "recoveryMs": 53836.627517999994,
+  "stats": {
+    "primaries": {
+      "docs": {
+        "count": 545,
+        "deleted": 0
+      },
+      "store": {
+        "size_in_bytes": 442090526,
+        "reserved_in_bytes": 0
+      },
+      "segments": {
+        "count": 12,
+        "memory_in_bytes": 0,
+        "terms_memory_in_bytes": 0,
+        "stored_fields_memory_in_bytes": 0,
+        "term_vectors_memory_in_bytes": 0,
+        "norms_memory_in_bytes": 0,
+        "points_memory_in_bytes": 0,
+        "doc_values_memory_in_bytes": 0,
+        "index_writer_memory_in_bytes": 0,
+        "version_map_memory_in_bytes": 0,
+        "fixed_bit_set_memory_in_bytes": 0,
+        "max_unsafe_auto_id_timestamp": -1,
+        "remote_store": {
+          "upload": {
+            "total_upload_size": {
+              "started_bytes": 0,
+              "succeeded_bytes": 0,
+              "failed_bytes": 0
+            },
+            "refresh_size_lag": {
+              "total_bytes": 0,
+              "max_bytes": 0
+            },
+            "max_refresh_time_lag_in_millis": 0,
+            "total_time_spent_in_millis": 0
+          },
+          "download": {
+            "total_download_size": {
+              "started_bytes": 0,
+              "succeeded_bytes": 0,
+              "failed_bytes": 0
+            },
+            "total_time_spent_in_millis": 0
+          }
+        },
+        "segment_replication": {
+          "max_bytes_behind": "0b",
+          "total_bytes_behind": "0b",
+          "max_replication_lag": "0s"
+        },
+        "file_sizes": {}
+      }
+    },
+    "total": {
+      "docs": {
+        "count": 545,
+        "deleted": 0
+      },
+      "store": {
+        "size_in_bytes": 442090526,
+        "reserved_in_bytes": 0
+      },
+      "segments": {
+        "count": 12,
+        "memory_in_bytes": 0,
+        "terms_memory_in_bytes": 0,
+        "stored_fields_memory_in_bytes": 0,
+        "term_vectors_memory_in_bytes": 0,
+        "norms_memory_in_bytes": 0,
+        "points_memory_in_bytes": 0,
+        "doc_values_memory_in_bytes": 0,
+        "index_writer_memory_in_bytes": 0,
+        "version_map_memory_in_bytes": 0,
+        "fixed_bit_set_memory_in_bytes": 0,
+        "max_unsafe_auto_id_timestamp": -1,
+        "remote_store": {
+          "upload": {
+            "total_upload_size": {
+              "started_bytes": 0,
+              "succeeded_bytes": 0,
+              "failed_bytes": 0
+            },
+            "refresh_size_lag": {
+              "total_bytes": 0,
+              "max_bytes": 0
+            },
+            "max_refresh_time_lag_in_millis": 0,
+            "total_time_spent_in_millis": 0
+          },
+          "download": {
+            "total_download_size": {
+              "started_bytes": 0,
+              "succeeded_bytes": 0,
+              "failed_bytes": 0
+            },
+            "total_time_spent_in_millis": 0
+          }
+        },
+        "segment_replication": {
+          "max_bytes_behind": "0b",
+          "total_bytes_behind": "0b",
+          "max_replication_lag": "0s"
+        },
+        "file_sizes": {}
+      }
+    }
+  }
+}

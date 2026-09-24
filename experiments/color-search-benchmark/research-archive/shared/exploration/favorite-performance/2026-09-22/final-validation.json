@@ -1,0 +1,166 @@
+{
+  "at": "2026-09-23T00:37:30.118618+00:00",
+  "health": [
+    {
+      "url": "http://zerotwo:8227/",
+      "status": 200,
+      "bytes": 14069
+    },
+    {
+      "url": "http://zerotwo:8225/",
+      "status": 200,
+      "bytes": 4508
+    },
+    {
+      "url": "http://zerotwo:8226/",
+      "status": 200,
+      "bytes": 8605
+    },
+    {
+      "url": "http://127.0.0.1:19216/_cluster/health",
+      "status": 200,
+      "bytes": 459,
+      "body": {
+        "cluster_name": "color-global-prototype",
+        "status": "green",
+        "timed_out": false,
+        "number_of_nodes": 1,
+        "number_of_data_nodes": 1,
+        "discovered_master": true,
+        "discovered_cluster_manager": true,
+        "active_primary_shards": 81,
+        "active_shards": 81,
+        "relocating_shards": 0,
+        "initializing_shards": 0,
+        "unassigned_shards": 0,
+        "delayed_unassigned_shards": 0,
+        "number_of_pending_tasks": 0,
+        "number_of_in_flight_fetch": 0,
+        "task_max_waiting_in_queue_millis": 0,
+        "active_shards_percent_as_number": 100.0
+      }
+    },
+    {
+      "url": "http://127.0.0.1:19217/_cluster/health",
+      "status": 200,
+      "bytes": 460,
+      "body": {
+        "cluster_name": "color-exploration-scale",
+        "status": "green",
+        "timed_out": false,
+        "number_of_nodes": 1,
+        "number_of_data_nodes": 1,
+        "discovered_master": true,
+        "discovered_cluster_manager": true,
+        "active_primary_shards": 14,
+        "active_shards": 14,
+        "relocating_shards": 0,
+        "initializing_shards": 0,
+        "unassigned_shards": 0,
+        "delayed_unassigned_shards": 0,
+        "number_of_pending_tasks": 0,
+        "number_of_in_flight_fetch": 0,
+        "task_max_waiting_in_queue_millis": 0,
+        "active_shards_percent_as_number": 100.0
+      }
+    },
+    {
+      "url": "http://127.0.0.1:19216/color-exploration-shade-hue-256-real-v1/_count",
+      "status": 200,
+      "bytes": 73,
+      "body": {
+        "count": 545,
+        "_shards": {
+          "total": 1,
+          "successful": 1,
+          "skipped": 0,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "url": "http://127.0.0.1:19216/color-exploration-shade-hue-1024-real-v1/_count",
+      "status": 200,
+      "bytes": 73,
+      "body": {
+        "count": 545,
+        "_shards": {
+          "total": 1,
+          "successful": 1,
+          "skipped": 0,
+          "failed": 0
+        }
+      }
+    }
+  ],
+  "frozenSourceChecks": [
+    {
+      "phase": "projection",
+      "files": 21,
+      "mismatches": []
+    },
+    {
+      "phase": "arrival",
+      "files": 23,
+      "mismatches": []
+    },
+    {
+      "phase": "full256",
+      "files": 21,
+      "mismatches": []
+    },
+    {
+      "phase": "full1024",
+      "files": 21,
+      "mismatches": []
+    },
+    {
+      "phase": "full1024-completion",
+      "files": 25,
+      "mismatches": []
+    },
+    {
+      "phase": "maintenance",
+      "files": 22,
+      "mismatches": []
+    },
+    {
+      "phase": "maintained",
+      "files": 24,
+      "mismatches": []
+    }
+  ],
+  "snapshotManifest": {
+    "sha256": "0c73fec9b5c8f3844c23b5d2e3b06738852ea32b8f333896b6bb4fd3c89ca7ad",
+    "matches": true
+  },
+  "snapshotArchive": {
+    "sha256": "25cb051d58244b05c923adf2d52fccc470cc5600af2f0b6913c7a1dfb18a6ddd",
+    "matches": true
+  },
+  "postShutdown": {
+    "at": "2026-09-23T00:38:09.878040+00:00",
+    "scaleState": "exited",
+    "scaleFinishedAt": "2026-09-23T00:37:55.700651514Z",
+    "retainedVolumes": [
+      "wallpaperdb-t3code-28be15f7-color-exploration-scale_color-exploration-scale"
+    ],
+    "observer": {
+      "finishedAt": "2026-09-23T00:37:39.263866+00:00",
+      "samples": 4510,
+      "elapsedSeconds": 4527.534899909049,
+      "reason": "requested stop"
+    },
+    "checks": [
+      {
+        "url": "http://zerotwo:8227/",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:19216/_cluster/health",
+        "status": 200,
+        "clusterStatus": "green"
+      }
+    ]
+  }
+}

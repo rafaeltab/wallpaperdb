@@ -1,0 +1,227 @@
+{
+  "recordedAt": "2026-09-23T13:30:59.942833+00:00",
+  "url": "http://zerotwo:8228/",
+  "wallpapers": 523,
+  "methods": 7,
+  "unitTests": {
+    "command": "make color-favorite-lab-test",
+    "passed": 7,
+    "failed": 0
+  },
+  "browserSession": "favorite-opt-ui-t3code-28be15f7",
+  "browserClosed": true,
+  "controlCombinations": {
+    "done": true,
+    "error": null,
+    "runs": [
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "0",
+        "errors": 0,
+        "preset": "red",
+        "quality": "0"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "1",
+        "errors": 0,
+        "preset": "green40",
+        "quality": "0"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "3",
+        "errors": 0,
+        "preset": "redgreen",
+        "quality": "0"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "0",
+        "errors": 0,
+        "preset": "rainbow",
+        "quality": "0.5"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "1",
+        "errors": 0,
+        "preset": "grayred",
+        "quality": "0.5"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "3",
+        "errors": 0,
+        "preset": "dark",
+        "quality": "0.5"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "0",
+        "errors": 0,
+        "preset": "trans",
+        "quality": "1"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "1",
+        "errors": 0,
+        "preset": "rainbow",
+        "quality": "1"
+      },
+      {
+        "cards": [
+          24,
+          24,
+          24,
+          24,
+          24,
+          24,
+          24
+        ],
+        "cutoff": "3",
+        "errors": 0,
+        "preset": "grayred",
+        "quality": "1"
+      }
+    ]
+  },
+  "checks": {
+    "desktop1440x1000": true,
+    "mobile390x844": true,
+    "noPageWidthOverflow": true,
+    "methodStripScrolls": true,
+    "livePresetUpdate": true,
+    "largeImageModal": true,
+    "fullImageHead200": true,
+    "knownSourceLink": true,
+    "sourceHiddenForArchiveWithoutAttribution": true,
+    "escapeClosesModal": true,
+    "noConsoleErrors": true,
+    "noBrowserErrors": true,
+    "noBrokenResultImages": true,
+    "tailnetHostnameHealth200": true,
+    "fixtureExclusionCoveredByProviderAndHttpTests": true,
+    "lightweightGenerationCache": true,
+    "cacheInvalidationUnitCoverage": true
+  },
+  "service": "wallpaperdb-color-favorite-lab.service",
+  "screenshots": [
+    "modal-wallpaper.png",
+    "desktop-red.png",
+    "mobile-results.png",
+    "desktop-red-seven.png",
+    "mobile-five-colors.png",
+    "mobile-modal-source.png"
+  ],
+  "caveats": [
+    "Screenshots and small-corpus UI checks are not production performance evidence.",
+    "Utility API timing includes lightweight index stats; mapping metadata and complete corpus validation are repeated only after observed generation changes."
+  ],
+  "metadataCacheSmoke": {
+    "errors": 0,
+    "methods": [
+      {
+        "cards": 24,
+        "method": "Saved favorite",
+        "timing": "OpenSearch 4 ms \u00b7 API 8.6 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Fused score",
+        "timing": "OpenSearch 5 ms \u00b7 API 8.6 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Typed specialized score",
+        "timing": "OpenSearch 4 ms \u00b7 API 7.4 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Precomputed float",
+        "timing": "OpenSearch 4 ms \u00b7 API 6.6 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Indexed 8-bit",
+        "timing": "OpenSearch 17 ms \u00b7 API 19.7 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Indexed split 16-bit",
+        "timing": "OpenSearch 4 ms \u00b7 API 7.7 ms"
+      },
+      {
+        "cards": 24,
+        "method": "Indexed native precision",
+        "timing": "OpenSearch 3 ms \u00b7 API 6.3 ms"
+      }
+    ],
+    "status": "Compared 7 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+  }
+}

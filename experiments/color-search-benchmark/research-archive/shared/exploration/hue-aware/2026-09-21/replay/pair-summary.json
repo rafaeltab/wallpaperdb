@@ -1,0 +1,1208 @@
+{
+  "source": "rank-matrix.json",
+  "selectedDevelopmentPair": true,
+  "pairs": [
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 91,
+          "candidateRank": 81,
+          "baselineScore": 0.06758403,
+          "candidateScore": 0.065260366,
+          "relativeScoreChange": -0.03438185026847318
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 52,
+          "candidateRank": 112,
+          "baselineScore": 0.10506007,
+          "candidateScore": 0.04346238,
+          "relativeScoreChange": -0.5863092419413007
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 8,
+          "candidateRank": 7,
+          "baselineScore": 0.24972959,
+          "candidateScore": 0.24976376,
+          "relativeScoreChange": 0.00013682799863645734
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 9,
+          "candidateRank": 8,
+          "baselineScore": 0.23474109,
+          "candidateScore": 0.23428889,
+          "relativeScoreChange": -0.0019263776955283918
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 101,
+          "candidateRank": 92,
+          "baselineScore": 0.021471864,
+          "candidateScore": 0.021107398,
+          "relativeScoreChange": -0.01697412017885358
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 61,
+          "candidateRank": 121,
+          "baselineScore": 0.033415463,
+          "candidateScore": 0.013552773,
+          "relativeScoreChange": -0.5944161240560994
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 10,
+          "candidateRank": 10,
+          "baselineScore": 0.1444007,
+          "candidateScore": 0.14440401,
+          "relativeScoreChange": 0.000022922326553764805
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 24,
+          "candidateRank": 20,
+          "baselineScore": 0.08913035,
+          "candidateScore": 0.08905158,
+          "relativeScoreChange": -0.0008837618162611527
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 95,
+          "candidateRank": 87,
+          "baselineScore": 0.006897135,
+          "candidateScore": 0.0068588713,
+          "relativeScoreChange": -0.005547767297580775
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 81,
+          "candidateRank": 135,
+          "baselineScore": 0.008582088,
+          "candidateScore": 0.0033662757,
+          "relativeScoreChange": -0.6077556300984096
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.09108182,
+          "candidateScore": 0.09108191,
+          "relativeScoreChange": 9.88122547562753e-7
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 38,
+          "candidateRank": 38,
+          "baselineScore": 0.02926569,
+          "candidateScore": 0.029255757,
+          "relativeScoreChange": -0.0003394076818281633
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 108,
+          "candidateRank": 102,
+          "baselineScore": 0.00959623,
+          "candidateScore": 0.009421087,
+          "relativeScoreChange": -0.018251229910079325
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 60,
+          "candidateRank": 129,
+          "baselineScore": 0.01904345,
+          "candidateScore": 0.005966578,
+          "relativeScoreChange": -0.6866860784154132
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 11,
+          "candidateRank": 10,
+          "baselineScore": 0.09134206,
+          "candidateScore": 0.091514364,
+          "relativeScoreChange": 0.0018863599091152317
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 13,
+          "candidateRank": 12,
+          "baselineScore": 0.07973657,
+          "candidateScore": 0.08073295,
+          "relativeScoreChange": 0.012495897428243863
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 100,
+          "candidateRank": 94,
+          "baselineScore": 0.0054179393,
+          "candidateScore": 0.0053971964,
+          "relativeScoreChange": -0.003828558950448091
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 80,
+          "candidateRank": 139,
+          "baselineScore": 0.007962736,
+          "candidateScore": 0.0026089593,
+          "relativeScoreChange": -0.6723539120221993
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.07669297,
+          "candidateScore": 0.07671559,
+          "relativeScoreChange": 0.0002949422874092278
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 30,
+          "candidateRank": 29,
+          "baselineScore": 0.034361146,
+          "candidateScore": 0.03462684,
+          "relativeScoreChange": 0.007732396352554627
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": true,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 83,
+          "candidateRank": 81,
+          "baselineScore": 0.0026411,
+          "candidateScore": 0.0026397642,
+          "relativeScoreChange": -0.0005057741092726609
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 92,
+          "candidateRank": 145,
+          "baselineScore": 0.0024026358,
+          "candidateScore": 0.0007812598,
+          "relativeScoreChange": -0.6748321988709234
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 15,
+          "candidateRank": 15,
+          "baselineScore": 0.05946789,
+          "candidateScore": 0.059469715,
+          "relativeScoreChange": 0.00003068883056034366
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 42,
+          "candidateRank": 42,
+          "baselineScore": 0.01257257,
+          "candidateScore": 0.012614219,
+          "relativeScoreChange": 0.003312687859363672
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 91,
+          "candidateRank": 81,
+          "baselineScore": 0.06758403,
+          "candidateScore": 0.065260366,
+          "relativeScoreChange": -0.03438185026847318
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 52,
+          "candidateRank": 112,
+          "baselineScore": 0.10506007,
+          "candidateScore": 0.04346238,
+          "relativeScoreChange": -0.5863092419413007
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 8,
+          "candidateRank": 7,
+          "baselineScore": 0.24972959,
+          "candidateScore": 0.24976376,
+          "relativeScoreChange": 0.00013682799863645734
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 9,
+          "candidateRank": 8,
+          "baselineScore": 0.23474109,
+          "candidateScore": 0.23428889,
+          "relativeScoreChange": -0.0019263776955283918
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 101,
+          "candidateRank": 92,
+          "baselineScore": 0.021471864,
+          "candidateScore": 0.021107398,
+          "relativeScoreChange": -0.01697412017885358
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 61,
+          "candidateRank": 121,
+          "baselineScore": 0.033415463,
+          "candidateScore": 0.013552773,
+          "relativeScoreChange": -0.5944161240560994
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 10,
+          "candidateRank": 10,
+          "baselineScore": 0.1444007,
+          "candidateScore": 0.14440401,
+          "relativeScoreChange": 0.000022922326553764805
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 24,
+          "candidateRank": 20,
+          "baselineScore": 0.08913035,
+          "candidateScore": 0.08905158,
+          "relativeScoreChange": -0.0008837618162611527
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 95,
+          "candidateRank": 87,
+          "baselineScore": 0.006897135,
+          "candidateScore": 0.0068588713,
+          "relativeScoreChange": -0.005547767297580775
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 81,
+          "candidateRank": 135,
+          "baselineScore": 0.008582088,
+          "candidateScore": 0.0033662757,
+          "relativeScoreChange": -0.6077556300984096
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.09108182,
+          "candidateScore": 0.09108191,
+          "relativeScoreChange": 9.88122547562753e-7
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 38,
+          "candidateRank": 38,
+          "baselineScore": 0.02926569,
+          "candidateScore": 0.029255757,
+          "relativeScoreChange": -0.0003394076818281633
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 108,
+          "candidateRank": 102,
+          "baselineScore": 0.00959623,
+          "candidateScore": 0.009421087,
+          "relativeScoreChange": -0.018251229910079325
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 60,
+          "candidateRank": 129,
+          "baselineScore": 0.01904345,
+          "candidateScore": 0.005966578,
+          "relativeScoreChange": -0.6866860784154132
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 11,
+          "candidateRank": 10,
+          "baselineScore": 0.09134206,
+          "candidateScore": 0.091514364,
+          "relativeScoreChange": 0.0018863599091152317
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 13,
+          "candidateRank": 12,
+          "baselineScore": 0.07973657,
+          "candidateScore": 0.08073295,
+          "relativeScoreChange": 0.012495897428243863
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 100,
+          "candidateRank": 94,
+          "baselineScore": 0.0054179393,
+          "candidateScore": 0.0053971964,
+          "relativeScoreChange": -0.003828558950448091
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 80,
+          "candidateRank": 139,
+          "baselineScore": 0.007962736,
+          "candidateScore": 0.0026089593,
+          "relativeScoreChange": -0.6723539120221993
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.07669297,
+          "candidateScore": 0.07671559,
+          "relativeScoreChange": 0.0002949422874092278
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 30,
+          "candidateRank": 29,
+          "baselineScore": 0.034361146,
+          "candidateScore": 0.03462684,
+          "relativeScoreChange": 0.007732396352554627
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": true,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 83,
+          "candidateRank": 81,
+          "baselineScore": 0.0026411,
+          "candidateScore": 0.0026397642,
+          "relativeScoreChange": -0.0005057741092726609
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 92,
+          "candidateRank": 145,
+          "baselineScore": 0.0024026358,
+          "candidateScore": 0.0007812598,
+          "relativeScoreChange": -0.6748321988709234
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 15,
+          "candidateRank": 15,
+          "baselineScore": 0.05946789,
+          "candidateScore": 0.059469715,
+          "relativeScoreChange": 0.00003068883056034366
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 42,
+          "candidateRank": 42,
+          "baselineScore": 0.01257257,
+          "candidateScore": 0.012614219,
+          "relativeScoreChange": 0.003312687859363672
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 91,
+          "candidateRank": 81,
+          "baselineScore": 0.06758403,
+          "candidateScore": 0.065260366,
+          "relativeScoreChange": -0.03438185026847318
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 52,
+          "candidateRank": 112,
+          "baselineScore": 0.10506007,
+          "candidateScore": 0.04346238,
+          "relativeScoreChange": -0.5863092419413007
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 8,
+          "candidateRank": 7,
+          "baselineScore": 0.24972959,
+          "candidateScore": 0.24976376,
+          "relativeScoreChange": 0.00013682799863645734
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 9,
+          "candidateRank": 8,
+          "baselineScore": 0.23474109,
+          "candidateScore": 0.23428889,
+          "relativeScoreChange": -0.0019263776955283918
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 101,
+          "candidateRank": 92,
+          "baselineScore": 0.021471864,
+          "candidateScore": 0.021107398,
+          "relativeScoreChange": -0.01697412017885358
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 61,
+          "candidateRank": 121,
+          "baselineScore": 0.033415463,
+          "candidateScore": 0.013552773,
+          "relativeScoreChange": -0.5944161240560994
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 10,
+          "candidateRank": 10,
+          "baselineScore": 0.1444007,
+          "candidateScore": 0.14440401,
+          "relativeScoreChange": 0.000022922326553764805
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 24,
+          "candidateRank": 20,
+          "baselineScore": 0.08913035,
+          "candidateScore": 0.08905158,
+          "relativeScoreChange": -0.0008837618162611527
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 95,
+          "candidateRank": 87,
+          "baselineScore": 0.006897135,
+          "candidateScore": 0.0068588713,
+          "relativeScoreChange": -0.005547767297580775
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 81,
+          "candidateRank": 135,
+          "baselineScore": 0.008582088,
+          "candidateScore": 0.0033662757,
+          "relativeScoreChange": -0.6077556300984096
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.09108182,
+          "candidateScore": 0.09108191,
+          "relativeScoreChange": 9.88122547562753e-7
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 38,
+          "candidateRank": 38,
+          "baselineScore": 0.02926569,
+          "candidateScore": 0.029255757,
+          "relativeScoreChange": -0.0003394076818281633
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 108,
+          "candidateRank": 102,
+          "baselineScore": 0.00959623,
+          "candidateScore": 0.009421087,
+          "relativeScoreChange": -0.018251229910079325
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 60,
+          "candidateRank": 129,
+          "baselineScore": 0.01904345,
+          "candidateScore": 0.005966578,
+          "relativeScoreChange": -0.6866860784154132
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 11,
+          "candidateRank": 10,
+          "baselineScore": 0.09134206,
+          "candidateScore": 0.091514364,
+          "relativeScoreChange": 0.0018863599091152317
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 13,
+          "candidateRank": 12,
+          "baselineScore": 0.07973657,
+          "candidateScore": 0.08073295,
+          "relativeScoreChange": 0.012495897428243863
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 100,
+          "candidateRank": 94,
+          "baselineScore": 0.0054179393,
+          "candidateScore": 0.0053971964,
+          "relativeScoreChange": -0.003828558950448091
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 80,
+          "candidateRank": 139,
+          "baselineScore": 0.007962736,
+          "candidateScore": 0.0026089593,
+          "relativeScoreChange": -0.6723539120221993
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.07669297,
+          "candidateScore": 0.07671559,
+          "relativeScoreChange": 0.0002949422874092278
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 30,
+          "candidateRank": 29,
+          "baselineScore": 0.034361146,
+          "candidateScore": 0.03462684,
+          "relativeScoreChange": 0.007732396352554627
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": true,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 83,
+          "candidateRank": 81,
+          "baselineScore": 0.0026411,
+          "candidateScore": 0.0026397642,
+          "relativeScoreChange": -0.0005057741092726609
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 92,
+          "candidateRank": 145,
+          "baselineScore": 0.0024026358,
+          "candidateScore": 0.0007812598,
+          "relativeScoreChange": -0.6748321988709234
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 15,
+          "candidateRank": 15,
+          "baselineScore": 0.05946789,
+          "candidateScore": 0.059469715,
+          "relativeScoreChange": 0.00003068883056034366
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 42,
+          "candidateRank": 42,
+          "baselineScore": 0.01257257,
+          "candidateScore": 0.012614219,
+          "relativeScoreChange": 0.003312687859363672
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 91,
+          "candidateRank": 81,
+          "baselineScore": 0.06758403,
+          "candidateScore": 0.065260366,
+          "relativeScoreChange": -0.03438185026847318
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 52,
+          "candidateRank": 112,
+          "baselineScore": 0.10506007,
+          "candidateScore": 0.04346238,
+          "relativeScoreChange": -0.5863092419413007
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 8,
+          "candidateRank": 7,
+          "baselineScore": 0.24972959,
+          "candidateScore": 0.24976376,
+          "relativeScoreChange": 0.00013682799863645734
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 9,
+          "candidateRank": 8,
+          "baselineScore": 0.23474109,
+          "candidateScore": 0.23428889,
+          "relativeScoreChange": -0.0019263776955283918
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 101,
+          "candidateRank": 92,
+          "baselineScore": 0.021471864,
+          "candidateScore": 0.021107398,
+          "relativeScoreChange": -0.01697412017885358
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 61,
+          "candidateRank": 121,
+          "baselineScore": 0.033415463,
+          "candidateScore": 0.013552773,
+          "relativeScoreChange": -0.5944161240560994
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 10,
+          "candidateRank": 10,
+          "baselineScore": 0.1444007,
+          "candidateScore": 0.14440401,
+          "relativeScoreChange": 0.000022922326553764805
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 24,
+          "candidateRank": 20,
+          "baselineScore": 0.08913035,
+          "candidateScore": 0.08905158,
+          "relativeScoreChange": -0.0008837618162611527
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 95,
+          "candidateRank": 87,
+          "baselineScore": 0.006897135,
+          "candidateScore": 0.0068588713,
+          "relativeScoreChange": -0.005547767297580775
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 81,
+          "candidateRank": 135,
+          "baselineScore": 0.008582088,
+          "candidateScore": 0.0033662757,
+          "relativeScoreChange": -0.6077556300984096
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.09108182,
+          "candidateScore": 0.09108191,
+          "relativeScoreChange": 9.88122547562753e-7
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 38,
+          "candidateRank": 38,
+          "baselineScore": 0.02926569,
+          "candidateScore": 0.029255757,
+          "relativeScoreChange": -0.0003394076818281633
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 0
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 108,
+          "candidateRank": 102,
+          "baselineScore": 0.00959623,
+          "candidateScore": 0.009421087,
+          "relativeScoreChange": -0.018251229910079325
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 60,
+          "candidateRank": 129,
+          "baselineScore": 0.01904345,
+          "candidateScore": 0.005966578,
+          "relativeScoreChange": -0.6866860784154132
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 11,
+          "candidateRank": 10,
+          "baselineScore": 0.09134206,
+          "candidateScore": 0.091514364,
+          "relativeScoreChange": 0.0018863599091152317
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 13,
+          "candidateRank": 12,
+          "baselineScore": 0.07973657,
+          "candidateScore": 0.08073295,
+          "relativeScoreChange": 0.012495897428243863
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 3
+      },
+      "baselinePreferencePasses": false,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 100,
+          "candidateRank": 94,
+          "baselineScore": 0.0054179393,
+          "candidateScore": 0.0053971964,
+          "relativeScoreChange": -0.003828558950448091
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 80,
+          "candidateRank": 139,
+          "baselineScore": 0.007962736,
+          "candidateScore": 0.0026089593,
+          "relativeScoreChange": -0.6723539120221993
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 14,
+          "candidateRank": 14,
+          "baselineScore": 0.07669297,
+          "candidateScore": 0.07671559,
+          "relativeScoreChange": 0.0002949422874092278
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 30,
+          "candidateRank": 29,
+          "baselineScore": 0.034361146,
+          "candidateScore": 0.03462684,
+          "relativeScoreChange": 0.007732396352554627
+        }
+      ]
+    },
+    {
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "qualityCurve": "power",
+        "minimumQuality": 0,
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches",
+        "cutoffBlendExponent": 6
+      },
+      "baselinePreferencePasses": true,
+      "candidatePreferencePasses": true,
+      "changes": [
+        {
+          "id": "madness-wallhaven-ogg7ql",
+          "baselineRank": 83,
+          "candidateRank": 81,
+          "baselineScore": 0.0026411,
+          "candidateScore": 0.0026397642,
+          "relativeScoreChange": -0.0005057741092726609
+        },
+        {
+          "id": "wallpaper-031",
+          "baselineRank": 92,
+          "candidateRank": 145,
+          "baselineScore": 0.0024026358,
+          "candidateScore": 0.0007812598,
+          "relativeScoreChange": -0.6748321988709234
+        },
+        {
+          "id": "madness-wallhaven-gww23l",
+          "baselineRank": 15,
+          "candidateRank": 15,
+          "baselineScore": 0.05946789,
+          "candidateScore": 0.059469715,
+          "relativeScoreChange": 0.00003068883056034366
+        },
+        {
+          "id": "madness-wallhaven-9oov2d",
+          "baselineRank": 42,
+          "candidateRank": 42,
+          "baselineScore": 0.01257257,
+          "candidateScore": 0.012614219,
+          "relativeScoreChange": 0.003312687859363672
+        }
+      ]
+    }
+  ],
+  "baselinePasses": 4,
+  "candidatePasses": 24
+}

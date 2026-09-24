@@ -1,0 +1,12 @@
+{
+  "families": 18,
+  "pairUnions": 153,
+  "closedFormChecks": 2352,
+  "nativeQueries": 216,
+  "boundQueries": 180,
+  "boundaryEpsilon": 1e-10,
+  "float32ScoreAgreement": true,
+  "filteredBoundedPitDocuments": 31,
+  "documents": 65,
+  "passed": true
+}

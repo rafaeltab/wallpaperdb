@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "id": "strict-hue-favorite-001",
+  "recordedAt": "2026-09-21T23:48:59.083659+00:00",
+  "status": "user-endorsed reference snapshot; experimental, not a production choice",
+  "method": {
+    "id": "cutoff-shade-hue-all-levels",
+    "label": "All cutoffs: shade-aware + strict hue",
+    "metric": "shade-hue-aware",
+    "profile": "all-levels"
+  },
+  "userPreferences": {
+    "jointFavoriteBucketCounts": [
+      256,
+      1024
+    ],
+    "preferredCutoffBlendExponent": 1,
+    "preferredQualityCurve": "linear",
+    "preferredQualityInfluence": 0.5,
+    "controlsRemainAdjustable": [
+      "cutoffBlendExponent",
+      "qualityInfluence",
+      "qualityCurve"
+    ],
+    "curveExperience": "Likes Smooth power usage, but Original linear penalty at 0.5 currently gives the preferred result. No exact global power exponent is inferred.",
+    "balanceGoal": "Quality and coverage should feel similarly important; no mathematical equal-weight claim.",
+    "querySpecified": false
+  },
+  "inheritedReproductionDefaults": {
+    "provenance": "Pinned current implementation defaults; not stated user preferences.",
+    "minimumQuality": 0,
+    "namedMode": "concrete-swatches",
+    "areaPower": 0.5,
+    "qualityPenalty": 0.35,
+    "excessPenalty": 1.5,
+    "pixelCutoff": {
+      "value": 0,
+      "provenance": "Normalized and unused by the all-levels profile; all five layers remain active."
+    }
+  },
+  "scoring": {
+    "cutoffs": [
+      0,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "cutoffWeights": [
+      {
+        "cutoff": 0,
+        "weight": 0.11010354735387826
+      },
+      {
+        "cutoff": 0.25,
+        "weight": 0.14535790919760475
+      },
+      {
+        "cutoff": 0.5,
+        "weight": 0.19190046346453946
+      },
+      {
+        "cutoff": 0.75,
+        "weight": 0.25334560796305033
+      },
+      {
+        "cutoff": 0.9,
+        "weight": 0.29929247202092724
+      }
+    ],
+    "weightFormula": "normalize(exp(cutoffBlendExponent * (cutoff / 0.9 - 1)))",
+    "vibeComponent": "sqrt(coverage) * (0.5 + 0.5 * conditionalQuality)",
+    "positiveProportionQualityMultiplier": "1 - 0.35 * 0.5 * (1 - conditionalQuality)",
+    "zeroProportionQuality": "Bypassed, as in the frozen original implementation.",
+    "composition": "Each cutoff component scores independently; weighted components sum and requested targets average. Minimum quality gates components without redistributing weights.",
+    "preservedCurves": [
+      "linear",
+      "power"
+    ],
+    "hybridCurve": "Unimplemented design proposal only; not part of this snapshot."
+  },
+  "sourceArchive": {
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/prototype-source.tar.gz",
+    "sha256": "25cb051d58244b05c923adf2d52fccc470cc5600af2f0b6913c7a1dfb18a6ddd",
+    "bytes": 6026994,
+    "fileCount": 635,
+    "inventory": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/source-inventory.json",
+      "sha256": "7532d0bae4d8c9e071f8c4fd92c1b47a779c739fb4b948dfcdb77710d54c13b0"
+    },
+    "scope": "UTF-8 prototype source, UI, experiment configuration and documentation, Makefile, lockfile and dependency manifests/referenced baseline sources. No raster/vector image files, ZIPs, environment files, node_modules or credentials.",
+    "manifestExcluded": "Snapshot manifest excluded to avoid self-reference; this manifest can be versioned separately.",
+    "verified": "Every archived file hash checked against the frozen inventory; all nine extraction-source hashes matched the original metadata before evaluation.",
+    "postCaptureNotes": "Feedback results and this manifest were added after archive creation; later documentation notes do not change the archived source or query behavior."
+  },
+  "measurements": {
+    "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/hues/334de5f444ac67fb606b",
+    "identityHash": "334de5f444ac67fb606be1149cbf3f04a9871bd369ef826bf48ae381370faa76",
+    "descriptorHash": "5639069403d2dcb7615bdd56aba70d1a719fd1106abc15577931fc3b5f2dc7a5",
+    "count": 545,
+    "metadata": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/evidence/metadata.json",
+      "sha256": "2e5fdec0237d736e9ef1383d17eaf38c14c3feff8b1868004dab60dadfd08a4a",
+      "originalPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/hues/334de5f444ac67fb606b/metadata.json"
+    },
+    "definition": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/evidence/metric-definition.canonical.json",
+      "sha256": "b7d8bf731c07e6c97475de181ab9750012ed52b68d0ea1bc0499b2f533d9798c",
+      "hashEncoding": "Exact bytes of the saved canonical JSON file; not the runtime JSON.stringify identity hash."
+    },
+    "sourceHashes": {
+      "hue-definition.mjs": "9f7123bfa540fc847f97892248a42f535b24f02b5bd0587f53bba7028ab3c73c",
+      "hue-index.mjs": "ce38441960b5775101cac87ac6945dc4e49c18bf16f50b403a3a4b2a9296e426",
+      "shade-definition.mjs": "b4c0b5b0513c191390b1fb3ca6784584cc52dd3452041e28fe7278e09250943f",
+      "cutoff-definition.mjs": "2ddb90e261cb03e94e66fc9ccae720e284c690ace8ae19f579fc53a283514ab4",
+      "cutoff-blend.mjs": "b4dbf5d041a44ab3270e3ecd12aa5e7c788656ede601c7bd91af6e636bcb9357",
+      "overlap-regions.mjs": "fa1b265e0f5a7c06624df04e08061ecd9b6b80267e9639f00e0dfe42394b5906",
+      "overlap-banks.mjs": "661284ebe268353c5337877cc34f38bf9b84ceab17cfb58d87da077d71fb8018",
+      "overlap-index.mjs": "8113de104d7e8079aac0d973b3c8feb44718ba2be7091ff3087a77fa34d40194",
+      "corpus-colors.mjs": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad"
+    },
+    "audit": {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/evidence/hue-subset-audit.json",
+      "sha256": "9aeedac2e27e338823356fbc9dd908984f5d483c1b5fed2f2133dabf73bb4acc",
+      "originalPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/hues/334de5f444ac67fb606b/hue-subset-audit.json"
+    },
+    "indices": [
+      {
+        "index": "color-exploration-shade-hue-256-real-v1",
+        "bucketCount": 256,
+        "count": 545,
+        "identityHash": "334de5f444ac67fb606be1149cbf3f04a9871bd369ef826bf48ae381370faa76",
+        "descriptorHash": "5639069403d2dcb7615bdd56aba70d1a719fd1106abc15577931fc3b5f2dc7a5",
+        "anchorsHash": "05ada2096f72f06cc11d3c54a456a6f22c721f1b36a89bdc146c418c2a6092a5",
+        "valuesHash": "42eabaa31dc9ca52a1c6f63306e4aa6209ff58be7828ba656485ff910ac90c0b",
+        "completeIdsVerified": true,
+        "allValuesVerified": true,
+        "metricDefinitionVerified": true,
+        "receipt": {
+          "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/evidence/color-exploration-shade-hue-256-real-v1.json",
+          "sha256": "fa2559297557e901a7b398be01ca97aebf71750534cd35950184c3e2d9684091",
+          "originalPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/color-exploration-shade-hue-256-real-v1.json"
+        }
+      },
+      {
+        "index": "color-exploration-shade-hue-1024-real-v1",
+        "bucketCount": 1024,
+        "count": 545,
+        "identityHash": "334de5f444ac67fb606be1149cbf3f04a9871bd369ef826bf48ae381370faa76",
+        "descriptorHash": "5639069403d2dcb7615bdd56aba70d1a719fd1106abc15577931fc3b5f2dc7a5",
+        "anchorsHash": "42005e159a9bd674118b0a567dfcb605c27775d66c58a6155d7704e3540be014",
+        "valuesHash": "410c2261cf2c42d5f3d307280b578e0e90a09f05abdd51c9368a272fc7f4da00",
+        "completeIdsVerified": true,
+        "allValuesVerified": true,
+        "metricDefinitionVerified": true,
+        "receipt": {
+          "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/evidence/color-exploration-shade-hue-1024-real-v1.json",
+          "sha256": "66abe6f8502d72497891a0fefc76aac4def110acb608d2f761ef46519a5fc6bc",
+          "originalPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/color-exploration-shade-hue-1024-real-v1.json"
+        }
+      }
+    ],
+    "note": "Stored extraction definition contains its original default component weights; preferred query-time weights are pinned separately above and do not alter extraction."
+  },
+  "feedbackConfiguration": {
+    "path": "experiments/color-search-benchmark/exploration/configs/strict-hue-favorite-001.json",
+    "sha256": "def908314d6f15d154e3d49b45645e0e5327191f7d909f1f43d2a2bbb4ea373c",
+    "command": "make color-exploration-evaluate COLOR_EXP_ARGS='--config experiments/color-search-benchmark/exploration/configs/strict-hue-favorite-001.json'",
+    "evaluation": {
+      "status": "complete",
+      "runId": "2026-09-21T23-49-12.493Z-97753239",
+      "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-49-12.493Z-97753239",
+      "runJson": {
+        "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-49-12.493Z-97753239/run.json",
+        "sha256": "91f87c643751526573b34a3976a81a2277016e07c99f7d0290167353ebc8785d"
+      },
+      "report": {
+        "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-49-12.493Z-97753239/report.html",
+        "sha256": "dcefca86ca3d98423a4b999bc77d3a28788b85509684dc91a5f84aa0e8f81424"
+      },
+      "findings": {
+        "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorites/strict-hue-favorite-001/favorite-findings.json",
+        "sha256": "11fbbe4fe6d38c44daa3e242ce21630b94f7c8edd9fa850df2793e84d044cf7f"
+      },
+      "sourceSnapshot": {
+        "sha256": "622c4acb4eb467570fd34864767d96b4f2da26c060b0137c51e03a3159785840",
+        "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/source-snapshots/622c4acb4eb467570fd34864767d96b4f2da26c060b0137c51e03a3159785840.json"
+      },
+      "datasetHash": "ad79fa37f9809998ef53fd2336f558bb24905c2c2cb5522980fad7d126e36815",
+      "corpusHash": "ebb1a5d73662ba011ad04ddbc65335866d13a218e0475237df7399743f185c7b",
+      "workload": {
+        "warmup": 1,
+        "repeats": 3,
+        "concurrency": 1,
+        "limit": 20,
+        "accuracyLimit": 1000,
+        "timeoutMs": 10000,
+        "timingScope": "adapter-end-to-end",
+        "cacheState": "uncontrolled; explicit warmup rounds",
+        "schedule": "rotating case order per round; candidates sequential",
+        "percentiles": "nearest-rank",
+        "setupExcluded": true
+      },
+      "totalTimedRequests": 192,
+      "totalTimedFailures": 0,
+      "timedAtOrAbove1s": 0,
+      "candidates": [
+        {
+          "id": "strict-hue-favorite-001-256",
+          "bucketCount": 256,
+          "parameters": {
+            "bucketCount": 256,
+            "cutoffBlendExponent": 1,
+            "qualityCurve": "linear",
+            "qualityInfluence": 0.5,
+            "minimumQuality": 0,
+            "namedMode": "concrete-swatches",
+            "areaPower": 0.5,
+            "qualityPenalty": 0.35,
+            "excessPenalty": 1.5,
+            "pixelCutoff": 0
+          },
+          "coverage": {
+            "total": 38,
+            "ok": 32,
+            "unsupported": 6,
+            "error": 0
+          },
+          "all": {
+            "caseCount": 32,
+            "queryMacroAgreement": 0.6947916666666667,
+            "assessedPairs": 234,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "allReal": {
+            "caseCount": 28,
+            "queryMacroAgreement": 0.7035714285714285,
+            "assessedPairs": 184,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "historical": {
+            "caseCount": 31,
+            "queryMacroAgreement": 0.6849462365591398,
+            "assessedPairs": 233,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "historicalReal": {
+            "caseCount": 27,
+            "queryMacroAgreement": 0.6925925925925925,
+            "assessedPairs": 183,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "pagodaPair": {
+            "caseId": "perceived-red-pagoda-001",
+            "pass": true,
+            "preferredScore": 0.09721769,
+            "otherScore": 0.066583484,
+            "scope": "Selected development pair, not held-out evidence."
+          },
+          "performance": {
+            "sampleCount": 96,
+            "p50Ms": 3.353223000000071,
+            "p95Ms": 6.166220000000067,
+            "maxMs": 38.50730899999962,
+            "failures": 0
+          },
+          "timedAtOrAbove1s": 0
+        },
+        {
+          "id": "strict-hue-favorite-001-1024",
+          "bucketCount": 1024,
+          "parameters": {
+            "bucketCount": 1024,
+            "cutoffBlendExponent": 1,
+            "qualityCurve": "linear",
+            "qualityInfluence": 0.5,
+            "minimumQuality": 0,
+            "namedMode": "concrete-swatches",
+            "areaPower": 0.5,
+            "qualityPenalty": 0.35,
+            "excessPenalty": 1.5,
+            "pixelCutoff": 0
+          },
+          "coverage": {
+            "total": 38,
+            "ok": 32,
+            "unsupported": 6,
+            "error": 0
+          },
+          "all": {
+            "caseCount": 32,
+            "queryMacroAgreement": 0.7125,
+            "assessedPairs": 234,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "allReal": {
+            "caseCount": 28,
+            "queryMacroAgreement": 0.7214285714285714,
+            "assessedPairs": 184,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "historical": {
+            "caseCount": 31,
+            "queryMacroAgreement": 0.7032258064516129,
+            "assessedPairs": 233,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "historicalReal": {
+            "caseCount": 27,
+            "queryMacroAgreement": 0.7111111111111111,
+            "assessedPairs": 183,
+            "missingImages": 0,
+            "eligibilityViolations": 0
+          },
+          "pagodaPair": {
+            "caseId": "perceived-red-pagoda-001",
+            "pass": true,
+            "preferredScore": 0.09721769,
+            "otherScore": 0.066583484,
+            "scope": "Selected development pair, not held-out evidence."
+          },
+          "performance": {
+            "sampleCount": 96,
+            "p50Ms": 3.576551999998628,
+            "p95Ms": 6.229159000002255,
+            "maxMs": 15.987068999998883,
+            "failures": 0
+          },
+          "timedAtOrAbove1s": 0
+        }
+      ],
+      "limitations": [
+        "One reviewer; development cases, including quick and explicitly uncertain judgments.",
+        "Six unsupported cases remain unsupported; aggregate accuracy is over supported cases only.",
+        "Latency is adapter-end-to-end, concurrency 1, explicit warmup on 545 assets; not evidence of million-record or concurrent production capacity.",
+        "Timed top-20 queries and accuracy-limit-1000 judgments are separate; missing judged images in a timed top-20 result are not silently treated as measured ranking failures.",
+        "Both banks remain equally endorsed by the user regardless of these development aggregate differences."
+      ]
+    }
+  },
+  "historicalEvidence": {
+    "mainRun": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-11-56.676Z-ea2526a6",
+    "legacyDefaultsRun": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/runs/2026-09-21T23-14-33.424Z-046c06d3",
+    "pairReplay": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/hue-aware/2026-09-21/replay",
+    "limitation": "These previous runs tested other settings. They are not relabeled as measurements of the newly preserved linear 0.5 / cutoff weighting 1 tuning."
+  },
+  "restore": {
+    "ui": "http://zerotwo:8227/",
+    "documentation": "experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md",
+    "requirements": "Restore source archive in an isolated checkout retaining repository-relative paths. Install the locked dependencies and reuse the separately preserved external corpus, descriptor caches and OpenSearch indexes, or rebuild them with the frozen sources. This source archive is not a wallpaper backup, dependency binary bundle or OpenSearch snapshot.",
+    "avoid": "Do not overwrite this archive or these v1 measurements for a new metric/curve; give variants a new identity.",
+    "unrecordedState": [
+      "Specific search query",
+      "Target proportions",
+      "Other interactive UI state"
+    ]
+  }
+}

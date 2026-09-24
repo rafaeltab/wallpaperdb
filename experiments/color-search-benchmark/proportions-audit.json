@@ -1,0 +1,45 @@
+{
+  "seed": "0x60260915",
+  "approach": "Independent exhaustive unit-assignment oracle and closed-form 2x2 optimum; no production transport internals reused.",
+  "passed": 8,
+  "failed": 0,
+  "findings": [
+    {
+      "name": "Residual rerouting beats greedy matching",
+      "pass": true
+    },
+    {
+      "name": "500 seeded exhaustive integer-mass comparisons and permutations",
+      "pass": true,
+      "cases": 500,
+      "additionalPermutations": 500,
+      "maxError": 2.220446049250313e-16
+    },
+    {
+      "name": "1000 continuous 2x2 problems agree with analytic optimum",
+      "pass": true,
+      "cases": 1000,
+      "maxError": 1.1102230246251565e-16
+    },
+    {
+      "name": "Zero and tiny marginal masses remain feasible",
+      "pass": true
+    },
+    {
+      "name": "Roundoff correction does not create a negative requested fraction",
+      "pass": true
+    },
+    {
+      "name": "Exact 40% and at-least 40% have distinct intended rankings",
+      "pass": true
+    },
+    {
+      "name": "Duplicate and reordered nearby targets conserve support",
+      "pass": true
+    },
+    {
+      "name": "Equidistant target ties do not depend on input order",
+      "pass": true
+    }
+  ]
+}

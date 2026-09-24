@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "label": "Canonical shade and stricter-hue defaults on unchanged historical cases",
+  "description": "Two canonical no-parameter methods on the original37-case feedback dataset. This separate run preserves meaningful consolidated default comparisons and verifies exact historical-result parity with the49configuration experiment that explicitly includes the new pagoda preference. No extra cases; no production winner. All filtering/ranking is in real OpenSearch over545assets.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "cutoff-shade-all-levels",
+      "method": "cutoff-shade-all-levels",
+      "label": "Existing shade-aware · registered default",
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "cutoff-shade-hue-all-levels",
+      "method": "cutoff-shade-hue-all-levels",
+      "label": "Shade-aware with stricter hue · registered default",
+      "module": "./adapter.mjs"
+    }
+  ]
+}

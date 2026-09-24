@@ -1,0 +1,37 @@
+{
+  "createdAt": "2026-09-23T15:55:41.768612+00:00",
+  "status": "implemented-offline; real fidelity and coordinator activation pending",
+  "method": "favorite-utility-maxima-bounded",
+  "fileOnly": true,
+  "serviceCalls": false,
+  "labRestarted": false,
+  "sources": {
+    "favorite-maxima-adapter.mjs": "51f25a9d0eedce012919fa781c94360c14106dd5b84a4e56b947a7318e5e23ed",
+    "favorite-maxima-adapter.test.mjs": "7c81c5a30e1f6ba7d9ac5af0c8ba8c05f07383bdc54b44c493dc33215b4770bb",
+    "configs/favorite-maxima-feedback.json": "eda4e0c4215d31a3e81fc4f46fba695baffa77c2dd0be9859ead64699338456d",
+    "configs/favorite-maxima-projection-1m.json": "a721158cda09d962a9ecb33676bfa703c887c2337f2583bca45dd62e609302cd",
+    "configs/favorite-maxima-full-1m.json": "28dc90b526dbbc1e2496273cb53673bbe1eaaf588a63527516ba629f4b60613b",
+    "favorite-lab.mjs": "3fbfeb2d4893c20aae51d92821590e37b3053be8b09623e5cebd236a54a88fbe",
+    "favorite-lab.test.mjs": "f11a5c35b1f820ca947162288b246ad06dbbba4602ee296c49740b66e6ccd632",
+    "favorite-optimization-arrival.mjs": "18afc8bbca2813803ee5a1b88971e981671cb7a7e8dc7c6f0569fd242d68ea51",
+    "favorite-optimization-arrival.test.mjs": "cabfed4f7628d27741878b36ebf1210e6e4d17ea7d6bbacf0bd16127c7dcbce4",
+    "favorite-optimization-arrival-audit.mjs": "21e68abfc68353e272b7cc086fc25c98360566bdbb1ea62f3f23b9c275249ad9",
+    "favorite-optimization-arrival-audit.test.mjs": "2a9b300f3ec295b3a079b83cdd326e46782e9481b57568783e4ced45b7657cec",
+    "favorite-maxima-bounded-utilities.mjs": "176e215147c5f2f7f68a52502d0ee705850bb4966ac9dc1ffc2182e58a57ffb7"
+  },
+  "tests": {
+    "color-favorite-maxima-adapter-test": 4,
+    "color-favorite-lab-test": 15,
+    "color-favorite-optimization-arrival-test": 18,
+    "color-favorite-optimization-arrival-audit-test": 11
+  },
+  "feedbackConfig": "configs/favorite-maxima-feedback.json",
+  "scaleConfigs": [
+    "configs/favorite-maxima-projection-1m.json",
+    "configs/favorite-maxima-full-1m.json"
+  ],
+  "lab": "Sixteenth appended method; all previous entries retained. Same real point index; separate executor with fixture exclusion and numeric/ID guards.",
+  "arrival": "Exact registered method resolves to numeric schema, requires explicit maxima builder/executor, numeric float points and keyword ID doc values; bound definition captured; independent auditor verifies binding and warmup PIT-stage evidence.",
+  "remainingBoundary": "Benchmark automatic feedback-config helper hardcodes ./adapter.mjs. It was not changed; run standalone favorite-maxima-feedback.json instead.",
+  "activation": "Do not restart lab or run services until root coordinates completion of active screen and real maxima fidelity."
+}

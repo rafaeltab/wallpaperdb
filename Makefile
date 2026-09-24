@@ -1,4 +1,8 @@
-.PHONY: infra-start infra-stop infra-reset infra-logs apps-start apps-stop \
+.PHONY: color-benchmark color-benchmark-up color-benchmark-down color-benchmark-corpus color-benchmark-diagnose color-benchmark-report color-benchmark-serve color-benchmark-extract color-benchmark-rank color-benchmark-blind-review color-benchmark-analysis color-benchmark-format \
+        color-proportions color-proportions-prepare color-proportions-diagnose color-proportions-evaluate color-proportions-audit color-proportions-serve color-proportions-format \
+        color-ranges color-ranges-diagnose color-ranges-evaluate color-ranges-format color-ranges-serve \
+        color-global-up color-global-down color-global-prepare color-global-native-probe color-global-dynamic-probe color-global-index color-global-evaluate color-global-format color-global-serve \
+        infra-start infra-stop infra-reset infra-logs apps-start apps-stop \
         redis-cli redis-flush redis-info \
         nats-setup-streams nats-stream-list nats-stream-info \
         migrate psql psql-ingestor psql-media psql-tags psql-user db-studio-ingestor db-studio-media db-studio-user \
@@ -53,6 +57,109 @@ TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 
 help:
 	@echo "WallpaperDB - Available commands:"
+	@echo "  make color-proportions - Prepare the interactive color-proportion prototype"
+	@echo "  make color-proportions-serve - Prepare and serve the proportion editor"
+	@echo "  make color-proportions-prepare / color-proportions-diagnose - Build palette data / check ratio semantics"
+	@echo "  make color-proportions-evaluate / color-proportions-audit - Evaluate real images / independently verify transport"
+	@echo "  make color-proportions-format - Format only the proportion prototype sources"
+	@echo "  make color-ranges / color-ranges-serve - Prepare / serve the per-color range prototype"
+	@echo "  make color-ranges-diagnose / color-ranges-evaluate - Verify ranges / compare palettes with source pixels"
+	@echo "  make color-ranges-format - Format only the range prototype sources"
+	@echo "  make color-global-up / color-global-down - Start/stop isolated global-ranking OpenSearch"
+	@echo "  make color-global-prepare / color-global-index - Prepare pixel features / index the global-ranking corpus"
+	@echo "  make color-global-evaluate - Verify global order, pagination and query performance"
+	@echo "  make color-global-accuracy - Check source sampling convergence at 256 vs 1024 pixels"
+	@echo "  make color-global-sampling - Compare resized measurements with original-pixel samples"
+	@echo "  make color-global-adaptive / color-global-report - Measure safe range expansion / render evidence"
+	@echo "  make color-global-joint-probe / color-global-bounded-probe / color-global-joint-bounded-probe - Check global joint ordering and pagination"
+	@echo "  make color-global-multi-index - Build original-pixel joint indexes (GLOBAL_COUNTS='' for just the real corpus)"
+	@echo "  make color-global-multi-probe / color-global-multi-evaluate - Check and measure one-to-five-color matching"
+	@echo "  make color-global-multi-fast-probe / color-global-multi-fast-evaluate - Verify / measure the optimized scoring script"
+	@echo "  make color-global-varied - Compare 60 changing queries and a concurrency-four pass"
+	@echo "  make color-global-planner - Verify and benchmark selective-filter query planning"
+	@echo "  make color-global-multi-finalize - Verify million-document global winners with extended reference queries"
+	@echo "  make color-global-settle / color-global-resources - Measure settled index sizes / sustained resource use"
+	@echo "  make color-global-native-probe / color-global-dynamic-probe - Verify prototype OpenSearch queries"
+	@echo "  make color-global-format / color-global-serve - Format / serve the global-ranking prototype"
+	@echo "  make color-benchmark - Run the isolated 100-wallpaper color search experiment"
+	@echo "  make color-benchmark-diagnose - Run color ranking diagnostic cases"
+	@echo "  make color-benchmark-corpus - Download the pinned experiment wallpapers"
+	@echo "  make color-benchmark-up / color-benchmark-down - Start/stop scratch search and NATS"
+	@echo "  make color-benchmark-extract - Run production extraction/event projection on the corpus"
+	@echo "  make color-benchmark-rank - Compare algorithms on the already extracted corpus"
+	@echo "  make color-benchmark-blind-review - Generate blinded visual comparison sheets"
+	@echo "  make color-benchmark-analysis - Check candidate retrieval and query variation"
+	@echo "  make color-benchmark-format - Format the experiment source files"
+	@echo "  make color-benchmark-report / color-benchmark-serve - Build/view the comparison report"
+	@echo "  make color-review-serve - Serve the batch human color review on port 8222"
+	@echo "  make color-review-test - Verify review submissions and durable storage"
+	@echo "  make color-eval-test - Verify color evaluation datasets, metrics, adapters and run reports"
+	@echo "  make color-eval-run - Evaluate configured methods (COLOR_EVAL_CONFIG=... optional)"
+	@echo "  make color-eval-report - Rebuild a saved run report (COLOR_EVAL_RUN=..., COLOR_EVAL_PREVIOUS=... optional)"
+	@echo "  make color-eval-format - Format the evaluation loop source"
+	@echo "  make color-eval-serve - View saved color evaluation runs on port 8224"
+	@echo "  make color-exploration-corpus / color-exploration-index - Import all wallpapers / create the real prototype index"
+	@echo "  make color-exploration-evaluate / color-exploration-summary - Run feedback comparisons / render consolidated findings"
+	@echo "  make color-exploration-browser - Try all prototypes on port 8225"
+	@echo "  make color-histogram-inspector - Inspect histogram bins and score effects on port 8226"
+	@echo "  make color-overlap-index / -test / -scale - Explore 1024 overlapping coverage/quality regions"
+	@echo "  make color-overlap-bucket-index - Build or verify the 16/64/256 bucket comparison indexes"
+	@echo "  make color-cutoff-index / -resume / -test / -integration / -smoke / -scale - Compare pixel cutoffs and feathering"
+	@echo "  make color-shade-prepare / -test / -integration / -evaluate / -neutral-audit - Compare shade-aware color tolerance"
+	@echo "  make color-shade-pair-replay / -probe - Diagnose red versus orange ranking feedback"
+	@echo "  make color-hue-prepare / -test / -integration / -evaluate / -audit - Compare stricter hue with shade tolerance"
+	@echo "  make color-cutoff-heavy - Test concurrent unfiltered five-color queries on the million-record projection"
+	@echo "  make color-quality-curve-test / -scale - Check smooth power quality scoring and its projected scale cost"
+	@echo "  make color-favorite-corpus-test / color-favorite-scale-test / color-favorite-scale - Benchmark the preserved strict-hue favorite"
+	@echo "  make color-favorite-resources - Observe isolated benchmark CPU and memory counters"
+	@echo "  make color-favorite-arrival-test / color-favorite-arrival - Check independent query arrivals for the favorite"
+	@echo "  make color-favorite-maintained-test / color-favorite-maintained - Recheck favorite queries after index maintenance"
+	@echo "  make color-favorite-maintenance-test / color-favorite-maintenance - Record settled benchmark index layouts"
+	@echo "  make color-favorite-completion-test / color-favorite-completion - Complete the retained full-schema query pilot"
+	@echo "  make color-favorite-compiled-encoder-test / color-favorite-compiled-encoder-benchmark - Verify and time cached utility indexing plans"
+	@echo "  make color-favorite-compiled-index-test / color-favorite-compiled-index - Build isolated utility indexes with the cached encoder"
+	@echo "  make color-favorite-optimization-arrival-audit-test / color-favorite-optimization-arrival-audit - Independently audit saved query-arrival evidence"
+	@echo "  make color-favorite-performance-test - Check immutable performance page artifacts"
+	@echo "  make color-favorite-transport-diagnostic-test / -diagnostic - Trace bounded-query transport without scoring changes"
+	@echo "  make color-favorite-pooled-test / -pooled-fidelity-test / -pooled-fidelity - Check pooled PIT cleanup with unchanged scoring"
+	@echo "  make color-favorite-pooled-adapter-test - Check pooled feedback integration"
+	@echo "  make color-favorite-multishard-fidelity-test / -fidelity - Check projected utilities on three primary shards"
+	@echo "  make color-favorite-multiplicity-test / -fidelity-test / -fidelity - Verify repeated target weights in a separate prototype"
+	@echo "  make color-favorite-maxima-fidelity-test / color-favorite-maxima-fidelity - Verify global maxima pruning against numeric service rankings"
+	@echo "  make color-favorite-docvalue-fetch-test / -fidelity / color-favorite-docvalue-adapter-test - Check result retrieval without stored-field reads"
+	@echo "  make color-favorite-bulk-scheduler-test - Verify bounded parallel indexing and failure receipts"
+	@echo "  make color-favorite-preset-workload-test - Verify balanced queries across all nine score presets"
+	@echo "  make color-linked-strictness-test / -index - Prepare compact three/five-step color preference prototypes"
+	@echo "  make color-linked-strictness-lab-test - Check original/linked preference API behavior"
+	@echo "  make color-linked-strictness-verify - Verify compact rankings against original and precomputed service results"
+	@echo "  make color-linked-strictness-feedback-test - Check linked-slider feedback-loop adapter"
+	@echo "  make color-favorite-sorted-test - Verify native numeric-sort favorite prototypes"
+	@echo "  make color-dark-red-identify / -diagnose - Reproduce dark-red rankings and inspect color-distance losses"
+	@echo "  make color-overlap-fidelity - Measure nearest-anchor approximation on original pixels"
+	@echo "  make color-overlap-diversity - Probe many distinct query regions on the million-record index"
+	@echo "  make color-overlap-inspector / -smoke - Inspect overlapping regions on port 8227"
+	@echo "  make color-histogram-inspector-test / -integration - Verify inspector contracts / real score explanations"
+	@echo "  make color-histogram-inspector-smoke - Compare both live pages and save diagnostic receipts"
+	@echo "  make color-histogram-inspector-browser-check - Inspect the new UI with an isolated browser session"
+	@echo "  make color-exploration-scale / color-exploration-rank-scale - Run isolated scale and concurrency profiles"
+	@echo "  make color-exploration-arrival-load - Measure scheduled query arrivals and queue delay"
+	@echo "  make color-exploration-clickhouse-up / -index / -test / -scale - Compare exact palette scoring in ClickHouse"
+	@echo "  make color-exploration-precision-grid-index / -test / -scale - Explore native indexed picked-color utilities"
+	@echo "  make color-exploration-native-probe - Verify native quality/area scoring against real OpenSearch"
+	@echo "  make color-exploration-query-test - Verify structured and textual color intent consistency"
+	@echo "  make color-exploration-palette-mass-assessment - Reproduce the rejected quality-mass pruning diagnostic"
+	@echo "  make color-exploration-precision-precomputed-index - Index precomputed perceptual palette coordinates"
+	@echo "  make color-exploration-precision-precomputed-probe - Compare precomputed palette scores and latency"
+	@echo "  make color-exploration-recall - Compare native ANN retrieval with exact OpenSearch references"
+	@echo "  make color-exploration-palette-bounds / color-exploration-palette-cell-index - Prepare safe precision bounds"
+	@echo "  make color-exploration-refinement-features / color-exploration-refinement-index - Prepare relative highlight fields"
+	@echo "  make color-exploration-rank-index - Create the indexed utility prototype index"
+	@echo "  make color-exploration-browser-smoke / color-exploration-browser-check - Verify live UI APIs / browser automation"
+	@echo "  make color-exploration-relative-probe - Verify relative highlight service scores"
+	@echo "  make color-exploration-test - Verify prototype query and corpus contracts"
+	@echo "  make color-exploration-test-integration - Include every real OpenSearch prototype check"
+	@echo "  make color-exploration-scale-up - Start isolated OpenSearch 2.11 scale node (port19217, 8 CPU, 12 GiB)"
+	@echo "  make color-exploration-scale-stop - Stop the isolated scale node and retain its indexes"
 	@echo ""
 	@echo "Current worktree: project=$(COMPOSE_PROJECT_NAME), ingress=http://localhost:$(INGRESS_PORT)"
 	@echo ""
@@ -865,6 +972,540 @@ check: crap-check-types
 install:
 	pnpm install
 
+# Throwaway color search research. Separate ports, containers, and indexes.
+COLOR_BENCH_DIR = experiments/color-search-benchmark
+COLOR_BENCH_TS = node_modules/.bin/tsx --tsconfig $(COLOR_BENCH_DIR)/tsconfig.json -r ./apps/gateway/node_modules/reflect-metadata
+COLOR_BENCH_COMPOSE = docker compose -p $(COMPOSE_PROJECT_NAME)-color-benchmark -f $(COLOR_BENCH_DIR)/compose.yml
+COLOR_FAVORITE_REAL_DATA ?= $(HOME)/.local/share/wallpaperdb/color-evaluation/opensearch-real-data
+export COLOR_FAVORITE_REAL_DATA
+COLOR_GLOBAL_BASE_COMPOSE = docker compose -p $(COMPOSE_PROJECT_NAME)-color-global -f $(COLOR_BENCH_DIR)/global-compose.yml
+# Preserve the migrated real-corpus volume on subsequent ordinary lab starts.
+# The marker is written only after every source/copy file and restored index pass.
+COLOR_GLOBAL_COMPOSE = $(COLOR_GLOBAL_BASE_COMPOSE) $(if $(wildcard $(COLOR_FAVORITE_REAL_DATA).verified),-f $(COLOR_BENCH_DIR)/exploration/favorite-real-memory.yml,)
+
+color-benchmark-up:
+	@$(COLOR_BENCH_COMPOSE) up -d --wait
+
+color-benchmark-down:
+	@$(COLOR_BENCH_COMPOSE) down
+
+color-benchmark-corpus:
+	@node $(COLOR_BENCH_DIR)/downloader.mjs
+
+color-benchmark-diagnose:
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/diagnose.ts
+
+color-benchmark-extract: color-benchmark-up color-benchmark-corpus
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/pipeline.ts
+
+color-benchmark: color-benchmark-extract
+	@$(MAKE) color-benchmark-diagnose
+	@$(MAKE) color-benchmark-rank
+	@$(MAKE) color-benchmark-analysis color-benchmark-report color-benchmark-blind-review
+
+color-benchmark-rank:
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/benchmark.ts
+
+color-benchmark-report:
+	@node $(COLOR_BENCH_DIR)/report.mjs
+
+color-benchmark-blind-review:
+	@node $(COLOR_BENCH_DIR)/review-sheets.mjs
+
+color-benchmark-analysis:
+	@node $(COLOR_BENCH_DIR)/analyze.mjs
+
+color-benchmark-format:
+	@apps/gateway/node_modules/.bin/biome format --write $(COLOR_BENCH_DIR)/*.ts $(COLOR_BENCH_DIR)/*.mjs
+
+color-benchmark-serve:
+	@python3 -m http.server 8220 --bind 127.0.0.1 --directory $(COLOR_BENCH_DIR)
+
+color-proportions: color-proportions-prepare color-proportions-diagnose
+
+color-proportions-prepare: color-benchmark-corpus
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/proportions-prepare.ts
+
+color-proportions-diagnose:
+	@node $(COLOR_BENCH_DIR)/proportions-diagnose.mjs
+
+color-proportions-evaluate: color-proportions-prepare
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/proportions-evaluate.ts
+
+color-proportions-audit:
+	@node $(COLOR_BENCH_DIR)/proportions-audit.mjs
+
+color-proportions-format:
+	@apps/gateway/node_modules/.bin/biome format --write $(COLOR_BENCH_DIR)/proportions*.ts $(COLOR_BENCH_DIR)/proportions*.mjs
+
+color-proportions-serve: color-proportions
+	@node $(COLOR_BENCH_DIR)/proportions-serve.mjs
+
+color-ranges: color-proportions-prepare color-ranges-diagnose
+
+color-ranges-diagnose:
+	@node $(COLOR_BENCH_DIR)/ranges-diagnose.mjs
+
+color-ranges-evaluate: color-proportions-prepare
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/ranges-evaluate.ts
+
+color-ranges-format:
+	@apps/gateway/node_modules/.bin/biome format --write $(COLOR_BENCH_DIR)/ranges*.ts $(COLOR_BENCH_DIR)/ranges*.mjs
+
+color-ranges-serve: color-ranges
+	@node $(COLOR_BENCH_DIR)/proportions-serve.mjs
+
+color-global-up:
+	@$(COLOR_GLOBAL_COMPOSE) up -d --wait
+
+color-global-down:
+	@$(COLOR_GLOBAL_COMPOSE) down
+
+color-global-prepare: color-benchmark-corpus
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/global-prepare.ts
+
+color-global-native-probe:
+	@node $(COLOR_BENCH_DIR)/global-native.mjs --probe
+
+color-global-dynamic-probe:
+	@node $(COLOR_BENCH_DIR)/global-dynamic.mjs --probe
+
+.PHONY: color-global-joint-probe
+color-global-joint-probe:
+	@node $(COLOR_BENCH_DIR)/global-joint.mjs --probe
+
+color-global-index: color-global-up color-global-prepare
+	@node $(COLOR_BENCH_DIR)/global-index.mjs
+
+color-global-evaluate:
+	@node $(COLOR_BENCH_DIR)/global-evaluate.mjs
+
+.PHONY: color-global-report
+color-global-report:
+	@node $(COLOR_BENCH_DIR)/global-report.mjs
+
+.PHONY: color-global-adaptive
+color-global-adaptive:
+	@node $(COLOR_BENCH_DIR)/global-adaptive.mjs
+
+.PHONY: color-global-sampling
+color-global-sampling:
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/global-sampling.ts
+
+.PHONY: color-global-multi-index
+color-global-multi-index: color-global-up color-global-multi-prepare
+	@node $(COLOR_BENCH_DIR)/global-multi-index.mjs
+
+.PHONY: color-global-multi-evaluate
+color-global-multi-evaluate:
+	@node $(COLOR_BENCH_DIR)/global-multi-evaluate.mjs
+
+.PHONY: color-global-resources
+color-global-resources:
+	@node $(COLOR_BENCH_DIR)/global-resources.mjs
+
+.PHONY: color-global-settle
+color-global-settle:
+	@node $(COLOR_BENCH_DIR)/global-settle.mjs
+
+.PHONY: color-global-multi-finalize color-global-multi-fast-probe
+color-global-multi-finalize:
+	@node $(COLOR_BENCH_DIR)/global-multi-finalize.mjs
+
+color-global-multi-fast-probe:
+	@node $(COLOR_BENCH_DIR)/global-multi-fast.mjs --probe
+
+.PHONY: color-global-multi-fast-evaluate
+color-global-multi-fast-evaluate:
+	@node $(COLOR_BENCH_DIR)/global-multi-fast-evaluate.mjs
+
+.PHONY: color-global-varied
+color-global-varied:
+	@node $(COLOR_BENCH_DIR)/global-varied.mjs
+
+.PHONY: color-global-accuracy
+color-global-accuracy:
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/global-accuracy.ts
+
+color-global-format:
+	@apps/gateway/node_modules/.bin/biome format --write $(COLOR_BENCH_DIR)/global*.ts $(COLOR_BENCH_DIR)/global*.mjs
+
+color-global-serve:
+	@node $(COLOR_BENCH_DIR)/global-server.mjs
+
+.PHONY: color-review-serve color-review-test
+color-review-serve:
+	@node $(COLOR_BENCH_DIR)/evaluation/review-server.mjs
+
+color-review-test:
+	@node --test $(COLOR_BENCH_DIR)/evaluation/review-server.test.mjs
+
+COLOR_EVAL_CONFIG ?= $(COLOR_BENCH_DIR)/evaluation/loop/configs/initial.json
+.PHONY: color-eval-test color-eval-run color-eval-report color-eval-format color-eval-serve
+color-eval-test:
+	@node --test $(COLOR_BENCH_DIR)/evaluation/loop/*.test.mjs
+
+color-eval-run:
+	@node $(COLOR_BENCH_DIR)/evaluation/loop/cli.mjs run --config "$(COLOR_EVAL_CONFIG)"
+
+color-eval-report:
+	@node $(COLOR_BENCH_DIR)/evaluation/loop/cli.mjs report --run "$(COLOR_EVAL_RUN)" $(if $(COLOR_EVAL_PREVIOUS),--previous "$(COLOR_EVAL_PREVIOUS)")
+
+color-eval-format:
+	@apps/gateway/node_modules/.bin/biome format --write $(COLOR_BENCH_DIR)/evaluation/loop/*.mjs $(COLOR_BENCH_DIR)/evaluation/loop/configs/*.json
+
+color-eval-serve:
+	@node $(COLOR_BENCH_DIR)/evaluation/loop/server.mjs
+
+COLOR_EXP_ARGS ?=
+.PHONY: color-exploration-palette-mass-assessment
+color-exploration-palette-mass-assessment:
+	@node $(COLOR_BENCH_DIR)/exploration/palette-mass-assessment.mjs
+.PHONY: color-exploration-query-test
+color-exploration-query-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/query-intent.test.mjs
+.PHONY: color-exploration-precision-precomputed-index
+color-exploration-precision-precomputed-index:
+	@node $(COLOR_BENCH_DIR)/exploration/precision-precomputed-index.mjs
+.PHONY: color-exploration-precision-precomputed-probe
+color-exploration-precision-precomputed-probe:
+	@node $(COLOR_BENCH_DIR)/exploration/precision-precomputed-probe.mjs
+.PHONY: color-exploration-native-test color-exploration-native-probe
+color-exploration-native-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/methods-native-refined.test.mjs
+color-exploration-native-probe:
+	@node $(COLOR_BENCH_DIR)/exploration/methods-native-refined-probe.mjs
+.PHONY: color-exploration-arrival-load
+color-exploration-arrival-load:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/arrival-load.mjs $(COLOR_EXP_ARGS)
+.PHONY: color-exploration-clickhouse-up color-exploration-clickhouse-index color-exploration-clickhouse-test color-exploration-clickhouse-scale
+color-exploration-clickhouse-up:
+	@docker compose -p $(COMPOSE_PROJECT_NAME)-color-exploration-clickhouse -f $(COLOR_BENCH_DIR)/exploration/clickhouse-compose.yml up -d
+color-exploration-clickhouse-index:
+	@node $(COLOR_BENCH_DIR)/exploration/clickhouse-index.mjs $(COLOR_EXP_ARGS)
+color-exploration-clickhouse-test:
+	@COLOR_EXPLORATION_CLICKHOUSE_TEST=1 node --test $(COLOR_BENCH_DIR)/exploration/methods-clickhouse.test.mjs
+color-exploration-clickhouse-scale:
+	@node $(COLOR_BENCH_DIR)/exploration/clickhouse-scale.mjs $(COLOR_EXP_ARGS)
+.PHONY: color-exploration-precision-grid-index color-exploration-precision-grid-test color-exploration-precision-grid-scale
+color-exploration-precision-grid-index:
+	@node $(COLOR_BENCH_DIR)/exploration/precision-grid-index.mjs $(COLOR_EXP_ARGS)
+color-exploration-precision-grid-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/methods-precision-grid.test.mjs $(COLOR_BENCH_DIR)/exploration/precision-grid-scale.test.mjs
+color-exploration-precision-grid-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/precision-grid-scale.mjs $(COLOR_EXP_ARGS)
+.PHONY: color-exploration-summary color-exploration-browser-smoke color-exploration-rank-index
+color-exploration-summary:
+	@node $(COLOR_BENCH_DIR)/exploration/summary.mjs
+color-exploration-browser-smoke:
+	@node $(COLOR_BENCH_DIR)/exploration/browser-smoke.mjs
+color-exploration-rank-index:
+	@node $(COLOR_BENCH_DIR)/exploration/rank-features-index.mjs
+.PHONY: color-exploration-palette-cell-index
+color-exploration-palette-cell-index:
+	@node $(COLOR_BENCH_DIR)/exploration/palette-cell-index.mjs
+.PHONY: color-exploration-palette-bounds color-exploration-relative-probe
+color-exploration-palette-bounds:
+	@node $(COLOR_BENCH_DIR)/exploration/methods-palette-bounded.mjs --prepare-bounds
+color-exploration-relative-probe:
+	@node $(COLOR_BENCH_DIR)/exploration/methods-relative-probe.mjs
+.PHONY: color-exploration-recall color-exploration-refinement-index color-exploration-relative-test color-exploration-rank-scale
+color-exploration-recall:
+	@node $(COLOR_BENCH_DIR)/exploration/recall.mjs
+color-exploration-refinement-index:
+	@node $(COLOR_BENCH_DIR)/exploration/refinement-index.mjs
+color-exploration-relative-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/methods-relative.test.mjs $(COLOR_BENCH_DIR)/exploration/refinement-index.test.mjs
+color-exploration-rank-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/rank-features-scale.mjs $(COLOR_EXP_ARGS)
+COLOR_BROWSER_COMMAND ?= snapshot -i
+.PHONY: color-exploration-refinement-features color-exploration-refinement-feature-test
+color-exploration-refinement-features:
+	@node $(COLOR_BENCH_DIR)/exploration/refinement-features.mjs
+color-exploration-refinement-feature-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/refinement-features.test.mjs
+.PHONY: color-exploration-browser-check
+color-exploration-browser-check:
+	@agent-browser --session color-exploration-browser-t3code-28be15f7 $(COLOR_BROWSER_COMMAND)
+.PHONY: color-exploration-scale-up color-exploration-scale-stop
+.PHONY: color-exploration-method-test
+color-exploration-method-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/methods.test.mjs
+color-exploration-scale-up:
+	@docker compose -p $(COMPOSE_PROJECT_NAME)-color-exploration-scale -f $(COLOR_BENCH_DIR)/exploration/compose.yml up -d
+color-exploration-scale-stop:
+	@docker compose -p $(COMPOSE_PROJECT_NAME)-color-exploration-scale -f $(COLOR_BENCH_DIR)/exploration/compose.yml stop opensearch
+.PHONY: color-exploration-corpus color-exploration-index color-exploration-evaluate color-exploration-scale color-exploration-browser color-exploration-test color-exploration-corpus-test color-exploration-browser-test
+color-exploration-corpus:
+	@node $(COLOR_BENCH_DIR)/exploration/corpus.mjs $(COLOR_EXP_ARGS)
+color-exploration-index:
+	@node $(COLOR_BENCH_DIR)/exploration/cli.mjs index $(COLOR_EXP_ARGS)
+color-exploration-evaluate:
+	@node $(COLOR_BENCH_DIR)/exploration/cli.mjs evaluate $(COLOR_EXP_ARGS)
+color-exploration-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/scale.mjs $(COLOR_EXP_ARGS)
+color-exploration-browser:
+	@node $(COLOR_BENCH_DIR)/exploration/cli.mjs browser $(COLOR_EXP_ARGS)
+color-exploration-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/*.test.mjs
+.PHONY: color-exploration-test-integration
+color-exploration-test-integration:
+	@COLOR_EXPLORATION_METHOD_INTEGRATION=1 \
+	 COLOR_EXPLORATION_DIRECT_TEST=1 COLOR_EXPLORATION_INTENT_INTEGRATION=1 \
+	 COLOR_EXPLORATION_PRECISION_TYPED_TEST=1 COLOR_EXPLORATION_RANK_FEATURE_INTEGRATION=1 \
+	 COLOR_EXPLORATION_PRECISION_PRECOMPUTED_TEST=1 COLOR_EXPLORATION_PRECISION_DUPLICATE_TEST=1 \
+	 COLOR_EXPLORATION_PALETTE_BOUNDS_TEST=1 COLOR_EXPLORATION_PALETTE_BOUNDS_INTEGRATION=1 \
+	 COLOR_EXPLORATION_FAST_INTEGRATION=1 COLOR_EXPLORATION_ACCENT_INTEGRATION=1 \
+	 COLOR_EXPLORATION_CLICKHOUSE_TEST=1 COLOR_HISTOGRAM_INSPECTOR_INTEGRATION=1 COLOR_OVERLAP_INTEGRATION=1 COLOR_CUTOFF_INTEGRATION=1 \
+	 node --test $(COLOR_BENCH_DIR)/exploration/*.test.mjs
+.PHONY: color-histogram-inspector color-histogram-inspector-test color-histogram-inspector-integration color-histogram-inspector-browser-check color-histogram-inspector-smoke
+.PHONY: color-overlap-index color-overlap-test color-overlap-integration color-overlap-scale color-overlap-inspector color-overlap-inspector-test color-overlap-inspector-smoke color-overlap-inspector-browser-check
+.PHONY: color-overlap-fidelity
+.PHONY: color-overlap-bucket-index
+COLOR_CUTOFF_ARGS ?=
+.PHONY: color-cutoff-index color-cutoff-resume color-cutoff-test color-cutoff-integration color-cutoff-scale color-cutoff-smoke color-cutoff-heavy
+.PHONY: color-quality-curve-test color-quality-curve-scale
+.PHONY: color-dark-red-identify color-dark-red-diagnose
+COLOR_DARK_RED_ARGS ?=
+COLOR_SHADE_ARGS ?=
+COLOR_HUE_ARGS ?=
+COLOR_FAVORITE_ARGS ?=
+.PHONY: color-favorite-optimized-scoring-test color-favorite-utilities-test color-favorite-optimization-test color-favorite-optimization
+color-favorite-optimized-scoring-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimized-scoring.test.mjs
+color-favorite-utilities-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-utilities.test.mjs
+color-favorite-optimization-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-benchmark.test.mjs
+color-favorite-optimization:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-benchmark.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-utility-index-test color-favorite-utility-index color-favorite-lab-test color-favorite-lab
+color-favorite-utility-index-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-utility-index.test.mjs
+color-favorite-utility-index:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-utility-index.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-lab-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-lab.test.mjs
+color-favorite-lab:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-lab.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-optimization-fidelity-test color-favorite-optimization-fidelity
+color-favorite-optimization-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-fidelity.test.mjs
+color-favorite-optimization-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-optimization-audit-test color-favorite-optimization-audit
+color-favorite-optimization-audit-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-audit.test.mjs
+color-favorite-optimization-audit:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-audit.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-adapter-test color-favorite-typed-scoring-test
+color-favorite-adapter-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-adapter.test.mjs
+color-favorite-typed-scoring-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-typed-scoring.test.mjs
+.PHONY: color-favorite-optimization-pipeline
+color-favorite-optimization-pipeline:
+	@python3 $(COLOR_BENCH_DIR)/exploration/favorite-optimization-pipeline.py $(COLOR_FAVORITE_ARGS)
+COLOR_FAVORITE_BROWSER_ARGS ?= snapshot -i
+.PHONY: color-favorite-lab-browser
+color-favorite-lab-browser:
+	@agent-browser --session favorite-opt-ui-t3code-28be15f7 $(COLOR_FAVORITE_BROWSER_ARGS)
+.PHONY: color-favorite-utility-completion-test color-favorite-utility-completion
+color-favorite-utility-completion-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-utility-completion.test.mjs
+color-favorite-utility-completion:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-utility-completion.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-precision-test color-favorite-precision-index-test color-favorite-precision-index
+color-favorite-precision-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-precision-utilities.test.mjs
+color-favorite-precision-index-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-precision-index.test.mjs
+color-favorite-precision-index:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-precision-index.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-precision-fidelity-test color-favorite-precision-fidelity color-favorite-optimization-arrival-test color-favorite-optimization-arrival
+color-favorite-precision-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-precision-fidelity.test.mjs
+color-favorite-precision-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-precision-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-optimization-arrival-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-arrival.test.mjs
+color-favorite-optimization-arrival:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-arrival.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-optimization-arrival-audit-test color-favorite-optimization-arrival-audit
+color-favorite-optimization-arrival-audit-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-arrival-audit.test.mjs
+color-favorite-optimization-arrival-audit:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-arrival-audit.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-bounded-utilities-test
+color-favorite-bounded-utilities-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-bounded-utilities.test.mjs
+.PHONY: color-favorite-execution-fidelity-test color-favorite-execution-fidelity color-favorite-real-preserve color-favorite-real-expanded-up
+color-favorite-execution-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-execution-fidelity.test.mjs
+color-favorite-execution-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-execution-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-wide-workload-test color-favorite-optimization-results-test color-favorite-optimization-results
+color-favorite-wide-workload-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-wide-workload.test.mjs
+color-favorite-optimization-results-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-optimization-results.test.mjs
+color-favorite-optimization-results:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-optimization-results.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-numeric-index-audit-test color-favorite-numeric-index-audit
+color-favorite-numeric-index-audit-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-numeric-index-audit.test.mjs
+color-favorite-numeric-index-audit:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-numeric-index-audit.mjs $(COLOR_FAVORITE_ARGS)
+COLOR_FAVORITE_REAL_DATA ?= $(HOME)/.local/share/wallpaperdb/color-evaluation/opensearch-real-data
+COLOR_FAVORITE_REAL_PRESERVATION ?= $(HOME)/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/real-node-preservation
+color-favorite-real-preserve:
+	@python3 $(COLOR_BENCH_DIR)/exploration/favorite-real-node-preserve.py --container $(COMPOSE_PROJECT_NAME)-color-global-opensearch-1 --data-dir $(COLOR_FAVORITE_REAL_DATA) --receipt-dir $(COLOR_FAVORITE_REAL_PRESERVATION)
+color-favorite-real-expanded-up:
+	@python3 -c 'import json; from pathlib import Path; d=json.loads(Path("$(COLOR_FAVORITE_REAL_PRESERVATION)/preservation.json").read_text()); assert d.get("verified") is True and Path(d["dataDirectory"]).resolve() == Path("$(COLOR_FAVORITE_REAL_DATA)").resolve(), "Data preservation must pass before recreation"'
+	@COLOR_FAVORITE_REAL_DATA=$(COLOR_FAVORITE_REAL_DATA) $(COLOR_GLOBAL_BASE_COMPOSE) -f $(COLOR_BENCH_DIR)/exploration/favorite-real-memory.yml up -d --wait
+.PHONY: color-favorite-sorted-test
+color-favorite-sorted-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-sorted-utilities.test.mjs
+.PHONY: color-favorite-docvalue-fetch-test color-favorite-docvalue-fetch-fidelity
+color-favorite-docvalue-fetch-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-docvalue-fetch.test.mjs
+.PHONY: color-favorite-docvalue-adapter-test
+color-favorite-docvalue-adapter-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-docvalue-adapter.test.mjs
+color-favorite-docvalue-fetch-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-docvalue-fetch-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-bulk-scheduler-test
+color-favorite-bulk-scheduler-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-bulk-scheduler.test.mjs
+
+.PHONY: color-favorite-maxima-bounded-test
+color-favorite-maxima-bounded-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-maxima-bounded-utilities.test.mjs
+
+.PHONY: color-favorite-maxima-adapter-test
+color-favorite-maxima-adapter-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-maxima-adapter.test.mjs
+.PHONY: color-favorite-maxima-fidelity-test color-favorite-maxima-fidelity
+color-favorite-maxima-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-maxima-fidelity.test.mjs
+color-favorite-maxima-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-maxima-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-favorite-corpus-test color-favorite-scale-test color-favorite-scale color-favorite-resources
+.PHONY: color-favorite-arrival-test color-favorite-arrival
+.PHONY: color-favorite-maintained-test color-favorite-maintained
+.PHONY: color-favorite-maintenance-test color-favorite-maintenance
+.PHONY: color-favorite-completion-test color-favorite-completion
+color-favorite-corpus-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-scale-corpus.test.mjs
+color-favorite-scale-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-scale.test.mjs $(COLOR_BENCH_DIR)/exploration/favorite-scale-corpus.test.mjs
+color-favorite-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-scale.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-resources:
+	@python3 $(COLOR_BENCH_DIR)/exploration/favorite-resources.py $(COLOR_FAVORITE_ARGS)
+color-favorite-arrival-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-arrival.test.mjs
+color-favorite-arrival:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-arrival.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-maintained-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-maintained.test.mjs
+color-favorite-maintained:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-maintained.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-maintenance-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-maintenance.test.mjs
+color-favorite-maintenance:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-maintenance.mjs $(COLOR_FAVORITE_ARGS)
+color-favorite-completion-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-completion.test.mjs
+color-favorite-completion:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/favorite-completion.mjs $(COLOR_FAVORITE_ARGS)
+.PHONY: color-hue-prepare color-hue-test color-hue-integration color-hue-evaluate color-hue-audit
+color-hue-prepare:
+	@node $(COLOR_BENCH_DIR)/exploration/hue-index.mjs $(COLOR_HUE_ARGS)
+color-hue-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/hue-*.test.mjs
+color-hue-integration:
+	@COLOR_HUE_INTEGRATION=1 node --test $(COLOR_BENCH_DIR)/exploration/hue-*.test.mjs
+color-hue-evaluate:
+	@node $(COLOR_BENCH_DIR)/exploration/hue-evaluate.mjs $(COLOR_HUE_ARGS)
+color-hue-audit:
+	@node $(COLOR_BENCH_DIR)/exploration/hue-subset-audit.mjs $(COLOR_HUE_ARGS)
+.PHONY: color-shade-prepare color-shade-test color-shade-integration color-shade-evaluate color-shade-neutral-audit
+.PHONY: color-shade-pair-replay color-shade-pair-probe
+color-shade-pair-replay:
+	@node $(COLOR_BENCH_DIR)/exploration/shade-pair-replay.mjs $(COLOR_SHADE_ARGS)
+color-shade-pair-probe:
+	@node $(COLOR_BENCH_DIR)/exploration/shade-pair-probe.mjs $(COLOR_SHADE_ARGS)
+color-shade-prepare:
+	@node $(COLOR_BENCH_DIR)/exploration/shade-index.mjs $(COLOR_SHADE_ARGS)
+color-shade-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/shade-*.test.mjs
+color-shade-integration:
+	@COLOR_SHADE_INTEGRATION=1 node --test $(COLOR_BENCH_DIR)/exploration/shade-*.test.mjs
+color-shade-evaluate:
+	@node $(COLOR_BENCH_DIR)/exploration/shade-evaluate.mjs $(COLOR_SHADE_ARGS)
+color-shade-neutral-audit:
+	@node $(COLOR_BENCH_DIR)/exploration/shade-neutral-audit.mjs $(COLOR_SHADE_ARGS)
+color-dark-red-identify:
+	@node $(COLOR_BENCH_DIR)/exploration/dark-red-identify.mjs $(COLOR_DARK_RED_ARGS)
+color-dark-red-diagnose:
+	@node $(COLOR_BENCH_DIR)/exploration/dark-red-diagnose.mjs $(COLOR_DARK_RED_ARGS)
+color-quality-curve-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/quality-curve-scale.test.mjs
+color-quality-curve-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/quality-curve-scale.mjs $(COLOR_CUTOFF_ARGS)
+color-cutoff-index:
+	@node $(COLOR_BENCH_DIR)/exploration/cutoff-index.mjs $(COLOR_CUTOFF_ARGS)
+color-cutoff-resume:
+	@node $(COLOR_BENCH_DIR)/exploration/cutoff-resume.mjs $(COLOR_CUTOFF_ARGS)
+color-cutoff-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/cutoff-scale.mjs $(COLOR_CUTOFF_ARGS)
+color-cutoff-heavy:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/cutoff-heavy.mjs $(COLOR_CUTOFF_ARGS)
+color-cutoff-smoke:
+	@node $(COLOR_BENCH_DIR)/exploration/cutoff-api-smoke.mjs
+color-cutoff-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/cutoff-*.test.mjs $(COLOR_BENCH_DIR)/exploration/methods-cutoff.test.mjs
+color-cutoff-integration:
+	@COLOR_CUTOFF_INTEGRATION=1 node --test $(COLOR_BENCH_DIR)/exploration/cutoff-*.test.mjs $(COLOR_BENCH_DIR)/exploration/methods-cutoff.test.mjs
+color-overlap-bucket-index:
+	@node $(COLOR_BENCH_DIR)/exploration/overlap-bucket-index.mjs $(COLOR_OVERLAP_ARGS)
+.PHONY: color-overlap-diversity
+color-overlap-diversity:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/overlap-diversity-probe.mjs $(COLOR_OVERLAP_ARGS)
+color-overlap-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/overlap-fidelity.mjs
+color-overlap-index:
+	@node $(COLOR_BENCH_DIR)/exploration/overlap-index.mjs $(COLOR_OVERLAP_ARGS)
+color-overlap-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/overlap*.test.mjs $(COLOR_BENCH_DIR)/exploration/methods-overlap.test.mjs
+color-overlap-integration:
+	@COLOR_OVERLAP_INTEGRATION=1 node --test $(COLOR_BENCH_DIR)/exploration/overlap*.test.mjs $(COLOR_BENCH_DIR)/exploration/methods-overlap.test.mjs
+color-overlap-scale:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19217 node $(COLOR_BENCH_DIR)/exploration/overlap-scale.mjs $(COLOR_OVERLAP_ARGS)
+color-overlap-inspector:
+	@node $(COLOR_BENCH_DIR)/exploration/overlap-inspector-cli.mjs
+color-overlap-inspector-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/overlap-inspector-server.test.mjs
+color-overlap-inspector-smoke:
+	@node $(COLOR_BENCH_DIR)/exploration/overlap-inspector-smoke.mjs
+color-overlap-inspector-browser-check:
+	@agent-browser --session overlap-inspector-t3code-28be15f7 $(COLOR_OVERLAP_BROWSER_COMMAND)
+color-histogram-inspector:
+	@node $(COLOR_BENCH_DIR)/exploration/histogram-inspector-cli.mjs
+color-histogram-inspector-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/histogram-inspector*.test.mjs
+color-histogram-inspector-integration:
+	@COLOR_HISTOGRAM_INSPECTOR_INTEGRATION=1 node --test $(COLOR_BENCH_DIR)/exploration/histogram-inspector*.test.mjs
+color-histogram-inspector-browser-check:
+	@agent-browser --session histogram-inspector-t3code-28be15f7 $(COLOR_HISTOGRAM_BROWSER_COMMAND)
+color-histogram-inspector-smoke:
+	@node $(COLOR_BENCH_DIR)/exploration/histogram-inspector-smoke.mjs
+color-exploration-corpus-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/corpus.test.mjs
+color-exploration-browser-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/browser.test.mjs
+
 check-types: crap-check-types
 	@$(TURBO) run check-types
 
@@ -919,3 +1560,94 @@ clean:
 	@echo "Cleaning generated OpenAPI specs..."
 	@rm -f apps/ingestor/swagger.json apps/media/swagger.json apps/user/swagger.json
 	@echo "✓ Clean complete"
+
+.PHONY: color-global-bounded-probe
+color-global-bounded-probe:
+	@node $(COLOR_BENCH_DIR)/global-bounded.mjs --probe
+
+.PHONY: color-global-joint-bounded-probe
+color-global-joint-bounded-probe:
+	@node $(COLOR_BENCH_DIR)/global-joint-bounded.mjs --probe
+
+.PHONY: color-global-multi-prepare color-global-multi-probe
+color-global-multi-prepare: color-benchmark-corpus
+	@$(COLOR_BENCH_TS) $(COLOR_BENCH_DIR)/global-multi-prepare.mjs
+
+color-global-multi-probe:
+	@node $(COLOR_BENCH_DIR)/global-multi.mjs --probe
+
+# Read-only planner experiment; requires the existing frozen million-document index.
+.PHONY: color-global-planner
+color-global-planner:
+	@node $(COLOR_BENCH_DIR)/global-planner-evaluate.mjs
+
+.PHONY: color-favorite-compiled-encoder-test color-favorite-compiled-encoder-benchmark
+color-favorite-compiled-encoder-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-compiled-encoder.test.mjs
+color-favorite-compiled-encoder-benchmark:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-compiled-encoder.mjs --benchmark $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-compiled-index-test color-favorite-compiled-index
+color-favorite-compiled-index-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-compiled-index.test.mjs
+color-favorite-compiled-index:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-compiled-index.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-preset-workload-test
+color-favorite-preset-workload-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-preset-workload.test.mjs
+
+.PHONY: color-linked-strictness-test color-linked-strictness-index color-linked-strictness-lab-test color-linked-strictness-verify color-linked-strictness-feedback-test
+color-linked-strictness-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/linked-strictness.test.mjs $(COLOR_BENCH_DIR)/exploration/linked-strictness-index.test.mjs
+color-linked-strictness-index:
+	@node $(COLOR_BENCH_DIR)/exploration/linked-strictness-index.mjs $(COLOR_FAVORITE_ARGS)
+color-linked-strictness-lab-test:
+	@node --check $(COLOR_BENCH_DIR)/exploration/web/favorite-lab/strictness.js
+	@node --test $(COLOR_BENCH_DIR)/exploration/linked-strictness-lab.test.mjs
+color-linked-strictness-verify:
+	@COLOR_EXPLORATION_OPENSEARCH=http://127.0.0.1:19216 node $(COLOR_BENCH_DIR)/exploration/linked-strictness-verify.mjs $(COLOR_FAVORITE_ARGS)
+color-linked-strictness-feedback-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/linked-strictness-feedback.test.mjs
+
+.PHONY: color-favorite-multiplicity-test color-favorite-multiplicity-fidelity-test color-favorite-multiplicity-fidelity
+color-favorite-multiplicity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-utilities.test.mjs $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-adapter.test.mjs $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-feedback.test.mjs
+color-favorite-multiplicity-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-fidelity.test.mjs
+color-favorite-multiplicity-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-multishard-fidelity-test color-favorite-multishard-fidelity
+color-favorite-multishard-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-multishard-fidelity.test.mjs
+color-favorite-multishard-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-multishard-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-performance-test
+color-favorite-performance-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-performance.test.mjs
+
+.PHONY: color-favorite-multiplicity-feedback
+color-favorite-multiplicity-feedback:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-multiplicity-feedback.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-transport-diagnostic-test color-favorite-transport-diagnostic
+color-favorite-transport-diagnostic-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-transport-diagnostic.test.mjs
+color-favorite-transport-diagnostic:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-transport-diagnostic.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-pooled-test
+color-favorite-pooled-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-pooled-delete.test.mjs $(COLOR_BENCH_DIR)/exploration/favorite-pooled-utilities.test.mjs
+
+.PHONY: color-favorite-pooled-fidelity-test color-favorite-pooled-fidelity
+color-favorite-pooled-fidelity-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-pooled-fidelity.test.mjs
+color-favorite-pooled-fidelity:
+	@node $(COLOR_BENCH_DIR)/exploration/favorite-pooled-fidelity.mjs $(COLOR_FAVORITE_ARGS)
+
+.PHONY: color-favorite-pooled-adapter-test
+color-favorite-pooled-adapter-test:
+	@node --test $(COLOR_BENCH_DIR)/exploration/favorite-pooled-adapter.test.mjs

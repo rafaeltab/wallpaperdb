@@ -1,0 +1,190 @@
+{
+  "createdAt": "2026-09-21T15:49:33.781Z",
+  "inspector": "http://127.0.0.1:8227",
+  "comparison": "http://127.0.0.1:8225",
+  "corpus": {
+    "total": 545,
+    "real": 523,
+    "fixtures": 22
+  },
+  "methods": [
+    "overlap-quality-dense",
+    "overlap-quality-hybrid"
+  ],
+  "checks": [
+    {
+      "method": "overlap-quality-dense",
+      "label": "Picked bright red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 7.10247199999867,
+      "inspectionMs": 11.974000000001979
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "Named red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.40664434,
+      "regionsUsed": [
+        8
+      ],
+      "scoreDifference": 1.1041026093394635e-8,
+      "searchMs": 3.525989000001573,
+      "inspectionMs": 8.642177000001539
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "40% green, rest free",
+      "id": "madness-wallhaven-gww9yl",
+      "score": 0.7582285,
+      "regionsUsed": [
+        11
+      ],
+      "scoreDifference": -4.258012775704145e-8,
+      "searchMs": 4.100639000011142,
+      "inspectionMs": 7.980683000001591
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "80% grayscale + 20% red",
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.8470526,
+      "regionsUsed": [
+        null,
+        8
+      ],
+      "scoreDifference": 8.114218186250355e-10,
+      "searchMs": 4.50464899999497,
+      "inspectionMs": 10.349294999992708
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "50% green + 50% red",
+      "id": "evaluation-green-red-tulips",
+      "score": 0.58242065,
+      "regionsUsed": [
+        11,
+        8
+      ],
+      "scoreDifference": 1.0085678070481663e-8,
+      "searchMs": 6.135704999993322,
+      "inspectionMs": 9.920610000001034
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "Precise orange-red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 4.203462000004947,
+      "inspectionMs": 10.101911000005202
+    },
+    {
+      "method": "overlap-quality-dense",
+      "label": "Dark",
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 4.693903999999748,
+      "inspectionMs": 8.43821300000127
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "Picked bright red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 4.877919999998994,
+      "inspectionMs": 10.572475000008126
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "Named red",
+      "id": "wallpaper-037",
+      "score": 0.7119949,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -2.2345067463014345e-8,
+      "searchMs": 5.524044999998296,
+      "inspectionMs": 8.1791760000051
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "40% green, rest free",
+      "id": "madness-wallhaven-d88mmj",
+      "score": 0.8497873,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -8.283960739596807e-9,
+      "searchMs": 3.315583000003244,
+      "inspectionMs": 8.580780999996932
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "80% grayscale + 20% red",
+      "id": "wallpaper-088",
+      "score": 0.89826566,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 1.2074258370908808e-8,
+      "searchMs": 2.90540200000396,
+      "inspectionMs": 7.106780000001891
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "50% green + 50% red",
+      "id": "madness-wallhaven-xeejzz",
+      "score": 0.8098078,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -5.316405293775972e-8,
+      "searchMs": 2.277071000004071,
+      "inspectionMs": 7.313418000005186
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "Precise orange-red",
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.3665689999907045,
+      "inspectionMs": 7.567616999993334
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "label": "Dark",
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 2.519916999997804,
+      "inspectionMs": 8.482155999998213
+    }
+  ],
+  "status": "passed",
+  "note": "Read-only interface and score-parity validation. This does not add relevance judgments or establish production latency."
+}

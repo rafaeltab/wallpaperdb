@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "proportion-green-001",
+  "status": "user-judged",
+  "category": [
+    "Combinations",
+    "Perceived color"
+  ],
+  "use": "development anchor",
+  "exampleType": "controlled-svg-composition",
+  "evaluationGroup": "green-target-amount",
+  "query": {
+    "userText": "40% green; the rest doesn’t matter",
+    "intent": "Aim close to 40% total green; green is a named color with no specified hex. Explore how amount and shade quality affect result preference.",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 40
+      }
+    ],
+    "unspecifiedRemainderPercent": 60,
+    "preciseHex": null,
+    "subjectConstraint": null,
+    "priorClarification": "The user confirmed that 40% is a target rather than a minimum: for otherwise comparable results, 40% green should rank above 80% green."
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/proportion-green-001.html",
+    "presentation": "Six complete 1600x900 SVG compositions, identical #707070 background and centered full-height bands. Equal rendered dimensions per viewport. Neutral #202020 page. No target swatch.",
+    "selection": "One source shade at 20%, 40%, 60% and 80%; two alternate source shades at 40%. These are controlled contrasts, not relevance labels.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": true,
+    "percentageLabel": "Colored band: X% of image",
+    "percentageDisclosureReason": "Give geometric amounts explicitly so review focuses on amount/quality preference rather than estimating widths. Geometric band area is not automatically a human green-membership judgment.",
+    "randomization": "Fixed nonsorted presentation order: A60% #22BB44, B40% #668066, C20% #22BB44, D40% #99BB22, E80% #22BB44, F40% #22BB44.",
+    "judgmentFormat": "Free descriptions and optional order, ties or uncertainty. Mention amount or color quality if useful; say if a shade does not feel green. No numerical score scale.",
+    "validation": "Desktop1280x1400/mobile390x844 browser: six loaded fixtures, equal16:9 sizes per viewport, no horizontal overflow or target swatches; stated areas visible. Desktop screenshot inspected. SVG colors/geometry, six hashes and JSON verified. Six fixtures HTTP200; page HTTP200 through local tailnet. Presentation verification is not user display calibration."
+  },
+  "construction": {
+    "createdDate": "2026-09-16",
+    "canvas": {
+      "width": 1600,
+      "height": 900
+    },
+    "background": "#707070",
+    "geometry": "Centered full-height rectangle with width equal to 1600 multiplied by the geometric band-area fraction.",
+    "rendering": "Opaque plain SVG rect fills. No gradients, textures, filters, masks, external assets or image edits."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "proportion-green-001-a",
+      "filename": "evaluation/fixtures/proportion-green-001-a.svg",
+      "sha256": "4327930ba76eddb86faa0ee01a03f68e2e6ec35f5cbf73ced88cce309bb97c7e",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 60,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 40,
+        "accentRect": {
+          "x": 320,
+          "y": 0,
+          "width": 960,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Too much grean",
+        "amountObservation": "Too much green.",
+        "colorQualityObservation": null,
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "proportion-green-001-b",
+      "filename": "evaluation/fixtures/proportion-green-001-b.svg",
+      "sha256": "f3f9e670906189527166f7f7d919f3f3597a2b19d1bd4be7d4679550511a7785",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#668066",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Right amount of green, but it doesnt feel very green its more gray than anything",
+        "amountObservation": "Right amount of green.",
+        "colorQualityObservation": "Does not feel very green; more gray than anything.",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "proportion-green-001-c",
+      "filename": "evaluation/fixtures/proportion-green-001-c.svg",
+      "sha256": "929f35f669e575599b18cbbc529982e60053b3be79d8600c5720c4a2b6e35229",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 20,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 80,
+        "accentRect": {
+          "x": 640,
+          "y": 0,
+          "width": 320,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Too little green",
+        "amountObservation": "Too little green.",
+        "colorQualityObservation": null,
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "proportion-green-001-d",
+      "filename": "evaluation/fixtures/proportion-green-001-d.svg",
+      "sha256": "8e1ed9b5a2008c3ce80dba18b59553b1d1a5d8d09ce7f44ba58c227b3a3a4e5d",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#99BB22",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Right amount of green, but its more yellow than green",
+        "amountObservation": "Right amount of green.",
+        "colorQualityObservation": "More yellow than green.",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "E",
+      "wallpaperId": "proportion-green-001-e",
+      "filename": "evaluation/fixtures/proportion-green-001-e.svg",
+      "sha256": "c9511142a67275cd92bd52f0871d3655a0de500f28c351e0d06ece70ba191ff6",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 80,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 20,
+        "accentRect": {
+          "x": 160,
+          "y": 0,
+          "width": 1280,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "WAY TOO MUCH GREEN",
+        "amountObservation": "WAY TOO MUCH GREEN",
+        "colorQualityObservation": null,
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "F",
+      "wallpaperId": "proportion-green-001-f",
+      "filename": "evaluation/fixtures/proportion-green-001-f.svg",
+      "sha256": "1b72e1157d2eb352fb374c452b8dc8323169a57f462968589adec91ddea27a47",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Right amount of green and it is very green",
+        "amountObservation": "Right amount of green.",
+        "colorQualityObservation": "Very green.",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "green-proportion-order-001",
+      "source": "user-response-001",
+      "type": "named-color-proportion-result-preference",
+      "orderedLabels": [
+        "F",
+        "C",
+        "D",
+        "A",
+        "B",
+        "E"
+      ],
+      "orderedWallpaperIds": [
+        "proportion-green-001-f",
+        "proportion-green-001-c",
+        "proportion-green-001-d",
+        "proportion-green-001-a",
+        "proportion-green-001-b",
+        "proportion-green-001-e"
+      ],
+      "tiesReported": false,
+      "scope": "One explicit overall order for the 40% named-green query. No numeric score distances or rejection labels supplied. Source band areas and subjective amount/color-quality observations remain separate."
+    }
+  ],
+  "shadeAssessments": [
+    {
+      "label": "B",
+      "source": "user-response-001",
+      "description": "Does not feel very green; more gray than anything.",
+      "scope": "Qualitative shade assessment, not quantified green membership or a rejection threshold."
+    },
+    {
+      "label": "D",
+      "source": "user-response-001",
+      "description": "More yellow than green.",
+      "scope": "Qualitative shade assessment, not quantified green membership or a rejection threshold."
+    },
+    {
+      "label": "F",
+      "source": "user-response-001",
+      "description": "Very green.",
+      "scope": "Qualitative shade assessment, not quantified green membership or a rejection threshold."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "F",
+      "over": "C",
+      "source": "green-proportion-order-001",
+      "derivation": "Adjacent relation derived from one overall ordering; not an independent annotation."
+    },
+    {
+      "preferred": "C",
+      "over": "D",
+      "source": "green-proportion-order-001",
+      "derivation": "Adjacent relation derived from one overall ordering; not an independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "A",
+      "source": "green-proportion-order-001",
+      "derivation": "Adjacent relation derived from one overall ordering; not an independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "B",
+      "source": "green-proportion-order-001",
+      "derivation": "Adjacent relation derived from one overall ordering; not an independent annotation."
+    },
+    {
+      "preferred": "B",
+      "over": "E",
+      "source": "green-proportion-order-001",
+      "derivation": "Adjacent relation derived from one overall ordering; not an independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A Too much grean\nB Right amount of green, but it doesnt feel very green its more gray than anything\nC Too little green\nD Right amount of green, but its more yellow than green\nE WAY TOO MUCH GREEN\nF Right amount of green and it is very green\n\nF, C, D, A, B, E\n\n40% feels like 'less than half', so if you have more than half green that makes it feel off"
+    }
+  ],
+  "notes": [
+    "User judged F > C > D > A > B > E. F is described as the right amount and very green; no numeric grade or maximum score supplied.",
+    "Prior target-versus-minimum clarification preserved. The latest response adds an explicit less-than-half interpretation for this 40% target.",
+    "Band percentages and hex values are construction facts. Do not convert geometric band area automatically into perceived green area or quality.",
+    "The query names green without selecting a reference swatch. F's shade is positively judged in this example, not declared the unique ideal for all named-green requests.",
+    "Alternate shades change multiple visual properties; this is not an isolated hue-only or saturation-only comparison.",
+    "C20% and A60% have equal geometric absolute error from40% using the same source shade; the user prefers C. Preserve this asymmetry for the comparison without inventing a universal under/over-target formula.",
+    "Do not treat lower-quality green as a fractional amount of an ideal green without a separate user clarification.",
+    "The rest is unspecified in the query but held gray in this case. These examples cannot establish treatment of arbitrary colorful remainders or extra green elsewhere.",
+    "User descriptions of green quality, estimated perceived amount, and whole-result preferences should be recorded separately.",
+    "All six variants belong to one related development group. Abstract fixture judgments need later real-wallpaper validation.",
+    "Browser scaling may antialias band edges. Source colors and geometry are pinned; display calibration and perceived color are not verified.",
+    "No corpus photos, original manifest, search method, descriptor, OpenSearch index, harness or benchmark was changed.",
+    "Preserve the raw typo 'grean' in A and uppercase emphasis 'WAY TOO MUCH GREEN' in E; normalized summaries may use green.",
+    "B and D are described as the right amount of green, alongside more-gray and more-yellow shade observations. Preserve both statements; do not reduce their subjective green amounts by an invented membership factor.",
+    "No numeric perceived-green area, strength, relevance score, tolerance threshold or outright exclusion supplied for any example.",
+    "The less-than-half explanation does not establish exclusion above50%, a discontinuous step at50%, or behavior exactly at50%. None of those nearby values were presented.",
+    "C20% outranks D40%, and A60% outranks B40%. These are concrete amount/quality tradeoffs, not proof of a universal area-versus-shade weighting.",
+    "F's positive assessment applies to this controlled comparison; real-wallpaper amount/quality behavior still needs validation."
+  ],
+  "semanticClarifications": [
+    {
+      "id": "green-forty-minority-001",
+      "source": "user-response-001",
+      "userText": "40% feels like 'less than half', so if you have more than half green that makes it feel off",
+      "interpretation": "For this 40% request, the user associates the target with green occupying less than half; more than half feels off. This supports the observed C20% preference over A60%, without defining a numeric penalty or a hard 50% boundary."
+    }
+  ]
+}

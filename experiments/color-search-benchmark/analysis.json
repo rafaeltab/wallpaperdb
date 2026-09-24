@@ -1,0 +1,2540 @@
+{
+  "selected": {
+    "palette": "palette32-06",
+    "retrieval": "rgb512-08"
+  },
+  "selectionRule": "Highest development-query CIELAB30 nDCG@10 within palette32 and rgb512 families; query holdout uses same images.",
+  "hybridSummaries": [
+    {
+      "split": "all",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.42499999999999993,
+      "worstPaletteTop10Recall": 0.1,
+      "ndcg10": 0.45423562574890824
+    },
+    {
+      "split": "all",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "meanPaletteTop10Recall": 0.8285714285714285,
+      "worstPaletteTop10Recall": 0.5,
+      "ndcg10": 0.7299738557577363
+    },
+    {
+      "split": "all",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.9500000000000001,
+      "worstPaletteTop10Recall": 0.5,
+      "ndcg10": 0.7591438077829132
+    },
+    {
+      "split": "all",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "meanPaletteTop10Recall": 0.9964285714285713,
+      "worstPaletteTop10Recall": 0.9,
+      "ndcg10": 0.7800110272226688
+    },
+    {
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.4714285714285715,
+      "worstPaletteTop10Recall": 0.2,
+      "ndcg10": 0.3885252173803015
+    },
+    {
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "meanPaletteTop10Recall": 0.8571428571428573,
+      "worstPaletteTop10Recall": 0.5,
+      "ndcg10": 0.6641824216209369
+    },
+    {
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.9785714285714286,
+      "worstPaletteTop10Recall": 0.8,
+      "ndcg10": 0.6944292818603156
+    },
+    {
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "meanPaletteTop10Recall": 1,
+      "worstPaletteTop10Recall": 1,
+      "ndcg10": 0.6951382640133552
+    },
+    {
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.37857142857142856,
+      "worstPaletteTop10Recall": 0.1,
+      "ndcg10": 0.5250006809151002
+    },
+    {
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "meanPaletteTop10Recall": 0.8,
+      "worstPaletteTop10Recall": 0.6,
+      "ndcg10": 0.8008261694435199
+    },
+    {
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "meanPaletteTop10Recall": 0.9214285714285715,
+      "worstPaletteTop10Recall": 0.5,
+      "ndcg10": 0.828836374161095
+    },
+    {
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "meanPaletteTop10Recall": 0.9928571428571429,
+      "worstPaletteTop10Recall": 0.9,
+      "ndcg10": 0.8714124645250062
+    }
+  ],
+  "hybrids": [
+    {
+      "query": "red",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.05961367459521433,
+      "top10": [
+        "wallpaper-094",
+        "wallpaper-082",
+        "wallpaper-058",
+        "wallpaper-040",
+        "wallpaper-035",
+        "wallpaper-084",
+        "wallpaper-087",
+        "wallpaper-038",
+        "wallpaper-072",
+        "wallpaper-073"
+      ]
+    },
+    {
+      "query": "orange",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.11830433219409933,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-049",
+        "wallpaper-094",
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-038",
+        "wallpaper-072",
+        "wallpaper-003",
+        "wallpaper-093",
+        "wallpaper-099"
+      ]
+    },
+    {
+      "query": "yellow",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0,
+      "top10": [
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-088",
+        "wallpaper-099",
+        "wallpaper-003",
+        "wallpaper-049",
+        "wallpaper-064",
+        "wallpaper-083",
+        "wallpaper-085",
+        "wallpaper-051"
+      ]
+    },
+    {
+      "query": "lime",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.6,
+      "ndcg10": null,
+      "top10": [
+        "wallpaper-049",
+        "wallpaper-099",
+        "wallpaper-083",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-058",
+        "wallpaper-093",
+        "wallpaper-073",
+        "wallpaper-003",
+        "wallpaper-069"
+      ]
+    },
+    {
+      "query": "green",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.6,
+      "ndcg10": 0.2702194850694412,
+      "top10": [
+        "wallpaper-050",
+        "wallpaper-058",
+        "wallpaper-094",
+        "wallpaper-083",
+        "wallpaper-093",
+        "wallpaper-098",
+        "wallpaper-040",
+        "wallpaper-012",
+        "wallpaper-034",
+        "wallpaper-099"
+      ]
+    },
+    {
+      "query": "teal",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.3,
+      "ndcg10": 0.5215867900597385,
+      "top10": [
+        "wallpaper-098",
+        "wallpaper-050",
+        "wallpaper-040",
+        "wallpaper-034",
+        "wallpaper-026",
+        "wallpaper-078",
+        "wallpaper-093",
+        "wallpaper-019",
+        "wallpaper-083",
+        "wallpaper-017"
+      ]
+    },
+    {
+      "query": "cyan",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.6,
+      "ndcg10": 0.33654596134471254,
+      "top10": [
+        "wallpaper-051",
+        "wallpaper-099",
+        "wallpaper-028",
+        "wallpaper-078",
+        "wallpaper-003",
+        "wallpaper-093",
+        "wallpaper-064",
+        "wallpaper-069",
+        "wallpaper-004",
+        "wallpaper-083"
+      ]
+    },
+    {
+      "query": "sky",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.4119006705855495,
+      "top10": [
+        "wallpaper-072",
+        "wallpaper-078",
+        "wallpaper-056",
+        "wallpaper-004",
+        "wallpaper-099",
+        "wallpaper-034",
+        "wallpaper-026",
+        "wallpaper-069",
+        "wallpaper-093",
+        "wallpaper-003"
+      ]
+    },
+    {
+      "query": "blue",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.00029444804620654526,
+      "top10": [
+        "wallpaper-057",
+        "wallpaper-039",
+        "wallpaper-034",
+        "wallpaper-038",
+        "wallpaper-026",
+        "wallpaper-035",
+        "wallpaper-098",
+        "wallpaper-013",
+        "wallpaper-040",
+        "wallpaper-050"
+      ]
+    },
+    {
+      "query": "navy",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.2,
+      "ndcg10": 0.7214553745226318,
+      "top10": [
+        "wallpaper-042",
+        "wallpaper-047",
+        "wallpaper-045",
+        "wallpaper-043",
+        "wallpaper-090",
+        "wallpaper-023",
+        "wallpaper-082",
+        "wallpaper-068",
+        "wallpaper-095",
+        "wallpaper-084"
+      ]
+    },
+    {
+      "query": "purple",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.3,
+      "ndcg10": 0.1608588834349475,
+      "top10": [
+        "wallpaper-035",
+        "wallpaper-039",
+        "wallpaper-038",
+        "wallpaper-098",
+        "wallpaper-013",
+        "wallpaper-026",
+        "wallpaper-087",
+        "wallpaper-040",
+        "wallpaper-050",
+        "wallpaper-082"
+      ]
+    },
+    {
+      "query": "magenta",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.4,
+      "ndcg10": 0.08249197843224719,
+      "top10": [
+        "wallpaper-039",
+        "wallpaper-038",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-056",
+        "wallpaper-094",
+        "wallpaper-058",
+        "wallpaper-087",
+        "wallpaper-026",
+        "wallpaper-072"
+      ]
+    },
+    {
+      "query": "pink",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.8246627166907161,
+      "top10": [
+        "wallpaper-038",
+        "wallpaper-039",
+        "wallpaper-058",
+        "wallpaper-035",
+        "wallpaper-003",
+        "wallpaper-087",
+        "wallpaper-056",
+        "wallpaper-069",
+        "wallpaper-072",
+        "wallpaper-073"
+      ]
+    },
+    {
+      "query": "rose",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.4,
+      "ndcg10": 0.549646822040391,
+      "top10": [
+        "wallpaper-035",
+        "wallpaper-082",
+        "wallpaper-039",
+        "wallpaper-094",
+        "wallpaper-087",
+        "wallpaper-038",
+        "wallpaper-040",
+        "wallpaper-093",
+        "wallpaper-085",
+        "wallpaper-084"
+      ]
+    },
+    {
+      "query": "brown",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.3,
+      "ndcg10": 0.4836746373622141,
+      "top10": [
+        "wallpaper-094",
+        "wallpaper-087",
+        "wallpaper-095",
+        "wallpaper-093",
+        "wallpaper-090",
+        "wallpaper-078",
+        "wallpaper-081",
+        "wallpaper-085",
+        "wallpaper-013",
+        "wallpaper-019"
+      ]
+    },
+    {
+      "query": "tan",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.3,
+      "ndcg10": 0.39572534350859495,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-094",
+        "wallpaper-069",
+        "wallpaper-066",
+        "wallpaper-093",
+        "wallpaper-073",
+        "wallpaper-099",
+        "wallpaper-003",
+        "wallpaper-056",
+        "wallpaper-012"
+      ]
+    },
+    {
+      "query": "olive",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.8234304927383305,
+      "top10": [
+        "wallpaper-093",
+        "wallpaper-050",
+        "wallpaper-094",
+        "wallpaper-081",
+        "wallpaper-099",
+        "wallpaper-083",
+        "wallpaper-086",
+        "wallpaper-026",
+        "wallpaper-019",
+        "wallpaper-085"
+      ]
+    },
+    {
+      "query": "forest",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.4,
+      "ndcg10": 0.8954091719189855,
+      "top10": [
+        "wallpaper-086",
+        "wallpaper-081",
+        "wallpaper-090",
+        "wallpaper-050",
+        "wallpaper-078",
+        "wallpaper-017",
+        "wallpaper-013",
+        "wallpaper-095",
+        "wallpaper-068",
+        "wallpaper-083"
+      ]
+    },
+    {
+      "query": "black",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.2,
+      "ndcg10": 0.7521488089828714,
+      "top10": [
+        "wallpaper-023",
+        "wallpaper-027",
+        "wallpaper-084",
+        "wallpaper-068",
+        "wallpaper-082",
+        "wallpaper-045",
+        "wallpaper-017",
+        "wallpaper-061",
+        "wallpaper-047",
+        "wallpaper-050"
+      ]
+    },
+    {
+      "query": "gray",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.1,
+      "ndcg10": 0.6945771587357511,
+      "top10": [
+        "wallpaper-093",
+        "wallpaper-019",
+        "wallpaper-066",
+        "wallpaper-069",
+        "wallpaper-061",
+        "wallpaper-085",
+        "wallpaper-050",
+        "wallpaper-098",
+        "wallpaper-078",
+        "wallpaper-026"
+      ]
+    },
+    {
+      "query": "white",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.8183928641454549,
+      "top10": [
+        "wallpaper-051",
+        "wallpaper-010",
+        "wallpaper-088",
+        "wallpaper-003",
+        "wallpaper-073",
+        "wallpaper-064",
+        "wallpaper-085",
+        "wallpaper-066",
+        "wallpaper-069",
+        "wallpaper-026"
+      ]
+    },
+    {
+      "query": "cream",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.6,
+      "ndcg10": 0.541667731414294,
+      "top10": [
+        "wallpaper-010",
+        "wallpaper-073",
+        "wallpaper-003",
+        "wallpaper-088",
+        "wallpaper-051",
+        "wallpaper-064",
+        "wallpaper-085",
+        "wallpaper-066",
+        "wallpaper-099",
+        "wallpaper-083"
+      ]
+    },
+    {
+      "query": "lavender",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.4,
+      "ndcg10": 0.3667141071072156,
+      "top10": [
+        "wallpaper-038",
+        "wallpaper-056",
+        "wallpaper-072",
+        "wallpaper-003",
+        "wallpaper-069",
+        "wallpaper-026",
+        "wallpaper-066",
+        "wallpaper-064",
+        "wallpaper-093",
+        "wallpaper-012"
+      ]
+    },
+    {
+      "query": "slate",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.1,
+      "ndcg10": 0.6106682255071565,
+      "top10": [
+        "wallpaper-098",
+        "wallpaper-078",
+        "wallpaper-026",
+        "wallpaper-066",
+        "wallpaper-061",
+        "wallpaper-093",
+        "wallpaper-050",
+        "wallpaper-019",
+        "wallpaper-069",
+        "wallpaper-085"
+      ]
+    },
+    {
+      "query": "blue-orange",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.7727042313124574,
+      "top10": [
+        "wallpaper-034",
+        "wallpaper-058",
+        "wallpaper-038",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-098",
+        "wallpaper-026",
+        "wallpaper-056",
+        "wallpaper-078",
+        "wallpaper-073"
+      ]
+    },
+    {
+      "query": "pink-teal",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.3,
+      "ndcg10": 0.043981987021599916,
+      "top10": [
+        "wallpaper-098",
+        "wallpaper-040",
+        "wallpaper-026",
+        "wallpaper-038",
+        "wallpaper-066",
+        "wallpaper-069",
+        "wallpaper-056",
+        "wallpaper-093",
+        "wallpaper-078",
+        "wallpaper-061"
+      ]
+    },
+    {
+      "query": "black-red",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.4,
+      "ndcg10": 0.5088710216644051,
+      "top10": [
+        "wallpaper-082",
+        "wallpaper-040",
+        "wallpaper-084",
+        "wallpaper-087",
+        "wallpaper-094",
+        "wallpaper-090",
+        "wallpaper-095",
+        "wallpaper-085",
+        "wallpaper-038",
+        "wallpaper-061"
+      ]
+    },
+    {
+      "query": "green-cream",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 20,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.49881497678529674,
+      "top10": [
+        "wallpaper-093",
+        "wallpaper-083",
+        "wallpaper-026",
+        "wallpaper-099",
+        "wallpaper-073",
+        "wallpaper-085",
+        "wallpaper-064",
+        "wallpaper-066",
+        "wallpaper-012",
+        "wallpaper-078"
+      ]
+    },
+    {
+      "query": "red",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.9529970343076822,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-094",
+        "wallpaper-031",
+        "wallpaper-082",
+        "wallpaper-058",
+        "wallpaper-040",
+        "wallpaper-035",
+        "wallpaper-004",
+        "wallpaper-084",
+        "wallpaper-087"
+      ]
+    },
+    {
+      "query": "orange",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.7518393073585063,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-058",
+        "wallpaper-049",
+        "wallpaper-094",
+        "wallpaper-044",
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-046",
+        "wallpaper-038",
+        "wallpaper-012"
+      ]
+    },
+    {
+      "query": "yellow",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-060",
+        "wallpaper-010",
+        "wallpaper-006",
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-088",
+        "wallpaper-099",
+        "wallpaper-003",
+        "wallpaper-049"
+      ]
+    },
+    {
+      "query": "lime",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": null,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-052",
+        "wallpaper-049",
+        "wallpaper-099",
+        "wallpaper-083",
+        "wallpaper-060",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-010",
+        "wallpaper-058"
+      ]
+    },
+    {
+      "query": "green",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.28587044549665713,
+      "top10": [
+        "wallpaper-050",
+        "wallpaper-052",
+        "wallpaper-058",
+        "wallpaper-094",
+        "wallpaper-083",
+        "wallpaper-093",
+        "wallpaper-098",
+        "wallpaper-004",
+        "wallpaper-040",
+        "wallpaper-086"
+      ]
+    },
+    {
+      "query": "teal",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.7052186996016915,
+      "top10": [
+        "wallpaper-024",
+        "wallpaper-013",
+        "wallpaper-098",
+        "wallpaper-004",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-020",
+        "wallpaper-050",
+        "wallpaper-040",
+        "wallpaper-034"
+      ]
+    },
+    {
+      "query": "cyan",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.38479161082753577,
+      "top10": [
+        "wallpaper-010",
+        "wallpaper-051",
+        "wallpaper-099",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-078",
+        "wallpaper-003",
+        "wallpaper-093"
+      ]
+    },
+    {
+      "query": "sky",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.8076737949861948,
+      "top10": [
+        "wallpaper-028",
+        "wallpaper-072",
+        "wallpaper-021",
+        "wallpaper-087",
+        "wallpaper-078",
+        "wallpaper-010",
+        "wallpaper-056",
+        "wallpaper-004",
+        "wallpaper-099",
+        "wallpaper-034"
+      ]
+    },
+    {
+      "query": "blue",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8336217903980472,
+      "top10": [
+        "wallpaper-091",
+        "wallpaper-032",
+        "wallpaper-057",
+        "wallpaper-036",
+        "wallpaper-039",
+        "wallpaper-034",
+        "wallpaper-038",
+        "wallpaper-033",
+        "wallpaper-026",
+        "wallpaper-047"
+      ]
+    },
+    {
+      "query": "navy",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.8990894554161939,
+      "top10": [
+        "wallpaper-067",
+        "wallpaper-015",
+        "wallpaper-042",
+        "wallpaper-079",
+        "wallpaper-047",
+        "wallpaper-074",
+        "wallpaper-007",
+        "wallpaper-045",
+        "wallpaper-063",
+        "wallpaper-043"
+      ]
+    },
+    {
+      "query": "purple",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.9293030768396287,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-035",
+        "wallpaper-032",
+        "wallpaper-039",
+        "wallpaper-036",
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-057",
+        "wallpaper-045",
+        "wallpaper-056"
+      ]
+    },
+    {
+      "query": "magenta",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.876966427946351,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-039",
+        "wallpaper-038",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-045",
+        "wallpaper-004",
+        "wallpaper-080",
+        "wallpaper-082",
+        "wallpaper-056"
+      ]
+    },
+    {
+      "query": "pink",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.8581085852619189,
+      "top10": [
+        "wallpaper-038",
+        "wallpaper-039",
+        "wallpaper-044",
+        "wallpaper-058",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-003",
+        "wallpaper-037",
+        "wallpaper-054",
+        "wallpaper-004"
+      ]
+    },
+    {
+      "query": "rose",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.6,
+      "ndcg10": 0.5414418828891772,
+      "top10": [
+        "wallpaper-035",
+        "wallpaper-097",
+        "wallpaper-082",
+        "wallpaper-039",
+        "wallpaper-094",
+        "wallpaper-049",
+        "wallpaper-046",
+        "wallpaper-072",
+        "wallpaper-059",
+        "wallpaper-087"
+      ]
+    },
+    {
+      "query": "brown",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.6414031949034511,
+      "top10": [
+        "wallpaper-100",
+        "wallpaper-046",
+        "wallpaper-094",
+        "wallpaper-087",
+        "wallpaper-024",
+        "wallpaper-095",
+        "wallpaper-068",
+        "wallpaper-093",
+        "wallpaper-090",
+        "wallpaper-078"
+      ]
+    },
+    {
+      "query": "tan",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.7623071249785787,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-049",
+        "wallpaper-096",
+        "wallpaper-097",
+        "wallpaper-044",
+        "wallpaper-094",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-069",
+        "wallpaper-066"
+      ]
+    },
+    {
+      "query": "olive",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.8376354627169854,
+      "top10": [
+        "wallpaper-093",
+        "wallpaper-050",
+        "wallpaper-097",
+        "wallpaper-034",
+        "wallpaper-094",
+        "wallpaper-081",
+        "wallpaper-099",
+        "wallpaper-049",
+        "wallpaper-083",
+        "wallpaper-013"
+      ]
+    },
+    {
+      "query": "forest",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.8599328762632824,
+      "top10": [
+        "wallpaper-086",
+        "wallpaper-081",
+        "wallpaper-025",
+        "wallpaper-090",
+        "wallpaper-031",
+        "wallpaper-002",
+        "wallpaper-021",
+        "wallpaper-050",
+        "wallpaper-078",
+        "wallpaper-089"
+      ]
+    },
+    {
+      "query": "black",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.8779856002661385,
+      "top10": [
+        "wallpaper-067",
+        "wallpaper-023",
+        "wallpaper-063",
+        "wallpaper-079",
+        "wallpaper-027",
+        "wallpaper-084",
+        "wallpaper-029",
+        "wallpaper-076",
+        "wallpaper-089",
+        "wallpaper-068"
+      ]
+    },
+    {
+      "query": "gray",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.8747065765574489,
+      "top10": [
+        "wallpaper-097",
+        "wallpaper-020",
+        "wallpaper-075",
+        "wallpaper-018",
+        "wallpaper-013",
+        "wallpaper-058",
+        "wallpaper-093",
+        "wallpaper-056",
+        "wallpaper-019",
+        "wallpaper-024"
+      ]
+    },
+    {
+      "query": "white",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9616626885703099,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-006",
+        "wallpaper-051",
+        "wallpaper-010",
+        "wallpaper-055",
+        "wallpaper-088",
+        "wallpaper-003",
+        "wallpaper-073",
+        "wallpaper-064",
+        "wallpaper-085"
+      ]
+    },
+    {
+      "query": "cream",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9544054490585746,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-006",
+        "wallpaper-010",
+        "wallpaper-073",
+        "wallpaper-003",
+        "wallpaper-088",
+        "wallpaper-051",
+        "wallpaper-064",
+        "wallpaper-057"
+      ]
+    },
+    {
+      "query": "lavender",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.7537356699916791,
+      "top10": [
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-021",
+        "wallpaper-056",
+        "wallpaper-072",
+        "wallpaper-028",
+        "wallpaper-054",
+        "wallpaper-003",
+        "wallpaper-087",
+        "wallpaper-069"
+      ]
+    },
+    {
+      "query": "slate",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.8376706938063607,
+      "top10": [
+        "wallpaper-075",
+        "wallpaper-013",
+        "wallpaper-020",
+        "wallpaper-024",
+        "wallpaper-068",
+        "wallpaper-018",
+        "wallpaper-098",
+        "wallpaper-004",
+        "wallpaper-078",
+        "wallpaper-026"
+      ]
+    },
+    {
+      "query": "blue-orange",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.7686418210655338,
+      "top10": [
+        "wallpaper-034",
+        "wallpaper-058",
+        "wallpaper-038",
+        "wallpaper-012",
+        "wallpaper-004",
+        "wallpaper-054",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-035",
+        "wallpaper-024"
+      ]
+    },
+    {
+      "query": "pink-teal",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.44202864625196664,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-004",
+        "wallpaper-098",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-040",
+        "wallpaper-054",
+        "wallpaper-020",
+        "wallpaper-097",
+        "wallpaper-026"
+      ]
+    },
+    {
+      "query": "black-red",
+      "split": "holdout",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.7708460928378661,
+      "top10": [
+        "wallpaper-082",
+        "wallpaper-027",
+        "wallpaper-040",
+        "wallpaper-036",
+        "wallpaper-084",
+        "wallpaper-025",
+        "wallpaper-031",
+        "wallpaper-087",
+        "wallpaper-046",
+        "wallpaper-042"
+      ]
+    },
+    {
+      "query": "green-cream",
+      "split": "development",
+      "retrieval": "cosine-default",
+      "count": 50,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.5394100968611166,
+      "top10": [
+        "wallpaper-093",
+        "wallpaper-083",
+        "wallpaper-026",
+        "wallpaper-099",
+        "wallpaper-073",
+        "wallpaper-057",
+        "wallpaper-085",
+        "wallpaper-064",
+        "wallpaper-066",
+        "wallpaper-088"
+      ]
+    },
+    {
+      "query": "red",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.9550303188432864,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-094",
+        "wallpaper-031",
+        "wallpaper-082",
+        "wallpaper-058",
+        "wallpaper-040",
+        "wallpaper-036",
+        "wallpaper-035",
+        "wallpaper-004",
+        "wallpaper-084"
+      ]
+    },
+    {
+      "query": "orange",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8820426203168754,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-058",
+        "wallpaper-031",
+        "wallpaper-049",
+        "wallpaper-094",
+        "wallpaper-044",
+        "wallpaper-052",
+        "wallpaper-077",
+        "wallpaper-073",
+        "wallpaper-040"
+      ]
+    },
+    {
+      "query": "yellow",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-060",
+        "wallpaper-010",
+        "wallpaper-006",
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-088",
+        "wallpaper-099",
+        "wallpaper-003",
+        "wallpaper-037"
+      ]
+    },
+    {
+      "query": "lime",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": null,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-052",
+        "wallpaper-049",
+        "wallpaper-099",
+        "wallpaper-083",
+        "wallpaper-060",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-010",
+        "wallpaper-058"
+      ]
+    },
+    {
+      "query": "green",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.23974034495287358,
+      "top10": [
+        "wallpaper-050",
+        "wallpaper-052",
+        "wallpaper-058",
+        "wallpaper-094",
+        "wallpaper-083",
+        "wallpaper-093",
+        "wallpaper-055",
+        "wallpaper-096",
+        "wallpaper-098",
+        "wallpaper-004"
+      ]
+    },
+    {
+      "query": "teal",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.8985682566842108,
+      "top10": [
+        "wallpaper-030",
+        "wallpaper-024",
+        "wallpaper-013",
+        "wallpaper-098",
+        "wallpaper-004",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-020",
+        "wallpaper-050",
+        "wallpaper-034"
+      ]
+    },
+    {
+      "query": "cyan",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.38479161082753577,
+      "top10": [
+        "wallpaper-010",
+        "wallpaper-051",
+        "wallpaper-099",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-078",
+        "wallpaper-003",
+        "wallpaper-093"
+      ]
+    },
+    {
+      "query": "sky",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8868678397736426,
+      "top10": [
+        "wallpaper-028",
+        "wallpaper-014",
+        "wallpaper-072",
+        "wallpaper-021",
+        "wallpaper-087",
+        "wallpaper-078",
+        "wallpaper-010",
+        "wallpaper-056",
+        "wallpaper-004",
+        "wallpaper-099"
+      ]
+    },
+    {
+      "query": "blue",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8336217903980472,
+      "top10": [
+        "wallpaper-091",
+        "wallpaper-032",
+        "wallpaper-057",
+        "wallpaper-036",
+        "wallpaper-039",
+        "wallpaper-034",
+        "wallpaper-038",
+        "wallpaper-033",
+        "wallpaper-026",
+        "wallpaper-047"
+      ]
+    },
+    {
+      "query": "navy",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.947969481894727,
+      "top10": [
+        "wallpaper-008",
+        "wallpaper-016",
+        "wallpaper-022",
+        "wallpaper-067",
+        "wallpaper-015",
+        "wallpaper-042",
+        "wallpaper-079",
+        "wallpaper-047",
+        "wallpaper-074",
+        "wallpaper-007"
+      ]
+    },
+    {
+      "query": "purple",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9293030768396287,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-035",
+        "wallpaper-032",
+        "wallpaper-039",
+        "wallpaper-036",
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-080",
+        "wallpaper-057",
+        "wallpaper-045"
+      ]
+    },
+    {
+      "query": "magenta",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.876966427946351,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-039",
+        "wallpaper-038",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-045",
+        "wallpaper-004",
+        "wallpaper-036",
+        "wallpaper-077",
+        "wallpaper-048"
+      ]
+    },
+    {
+      "query": "pink",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.7864439334365592,
+      "top10": [
+        "wallpaper-038",
+        "wallpaper-077",
+        "wallpaper-039",
+        "wallpaper-044",
+        "wallpaper-058",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-003",
+        "wallpaper-037",
+        "wallpaper-054"
+      ]
+    },
+    {
+      "query": "rose",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.5249735129260297,
+      "top10": [
+        "wallpaper-009",
+        "wallpaper-044",
+        "wallpaper-035",
+        "wallpaper-097",
+        "wallpaper-048",
+        "wallpaper-096",
+        "wallpaper-082",
+        "wallpaper-039",
+        "wallpaper-094",
+        "wallpaper-049"
+      ]
+    },
+    {
+      "query": "brown",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.7530984435911874,
+      "top10": [
+        "wallpaper-100",
+        "wallpaper-046",
+        "wallpaper-094",
+        "wallpaper-097",
+        "wallpaper-087",
+        "wallpaper-049",
+        "wallpaper-024",
+        "wallpaper-095",
+        "wallpaper-068",
+        "wallpaper-092"
+      ]
+    },
+    {
+      "query": "tan",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8629568769787623,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-049",
+        "wallpaper-009",
+        "wallpaper-096",
+        "wallpaper-097",
+        "wallpaper-044",
+        "wallpaper-094",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-069"
+      ]
+    },
+    {
+      "query": "olive",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8313861835730514,
+      "top10": [
+        "wallpaper-096",
+        "wallpaper-093",
+        "wallpaper-050",
+        "wallpaper-097",
+        "wallpaper-009",
+        "wallpaper-034",
+        "wallpaper-094",
+        "wallpaper-081",
+        "wallpaper-099",
+        "wallpaper-049"
+      ]
+    },
+    {
+      "query": "forest",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.7,
+      "ndcg10": 0.7836872411860827,
+      "top10": [
+        "wallpaper-086",
+        "wallpaper-081",
+        "wallpaper-025",
+        "wallpaper-071",
+        "wallpaper-090",
+        "wallpaper-031",
+        "wallpaper-002",
+        "wallpaper-089",
+        "wallpaper-013",
+        "wallpaper-074"
+      ]
+    },
+    {
+      "query": "black",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9374655896396534,
+      "top10": [
+        "wallpaper-005",
+        "wallpaper-011",
+        "wallpaper-067",
+        "wallpaper-023",
+        "wallpaper-063",
+        "wallpaper-041",
+        "wallpaper-065",
+        "wallpaper-062",
+        "wallpaper-079",
+        "wallpaper-027"
+      ]
+    },
+    {
+      "query": "gray",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.949223457384414,
+      "top10": [
+        "wallpaper-009",
+        "wallpaper-096",
+        "wallpaper-097",
+        "wallpaper-020",
+        "wallpaper-075",
+        "wallpaper-018",
+        "wallpaper-013",
+        "wallpaper-058",
+        "wallpaper-093",
+        "wallpaper-052"
+      ]
+    },
+    {
+      "query": "white",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9616626885703099,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-006",
+        "wallpaper-051",
+        "wallpaper-010",
+        "wallpaper-055",
+        "wallpaper-088",
+        "wallpaper-003",
+        "wallpaper-073",
+        "wallpaper-064",
+        "wallpaper-085"
+      ]
+    },
+    {
+      "query": "cream",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9544054490585746,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-006",
+        "wallpaper-010",
+        "wallpaper-073",
+        "wallpaper-003",
+        "wallpaper-088",
+        "wallpaper-051",
+        "wallpaper-064",
+        "wallpaper-057"
+      ]
+    },
+    {
+      "query": "lavender",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8154958881546441,
+      "top10": [
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-021",
+        "wallpaper-056",
+        "wallpaper-072",
+        "wallpaper-028",
+        "wallpaper-054",
+        "wallpaper-003",
+        "wallpaper-014",
+        "wallpaper-087"
+      ]
+    },
+    {
+      "query": "slate",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8923246484431716,
+      "top10": [
+        "wallpaper-075",
+        "wallpaper-013",
+        "wallpaper-020",
+        "wallpaper-030",
+        "wallpaper-096",
+        "wallpaper-024",
+        "wallpaper-068",
+        "wallpaper-097",
+        "wallpaper-018",
+        "wallpaper-098"
+      ]
+    },
+    {
+      "query": "blue-orange",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.6973442475035501,
+      "top10": [
+        "wallpaper-034",
+        "wallpaper-058",
+        "wallpaper-038",
+        "wallpaper-012",
+        "wallpaper-004",
+        "wallpaper-054",
+        "wallpaper-052",
+        "wallpaper-094",
+        "wallpaper-024",
+        "wallpaper-098"
+      ]
+    },
+    {
+      "query": "pink-teal",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.8,
+      "ndcg10": 0.45195635045184274,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-004",
+        "wallpaper-098",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-020",
+        "wallpaper-097",
+        "wallpaper-026",
+        "wallpaper-052",
+        "wallpaper-024"
+      ]
+    },
+    {
+      "query": "black-red",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 0.5,
+      "ndcg10": 0.6175428039978441,
+      "top10": [
+        "wallpaper-082",
+        "wallpaper-027",
+        "wallpaper-029",
+        "wallpaper-036",
+        "wallpaper-084",
+        "wallpaper-016",
+        "wallpaper-079",
+        "wallpaper-062",
+        "wallpaper-063",
+        "wallpaper-065"
+      ]
+    },
+    {
+      "query": "green-cream",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 20,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8420137267657991,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-093",
+        "wallpaper-083",
+        "wallpaper-026",
+        "wallpaper-099",
+        "wallpaper-073",
+        "wallpaper-057",
+        "wallpaper-085",
+        "wallpaper-064",
+        "wallpaper-006"
+      ]
+    },
+    {
+      "query": "red",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9748837731857171,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-094",
+        "wallpaper-031",
+        "wallpaper-082",
+        "wallpaper-058",
+        "wallpaper-040",
+        "wallpaper-036",
+        "wallpaper-035",
+        "wallpaper-029",
+        "wallpaper-004"
+      ]
+    },
+    {
+      "query": "orange",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8820426203168754,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-058",
+        "wallpaper-031",
+        "wallpaper-049",
+        "wallpaper-094",
+        "wallpaper-044",
+        "wallpaper-052",
+        "wallpaper-077",
+        "wallpaper-073",
+        "wallpaper-040"
+      ]
+    },
+    {
+      "query": "yellow",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-060",
+        "wallpaper-010",
+        "wallpaper-006",
+        "wallpaper-073",
+        "wallpaper-040",
+        "wallpaper-088",
+        "wallpaper-099",
+        "wallpaper-003",
+        "wallpaper-037"
+      ]
+    },
+    {
+      "query": "lime",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": null,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-052",
+        "wallpaper-049",
+        "wallpaper-099",
+        "wallpaper-083",
+        "wallpaper-060",
+        "wallpaper-040",
+        "wallpaper-094",
+        "wallpaper-010",
+        "wallpaper-058"
+      ]
+    },
+    {
+      "query": "green",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.23974034495287358,
+      "top10": [
+        "wallpaper-050",
+        "wallpaper-052",
+        "wallpaper-058",
+        "wallpaper-094",
+        "wallpaper-083",
+        "wallpaper-093",
+        "wallpaper-055",
+        "wallpaper-096",
+        "wallpaper-098",
+        "wallpaper-004"
+      ]
+    },
+    {
+      "query": "teal",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9142470068278513,
+      "top10": [
+        "wallpaper-030",
+        "wallpaper-024",
+        "wallpaper-013",
+        "wallpaper-098",
+        "wallpaper-004",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-020",
+        "wallpaper-050",
+        "wallpaper-040"
+      ]
+    },
+    {
+      "query": "cyan",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.38479161082753577,
+      "top10": [
+        "wallpaper-010",
+        "wallpaper-051",
+        "wallpaper-099",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-078",
+        "wallpaper-003",
+        "wallpaper-093"
+      ]
+    },
+    {
+      "query": "sky",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8868678397736426,
+      "top10": [
+        "wallpaper-028",
+        "wallpaper-014",
+        "wallpaper-072",
+        "wallpaper-021",
+        "wallpaper-087",
+        "wallpaper-078",
+        "wallpaper-010",
+        "wallpaper-056",
+        "wallpaper-004",
+        "wallpaper-099"
+      ]
+    },
+    {
+      "query": "blue",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8336217903980472,
+      "top10": [
+        "wallpaper-091",
+        "wallpaper-032",
+        "wallpaper-057",
+        "wallpaper-036",
+        "wallpaper-039",
+        "wallpaper-034",
+        "wallpaper-038",
+        "wallpaper-033",
+        "wallpaper-026",
+        "wallpaper-047"
+      ]
+    },
+    {
+      "query": "navy",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.947969481894727,
+      "top10": [
+        "wallpaper-008",
+        "wallpaper-016",
+        "wallpaper-022",
+        "wallpaper-067",
+        "wallpaper-015",
+        "wallpaper-042",
+        "wallpaper-079",
+        "wallpaper-047",
+        "wallpaper-074",
+        "wallpaper-007"
+      ]
+    },
+    {
+      "query": "purple",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9293030768396287,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-035",
+        "wallpaper-032",
+        "wallpaper-039",
+        "wallpaper-036",
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-080",
+        "wallpaper-057",
+        "wallpaper-045"
+      ]
+    },
+    {
+      "query": "magenta",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.876966427946351,
+      "top10": [
+        "wallpaper-033",
+        "wallpaper-039",
+        "wallpaper-038",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-045",
+        "wallpaper-004",
+        "wallpaper-036",
+        "wallpaper-077",
+        "wallpaper-048"
+      ]
+    },
+    {
+      "query": "pink",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.7864439334365592,
+      "top10": [
+        "wallpaper-038",
+        "wallpaper-077",
+        "wallpaper-039",
+        "wallpaper-044",
+        "wallpaper-058",
+        "wallpaper-035",
+        "wallpaper-059",
+        "wallpaper-003",
+        "wallpaper-037",
+        "wallpaper-054"
+      ]
+    },
+    {
+      "query": "rose",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.5249735129260297,
+      "top10": [
+        "wallpaper-009",
+        "wallpaper-044",
+        "wallpaper-035",
+        "wallpaper-097",
+        "wallpaper-048",
+        "wallpaper-096",
+        "wallpaper-082",
+        "wallpaper-039",
+        "wallpaper-094",
+        "wallpaper-049"
+      ]
+    },
+    {
+      "query": "brown",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.7530984435911874,
+      "top10": [
+        "wallpaper-100",
+        "wallpaper-046",
+        "wallpaper-094",
+        "wallpaper-097",
+        "wallpaper-087",
+        "wallpaper-049",
+        "wallpaper-024",
+        "wallpaper-095",
+        "wallpaper-068",
+        "wallpaper-092"
+      ]
+    },
+    {
+      "query": "tan",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8629568769787623,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-049",
+        "wallpaper-009",
+        "wallpaper-096",
+        "wallpaper-097",
+        "wallpaper-044",
+        "wallpaper-094",
+        "wallpaper-052",
+        "wallpaper-028",
+        "wallpaper-069"
+      ]
+    },
+    {
+      "query": "olive",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8313861835730514,
+      "top10": [
+        "wallpaper-096",
+        "wallpaper-093",
+        "wallpaper-050",
+        "wallpaper-097",
+        "wallpaper-009",
+        "wallpaper-034",
+        "wallpaper-094",
+        "wallpaper-081",
+        "wallpaper-099",
+        "wallpaper-049"
+      ]
+    },
+    {
+      "query": "forest",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8453937566299912,
+      "top10": [
+        "wallpaper-086",
+        "wallpaper-081",
+        "wallpaper-025",
+        "wallpaper-071",
+        "wallpaper-090",
+        "wallpaper-031",
+        "wallpaper-002",
+        "wallpaper-021",
+        "wallpaper-050",
+        "wallpaper-048"
+      ]
+    },
+    {
+      "query": "black",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9374655896396534,
+      "top10": [
+        "wallpaper-005",
+        "wallpaper-011",
+        "wallpaper-067",
+        "wallpaper-023",
+        "wallpaper-063",
+        "wallpaper-041",
+        "wallpaper-065",
+        "wallpaper-062",
+        "wallpaper-079",
+        "wallpaper-027"
+      ]
+    },
+    {
+      "query": "gray",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.949223457384414,
+      "top10": [
+        "wallpaper-009",
+        "wallpaper-096",
+        "wallpaper-097",
+        "wallpaper-020",
+        "wallpaper-075",
+        "wallpaper-018",
+        "wallpaper-013",
+        "wallpaper-058",
+        "wallpaper-093",
+        "wallpaper-052"
+      ]
+    },
+    {
+      "query": "white",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9616626885703099,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-006",
+        "wallpaper-051",
+        "wallpaper-010",
+        "wallpaper-055",
+        "wallpaper-088",
+        "wallpaper-003",
+        "wallpaper-073",
+        "wallpaper-064",
+        "wallpaper-085"
+      ]
+    },
+    {
+      "query": "cream",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.9544054490585746,
+      "top10": [
+        "wallpaper-060",
+        "wallpaper-055",
+        "wallpaper-006",
+        "wallpaper-010",
+        "wallpaper-073",
+        "wallpaper-003",
+        "wallpaper-088",
+        "wallpaper-051",
+        "wallpaper-064",
+        "wallpaper-057"
+      ]
+    },
+    {
+      "query": "lavender",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8154958881546441,
+      "top10": [
+        "wallpaper-059",
+        "wallpaper-038",
+        "wallpaper-021",
+        "wallpaper-056",
+        "wallpaper-072",
+        "wallpaper-028",
+        "wallpaper-054",
+        "wallpaper-003",
+        "wallpaper-014",
+        "wallpaper-087"
+      ]
+    },
+    {
+      "query": "slate",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8923246484431716,
+      "top10": [
+        "wallpaper-075",
+        "wallpaper-013",
+        "wallpaper-020",
+        "wallpaper-030",
+        "wallpaper-096",
+        "wallpaper-024",
+        "wallpaper-068",
+        "wallpaper-097",
+        "wallpaper-018",
+        "wallpaper-098"
+      ]
+    },
+    {
+      "query": "blue-orange",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8118976196809151,
+      "top10": [
+        "wallpaper-034",
+        "wallpaper-058",
+        "wallpaper-038",
+        "wallpaper-012",
+        "wallpaper-036",
+        "wallpaper-004",
+        "wallpaper-054",
+        "wallpaper-052",
+        "wallpaper-040",
+        "wallpaper-094"
+      ]
+    },
+    {
+      "query": "pink-teal",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.44202864625196664,
+      "top10": [
+        "wallpaper-058",
+        "wallpaper-004",
+        "wallpaper-098",
+        "wallpaper-075",
+        "wallpaper-012",
+        "wallpaper-040",
+        "wallpaper-054",
+        "wallpaper-020",
+        "wallpaper-097",
+        "wallpaper-026"
+      ]
+    },
+    {
+      "query": "black-red",
+      "split": "holdout",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 0.9,
+      "ndcg10": 0.979093340963776,
+      "top10": [
+        "wallpaper-037",
+        "wallpaper-082",
+        "wallpaper-027",
+        "wallpaper-040",
+        "wallpaper-029",
+        "wallpaper-036",
+        "wallpaper-084",
+        "wallpaper-025",
+        "wallpaper-031",
+        "wallpaper-046"
+      ]
+    },
+    {
+      "query": "green-cream",
+      "split": "development",
+      "retrieval": "rgb512-08",
+      "count": 50,
+      "paletteTop10Recall": 1,
+      "ndcg10": 0.8420137267657991,
+      "top10": [
+        "wallpaper-055",
+        "wallpaper-093",
+        "wallpaper-083",
+        "wallpaper-026",
+        "wallpaper-099",
+        "wallpaper-073",
+        "wallpaper-057",
+        "wallpaper-085",
+        "wallpaper-064",
+        "wallpaper-006"
+      ]
+    }
+  ],
+  "paired": [
+    {
+      "candidate": "l2-raw",
+      "queries": 13,
+      "meanDifference": 0.11996985653873467,
+      "queryBootstrap95": [
+        0.03329398073205114,
+        0.19690534591555467
+      ],
+      "wins": 11,
+      "losses": 2
+    },
+    {
+      "candidate": "l2-normalized",
+      "queries": 13,
+      "meanDifference": -0.08068524333764296,
+      "queryBootstrap95": [
+        -0.10569548592523909,
+        -0.055235891155675905
+      ],
+      "wins": 0,
+      "losses": 13
+    },
+    {
+      "candidate": "rgb512-08",
+      "queries": 13,
+      "meanDifference": 0.4149823750273741,
+      "queryBootstrap95": [
+        0.23716845420850957,
+        0.5733601728911878
+      ],
+      "wins": 12,
+      "losses": 1
+    },
+    {
+      "candidate": "palette32-06",
+      "queries": 13,
+      "meanDifference": 0.5813327673475804,
+      "queryBootstrap95": [
+        0.49195666683785877,
+        0.6651838495356446
+      ],
+      "wins": 13,
+      "losses": 0
+    }
+  ],
+  "availability": [
+    {
+      "query": "red",
+      "substantialMatches": 1,
+      "maxGradedCoverage": 0.203857421875
+    },
+    {
+      "query": "orange",
+      "substantialMatches": 2,
+      "maxGradedCoverage": 0.39133029513888895
+    },
+    {
+      "query": "yellow",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0.00032552083333333326
+    },
+    {
+      "query": "lime",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0
+    },
+    {
+      "query": "green",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0.00640190972222222
+    },
+    {
+      "query": "teal",
+      "substantialMatches": 33,
+      "maxGradedCoverage": 0.8846798780487805
+    },
+    {
+      "query": "cyan",
+      "substantialMatches": 3,
+      "maxGradedCoverage": 0.195556640625
+    },
+    {
+      "query": "sky",
+      "substantialMatches": 14,
+      "maxGradedCoverage": 0.5084292763157895
+    },
+    {
+      "query": "blue",
+      "substantialMatches": 2,
+      "maxGradedCoverage": 0.5491807725694444
+    },
+    {
+      "query": "navy",
+      "substantialMatches": 76,
+      "maxGradedCoverage": 0.9953070746527778
+    },
+    {
+      "query": "purple",
+      "substantialMatches": 3,
+      "maxGradedCoverage": 0.6875542534722222
+    },
+    {
+      "query": "magenta",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0.00027126736111111096
+    },
+    {
+      "query": "pink",
+      "substantialMatches": 3,
+      "maxGradedCoverage": 0.2812228732638889
+    },
+    {
+      "query": "rose",
+      "substantialMatches": 12,
+      "maxGradedCoverage": 0.4441121419270833
+    },
+    {
+      "query": "brown",
+      "substantialMatches": 36,
+      "maxGradedCoverage": 0.9327528211805556
+    },
+    {
+      "query": "tan",
+      "substantialMatches": 36,
+      "maxGradedCoverage": 0.9669053819444444
+    },
+    {
+      "query": "olive",
+      "substantialMatches": 12,
+      "maxGradedCoverage": 0.31223192401960786
+    },
+    {
+      "query": "forest",
+      "substantialMatches": 45,
+      "maxGradedCoverage": 0.7980171783625731
+    },
+    {
+      "query": "black",
+      "substantialMatches": 76,
+      "maxGradedCoverage": 0.9903428819444444
+    },
+    {
+      "query": "gray",
+      "substantialMatches": 78,
+      "maxGradedCoverage": 1
+    },
+    {
+      "query": "white",
+      "substantialMatches": 44,
+      "maxGradedCoverage": 0.9812554253472222
+    },
+    {
+      "query": "cream",
+      "substantialMatches": 27,
+      "maxGradedCoverage": 0.9688856336805556
+    },
+    {
+      "query": "lavender",
+      "substantialMatches": 11,
+      "maxGradedCoverage": 0.5916264681208053
+    },
+    {
+      "query": "slate",
+      "substantialMatches": 79,
+      "maxGradedCoverage": 0.9921332465277778
+    },
+    {
+      "query": "blue-orange",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0.06904238767351234
+    },
+    {
+      "query": "pink-teal",
+      "substantialMatches": 0,
+      "maxGradedCoverage": 0.21780897508498703
+    },
+    {
+      "query": "black-red",
+      "substantialMatches": 1,
+      "maxGradedCoverage": 0.17306156071149056
+    },
+    {
+      "query": "green-cream",
+      "substantialMatches": 2,
+      "maxGradedCoverage": 0.26800890194272275
+    }
+  ],
+  "limitations": [
+    "Query bootstrap describes variation across these fixed queries, not independent unseen datasets.",
+    "Hybrid shortlist experiments use recorded exact rankings of real native vectors; verify candidate recall at larger scale.",
+    "No strict production threshold has been calibrated."
+  ]
+}

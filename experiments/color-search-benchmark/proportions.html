@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WallpaperDB · Color proportions prototype</title>
+  <style>
+    :root { color-scheme:light; font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; color:#18232e; background:#f4f6f8 }
+    * { box-sizing:border-box } body { margin:0 } main { max-width:1500px; margin:auto; padding:28px 30px 60px }
+    h1 { font-size:31px; letter-spacing:-.8px; margin:4px 0 8px } h2 { font-size:20px; margin:0 } h3 { font-size:16px; margin:0 } p { margin:7px 0 }
+    a { color:#175aae; text-underline-offset:3px } button,input,select { font:inherit; color:inherit; border:1px solid #b9c5d0; border-radius:6px; background:#fff; padding:8px 10px }
+    button { cursor:pointer } button:hover { background:#e9f2ff } button:disabled { opacity:.5; cursor:default }
+    button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible { outline:3px solid #428cef; outline-offset:3px }
+    label { display:block; font-size:12px; font-weight:650; color:#41536a; margin-bottom:5px } select { width:100%; min-width:0 } [hidden] { display:none!important }
+    .eyebrow { text-transform:uppercase; letter-spacing:1.5px; color:#49617b; font-size:11px; font-weight:700 }
+    .intro { display:flex; gap:24px; justify-content:space-between; align-items:flex-start } .links { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:13px }
+    .muted,.explanation { color:#566679; font-size:13px } .notice { border-left:3px solid #5478a4; background:#eaf0f6; padding:11px 14px; margin:18px 0; font-size:13px }
+    .query-panel { background:white; border:1px solid #d5dde5; border-radius:9px; padding:20px }
+    .section-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px }
+    .presets { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 18px } .preset { font-size:12px; padding:6px 9px }
+    .query-layout { display:grid; grid-template-columns:minmax(330px,1fr) minmax(280px,1fr); gap:30px }
+    .row-headings,.color-row { display:grid; grid-template-columns:48px minmax(100px,1fr) 100px 34px; gap:10px; align-items:center }
+    .row-headings { font-size:11px; color:#566679; margin-bottom:6px } .row-headings span:first-child { grid-column:1 / 3 }
+    .color-row { margin-bottom:9px } .color-picker { height:39px; width:48px; padding:3px; cursor:pointer }
+    .hex-input { width:100%; font-family:ui-monospace,SFMono-Regular,monospace; font-size:13px } .amount-input { width:100%; padding-right:20px; font-variant-numeric:tabular-nums }
+    .amount-wrap { position:relative } .amount-wrap span { position:absolute; right:8px; top:9px; font-size:13px; color:#566679 }
+    .remove-color { padding:6px; font-size:19px; line-height:24px; height:39px } .add-color { margin-top:3px; font-size:12px }
+    .composition-bar { display:flex; width:100%; height:26px; border:1px solid #bec8d2; border-radius:6px; overflow:hidden; margin:8px 0 }
+    .composition-bar span { min-width:0 } .anything { background:repeating-linear-gradient(135deg,#ecf0f4,#ecf0f4 6px,#dce3ea 6px,#dce3ea 12px) }
+    .query-legend { display:flex; gap:7px 15px; flex-wrap:wrap; margin:10px 0 13px; font-size:12px; font-variant-numeric:tabular-nums }
+    .legend-item { display:inline-flex; align-items:center; gap:6px } .swatch { display:inline-block; width:13px; height:13px; border:1px solid #8e9aa9; border-radius:3px; flex:none }
+    .total { font-size:13px; font-weight:650 } .query-explanation { font-size:13px; color:#41536a; margin-top:12px }
+    .query-error { color:#9b241f; background:#fff0ee; border:1px solid #ecc1bc; padding:9px 11px; border-radius:6px; margin:12px 0 0; font-size:13px }
+    .advanced { margin-top:20px; padding-top:13px; border-top:1px solid #e4e9ef } summary { cursor:pointer; font-size:13px; font-weight:650 }
+    .advanced-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:14px } .tolerance-row { display:flex; align-items:center; gap:12px }
+    input[type=range] { width:100%; padding:0; accent-color:#2268b4 } output { min-width:38px; font-size:13px; font-variant-numeric:tabular-nums }
+    .comparison-heading { margin:26px 0 12px } .dataset-control { max-width:320px; margin-bottom:10px } .status { font-size:13px; color:#41536a; margin:0 0 12px; min-height:20px } .weak-match { color:#86510b }
+    .comparison { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px } .comparison-column { min-width:0; background:white; border:1px solid #d5dde5; border-radius:9px; padding:16px }
+    .method-description { font-size:12px; color:#566679; margin:10px 0; min-height:36px } .column-summary { color:#566679; font-size:11px; padding-bottom:9px }
+    .match { display:grid; grid-template-columns:minmax(150px,.95fr) minmax(0,1fr); gap:13px; padding:14px 0; border-top:1px solid #e4e9ef }
+    .picture-link { display:flex; align-items:center; justify-content:center; background:#edf0f3; border-radius:5px; min-width:0; overflow:hidden }
+    .picture-link img { width:100%; height:145px; object-fit:contain; display:block } .match-info { min-width:0 }
+    .rank { font-size:10px; color:#66768a } .match-title { font-size:12px; font-weight:650; line-height:1.3; margin:3px 0 7px }
+    .palette { height:9px; display:flex; border-radius:3px; overflow:hidden; border:1px solid #c8d0d9; margin:6px 0 9px }
+    .palette span { min-width:0 } .estimate-heading { font-size:10px; color:#566679; margin:6px 0 4px }
+    .estimate-row { display:grid; grid-template-columns:13px 1fr auto; align-items:center; gap:5px; font-size:11px; font-variant-numeric:tabular-nums; margin:3px 0 }
+    .estimate-row .swatch { width:10px; height:10px } .estimate-row strong { font-weight:650 } .estimate-row .wanted { color:#66768a; font-size:10px }
+    .other-estimate { font-size:10px; color:#66768a; margin-top:5px } .ranking-score { font-size:11px; margin:7px 0 0; color:#41536a; font-variant-numeric:tabular-nums }
+    .source { display:inline-block; font-size:10px; margin-top:6px } .show-more { margin-top:8px; width:100%; font-size:12px }
+    .methodology { margin-top:25px; border-top:1px solid #d5dde5; padding:16px 0 } .methodology li { font-size:13px; margin-bottom:8px; max-width:1050px }
+    footer { margin-top:25px; padding-top:16px; border-top:1px solid #d5dde5; font-size:12px; color:#53647b } noscript { display:block; padding:20px; background:#ffe9bf }
+    @media(max-width:1050px) { main { padding:22px 20px 45px } .match { grid-template-columns:1fr } .picture-link img { height:175px } .query-layout { gap:22px } }
+    @media(max-width:700px) { main { padding:18px 12px 35px } h1 { font-size:26px } h2 { font-size:18px } .intro { display:block } .query-panel { padding:15px } .query-layout,.advanced-grid,.comparison { grid-template-columns:1fr; gap:18px } .color-row,.row-headings { grid-template-columns:43px minmax(85px,1fr) 88px 34px; gap:7px } .color-picker { width:43px } .match { grid-template-columns:42% minmax(0,1fr); gap:10px } .picture-link img { height:150px } .method-description { min-height:0 } .comparison-column { padding:13px } }
+    @media(max-width:390px) { .match { grid-template-columns:1fr } .picture-link img { height:180px } }
+  </style>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <div><div class="eyebrow">WallpaperDB · throwaway search prototype</div><h1>Find a color composition</h1><p class="muted">Choose the colors, say how much, and inspect the nearest wallpapers.</p></div>
+    <nav class="links" aria-label="Experiment files"><a href="./ranges.html">Color ranges prototype</a><a href="./report.html">Previous comparison</a><a href="./PROPORTIONS-FINDINGS.md">Recorded findings</a><a href="./PROPORTIONS-README.md">Reproduce</a><a href="./CORPUS.md">Image sources</a></nav>
+  </header>
+  <div class="notice"><strong>Proportion experiment.</strong> Percentages refer to the whole image. The unrequested part can contain other colors. Results are ranked by closeness; a closest result can still be a poor match.</div>
+  <section class="query-panel" aria-labelledby="query-heading">
+    <div class="section-heading"><h2 id="query-heading">Your composition</h2><button type="button" id="share-query">Copy query link</button></div>
+    <div id="presets" class="presets" role="group" aria-label="Example queries"></div>
+    <div class="query-layout">
+      <div><div class="row-headings" aria-hidden="true"><span>Color / hex value</span><span>Image area</span></div><div id="color-rows"></div><button type="button" class="add-color" id="add-color">+ Add color</button></div>
+      <div><label id="composition-label">Requested image composition</label><div id="composition-bar" class="composition-bar" role="img" aria-labelledby="composition-label"></div><div id="query-legend" class="query-legend"></div><p id="query-total" class="total"></p><p id="query-explanation" class="query-explanation"></p><p id="query-error" class="query-error" role="alert" hidden></p></div>
+    </div>
+    <details class="advanced"><summary>Color tolerance and matching behavior</summary><div class="advanced-grid">
+      <div><label for="tolerance">How close should the shades be?</label><div class="tolerance-row"><span class="muted">Strict</span><input type="range" id="tolerance" min="0.02" max="0.14" step="0.01" value="0.06"><span class="muted">Broad</span><output id="tolerance-value" for="tolerance">0.06</output></div><p class="explanation">Perceptual color distance in OKLab. A broader tolerance treats more neighboring shades as similar; it is not a percentage tolerance.</p></div>
+      <div><label for="mode">Meaning of the percentages</label><select id="mode"><option value="target">As close to these percentages as possible</option><option value="minimum">At least these percentages; extra is okay</option></select><p class="explanation" id="mode-explanation">A request for 40% green prefers 40% over 80% green. The other 60% is unconstrained except for extra green.</p></div>
+    </div></details>
+  </section>
+  <section aria-labelledby="results-heading"><div class="section-heading comparison-heading"><h2 id="results-heading">Compare the nearest matches</h2><p id="run-meta" class="muted">Loading the wallpaper palettes…</p></div>
+    <div class="dataset-control"><label for="dataset">Images to search</label><select id="dataset"><option value="wallpapers">100 real wallpapers</option><option value="fixtures">Controlled color-ratio examples</option></select></div>
+    <p id="dataset-note" class="explanation">Real wallpaper corpus. Some requested compositions may have no close match.</p>
+    <p id="status" class="status" aria-live="polite">Loading…</p>
+    <div class="comparison">
+      <section class="comparison-column" aria-labelledby="left-label"><label id="left-label" for="left-method">Proportion-aware method</label><select id="left-method"><option value="transport">Perceptual transport</option><option value="coverage">Exclusive coverage distance</option><option value="legacy">Previous palette presence score</option></select><p class="method-description" id="left-description"></p><div class="column-summary" id="left-summary"></div><div id="left-results"></div><button class="show-more" id="left-more" type="button" hidden>Show more matches</button></section>
+      <section class="comparison-column" aria-labelledby="right-label"><label id="right-label" for="right-method">Comparison method</label><select id="right-method"><option value="legacy">Previous palette presence score</option><option value="transport">Perceptual transport</option><option value="coverage">Exclusive coverage distance</option></select><p class="method-description" id="right-description"></p><div class="column-summary" id="right-summary"></div><div id="right-results"></div><button class="show-more" id="right-more" type="button" hidden>Show more matches</button></section>
+    </div><p class="explanation">Each thumbnail shows the complete wallpaper. The area estimates use the same exclusive color measurement in both columns, independently of each method’s assignments. Match cost is specific to each method; zero is best. It is not an accuracy percentage.</p>
+  </section>
+  <details class="methodology"><summary>How to read this prototype</summary><ul>
+    <li><strong>Absolute proportions:</strong> 40% green means 40% of the whole image. Amounts below 100% leave a remainder. Amounts above 100% are invalid; this page never silently rescales your request.</li>
+    <li><strong>Default behavior:</strong> both too little and too much of a requested color matter. The optional minimum mode accepts extra requested color in the remainder.</li>
+    <li><strong>Color overlap:</strong> a palette color contributes to its nearest requested color, with less credit as its shade differs. The same patch cannot fully count as both red and orange. Identical requested hex colors are merged for scoring.</li>
+    <li><strong>Perceptual transport:</strong> distributes the palette’s area across the requested colors and the remainder while paying for color differences. In the default mode, putting extra requested color in the remainder also has a cost.</li>
+    <li><strong>Estimated area:</strong> measured from up to 32 palette colors, not a full-resolution pixel count. Area assigned by the transport solver is not shown as measured coverage. Broad tolerance and nearby requested colors can blur the distinction.</li>
+    <li><strong>Previous palette presence:</strong> rewards having the colors, with their requested amounts used as relative importance. It does not enforce absolute proportions. The comparison makes that limitation visible.</li>
+    <li><strong>Nearest is not necessarily close:</strong> this small corpus may have no suitable wallpaper, especially for five-color compositions. The page still ranks every image and exposes the estimated composition.</li>
+    <li><strong>Controlled examples:</strong> switch the image set to simple synthetic color strips with known proportions to see whether a 40% request correctly prefers 40% to 80%. These examples are separate from the 100 real wallpapers.</li>
+  </ul></details>
+  <footer><p>Runs locally over the recorded 100-image corpus. Query settings live in the URL. This is an experimental ranking interface; it does not alter production search.</p></footer>
+  <noscript>Enable JavaScript and serve this folder over HTTP to use the interactive prototype.</noscript>
+</main>
+<script type="module" src="./proportions-ui.mjs"></script>
+</body>
+</html>

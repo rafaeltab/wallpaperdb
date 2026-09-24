@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-transport-ab-independent-audit",
+  "at": "2026-09-23T18:26:01.790Z",
+  "fileOnly": true,
+  "verified": true,
+  "sourceSha256": "f83c3887ea61dab13723563f31fb944d13c8c37b6ebd2a65fc5ba45aee58a0ec",
+  "baseline": {
+    "name": "transport-maxima-fetch-v1",
+    "inputHashes": {
+      "diagnostic.json": "76f5ebd30cfae8719b58a8717e4edc822e23de4c76ae30ff1997c403072536b5",
+      "source-snapshot.json": "f8e771a6ff7b56244645f4615f3419896892f4ff276e979f00d53668448f19ff",
+      "trials.jsonl": "8f3dd3750301af6ae7cab9f5a356310e7327c3114ba8241ec3baeacdf2d4a815",
+      "requests.jsonl": "067cb8625914d382d9a410b4f53d35bc3105759933246b78c0ef2b26f303198e",
+      "resources.jsonl": "003ad650403c09b5d5237bc9d00e3cd6dc4af046c0cea2c263285bbee795ff19"
+    },
+    "sourceHash": "f8e771a6ff7b56244645f4615f3419896892f4ff276e979f00d53668448f19ff",
+    "receiptHash": "0b86e8de49c08eb4efb64041d3693c589319e68f3974ea30d0826b85480390c9",
+    "configuration": {
+      "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/transport-maxima-fetch-v1",
+      "method": "maxima",
+      "transport": "fetch",
+      "concurrency": 16,
+      "durationMs": 60000,
+      "maximumRequests": 100000,
+      "stopErrors": 32,
+      "tcp": true,
+      "base": "http://127.0.0.1:19217",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "receipt": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-full-1m-v1/index.json",
+      "sampleIntervalMs": 1000
+    },
+    "query": {
+      "mode": "vibe",
+      "targets": [
+        {
+          "color": "#ff0000"
+        }
+      ]
+    },
+    "parameters": {
+      "cutoffBlendExponent": 1,
+      "qualityCurve": "linear",
+      "qualityInfluence": 0.5,
+      "minimumQuality": 0,
+      "namedMode": "concrete-swatches",
+      "areaPower": 0.5,
+      "qualityPenalty": 0.35,
+      "excessPenalty": 1.5,
+      "pixelCutoff": 0,
+      "bucketCount": 256
+    },
+    "runtime": {
+      "node": "v22.22.3",
+      "undici": "6.24.1"
+    },
+    "index": {
+      "settings": {
+        "replication": {
+          "type": "DOCUMENT"
+        },
+        "mapping": {
+          "total_fields": {
+            "limit": "6164"
+          }
+        },
+        "refresh_interval": "-1",
+        "number_of_shards": "1",
+        "provided_name": "color-exploration-favorite-points-full-1m-v1",
+        "creation_date": "1790178955934",
+        "number_of_replicas": "0",
+        "uuid": "LHjoEvSiR8KNe5WZv_a7iA",
+        "version": {
+          "created": "136327827"
+        }
+      },
+      "count": 1000000
+    },
+    "completed": true,
+    "strictPassed": false,
+    "trials": 28269,
+    "queryErrors": 46,
+    "overOneSecond": 0,
+    "strictFailures": 46,
+    "serviceRequests": 141199,
+    "serviceErrors": 52,
+    "errorCodes": {
+      "ECONNRESET": 47,
+      "UND_ERR_SOCKET": 5
+    },
+    "phaseErrors": {
+      "pit-close": 9,
+      "pit-open": 34,
+      "seed-score": 4,
+      "global-final": 2,
+      "seed": 3
+    },
+    "elapsedMs": 38927.204878000004,
+    "stopReason": "error-budget",
+    "hitsHash": "d475baf86a0a6c42a781560547c6b2be74c462a6a023c18e6777332ee5e5c94d",
+    "retainedStageQueries": 106,
+    "retainedServiceRows": 384,
+    "unretainedSuccessfulQueries": 28163,
+    "newHttpConnections": 28227,
+    "httpObservationWindowMs": 38947,
+    "newConnectionsPerSecond": 724.7541530798263,
+    "newConnectionsPerQuery": 0.9985142735859068,
+    "observedSockets": 28279,
+    "socketCloses": 28278,
+    "nativeDeleteSends": 0,
+    "nativeDeleteResponses": 0,
+    "openContextsBefore": 0,
+    "openContextsAfter": 9,
+    "fdBefore": 704,
+    "fdAfter": 717,
+    "fdLimit": 65536,
+    "timeWaitBefore": 0,
+    "timeWaitAfter": 12545,
+    "resourceSamples": 40,
+    "firstRecordedServiceError": {
+      "at": "2026-09-23T18:20:27.200Z",
+      "phase": "pit-close",
+      "trialId": 28214,
+      "error": {
+        "name": "TypeError",
+        "message": "fetch failed",
+        "stack": "TypeError: fetch failed\n    at node:internal/deps/undici/undici:14976:13\n    at async api (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/service.mjs:21:20)\n    at async file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-transport-diagnostic.mjs:158:28\n    at async call (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-maxima-bounded-utilities.mjs:132:22)\n    at async executeFavoriteMaximaBoundedUtilitySearch (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-maxima-bounded-utilities.mjs:188:24)\n    at async worker (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-transport-diagnostic.mjs:177:26)\n    at async Promise.all (index 12)\n    at async runTransportTrials (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-transport-diagnostic.mjs:201:3)\n    at async runFavoriteTransportDiagnostic (file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-transport-diagnostic.mjs:267:21)\n    at async file:///home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-transport-diagnostic.mjs:291:18",
+        "cause": {
+          "name": "Error",
+          "message": "read ECONNRESET",
+          "stack": "Error: read ECONNRESET\n    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)\n    at TCP.callbackTrampoline (node:internal/async_hooks:130:17)",
+          "code": "ECONNRESET",
+          "errno": -104,
+          "syscall": "read"
+        }
+      }
+    }
+  },
+  "pooled": {
+    "name": "transport-maxima-pooled-v1",
+    "inputHashes": {
+      "diagnostic.json": "46739b22ee58b6965a4079065186ffe5195a2e08808f7de529a79fa7c7e43cc9",
+      "source-snapshot.json": "f8e771a6ff7b56244645f4615f3419896892f4ff276e979f00d53668448f19ff",
+      "trials.jsonl": "f5ba24cb00fe1b79277b9c007d789b4f3c02e58e518b33770390f94c395d45d8",
+      "requests.jsonl": "eb4eb214294831dd6086c510836967fe5083f231740335ff6332717f2687c3e3",
+      "resources.jsonl": "b03a531bc434946102731f1470a9845e7e0f6bce97eb0f6d871d088f7d4a47a0"
+    },
+    "sourceHash": "f8e771a6ff7b56244645f4615f3419896892f4ff276e979f00d53668448f19ff",
+    "receiptHash": "0b86e8de49c08eb4efb64041d3693c589319e68f3974ea30d0826b85480390c9",
+    "configuration": {
+      "directory": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/transport-maxima-pooled-v1",
+      "method": "maxima",
+      "transport": "pooled-delete",
+      "concurrency": 16,
+      "durationMs": 60000,
+      "maximumRequests": 100000,
+      "stopErrors": 32,
+      "tcp": true,
+      "base": "http://127.0.0.1:19217",
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "receipt": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-full-1m-v1/index.json",
+      "sampleIntervalMs": 1000
+    },
+    "query": {
+      "mode": "vibe",
+      "targets": [
+        {
+          "color": "#ff0000"
+        }
+      ]
+    },
+    "parameters": {
+      "cutoffBlendExponent": 1,
+      "qualityCurve": "linear",
+      "qualityInfluence": 0.5,
+      "minimumQuality": 0,
+      "namedMode": "concrete-swatches",
+      "areaPower": 0.5,
+      "qualityPenalty": 0.35,
+      "excessPenalty": 1.5,
+      "pixelCutoff": 0,
+      "bucketCount": 256
+    },
+    "runtime": {
+      "node": "v22.22.3",
+      "undici": "6.24.1"
+    },
+    "index": {
+      "settings": {
+        "replication": {
+          "type": "DOCUMENT"
+        },
+        "mapping": {
+          "total_fields": {
+            "limit": "6164"
+          }
+        },
+        "refresh_interval": "-1",
+        "number_of_shards": "1",
+        "provided_name": "color-exploration-favorite-points-full-1m-v1",
+        "creation_date": "1790178955934",
+        "number_of_replicas": "0",
+        "uuid": "LHjoEvSiR8KNe5WZv_a7iA",
+        "version": {
+          "created": "136327827"
+        }
+      },
+      "count": 1000000
+    },
+    "completed": true,
+    "strictPassed": true,
+    "trials": 52001,
+    "queryErrors": 0,
+    "overOneSecond": 0,
+    "strictFailures": 0,
+    "serviceRequests": 260005,
+    "serviceErrors": 0,
+    "errorCodes": {},
+    "phaseErrors": {},
+    "elapsedMs": 60002.931009,
+    "stopReason": "duration",
+    "hitsHash": "d475baf86a0a6c42a781560547c6b2be74c462a6a023c18e6777332ee5e5c94d",
+    "retainedStageQueries": 84,
+    "retainedServiceRows": 420,
+    "unretainedSuccessfulQueries": 51917,
+    "newHttpConnections": 32,
+    "httpObservationWindowMs": 60020,
+    "newConnectionsPerSecond": 0.5331556147950682,
+    "newConnectionsPerQuery": 0.0006153727812926675,
+    "observedSockets": 32,
+    "socketCloses": 16,
+    "nativeDeleteSends": 52001,
+    "nativeDeleteResponses": 52001,
+    "openContextsBefore": 0,
+    "openContextsAfter": 0,
+    "fdBefore": 704,
+    "fdAfter": 736,
+    "fdLimit": 65536,
+    "timeWaitBefore": 11,
+    "timeWaitAfter": 0,
+    "resourceSamples": 61,
+    "firstRecordedServiceError": null
+  },
+  "hostEvidence": {
+    "file": "transport-host-before-v1.json",
+    "sha256": "02b931a7da23c7885679d821cf6954d77c33b044b2d0e11ae9dc641715ad1a3a",
+    "ephemeralPortRange": [
+      32768,
+      60999
+    ],
+    "rangeCardinality": 28232,
+    "mutations": false
+  },
+  "cooldownEvidence": {
+    "file": "transport-cooldown-after-fetch-v1.json",
+    "sha256": "d54dcf8c706c8239540120ad1d421437f9245b8c9565d594aa1b5506e2711494",
+    "final": {
+      "at": "2026-09-23T18:22:24.830387+00:00",
+      "openContexts": 0,
+      "endpointTimeWait": 13,
+      "ready": true
+    }
+  },
+  "conclusion": "Pooled cleanup preserves every successful ranking hash while avoiding the default DELETE transport connection churn and the reproduced reset failures in this controlled comparison.",
+  "limitations": [
+    "Instrumented fixed-query diagnosis on one host; not a concurrency or arrival capacity qualification.",
+    "Baseline stops on its error budget after38.9s; pooled completes60s, so latency/throughput are not unbiased head-to-head performance estimates.",
+    "All compact queries and all failures are audited; only sampled successful stage traces exist. Unretained-success stage counts are reconciled with whole-run observer counters and the frozen five-stage executor.",
+    "The close-to-ephemeral-range failure onset supports port-pressure inference but does not identify the exact failing host/Docker namespace allocation without kernel/proxy error evidence.",
+    "Observer socketErrorCloses counts intentional Undici reset closures too; actual service failures are counted separately.",
+    "Existing7,491-error screen remains failed; this diagnostic does not replace it."
+  ]
+}

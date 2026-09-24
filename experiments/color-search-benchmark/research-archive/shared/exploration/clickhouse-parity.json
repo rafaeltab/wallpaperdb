@@ -1,0 +1,566 @@
+{
+  "createdAt": "2026-09-21T14:24:34.284Z",
+  "validation": {
+    "table": "color_exploration_real_v1",
+    "count": 545,
+    "createdAt": "2026-09-20T02:38:56.000Z",
+    "indexMs": 446.095369,
+    "descriptorHashes": {
+      "sourceFeatures": "424e78bb42994021cb50ee3d254a777680f432be89bc66e9217307a6123be680",
+      "clickhouseDocuments": "18e2668a821f0ae0fb1ece76410d21ca2777964ff3a247015ea7b121e53b57c4",
+      "colorTransform": "eb24a0e60cef33d643506bd88021fa2e3020d8e9f2cdde9de14d5187a3667fc8"
+    },
+    "sourceHashes": {
+      "clickhouse-service.mjs": "4fcc5d49cabbf7f2f0ffe7273bfee1119ba869e920f70d6ad94af5c4b6763083",
+      "methods-clickhouse.mjs": "1bd48e5d108e31deea420a1879160d8e1fb3216f6549536a510a64a98621f0e4",
+      "clickhouse-index.mjs": "89e434e4339b97da3e2793fc92936f42980f74b5f0e007b7a575235a8786368e",
+      "corpus-colors.mjs": "2a1648308da0e0cf395146c8d2fd9ffc3d36437c6f764c8bb35c8c00c8e61fad"
+    },
+    "version": "26.3.9.8",
+    "hostname": "d96044c4ca3a",
+    "parts": {
+      "rows": 545,
+      "bytesOnDisk": 454061,
+      "uncompressedBytes": 575890,
+      "activeParts": 1
+    },
+    "metrics": {
+      "CGroupMaxCPU": 8,
+      "OSSystemTime": 0.19997960208058776,
+      "CGroupMemoryUsed": 889812904,
+      "MemoryResident": 946860032,
+      "OSUserTime": 1.6598306972688786
+    },
+    "containerLimits": {
+      "cpus": 8,
+      "memoryBytes": 12884901888,
+      "source": "clickhouse-compose.yml; compare with observed metrics"
+    },
+    "expectedIdsVerified": true
+  },
+  "results": [
+    {
+      "query": {
+        "swatchHex": "#ff2200"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 52.54623000000001,
+        "serviceTookMs": 32.923739,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-ba1e1bc8-7b1d-43e4-b861-d11a968324d9",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "38405415",
+          "memory_usage": "9598116"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 37.92397699999998,
+        "serviceTookMs": 27.700492999999998,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-9fd30a0b-0d86-4d70-82cb-0560b62893e8",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "29514215",
+          "memory_usage": "8547429"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#4c8c72"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 28.455070999999975,
+        "serviceTookMs": 20.072656000000002,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-1f50ee3c-3af6-49e0-b695-0cb0f08b60dd",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "21100871",
+          "memory_usage": "9596068"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 19.291858999999988,
+        "serviceTookMs": 14.46686,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-6f5d24e4-7626-4663-9a4d-833c10e8005d",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "15453673",
+          "memory_usage": "8547429"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#808080"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 17.797180000000026,
+        "serviceTookMs": 13.341675,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-c18db238-2ab6-4852-81fa-e0c18c2e3047",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "15100211",
+          "memory_usage": "9597284"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 18.12431399999997,
+        "serviceTookMs": 14.138853999999998,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-b682b965-ab46-465b-80cc-37f38e1c33f7",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "15053853",
+          "memory_usage": "8547429"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#101010"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 18.23133500000006,
+        "serviceTookMs": 13.623716,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-61134b26-f14f-47ff-bdca-714eca14d96a",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "14874828",
+          "memory_usage": "9596948"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 18.798430999999937,
+        "serviceTookMs": 15.810365,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-dbc2dbb3-3d88-41c6-9e48-44c931c64cc9",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "16498722",
+          "memory_usage": "8547493"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#dd6600"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 20.276027999999997,
+        "serviceTookMs": 16.285808999999997,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-b3ae55c6-6815-485b-acfe-221327e382ad",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "17375787",
+          "memory_usage": "9597092"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 15.746485000000007,
+        "serviceTookMs": 12.715318,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-8b4549a5-da85-4ae8-8adc-4f92103cd157",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "13234904",
+          "memory_usage": "8547301"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#8030b0"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 15.879455000000007,
+        "serviceTookMs": 11.697175000000001,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-ac80a676-ccf5-4d18-8eae-0b562cf63f09",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "13076717",
+          "memory_usage": "9596516"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 15.68714399999999,
+        "serviceTookMs": 12.607526,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-455f4ab5-59ed-4c7a-bab6-02c7c8be555d",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "13254199",
+          "memory_usage": "8547429"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "swatchHex": "#20b8d0"
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 16.89545499999997,
+        "serviceTookMs": 12.623967,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-10cffe55-8bad-4274-bb04-7ad8138ce116",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "14328063",
+          "memory_usage": "8566281"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 12.441473999999971,
+        "serviceTookMs": 9.825797000000001,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-c022819a-0d9c-49ba-ac96-8460f3a4fa25",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "10240038",
+          "memory_usage": "8547429"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "mode": "vibe",
+        "targets": [
+          {
+            "color": "#ff2200",
+            "space": "oklab",
+            "tolerance": {
+              "distance": 0
+            },
+            "edgeWeight": 0.5
+          }
+        ]
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 17.683446000000004,
+        "serviceTookMs": 13.756665,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-7b33cc7d-1abc-4989-b3ed-366118576408",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "14524751",
+          "memory_usage": "9607060"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 13.053262999999902,
+        "serviceTookMs": 10.80076,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-92779e78-45fc-4788-9a33-ec4bb562d97f",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "11221999",
+          "memory_usage": "8557589"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    },
+    {
+      "query": {
+        "mode": "vibe",
+        "targets": [
+          {
+            "color": "#4c8c72",
+            "space": "oklab",
+            "tolerance": {
+              "distance": 0.2
+            },
+            "edgeWeight": 1
+          }
+        ]
+      },
+      "documents": 545,
+      "maximumError": 0,
+      "completeOrderEqual": true,
+      "evidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 8,
+        "httpMs": 12.9616410000001,
+        "serviceTookMs": 10.329694,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-e0e76095-b931-4c63-82e9-dd6d06acc0cc",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "11219294",
+          "memory_usage": "9596740"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      },
+      "oneThreadScoreOrderEqual": true,
+      "oneThreadEvidence": {
+        "engine": "clickhouse",
+        "table": "color_exploration_real_v1",
+        "maxThreads": 1,
+        "httpMs": 10.699640000000045,
+        "serviceTookMs": 8.900569,
+        "rowsRead": 545,
+        "bytesRead": 555675,
+        "queryId": "color-exploration-cc20a85d-9e6f-496c-b571-1e2c98b157b6",
+        "summary": {
+          "read_rows": "545",
+          "read_bytes": "555675",
+          "written_rows": "0",
+          "written_bytes": "0",
+          "total_rows_to_read": "545",
+          "result_rows": "545",
+          "result_bytes": "18916",
+          "elapsed_ns": "9298724",
+          "memory_usage": "8547333"
+        },
+        "finalGloballyEligible": true,
+        "retrieval": "exact-stored-objective"
+      }
+    }
+  ],
+  "filteredChecks": true,
+  "sourceHashes": {
+    "methods-clickhouse.mjs": "ef75425cdfd8d33375dc40f3d010249ca415e8648e1552c18c52e7c1054213ef",
+    "clickhouse-service.mjs": "4fcc5d49cabbf7f2f0ffe7273bfee1119ba869e920f70d6ad94af5c4b6763083",
+    "clickhouse-index.mjs": "89e434e4339b97da3e2793fc92936f42980f74b5f0e007b7a575235a8786368e",
+    "methods-clickhouse.test.mjs": "a6516c75b054e8125562621bda5c9aa1934b74a2cbfce1805f9f892077476e52",
+    "methods-precision-typed.mjs": "d0fa14848e38619271f58f0214ee94049c881daa5c3c41a56b7843fc3d655feb"
+  }
+}

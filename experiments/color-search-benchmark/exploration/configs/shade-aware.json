@@ -1,0 +1,693 @@
+{
+  "schemaVersion": 1,
+  "label": "Shade-aware versus original all-cutoff color matching",
+  "description": "Paired comparisons of original Euclidean OKLab measurements and newly indexed shade-aware measurements. Four bucket counts, blend exponents 0/3/6, and power quality influence 1/3, plus the new registered default. Both methods globally rank the complete 545-asset corpus in real OpenSearch using the same all-cutoff formula. Existing single-observer development judgments only; no inferred preferences for the two newly reported dark-red examples. Small-corpus latency does not establish million-record scalability.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "cutoff-shade-all-levels",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware all cutoffs · registered default",
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "cutoff-all-levels-16-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend0-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend3-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend3-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend6-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend0-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend3-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend3-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 16 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-16-blend6-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 16 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend0-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend3-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend3-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend6-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend0-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend3-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend3-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 64 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-64-blend6-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 64 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend0-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend3-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend3-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend6-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend0-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend3-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend3-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 256 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-256-blend6-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 256 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend0-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend3-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend3-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 3 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend6-i1",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend0-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend3-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend3-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 3 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 3,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "Original OKLab · 1024 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-shade-all-levels-1024-blend6-i3",
+      "method": "cutoff-shade-all-levels",
+      "label": "Shade-aware · 1024 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    }
+  ]
+}

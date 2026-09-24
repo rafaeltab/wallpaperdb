@@ -1,0 +1,37 @@
+{
+  "createdAt": "2026-09-20T22:00:46.279823+00:00",
+  "url": "http://zerotwo:8226/",
+  "kind": "manual real-browser inspection",
+  "browserSession": "histogram-inspector-t3code-28be15f7",
+  "sessionClosed": true,
+  "desktop": [
+    1440,
+    1000
+  ],
+  "mobile": [
+    390,
+    844
+  ],
+  "checks": [
+    "Red search and click returned all4096 diagnostic bins; score0.7167626 and reconstruction0.7167625795499136 differ by about2e-8.",
+    "Changed controls to40%green without searching; opening prior red gallery retained Overall vibe: Red.",
+    "40%green query displayed service formula and penalty ledger: area0.00498, quality0.01734, outside0, total0.02232.",
+    "All-bin table toggle showed4096 bins; ascending bin sort began0,1,2. Only diagnostic bins are locally filtered/sorted.",
+    "Selecting red versus green target changed bin3840 from area1/quality0.943 to area0/quality0.",
+    "Keyboard ArrowRight moved selected and focused bin3840 to3841.",
+    "Single occupied bin image madness-wallhaven-vppy93 displayed removal effect Not defined and removed score dash.",
+    "Named hex editing switched control/query to picked hex and updated explanatory copy.",
+    "HSL black range searched and inspected successfully with4096 bins.",
+    "Advanced colorName/amount aliases displayed Target areas:40%Green correctly.",
+    "No loaded wallpaper image errors; agent-browser errors empty.",
+    "Mobile page and inspector content width390px. Fixed initial15px internal overflow by allowing larger score cards to wrap."
+  ],
+  "screenshots": [
+    "/tmp/color-histogram-inspector-desktop.png",
+    "/tmp/color-histogram-inspector-bins-desktop.png",
+    "/tmp/color-histogram-inspector-proportions-desktop.png",
+    "/tmp/color-histogram-inspector-mobile.png",
+    "/tmp/color-histogram-inspector-mobile-overview.png"
+  ],
+  "limits": "This checks UI integration and interpretation, not load performance or new human color judgments. Request race guards were independently reviewed; no synthetic network-race injection was used."
+}

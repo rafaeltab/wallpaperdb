@@ -1,0 +1,693 @@
+{
+  "schemaVersion": 1,
+  "label": "All five cutoffs: equal through exponential weighting",
+  "description": "Four bucket counts, blend exponents 0/2/4/6, and power quality influence 1/3, with existing three-cutoff blends at pixel cutoff 0% and 50% as controls. All five-level candidates use hard admissions 0/25/50/75/90%, normalized exp(exponent * cutoff / 0.9) weights, and the complete 545-asset corpus. No image extraction or index changes. Existing single-observer development judgments only; not a held-out relevance study. All ranking is in OpenSearch. Small-corpus latency does not establish million-record scalability.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "cutoff-all-levels",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · registered default",
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "cutoff-all-levels-16-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend2-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 2 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend4-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 4 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q00-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 16 bins · cutoff 0% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q50-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 16 bins · cutoff 50% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend2-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 2 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend4-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 4 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-16-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 16 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q00-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 16 bins · cutoff 0% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-q50-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 16 bins · cutoff 50% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend2-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 2 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend4-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 4 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q00-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 64 bins · cutoff 0% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q50-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 64 bins · cutoff 50% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend2-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 2 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend4-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 4 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-64-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 64 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q00-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 64 bins · cutoff 0% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-q50-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 64 bins · cutoff 50% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend2-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 2 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend4-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 4 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q00-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 256 bins · cutoff 0% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q50-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 256 bins · cutoff 50% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend2-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 2 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend4-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 4 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-256-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 256 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q00-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 256 bins · cutoff 0% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-q50-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 256 bins · cutoff 50% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend0-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 0 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend2-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 2 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend4-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 4 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend6-i1",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 6 · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q00-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 1024 bins · cutoff 0% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q50-i1",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 1024 bins · cutoff 50% · influence 1",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend0-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 0 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend2-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 2 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 2,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend4-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 4 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 4,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-all-levels-1024-blend6-i3",
+      "method": "cutoff-all-levels",
+      "label": "All five cutoffs · 1024 bins · blend 6 · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "cutoffBlendExponent": 6,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q00-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 1024 bins · cutoff 0% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-q50-i3",
+      "method": "cutoff-consensus",
+      "label": "Existing three cutoffs · 1024 bins · cutoff 50% · influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "pixelCutoff": 0.5,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches"
+      }
+    }
+  ]
+}

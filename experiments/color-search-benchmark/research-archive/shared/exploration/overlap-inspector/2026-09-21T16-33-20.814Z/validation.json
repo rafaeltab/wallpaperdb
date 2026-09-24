@@ -1,0 +1,2456 @@
+{
+  "createdAt": "2026-09-21T16:33:20.814Z",
+  "inspector": "http://127.0.0.1:8227",
+  "comparison": "http://127.0.0.1:8225",
+  "corpus": {
+    "total": 545,
+    "real": 523,
+    "fixtures": 22
+  },
+  "bucketCounts": [
+    16,
+    64,
+    256,
+    1024
+  ],
+  "methods": [
+    "overlap-quality-dense",
+    "overlap-quality-hybrid"
+  ],
+  "checks": [
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 4.886273999996774,
+      "inspectionMs": 4.302498000000924
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 4.137025999996695,
+      "inspectionMs": 2.7205329999997048
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qqvk9",
+      "score": 0.5771473,
+      "regionsUsed": [
+        873
+      ],
+      "scoreDifference": 1.9689690988755615e-8,
+      "searchMs": 3.4038579999978538,
+      "inspectionMs": 2.4244870000002265
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.8434477,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -1.9734841649743373e-8,
+      "searchMs": 2.292398999998113,
+      "inspectionMs": 2.2282479999994393
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.5537757,
+      "regionsUsed": [
+        873,
+        4
+      ],
+      "scoreDifference": 3.258668179739743e-8,
+      "searchMs": 1.8869759999979578,
+      "inspectionMs": 2.043179999996937
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.9871149999999034,
+      "inspectionMs": 1.6064289999994799
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 2.3586539999996603,
+      "inspectionMs": 1.4915230000005977
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 1.802557999999408,
+      "inspectionMs": 1.85761199999979
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 2.7688750000015716,
+      "inspectionMs": 1.6854979999989155
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 1.3391469999987748,
+      "inspectionMs": 1.9002020000007178
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-w553y6",
+      "score": 0.870375,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 1.7586749999973108,
+      "inspectionMs": 2.3105429999995977
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.4745906,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -8.059501399593216e-10,
+      "searchMs": 1.5282229999975243,
+      "inspectionMs": 1.8464310000017576
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 1.7567719999969995,
+      "inspectionMs": 1.7789540000012494
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.9134669999984908,
+      "inspectionMs": 1.5797590000001946
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.8310219999984838,
+      "inspectionMs": 1.390213999999105
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gww9yl",
+      "score": 0.8272101,
+      "regionsUsed": [
+        601
+      ],
+      "scoreDifference": 3.5993957481217365e-8,
+      "searchMs": 1.5489120000020193,
+      "inspectionMs": 2.781387999999424
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.8434477,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -1.9734841649743373e-8,
+      "searchMs": 1.4462380000004487,
+      "inspectionMs": 2.3597650000010617
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-green-red-tulips",
+      "score": 0.61560017,
+      "regionsUsed": [
+        601,
+        4
+      ],
+      "scoreDifference": 2.5040376439022793e-9,
+      "searchMs": 1.7886519999992743,
+      "inspectionMs": 1.6963080000023183
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.141164000000572,
+      "inspectionMs": 1.5099090000003343
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 1.3618500000011409,
+      "inspectionMs": 2.1324580000000424
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 2.1418349999985367,
+      "inspectionMs": 1.4044699999976729
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 1.4857229999979609,
+      "inspectionMs": 2.2638950000000477
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.456177000000025,
+      "inspectionMs": 6.341298999999708
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-w553y6",
+      "score": 0.870375,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.345367999998416,
+      "inspectionMs": 2.494608999997581
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.4745906,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -8.059501399593216e-10,
+      "searchMs": 2.2840130000004137,
+      "inspectionMs": 2.3695740000002843
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 2.180800000001909,
+      "inspectionMs": 2.1232009999985166
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.7990910000007716,
+      "inspectionMs": 3.951788000002125
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.7923289999998815,
+      "inspectionMs": 2.7574529999983497
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gww9yl",
+      "score": 0.6659249,
+      "regionsUsed": [
+        456
+      ],
+      "scoreDifference": 2.0455217408787973e-8,
+      "searchMs": 1.9063129999994999,
+      "inspectionMs": 2.832955000001675
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.8434477,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -1.9734841649743373e-8,
+      "searchMs": 1.8413809999983641,
+      "inspectionMs": 3.5063410000002477
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.5490346,
+      "regionsUsed": [
+        456,
+        4
+      ],
+      "scoreDifference": 1.95809590763929e-9,
+      "searchMs": 2.3895510000002105,
+      "inspectionMs": 3.222968000001856
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.677733000000444,
+      "inspectionMs": 3.2541669999991427
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 2.337523999998666,
+      "inspectionMs": 2.9990469999975176
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 2.480853000000934,
+      "inspectionMs": 2.8649249999980384
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 2.838184000000183,
+      "inspectionMs": 3.535024999997404
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.6674540000021807,
+      "inspectionMs": 3.596229000002495
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-w553y6",
+      "score": 0.870375,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.3984380000001693,
+      "inspectionMs": 3.079368999999133
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.4745906,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": -8.059501399593216e-10,
+      "searchMs": 1.8478030000005674,
+      "inspectionMs": 2.9193169999998645
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        4
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 2.229882000003272,
+      "inspectionMs": 2.883890999997675
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.680299000003288,
+      "inspectionMs": 6.977896000000328
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.40664434,
+      "regionsUsed": [
+        8
+      ],
+      "scoreDifference": 1.1041026093394635e-8,
+      "searchMs": 2.4262199999975564,
+      "inspectionMs": 7.64704399999755
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-gww9yl",
+      "score": 0.7582285,
+      "regionsUsed": [
+        11
+      ],
+      "scoreDifference": -4.258012775704145e-8,
+      "searchMs": 2.268363999999565,
+      "inspectionMs": 6.174215999999433
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.8470526,
+      "regionsUsed": [
+        null,
+        8
+      ],
+      "scoreDifference": 8.114218186250355e-10,
+      "searchMs": 2.489118999998027,
+      "inspectionMs": 6.934303999998519
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "evaluation-green-red-tulips",
+      "score": 0.58242065,
+      "regionsUsed": [
+        11,
+        8
+      ],
+      "scoreDifference": 1.0085678070481663e-8,
+      "searchMs": 2.408327000001009,
+      "inspectionMs": 6.254475999998249
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.5894569999982195,
+      "inspectionMs": 7.312143999999535
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 2.204955000001064,
+      "inspectionMs": 5.935196000002179
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 2.523192000000563,
+      "inspectionMs": 7.196657000000414
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 2.997684999998455,
+      "inspectionMs": 7.135802999997395
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 3.640673000001698,
+      "inspectionMs": 7.71530200000052
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-w553y6",
+      "score": 0.870725,
+      "regionsUsed": [
+        null,
+        8
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.5769340000006196,
+      "inspectionMs": 6.2147619999996095
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-xeewg3",
+      "score": 0.79394835,
+      "regionsUsed": [
+        null,
+        8
+      ],
+      "scoreDifference": -3.46729756017794e-9,
+      "searchMs": 2.681319999999687,
+      "inspectionMs": 6.694123000001127
+    },
+    {
+      "method": "overlap-quality-dense",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        8
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 2.5474490000015066,
+      "inspectionMs": 6.659757999997964
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.351300000002084,
+      "inspectionMs": 1.6733950000016193
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-037",
+      "score": 0.7119949,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -2.2345067463014345e-8,
+      "searchMs": 1.5407059999997728,
+      "inspectionMs": 1.1693779999986873
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88mmj",
+      "score": 0.8497873,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -8.283960739596807e-9,
+      "searchMs": 1.7299720000009984,
+      "inspectionMs": 1.012523000001238
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-088",
+      "score": 0.89826566,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 1.2074258370908808e-8,
+      "searchMs": 2.0360470000014175,
+      "inspectionMs": 1.641696000002412
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-xeejzz",
+      "score": 0.8098078,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -5.316405293775972e-8,
+      "searchMs": 1.850469000000885,
+      "inspectionMs": 1.4496350000008533
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.549633000002359,
+      "inspectionMs": 1.3290780000024824
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 0.9897200000013981,
+      "inspectionMs": 1.2672319999983301
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 0.997654999999213,
+      "inspectionMs": 0.9888189999983297
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 0.99449900000036,
+      "inspectionMs": 1.3475829999988491
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 0.9521390000008978,
+      "inspectionMs": 0.8837009999988368
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.91324997,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 3.0000000039720476e-8,
+      "searchMs": 1.1441000000013446,
+      "inspectionMs": 1.2362740000025951
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjl7",
+      "score": 0.81741667,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -1.0203165978772688e-8,
+      "searchMs": 1.5520570000007865,
+      "inspectionMs": 1.448422000001301
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 16,
+      "index": "color-exploration-overlap-16-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 16
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 1.0660739999984798,
+      "inspectionMs": 0.9824369999987539
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.7701780000024883,
+      "inspectionMs": 1.1921210000000428
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-037",
+      "score": 0.7119949,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -2.2345067463014345e-8,
+      "searchMs": 0.9506560000008903,
+      "inspectionMs": 1.0250669999986712
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88mmj",
+      "score": 0.8497873,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -8.283960739596807e-9,
+      "searchMs": 1.1573050000006333,
+      "inspectionMs": 1.9130260000019916
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-088",
+      "score": 0.89826566,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 1.2074258370908808e-8,
+      "searchMs": 1.9349069999989297,
+      "inspectionMs": 2.0985540000001492
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-xeejzz",
+      "score": 0.8098078,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -5.316405293775972e-8,
+      "searchMs": 1.6190629999982775,
+      "inspectionMs": 1.336301999999705
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.5632079999995767,
+      "inspectionMs": 1.3720389999980398
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 1.0308179999992717,
+      "inspectionMs": 1.1550309999984165
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 1.0605239999968035,
+      "inspectionMs": 1.8370930000019143
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 1.2712800000008428,
+      "inspectionMs": 1.148338999999396
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 1.5639799999989918,
+      "inspectionMs": 1.4714449999992212
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.91324997,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 3.0000000039720476e-8,
+      "searchMs": 1.8765869999988354,
+      "inspectionMs": 1.4474110000010114
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjl7",
+      "score": 0.81741667,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -1.0203165978772688e-8,
+      "searchMs": 1.978678999999829,
+      "inspectionMs": 1.9857320000010077
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 64,
+      "index": "color-exploration-overlap-64-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 64
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 1.226806000002398,
+      "inspectionMs": 1.8644450000028883
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.262813000001188,
+      "inspectionMs": 3.027991999999358
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-037",
+      "score": 0.7119949,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -2.2345067463014345e-8,
+      "searchMs": 1.2229890000016894,
+      "inspectionMs": 2.974411000002874
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88mmj",
+      "score": 0.8497873,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -8.283960739596807e-9,
+      "searchMs": 2.1602600000005623,
+      "inspectionMs": 2.8381049999989045
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "wallpaper-088",
+      "score": 0.89826566,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 1.2074258370908808e-8,
+      "searchMs": 2.2660290000021632,
+      "inspectionMs": 2.3485040000014124
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-xeejzz",
+      "score": 0.8098078,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -5.316405293775972e-8,
+      "searchMs": 2.002443999997922,
+      "inspectionMs": 2.2036619999998948
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.0490410000020347,
+      "inspectionMs": 2.1495899999972607
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 1.3568000000013853,
+      "inspectionMs": 2.6139939999993658
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 1.8880479999970703,
+      "inspectionMs": 1.8682509999998729
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 2.2446490000002086,
+      "inspectionMs": 3.621487000000343
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 1.422523999997793,
+      "inspectionMs": 3.4133660000006785
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.91324997,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 3.0000000039720476e-8,
+      "searchMs": 1.6225400000002992,
+      "inspectionMs": 2.715414000002056
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjl7",
+      "score": 0.81741667,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -1.0203165978772688e-8,
+      "searchMs": 1.3326250000027358,
+      "inspectionMs": 2.7074589999974705
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 256,
+      "index": "color-exploration-overlap-256-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 256
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 1.262283000000025,
+      "inspectionMs": 2.089457999998558
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 1.8502880000014557,
+      "inspectionMs": 7.750479000002088
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Named red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "wallpaper-037",
+      "score": 0.7119949,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -2.2345067463014345e-8,
+      "searchMs": 2.103313999999955,
+      "inspectionMs": 7.22112300000299
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "40% green, rest free",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-d88mmj",
+      "score": 0.8497873,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -8.283960739596807e-9,
+      "searchMs": 2.225954000001366,
+      "inspectionMs": 7.609954000003199
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "wallpaper-088",
+      "score": 0.89826566,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 1.2074258370908808e-8,
+      "searchMs": 2.179536999999982,
+      "inspectionMs": 5.678342999999586
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "50% green + 50% red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-xeejzz",
+      "score": 0.8098078,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -5.316405293775972e-8,
+      "searchMs": 2.741422999999486,
+      "inspectionMs": 6.3468790000006265
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Precise orange-red",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.35960144,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -6.150842890573216e-9,
+      "searchMs": 2.204494000001432,
+      "inspectionMs": 8.110014000001684
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Dark",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 1,
+        "minimumQuality": 0,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": true,
+      "id": "madness-wallhaven-jeerxp",
+      "score": 0.99718714,
+      "regionsUsed": [
+        null
+      ],
+      "scoreDifference": -6.871045510337126e-9,
+      "searchMs": 1.7657190000027185,
+      "inspectionMs": 5.867589000001317
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjrj",
+      "score": 0.50507426,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": -8.033024356812746e-9,
+      "searchMs": 2.7231379999975616,
+      "inspectionMs": 7.179544999999052
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-gwwvqe",
+      "score": 0.12126331,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 3.0121041771913326e-10,
+      "searchMs": 3.481674999999086,
+      "inspectionMs": 7.816001999999571
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "Picked bright red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "evaluation-gray-red-002-telephone",
+      "score": 0,
+      "regionsUsed": [
+        4
+      ],
+      "scoreDifference": 0,
+      "searchMs": 2.8398080000006303,
+      "inspectionMs": 7.545964000000822
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 0, minimum 0.7",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 0,
+        "minimumQuality": 0.7,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-3qq5lv",
+      "score": 0.91324997,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 3.0000000039720476e-8,
+      "searchMs": 3.406103000001167,
+      "inspectionMs": 6.794561999999132
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 2.4, minimum 0.8",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 2.4,
+        "minimumQuality": 0.8,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-rqqjl7",
+      "score": 0.81741667,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": -1.0203165978772688e-8,
+      "searchMs": 3.1573239999997895,
+      "inspectionMs": 7.115755000002537
+    },
+    {
+      "method": "overlap-quality-hybrid",
+      "bucketCount": 1024,
+      "index": "color-exploration-overlap-real-v1",
+      "label": "80% grayscale + 20% red / quality 3, minimum 1",
+      "parameters": {
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "qualityInfluence": 3,
+        "minimumQuality": 1,
+        "bucketCount": 1024
+      },
+      "comparedOriginal": false,
+      "id": "madness-wallhaven-d88jym",
+      "score": 0.35,
+      "regionsUsed": [
+        null,
+        null
+      ],
+      "scoreDifference": 5.551115123125783e-17,
+      "searchMs": 2.7222970000002533,
+      "inspectionMs": 6.095005999999557
+    }
+  ],
+  "status": "passed",
+  "note": "Read-only API routing, saved-parameter, anchor-bank, quality-control and score-parity validation. The 1024-bucket defaults also match the existing comparison. This does not add relevance judgments or establish production latency."
+}

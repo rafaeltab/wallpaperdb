@@ -1,0 +1,68 @@
+{
+  "status": "passed",
+  "completedAt": "2026-09-23T18:45:33.158678+00:00",
+  "browserClosed": true,
+  "serviceTrafficStopped": true,
+  "service": "http://zerotwo:8228/",
+  "methods": 19,
+  "priorMethodsPreserved": 17,
+  "visibleRealWallpapers": 523,
+  "controlledFixturesExcluded": 22,
+  "searchResponses": 39,
+  "returnedHitsChecked": 936,
+  "pooledParentTop20Comparisons": 10,
+  "allComparedIdsAndFloat32ScoresEqual": true,
+  "queryShapes": [
+    "red",
+    "red50/green50",
+    "fivecolors20each",
+    "grayscale80/red20"
+  ],
+  "alternateControls": {
+    "qualityInfluence": 1,
+    "cutoffBlendExponent": 3,
+    "liveUpdate": true
+  },
+  "desktopViewport": [
+    1440,
+    1000
+  ],
+  "mobileViewport": [
+    390,
+    844
+  ],
+  "mobileNoPageOverflow": true,
+  "loadedWallpaperModal": true,
+  "cutoffModal": {
+    "buttons": 1513,
+    "errors": [],
+    "grid": {
+      "axis": "saturation",
+      "bucketCount": "256",
+      "columns": "73",
+      "cutoff": "0.9",
+      "layer": "cutoff-90",
+      "metric": "shade-hue-aware",
+      "profile": "hard",
+      "regionIndex": "4",
+      "rows": "21"
+    },
+    "layer": "cutoff-90",
+    "open": true
+  },
+  "performance": {
+    "httpStatus": 200,
+    "timedRequests": 97578,
+    "pendingTimedRequests": 12285,
+    "strictFailures": 7491,
+    "errors": 7491,
+    "preservedWhenAllCompletedProfilesFilteredOut": true,
+    "onlyFixedSnapshotRequest": true
+  },
+  "resolvedIssue": "Initial v10 publication used an absolute sourceCheckpoint path, violating basename contract. Root corrected publication metadata without source changes; both failed and corrected captures preserved.",
+  "limitations": [
+    "Correctness and layout checks only; timings are not capacity evidence.",
+    "No19217 traffic. Original8227 inspector checked separately for combined/90%cutoff and hue/lightness-to-saturation tabs.",
+    "Zip wallpaper source links can be absent; full image loads correctly."
+  ]
+}

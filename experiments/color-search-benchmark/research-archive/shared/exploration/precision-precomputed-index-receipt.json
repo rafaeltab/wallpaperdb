@@ -1,0 +1,14 @@
+{
+  "index": "color-exploration-real-v1",
+  "count": 545,
+  "createdAt": "2026-09-20T01:52:10.757Z",
+  "fields": [
+    "palette_lab_lw",
+    "palette_lab_ab"
+  ],
+  "featureHash": "424e78bb42994021cb50ee3d254a777680f432be89bc66e9217307a6123be680",
+  "descriptorHash": "20b772193bae54d7a06289180f4d8dc2ecbf39d34ed219417f751bac618ac253",
+  "coordinateStep": 0.000001,
+  "coordinateDistanceErrorBound": 8.661254037844386e-7,
+  "methodSourceHash": "3ec1a846b840f77938b9a95e46c476c6d8b8852d37d02877c4b00429a3dd8223"
+}

@@ -1,0 +1,168 @@
+{
+  "initial": {
+    "status": "Compared 17 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results.",
+    "cards": [
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24
+    ]
+  },
+  "checks": [
+    {
+      "id": "duplicate-two-targets",
+      "sameOrderDoubleScore": true,
+      "evidence": {
+        "targetCount": 2,
+        "distinctUtilityCount": 1,
+        "corrected": true,
+        "groups": [
+          {
+            "field": "utilities.r0004_p050_q050_w1",
+            "multiplicity": 2,
+            "factor": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "same-bin-different-percent",
+      "equal": true,
+      "evidence": {
+        "targetCount": 2,
+        "distinctUtilityCount": 2,
+        "corrected": false,
+        "groups": [
+          {
+            "field": "utilities.r0004_p020_q050_w1",
+            "multiplicity": 1,
+            "factor": 0.5
+          },
+          {
+            "field": "utilities.r0004_p040_q050_w1",
+            "multiplicity": 1,
+            "factor": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "id": "red-red-blue",
+      "equal": false,
+      "evidence": {
+        "targetCount": 3,
+        "distinctUtilityCount": 2,
+        "corrected": true,
+        "groups": [
+          {
+            "field": "utilities.r0004_p020_q050_w1",
+            "multiplicity": 2,
+            "factor": 0.6666666666666666
+          },
+          {
+            "field": "utilities.r0001_p020_q050_w1",
+            "multiplicity": 1,
+            "factor": 0.3333333333333333
+          }
+        ]
+      }
+    }
+  ],
+  "desktop": {
+    "width": 1440,
+    "pageWidth": 1440
+  },
+  "mobile": {
+    "width": 390,
+    "pageWidth": 390,
+    "dialogWidth": 366.59375,
+    "title": "Red tulips on a field at the Skagit Valley Tulip Festival",
+    "naturalWidth": 3008,
+    "source": "https://commons.wikimedia.org/wiki/File:Redtulips.jpg"
+  },
+  "passed": true,
+  "browserClosed": true,
+  "consoleErrors": [],
+  "capturedResponseCount": 6,
+  "fixtureLeaks": [],
+  "returnedHitOccurrences": 144,
+  "performance": {
+    "scopes": [
+      {
+        "button": "545 real wallpapers",
+        "title": "545 real wallpapers",
+        "description": "Preference agreement below measures the saved judgments. Small-corpus timings are not a substitute for scale tests.",
+        "rows": 0,
+        "width": 390
+      },
+      {
+        "button": "1 million \u00b7 narrow projection",
+        "title": "1 million \u00b7 narrow projection",
+        "description": "Recorded concurrency: 1. Scheduled arrivals: unmeasured. Concurrency 4 is unmeasured. Concurrency 16 is unmeasured. Missing tests do not count as passes.",
+        "rows": 76,
+        "width": 390
+      },
+      {
+        "button": "100,000 \u00b7 full schema",
+        "title": "100,000 \u00b7 full schema",
+        "description": "Recorded concurrency: 1. Scheduled arrivals: unmeasured. Concurrency 4 is unmeasured. Concurrency 16 is unmeasured. Missing tests do not count as passes.",
+        "rows": 36,
+        "width": 390
+      },
+      {
+        "button": "1 million \u00b7 full schema",
+        "title": "1 million \u00b7 full schema",
+        "description": "Recorded concurrency: none. Scheduled arrivals: unmeasured. Concurrency 4 is unmeasured. Concurrency 16 is unmeasured. Missing tests do not count as passes.",
+        "rows": 0,
+        "width": 390
+      },
+      {
+        "button": "Earlier / other scopes",
+        "title": "Earlier / other scopes",
+        "description": "Recorded concurrency: 1. Scheduled arrivals: unmeasured. Concurrency 4 is unmeasured. Concurrency 16 is unmeasured. Missing tests do not count as passes.",
+        "rows": 16,
+        "width": 390
+      }
+    ],
+    "requests": [],
+    "mobile": {
+      "width": 390,
+      "pageWidth": 390
+    },
+    "initialResources": [
+      "http://127.0.0.1:8228/performance.css",
+      "http://127.0.0.1:8228/performance.js",
+      "http://127.0.0.1:8228/api/performance"
+    ],
+    "methodFilter": {
+      "value": "cutoff-shade-hue-all-levels",
+      "rows": 4
+    },
+    "queryFilter": {
+      "value": "picked-five-portions",
+      "rows": 1
+    },
+    "desktop": {
+      "width": 1440,
+      "pageWidth": 1440
+    }
+  },
+  "limitations": [
+    "Correctness/layout only while1Mindexing; no capacity conclusions.",
+    "Initial17auto-query responses not captured;6subsequentparent/corrected responses archived."
+  ],
+  "performanceLabelFixed": true
+}

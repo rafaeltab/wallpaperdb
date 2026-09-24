@@ -1,0 +1,261 @@
+{
+  "generatedAt": "2026-09-16T14:59:21.749Z",
+  "version": {
+    "distribution": "opensearch",
+    "number": "2.11.0",
+    "build_type": "tar",
+    "build_hash": "4dcad6dd1fd45b6bd91f041a041829c8687278fa",
+    "build_date": "2023-10-13T02:55:55.511945994Z",
+    "build_snapshot": false,
+    "lucene_version": "9.7.0",
+    "minimum_wire_compatibility_version": "7.10.0",
+    "minimum_index_compatibility_version": "7.0.0"
+  },
+  "documentsBeforeConcurrentInsert": 429,
+  "shards": 3,
+  "checks": [
+    {
+      "name": "Fine global winner absent from coarse seed is recovered",
+      "passes": true,
+      "threshold": 49,
+      "seedCount": 20
+    },
+    {
+      "name": "Seeded first page agrees with complete eligible oracle",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.4
+        },
+        {
+          "family": "green",
+          "amount": 0.6
+        }
+      ],
+      "filter": [],
+      "passes": true,
+      "hits": 20,
+      "threshold": 912
+    },
+    {
+      "name": "Seeded first page agrees with complete eligible oracle",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0.3333
+        },
+        {
+          "family": "dark",
+          "amount": 0.6667
+        }
+      ],
+      "filter": [
+        {
+          "term": {
+            "cohort": "odd"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 20,
+      "threshold": 916
+    },
+    {
+      "name": "Seeded first page agrees with complete eligible oracle",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 0
+        }
+      ],
+      "filter": [
+        {
+          "term": {
+            "cohort": "few"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 7,
+      "threshold": 10000
+    },
+    {
+      "name": "Seeded first page agrees with complete eligible oracle",
+      "colors": [
+        {
+          "family": "red",
+          "amount": 1
+        }
+      ],
+      "filter": [
+        {
+          "term": {
+            "cohort": "absent"
+          }
+        }
+      ],
+      "passes": true,
+      "hits": 0,
+      "threshold": 10000
+    },
+    {
+      "name": "min_score and range endpoints retain exact threshold ties",
+      "passes": true,
+      "threshold": 1
+    },
+    {
+      "name": "Undersized initial threshold widens before returning a page",
+      "passes": true,
+      "thresholds": [
+        0,
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ]
+    },
+    {
+      "name": "All documents paginate exactly once in global fine order",
+      "passes": true,
+      "documents": 429,
+      "pages": 26,
+      "widenings": 16
+    },
+    {
+      "name": "PIT excludes a newly inserted global best; new PIT includes it",
+      "passes": true
+    },
+    {
+      "name": "Unsafe cursor reuse is rejected",
+      "passes": true
+    }
+  ],
+  "exampleDiagnostics": {
+    "seeded": {
+      "seedCount": 20,
+      "seedThreshold": 49,
+      "seedIds": [
+        "a-coarse-away-00",
+        "a-coarse-away-01",
+        "a-coarse-away-02",
+        "a-coarse-away-03",
+        "a-coarse-away-04",
+        "a-coarse-away-05",
+        "a-coarse-away-06",
+        "a-coarse-away-07",
+        "a-coarse-away-08",
+        "a-coarse-away-09",
+        "a-coarse-away-10",
+        "a-coarse-away-11",
+        "a-coarse-away-12",
+        "a-coarse-away-13",
+        "a-coarse-away-14",
+        "a-coarse-away-15",
+        "a-coarse-away-16",
+        "a-coarse-away-17",
+        "a-coarse-away-18",
+        "a-coarse-away-19"
+      ],
+      "iterations": [
+        {
+          "threshold": 49,
+          "minScore": 9951,
+          "hits": 20,
+          "wallMs": 2.2205529999999953,
+          "took": 0,
+          "boundedTotal": null
+        }
+      ],
+      "maximumThreshold": 10000,
+      "eligibleTotalKnown": false
+    },
+    "widened": {
+      "seedCount": null,
+      "seedThreshold": null,
+      "seedIds": [],
+      "iterations": [
+        {
+          "threshold": 0,
+          "minScore": 10000,
+          "hits": 1,
+          "wallMs": 2.3836000000000013,
+          "took": 1,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 1,
+          "minScore": 9999,
+          "hits": 3,
+          "wallMs": 2.0557440000000042,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 2,
+          "minScore": 9998,
+          "hits": 3,
+          "wallMs": 1.704652999999979,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 4,
+          "minScore": 9996,
+          "hits": 3,
+          "wallMs": 1.543471000000011,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 8,
+          "minScore": 9992,
+          "hits": 4,
+          "wallMs": 1.580711000000008,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 16,
+          "minScore": 9984,
+          "hits": 5,
+          "wallMs": 1.5256880000000024,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 32,
+          "minScore": 9968,
+          "hits": 6,
+          "wallMs": 1.3056040000000166,
+          "took": 0,
+          "boundedTotal": null
+        },
+        {
+          "threshold": 64,
+          "minScore": 9936,
+          "hits": 20,
+          "wallMs": 1.5110899999999958,
+          "took": 0,
+          "boundedTotal": null
+        }
+      ],
+      "maximumThreshold": 10000,
+      "eligibleTotalKnown": false
+    }
+  },
+  "timingExample": {
+    "pitMs": 2.452297999999999,
+    "seedMs": 4.9992349999999846,
+    "finalMs": 2.2205529999999953,
+    "totalMs": 10.439029000000005,
+    "requests": 3
+  },
+  "limitations": [
+    "Exactness is for fine indexed independent-family L1, not full-resolution pixels or joint transport.",
+    "This probe checks correctness, not production speed.",
+    "Bounded hit totals are not original metadata-eligible totals."
+  ]
+}

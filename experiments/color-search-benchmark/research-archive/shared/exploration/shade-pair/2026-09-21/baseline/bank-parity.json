@@ -1,0 +1,70 @@
+{
+  "groups": [
+    {
+      "influence": 1,
+      "blend": 0,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "influence": 1,
+      "blend": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "influence": 1,
+      "blend": 6,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "influence": 3,
+      "blend": 0,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "influence": 3,
+      "blend": 3,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    },
+    {
+      "influence": 3,
+      "blend": 6,
+      "banks": [
+        16,
+        64,
+        256,
+        1024
+      ],
+      "identicalAcrossBanks": true
+    }
+  ]
+}

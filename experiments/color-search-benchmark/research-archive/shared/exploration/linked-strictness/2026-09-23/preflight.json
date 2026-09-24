@@ -1,0 +1,15 @@
+{
+  "at": "2026-09-23T22:38:09.767932+00:00",
+  "availableBytes": 235221659648,
+  "scope": "545real-corpusassets including22excludedfixtures; 523visualwallpapers",
+  "newIndices": [
+    "color-exploration-favorite-linked-3-real-v1",
+    "color-exploration-favorite-linked-5-real-v1"
+  ],
+  "ports": {
+    "realOpenSearch": 19216,
+    "ui": 8228
+  },
+  "scaleServiceRemainsStopped": true,
+  "favoriteSnapshotUnchanged": true
+}

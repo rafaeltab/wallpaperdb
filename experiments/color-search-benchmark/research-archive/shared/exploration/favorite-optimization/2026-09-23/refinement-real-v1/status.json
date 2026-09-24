@@ -1,0 +1,29 @@
+{
+  "startedAt": "2026-09-23T14:07:05.329471+00:00",
+  "planSha256": "d0cb4b777f4ca418cdc7dbee088c89f2bd404faa5c43e66c58cdbfed1be85cf2",
+  "phases": [
+    {
+      "id": "compiled-encoder",
+      "startedAt": "2026-09-23T14:07:05.329640+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-encoder-benchmark",
+        "COLOR_FAVORITE_ARGS=--samples 32 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/compiled-encoder"
+      ],
+      "finishedAt": "2026-09-23T14:07:11.377084+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "lean-real",
+      "startedAt": "2026-09-23T14:07:11.377584+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode real --scope full --presets all --encodings numeric,rank8,rank16,rankfloat --index color-exploration-favorite-opt-real-v3 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/real-index-v3"
+      ],
+      "finishedAt": "2026-09-23T14:07:40.094832+00:00",
+      "exitCode": 2
+    }
+  ],
+  "stoppedAt": "2026-09-23T14:07:40.095070+00:00"
+}

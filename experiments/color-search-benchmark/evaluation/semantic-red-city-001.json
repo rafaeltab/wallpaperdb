@@ -1,0 +1,201 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "semantic-red-city-001",
+  "status": "user-judged",
+  "category": [
+    "Semantic filtering",
+    "Perceived color"
+  ],
+  "use": "development anchor",
+  "query": {
+    "userText": "A city wallpaper with a red feel",
+    "intent": "Explore which images belong in results for the combined subject and color request, then preferred ordering among them.",
+    "specifiedPercentages": null,
+    "preciseHex": null,
+    "subjectRequest": "city",
+    "subjectFilteringMode": "For the user's interpretation of this case, matching the city tag is required for eligibility. Rank by fit among eligible images. C is conditional on matching that tag.",
+    "initialSubjectFilteringMode": "Unresolved. This intent review does not stipulate a hard selected tag or weighted natural-language search."
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/semantic-red-city-001.html",
+    "presentation": "Existing whole-image JPEG previews, contained on the same neutral background; clicking opens originals. A–D are case-specific presentation IDs, not ranks.",
+    "selection": "Four visually selected existing corpus photographs spanning urban scenes with different red appearances and a non-urban subject. Selection descriptions are hypotheses, not relevance labels or verified metadata tags.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "sourceTitlesVisible": false,
+    "randomization": "Fixed nonsorted presentation order: wallpaper-022, wallpaper-082, wallpaper-027, wallpaper-029.",
+    "judgmentFormat": "Describe fit, identify examples that should not appear at all if any, and order the remaining examples. Ties and uncertainty are welcome; no mandatory numeric scale."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-022",
+      "filename": "corpus/wallpaper-022.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-022.jpg",
+      "sha256": "544c5a8d83c439fcdda97d55f923c22ca930abe871abb5028fcd6ca1dde52078",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_city_at_night_with_many_tall_buildings.jpg",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_city_at_night_with_many_tall_buildings.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 6512,
+      "height": 4341,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "city 100%, and there is some car lights that are red - city matches, red matches weakly",
+        "subjectFit": "Unequivocal city match. The user's 'city 100%' is not a measured area percentage or calibrated numerical confidence.",
+        "colorFit": "Weak red match from car lights.",
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-082",
+      "filename": "corpus/wallpaper-082.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+      "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 6000,
+      "height": 4000,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "that's not a city, but it is red - city doesn't match so would be excluded, red matches",
+        "subjectFit": "Does not match city and should be excluded.",
+        "colorFit": "Matches red.",
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-027",
+      "filename": "corpus/wallpaper-027.png",
+      "thumbnail": "corpus/thumbnails/wallpaper-027.jpg",
+      "sha256": "4f250c07835e1350bf69761a6f794aa39c606d59ec13ef4701197add92073b34",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_narrow_street_with_shops_and_signs.png",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_narrow_street_with_shops_and_signs.png",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 4579,
+      "height": 2616,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "thats either a village or a less tall part of a city, and it has a red vibe for sure - city might match (if the author says its a village, then its a village), red matches",
+        "subjectFit": "Could be a village or a less tall part of a city. If the author identifies it as a village, the user accepts that identification. City eligibility remains conditional; no actual tag verified.",
+        "colorFit": "Has a red vibe for sure; matches red.",
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-029",
+      "filename": "corpus/wallpaper-029.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-029.jpg",
+      "sha256": "08e7badf417a6017f3e7443a150e8e2f910ab2188a779ff8cb74b910fd321789",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_red_sign_on_a_building.jpg",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/architecture/a_red_sign_on_a_building.jpg",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "width": 4423,
+      "height": 2975,
+      "judgment": {
+        "source": "user-response-001",
+        "description": "this is a city, and it has a red sign - city matches red matches less weakly, but still weakly",
+        "subjectFit": "Matches city.",
+        "colorFit": "Red sign; stronger red match than A, but still weak.",
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "subjectEligibility": [
+    {
+      "label": "A",
+      "wallpaperId": "wallpaper-022",
+      "source": "user-response-001",
+      "status": "eligible",
+      "condition": null,
+      "reason": "Unequivocal city match. The user's 'city 100%' is not a measured area percentage or calibrated numerical confidence."
+    },
+    {
+      "label": "B",
+      "wallpaperId": "wallpaper-082",
+      "source": "user-response-001",
+      "status": "excluded",
+      "condition": null,
+      "reason": "Does not match city and should be excluded."
+    },
+    {
+      "label": "C",
+      "wallpaperId": "wallpaper-027",
+      "source": "user-response-001",
+      "status": "conditional",
+      "condition": "Matches the city tag.",
+      "reason": "Could be a village or a less tall part of a city. If the author identifies it as a village, the user accepts that identification. City eligibility remains conditional; no actual tag verified."
+    },
+    {
+      "label": "D",
+      "wallpaperId": "wallpaper-029",
+      "source": "user-response-001",
+      "status": "eligible",
+      "condition": null,
+      "reason": "Matches city."
+    }
+  ],
+  "judgments": [
+    {
+      "id": "semantic-red-city-order-001",
+      "source": "user-response-001",
+      "type": "relative-order-among-eligible-images",
+      "condition": "Assuming C matches the city tag.",
+      "orderedLabels": [
+        "C",
+        "D",
+        "A"
+      ],
+      "orderedWallpaperIds": [
+        "wallpaper-027",
+        "wallpaper-029",
+        "wallpaper-022"
+      ],
+      "excludedLabels": [
+        "B"
+      ],
+      "tiesReported": false,
+      "scope": "The user explicitly excludes B for subject mismatch. B has no position in this ranking. C's eligibility is unresolved; its actual tag was not checked. No numeric scores or score distances supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "C",
+      "over": "D",
+      "source": "semantic-red-city-order-001",
+      "condition": "Recorded within the user's scenario where C matches the city tag.",
+      "derivation": "Adjacent relation from one explicit conditional ordering, not an independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "A",
+      "source": "semantic-red-city-order-001",
+      "condition": "Recorded within the user's scenario where C matches the city tag.",
+      "derivation": "Adjacent relation from one explicit conditional ordering, not an independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A city 100%, and there is some car lights that are red - city matches, red matches weakly\nB that's not a city, but it is red - city doesn't match so would be excluded, red matches\nC thats either a village or a less tall part of a city, and it has a red vibe for sure - city might match (if the author says its a village, then its a village), red matches\nD this is a city, and it has a red sign - city matches red matches less weakly, but still weakly\n\nAssuming C matches 'city' tag ranking would be:\n\nC, D, A with B excluded"
+    }
+  ],
+  "notes": [
+    "User judgments recorded: C > D > A if C matches the city tag; B is excluded for subject mismatch.",
+    "Subject eligibility is separate from color ranking in this case. B's red match does not compensate for not being a city. A and D remain eligible despite weak red matches.",
+    "This is an intent-elicitation case, not a test of existing subject tags. No City metadata has been assigned or verified; source filenames and folders do not establish eligibility.",
+    "Earlier red/dark/combination judgments on these images remain in their original cases; they are not transferred to the combined query.",
+    "All four images have appeared in earlier development reviews. Keep related image/query evidence together when establishing later held-out evaluation groups.",
+    "No originals or previews were altered, and no search method or scoring formula was used to generate this presentation.",
+    "The user judged A an unequivocal city match ('city 100%'); do not treat this as image-area coverage or a calibrated confidence number.",
+    "C's possible village identity is a conditional observation, not verified metadata. The comment about the author does not establish a universal metadata-authority policy.",
+    "No red-only ordering involving B was supplied. Earlier red-query rankings are not transferred.",
+    "The required city-tag interpretation is specific to this case; it does not define all natural-language subject requests as hard filters.",
+    "No numeric relevance grades, minimum red amount, cutoff or scoring formula was supplied."
+  ]
+}

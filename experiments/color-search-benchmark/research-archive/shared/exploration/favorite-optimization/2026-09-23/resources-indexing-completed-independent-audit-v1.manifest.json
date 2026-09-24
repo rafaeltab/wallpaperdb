@@ -1,0 +1,5 @@
+{
+  "auditSha256": "6bae977111499f009f0eeb78be45184f94a9e14df1109834065ed7c64dadbb15",
+  "reviewSourceSha256": "635d4ba59daa3456d678e82b60460a3e013050ce8ee80bccafc549e75f7fba7d",
+  "notes": "Independent standard-library calculations from archived observer prefix; no import of resource_summary helper, no services."
+}

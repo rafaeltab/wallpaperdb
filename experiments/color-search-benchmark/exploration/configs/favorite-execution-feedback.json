@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "label": "Favorite numeric execution refinements: real545 feedback",
+  "description": "Same 545 assets. Exact global OpenSearch ranking for each stored objective. The new rank18/rank27 methods preserve the favorite formula at indexed presets but change digit quantization and float32 arithmetic. Single-observer development evidence, not held-out population validation.",
+  "extraImageFiles": [
+    "evaluation/perceived-red-pagoda-001.json"
+  ],
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "method": "cutoff-shade-hue-all-levels",
+      "index": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-numeric",
+      "method": "favorite-utility-numeric",
+      "index": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-sorted",
+      "method": "favorite-utility-sorted",
+      "index": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-sorted-scored",
+      "method": "favorite-utility-sorted-scored",
+      "index": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-bounded",
+      "method": "favorite-utility-bounded",
+      "index": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    }
+  ]
+}

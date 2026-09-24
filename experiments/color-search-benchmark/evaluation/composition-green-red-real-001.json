@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "presentationVersion": 1,
+  "id": "composition-green-red-real-001",
+  "status": "user-judged",
+  "category": [
+    "Combinations",
+    "Perceived color"
+  ],
+  "use": "related development follow-up",
+  "exampleType": "natural-photographs",
+  "evaluationGroup": "green-red-specified-remainder",
+  "relatedCases": [
+    "composition-green-red-001",
+    "proportion-green-001",
+    "proportion-green-002",
+    "perceived-red-001"
+  ],
+  "query": {
+    "userText": "50% green, 50% red",
+    "intent": "Find images close to both whole-image named-color proportion targets; natural-image validation after the user questioned transfer from pure bands.",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 50
+      },
+      {
+        "colorName": "red",
+        "targetImagePercent": 50
+      }
+    ],
+    "unspecifiedRemainderPercent": 0,
+    "preciseHex": null,
+    "subjectConstraint": null
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/composition-green-red-real-001.html",
+    "presentation": "Four complete original photographs, unchanged source bytes, equal neutral frames with object-fit: contain and maximum height340px. No cropping; browser scaling only.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": false,
+    "randomization": "One Python secrets.SystemRandom sample of the four stable image IDs, persisted in this examples array. No expected relevance order used; refresh does not reshuffle.",
+    "judgmentFormat": "Brief impressions for A–D and preferred order; ties, uncertainty and none matching well are welcome. No numeric score or percentage estimate required.",
+    "selection": "Deliberately selected natural scenes featuring green/red variations, including additional colors. Visual selection only; no measured candidate percentages or assumed positive reference.",
+    "validation": "Four source SHA256 checksums and shared/worktree hard-link identities verified. Browser decoded dimensions match source metadata. Page and image URLs HTTP200; page also HTTP200 via local tailnet IP and zerotwo hostname. Desktop1280x1400/mobile390x844: four loaded complete images with object-fit: contain, stable A–D labels, no candidate percentages and no horizontal overflow. Desktop screenshot inspected; browser closed. Does not verify connectivity from a separate tailnet computer."
+  },
+  "examples": [
+    {
+      "filename": "corpus/evaluation/green-red-real-tulips.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Redtulips.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Redtulips.jpg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Redtulips.jpg&oldid=1116964383",
+      "originalPublication": "https://www.flickr.com/photos/evilerin/3472825850",
+      "title": "Red tulips on a field at the Skagit Valley Tulip Festival",
+      "author": "Evil Erin",
+      "license": "CC BY 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+      "sha256": "75dd9cb3844694f97ac67041eb3335b7206226f4bd20db1197b00a57008973e3",
+      "width": 3008,
+      "height": 2000,
+      "bytes": 2700033,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "A",
+      "wallpaperId": "evaluation-green-red-tulips",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Feels nicely 'red and green', but there is not enough red",
+        "wholeImageMatchRating": "Feels nicely 'red and green'",
+        "amountObservations": [
+          {
+            "colorName": "red",
+            "observation": "not enough red",
+            "perceivedImagePercent": null
+          }
+        ],
+        "colorQualityObservations": []
+      }
+    },
+    {
+      "filename": "corpus/evaluation/green-red-real-leaves.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_and_green_leaves.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Red_and_green_leaves.jpg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_and_green_leaves.jpg&oldid=700850586",
+      "title": "Red and green leaves",
+      "author": "Iwanjayz",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "sha256": "3ae3e24af1783fac04adf4eb03facf448503ae589f0dbda57329bee50db9ee1c",
+      "width": 3456,
+      "height": 2304,
+      "bytes": 3485161,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "B",
+      "wallpaperId": "evaluation-green-red-leaves",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "The red isn't strong enough",
+        "wholeImageMatchRating": null,
+        "amountObservations": [],
+        "colorQualityObservations": [
+          {
+            "colorName": "red",
+            "observation": "The red isn't strong enough",
+            "numericStrength": null,
+            "interpretation": "Preserve perceived strength language; no separate amount estimate or specific brightness/saturation cause supplied."
+          }
+        ]
+      }
+    },
+    {
+      "filename": "corpus/evaluation/green-red-real-tulip-field.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_Tulips_(205290827).jpeg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/11/Red_Tulips_%28205290827%29.jpeg",
+      "sourceRevision": "https://commons.wikimedia.org/w/index.php?title=File:Red_Tulips_(205290827).jpeg&oldid=1164769766",
+      "title": "Red Tulips",
+      "author": "Dana Hutchinson",
+      "license": "CC BY 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/3.0/",
+      "sha256": "ef3133f273312d74c57492947d8a97475be2e5ee7d726c4791afa6c75d7445da",
+      "width": 2048,
+      "height": 1365,
+      "bytes": 1137255,
+      "format": "jpeg",
+      "modifications": "None; original source bytes.",
+      "retrievedDate": "2026-09-16",
+      "label": "C",
+      "wallpaperId": "evaluation-green-red-tulip-field",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "This is not what I am looking for with this search",
+        "wholeImageMatchRating": "not what I am looking for with this search",
+        "amountObservations": [],
+        "colorQualityObservations": [],
+        "explicitMismatch": {
+          "querySpecific": true,
+          "reason": null,
+          "hardEligibilityExclusionSpecified": false
+        }
+      }
+    },
+    {
+      "filename": "corpus/wallpaper-082.jpg",
+      "thumbnail": "corpus/thumbnails/wallpaper-082.jpg",
+      "sourceUrl": "https://raw.githubusercontent.com/dharmx/walls/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourcePage": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/nature/a_close_up_of_red_leaves.jpg",
+      "sourceRepository": "https://github.com/dharmx/walls",
+      "sourceCommit": "6bf4d733ebf2b484a37c17d742eb47e5139e6a14",
+      "sourcePath": "nature/a_close_up_of_red_leaves.jpg",
+      "category": "nature",
+      "title": "a close up of red leaves",
+      "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690",
+      "width": 6000,
+      "height": 4000,
+      "bytes": 2193246,
+      "format": "jpeg",
+      "license": "unknown",
+      "label": "D",
+      "wallpaperId": "wallpaper-082",
+      "judgment": {
+        "source": "user-response-001",
+        "description": "Really good, would need brighter red and green to feel perfect",
+        "wholeImageMatchRating": "Really good",
+        "amountObservations": [],
+        "colorQualityObservations": [
+          {
+            "colorName": "red",
+            "observation": "would need brighter red to feel perfect",
+            "numericStrength": null
+          },
+          {
+            "colorName": "green",
+            "observation": "would need brighter green to feel perfect",
+            "numericStrength": null
+          }
+        ],
+        "idealMatch": false
+      },
+      "author": null
+    }
+  ],
+  "judgments": [
+    {
+      "id": "natural-green-red-order-001",
+      "source": "user-response-001",
+      "type": "whole-image-composition-order",
+      "orderedLabels": [
+        "D",
+        "A",
+        "B",
+        "C"
+      ],
+      "orderedWallpaperIds": [
+        "wallpaper-082",
+        "evaluation-green-red-tulips",
+        "evaluation-green-red-leaves",
+        "evaluation-green-red-tulip-field"
+      ],
+      "tiesReported": false,
+      "scope": "Relative preference in this four-photo presentation for50%green50%red. D is explicitly really good with a brightness limitation; C explicitly mismatches the query. No numerical grades, score gaps or hard exclusion rule supplied."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "D",
+      "over": "A",
+      "source": "natural-green-red-order-001",
+      "derivation": "Adjacent relation derived from one supplied order, not an independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "B",
+      "source": "natural-green-red-order-001",
+      "derivation": "Adjacent relation derived from one supplied order, not an independent annotation."
+    },
+    {
+      "preferred": "B",
+      "over": "C",
+      "source": "natural-green-red-order-001",
+      "derivation": "Adjacent relation derived from one supplied order, not an independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "recordedDate": "2026-09-17",
+      "text": "A Feels nicely 'red and green', but there is not enough red\nB The red isn't strong enough\nC This is not what I am looking for with this search\nD Really good, would need brighter red and green to feel perfect\n\nD, A, B, C"
+    }
+  ],
+  "notes": [
+    "This case follows an explicit realism caveat on composition-green-red-001. The constructed B>D>E>F>A>C order remains recorded, with uncertain transfer, especially A vs E.",
+    "Different scenes cannot isolate a causal effect of additional blue, shade quality, proportion, subject, contrast or spatial arrangement. This does not exactly recreate the stripe A/E contrast.",
+    "Do not treat visual selection notes, source titles, old sampling metadata or past single-red judgments as relevance labels for this query.",
+    "The user supplied D>A>B>C and qualitative whole-image assessments. No measured color percentages, calibrated numeric scores, score gaps or exact50/50 composition were supplied.",
+    "Keep related composition cases and overlapping images together in any later evaluation split. This is development evidence, not held-out validation.",
+    "The four images are original source bytes. Browser display scales the complete image; no local image generation, recoloring, cropping or resampling was performed.",
+    "Shared storage is /home/rafaeltab/.local/share/wallpaperdb/color-evaluation; corpus URLs expose hard links. The original100-image manifest and historical indexes remain unchanged.",
+    "The previously authorized partial-composition stripe query is deferred by assistant workflow after the user questioned realism, not cancelled by the user.",
+    "No algorithm prototypes, benchmarks or OpenSearch changes are part of this review.",
+    "A's insufficient-red amount observation is distinct from B's insufficient-red strength observation and D's wish for brighter red and green. Do not collapse them into one numeric membership value.",
+    "C is explicitly not what the user seeks for this query, beyond merely ranking last. The user did not state why, impose a general blue veto, require exclusion from all results or supply a hard relevance threshold.",
+    "D's brightness limitation does not imply that making every color brighter always improves relevance. These scenes do not isolate saturation, luminance, hue, proportion or context.",
+    "The new natural-photo preference does not settle or overturn the constructed A/E tradeoff; labels refer to different images in the two cases."
+  ],
+  "positiveReference": {
+    "label": "D",
+    "wallpaperId": "wallpaper-082",
+    "source": "user-response-001",
+    "userDescription": "Really good, would need brighter red and green to feel perfect",
+    "scope": "Qualitative positive reference for this query with an explicit desire for brighter red and green. Neither an ideal match nor verified50/50 coverage."
+  }
+}

@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 3,
+  "id": "proportion-green-002",
+  "status": "user-judged",
+  "category": [
+    "Combinations",
+    "Perceived color"
+  ],
+  "use": "related development follow-up",
+  "exampleType": "controlled-svg-composition",
+  "evaluationGroup": "green-target-amount",
+  "relatedCase": "proportion-green-001",
+  "query": {
+    "userText": "40% green; the rest doesn’t matter",
+    "intent": "Aim close to 40% total green. Gather amount preferences and their perceived strength, holding source shades and background fixed.",
+    "specifiedPercentages": [
+      {
+        "colorName": "green",
+        "targetImagePercent": 40
+      }
+    ],
+    "unspecifiedRemainderPercent": 60,
+    "preciseHex": null,
+    "subjectConstraint": null,
+    "priorEvidence": {
+      "case": "proportion-green-001",
+      "source": "user-response-001",
+      "summary": "The user preferred20% over60% of the same green for this40% query and explained that40% feels like less than half. This does not set expected outcomes here."
+    }
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/proportion-green-002.html?v=2",
+    "presentation": "Six whole1600x900 SVGs with identical source colors and centered full-height bands. Equal16:9 sizes on neutral #202020 page. Candidate areas hidden; only the requested40% remains visible.",
+    "selection": "Amounts29,31,39,41,49,51 form three equal-absolute-error under/over pairs around40%, including comparisons below and across half. No expected order assigned.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": false,
+    "percentageLabel": null,
+    "percentageDisclosureReason": "User requested removal of candidate percentages and a shuffle to reduce bias. Only the query target remains visible.",
+    "randomization": "One SystemRandom shuffle, rejecting fixed points so every A–F label changes. This order is persisted for reliable annotation; refreshes do not reshuffle. New-label mapping is recorded in examples.",
+    "judgmentFormat": "Optional ranking plus descriptions of practically interchangeable examples and substantial differences. Preserve ties and uncertainty; no numerical score scale required.",
+    "priorHypothesisVisible": "The user has already explained a less-than-half preference in the conversation; the sheet itself does not introduce a cutoff hypothesis.",
+    "validation": "Version2 desktop1280/mobile390 browser checks: six loaded fixtures, A–F labels, no candidate percentages or amount elements, only revision2 alias links, no overflow. Read-only audit verified label/source/JSON/design mappings, aliases byte-identical to source hashes, and every label changed. Browser closed."
+  },
+  "construction": {
+    "createdDate": "2026-09-16",
+    "canvas": {
+      "width": 1600,
+      "height": 900
+    },
+    "background": "#707070",
+    "accentHex": "#22BB44",
+    "geometry": "Centered full-height band. Only width and corresponding centered x offset change.",
+    "rendering": "Plain opaque SVG rect fills. No gradients, masks, filters, textures, external assets or raster-image edits."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "proportion-green-002-f",
+      "filename": "evaluation/fixtures/proportion-green-002-f.svg",
+      "sha256": "63a075f1e0e892b163ba2d34a3f141db4c3507119b446e4d6bc1e67fe3188766",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 39,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 61,
+        "accentRect": {
+          "x": 488,
+          "y": 0,
+          "width": 624,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "right amount of green",
+        "amountObservation": "right amount of green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-a.svg"
+    },
+    {
+      "label": "B",
+      "wallpaperId": "proportion-green-002-a",
+      "filename": "evaluation/fixtures/proportion-green-002-a.svg",
+      "sha256": "15046a93b0ab8cf242756c4545febccfa61373fdc1f561457e6bd4cb29e5c2b9",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 49,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 51,
+        "accentRect": {
+          "x": 408,
+          "y": 0,
+          "width": 784,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "a bit too much green",
+        "amountObservation": "a bit too much green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-b.svg"
+    },
+    {
+      "label": "C",
+      "wallpaperId": "proportion-green-002-d",
+      "filename": "evaluation/fixtures/proportion-green-002-d.svg",
+      "sha256": "4a45b9420bb2cad18f41bf28e5d4755a385aaebfd996989d787e98fdc0f14911",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 31,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 69,
+        "accentRect": {
+          "x": 552,
+          "y": 0,
+          "width": 496,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "Slightly too little green",
+        "amountObservation": "Slightly too little green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-c.svg"
+    },
+    {
+      "label": "D",
+      "wallpaperId": "proportion-green-002-e",
+      "filename": "evaluation/fixtures/proportion-green-002-e.svg",
+      "sha256": "2aa3435e1e5889fd2f9a1b3948e9a5c4d392ae33273383342be121565fd75be4",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 51,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 49,
+        "accentRect": {
+          "x": 392,
+          "y": 0,
+          "width": 816,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "too much green",
+        "amountObservation": "too much green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-d.svg"
+    },
+    {
+      "label": "E",
+      "wallpaperId": "proportion-green-002-c",
+      "filename": "evaluation/fixtures/proportion-green-002-c.svg",
+      "sha256": "437343316e6cb05dc78cab96f6905aa88e6347fc61f5b7d2dce0af57070322e2",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 41,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 59,
+        "accentRect": {
+          "x": 472,
+          "y": 0,
+          "width": 656,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "almost right amount of green",
+        "amountObservation": "almost right amount of green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-e.svg"
+    },
+    {
+      "label": "F",
+      "wallpaperId": "proportion-green-002-b",
+      "filename": "evaluation/fixtures/proportion-green-002-b.svg",
+      "sha256": "50af5bd400b3b15fcd948ea32565e4e0745b8d76ce49371c4e422ed958a89023",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#22BB44",
+        "accentAreaPercent": 29,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 71,
+        "accentRect": {
+          "x": 568,
+          "y": 0,
+          "width": 464,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "presentationVersion": 2,
+        "description": "too little green",
+        "amountObservation": "too little green",
+        "perceivedGreenAreaPercent": null,
+        "wholeImageMatchRating": null
+      },
+      "presentationFilename": "evaluation/fixtures/proportion-green-002-r2-f.svg"
+    }
+  ],
+  "comparisonDesign": {
+    "equalGeometricErrorPairs": [
+      {
+        "labels": [
+          "A",
+          "E"
+        ],
+        "bandPercents": [
+          39,
+          41
+        ],
+        "absoluteErrorPercentagePoints": 1
+      },
+      {
+        "labels": [
+          "C",
+          "B"
+        ],
+        "bandPercents": [
+          31,
+          49
+        ],
+        "absoluteErrorPercentagePoints": 9
+      },
+      {
+        "labels": [
+          "F",
+          "D"
+        ],
+        "bandPercents": [
+          29,
+          51
+        ],
+        "absoluteErrorPercentagePoints": 11
+      }
+    ],
+    "gapComparisons": [
+      {
+        "labels": [
+          "B",
+          "D"
+        ],
+        "bandPercents": [
+          49,
+          51
+        ],
+        "increaseInAbsoluteTargetErrorPercentagePoints": 2
+      },
+      {
+        "labels": [
+          "C",
+          "F"
+        ],
+        "bandPercents": [
+          31,
+          29
+        ],
+        "increaseInAbsoluteTargetErrorPercentagePoints": 2
+      }
+    ],
+    "scope": "Geometry-based opportunities for human comparison, not target relevance scores, pairwise preferences or independent cases."
+  },
+  "judgments": [
+    {
+      "id": "green-closer-amount-order-001",
+      "source": "user-response-001",
+      "presentationVersion": 2,
+      "type": "named-color-proportion-result-preference",
+      "status": "tentative",
+      "certaintyDescription": "something like that?",
+      "orderedLabels": [
+        "A",
+        "E",
+        "C",
+        "B",
+        "F",
+        "D"
+      ],
+      "orderedWallpaperIds": [
+        "proportion-green-002-f",
+        "proportion-green-002-c",
+        "proportion-green-002-d",
+        "proportion-green-002-a",
+        "proportion-green-002-b",
+        "proportion-green-002-e"
+      ],
+      "tiesReported": false,
+      "scope": "The user supplies a complete order but explicitly qualifies it. Preserve as a tentative overall ordering, not firm pairwise ground truth. No numeric confidence, score gaps, interchangeability groups or rejection labels supplied."
+    }
+  ],
+  "differenceStrengthJudgments": [],
+  "pairwisePreferences": [
+    {
+      "preferred": "A",
+      "over": "E",
+      "source": "green-closer-amount-order-001",
+      "presentationVersion": 2,
+      "status": "tentative",
+      "derivation": "Adjacent relation from the single tentative ordering; not an independent or firmly confirmed annotation."
+    },
+    {
+      "preferred": "E",
+      "over": "C",
+      "source": "green-closer-amount-order-001",
+      "presentationVersion": 2,
+      "status": "tentative",
+      "derivation": "Adjacent relation from the single tentative ordering; not an independent or firmly confirmed annotation."
+    },
+    {
+      "preferred": "C",
+      "over": "B",
+      "source": "green-closer-amount-order-001",
+      "presentationVersion": 2,
+      "status": "tentative",
+      "derivation": "Adjacent relation from the single tentative ordering; not an independent or firmly confirmed annotation."
+    },
+    {
+      "preferred": "B",
+      "over": "F",
+      "source": "green-closer-amount-order-001",
+      "presentationVersion": 2,
+      "status": "tentative",
+      "derivation": "Adjacent relation from the single tentative ordering; not an independent or firmly confirmed annotation."
+    },
+    {
+      "preferred": "F",
+      "over": "D",
+      "source": "green-closer-amount-order-001",
+      "presentationVersion": 2,
+      "status": "tentative",
+      "derivation": "Adjacent relation from the single tentative ordering; not an independent or firmly confirmed annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "presentationVersion": 2,
+      "text": "A right amount of green\nB a bit too much green\nC Slightly too little green\nD too much green\nE almost right amount of green\nF too little green\n\nA, E, C, B, F, D\n\nsomething like that?"
+    }
+  ],
+  "notes": [
+    "User judged the shuffled presentation2. Tentative order A > E > C > B > F > D, qualified by 'something like that?'. Preserve uncertainty without inventing ties or numerical confidence.",
+    "Ranking alone cannot establish how strong a preference is or whether a penalty changes smoothly or abruptly.",
+    "Do not infer a50% hard cutoff, discontinuity or universal undershoot preference from this single informed follow-up.",
+    "Exactly50% is not shown; no behavior at that value may be filled in.",
+    "All six source bands share the same green as the previous vivid-green fixtures; no new color-quality ranking is presumed.",
+    "There is no new40% candidate. Do not invent cross-case ordering against the earlier40% reference.",
+    "Same-band-source-shade geometry isolates amount changes but does not prove perceived color quality is independent of area or context.",
+    "Version2 hides candidate areas and relabels a persisted shuffle at the user's request. Prior exposure to version1 and the hypothesis remains; do not describe this as an independent blind review.",
+    "Practically interchangeable results need not receive equal model scores; preserve user confidence and preference strength without numerical invention.",
+    "Gray remainder is a controlled case condition, not an additional query requirement. No claims about other remainders or targets follow.",
+    "All variants belong to green-target-amount development group, including the previous case. Natural-image validation remains needed.",
+    "Right/almost right, slightly too little, a bit too much and too much/little remain the user's qualitative amount observations. No measured perceived-area values supplied.",
+    "No explicit interchangeable groups or substantial pairwise gaps were identified; differenceStrengthJudgments remains empty.",
+    "All three equal-geometric-error comparisons favor the under-target example in this tentative order, including pairs below half. This is suggestive case evidence, not a universal undershoot rule.",
+    "B ranks above F, so an under-target result is not always preferred to an over-target result.",
+    "B49% versus D51% differs in absolute target error as well as being below/above half; order alone cannot establish a50% discontinuity or a large score gap.",
+    "Do not expose hidden source percentages or remapping in the user-facing response unless requested. Presentation2 remains unchanged for possible revisions."
+  ],
+  "presentationHistory": [
+    {
+      "caseVersion": 1,
+      "candidatePercentagesVisible": true,
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "proportion-green-002-a",
+          "filename": "evaluation/fixtures/proportion-green-002-a.svg",
+          "sha256": "15046a93b0ab8cf242756c4545febccfa61373fdc1f561457e6bd4cb29e5c2b9",
+          "accentAreaPercent": 49
+        },
+        {
+          "label": "B",
+          "wallpaperId": "proportion-green-002-b",
+          "filename": "evaluation/fixtures/proportion-green-002-b.svg",
+          "sha256": "50af5bd400b3b15fcd948ea32565e4e0745b8d76ce49371c4e422ed958a89023",
+          "accentAreaPercent": 29
+        },
+        {
+          "label": "C",
+          "wallpaperId": "proportion-green-002-c",
+          "filename": "evaluation/fixtures/proportion-green-002-c.svg",
+          "sha256": "437343316e6cb05dc78cab96f6905aa88e6347fc61f5b7d2dce0af57070322e2",
+          "accentAreaPercent": 41
+        },
+        {
+          "label": "D",
+          "wallpaperId": "proportion-green-002-d",
+          "filename": "evaluation/fixtures/proportion-green-002-d.svg",
+          "sha256": "4a45b9420bb2cad18f41bf28e5d4755a385aaebfd996989d787e98fdc0f14911",
+          "accentAreaPercent": 31
+        },
+        {
+          "label": "E",
+          "wallpaperId": "proportion-green-002-e",
+          "filename": "evaluation/fixtures/proportion-green-002-e.svg",
+          "sha256": "2aa3435e1e5889fd2f9a1b3948e9a5c4d392ae33273383342be121565fd75be4",
+          "accentAreaPercent": 51
+        },
+        {
+          "label": "F",
+          "wallpaperId": "proportion-green-002-f",
+          "filename": "evaluation/fixtures/proportion-green-002-f.svg",
+          "sha256": "63a075f1e0e892b163ba2d34a3f141db4c3507119b446e4d6bc1e67fe3188766",
+          "accentAreaPercent": 39
+        }
+      ],
+      "status": "Superseded before relevance judgments were received."
+    }
+  ],
+  "presentationChanges": [
+    {
+      "caseVersion": 2,
+      "author": "user",
+      "request": "Can you remove the percentages and shuffle them so it is less biased?",
+      "change": "Hide candidate amounts, shuffle and relabel A–F, and use revision-specific full-size aliases so link filenames do not reveal the original label. Keep requested40% query visible. Original source files and hashes unchanged."
+    }
+  ],
+  "presentationVersion": 2
+}

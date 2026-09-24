@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" shape-rendering="crispEdges">
+  <title>70% red · 30% middle gray</title>
+  <rect x="0" y="0" width="700" height="600" fill="#FF0000"/>
+  <rect x="700" y="0" width="300" height="600" fill="#808080"/>
+</svg>

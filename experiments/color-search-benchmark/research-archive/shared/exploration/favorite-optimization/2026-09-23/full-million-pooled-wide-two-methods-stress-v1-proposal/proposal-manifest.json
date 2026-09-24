@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "createdAt": "2026-09-23T20:10:43.057354+00:00",
+  "preparedOnly": true,
+  "servicesCalled": false,
+  "testsRun": false,
+  "runtimeEdits": false,
+  "sourceCandidateConfig": {
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-retry-v1-proposal/favorite-full-million-four-methods-pooled.json",
+    "sha256": "1ab237ca5d8fe6835365e21a947332866af2ca6600a0a7909360d4d204e629bd"
+  },
+  "candidateIds": [
+    "favorite-utility-numeric-docvalues",
+    "favorite-utility-bounded-pooled-delete"
+  ],
+  "subsetIdentity": "Exact original candidate objects copied unchanged; runtime validates against actual primary artifact before load.",
+  "preservedEarlierProposal": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-bounded-wide-stress-v1-proposal/stress-plan.json",
+  "pins": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1-proposal/favorite-numeric-and-bounded-pooled.json",
+      "sha256": "a5a9161990cf752ab4a8c3206377b2074d739c8eb247d4450bafbd6a88ea72cf"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-wide-two-methods-stress-v1-proposal/stress-plan.json",
+      "sha256": "7266bfda14c4163d3d558426f41b107cffd9bb22522df1d923207433eb2c15f2"
+    }
+  ],
+  "runtimeSourcePinReference": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-pooled-retry-v1-proposal/source-config-plan-pins-v2.json",
+  "runtimePinNote": "Reference only; root/current harness verifies unchanged source graph at launch."
+}

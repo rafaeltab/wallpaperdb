@@ -1,0 +1,58 @@
+{
+  "runId": "2026-09-23T22-53-05.476Z-115e5722",
+  "comparisons": [
+    {
+      "candidate": "linked-3-level-0",
+      "reference": "original-linked-pair-0",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.6833333333333335
+    },
+    {
+      "candidate": "linked-3-level-1",
+      "reference": "original-linked-pair-2",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7035714285714285
+    },
+    {
+      "candidate": "linked-3-level-2",
+      "reference": "original-linked-pair-4",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7226190476190476
+    },
+    {
+      "candidate": "linked-5-level-0",
+      "reference": "original-linked-pair-0",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.6833333333333335
+    },
+    {
+      "candidate": "linked-5-level-1",
+      "reference": "original-linked-pair-1",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7095238095238096
+    },
+    {
+      "candidate": "linked-5-level-2",
+      "reference": "original-linked-pair-2",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7035714285714285
+    },
+    {
+      "candidate": "linked-5-level-3",
+      "reference": "original-linked-pair-3",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7023809523809524
+    },
+    {
+      "candidate": "linked-5-level-4",
+      "reference": "original-linked-pair-4",
+      "allCaseAccuracyIdentical": true,
+      "agreement": 0.7226190476190476
+    }
+  ],
+  "allPassed": true,
+  "supportedCases": 28,
+  "assessedPairs": 184,
+  "unsupportedCases": 10,
+  "scope": "Matched shared real-image cases only; retained unsupported records. Not new human judgments or scale performance."
+}

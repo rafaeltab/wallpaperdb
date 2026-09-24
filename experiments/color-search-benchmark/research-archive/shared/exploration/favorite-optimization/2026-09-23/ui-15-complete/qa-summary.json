@@ -1,0 +1,356 @@
+{
+  "errors": [],
+  "capturedAt": "2026-09-23T15:38:31.717Z",
+  "initial15": {
+    "count": 15,
+    "cards": [
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24,
+      24
+    ],
+    "status": "Compared 15 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+  },
+  "checks": [
+    {
+      "quality": 0,
+      "cutoff": 0,
+      "preset": "red",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0,
+      "cutoff": 1,
+      "preset": "green40",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0,
+      "cutoff": 3,
+      "preset": "redgreen",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0.5,
+      "cutoff": 0,
+      "preset": "rainbow",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0.5,
+      "cutoff": 1,
+      "preset": "grayred",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0.5,
+      "cutoff": 3,
+      "preset": "dark",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 1,
+      "cutoff": 0,
+      "preset": "trans",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 1,
+      "cutoff": 1,
+      "preset": "redgreen",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 1,
+      "cutoff": 3,
+      "preset": "rainbow",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    },
+    {
+      "quality": 0.5,
+      "cutoff": 1,
+      "preset": "red",
+      "checks": [
+        {
+          "parent": "favorite-utility-numeric",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-rank27",
+          "identicalHits": true,
+          "count": 24
+        },
+        {
+          "parent": "favorite-utility-sorted",
+          "identicalHits": true,
+          "count": 24
+        }
+      ],
+      "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+    }
+  ],
+  "desktop": {
+    "width": 1440,
+    "pageWidth": 1440,
+    "visibleColumns": [
+      "Precomputed float",
+      "Indexed split 27-bit",
+      "Native numeric sort",
+      "Precomputed float \u00b7 lean fetch",
+      "Indexed split 27-bit \u00b7 lean fetch",
+      "Native numeric sort \u00b7 lean fetch"
+    ],
+    "status": "Compared 6 methods in sequence. Click a wallpaper to inspect it. \u201cref\u201d shows its rank in the visible reference results."
+  },
+  "detail": {
+    "open": true,
+    "title": "a red and orange sky with clouds",
+    "details": "Precomputed float \u00b7 lean fetch \u00b7 rank 2 \u00b7 score 0.3575160 \u00b7 wallpaper-037",
+    "naturalWidth": 1920,
+    "source": "https://github.com/dharmx/walls/blob/6bf4d733ebf2b484a37c17d742eb47e5139e6a14/digital/a_red_and_orange_sky_with_clouds.png",
+    "sourceHidden": false,
+    "fullImage": "http://127.0.0.1:8228/api/images/wallpaper-037"
+  },
+  "mobile": {
+    "viewport": 390,
+    "pageWidth": 390,
+    "dialogWidth": 366.59375,
+    "modalClosed": true
+  },
+  "failure": {
+    "injected": true,
+    "visible": true,
+    "status": "0/1 methods completed. Unavailable methods show their error above."
+  },
+  "live": {
+    "request": {
+      "methodId": "favorite-utility-sorted-docvalues",
+      "query": {
+        "mode": "proportions",
+        "targets": [
+          {
+            "color": "#22cc44",
+            "percent": 40
+          }
+        ]
+      },
+      "parameters": {
+        "bucketCount": 256,
+        "qualityInfluence": 0.5,
+        "cutoffBlendExponent": 1
+      },
+      "limit": 24
+    },
+    "status": 200,
+    "count": 24
+  },
+  "trafficStoppedAt": "2026-09-23T15:40:08.635Z",
+  "consoleErrors": [],
+  "consoleMessages": [],
+  "limitations": [
+    "QA checks controls, returned IDs/scores and layout; timings are not capacity evidence.",
+    "Initial15-column results were inspected before response capture; subsequent six-column comparisons retain raw API responses."
+  ],
+  "passed": true,
+  "browserClosed": true,
+  "methods": 15,
+  "capturedResponses": 61,
+  "exactParentComparisons": 30,
+  "hitOccurrences": 1464,
+  "rawEvidenceFile": "browser-capture.json",
+  "rawBrowserOutputSha256": "d964d996db885ac9b4659f9c6798d4e900f7035c726139e7d3db1333a5ccb131",
+  "fixtureCheck": {
+    "fixtureIds": [
+      "composition-green-red-001-a",
+      "composition-green-red-001-b",
+      "composition-green-red-001-c",
+      "composition-green-red-001-d",
+      "composition-green-red-001-e",
+      "composition-green-red-001-f",
+      "precision-shade-001-a",
+      "precision-shade-001-b",
+      "precision-shade-001-c",
+      "precision-shade-001-d",
+      "proportion-green-001-a",
+      "proportion-green-001-b",
+      "proportion-green-001-c",
+      "proportion-green-001-d",
+      "proportion-green-001-e",
+      "proportion-green-001-f",
+      "proportion-green-002-a",
+      "proportion-green-002-b",
+      "proportion-green-002-c",
+      "proportion-green-002-d",
+      "proportion-green-002-e",
+      "proportion-green-002-f"
+    ],
+    "hitOccurrencesChecked": 1464,
+    "fixtureLeaks": 0,
+    "allScoresFinite": true
+  }
+}

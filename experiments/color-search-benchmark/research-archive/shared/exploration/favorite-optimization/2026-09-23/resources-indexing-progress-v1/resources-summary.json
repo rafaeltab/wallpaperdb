@@ -1,0 +1,670 @@
+{
+  "schemaVersion": 1,
+  "experiment": "favorite-resource-attribution",
+  "generatedAt": "2026-09-23T16:56:08.500402+00:00",
+  "fileOnly": true,
+  "sourceSha256": "3d0edee7c5c7f9f601a433bc4bd0dc4d0cf7b3e85ea609cea2c6bf811e5180e1",
+  "observer": {
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/resources-v3/resources.jsonl",
+    "completePrefixSha256": "c5485dca69ecb17d9ff315882743bba9b1a31c5c3adcd6c13a5ffd9b749f3113",
+    "completePrefixBytes": 29426115,
+    "ignoredIncompleteTailBytes": 0,
+    "sampleCount": 6254,
+    "firstAt": "2026-09-23T13:27:08.355023+00:00",
+    "lastAt": "2026-09-23T16:56:06.238801+00:00",
+    "metadataSha256": "e638bcfa6db1f26be93ea574c734d49b2d296bf92e70edecd8a11685e3efa2a4",
+    "sourceSha256": "d0be334e4b5871c7af24be2ef4e7fc8181d8df6c90a37348412c5f3d766a9e37",
+    "observedPid": 480753,
+    "cgroup": "/sys/fs/cgroup/system.slice/docker-8e048ff78dd161a8a22f4f045309296477e357fa764be0e7aae0feb2dd6d4ad5.scope",
+    "intervalSeconds": 2.0
+  },
+  "buildStatus": {
+    "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-build-v1/status.json",
+    "sha256": "1767a585f555685a68a24a81bc5b5123f8778618ef3baab3f8874ddb84eda5e4"
+  },
+  "indexing": [
+    {
+      "id": "points-full-1m-index",
+      "kind": "indexing",
+      "interval": {
+        "requestedStart": "2026-09-23T15:55:51.514553+00:00",
+        "requestedEnd": "2026-09-23T16:56:07.819193+00:00",
+        "phaseComplete": false,
+        "samples": 1807,
+        "firstObservedAt": "2026-09-23T15:55:52.627514+00:00",
+        "lastObservedAt": "2026-09-23T16:56:06.238801+00:00",
+        "observedSeconds": 3613.6112871170044,
+        "requestedSeconds": 3616.304639816284,
+        "unobservedStartSeconds": 1.1129608154296875,
+        "unobservedEndSeconds": 1.5803918838500977,
+        "fractionCoveredByCounterWindow": 0.9992552196323216,
+        "maximumSampleGapSeconds": 2.005122184753418
+      },
+      "cgroupCpu": {
+        "usage_usec": {
+          "delta": 8578344898,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "user_usec": {
+          "delta": 8169435290,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "system_usec": {
+          "delta": 408909607,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "nr_periods": {
+          "delta": 36113,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "nr_throttled": {
+          "delta": 858,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "throttled_usec": {
+          "delta": 231914191,
+          "valid": true,
+          "missingSamples": 0,
+          "counterResets": 0
+        },
+        "meanCores": 2.3738980804556697,
+        "quotaCores": 8.0,
+        "meanFractionOfQuota": 0.2967372600569587,
+        "quotaValues": [
+          "800000 100000"
+        ],
+        "throttledPeriodFraction": 0.02375875723423698
+      },
+      "cgroupMemory": {
+        "memoryChargeBytes": {
+          "first": 5416853504.0,
+          "last": 7619473408.0,
+          "sampledMinimum": 5416853504.0,
+          "sampledMaximum": 12884901888.0,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "swapChargeBytes": {
+          "first": 1038491648.0,
+          "last": 889356288.0,
+          "sampledMinimum": 800182272.0,
+          "sampledMaximum": 1038491648.0,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "cgroupLifetimePeakBytes": {
+          "first": 12194643968.0,
+          "last": 12890075136.0,
+          "sampledMinimum": 12194643968.0,
+          "sampledMaximum": 12890075136.0,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "limitBytes": {
+          "first": 12884901888.0,
+          "last": 12884901888.0,
+          "sampledMinimum": 12884901888.0,
+          "sampledMaximum": 12884901888.0,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "anonBytes": {
+          "first": 4648906752,
+          "last": 4893843456,
+          "sampledMinimum": 4648906752,
+          "sampledMaximum": 4948140032,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "fileBytes": {
+          "first": 704688128,
+          "last": 2530553856,
+          "sampledMinimum": 704688128,
+          "sampledMaximum": 7874826240,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "kernelBytes": {
+          "first": 53837824,
+          "last": 186798080,
+          "sampledMinimum": 53145600,
+          "sampledMaximum": 297205760,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "file_mappedBytes": {
+          "first": 159203328,
+          "last": 144330752,
+          "sampledMinimum": 1474560,
+          "sampledMaximum": 6111694848,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "file_dirtyBytes": {
+          "first": 806912,
+          "last": 33734656,
+          "sampledMinimum": 806912,
+          "sampledMaximum": 1161564160,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "file_writebackBytes": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 27979776,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "shmemBytes": {
+          "first": 0,
+          "last": 0,
+          "sampledMinimum": 0,
+          "sampledMaximum": 0,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "swapcachedBytes": {
+          "first": 6307840,
+          "last": 4362240,
+          "sampledMinimum": 847872,
+          "sampledMaximum": 7966720,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "events": {
+          "high": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "low": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "max": {
+            "delta": 69297,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "oom": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "oom_group_kill": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "oom_kill": {
+            "delta": 0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "sock_throttled": {
+            "delta": 652967,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          }
+        },
+        "activityCounters": {
+          "pgfault": {
+            "delta": 2828328,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "pgmajfault": {
+            "delta": 83400,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "pgscan": {
+            "delta": 44964866,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "pgsteal": {
+            "delta": 35171218,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "pswpin": {
+            "delta": 56671,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "pswpout": {
+            "delta": 53845,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "workingset_refault_anon": {
+            "delta": 94877,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "workingset_refault_file": {
+            "delta": 20441899,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          }
+        }
+      },
+      "cgroupIoByDevice": {
+        "252:0": {
+          "rbytes": {
+            "delta": 83974111232.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "wbytes": {
+            "delta": 345226022912.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "rios": {
+            "delta": 789935.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "wios": {
+            "delta": 435620.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "dbytes": {
+            "delta": 0.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "dios": {
+            "delta": 0.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          }
+        },
+        "259:0": {
+          "rbytes": {
+            "delta": 83974111232.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "wbytes": {
+            "delta": 345226022912.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "rios": {
+            "delta": 789935.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "wios": {
+            "delta": 2937661.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "dbytes": {
+            "delta": 0.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          },
+          "dios": {
+            "delta": 0.0,
+            "valid": true,
+            "missingSamples": 0,
+            "counterResets": 0
+          }
+        }
+      },
+      "cgroupPressure": {
+        "cpu": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 13029695.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.00360572678263779,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.07,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 1.33,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 11792550.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.003263369815686037,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.07,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 1.31,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        },
+        "memory": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 2544179.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.0007040544203164104,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.04,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 0.87,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 2542154.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.0007034940390692022,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.04,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 0.87,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        },
+        "io": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 32805459.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.00907830322452106,
+            "avg10Percent": {
+              "first": 0.54,
+              "last": 0.53,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 3.32,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 32279371.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.008932718113616749,
+            "avg10Percent": {
+              "first": 0.54,
+              "last": 0.53,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 3.32,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        }
+      },
+      "observedEntrypointProcessMemory": {
+        "VmRSS": {
+          "first": 1974272,
+          "last": 1974272,
+          "sampledMinimum": 1974272,
+          "sampledMaximum": 1974272,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "VmHWM": {
+          "first": 3956736,
+          "last": 3956736,
+          "sampledMinimum": 3956736,
+          "sampledMaximum": 3956736,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "RssAnon": {
+          "first": 8192,
+          "last": 8192,
+          "sampledMinimum": 8192,
+          "sampledMaximum": 8192,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "RssFile": {
+          "first": 1966080,
+          "last": 1966080,
+          "sampledMinimum": 1966080,
+          "sampledMaximum": 1966080,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "VmSwap": {
+          "first": 888832,
+          "last": 888832,
+          "sampledMinimum": 888832,
+          "sampledMaximum": 888832,
+          "validSamples": 1807,
+          "missingSamples": 0
+        }
+      },
+      "hostMemoryBytes": {
+        "MemTotal": {
+          "first": 30637961216,
+          "last": 30637961216,
+          "sampledMinimum": 30637961216,
+          "sampledMaximum": 30637961216,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "MemAvailable": {
+          "first": 12900511744,
+          "last": 12796375040,
+          "sampledMinimum": 11258191872,
+          "sampledMaximum": 13160804352,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "SwapTotal": {
+          "first": 8589930496,
+          "last": 8589930496,
+          "sampledMinimum": 8589930496,
+          "sampledMaximum": 8589930496,
+          "validSamples": 1807,
+          "missingSamples": 0
+        },
+        "SwapFree": {
+          "first": 499499008,
+          "last": 1064960,
+          "sampledMinimum": 0,
+          "sampledMaximum": 683163648,
+          "validSamples": 1807,
+          "missingSamples": 0
+        }
+      },
+      "hostPressure": {
+        "cpu": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 17462130.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.004832321080647154,
+            "avg10Percent": {
+              "first": 0.18,
+              "last": 0.09,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 1.74,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 0.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.0,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.0,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 0.0,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        },
+        "memory": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 3515243.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.0009727783983109361,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.03,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 1.08,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 3492929.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.0009666034120639228,
+            "avg10Percent": {
+              "first": 0.0,
+              "last": 0.03,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 1.08,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        },
+        "io": {
+          "some": {
+            "totalMicroseconds": {
+              "delta": 31590464.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.008742075859853583,
+            "avg10Percent": {
+              "first": 1.81,
+              "last": 0.5,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 2.45,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          },
+          "full": {
+            "totalMicroseconds": {
+              "delta": 30822719.0,
+              "valid": true,
+              "missingSamples": 0,
+              "counterResets": 0
+            },
+            "fractionOfObservedWallTime": 0.008529616649662074,
+            "avg10Percent": {
+              "first": 1.81,
+              "last": 0.5,
+              "sampledMinimum": 0.0,
+              "sampledMaximum": 2.45,
+              "validSamples": 1807,
+              "missingSamples": 0
+            }
+          }
+        }
+      }
+    }
+  ],
+  "campaigns": [],
+  "limitations": [
+    "Cgroup observations include all processes in the OpenSearch container, indexing, merges and background work. Phase boundaries provide temporal attribution, not a causal allocation to one method.",
+    "memory.current is the cgroup memory charge; anon is not JVM heap, and file is filesystem cache including mapped pages. file_mapped/dirty/writeback are subsets, not additive categories. Swap is reported separately.",
+    "The observed /proc PID is the container entrypoint, not the JVM. Its RSS and lifetime VmHWM do not measure OpenSearch resident memory. JVM resident memory is unavailable in these saved node stats.",
+    "memory.peak is a cgroup lifetime peak, not a phase peak. All phase maxima are sampled maxima; sub-sample spikes can be missed.",
+    "IO stays per device. Layered device counters can describe the same IO and must not be summed as independent traffic.",
+    "CPU usage deltas give mean cores within the observed counter window. Throttling/pressure counters are reported separately, not treated as extra CPU usage.",
+    "JVM heap/GC and load-generator CPU/RSS are available only where saved benchmark resource brackets exist. Indexing has no continuously sampled JVM heap or encoder-client memory in this observer.",
+    "Load-generator CPU/RSS includes query orchestration, response processing, metrics and evidence writing. It is not an isolated production gateway/service measurement.",
+    "Only samples inside each phase are used. Boundary gaps, missing samples and counter resets are explicit. No extrapolation fills unobserved intervals.",
+    "Host pressure/memory include unrelated applications and other containers. They identify possible contention, not its cause.",
+    "Root verified the live resources-v3 invocation uses --max-seconds43200 (12h), beginning13:27UTC; expected duration limit about01:27UTC next day. Archived observer metadata does not record this argument; source default21600 is not the actual invocation."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "phase": "layout-and-availability-only",
+  "url": "http://zerotwo:8228/",
+  "session": "favorite-opt-ui-t3code-28be15f7",
+  "searches": "All /api/search requests were intentionally aborted in the browser before navigation; search correctness and timing remain deferred.",
+  "registeredMethods": 12,
+  "availableMethods": 9,
+  "unavailableMethods": ["Native numeric sort", "Numeric sort · score tracking", "Globally bounded float"],
+  "unavailableBehavior": "Visible labels say unavailable; checkboxes are disabled and unchecked; corresponding columns are hidden. Tooltip explains incomplete indexed corpus and advises reload after readiness.",
+  "desktop": { "viewport": [1440, 1000], "documentWidth": 1440, "columnsWidth": 1392, "columnsScrollWidth": 2740 },
+  "mobile": { "viewport": [390, 844], "documentWidth": 390, "controlsWidth": 366, "columnsWidth": 366, "columnsScrollWidth": 3226 },
+  "pageErrors": [],
+  "originalInspector": "http://zerotwo:8227/",
+  "screenshots": ["desktop.png", "mobile.png", "mobile-methods.png"],
+  "uiChangePendingSearchValidation": "Bounded timings now label aggregated OpenSearch time as total and display the number of service requests. API time remains whole elapsed request time."
+}

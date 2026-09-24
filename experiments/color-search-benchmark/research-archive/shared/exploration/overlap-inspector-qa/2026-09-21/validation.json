@@ -1,0 +1,73 @@
+{
+  "createdAt": "2026-09-21T14:22:17.249230+00:00",
+  "status": "passed",
+  "url": "http://zerotwo:8227/",
+  "unitChecks": 5,
+  "liveParityChecks": 14,
+  "liveReceipt": "../overlap-inspector/2026-09-21T14-19-37.496Z/validation.json",
+  "browser": {
+    "viewports": [
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "scriptErrors": [],
+    "checks": [
+      "Default picked-red search returns 24 service-ordered results; the clicked image shows 1,024 regions and one score term.",
+      "Desktop and mobile inspection render without horizontal overflow in the document or dialog.",
+      "Advanced colorTargets/colorName/targetImagePercent aliases display: Target areas: 40% Green.",
+      "Editing the query to blue and switching to hybrid without searching preserves the clicked gallery diagnosis: 40% Green / overlap-quality-dense.",
+      "Hybrid 80% grayscale + 20% red returns two broad named terms and no dense regions used; all 1,024 regions remain inspectable.",
+      "The proportion notice states that target amounts total 100%, outside colors are unconstrained, and regions may overlap.",
+      "Filtering the region table by #ff0000 returns region 4; selecting an unused region explains that it makes no direct contribution.",
+      "Mobile gallery returns 24 results with page width 390, matching viewport width 390."
+    ]
+  },
+  "screenshots": [
+    "desktop-inspection.png",
+    "mobile-inspection.png",
+    "mobile-regions.png",
+    "desktop-regions.png",
+    "mobile-gallery.png"
+  ],
+  "sources": [
+    {
+      "path": "experiments/color-search-benchmark/exploration/overlap-inspector-server.mjs",
+      "sha256": "96d0782806102241846f8c4e8184e1c272f51859dcb1bf5abb3861de5103516f"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/overlap-inspector-cli.mjs",
+      "sha256": "528f6cf5eaa1a2df773edcaa2a3f32f56158732a2097d6f8cdc85cc6af3c81ac"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/overlap-inspector-smoke.mjs",
+      "sha256": "98745595065c7def423ca94567661af6d97d272c04ab943202e08bd5768a07ab"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/overlap-inspector-server.test.mjs",
+      "sha256": "23ac88a5fc41c29ed5fccc5e44a0a13ba274466ae1f04f7c81bc3f680c40a309"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/overlap-inspector-provider.mjs",
+      "sha256": "1c3f38827a26cf4eefe0e7e836dfb03f381464f5b5f35873f3575680187e5c6f"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/web/overlap-inspector.css",
+      "sha256": "168079d1edfead4a0bd10375bf48fc6de83abefd9c5e6c28e8f9f335236672d1"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/web/overlap-inspector.js",
+      "sha256": "3811108a657be61db0a90f5a2e961eea0db5fc0f3866c96413161f934189b933"
+    },
+    {
+      "path": "experiments/color-search-benchmark/exploration/web/overlap-inspector.html",
+      "sha256": "ed530431d11ddd2197515552e4d102171918de115e0cd5f996c12f35a6e2cf51"
+    }
+  ],
+  "limitations": "Read-only functional validation; no human relevance judgments and no large-corpus performance claim. Browser session closed."
+}

@@ -1,0 +1,40 @@
+{
+  "startedAt": "2026-09-23T14:18:53.686426+00:00",
+  "planSha256": "901a8151fbc46e00d8cb9c52189476598fcd5110116560a3dbb6ea7deaae9705",
+  "phases": [
+    {
+      "id": "lean-real",
+      "startedAt": "2026-09-23T14:18:53.686539+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode real --scope full --presets all --encodings numeric,rank8,rank16,rankfloat --index color-exploration-favorite-opt-real-v4 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/real-index-v4"
+      ],
+      "finishedAt": "2026-09-23T14:24:57.469750+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "precision-real",
+      "startedAt": "2026-09-23T14:24:57.491010+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode real --scope full --presets all --encodings rank18,rank27 --index color-exploration-favorite-precision-real-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/precision-real"
+      ],
+      "finishedAt": "2026-09-23T14:30:15.014615+00:00",
+      "exitCode": 0
+    },
+    {
+      "id": "points-real",
+      "startedAt": "2026-09-23T14:30:15.015274+00:00",
+      "command": [
+        "make",
+        "color-favorite-compiled-index",
+        "COLOR_FAVORITE_ARGS=--mode real --scope full --presets all --encodings numeric --numeric-points true --index color-exploration-favorite-points-real-v1 --directory /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/points-real"
+      ],
+      "finishedAt": "2026-09-23T14:31:01.852107+00:00",
+      "exitCode": 2
+    }
+  ],
+  "stoppedAt": "2026-09-23T14:31:01.852705+00:00"
+}

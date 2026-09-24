@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "label": "Linked strictness: matched real-wallpaper feedback",
+  "description": "Five original-control references and all eight linked slider positions. Every candidate uses the same real-image-only query scope: controlled-fixture cases and non-10%-step proportions remain recorded as unsupported. Original UI controls are unchanged. Development judgments from one quick single-observer review; no new labels, held-out test, or scale-capacity claim.",
+  "extraImageFiles": [
+    "evaluation/perceived-red-pagoda-001.json"
+  ],
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "original-linked-pair-0",
+      "variant": "original",
+      "bankId": "linked-5",
+      "stepIndex": 0,
+      "label": "Original reference: Relaxed",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "original-linked-pair-1",
+      "variant": "original",
+      "bankId": "linked-5",
+      "stepIndex": 1,
+      "label": "Original reference: Gentler",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "original-linked-pair-2",
+      "variant": "original",
+      "bankId": "linked-5",
+      "stepIndex": 2,
+      "label": "Original reference: Favorite",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "original-linked-pair-3",
+      "variant": "original",
+      "bankId": "linked-5",
+      "stepIndex": 3,
+      "label": "Original reference: Stricter",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "original-linked-pair-4",
+      "variant": "original",
+      "bankId": "linked-5",
+      "stepIndex": 4,
+      "label": "Original reference: Strictest",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-3-level-0",
+      "variant": "linked",
+      "bankId": "linked-3",
+      "stepIndex": 0,
+      "label": "Three levels: Relaxed",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-3-level-1",
+      "variant": "linked",
+      "bankId": "linked-3",
+      "stepIndex": 1,
+      "label": "Three levels: Favorite",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-3-level-2",
+      "variant": "linked",
+      "bankId": "linked-3",
+      "stepIndex": 2,
+      "label": "Three levels: Strictest",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-5-level-0",
+      "variant": "linked",
+      "bankId": "linked-5",
+      "stepIndex": 0,
+      "label": "Five levels: Relaxed",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-5-level-1",
+      "variant": "linked",
+      "bankId": "linked-5",
+      "stepIndex": 1,
+      "label": "Five levels: Gentler",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-5-level-2",
+      "variant": "linked",
+      "bankId": "linked-5",
+      "stepIndex": 2,
+      "label": "Five levels: Favorite",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-5-level-3",
+      "variant": "linked",
+      "bankId": "linked-5",
+      "stepIndex": 3,
+      "label": "Five levels: Stricter",
+      "module": "./linked-strictness-feedback.mjs"
+    },
+    {
+      "id": "linked-5-level-4",
+      "variant": "linked",
+      "bankId": "linked-5",
+      "stepIndex": 4,
+      "label": "Five levels: Strictest",
+      "module": "./linked-strictness-feedback.mjs"
+    }
+  ]
+}

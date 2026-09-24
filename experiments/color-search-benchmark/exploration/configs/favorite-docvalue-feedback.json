@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "label": "Favorite scoring with doc-value result IDs",
+  "description": "Unchanged parent scoring and global ranking; fetch result IDs from doc values with stored fields disabled. Same 545-asset development feedback, not population validation.",
+  "extraImageFiles": [
+    "evaluation/perceived-red-pagoda-001.json"
+  ],
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "favorite-baseline256",
+      "method": "cutoff-shade-hue-all-levels",
+      "index": "color-exploration-shade-hue-256-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-numeric-docvalues",
+      "method": "favorite-utility-numeric-docvalues",
+      "index": "color-exploration-favorite-opt-real-v4",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./favorite-docvalue-adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-rank27-docvalues",
+      "method": "favorite-utility-rank27-docvalues",
+      "index": "color-exploration-favorite-precision-real-v1",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./favorite-docvalue-adapter.mjs"
+    },
+    {
+      "id": "favorite-utility-sorted-docvalues",
+      "method": "favorite-utility-sorted-docvalues",
+      "index": "color-exploration-favorite-points-real-v2",
+      "parameters": {
+        "bucketCount": 256,
+        "cutoffBlendExponent": 1,
+        "qualityCurve": "linear",
+        "qualityInfluence": 0.5,
+        "minimumQuality": 0,
+        "namedMode": "concrete-swatches",
+        "areaPower": 0.5,
+        "qualityPenalty": 0.35,
+        "excessPenalty": 1.5,
+        "pixelCutoff": 0
+      },
+      "module": "./favorite-docvalue-adapter.mjs"
+    }
+  ]
+}

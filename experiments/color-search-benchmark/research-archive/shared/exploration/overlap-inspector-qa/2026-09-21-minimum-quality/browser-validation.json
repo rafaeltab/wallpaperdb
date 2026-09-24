@@ -1,0 +1,209 @@
+{
+  "checks": [
+    "cutoff initially off",
+    "manual cutoff edit only updates control",
+    "old result inspection keeps original cutoff",
+    "query succeeds",
+    "cutoff sent to OpenSearch independently of influence",
+    "result caption records cutoff",
+    "zero-score results remain inspectable",
+    "edited controls cannot alter a saved cutoff",
+    "below-cutoff term is gated to zero",
+    "cutoff explanation is visible",
+    "gated regions shrink in score grid",
+    "diagnostic and native scores agree",
+    "query succeeds",
+    "cutoff slider burst debounces to one request",
+    "live off cancels queued cutoff update",
+    "reset clears cutoff without changing influence",
+    "query succeeds",
+    "cutoff still works when quality influence is zero",
+    "query succeeds",
+    "zero-percent target is exempt in real query",
+    "zero-percent exemption is visible",
+    "multi-target contribution ledger matches OpenSearch",
+    "desktop has no horizontal overflow"
+  ],
+  "checksPassed": 23,
+  "requests": [
+    {
+      "body": {
+        "id": "madness-wallhaven-rqqjrj",
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "areaPower": 0.5,
+          "excessPenalty": 1.5,
+          "minimumQuality": 0,
+          "qualityInfluence": 1,
+          "qualityPenalty": 0.35
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/inspect"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "minimumQuality": 1,
+          "qualityInfluence": 1
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "id": "evaluation-gray-red-002-telephone",
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "areaPower": 0.5,
+          "excessPenalty": 1.5,
+          "minimumQuality": 1,
+          "qualityInfluence": 1,
+          "qualityPenalty": 0.35
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/inspect"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "minimumQuality": 0.75,
+          "qualityInfluence": 1
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "minimumQuality": 1,
+          "qualityInfluence": 0
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "id": "evaluation-gray-red-002-telephone",
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "areaPower": 0.5,
+          "excessPenalty": 1.5,
+          "minimumQuality": 1,
+          "qualityInfluence": 0,
+          "qualityPenalty": 0.35
+        },
+        "query": {
+          "mode": "vibe",
+          "targets": [
+            {
+              "color": "#ff0000"
+            }
+          ]
+        }
+      },
+      "url": "/api/inspect"
+    },
+    {
+      "body": {
+        "includeFixtures": false,
+        "limit": 24,
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "minimumQuality": 1,
+          "qualityInfluence": 0
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#ff0000",
+              "percent": 0
+            },
+            {
+              "color": "#209040",
+              "percent": 40
+            }
+          ]
+        }
+      },
+      "url": "/api/search"
+    },
+    {
+      "body": {
+        "id": "evaluation-green-red-leaves",
+        "methodId": "overlap-quality-dense",
+        "parameters": {
+          "areaPower": 0.5,
+          "excessPenalty": 1.5,
+          "minimumQuality": 1,
+          "qualityInfluence": 0,
+          "qualityPenalty": 0.35
+        },
+        "query": {
+          "mode": "proportions",
+          "targets": [
+            {
+              "color": "#ff0000",
+              "percent": 0
+            },
+            {
+              "color": "#209040",
+              "percent": 40
+            }
+          ]
+        }
+      },
+      "url": "/api/inspect"
+    }
+  ],
+  "status": "passed"
+}

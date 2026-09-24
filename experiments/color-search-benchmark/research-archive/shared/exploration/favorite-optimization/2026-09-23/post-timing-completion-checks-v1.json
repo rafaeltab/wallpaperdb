@@ -1,0 +1,112 @@
+{
+  "fileOnly": true,
+  "finishedAt": "2026-09-23T20:35:20.693968+00:00",
+  "runtimeChanges": false,
+  "serviceRequests": 0,
+  "workspaceMakefileChanged": false,
+  "invocation": "make -f /home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-audits-v1.mk",
+  "tests": {
+    "pooledWarmupHelper": {
+      "passed": 4,
+      "failed": 0
+    },
+    "unintegratedCardinalityCompiler": {
+      "passed": 9,
+      "failed": 0,
+      "integrated": false,
+      "capacityMeasured": false
+    }
+  },
+  "warmupParity": {
+    "passed": true,
+    "warmups": 48,
+    "comparisons": 36,
+    "scoresCompared": 720,
+    "rawScoresIdentical": true,
+    "maximumRawScoreDelta": 0,
+    "index": {
+      "index": "color-exploration-favorite-points-full-1m-v1",
+      "count": 1000000,
+      "scope": "full",
+      "uuid": "LHjoEvSiR8KNe5WZv_a7iA",
+      "utilityCount": 6138
+    },
+    "archivedSourcesPinned": 31
+  },
+  "overlap": {
+    "schemaVersion": 1,
+    "startedAt": "2026-09-23T18:47:38.419Z",
+    "finishedAt": "2026-09-23T18:47:40.739Z",
+    "activity": "Independent saved-file fidelity/feedback proof replay already running when no-overlap notice arrived",
+    "durationMs": 2320,
+    "serviceRequests": 0,
+    "runtimeChanges": false,
+    "artifacts": [
+      "pooled-fidelity-v1/audit-independent-v2.json",
+      "pooled-feedback-execution-path-audit-v2.json"
+    ],
+    "assessment": "Shared-host overlap with early screen; identify affected profile from raw timestamps. Preserve rather than erase evidence.",
+    "rowsWithTimestamps": 1007220,
+    "rowsMissingTimestamps": 0,
+    "rowsMalformedTimestamps": 0,
+    "attributionComplete": true,
+    "affectedRequestGroups": [
+      {
+        "profileId": "1000000:favorite-utility-numeric-docvalues:picked-one-vibe:c1",
+        "candidateId": "favorite-utility-numeric-docvalues",
+        "caseId": "favorite-utility-numeric-docvalues:picked-one-vibe",
+        "phase": "timed",
+        "concurrency": 1,
+        "requestCount": 78,
+        "errors": 0,
+        "overOneSecond": 0,
+        "firstStartedAt": "2026-09-23T18:47:38.396Z",
+        "lastCompletedAt": "2026-09-23T18:47:40.762Z"
+      }
+    ],
+    "profileResourceEnvelopes": [
+      {
+        "profileId": "1000000:favorite-utility-numeric-docvalues:picked-one-vibe:c1",
+        "candidateId": "favorite-utility-numeric-docvalues",
+        "concurrency": 1,
+        "beforeAt": "2026-09-23T18:47:31.994Z",
+        "afterAt": "2026-09-23T18:47:42.007Z"
+      }
+    ],
+    "interpretation": "Timestamp association only; overlapping rows are retained unchanged. This does not estimate or remove the replay impact."
+  },
+  "files": [
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-audits-v1.mk",
+      "sha256": "ac4fd563d2e77c088b8ecbb93c7f9fc54cc914f8551adf2482e5b5d20a3461f6"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-isolated-tests-v1.log",
+      "sha256": "7b6b9b60eaff23e84e4aaef53ebc313c14e8fc62a745ff2d86e4f3a3aaac6e48"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/post-timing-warmup-audit-v1.log",
+      "sha256": "36fd9be6c15b30d5d045ca9fd1168e09bc70b41bb7ab8d90783a43f647a71f93"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/warmup-parity-pooled-audit-v1.mjs",
+      "sha256": "51604fff5e96260c0fab9fd9c9200d1fdf6a7d602664001e9934893853938966"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/warmup-parity-pooled-audit-v1.test.mjs",
+      "sha256": "01ca841d6557b950af556d5660ffda9b7b331ff9758bdda2bb640dd3f8d0ea16"
+    },
+    {
+      "path": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-cardinality-bounds.mjs",
+      "sha256": "5a5335e9cee1531193d2671320112a81598053e34cd0afab3a01787bd95c3c2e"
+    },
+    {
+      "path": "/home/rafaeltab/.t3/worktrees/wallpaperdb/t3code-28be15f7/experiments/color-search-benchmark/exploration/favorite-cardinality-bounds.test.mjs",
+      "sha256": "45b627afe359e2fab12cfeaeaa92fe923d0f8a97adc842cbe7052ec5fb0222cc"
+    },
+    {
+      "path": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/exploration/favorite-optimization/2026-09-23/full-million-four-methods-pooled-v1/audit-warmup-pooled-parity-v1.json",
+      "sha256": "49de9281ebdef72818f0b6e19b4aa28fb81c0ceeb2dc24211ea6b18df8b365ac"
+    }
+  ]
+}

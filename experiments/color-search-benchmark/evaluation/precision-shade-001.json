@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "caseVersion": 2,
+  "id": "precision-shade-001",
+  "status": "user-judged",
+  "category": "Precision",
+  "use": "development anchor",
+  "exampleType": "controlled-svg-composition",
+  "evaluationGroup": "picked-red-shade",
+  "query": {
+    "userText": "Color picker: #FF2200",
+    "intent": "Prefer colors as close as possible to the selected shade. A picked color signals that shade closeness matters to the user; nearby colors remain candidates instead of requiring exact equality.",
+    "specifiedPercentages": null,
+    "preciseHex": "#FF2200",
+    "colorSpace": "sRGB",
+    "subjectConstraint": null,
+    "initialIntent": "Find wallpapers matching the picked shade. How much shade variation remains acceptable and how the visible amount affects overall result preference are for the user to judge.",
+    "clarificationSource": "user-response-001"
+  },
+  "review": {
+    "url": "http://zerotwo:8221/evaluation/precision-shade-001.html",
+    "presentation": "Four complete 1600x900 SVG compositions, identical gray background and centered full-height band construction. Contained at the same size per viewport; target swatch repeated beside each example on matching gray surround. Neutral #202020 page. Candidate color codes and constructed percentages are hidden in the review UI.",
+    "selection": "Constructed to compare shade at the same amount, amount at the same shade, and a smaller exact shade with larger nearby shades. Source facts do not establish human relevance.",
+    "methodNamesVisible": false,
+    "computedScoresVisible": false,
+    "candidateHexValuesVisible": false,
+    "candidatePercentagesVisible": false,
+    "randomization": "Fixed A=40% #FF4400, B=10% #FF2200, C=40% #FF0000, D=40% #FF2200; not sorted by an expected match score.",
+    "judgmentFormat": "Ask separately which shades are close enough to the picked swatch and which complete examples the user prefers as results. Free descriptions, optional ranking, ties, uncertainty and indistinguishable shades are supported. No numeric scores requested.",
+    "requestedLabels": null,
+    "pairwiseOrdering": "Optional; no expected preference assigned.",
+    "validation": "Desktop 1280x1120 and mobile 390x844 browser checks: all four fixtures loaded, uniform 16:9 rendered size per viewport, no horizontal overflow, four target swatches rgb(255,34,0). SVG fill colors and geometry inspected. This verifies presentation, not color accuracy on the user's display."
+  },
+  "construction": {
+    "createdDate": "2026-09-16",
+    "canvas": {
+      "width": 1600,
+      "height": 900
+    },
+    "background": "#707070",
+    "geometry": "Centered full-height rectangle, width640 for40% area or160 for10% area.",
+    "rendering": "Plain opaque SVG rect fills. No gradients, texture, filters, opacity, masks, image edits or external assets."
+  },
+  "examples": [
+    {
+      "label": "A",
+      "wallpaperId": "precision-shade-001-a",
+      "filename": "evaluation/fixtures/precision-shade-001-a.svg",
+      "sha256": "25f57d1977de25453b81f741391fd3bb9e2c0c2aabfda04f88b0c945e1f8400b",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#FF4400",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "is a bit light",
+        "shadeObservation": "A bit light.",
+        "certaintyDescription": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "B",
+      "wallpaperId": "precision-shade-001-b",
+      "filename": "evaluation/fixtures/precision-shade-001-b.svg",
+      "sha256": "b49b84a58e54f58e7c6759925c452daf701f0f57bbae90dc612070c16f627429",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#FF2200",
+        "accentAreaPercent": 10,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 90,
+        "accentRect": {
+          "x": 720,
+          "y": 0,
+          "width": 160,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "is less wide, but pretty sure it matches the target precisely",
+        "shadeObservation": "Pretty sure it matches the target precisely.",
+        "certaintyDescription": "pretty sure",
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "C",
+      "wallpaperId": "precision-shade-001-c",
+      "filename": "evaluation/fixtures/precision-shade-001-c.svg",
+      "sha256": "9044c6aa6612b6d97b271cdf81cd5d6d2e850f974262e797376dbcccaf2b1b10",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#FF0000",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "is noticeably darker",
+        "shadeObservation": "Noticeably darker.",
+        "certaintyDescription": null,
+        "wholeImageMatchRating": null
+      }
+    },
+    {
+      "label": "D",
+      "wallpaperId": "precision-shade-001-d",
+      "filename": "evaluation/fixtures/precision-shade-001-d.svg",
+      "sha256": "a8eb2098ab14bcc4d488700c40884239e2aca40ef82c191920145dbefd1ef9b4",
+      "width": 1600,
+      "height": 900,
+      "format": "svg",
+      "construction": {
+        "accentHex": "#FF2200",
+        "accentAreaPercent": 40,
+        "backgroundHex": "#707070",
+        "backgroundAreaPercent": 60,
+        "accentRect": {
+          "x": 480,
+          "y": 0,
+          "width": 640,
+          "height": 900
+        }
+      },
+      "judgment": {
+        "source": "user-response-001",
+        "description": "pretty sure it matches the target precisely",
+        "shadeObservation": "Pretty sure it matches the target precisely.",
+        "certaintyDescription": "pretty sure",
+        "wholeImageMatchRating": null
+      }
+    }
+  ],
+  "judgments": [
+    {
+      "id": "precision-order-001",
+      "source": "user-response-001",
+      "type": "picked-shade-result-preference",
+      "orderedGroups": [
+        [
+          "B",
+          "D"
+        ],
+        [
+          "A"
+        ],
+        [
+          "C"
+        ]
+      ],
+      "orderedWallpaperGroups": [
+        [
+          "precision-shade-001-b",
+          "precision-shade-001-d"
+        ],
+        [
+          "precision-shade-001-a"
+        ],
+        [
+          "precision-shade-001-c"
+        ]
+      ],
+      "tiesReported": true,
+      "scope": "B and D together first, then A, then C. No required internal ordering or equal numerical model scores for the top group; no numeric score distances or hard rejection labels supplied."
+    }
+  ],
+  "shadeAcceptability": [
+    {
+      "label": "B",
+      "source": "user-response-001",
+      "assessment": "Perceived precise shade match",
+      "certaintyDescription": "pretty sure",
+      "scope": "User's shade-match observation. Exact encoded hex equality is separately recorded in fixture construction."
+    },
+    {
+      "label": "D",
+      "source": "user-response-001",
+      "assessment": "Perceived precise shade match",
+      "certaintyDescription": "pretty sure",
+      "scope": "User's shade-match observation. Exact encoded hex equality is separately recorded in fixture construction."
+    }
+  ],
+  "pairwisePreferences": [
+    {
+      "preferred": "B",
+      "over": "A",
+      "source": "precision-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "D",
+      "over": "A",
+      "source": "precision-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single explicit ordering, not a separate independent annotation."
+    },
+    {
+      "preferred": "A",
+      "over": "C",
+      "source": "precision-order-001",
+      "derivation": "Adjacent-group relation derived from the user's single explicit ordering, not a separate independent annotation."
+    }
+  ],
+  "rawUserResponses": [
+    {
+      "id": "user-response-001",
+      "author": "user",
+      "text": "A is a bit light\nB is less wide, but pretty sure it matches the target precisely\nC is noticeably darker\nD pretty sure it matches the target precisely\n\nNow the goal for us is not to filter by exactly this color and only this color, but by colors that are as close to it as possible, it means the color is important to the user.\n\nB + D, A, C"
+    }
+  ],
+  "notes": [
+    "User shade descriptions, semantic clarification and ordering are recorded: B/D together first, then A, then C. No numeric grades or score distances supplied.",
+    "The picked-shade query has no percentage target. The user clarified that the goal is proximity to the chosen color rather than exact-equality filtering; no cutoff or distance formula is specified.",
+    "Exact color codes and geometric area fractions are fixture construction facts. They are not perceived quality scores or preferred ranking ground truth.",
+    "Keep shade acceptability distinct from overall result preference. Do not infer one from the other when the user supplies only one.",
+    "A/C/D compare shades at40% source area; B/D compare10% and40% of the same shade. The user places B/D together above A/C in this case.",
+    "Equal steps in a single RGB channel do not establish equal perceived differences, lightness, hue changes or symmetry of user preference.",
+    "Browser scaling may antialias band edges. Source geometry and solid interior colors are pinned; perceived differences depend on display and viewing conditions. 'Indistinguishable' is a valid judgment.",
+    "These abstract fixtures isolate a design question; any observations need later real-wallpaper validation. They are not a representative production image sample.",
+    "The four closely related fixtures belong to one development evaluation group, not four independent held-out cases.",
+    "Existing photos, source manifests, descriptors and OpenSearch indexes are unchanged; no search method, harness or benchmark was implemented.",
+    "Preserve the user's 'pretty sure' for B and D. Fixture equality does not replace the user's expressed confidence.",
+    "'A bit light' and 'noticeably darker' are perceived differences, not measured lightness coordinates.",
+    "B's10% of the target shade outranks A/C's40% nearby shades here. B/D's shared top group does not establish that any tiny exact-color speck always wins or that amount never matters.",
+    "A and C's lower ranking does not establish rejection or a universal tolerance threshold.",
+    "The top group need not receive identical numerical model scores. Derived pairwise preferences belong to one ordering judgment."
+  ],
+  "semanticClarifications": [
+    {
+      "id": "precision-proximity-001",
+      "source": "user-response-001",
+      "userText": "Now the goal for us is not to filter by exactly this color and only this color, but by colors that are as close to it as possible, it means the color is important to the user.",
+      "interpretation": "Picking a color expresses a preference for shade closeness, not a requirement for exact equality. Nearby colors are not automatically rejected. No metric, tolerance cutoff or universal weight relative to image area is selected."
+    }
+  ]
+}

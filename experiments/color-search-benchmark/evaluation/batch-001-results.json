@@ -1,0 +1,2687 @@
+{
+  "schemaVersion": 1,
+  "id": "color-review-batch-001-results",
+  "resultVersion": 1,
+  "status": "recorded-provisional-human-preferences",
+  "sourceSubmission": {
+    "id": "30b36a99-4c94-4f15-9e18-27373dea04c5",
+    "savedAt": "2026-09-19T22:42:19.251Z",
+    "originalPath": "/home/rafaeltab/.local/share/wallpaperdb/color-evaluation/reviews/color-review-batch-001/30b36a99-4c94-4f15-9e18-27373dea04c5.json",
+    "repositoryCopy": "responses/30b36a99-4c94-4f15-9e18-27373dea04c5.json",
+    "fileSha256": "36a41bccdff3313eccbbf612ccb0057944b44e2a8b9e40524310d552592a0b76",
+    "submissionFingerprint": "1214b8ffe84b40130566806ce76da5bcc0b0b4604b62143cb96499d605665ae7",
+    "batchSha256": "d64f71e2629819aeb41a0193afa16de37fe69db8f1d04bc99fd62e9c606b294f"
+  },
+  "batchId": "color-review-batch-001",
+  "batchVersion": 1,
+  "summary": {
+    "reviewers": 1,
+    "submittedCases": 24,
+    "completeOrders": 24,
+    "submittedTieGroups": 0,
+    "skippedCases": 0,
+    "casesWithNotes": 14,
+    "explicitUncertainPairs": 5,
+    "separateAmbiguousPlacementNotes": 1,
+    "priorJudgmentRecords": 13,
+    "totalLogicalJudgmentRecords": 37,
+    "independentSampleCount": null
+  },
+  "evidenceContext": {
+    "id": "batch-001-quick-review-caveat",
+    "scope": "All24 judgments in this submission; earlier13 records retain their original qualifications.",
+    "type": "single-reviewer-quick-pass",
+    "rawUserMessage": "I have submitted the answers, I went quite quickly, so dont regard this as 100% accurate human perception preference, some of these will be ranked very differently by different people",
+    "selfReportedPace": "quick",
+    "accuracyQualification": "Provisional preference evidence; not definitive perceptual truth.",
+    "interReviewerVariation": "User expects some substantial ranking differences between people; not measured by this submission.",
+    "numericConfidence": null,
+    "numericWeight": null,
+    "groundTruthStatus": "not-universal-or-population-consensus",
+    "evaluationUse": "Development examples and discussion; no scoring rule or hard pass/fail threshold selected."
+  },
+  "cases": [
+    {
+      "caseId": "composition-green-red-real-002",
+      "sequence": 1,
+      "query": {
+        "text": "40% green, 40% red; the remaining 20% is unspecified",
+        "detail": "Aim close to 40% green and 40% red across the whole image. The remaining 20% can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "green",
+            "targetImagePercent": 40
+          },
+          {
+            "colorName": "red",
+            "targetImagePercent": 40
+          }
+        ],
+        "unspecifiedRemainderPercent": 20
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "composition-green-red-real-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:29:00.066Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "evaluation-green-red-leaves"
+        ],
+        [
+          "wallpaper-082"
+        ],
+        [
+          "evaluation-green-red-tulips"
+        ],
+        [
+          "evaluation-green-red-tulip-field"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "evaluation-green-red-leaves",
+          "filename": "corpus/evaluation/green-red-real-leaves.jpg",
+          "sha256": "3ae3e24af1783fac04adf4eb03facf448503ae589f0dbda57329bee50db9ee1c"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-082",
+          "filename": "corpus/wallpaper-082.jpg",
+          "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "evaluation-green-red-tulip-field",
+          "filename": "corpus/evaluation/green-red-real-tulip-field.jpg",
+          "sha256": "ef3133f273312d74c57492947d8a97475be2e5ee7d726c4791afa6c75d7445da"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "evaluation-green-red-tulips",
+          "filename": "corpus/evaluation/green-red-real-tulips.jpg",
+          "sha256": "75dd9cb3844694f97ac67041eb3335b7206226f4bd20db1197b00a57008973e3"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "B",
+          "preferredWallpaperId": "evaluation-green-red-leaves",
+          "overWallpaperId": "wallpaper-082",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-082",
+          "overWallpaperId": "evaluation-green-red-tulips",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "evaluation-green-red-tulips",
+          "overWallpaperId": "evaluation-green-red-tulip-field",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "perceived-red-batch-001",
+      "sequence": 2,
+      "query": {
+        "text": "Red",
+        "detail": "A wallpaper that feels red."
+      },
+      "category": "Perceived color",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "perceived-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "pink doesnt feel red at all",
+        "updatedAt": "2026-09-19T22:29:25.297Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-037"
+        ],
+        [
+          "wallpaper-095"
+        ],
+        [
+          "wallpaper-084"
+        ],
+        [
+          "wallpaper-044"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-084",
+          "filename": "corpus/wallpaper-084.jpg",
+          "sha256": "1729194d2b7593b21fac2427eb30d3d173549217a85981ed87186647659784ed"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-095",
+          "filename": "corpus/wallpaper-095.jpg",
+          "sha256": "bee0e7c41b884a45525586f5471555a3d0c2f1ca410c7b8f86e56e0f0fdbfa9c"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-037",
+          "filename": "corpus/wallpaper-037.png",
+          "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-044",
+          "filename": "corpus/wallpaper-044.jpg",
+          "sha256": "cf2cfddbfc8185367d85e1d99d695106ded3459ab4cea2d0c980f4dc72ca05e4"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-037",
+          "overWallpaperId": "wallpaper-095",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-095",
+          "overWallpaperId": "wallpaper-084",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-084",
+          "overWallpaperId": "wallpaper-044",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "perceived-orange-batch-001",
+      "sequence": 3,
+      "query": {
+        "text": "Orange",
+        "detail": "A wallpaper that feels orange."
+      },
+      "category": "Perceived color",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "perceived-orange-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "Rock doesnt feel orange",
+        "updatedAt": "2026-09-19T22:29:44.160Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-031"
+        ],
+        [
+          "wallpaper-046"
+        ],
+        [
+          "wallpaper-036"
+        ],
+        [
+          "wallpaper-087"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-046",
+          "filename": "corpus/wallpaper-046.jpg",
+          "sha256": "746ea33448f91eb907960138e1e79528830ca2828fcee444078371c054867d2c"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-031",
+          "filename": "corpus/wallpaper-031.jpg",
+          "sha256": "7ad700c6e4bfb0799eda39221bf0c0738650c5a891056d36956bb46788b8496a"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-087",
+          "filename": "corpus/wallpaper-087.jpg",
+          "sha256": "1284682ec29fa65a71ea7ecc1f1d5b8c06bdd1918eeb40b5fb826957cc5c6429"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-036",
+          "filename": "corpus/wallpaper-036.png",
+          "sha256": "59d5b727605c6d21ac18cd81b2b7169fdaeb2f6cce315625e9d8de614c2dab8b"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-031",
+          "overWallpaperId": "wallpaper-046",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-046",
+          "overWallpaperId": "wallpaper-036",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-036",
+          "overWallpaperId": "wallpaper-087",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "perceived-pink-batch-001",
+      "sequence": 4,
+      "query": {
+        "text": "Pink",
+        "detail": "A wallpaper that feels pink."
+      },
+      "category": "Perceived color",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "perceived-pink-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "The roses  don't feel pink",
+        "updatedAt": "2026-09-19T22:30:13.765Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-044"
+        ],
+        [
+          "wallpaper-039"
+        ],
+        [
+          "wallpaper-033"
+        ],
+        [
+          "wallpaper-048"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-033",
+          "filename": "corpus/wallpaper-033.png",
+          "sha256": "658622e9ff70054352b980612e80a92445fc834a9c74d241f3f01b684c7993d9"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-044",
+          "filename": "corpus/wallpaper-044.jpg",
+          "sha256": "cf2cfddbfc8185367d85e1d99d695106ded3459ab4cea2d0c980f4dc72ca05e4"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-048",
+          "filename": "corpus/wallpaper-048.png",
+          "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-039",
+          "filename": "corpus/wallpaper-039.jpg",
+          "sha256": "b1f9e273f464a532ee6157131fce11e4593b77a0f2047610401bd36dc0183b4b"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-044",
+          "overWallpaperId": "wallpaper-039",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-039",
+          "overWallpaperId": "wallpaper-033",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-033",
+          "overWallpaperId": "wallpaper-048",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "perceived-green-batch-001",
+      "sequence": 5,
+      "query": {
+        "text": "Green",
+        "detail": "A wallpaper that feels green."
+      },
+      "category": "Perceived color",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "perceived-green-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "Not sure about A and B order",
+        "updatedAt": "2026-09-19T22:30:41.964Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-086"
+        ],
+        [
+          "wallpaper-050"
+        ],
+        [
+          "wallpaper-083"
+        ],
+        [
+          "wallpaper-093"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-083",
+          "filename": "corpus/wallpaper-083.jpg",
+          "sha256": "f3382e02c83f83332d5ad90ed2bebce4e88601a52c9e8595a92818e00b544057"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-093",
+          "filename": "corpus/wallpaper-093.jpeg",
+          "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-050",
+          "filename": "corpus/wallpaper-050.jpg",
+          "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-086",
+          "filename": "corpus/wallpaper-086.png",
+          "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [
+        {
+          "labels": [
+            "A",
+            "B"
+          ],
+          "wallpaperIds": [
+            "wallpaper-083",
+            "wallpaper-093"
+          ],
+          "source": "rawAnswer.notes",
+          "treatment": "Keep the submitted order and this uncertainty; do not replace it with a tie or numeric confidence."
+        }
+      ],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-086",
+          "overWallpaperId": "wallpaper-050",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-050",
+          "overWallpaperId": "wallpaper-083",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-083",
+          "overWallpaperId": "wallpaper-093",
+          "specificUserUncertainty": true,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "perceived-blue-batch-001",
+      "sequence": 6,
+      "query": {
+        "text": "Blue",
+        "detail": "A wallpaper that feels blue."
+      },
+      "category": "Perceived color",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "perceived-blue-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "Not sure about B and D order. \n\nA feels very brightly blue, C has a lot of less bright blue, B doesnt feel as convincingly blue as D, maybe because D has the blue as the focus point?",
+        "updatedAt": "2026-09-19T22:31:49.693Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-091"
+        ],
+        [
+          "wallpaper-030"
+        ],
+        [
+          "wallpaper-047"
+        ],
+        [
+          "wallpaper-010"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-091",
+          "filename": "corpus/wallpaper-091.jpg",
+          "sha256": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-010",
+          "filename": "corpus/wallpaper-010.jpg",
+          "sha256": "bc9b1d219e079cc53c647266f91517cb9464ae4a6d16c9b1c653bfc64eaadc86"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-030",
+          "filename": "corpus/wallpaper-030.jpg",
+          "sha256": "01ec9dd89ce75f4b0d5135aa94543d71f8a710319fabb882ecaef104bc589c8c"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-047",
+          "filename": "corpus/wallpaper-047.jpg",
+          "sha256": "85b8ca0b004b0a5d353892e3ec38fe5e3aeb252f041808e884e13e97fa194b5d"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [
+        {
+          "labels": [
+            "B",
+            "D"
+          ],
+          "wallpaperIds": [
+            "wallpaper-010",
+            "wallpaper-047"
+          ],
+          "source": "rawAnswer.notes",
+          "treatment": "Keep the submitted order and this uncertainty; do not replace it with a tie or numeric confidence."
+        }
+      ],
+      "interpretationFlags": [
+        {
+          "type": "user-hypothesis-not-established-cause",
+          "explanation": "The user tentatively suggests blue focal prominence; do not treat this as a demonstrated spatial ranking rule."
+        }
+      ],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-091",
+          "overWallpaperId": "wallpaper-030",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-030",
+          "overWallpaperId": "wallpaper-047",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-047",
+          "overWallpaperId": "wallpaper-010",
+          "specificUserUncertainty": true,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "proportion-green-real-batch-001",
+      "sequence": 7,
+      "query": {
+        "text": "40% green; the remaining 60% is unspecified",
+        "detail": "Aim close to 40% green across the whole image. The rest can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "green",
+            "targetImagePercent": 40
+          }
+        ],
+        "unspecifiedRemainderPercent": 60
+      },
+      "category": "Proportions",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "proportion-green-real-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "not sure about B and D order",
+        "updatedAt": "2026-09-19T22:32:15.440Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-093"
+        ],
+        [
+          "wallpaper-081"
+        ],
+        [
+          "wallpaper-083"
+        ],
+        [
+          "wallpaper-050"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-093",
+          "filename": "corpus/wallpaper-093.jpeg",
+          "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-083",
+          "filename": "corpus/wallpaper-083.jpg",
+          "sha256": "f3382e02c83f83332d5ad90ed2bebce4e88601a52c9e8595a92818e00b544057"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-081",
+          "filename": "corpus/wallpaper-081.jpg",
+          "sha256": "ff9c795cef947e59970f87f08ed81df4d58f4c61ac28300fa44d253c8a2425b3"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-050",
+          "filename": "corpus/wallpaper-050.jpg",
+          "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [
+        {
+          "labels": [
+            "B",
+            "D"
+          ],
+          "wallpaperIds": [
+            "wallpaper-083",
+            "wallpaper-050"
+          ],
+          "source": "rawAnswer.notes",
+          "treatment": "Keep the submitted order and this uncertainty; do not replace it with a tie or numeric confidence."
+        }
+      ],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-093",
+          "overWallpaperId": "wallpaper-081",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-081",
+          "overWallpaperId": "wallpaper-083",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-083",
+          "overWallpaperId": "wallpaper-050",
+          "specificUserUncertainty": true,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "proportion-green-real-batch-002",
+      "sequence": 8,
+      "query": {
+        "text": "70% green; the remaining 30% is unspecified",
+        "detail": "Aim close to 70% green across the whole image. The rest can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "green",
+            "targetImagePercent": 70
+          }
+        ],
+        "unspecifiedRemainderPercent": 30
+      },
+      "category": "Proportions",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "proportion-green-real-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "A isn't very green. C doesnt have enough green",
+        "updatedAt": "2026-09-19T22:32:54.041Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-086"
+        ],
+        [
+          "wallpaper-050"
+        ],
+        [
+          "wallpaper-012"
+        ],
+        [
+          "wallpaper-090"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-090",
+          "filename": "corpus/wallpaper-090.jpg",
+          "sha256": "0f78ea66504b0f71182665a003280c0cb0879c7834c09c37cf130bdc63841049"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-050",
+          "filename": "corpus/wallpaper-050.jpg",
+          "sha256": "3c6401bf66759d5371290c62e07d5e09f4cb7f84beed0ad370451418d2b4ac0a"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-012",
+          "filename": "corpus/wallpaper-012.jpg",
+          "sha256": "5b7a292dbebab79a1048e50af0b51e9c447354a04425e48d05bddc5092edd7d5"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-086",
+          "filename": "corpus/wallpaper-086.png",
+          "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "D",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-086",
+          "overWallpaperId": "wallpaper-050",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-050",
+          "overWallpaperId": "wallpaper-012",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-012",
+          "overWallpaperId": "wallpaper-090",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "proportion-red-real-batch-001",
+      "sequence": 9,
+      "query": {
+        "text": "20% red; the remaining 80% is unspecified",
+        "detail": "Aim close to 20% red across the whole image. The rest can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "red",
+            "targetImagePercent": 20
+          }
+        ],
+        "unspecifiedRemainderPercent": 80
+      },
+      "category": "Proportions",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "proportion-red-real-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "B feels more red than A. C feels like it has too much red. D definitely has too much red.",
+        "updatedAt": "2026-09-19T22:33:32.444Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-029"
+        ],
+        [
+          "wallpaper-060"
+        ],
+        [
+          "wallpaper-084"
+        ],
+        [
+          "wallpaper-082"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-060",
+          "filename": "corpus/wallpaper-060.jpg",
+          "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-029",
+          "filename": "corpus/wallpaper-029.jpg",
+          "sha256": "08e7badf417a6017f3e7443a150e8e2f910ab2188a779ff8cb74b910fd321789"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-084",
+          "filename": "corpus/wallpaper-084.jpg",
+          "sha256": "1729194d2b7593b21fac2427eb30d3d173549217a85981ed87186647659784ed"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-082",
+          "filename": "corpus/wallpaper-082.jpg",
+          "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-029",
+          "overWallpaperId": "wallpaper-060",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-060",
+          "overWallpaperId": "wallpaper-084",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-084",
+          "overWallpaperId": "wallpaper-082",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-dark-batch-001",
+      "sequence": 10,
+      "query": {
+        "text": "Dark",
+        "detail": "A wallpaper that feels dark."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-dark-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:33:41.790Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-067"
+        ],
+        [
+          "wallpaper-011"
+        ],
+        [
+          "wallpaper-079"
+        ],
+        [
+          "wallpaper-075"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-067",
+          "filename": "corpus/wallpaper-067.jpg",
+          "sha256": "5c6c38c093055c135f55dc68c55e191606de32a63ccffd9df6733cde26df655e"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-011",
+          "filename": "corpus/wallpaper-011.jpg",
+          "sha256": "37b91fdcb3c15dda5f3189bcde76003ed79a10d4c732ded256d62d519fcf8687"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-075",
+          "filename": "corpus/wallpaper-075.jpg",
+          "sha256": "0182b8ae436cf426ed0ac727e9e2a69e3086d01b9508e4d27a208324002d12a3"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-079",
+          "filename": "corpus/wallpaper-079.jpg",
+          "sha256": "7e96fd38762f4fe359f88519097fc260b15867e98b8906be41660ad23d68d908"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-067",
+          "overWallpaperId": "wallpaper-011",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-011",
+          "overWallpaperId": "wallpaper-079",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-079",
+          "overWallpaperId": "wallpaper-075",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-light-batch-001",
+      "sequence": 11,
+      "query": {
+        "text": "Light",
+        "detail": "A wallpaper that feels light."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-light-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:33:58.603Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-088"
+        ],
+        [
+          "wallpaper-051"
+        ],
+        [
+          "wallpaper-073"
+        ],
+        [
+          "wallpaper-096"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-073",
+          "filename": "corpus/wallpaper-073.jpg",
+          "sha256": "b90dcdd5341762ee4968c5fcc543be23d5d6d102c0f9ba3f97219e36752a9c29"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-051",
+          "filename": "corpus/wallpaper-051.png",
+          "sha256": "d8848bb5111f77a6a3bb9e9a8888cde7794b17376fac379cdeb99a11fbab2434"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-096",
+          "filename": "corpus/wallpaper-096.jpg",
+          "sha256": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-088",
+          "filename": "corpus/wallpaper-088.jpg",
+          "sha256": "f2868aad3a75ed42289467b969b37348c8ad49727db93e830023f4684ac10df6"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "D",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-088",
+          "overWallpaperId": "wallpaper-051",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-051",
+          "overWallpaperId": "wallpaper-073",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-073",
+          "overWallpaperId": "wallpaper-096",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-vivid-batch-001",
+      "sequence": 12,
+      "query": {
+        "text": "Bright, vivid colors",
+        "detail": "A colorful wallpaper with a bright, vivid feel."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-vivid-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:09.469Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-094"
+        ],
+        [
+          "wallpaper-032"
+        ],
+        [
+          "wallpaper-052"
+        ],
+        [
+          "wallpaper-098"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-032",
+          "filename": "corpus/wallpaper-032.png",
+          "sha256": "80a85e97c8b63311543a59403c1266310df73b27ce0c491561ca69e5b309ce3e"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-094",
+          "filename": "corpus/wallpaper-094.jpg",
+          "sha256": "d2f9075c0b13ae2e16bfff1972dcc8f0574cf363e6f4056aabe80abce230f64a"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-052",
+          "filename": "corpus/wallpaper-052.png",
+          "sha256": "41bc0c2b2054edfa77c1b8a806b45276bcc2361032b84ac49005cb7828ee7491"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-098",
+          "filename": "corpus/wallpaper-098.jpg",
+          "sha256": "a8187d04f47f3c9193c9746362fc779d489533138b3c60fbb2adc43158d9632e"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-094",
+          "overWallpaperId": "wallpaper-032",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-032",
+          "overWallpaperId": "wallpaper-052",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-052",
+          "overWallpaperId": "wallpaper-098",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-strict-grayscale-batch-001",
+      "sequence": 13,
+      "query": {
+        "text": "Grayscale",
+        "detail": "Specifically black, white and gray; colored tints are not the goal."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-strict-grayscale-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:24.822Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-068"
+        ],
+        [
+          "wallpaper-070"
+        ],
+        [
+          "wallpaper-071"
+        ],
+        [
+          "wallpaper-007"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-071",
+          "filename": "corpus/wallpaper-071.jpg",
+          "sha256": "ad846eb13081bfcd675e000ecb66a7a2cfe5cfc3e97eb9ce966f7e922ed6698f"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-068",
+          "filename": "corpus/wallpaper-068.jpg",
+          "sha256": "0a4f4018a08fc37855662e2f4f59c34b6a210fc3949453eb1fe79da977daf224"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-070",
+          "filename": "corpus/wallpaper-070.jpg",
+          "sha256": "926206385f2509d9e1d911668ea0109ff25654963efe6bfe4a66c89778d04849"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-007",
+          "filename": "corpus/wallpaper-007.png",
+          "sha256": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-068",
+          "overWallpaperId": "wallpaper-070",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-070",
+          "overWallpaperId": "wallpaper-071",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-071",
+          "overWallpaperId": "wallpaper-007",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-near-neutral-batch-001",
+      "sequence": 14,
+      "query": {
+        "text": "Almost grayscale",
+        "detail": "Very little color overall; a subtle warm or cool tint is fine."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-near-neutral-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ],
+          [
+            "B"
+          ]
+        ],
+        "notes": "those flowers dont feel close to grayscale",
+        "updatedAt": "2026-09-19T22:34:43.636Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-007"
+        ],
+        [
+          "wallpaper-071"
+        ],
+        [
+          "wallpaper-062"
+        ],
+        [
+          "wallpaper-096"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-062",
+          "filename": "corpus/wallpaper-062.png",
+          "sha256": "e8293bebb250e93ce70991219f9d25b20fe553699732e55259b67465339decdd"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-096",
+          "filename": "corpus/wallpaper-096.jpg",
+          "sha256": "640bc7d99597ee2a16569726b71936b562b1c84fbdb6db882d0ffb0d0e1bab3f"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-007",
+          "filename": "corpus/wallpaper-007.png",
+          "sha256": "c818094c152bbe35cf864abda86dae5f18a069b716124f4102b44c49478e6850"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-071",
+          "filename": "corpus/wallpaper-071.jpg",
+          "sha256": "ad846eb13081bfcd675e000ecb66a7a2cfe5cfc3e97eb9ce966f7e922ed6698f"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "C",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-007",
+          "overWallpaperId": "wallpaper-071",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-071",
+          "overWallpaperId": "wallpaper-062",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-062",
+          "overWallpaperId": "wallpaper-096",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-monochromatic-batch-001",
+      "sequence": 15,
+      "query": {
+        "text": "One hue overall",
+        "detail": "A monochromatic feel: shades of one color. It does not have to be gray."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-monochromatic-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:34:58.628Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-009"
+        ],
+        [
+          "wallpaper-091"
+        ],
+        [
+          "wallpaper-008"
+        ],
+        [
+          "wallpaper-004"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-008",
+          "filename": "corpus/wallpaper-008.png",
+          "sha256": "3ebefaf297de677354aecfb5121d42753a49ccf69a4bd3a615ebb34d3cf00f78"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-091",
+          "filename": "corpus/wallpaper-091.jpg",
+          "sha256": "9bd46d4e1b4034bb9a238d194a691f7370e349ca95c283bd06a539b60a687052"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-009",
+          "filename": "corpus/wallpaper-009.png",
+          "sha256": "c12284f866aef429bb3f94335c86d57034ca91f52a699b9a88b2d66323006266"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-004",
+          "filename": "corpus/wallpaper-004.jpg",
+          "sha256": "8ce0380d95f76c457eec19a2fae02756f38bc5a4ab6ea3de24ccb37124a254da"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-009",
+          "overWallpaperId": "wallpaper-091",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-091",
+          "overWallpaperId": "wallpaper-008",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-008",
+          "overWallpaperId": "wallpaper-004",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "combination-gray-red-batch-001",
+      "sequence": 16,
+      "query": {
+        "text": "Grayscale with red accents",
+        "detail": "A mostly grayscale feel, with red as the color that stands out."
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "combination-gray-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:35:12.781Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "evaluation-gray-red-002-telephone"
+        ],
+        [
+          "wallpaper-060"
+        ],
+        [
+          "wallpaper-063"
+        ],
+        [
+          "wallpaper-095"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-095",
+          "filename": "corpus/wallpaper-095.jpg",
+          "sha256": "bee0e7c41b884a45525586f5471555a3d0c2f1ca410c7b8f86e56e0f0fdbfa9c"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-060",
+          "filename": "corpus/wallpaper-060.jpg",
+          "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "evaluation-gray-red-002-telephone",
+          "filename": "corpus/evaluation/gray-red-002-telephone.jpg",
+          "sha256": "c9060a015115125d20f0cc7e2008d17b571ee23ae4e7316095d3e307fd58e85b"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-063",
+          "filename": "corpus/wallpaper-063.jpg",
+          "sha256": "f8205c8f54b5f11b2579985ba5eb32450932f066f609fb731d160ba36ebc3b01"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "evaluation-gray-red-002-telephone",
+          "overWallpaperId": "wallpaper-060",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-060",
+          "overWallpaperId": "wallpaper-063",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-063",
+          "overWallpaperId": "wallpaper-095",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "composition-gray-red-batch-001",
+      "sequence": 17,
+      "query": {
+        "text": "80% grayscale, 20% red",
+        "detail": "Aim close to these shares of the whole image.",
+        "colorTargets": [
+          {
+            "colorName": "grayscale",
+            "targetImagePercent": 80
+          },
+          {
+            "colorName": "red",
+            "targetImagePercent": 20
+          }
+        ],
+        "unspecifiedRemainderPercent": 0
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "composition-gray-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "white just isn't grayscale, its just white. I mean technically it isnt, but when you search for grayscale you're not looking for white, you're looking for grayscale. I dont know why I put C above B, but it definitely feels better.",
+        "updatedAt": "2026-09-19T22:37:47.946Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "evaluation-gray-red-002-umbrella"
+        ],
+        [
+          "wallpaper-048"
+        ],
+        [
+          "wallpaper-042"
+        ],
+        [
+          "wallpaper-060"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "evaluation-gray-red-002-umbrella",
+          "filename": "corpus/evaluation/gray-red-002-umbrella.jpg",
+          "sha256": "05968ee9addc191a71564ae596e5436274a9370b223c6d75bc90eb366adeda52"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-042",
+          "filename": "corpus/wallpaper-042.jpg",
+          "sha256": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-048",
+          "filename": "corpus/wallpaper-048.png",
+          "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-060",
+          "filename": "corpus/wallpaper-060.jpg",
+          "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [
+        {
+          "type": "unexplained-reason-not-uncertain-order",
+          "labels": [
+            "C",
+            "B"
+          ],
+          "explanation": "The user does not know why C is above B but explicitly says it definitely feels better. Preserve the reported order; this is not an additional uncertain pair."
+        }
+      ],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "evaluation-gray-red-002-umbrella",
+          "overWallpaperId": "wallpaper-048",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-048",
+          "overWallpaperId": "wallpaper-042",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-042",
+          "overWallpaperId": "wallpaper-060",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "composition-gray-red-batch-002",
+      "sequence": 18,
+      "query": {
+        "text": "80% grayscale, 10% red; the remaining 10% is unspecified",
+        "detail": "Aim close to these shares of the whole image. The remaining 10% can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "grayscale",
+            "targetImagePercent": 80
+          },
+          {
+            "colorName": "red",
+            "targetImagePercent": 10
+          }
+        ],
+        "unspecifiedRemainderPercent": 10
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "composition-gray-red-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "with this percentage, the roses just have too much red to justify. ",
+        "updatedAt": "2026-09-19T22:38:18.865Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "evaluation-gray-red-002-umbrella"
+        ],
+        [
+          "wallpaper-042"
+        ],
+        [
+          "wallpaper-048"
+        ],
+        [
+          "wallpaper-060"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-048",
+          "filename": "corpus/wallpaper-048.png",
+          "sha256": "d5a9bd75a36c39dc3346e36af87ab4c51514b51527a3c7e9851e0b331e945790"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-042",
+          "filename": "corpus/wallpaper-042.jpg",
+          "sha256": "f4032f1b0f0191787b608779476d7994e01c6cfef2cf9fc63d0c2f86f990b0fd"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-060",
+          "filename": "corpus/wallpaper-060.jpg",
+          "sha256": "418326fa9dcc4734b2a9d8c07fa6b1a5a10cdb575b44f81fd4e7e6a54a9e1c89"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "evaluation-gray-red-002-umbrella",
+          "filename": "corpus/evaluation/gray-red-002-umbrella.jpg",
+          "sha256": "05968ee9addc191a71564ae596e5436274a9370b223c6d75bc90eb366adeda52"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "D",
+          "over": "B",
+          "preferredWallpaperId": "evaluation-gray-red-002-umbrella",
+          "overWallpaperId": "wallpaper-042",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-042",
+          "overWallpaperId": "wallpaper-048",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-048",
+          "overWallpaperId": "wallpaper-060",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "vibe-dark-accents-batch-001",
+      "sequence": 19,
+      "query": {
+        "text": "Mostly dark, with small bright areas",
+        "detail": "A dark overall feel, with bright spots that stand out."
+      },
+      "category": "Vibe",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "vibe-dark-accents-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "B has a dark vibe. I wouldn't necessarily describe black as dark, so maybe it should be lower ranked?",
+        "updatedAt": "2026-09-19T22:39:07.758Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-005"
+        ],
+        [
+          "wallpaper-022"
+        ],
+        [
+          "wallpaper-032"
+        ],
+        [
+          "wallpaper-015"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-005",
+          "filename": "corpus/wallpaper-005.jpeg",
+          "sha256": "9a01e9fd40cb21e830cbb37f9a8a91596a80e095df869ed73d87a7b46aa9b834"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-032",
+          "filename": "corpus/wallpaper-032.png",
+          "sha256": "80a85e97c8b63311543a59403c1266310df73b27ce0c491561ca69e5b309ce3e"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-022",
+          "filename": "corpus/wallpaper-022.jpg",
+          "sha256": "544c5a8d83c439fcdda97d55f923c22ca930abe871abb5028fcd6ca1dde52078"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-015",
+          "filename": "corpus/wallpaper-015.jpg",
+          "sha256": "c4632e9000ac1a44db4f052dc076eef0bcb9b069f7aebaabc407b01bb38baf63"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [
+        {
+          "type": "ambiguous-placement-question",
+          "explanation": "The dark/black note questions a placement, but its referent and intended pair are unclear. Preserve the note and order without assigning a specific pair or excluding black from dark."
+        }
+      ],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-005",
+          "overWallpaperId": "wallpaper-022",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-022",
+          "overWallpaperId": "wallpaper-032",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-032",
+          "overWallpaperId": "wallpaper-015",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "composition-blue-orange-batch-001",
+      "sequence": 20,
+      "query": {
+        "text": "50% blue, 50% orange",
+        "detail": "Aim close to these shares of the whole image.",
+        "colorTargets": [
+          {
+            "colorName": "blue",
+            "targetImagePercent": 50
+          },
+          {
+            "colorName": "orange",
+            "targetImagePercent": 50
+          }
+        ],
+        "unspecifiedRemainderPercent": 0
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "composition-blue-orange-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:39:54.264Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-058"
+        ],
+        [
+          "wallpaper-002"
+        ],
+        [
+          "wallpaper-040"
+        ],
+        [
+          "wallpaper-057"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-057",
+          "filename": "corpus/wallpaper-057.jpg",
+          "sha256": "1ab56e32c7916925061b4f79dc79aa14f8bd7d6d624a78c919891d127cefeca4"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-002",
+          "filename": "corpus/wallpaper-002.jpg",
+          "sha256": "a6a8e4fb3b9201cbd360717bb8f9dffb6b88160e25ed66b3e9f1b3394543c052"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-058",
+          "filename": "corpus/wallpaper-058.png",
+          "sha256": "8b044243052afc50f72aa7c6fffd8c37b4c679fbc51a97bcdc725c89833efb11"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-040",
+          "filename": "corpus/wallpaper-040.webp",
+          "sha256": "61386230f9a8a65935d65efd0e8ff19344b3637959bcfd237c670176576d694f"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-058",
+          "overWallpaperId": "wallpaper-002",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-002",
+          "overWallpaperId": "wallpaper-040",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-040",
+          "overWallpaperId": "wallpaper-057",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "composition-blue-orange-batch-002",
+      "sequence": 21,
+      "query": {
+        "text": "40% blue, 40% orange; the remaining 20% is unspecified",
+        "detail": "Aim close to these shares of the whole image. The remaining 20% can be any color.",
+        "colorTargets": [
+          {
+            "colorName": "blue",
+            "targetImagePercent": 40
+          },
+          {
+            "colorName": "orange",
+            "targetImagePercent": 40
+          }
+        ],
+        "unspecifiedRemainderPercent": 20
+      },
+      "category": "Combinations",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "composition-blue-orange-batch-002",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "A"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:40:03.336Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-058"
+        ],
+        [
+          "wallpaper-040"
+        ],
+        [
+          "wallpaper-002"
+        ],
+        [
+          "wallpaper-057"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-040",
+          "filename": "corpus/wallpaper-040.webp",
+          "sha256": "61386230f9a8a65935d65efd0e8ff19344b3637959bcfd237c670176576d694f"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-058",
+          "filename": "corpus/wallpaper-058.png",
+          "sha256": "8b044243052afc50f72aa7c6fffd8c37b4c679fbc51a97bcdc725c89833efb11"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-057",
+          "filename": "corpus/wallpaper-057.jpg",
+          "sha256": "1ab56e32c7916925061b4f79dc79aa14f8bd7d6d624a78c919891d127cefeca4"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-002",
+          "filename": "corpus/wallpaper-002.jpg",
+          "sha256": "a6a8e4fb3b9201cbd360717bb8f9dffb6b88160e25ed66b3e9f1b3394543c052"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-058",
+          "overWallpaperId": "wallpaper-040",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "A",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-040",
+          "overWallpaperId": "wallpaper-002",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-002",
+          "overWallpaperId": "wallpaper-057",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "precision-warm-red-batch-001",
+      "sequence": 22,
+      "query": {
+        "text": "Close to #FF2200",
+        "detail": "Find a wallpaper whose colors feel close to this selected shade. Exact equality is not required.",
+        "swatchHex": "#FF2200"
+      },
+      "category": "Precision",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "precision-warm-red-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "D"
+          ],
+          [
+            "B"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "",
+        "updatedAt": "2026-09-19T22:40:27.908Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-037"
+        ],
+        [
+          "wallpaper-082"
+        ],
+        [
+          "wallpaper-087"
+        ],
+        [
+          "wallpaper-046"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-046",
+          "filename": "corpus/wallpaper-046.jpg",
+          "sha256": "746ea33448f91eb907960138e1e79528830ca2828fcee444078371c054867d2c"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-082",
+          "filename": "corpus/wallpaper-082.jpg",
+          "sha256": "ea18b09ac6c9e02f10beed4fbeeeb6568c5588f3c21e99dc89fbd7b699249690"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-087",
+          "filename": "corpus/wallpaper-087.jpg",
+          "sha256": "1284682ec29fa65a71ea7ecc1f1d5b8c06bdd1918eeb40b5fb826957cc5c6429"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-037",
+          "filename": "corpus/wallpaper-037.png",
+          "sha256": "e045df734cd14f4b9abbf24c6abd8614b26ee9c6245a6a33f6ff1e983d1c7643"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "D",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-037",
+          "overWallpaperId": "wallpaper-082",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-082",
+          "overWallpaperId": "wallpaper-087",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-087",
+          "overWallpaperId": "wallpaper-046",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "precision-muted-green-batch-001",
+      "sequence": 23,
+      "query": {
+        "text": "Close to #4C8C72",
+        "detail": "Find a wallpaper whose colors feel close to this selected shade. Exact equality is not required.",
+        "swatchHex": "#4C8C72"
+      },
+      "category": "Precision",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "precision-muted-green-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "B"
+          ],
+          [
+            "D"
+          ],
+          [
+            "C"
+          ],
+          [
+            "A"
+          ]
+        ],
+        "notes": "not sure about the last two",
+        "updatedAt": "2026-09-19T22:40:53.462Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-052"
+        ],
+        [
+          "wallpaper-013"
+        ],
+        [
+          "wallpaper-093"
+        ],
+        [
+          "wallpaper-086"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-086",
+          "filename": "corpus/wallpaper-086.png",
+          "sha256": "0e2a7267c79acff9c18d1f6ca0f7bbd65bfcbfc542d99390c5913938c0a166e9"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-052",
+          "filename": "corpus/wallpaper-052.png",
+          "sha256": "41bc0c2b2054edfa77c1b8a806b45276bcc2361032b84ac49005cb7828ee7491"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-093",
+          "filename": "corpus/wallpaper-093.jpeg",
+          "sha256": "a79f7b20ec1ef72ce6ecd8c8ea93193c65cde7cae0787b5562d41329941461c8"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-013",
+          "filename": "corpus/wallpaper-013.jpg",
+          "sha256": "cca6d88bb995a01c20de6b9d2268fd78695c3a880b66fb6556195dbf9bf5e82d"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [
+        {
+          "labels": [
+            "C",
+            "A"
+          ],
+          "wallpaperIds": [
+            "wallpaper-093",
+            "wallpaper-086"
+          ],
+          "source": "rawAnswer.notes",
+          "treatment": "Keep the submitted order and this uncertainty; do not replace it with a tie or numeric confidence."
+        }
+      ],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-052",
+          "overWallpaperId": "wallpaper-013",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "D",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-013",
+          "overWallpaperId": "wallpaper-093",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "A",
+          "preferredWallpaperId": "wallpaper-093",
+          "overWallpaperId": "wallpaper-086",
+          "specificUserUncertainty": true,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    },
+    {
+      "caseId": "palette-rainbow-batch-001",
+      "sequence": 24,
+      "query": {
+        "text": "Rainbow-like colors",
+        "detail": "Bright colors across many hues. It does not need to contain a literal rainbow."
+      },
+      "category": "Palette",
+      "evidenceContextRef": "batch-001-quick-review-caveat",
+      "status": "recorded-with-quick-review-caveat",
+      "rawAnswer": {
+        "caseId": "palette-rainbow-batch-001",
+        "status": "ranked",
+        "ranking": [
+          [
+            "A"
+          ],
+          [
+            "C"
+          ],
+          [
+            "B"
+          ],
+          [
+            "D"
+          ]
+        ],
+        "notes": "Not sure about the last two",
+        "updatedAt": "2026-09-19T22:42:17.495Z"
+      },
+      "orderedWallpaperIdGroups": [
+        [
+          "wallpaper-094"
+        ],
+        [
+          "wallpaper-003"
+        ],
+        [
+          "wallpaper-034"
+        ],
+        [
+          "wallpaper-004"
+        ]
+      ],
+      "examples": [
+        {
+          "label": "A",
+          "wallpaperId": "wallpaper-094",
+          "filename": "corpus/wallpaper-094.jpg",
+          "sha256": "d2f9075c0b13ae2e16bfff1972dcc8f0574cf363e6f4056aabe80abce230f64a"
+        },
+        {
+          "label": "B",
+          "wallpaperId": "wallpaper-034",
+          "filename": "corpus/wallpaper-034.png",
+          "sha256": "59739ecbfd398cbe2885153d216a70fdeb398cc1b059f423aad6788ca63c3020"
+        },
+        {
+          "label": "C",
+          "wallpaperId": "wallpaper-003",
+          "filename": "corpus/wallpaper-003.png",
+          "sha256": "51b86d67a86428504a6570a1f36e40f230dda0228a74f574d0feedcaead6c444"
+        },
+        {
+          "label": "D",
+          "wallpaperId": "wallpaper-004",
+          "filename": "corpus/wallpaper-004.jpg",
+          "sha256": "8ce0380d95f76c457eec19a2fae02756f38bc5a4ab6ea3de24ccb37124a254da"
+        }
+      ],
+      "unrankedLabels": [],
+      "explicitPairUncertainty": [
+        {
+          "labels": [
+            "B",
+            "D"
+          ],
+          "wallpaperIds": [
+            "wallpaper-034",
+            "wallpaper-004"
+          ],
+          "source": "rawAnswer.notes",
+          "treatment": "Keep the submitted order and this uncertainty; do not replace it with a tie or numeric confidence."
+        }
+      ],
+      "interpretationFlags": [],
+      "adjacentPreferences": [
+        {
+          "preferred": "A",
+          "over": "C",
+          "preferredWallpaperId": "wallpaper-094",
+          "overWallpaperId": "wallpaper-003",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "C",
+          "over": "B",
+          "preferredWallpaperId": "wallpaper-003",
+          "overWallpaperId": "wallpaper-034",
+          "specificUserUncertainty": false,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        },
+        {
+          "preferred": "B",
+          "over": "D",
+          "preferredWallpaperId": "wallpaper-034",
+          "overWallpaperId": "wallpaper-004",
+          "specificUserUncertainty": true,
+          "evidenceContextRef": "batch-001-quick-review-caveat",
+          "derivation": "Adjacent relation from one reported order; not an independent annotation or a hard correctness assertion."
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "The raw receipt and original batch manifest remain unchanged. All notes retain original spelling, whitespace and line breaks.",
+    "Status ranked and lack of ties do not override uncertainty expressed in notes or the global quick-review caveat.",
+    "No probability, confidence weight, ranking margin, relevance grade, eligibility exclusion or universal color boundary has been inferred.",
+    "Repeated images and related queries are development evidence. Group source overlaps when designing later held-out evaluation; neither37cases nor derived pairs represent independent observers.",
+    "Different people may prefer different orders. Disagreement with one quick rank is a discrepancy to investigate, not automatically an incorrect search algorithm.",
+    "No algorithm comparison, prototype, benchmark, harness or scoring formula is selected by this import."
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-09-16T15:09:24.808Z",
+  "seed": "0x5c01a",
+  "checks": 7636,
+  "perK": {
+    "1": 32,
+    "2": 400,
+    "3": 4800,
+    "4": 1200,
+    "5": 1204
+  },
+  "maxDifference": 5.967448757360216e-16,
+  "wallMs": 236.273077,
+  "exactRainbowCost": 0,
+  "overlappingRainbowCost": 0.8,
+  "pairwiseInsufficiency": {
+    "evenParityCost": 0.25,
+    "oddParityCost": 0,
+    "sameSingletonsAndPairs": true
+  },
+  "invalidSubsetUpperBound": {
+    "query": [
+      0.2,
+      0.2,
+      0.6
+    ],
+    "pairUnion": 1,
+    "areaError": 0
+  },
+  "packedMax": 4398046445568,
+  "notes": [
+    "No OpenSearch calls or load tests.",
+    "Exhaustive denominator3 distributions for1–3 regions;600 deterministic random distributions each for4–5 regions;target and minimum modes.",
+    "Formula independently compared with generic min-cost transport; union zeta transform cross-checked against direct subset unions."
+  ]
+}

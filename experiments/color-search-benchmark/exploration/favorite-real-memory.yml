@@ -1,0 +1,9 @@
+# Retain the existing real-corpus volume and ports. The many parallel prototype
+# mappings and full preset banks need more heap than the original small lab.
+services:
+  opensearch:
+    environment:
+      OPENSEARCH_JAVA_OPTS: '-Xms4g -Xmx4g'
+    mem_limit: 8g
+    volumes:
+      - '${COLOR_FAVORITE_REAL_DATA:?Set the verified preserved data directory}:/usr/share/opensearch/data'

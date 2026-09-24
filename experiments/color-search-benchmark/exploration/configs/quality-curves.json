@@ -1,0 +1,655 @@
+{
+  "schemaVersion": 1,
+  "label": "Quality influence 3: original linear versus smooth power",
+  "description": "All six inspector methods and four bucket counts. Cutoff variants use broad 0% admission to expose the implicit linear threshold. Old overlap methods retain their fixed 50% boundary. Each curve pair shares all other parameters and the complete 545-asset corpus. Existing single-observer development judgments only; not a held-out relevance study. All ranking is in OpenSearch. No full-schema scale claim.",
+  "workload": {
+    "warmup": 1,
+    "repeats": 3,
+    "concurrency": 1,
+    "limit": 20,
+    "accuracyLimit": 1000,
+    "timeoutMs": 10000
+  },
+  "candidates": [
+    {
+      "id": "overlap-quality-dense-16-linear-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 16 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-16-power-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 16 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-64-linear-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 64 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-64-power-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 64 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-256-linear-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 256 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-256-power-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 256 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-1024-linear-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 1024 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-dense-1024-power-i3",
+      "method": "overlap-quality-dense",
+      "label": "overlap-quality-dense \u00b7 1024 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-16-linear-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 16 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-16-power-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 16 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-64-linear-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 64 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-64-power-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 64 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-256-linear-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 256 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-256-power-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 256 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-1024-linear-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 1024 bins \u00b7 linear \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "overlap-quality-hybrid-1024-power-i3",
+      "method": "overlap-quality-hybrid",
+      "label": "overlap-quality-hybrid \u00b7 1024 bins \u00b7 power \u00b7 influence 3",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0
+      }
+    },
+    {
+      "id": "cutoff-hard-16-linear-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 16 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-16-power-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 16 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-64-linear-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 64 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-64-power-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 64 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-256-linear-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 256 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-256-power-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 256 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-linear-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 1024 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-hard-1024-power-i3",
+      "method": "cutoff-hard",
+      "label": "cutoff-hard \u00b7 1024 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-16-linear-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 16 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-16-power-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 16 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-64-linear-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 64 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-64-power-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 64 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-256-linear-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 256 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-256-power-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 256 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-linear-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 1024 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-feather-1024-power-i3",
+      "method": "cutoff-feather",
+      "label": "cutoff-feather \u00b7 1024 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-linear-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 16 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-16-power-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 16 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-linear-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 64 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-64-power-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 64 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-linear-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 256 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-256-power-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 256 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-linear-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 1024 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-core-halo-1024-power-i3",
+      "method": "cutoff-core-halo",
+      "label": "cutoff-core-halo \u00b7 1024 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-linear-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 16 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-16-power-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 16 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 16,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-linear-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 64 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-64-power-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 64 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 64,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-linear-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 256 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-256-power-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 256 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 256,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-linear-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 1024 bins \u00b7 linear \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "linear",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    },
+    {
+      "id": "cutoff-consensus-1024-power-i3",
+      "method": "cutoff-consensus",
+      "label": "cutoff-consensus \u00b7 1024 bins \u00b7 power \u00b7 influence 3 \u00b7 cutoff 0%",
+      "module": "./adapter.mjs",
+      "parameters": {
+        "bucketCount": 1024,
+        "qualityCurve": "power",
+        "qualityInfluence": 3,
+        "minimumQuality": 0,
+        "pixelCutoff": 0,
+        "namedMode": "concrete-swatches"
+      }
+    }
+  ]
+}

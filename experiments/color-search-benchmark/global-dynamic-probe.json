@@ -1,0 +1,14 @@
+{
+  "endpoint": "http://127.0.0.1:19216",
+  "index": "color-global-dynamic-probe",
+  "mappingNumericFields": 224,
+  "maxRegions": 2,
+  "boundary": "hard",
+  "closedFormCases": 2352,
+  "documents": 120,
+  "nativeQueries": 22,
+  "maxNativeError": 3.3306690738754696e-16,
+  "maxOracleError": 5.551115123125783e-16,
+  "filteredPitPagination": 100,
+  "passed": true
+}

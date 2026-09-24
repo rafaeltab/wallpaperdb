@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Histogram color inspector</title>
+  <link rel="stylesheet" href="/assets/histogram-inspector.css">
+  <script type="module" src="/assets/histogram-inspector.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div><p class="eyebrow">Color search · experimental workbench</p><h1>Histogram inspector</h1><p id="corpus-summary" class="muted">Loading the shared wallpaper corpus…</p></div>
+    <nav aria-label="Related experiments"><a href="http://zerotwo:8225/">Compare all methods ↗</a><a href="http://zerotwo:8225/findings">Saved findings ↗</a></nav>
+  </header>
+  <main class="workspace">
+    <aside class="query-panel" aria-labelledby="query-heading">
+      <h2 id="query-heading">Describe the colors</h2>
+      <p class="muted">Search with the refined 4096-bin histogram method, then inspect why a wallpaper scored as it did.</p>
+      <form id="query-form">
+        <fieldset id="natural-controls">
+          <label class="field">Start with a query<select id="preset" aria-label="Start with a query"></select></label>
+          <div class="mode-switch" role="group" aria-label="Query mode"><button type="button" id="mode-vibe" aria-pressed="true">Overall vibe</button><button type="button" id="mode-proportions" aria-pressed="false">Target proportions</button></div>
+          <p id="mode-help" class="hint"></p>
+          <div id="targets"></div>
+          <button id="add-target" type="button" class="secondary full">+ Add a color or vibe</button>
+          <p id="remainder" class="notice" hidden></p>
+        </fieldset>
+        <details class="advanced"><summary>Advanced query JSON</summary><label class="check"><input id="use-json" type="checkbox">Use this JSON instead of the controls</label><textarea id="query-json" rows="12" readonly spellcheck="false" aria-label="Advanced query JSON"></textarea><p class="hint">Named colors, percentages, and range distances use the same query format as the comparison browser.</p></details>
+        <div class="search-options"><label class="field">Results<select id="result-limit"><option>12</option><option selected>24</option><option>48</option><option>100</option></select></label><label class="check"><input id="include-fixtures" type="checkbox"><span id="fixture-label">Include controlled test swatches</span></label></div>
+        <button id="search" type="submit" class="primary full">Search wallpapers</button>
+        <button id="cancel-search" type="button" class="secondary full" hidden>Cancel search</button>
+        <p id="search-status" role="status" aria-live="polite"></p>
+      </form>
+    </aside>
+    <section class="results-panel" aria-labelledby="results-heading">
+      <div class="section-heading"><div><h2 id="results-heading">Wallpapers</h2><p id="results-summary" class="muted">Results keep the order returned by OpenSearch.</p></div><span class="method-tag">histogram-intent-balanced</span></div>
+      <p id="query-caption" class="query-caption" hidden></p>
+      <div id="search-warnings" class="notice" hidden></div>
+      <div id="gallery" class="gallery"><div class="empty-state"><h3>See the colors behind the score</h3><p>Choose a query and open any result to explore its histogram.</p></div></div>
+    </section>
+  </main>
+  <dialog id="inspector" aria-labelledby="inspector-title">
+    <div class="dialog-shell">
+      <header class="dialog-header"><div><p class="eyebrow">Wallpaper diagnosis</p><h2 id="inspector-title">Color-bin inspection</h2></div><button id="close-inspector" class="secondary" type="button" autofocus>Close <span aria-hidden="true">×</span></button></header>
+      <div class="dialog-content">
+        <p id="inspection-status" role="status" aria-live="polite"></p>
+        <div id="inspection-content" hidden>
+          <section class="inspection-overview" aria-label="Wallpaper and score">
+            <div class="image-wrap"><img id="inspection-image" alt="Selected wallpaper"><a id="original-link" target="_blank" rel="noopener">Open original image ↗</a></div>
+            <div><p id="inspection-query" class="query-caption"></p><div id="score-cards" class="score-cards"></div><p class="hint">Scoring formula</p><p id="score-formula" class="score-formula"></p><div id="score-ledger" class="score-ledger"></div><p id="formula-description" class="hint"></p><details class="formula-details"><summary>Full parameters and service evidence</summary><pre id="formula-json"></pre></details></div>
+          </section>
+          <section aria-labelledby="target-summary-heading"><div class="section-heading"><h3 id="target-summary-heading">How the image matches each target</h3><span id="histogram-summary" class="muted"></span></div><div id="target-summary" class="target-summary"></div></section>
+          <section class="bin-section" aria-labelledby="bin-heading">
+            <div class="section-heading"><div><h3 id="bin-heading">All 4096 color bins</h3><p class="hint">The histogram uses a 128 × 128 image sample and 16 × 16 × 16 RGB cells. Only occupied bins are stored; empty bins are implicit zeros. The full-resolution image is a visual reference. Hex swatches are rounded representatives of the fractional RGB centers.</p><p class="hint">Select a square or a table row to inspect it. Pixel counts refer to the sample.</p></div></div>
+            <div class="bin-controls"><label class="field">Target to examine<select id="active-target"></select></label><label class="field">Color-grid display<select id="grid-metric"><option value="color">Bin colors · occupied bins highlighted</option><option value="coverage">Stored image coverage</option><option value="areaWeight">Query area weight</option><option value="qualityWeight">Query quality weight</option><option value="effect">Effect of removing each bin</option></select></label></div>
+            <p id="grid-legend" class="hint"></p>
+            <div class="bin-layout"><div><div id="bin-grid" class="bin-grid" role="group" aria-label="4096 color bins. Use arrow keys to move between bins."></div><p class="hint">Keyboard: arrow keys move one bin or one row; Home/End move within a row. Enter selects a bin. RGB order: red, then green, then blue.</p></div><aside id="bin-detail" class="bin-detail" aria-live="polite" aria-label="Selected bin details"></aside></div>
+            <div class="notice effect-note"><strong>Leave-one-bin-out effects are not additive contributions.</strong> The service removes a bin and rescales the remaining image to 100%. The effect is the full score minus that new score: positive means the bin supports the score; negative means it reduces it. Effects do not sum to the wallpaper’s score. Removing the only occupied bin has no defined remaining image.</div>
+            <div class="table-controls"><label class="check"><input id="present-only" type="checkbox" checked>Only bins present in this image</label><label class="field">Find a bin<input id="bin-search" type="search" placeholder="Bin number, hex, or RGB" autocomplete="off"></label><label class="field">Sort bins by<select id="bin-sort"><option value="coverage">Image coverage</option><option value="index">Bin number</option><option value="areaContribution">Target area contribution</option><option value="qualityMassContribution">Target quality-mass contribution</option><option value="effect">Leave-one-bin-out effect</option></select></label><label class="field">Order<select id="sort-direction"><option value="desc">Highest first</option><option value="asc">Lowest first</option></select></label></div>
+            <div class="table-scroll"><table class="bin-table"><caption id="bin-table-caption">Stored bins and service-computed diagnostic values</caption><thead><tr><th scope="col">Bin / representative color</th><th scope="col">Sampled pixels</th><th scope="col">Image area</th><th scope="col">Area weight</th><th scope="col">Quality weight</th><th scope="col">Target area</th><th scope="col">Quality mass</th><th scope="col">Removal effect</th></tr></thead><tbody id="bin-rows"></tbody></table></div>
+            <div class="pagination"><span id="table-count" role="status"></span><label class="field">Rows<select id="page-size"><option selected>64</option><option>128</option><option value="all">All</option></select></label><button id="previous-page" class="secondary" type="button">Previous</button><button id="next-page" class="secondary" type="button">Next</button></div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </dialog>
+</body>
+</html>

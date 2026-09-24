@@ -1,0 +1,43 @@
+{
+	"schemaVersion": 1,
+	"label": "Existing formulas through real OpenSearch: loop integration check",
+	"description": "A small-corpus execution check, not a method shortlist or production capacity benchmark. Creates and retains fresh isolated color-eval indexes.",
+	"candidates": [
+		{
+			"id": "hsv64-cosine",
+			"label": "Current HSV64 cosine formula (OpenSearch exact)",
+			"module": "../adapters.mjs",
+			"execution": "opensearch-exact",
+			"metric": "cosine",
+			"queryNormalization": "none",
+			"opensearch": {
+				"url": "http://127.0.0.1:19216",
+				"allowCreateIndex": true
+			}
+		},
+		{
+			"id": "hsv64-l2-raw",
+			"label": "Existing HSV64 raw L2 alternative (OpenSearch exact)",
+			"module": "../adapters.mjs",
+			"execution": "opensearch-exact",
+			"metric": "l2",
+			"queryNormalization": "none",
+			"opensearch": {
+				"url": "http://127.0.0.1:19216",
+				"allowCreateIndex": true
+			}
+		},
+		{
+			"id": "hsv64-l2-unit-sum",
+			"label": "Existing HSV64 unit-sum L2 alternative (OpenSearch exact)",
+			"module": "../adapters.mjs",
+			"execution": "opensearch-exact",
+			"metric": "l2",
+			"queryNormalization": "unit-sum",
+			"opensearch": {
+				"url": "http://127.0.0.1:19216",
+				"allowCreateIndex": true
+			}
+		}
+	]
+}

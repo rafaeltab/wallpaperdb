@@ -48,6 +48,8 @@ Coverage includes all ingestor source files. Vitest's instrumentation version ch
 
 ## Deployment and compatibility
 
+Before starting the new ingestor, rebuild and restart every consumer replica in Media, Variant Generator, Color Extractor, and User with the updated `@wallpaperdb/events` schema. These consumers accept both legacy and CloudEvents envelopes and can be deployed while the old ingestor runs. Old consumer binaries terminate CloudEvents deliveries on validation failure; upgrading afterward does not cause ordinary redelivery. Maintain both-format support while either format remains available for replay.
+
 Drain and stop old ingestor replicas, run `make migrate PACKAGE=ingestor` as a separate workspace/deployment job, then start the new replicas. Incomplete committed metadata requires repair; originals and their states remain preserved. Non-test startup requires both Clerk secret and publishable keys.
 
 CloudEvents metadata surrounds the existing shared event payload. Physical bucket/key fields remain in that shared payload for existing consumers; the local ingestion capability uses logical asset references. A coordinated cross-service payload migration is explicitly outside this change.

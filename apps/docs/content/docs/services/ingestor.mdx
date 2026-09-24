@@ -43,13 +43,21 @@ Existing upload, storage, file-processing, and reconciliation metric names are p
 
 ## Running and upgrading
 
+Upgrade existing deployments in this order:
+
+1. Rebuild and restart **Media, Variant Generator, Color Extractor, and User**, including every consumer replica, with this revision of `@wallpaperdb/events`. Its upload-event schema accepts both retained legacy events and the new CloudEvents envelope, so these consumers can run alongside the old ingestor.
+2. Drain and stop all old ingestor replicas before changing the database.
+3. Run the migration and start the new ingestor:
+
 ```bash
 make build PACKAGE=ingestor
 make migrate PACKAGE=ingestor
 make run PACKAGE=ingestor SCRIPT=start
 ```
 
-Before upgrading a populated database, drain and stop all old ingestor replicas. Use `make migrate PACKAGE=ingestor`, which prepares legacy reservations, applies generated Drizzle migrations, and adopts complete records. Do not invoke Drizzle Kit directly on an existing database: preparation must run before the broadened uniqueness constraint.
+Do not start the new ingestor until every upload-event consumer has been upgraded. Older consumer binaries reject the CloudEvents envelope and terminate those deliveries; upgrading them afterward does not trigger ordinary redelivery. Keep consumers on a version that accepts both formats while either can be retained or replayed.
+
+Use `make migrate PACKAGE=ingestor`, which prepares legacy reservations, applies generated Drizzle migrations, and adopts complete records. Do not invoke Drizzle Kit directly on an existing database: preparation must run before the broadened uniqueness constraint.
 
 The upgrade preserves committed originals and their states, resolves duplicate unfinished reservations deterministically, and marks interrupted, uncommitted records with incomplete metadata failed so clients can retry. Incomplete committed records stop migration for repair without becoming eligible for cleanup. Legacy stored uploads receive one stable outbox occurrence. Migration can be rerun safely after a failure. The context ADR records this deployment requirement and the event compatibility scope.
 

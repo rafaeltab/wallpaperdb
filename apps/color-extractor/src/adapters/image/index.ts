@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Context, Effect, Layer, Semaphore } from 'effect';
-import sharp, { type Sharp } from 'sharp';
+import { decodePixels } from './process.js';
 import {
   computeHistogram,
   ExtractionUnavailable,
@@ -35,33 +35,11 @@ const request = <A>(operation: string, send: (signal: AbortSignal) => Promise<A>
     )
   );
 
-/** Sharp cannot cancel native promises. Keep ownership until native work settles. */
-function decode<A>(bytes: Uint8Array, run: (image: Sharp) => Promise<A>) {
-  return Effect.scoped(
-    Effect.gen(function* () {
-      const image = yield* Effect.acquireRelease(
-        request('decode-image', async () => sharp(bytes).timeout({ seconds: 10 })),
-        (image) =>
-          Effect.sync(() => {
-            image.destroy();
-          })
-      );
-      return yield* request('decode-image', () => run(image)).pipe(Effect.uninterruptible);
-    })
-  );
-}
-
-/** Real image decoding is an adapter operation, independent of storage transport. */
+/** Decode in a killable process; keep pure histogram policy in the capability. */
 export const histogramFromImage = Effect.fn('color-extraction.image.decode')(function* (
   bytes: Uint8Array
 ) {
-  const metadata = yield* decode(bytes, (image) => image.metadata());
-  const aspectRatio = (metadata.width ?? 1) / (metadata.height ?? 1);
-  const targetHeight = Math.max(1, Math.round(Math.sqrt(10000 / aspectRatio)));
-  const targetWidth = Math.max(1, Math.round(targetHeight * aspectRatio));
-  const pixels = yield* decode(bytes, (image) =>
-    image.ensureAlpha().resize(targetWidth, targetHeight, { fit: 'fill' }).raw().toBuffer()
-  );
+  const pixels = yield* decodePixels(bytes);
   return computeHistogram(pixels);
 });
 

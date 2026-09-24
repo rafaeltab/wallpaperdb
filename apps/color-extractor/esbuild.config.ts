@@ -21,11 +21,12 @@ function externalizeExceptWorkspaces() {
 }
 
 await build({
-  entryPoints: ['src/index.ts'],
+  entryPoints: { index: 'src/index.ts', decoder: 'src/adapters/image/decoder.ts' },
   platform: 'node',
   target: ['node22'],
   bundle: true,
-  outfile: 'dist/index.mjs',
+  outdir: 'dist',
+  outExtension: { '.js': '.mjs' },
   format: 'esm',
   sourcemap: true,
   minify: false,

@@ -30,9 +30,10 @@ Storage-coordinate contracts remain deferred as in the Ingestor ADR. No database
 - [x] Implement image adapter with real Sharp/S3 contract evidence; preserve pure histogram table.
 - [x] Implement event translation, stable publication and bounded consumer with real NATS evidence.
 - [x] Route production composition and HTTP through scoped Layers; remove obsolete DI paths after accounting for callers.
-- [ ] Verify full source coverage, CRAP, service checks and full `make ci`.
-- [ ] Review full PR against origin/main with independent Standards/Spec reviewers; fix applicable findings in tested commits and repeat.
-- [ ] Run fresh actual extraction through Gateway and browser Color ranking; record and publish playable video.
+- [x] Verify full source coverage, CRAP, service checks and full `make ci`.
+- [x] Review full PR against origin/main with independent Standards/Spec reviewers; fix applicable findings in tested commits and repeat.
+- [x] Run fresh actual extraction through Gateway and browser Color ranking; record inspected video.
+- [ ] User attaches the playable video to PR #229.
 - [ ] Push focused PR and inspect CI on its current head.
 
 ## Browser evidence
@@ -92,4 +93,38 @@ Base and merge-base: `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Reviewed full `
 
 - P2: Health/readiness OpenAPI response schemas were deleted. Applicable, fixed in `71cd29c` with a failing documentation contract test first, then restored 200 and RFC 9457 503 schemas. All four HTTP tests pass.
 
-Round two will review the complete PR again after these fixes. The requested video will be attached by the user, as confirmed in the session; provide the final inspected clip locally and leave the PR attachment gate open until attached.
+Round two reviewed the complete PR again after these fixes; see final verification below. The requested video will be attached by the user, as confirmed in the session; provide the final inspected clip locally and leave the PR attachment gate open until attached.
+
+## Final verification
+
+The second independent Standards and Spec reviews examined the entire PR through `3e059e9`, against `origin/main` and merge-base `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Standards: zero applicable violations or actionable smells. Spec: zero actionable findings. Subsequent changes only record verification evidence.
+
+| Check | Result |
+| --- | --- |
+| `make check PACKAGE=color-extractor` | Build, lint, types and shared architecture checks passed |
+| Unit tier | 44 tests in 10 files; uncached Vitest 4.91 s |
+| Integration tier | 15 tests in 6 files; uncached Vitest 4.67 s |
+| `make run PACKAGE=color-extractor SCRIPT=test:all` | 59 tests in 16 files; Vitest 5.53 s, wall 6.12 s |
+| `make check-crap PACKAGE=color-extractor CRAP_THRESHOLD=30` | 0 of 49 inventoried functions above 30; maximum 27.672, versus baseline 52.188 |
+| Whole-source coverage | Lines/statements 1129/1175 = 96.08%; functions 48/56 = 85.71%; branches 228/258 = 88.37% |
+| Baseline aggregate coverage | Lines/statements 471/607 = 77.59%; functions 31/36 = 86.11%; branches 61/78 = 78.20% |
+| Existing web browser E2E | All 3 tests passed, Playwright 7.7 s |
+| Full repository CI | `GITHUB_ACTIONS=true make ci` passed: 72 build/check/unit/integration tasks and 10 E2E/dependency tasks; 166.69 s wall including Make prerequisite checks |
+
+Coverage uses V8 and Vitest 3.2.4 and includes all 17 source files. `bootstrap.ts`, `index.ts` and the decoder subprocess remain zero-covered in the parent Vitest report. They were not excluded. Real source and built decoder behavior is exercised through image adapter tests and the browser demonstration; that is different evidence from instrumented coverage. The shared CRAP callback/generator inventory limitation remains #217. The maximum reported score is the incoming trace-context adapter at 27.672; scores do not prove behavior completeness.
+
+The original integration tier took 8.16 s for four tests. The final tier takes 4.67 s for fifteen tests after removing the fixed processing sleep and using explicit configuration. Unit time rises from 0.868 s for 22 tests to 4.91 s for 44 tests, including the deliberately stalled telemetry collector. Isolating decoding adds roughly 56 ms per image in the focused Sharp table, a measured cost of enforceable cancellation. Timing runs use the same local Docker engine with isolated NATS/SeaweedFS fixtures; shared final CI uses successful caches where unchanged.
+
+Initial full CI attempts exposed environment prerequisites: the full browser stack was absent, then shared test-utils tests selected a hard-coded missing Docker Desktop socket. The worktree stack was started, and `GITHUB_ACTIONS=true` selects those tests' existing `/var/run/docker.sock` branch without changing assertions. A temporary readable copy of the public PostgreSQL init SQL fixed host bind-mount permissions. No repository implementation was changed for these environment repairs.
+
+## Final browser evidence and delivery
+
+PR: https://github.com/rafaeltab/wallpaperdb/pull/229. The user will attach the inspected 36.63-second H.264 clip, `/tmp/color-extractor-effect-demo.mp4`. The PR stays draft until that playable attachment is present. This local path is a handoff artifact, not a substitute for a published video.
+
+The clip shows a new orange upload, HTTP success, and orange/blue/red Color rankings through the existing UI. The final orange wallpaper is `wlpr_01M3A6X7Q55SE6C5CYMDNDXFH8`; extraction occurrence `43b00a22f0023770375008141d764a4d20ce5b4fc1cb279b73544a9e51a793be` and Gateway's stored histogram were checked. The actual child process ran the built `dist/decoder.mjs`.
+
+The running service artifact had SHA256 `2caddea23f7e6b63e6877c37e69218bc8b4239439d00b2d6da200a0f0fd875e4`, decoder `ec6986792be1cca1dd89f9f0f9fb498c45cc0ecac1f2745e661f57a83c78b16b`. It contains the native fix at `7061236`; final reviewed source `3e059e9` adds documentation only. Formatting after the initial build changed the rebuilt main artifact's byte hash without functional changes; decoder bytes are unchanged. Detailed local evidence is `/tmp/color-extractor-browser-results.json`.
+
+Demonstration limits: Ingestor used a disposable test-mode identity; the generated curl block was hidden to avoid showing its fixture bearer value. The unchanged Media neighbor needed a temporary dependency resolver for its undeclared ioredis import. The color worker ran its normal built artifact without that resolver. The native color input used its DOM setter and bubbling input event to invoke the real application handler; no result or network response was mocked. Demo-owned browser, processes and containers were cleaned up.
+
+Remaining limits are explicit: lost-PubAck ambiguity and the elapsed 30-second heartbeat lack dedicated tests; oversized quarantine publications stay pending for repair; storage-coordinate contract migration is deferred. No follow-on service migration was started.

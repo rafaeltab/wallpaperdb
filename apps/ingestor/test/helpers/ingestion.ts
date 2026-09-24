@@ -31,6 +31,7 @@ export class ControlledStore implements IngestionStore {
   readonly records = new Map<string, UploadRecord>();
   readonly outbox = new Map<string, UploadedEvent>();
   readonly deadlines = new Map<string, { changed: number; lease: number }>();
+  private readonly quarantined = new Set<string>();
   constructor(private readonly now: () => number) {}
   private owns(record: UploadRecord) {
     const current = this.records.get(record.wallpaper.id);
@@ -70,6 +71,9 @@ export class ControlledStore implements IngestionStore {
     Effect.sync(() => {
       if (!this.owns(record)) return;
       const attempts = record.attempts + 1;
+      if (record.state === 'stored' && attempts >= maxAttempts) {
+        this.quarantined.add(record.event.id);
+      }
       this.records.set(record.wallpaper.id, {
         ...record,
         attempts,
@@ -83,8 +87,10 @@ export class ControlledStore implements IngestionStore {
         .filter((record) => {
           const deadline = this.deadlines.get(record.wallpaper.id);
           return (
-            (record.state === 'uploading' || record.state === 'stored') &&
-            record.attempts < (record.state === 'uploading' ? 3 : 10) &&
+            (record.state === 'uploading' ||
+              (record.state === 'stored' &&
+                this.outbox.has(record.event.id) &&
+                !this.quarantined.has(record.event.id))) &&
             Boolean(
               deadline &&
                 deadline.changed < staleBefore.getTime() &&

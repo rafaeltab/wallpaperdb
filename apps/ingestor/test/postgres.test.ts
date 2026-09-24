@@ -6,7 +6,7 @@ import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postgresUploadsLayer } from '../src/adapters/postgres/index.js';
 import { IngestionStore, type UploadRecord } from '../src/ingestion/index.js';
-import { metadata } from './helpers/ingestion.js';
+import { ControlledStore, metadata } from './helpers/ingestion.js';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -191,12 +191,16 @@ describe('PostgreSQL ingestion contract', () => {
       )
     );
   });
-  it('releases failed upload content for a retry and quarantines exhausted committed publications', async () => {
+  it.each([
+    'PostgreSQL',
+    'controlled',
+  ])('%s releases failed uploads and preserves a lower retry limit quarantine', async (adapter) => {
     const failed = record('wlpr_failed', 'failed-owner');
     const quarantined = record('wlpr_quarantined', 'quarantined-owner');
     await runtime.runPromise(
-      IngestionStore.use((store) =>
-        Effect.gen(function* () {
+      IngestionStore.use((postgres) => {
+        const store = adapter === 'controlled' ? new ControlledStore(Date.now) : postgres;
+        return Effect.gen(function* () {
           yield* store.reserve(failed, new Date());
           yield* store.defer(failed, new Date(), 1);
           expect(yield* store.assetDisposition(failed.wallpaper.id)).toBe('remove');
@@ -205,7 +209,7 @@ describe('PostgreSQL ingestion contract', () => {
           ).toBe('Reserved');
           yield* store.reserve(quarantined, new Date());
           yield* store.stored(quarantined);
-          yield* store.defer({ ...quarantined, state: 'stored', attempts: 9 }, new Date(), 10);
+          yield* store.defer({ ...quarantined, state: 'stored' }, new Date(), 1);
           const later = new Date(Date.now() + 3600_000);
           expect(
             (yield* store.claim(later, later, later, 100)).some(
@@ -214,8 +218,44 @@ describe('PostgreSQL ingestion contract', () => {
           ).toBe(false);
           expect(yield* store.assetDisposition(quarantined.wallpaper.id)).toBe('retain');
           expect(yield* store.assetDisposition('does-not-exist')).toBe('remove');
-        })
-      )
+        });
+      })
+    );
+  });
+  it.each([
+    'PostgreSQL',
+    'controlled',
+  ])('%s permits higher retry limits for uploads and publications', async (adapter) => {
+    await runtime.runPromise(
+      IngestionStore.use((postgres) => {
+        const store = adapter === 'controlled' ? new ControlledStore(Date.now) : postgres;
+        return Effect.gen(function* () {
+          for (const state of ['uploading', 'stored'] as const) {
+            let candidate = record(`wlpr_${state}`, `owner-${state}`);
+            let now = new Date(Date.now() + 3600_000);
+            const maxAttempts = state === 'uploading' ? 4 : 11;
+            yield* store.reserve(candidate, now);
+            if (state === 'stored') {
+              yield* store.stored(candidate);
+              candidate = { ...candidate, state };
+            }
+            for (let attempts = 1; attempts < maxAttempts; attempts++) {
+              yield* store.defer(candidate, now, maxAttempts);
+              now = new Date(now.getTime() + 1);
+              const claimed = yield* store.claim(now, now, now, 100);
+              expect(claimed).toHaveLength(1);
+              const next = claimed[0];
+              if (!next) throw new Error('Missing retry');
+              expect(next.wallpaper.id).toBe(candidate.wallpaper.id);
+              expect(next.attempts).toBe(attempts);
+              candidate = next;
+            }
+            yield* store.defer(candidate, now, maxAttempts);
+            now = new Date(now.getTime() + 1);
+            expect(yield* store.claim(now, now, now, 100)).toEqual([]);
+          }
+        });
+      })
     );
   });
   it('rejects stale transitions and obeys active leases and batch bounds', async () => {

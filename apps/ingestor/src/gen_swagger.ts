@@ -10,7 +10,7 @@ const services = Layer.mergeAll(
   Layer.succeed(Admission, { admit: unavailable }),
   availabilityLayer.pipe(Layer.provide(Layer.succeed(AvailabilityProbe, { inspect: unavailable })))
 );
-const app = await createHttpApp({ nodeEnv: 'test', port: 3001, rateLimitMax: 100 }, services);
+const app = await createHttpApp({ nodeEnv: 'test', rateLimitMax: 100 }, services);
 try {
   await app.ready();
   await writeFile('swagger.json', JSON.stringify(app.swagger(), null, 2));

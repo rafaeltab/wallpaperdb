@@ -14,7 +14,6 @@ import { HttpExecution, httpExecutionLayer, type HttpServices } from '../runtime
 
 export interface HttpConfig {
   readonly nodeEnv: 'development' | 'production' | 'test';
-  readonly port: number;
   readonly rateLimitMax: number;
   readonly clerkSecretKey?: string;
   readonly clerkPublishableKey?: string;

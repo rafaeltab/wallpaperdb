@@ -19,7 +19,7 @@ Results use CloudEvents 1.0 on `wallpaper.colors.extracted`, with the unchanged 
 
 ## Resource ownership
 
-S3 reads have a 100-second deadline and health probes have a five-second deadline. Interruption aborts the request and closes its body. The image adapter serializes decoding in an owned child process. A ten-second deadline includes metadata reads and the pixel pipeline. Interruption or deadline kills the decoder and waits for process exit before releasing the permit. This also bounds nonresponsive native metadata work, which Sharp itself cannot cancel. The build emits `decoder.mjs` beside `index.mjs`; deploy both files.
+S3 reads have a 100-second deadline and health probes have a five-second deadline. Interruption aborts the request and closes its body. The image adapter serializes decoding in an owned child process. A ten-second deadline includes metadata reads and the pixel pipeline. Interruption or deadline kills the decoder and waits for process exit before releasing the permit. This also bounds nonresponsive native metadata work, which Sharp itself cannot cancel. The build emits `index.mjs`, `decoder.mjs` and deferred application chunks. Deploy the entire `dist` directory. The deferred imports let telemetry initialize before HTTP and storage clients load.
 
 Shutdown stops consumer intake, allows current work to finish within the configured drain period, then interrupts unfinished Effect work before closing clients. Failed startup releases resources already acquired. Health request fibers belong to the HTTP runtime. Telemetry exporters belong to the executable's outer scope.
 

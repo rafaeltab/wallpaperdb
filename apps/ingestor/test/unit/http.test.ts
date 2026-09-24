@@ -122,7 +122,7 @@ it('translates multipart bytes and authenticated ownership through the ingestion
   });
   expect(Buffer.from(uploads[0].bytes).toString()).toBe('image');
 });
-it.each<{ outcome: UploadOutcome; status: number; type: string }>([
+it.each<{ outcome: UploadOutcome; status: number; type: string; detail?: string }>([
   { outcome: { _tag: 'Duplicate', upload: receipt }, status: 200, type: 'already_uploaded' },
   { outcome: { _tag: 'InProgress' }, status: 409, type: 'upload-in-progress' },
   { outcome: { _tag: 'Unauthorized' }, status: 401, type: 'unauthorized' },
@@ -132,9 +132,15 @@ it.each<{ outcome: UploadOutcome; status: number; type: string }>([
     type: 'invalid-file-format',
   },
   {
-    outcome: { _tag: 'TooLarge', fileSizeBytes: 10, maxFileSizeBytes: 5, fileType: 'image' },
+    outcome: {
+      _tag: 'TooLarge',
+      fileSizeBytes: 51 * 1024 * 1024,
+      maxFileSizeBytes: 50 * 1024 * 1024,
+      fileType: 'image',
+    },
     status: 413,
     type: 'file-too-large',
+    detail: 'File size exceeds the 50 MiB limit for images.',
   },
   {
     outcome: {
@@ -148,8 +154,9 @@ it.each<{ outcome: UploadOutcome; status: number; type: string }>([
     },
     status: 400,
     type: 'dimensions-out-of-bounds',
+    detail: 'Image dimensions must be between 1280x720 and 7680x4320 pixels.',
   },
-])('maps $outcome._tag to a declared HTTP response', async ({ outcome, status, type }) => {
+])('maps $outcome._tag to a declared HTTP response', async ({ outcome, status, type, detail }) => {
   const { app } = await fixture(outcome);
   const response = await app.inject({ method: 'POST', url: '/upload', ...multipart() });
   expect(response.statusCode).toBe(status);
@@ -159,6 +166,7 @@ it.each<{ outcome: UploadOutcome; status: number; type: string }>([
     expect(response.json()).toMatchObject({
       status,
       type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
+      ...(detail ? { detail } : {}),
     });
   }
 });

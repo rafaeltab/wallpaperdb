@@ -97,7 +97,7 @@ export class ControlledStore implements IngestionStore {
         const claimed = { ...record, leaseToken: `${record.leaseToken}-claimed` };
         this.records.set(record.wallpaper.id, claimed);
         this.deadlines.set(record.wallpaper.id, {
-          changed: this.now(),
+          changed: this.deadlines.get(record.wallpaper.id)?.changed ?? this.now(),
           lease: leaseUntil.getTime(),
         });
         return claimed;
@@ -190,9 +190,9 @@ export function fixture(
     objects,
     published,
     layer,
-    advance: () =>
+    advance: (milliseconds = 11 * 60_000) =>
       Effect.sync(() => {
-        now += 11 * 60_000;
+        now += milliseconds;
       }),
   };
 }

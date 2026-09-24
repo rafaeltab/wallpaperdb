@@ -93,3 +93,16 @@ All demo-owned and worktree application/infrastructure containers were stopped a
 ## Delivery
 
 PR: https://github.com/rafaeltab/wallpaperdb/pull/230. The PR links the committed MP4 and its decoded-image/event verification notes. The published video URL returns HTTP 200. Both review axes have zero remaining findings; all requested local checks are complete.
+
+## PR comment follow-up
+
+Both inline review comments on PR #230 were valid and were fixed in separate test-only commits. Production source is unchanged by this follow-up.
+
+- [Unsupported-format test, comment 4099592663](https://github.com/rafaeltab/wallpaperdb/pull/230#discussion_r4099592663), fixed in `478dec6`. The fixture is now a valid GIF. The test checks both storage buckets for any object under the wallpaper prefix, regardless of extension. A temporary mutation that accepted and encoded GIF passed the old test but failed the corrected test. Restoring production code passed all nine image adapter tests.
+- [Telemetry propagation test, comment 4099592667](https://github.com/rafaeltab/wallpaperdb/pull/230#discussion_r4099592667), fixed in `c82f317`. A test-owned span decorates the public Availability port while preserving the production Layer and HTTP adapter. Renaming the application span passes. Removing the production tracer fails span export; removing the HTTP trace-context bridge fails the trace and parent ID assertions. All temporary mutations were restored before committing.
+
+Independent Standards and Spec reviews of `182fd0b...c82f317` each report zero findings. The Codecov comment accurately reports uncovered lines, but its checks pass and it identifies no additional runtime defect. Coverage scope remains unchanged.
+
+The full-stack verification encountered an empty local quarantine stream left over from an earlier migration run. It had unlimited size and age. After confirming it contained zero messages, its configuration was explicitly updated to 1 GiB and 30 days. The worker then became healthy. This changed only local test infrastructure.
+
+Follow-up verification passed `make check PACKAGE=variant-generator`, both focused integration files, and full `make ci` with the documented single-worker environment. CI completed 73 build/check/test tasks and 10 E2E/dependency tasks in 59 seconds; 69 and 8 tasks respectively used valid caches. `make test-e2e PACKAGE=web-e2e FORCE=1` then reran all three browser tests successfully against the healthy local stack. The service still passes all 74 tests. `make check-crap PACKAGE=variant-generator CRAP_THRESHOLD=30` reports zero of 56 functions above 30; `make crap PACKAGE=variant-generator` reports maximum 27.672. Whole-source coverage remains 96.09% lines, 87.30% functions and 91.22% branches.

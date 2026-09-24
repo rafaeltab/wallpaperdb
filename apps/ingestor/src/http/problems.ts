@@ -40,16 +40,14 @@ export function sendUpload(reply: FastifyReply, result: UploadOutcome) {
         fileSizeBytes: result.fileSizeBytes,
         maxFileSizeBytes: result.maxFileSizeBytes,
         fileType: result.fileType,
+        detail: `File size exceeds the ${result.maxFileSizeBytes / (1024 * 1024)} MiB limit for ${result.fileType}s.`,
       });
     case 'InvalidDimensions': {
       const { _tag, ...dimensions } = result;
-      return sendProblem(
-        reply,
-        400,
-        'dimensions-out-of-bounds',
-        'Dimensions Out of Bounds',
-        dimensions
-      );
+      return sendProblem(reply, 400, 'dimensions-out-of-bounds', 'Dimensions Out of Bounds', {
+        ...dimensions,
+        detail: `Image dimensions must be between ${result.minWidth}x${result.minHeight} and ${result.maxWidth}x${result.maxHeight} pixels.`,
+      });
     }
   }
 }

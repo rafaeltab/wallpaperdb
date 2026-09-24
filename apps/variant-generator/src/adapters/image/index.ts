@@ -109,6 +109,14 @@ class StoredVariantImages implements VariantImages {
                 operation: 'encode-image',
                 cause: new Error('Unsupported image format'),
               })
+            ).pipe(
+              Effect.tapError((error) =>
+                Effect.logError('Variant image format is unsupported', {
+                  operation: error.operation,
+                  mimeType,
+                  cause: error.cause,
+                })
+              )
             );
           }
           const output = yield* encodeImage(bytes, {

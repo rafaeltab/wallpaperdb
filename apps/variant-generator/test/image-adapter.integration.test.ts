@@ -88,6 +88,21 @@ describe('Stored variant image adapter', () => {
     expect(Result.isFailure(result)).toBe(true);
     if (Result.isFailure(result)) expect(result.failure.operation).toBe('read-image');
   });
+  it('returns a typed failure for unsupported image formats without writing a variant', async () => {
+    const key = 'unsupported-format';
+    await tester.s3.uploadObject('originals', key, Buffer.from('stored bytes'));
+    const result = await runtime.runPromise(Effect.result(Effect.gen(function* () {
+      return yield* (yield* VariantImages).generate({ ...input, wallpaperId: 'wlpr_unsupported', mimeType: 'image/gif', storage: { bucket: 'originals', key } }, { width: 80, height: 45, label: 'small' });
+    })));
+    expect(Result.isFailure(result)).toBe(true);
+    if (Result.isFailure(result)) {
+      expect(result.failure._tag).toBe('GenerationUnavailable');
+      expect(result.failure.operation).toBe('encode-image');
+      expect(result.failure.cause).toBeInstanceOf(Error);
+    }
+    expect(await tester.s3.objectExists('originals', 'wlpr_unsupported/variant_80x45.jpg')).toBe(false);
+    expect(await tester.s3.objectExists('originals', key)).toBe(true);
+  });
   it('checks configured storage health', async () => {
     expect(await runtime.runPromise(Effect.gen(function* () { return yield* (yield* ImageHealth).check(); }))).toBe(true);
   });

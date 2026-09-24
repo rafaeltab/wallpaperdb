@@ -87,14 +87,19 @@ class NatsColorEvents implements ColorEvents {
           timeout: 5000,
         })
       ).pipe(
-        Effect.onExit((exit) => Effect.gen(function* () {
-          const duration = (yield* Clock.currentTimeMillis) - started;
-          yield* Effect.sync(() => {
-            const attributes = { 'event.type': 'wallpaper.colors.extracted' };
-            recordCounter('events.published.total', 1, { ...attributes, status: Exit.isSuccess(exit) ? 'success' : 'error' });
-            recordHistogram('events.publish_duration_ms', duration, attributes);
-          }).pipe(Effect.catchCause(() => Effect.void));
-        })),
+        Effect.onExit((exit) =>
+          Effect.gen(function* () {
+            const duration = (yield* Clock.currentTimeMillis) - started;
+            yield* Effect.sync(() => {
+              const attributes = { 'event.type': 'wallpaper.colors.extracted' };
+              recordCounter('events.published.total', 1, {
+                ...attributes,
+                status: Exit.isSuccess(exit) ? 'success' : 'error',
+              });
+              recordHistogram('events.publish_duration_ms', duration, attributes);
+            }).pipe(Effect.catchCause(() => Effect.void));
+          })
+        ),
         Effect.uninterruptible
       )
     );

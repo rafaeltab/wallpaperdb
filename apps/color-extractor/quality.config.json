@@ -1,0 +1,4 @@
+{
+  "capabilities": ["extraction", "availability"],
+  "publicModules": ["extraction", "availability", "http", "adapters/image", "adapters/events"]
+}

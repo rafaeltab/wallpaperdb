@@ -257,15 +257,35 @@ it('interrupts unfinished extraction at the shutdown bound and leaves input retr
   }
 });
 it('quarantines malformed 64 KiB payloads byte for byte', async () => {
- const options={url:tester.nats.config.endpoints.fromHost,stream:'WALLPAPER',serviceName:'consumer-contract',retryDelayMs:10};
- const runtime=ManagedRuntime.make(natsConsumerLayer(options).pipe(Layer.provide(natsEventsLayer(options)),Layer.provide(Layer.succeed(ExtractColors,{extract:()=>Effect.die('Invalid input must not cross the driving port')}))));
- try {
-  await runtime.runPromise(ConsumerHealth);
-  const payload=new Uint8Array(64*1024).fill(255);
-  await (await tester.nats.getJsClient()).publish('wallpaper.uploaded',payload);
-  const manager=await (await tester.nats.getConnection()).jetstreamManager();
-  await expect.poll(async()=>(await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages).toBe(1);
-  const message=await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE',{last_by_subj:'color-extractor.quarantine'});
-  expect(message.data).toEqual(payload);
- }finally {await runtime.dispose();}
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'consumer-contract',
+    retryDelayMs: 10,
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: () => Effect.die('Invalid input must not cross the driving port'),
+        })
+      )
+    )
+  );
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const payload = new Uint8Array(64 * 1024).fill(255);
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(async () => (await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages)
+      .toBe(1);
+    const message = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+      last_by_subj: 'color-extractor.quarantine',
+    });
+    expect(message.data).toEqual(payload);
+  } finally {
+    await runtime.dispose();
+  }
 });

@@ -14,3 +14,5 @@ A child process owns each native encoding operation. Interruption kills and reap
 The deployment must include the complete `dist` directory. It contains `encoder.mjs` and deferred application chunks, which also preserve telemetry initialization before instrumented clients load.
 
 The context decision is recorded in `apps/variant-generator/docs/adr/0001-replay-safe-variant-generation.md`.
+
+Quarantine uses file storage, a 30-day repair horizon and a 1 GiB capacity with DiscardNew overflow. Startup rejects incompatible existing stream policies. Operators must export or repair retained input within that horizon. An input too large to fit with its quarantine headers is stored as bounded chunks followed by a manifest with stream sequences, total byte count and SHA-256. Replay reconstructs and verifies those bytes before republishing them. The input is acknowledged only after every publication succeeds; a full stream leaves it pending.

@@ -8,17 +8,18 @@ import {
   S3TesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, ManagedRuntime } from 'effect';
+import { Effect, Layer } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
-import { tracingLayer } from '../src/runtime.js';
-import { InProcessVariantGeneratorTesterBuilder } from './builders/index.js';
+import { variantGeneratorLayer } from '../src/app.js';
+import { Availability } from '../src/availability/index.js';
+import { createHttpApp } from '../src/http/index.js';
+import type { Config } from '../src/config.js';
 
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(S3TesterBuilder)
   .with(NatsTesterBuilder)
-  .with(InProcessVariantGeneratorTesterBuilder)
   .build();
 
 afterEach(() => {
@@ -35,8 +36,7 @@ describe('Production telemetry composition', () => {
       .withS3()
       .withS3Bucket('wallpapers')
       .withNats((nats) => nats.withJetstream())
-      .withStream('WALLPAPER')
-      .withInProcessApp();
+      .withStream('WALLPAPER');
     const exported = new Map<string, string[]>();
     const collector = createServer((request, response) => {
       const chunks: Buffer[] = [];
@@ -60,22 +60,36 @@ describe('Production telemetry composition', () => {
             otelServiceName: 'variant-generator-contract',
             otelEndpoint: `http://127.0.0.1:${address.port}/`,
           });
-          trace.getTracer('contract').startSpan('extraction.contract').end();
-          recordCounter('extraction.contract', 1);
-          const runtime = yield* Effect.acquireRelease(
-            Effect.sync(() => ManagedRuntime.make(tracingLayer)),
-            (runtime) => Effect.promise(() => runtime.dispose())
-          );
-          yield* Effect.promise(() =>
-            runtime.runPromise(
-              Effect.logInfo('Extraction completed').pipe(Effect.withSpan('effect.contract'))
-            )
-          );
+          trace.getTracer('contract').startSpan('telemetry.sdk.contract').end();
+          recordCounter('telemetry.sdk.contract', 1);
           yield* Effect.acquireRelease(Effect.succeed(tester), () =>
             Effect.promise(() => tester.destroy())
           );
           yield* Effect.tryPromise(() => tester.setup());
-          const app = tester.getApp();
+          const s3 = tester.getS3();
+          const config: Config = {
+            nodeEnv: 'test', port: 0, jpegQuality: 90, webpQuality: 90, pngCompressionLevel: 6,
+            s3Endpoint: s3.endpoints.fromHost, s3Region: 'us-east-1', s3Bucket: 'wallpapers',
+            s3AccessKeyId: s3.options.accessKey, s3SecretAccessKey: s3.options.secretKey,
+            natsUrl: tester.getNats().endpoints.fromHost, natsStream: 'WALLPAPER',
+            otelServiceName: 'variant-generator-contract',
+          };
+          // Decorate the public port while retaining the production dependencies and tracer.
+          // Only this test-owned span name is part of the telemetry contract.
+          const services = Layer.effect(Availability, Effect.gen(function* () {
+            const actual = yield* Availability;
+            return Availability.of({
+              health: (shuttingDown) => Effect.logInfo('Telemetry contract').pipe(
+                Effect.andThen(actual.health(shuttingDown)),
+                Effect.withSpan('telemetry.http.contract')
+              ),
+              ready: (shuttingDown, initialized) => actual.ready(shuttingDown, initialized),
+            });
+          })).pipe(Layer.provideMerge(variantGeneratorLayer(config, { otelHealthy: true })));
+          const app = yield* Effect.acquireRelease(
+            Effect.tryPromise(() => createHttpApp({ nodeEnv: 'test', port: 0 }, services)),
+            (app) => Effect.promise(() => app.close())
+          );
           const response = yield* Effect.promise(() =>
             app.inject({
               method: 'GET',
@@ -88,10 +102,10 @@ describe('Production telemetry composition', () => {
         }).pipe(Effect.scoped)
       );
       expect(status).toEqual({ _tag: 'Started' });
-      expect(exported.get('/v1/traces')?.join()).toContain('extraction.contract');
-      expect(exported.get('/v1/traces')?.join()).toContain('effect.contract');
-      expect(exported.get('/v1/metrics')?.join()).toContain('extraction.contract');
-      expect(exported.get('/v1/logs')?.join()).toContain('Extraction completed');
+      expect(exported.get('/v1/traces')?.join()).toContain('telemetry.sdk.contract');
+      expect(exported.get('/v1/traces')?.join()).toContain('telemetry.http.contract');
+      expect(exported.get('/v1/metrics')?.join()).toContain('telemetry.sdk.contract');
+      expect(exported.get('/v1/logs')?.join()).toContain('Telemetry contract');
       const spans: unknown[] = [];
       for (const body of exported.get('/v1/traces') ?? []) {
         JSON.parse(body, (key, value: unknown) => {
@@ -101,7 +115,7 @@ describe('Production telemetry composition', () => {
       }
       expect(spans).toContainEqual(
         expect.objectContaining({
-          name: 'availability.health',
+          name: 'telemetry.http.contract',
           traceId: '0123456789abcdef0123456789abcdef',
           parentSpanId: '0123456789abcdef',
         })

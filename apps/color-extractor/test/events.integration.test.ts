@@ -63,8 +63,9 @@ it('reports rejected publication as a typed failure without claiming completion'
       serviceName: 'events-contract',
     })
   );
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const { max_msg_size: originalMaxMessageSize } = (await manager.streams.info('WALLPAPER')).config;
   try {
-    const manager = await (await tester.nats.getConnection()).jetstreamManager();
     await manager.streams.update('WALLPAPER', { max_msg_size: 1 });
     const result = await runtime.runPromise(
       Effect.flatMap(ColorEvents, (events) =>
@@ -82,6 +83,10 @@ it('reports rejected publication as a typed failure without claiming completion'
         operation: 'publish-colors',
       });
   } finally {
-    await runtime.dispose();
+    try {
+      await manager.streams.update('WALLPAPER', { max_msg_size: originalMaxMessageSize });
+    } finally {
+      await runtime.dispose();
+    }
   }
 });

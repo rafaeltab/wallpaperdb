@@ -2,7 +2,7 @@
 
 [Watch the browser recording](variant-generator-effect.mp4) · 37.6 seconds · H.264 MP4 · 1,576,402 bytes.
 
-Recorded on 2026-09-24 against the built migrated worker, built Media and Gateway, the existing web application, and isolated real NATS, SeaweedFS, PostgreSQL, and OpenSearch instances. Frames at 1, 22, and 36 seconds were inspected.
+Recorded on 2026-09-24 against the migrated worker built from `ad2274e`, built Media and Gateway, the existing web application, and isolated real NATS, SeaweedFS, PostgreSQL, and OpenSearch instances. Frames at 1, 22, and 36 seconds were inspected.
 
 The fixture uploaded a fresh 3840×2160 JPEG derived from `apps/web-e2e/fixtures/fixture-b.jpg` to object storage and published `wallpaper.uploaded`. Media and Gateway projected the original before the worker started. The recording shows the original alone, then six generated variants after starting the migrated worker and refreshing. It selects 1920×1080, downloads it, and displays 640×360. Browser requests to Gateway GraphQL, Media image URLs, and the 1920×1080 download returned HTTP 200. No browser responses were mocked.
 
@@ -41,8 +41,11 @@ Stable variant storage identities and output event occurrences support replay. T
 
 ## Artifact hashes
 
+The recording predates the unsupported-format diagnostic and quarantine follow-ups. Successful generation and encoding are unchanged by those fixes; their focused tests and final CI provide separate evidence.
+
 SHA-256 of the files used during the recording:
 
 - `apps/variant-generator/dist/index.mjs`: `424eef176aa543a9cac202f1db40c60b895faff16acda900627222af7a956db4`
+- `apps/variant-generator/dist/server-INU7ZFZP.mjs`: `d2a2db895ad53d0a27b905da898fc4ea82a3f655e7f122574a53b51860e0fcee`
 - `apps/variant-generator/dist/encoder.mjs`: `f616f3f7fa1fc6d79b87ccfdc630ab18ccbc9fe22ff9ca5aa1946f5552c1240b`
 - `variant-generator-effect.mp4`: `234248a6718753d63f48050d18580feec8e8529c7df42428df09b0d309e96615`

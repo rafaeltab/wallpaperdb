@@ -1,131 +1,67 @@
 ---
 name: unslop
-description: Remove AI writing patterns from prose using either audit-only detection or a two-pass rewrite flow (diagnosis then reconstruction). Use this skill when editing, reviewing, or rewriting AI-generated content to make it sound human. Triggers on requests to "humanize", "de-slop", "fix AI text", "make it sound human", "remove AI patterns", or when reviewing text that contains obvious AI tells like "Here's the thing:", "Let that sink in", or "In today's fast-paced landscape". Also use when the user pastes text and says it "sounds like ChatGPT", "sounds robotic", "needs to sound more natural", or asks you to "clean up" drafted content before publishing.
-license: MIT
-user-invocable: true
-argument-hint: "[teach · cleanup · rewrite · mimic] [input]"
-metadata:
-  author: claytonkim
-  version: "2.3.0"
+description: Cut AI tells from any writing. Must always apply.
+disable-model-invocation: true
 ---
 
 # Unslop
 
-Humanize AI-generated prose. Audit first. Rewrite only when the user asks for a rewrite.
+Edit text to remove AI patterns.
 
-For every audit or rewrite, read [references/core-contract.md](references/core-contract.md).
-It is the single behavior contract. Command files define routing and mechanics;
-presets supply optional voice, but neither can override the core contract.
+## Process
 
-## Routing
+1. Scan for the patterns below.
+2. Rewrite. Preserve meaning, match intended tone.
 
-**When the user invokes a sub-command (`/unslop teach ...`, `/unslop cleanup
-...`), you MUST read `references/commands/<command>.md` before acting.
-Non-optional — the command file defines the flow, and skipping it drops steps the
-user expects.** A bare `/unslop <text>` with no leading command word defaults to
-`rewrite`. If the first word does not match a command but the intent clearly maps
-to one (e.g. "flag the AI tells, don't change anything" → `cleanup` report-only),
-load that command file and proceed as if invoked.
+## Patterns to detect and fix
 
-| Command | Purpose | File |
-|---------|---------|------|
-| `rewrite` | Default two-pass de-slop: diagnose, reconstruct under the guards, validate. | [references/commands/rewrite.md](references/commands/rewrite.md) |
-| `cleanup` | Co-writer: cheap detection, reviewable suggestions with contract gates; includes report-only "flag, change nothing". | [references/commands/cleanup.md](references/commands/cleanup.md) |
-| `teach` | Agent-driven voice building: harvest, approve, profile, layered card, scored demo. | [references/commands/teach.md](references/commands/teach.md) |
-| `mimic` | Voiced drafting or rewriting under the full gates; refine loop when one pass falls short. | [references/commands/mimic.md](references/commands/mimic.md) |
-| _maintenance_ | Turn a wild AI-ism into an eval row and a PR (not a top-level verb). | [references/commands/contribute.md](references/commands/contribute.md) |
+Rule numbers are stable ids that other skills cite. A removed rule leaves a gap.
 
-### Routing by phrase
+### Content
 
-Sub-flows are reachable by their natural names without being top-level verbs.
-When the user says any of these, load the named file and jump to the flow:
+3. **Superficial -ing phrases.** "highlighting...", "ensuring...", "reflecting...", "showcasing...", "fostering...". Delete or expand with real sources.
+5. **Vague attributions.** "Experts believe", "Industry reports suggest", "Some critics argue". Name the source or delete.
 
-| The user says | Go to |
-|---------------|-------|
-| `audit` / "just flag it" / "don't change anything" | [references/commands/cleanup.md](references/commands/cleanup.md#report-only) |
-| `review` / "review this before I publish" | [references/commands/cleanup.md](references/commands/cleanup.md#report-only) |
-| `harvest` / "what writing of mine do you have?" | [references/commands/teach.md](references/commands/teach.md#1-gather-samples-harvest) |
-| `calibrate` / "the A/B game" / "quiz me on my voice" | [references/commands/teach.md](references/commands/teach.md#calibrate) |
-| `refine` / "keep pushing until it sounds like me" | [references/commands/mimic.md](references/commands/mimic.md#refine) |
-| voice check / "does this sound like me?" | [references/commands/mimic.md](references/commands/mimic.md#voice-check) |
-| "found a new AI-ism" / "add this tell" | [references/commands/contribute.md](references/commands/contribute.md) |
+### Language
 
-## Interface
+7. **AI vocabulary.** Additionally, crucial, delve, enduring, enhance, fostering, garner, interplay, intricate, landscape (abstract), pivotal, showcase, tapestry (abstract), testament, underscore, vibrant. Replace with plain words.
+8. **Fancy ways to say "is".** "serves as", "stands as", "boasts", "features". Just say "is" or "has".
+9. **"Not just X, but Y."** State the point directly instead.
+10. **Rule of three.** Forcing ideas into groups of three. Use the natural number.
+11. **Synonym cycling.** Protagonist, main character, central figure, hero all in one paragraph. Pick one, repeat it.
+12. **False ranges.** "from X to Y" where X and Y aren't on a meaningful scale. List topics directly.
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--preset` | Voice style: `crisp`, `warm`, `expert`, `story` | `crisp` |
-| `--strict` | Fail if rubric score < 32/40 | false |
-| `--report` | Flag AI patterns without changing the text (cleanup) | false |
-| Input | Text to transform (argument, file path, or stdin) | required |
+### Style
 
-Read one preset from `presets/` before writing.
+13. **Em dash overuse.** Avoid em dashes entirely. Use periods or commas only (no parentheses, no en dashes, no hyphen-as-dash substitutes). If a thought needs separation, end the sentence or use a comma.
+14. **Colon overuse.** Colons are fine before a list or example. Not as mid-sentence connectors. "If you're coming from traditional automation: instead of registering event handlers, you describe conditions" adds nothing with the colon. Rewrite to let the point stand on its own without comparison framing. "Describing when the scheduler should fire works best as plain English." Same meaning, no crutch punctuation.
+15. **Boldface overuse.** Don't bold every proper noun or acronym.
+16. **Inline-header lists.** The tell is a bold label and colon that restates the line: "**Performance:** Performance improved...". Convert those to prose. A bold lead-in that ends in a period, names the item, and is followed by genuinely new detail ("**Schema in TypeScript.** Tables live in one file.") is fine, not a tell.
+17. **Title case headings.** Use sentence case.
+18. **Decorative emojis.** Remove from headings and bullets.
+19. **Curly quotes.** Replace with straight quotes.
 
-| Preset | Style | Best For |
-|--------|-------|----------|
-| `crisp` | Short, direct, no fluff | Technical writing, documentation |
-| `warm` | Friendly, conversational | Emails, blog posts |
-| `expert` | Authoritative, confident | Thought leadership, articles |
-| `story` | Narrative flow, show don't tell | Case studies, personal posts |
+### Communication artifacts
 
-Rewrite, preservation, register, and validation behavior lives only in
-`references/core-contract.md`; do not recreate or override those rules here.
+20. **Chatbot phrases.** "I hope this helps!", "Let me know if...", "Of course!", "Certainly!", "Found the smoking gun!" Remove.
+22. **Sycophantic tone.** "Great question! You're absolutely right!" Respond directly.
 
-## Output Format
+### Filler
 
-For a quick rewrite, return the cleaned text only. For audit-only (cleanup
-`--report`):
+23. **Filler phrases.** "In order to" becomes "To". "Due to the fact that" becomes "Because". "It is important to note that" gets deleted.
+24. **Excessive hedging.** "could potentially possibly be argued that it might" becomes "may".
+25. **Generic conclusions.** "The future looks bright." State specific plans or facts.
 
-```markdown
-## Issues Found
+### Jargon
 
-- [Quoted issue, category, severity, why it reads as AI]
+26. **Abstract metaphor nouns.** Substrate, wedge, vector, locus, vantage, nexus, primitive (as noun), harness (as metaphor), surface (as in "API surface"), bedrock, scaffolding (as metaphor), modality, paradigm, gold-plating, ratchet (as metaphor), evacuate (for moving code), endgame, north star, flywheel. These read as technical but usually have a plainer concrete word. "Substrate" becomes "base". "Wedge in" becomes "add". "Vector" becomes "way" or "method". "Gold-plating" becomes "more than the job needs". "Ratchet" becomes the mechanism's real name or "a limit that only tightens". "Evacuate" becomes "move out". "Endgame" becomes "the last phase". Pick the concrete word.
 
-## Assessment
+### Plain speech
 
-- [Which issues are clear problems]
-- [Which issues are judgment calls or context-dependent]
-```
-
-For strict or requested analysis:
-
-```markdown
-## Transformed Text
-
-[The humanized version]
-
-## Validation
-
-- Constraints: [X]/[Y] preserved
-- AI patterns: [N] remaining (was [M])
-- Structure: [pass/fail]
-- Readability: Grade [X], sentence variance [Y]
-- Change: [X]% from original
-- Score: [X]/40
-```
-
-## Reference Files
-
-| File | When to Read |
-|------|-------------|
-| `references/commands/*.md` | The routed command flows (rewrite, cleanup, teach, mimic, contribute). |
-| `references/pipeline.md` | Orchestrated tiered execution for multi-agent harnesses. |
-| `references/taboo-phrases.md` | Authoritative phrase catalog and scanner categories. |
-| `references/fact-preservation.md` | Constraint preservation rules. |
-| `references/rewrite-examples.md` | Executable before/after examples. |
-| `references/{mimic,harvest,calibrate}.md` | Voice-tool internals loaded by their routed command. |
-| `references/{rubric,edit-library,maintenance}.md` | Strict scoring, examples, and contribution procedures. |
-| `presets/*.md` | Voice-specific deltas. |
-
-## Maintenance
-
-The eval contracts define the product. Add scanner examples eval-first in
-`evals/fixtures/contracts/scanner-examples.json`; use
-`evals/adversarial-evals.json` for agent behavior and routing. Do not edit legacy
-`evals/evals.json`. New patterns need a false-negative example and a
-false-positive protection example. Agent behavior changes need a `skill` row
-and a regenerated shared benchmark. For the
-concrete procedures (add a phrase or structure, list current patterns, sync with
-Wikipedia's signs-of-AI-writing page), read `references/maintenance.md`. Found a
-new AI-ism in the wild? `references/commands/contribute.md` turns the exact
-snippet into a contract example and a structured PR, keeping both user-confirmation gates.
+27. **Say what it does, not how it feels.** "the database stays close at hand", "SQL you can read", "types that follow your schema" name a feeling. The fix names the mechanism or a number: "`.toSQL()` returns the exact string sent to the database", "a column rename fails the build". Ask what the sentence tells the reader to do or know, then write that. If you can't restate it as a concrete instruction, fact, or number, cut it. One more check: if the sentence could appear unchanged in another project's docs, it says nothing about this one. Cut it.
+28. **Shorten or split dense sentences.** If the reader has to backtrack to parse a sentence, break it in two or drop clauses. One idea per sentence.
+29. **Active voice.** Prefer it. Catch "is/are/was/were + past participle" and name the actor: "queries are validated" becomes "the compiler validates queries", "the file is parsed by the loader" becomes "the loader parses the file". Passive is fine only when the actor is unknown or genuinely doesn't matter.
+30. **Cut adverbs, or use a stronger verb.** "runs quickly" becomes "is fast" or the number. "significantly improves" becomes the measured delta. An adverb propping up a weak verb means the verb is wrong.
+31. **Prefer the plain word.** "utilize" becomes "use", "leverage" becomes "use", "facilitate" becomes "help", "numerous" becomes "many", "in the event that" becomes "if". The fancier synonym is rarely clearer.
+32. **Mannered prose.** Metaphor or flourish where a literal phrase exists: aphorisms ("wire it or delete it"), rhetorical fragments for effect, personified code ("the plan holds it"), figurative verbs ("rides along", "stands on"), stock framing phrases. "A dial worth turning" becomes "a parameter worth varying". Say what you mean. Rule 26 covers the metaphor nouns.
+33. **Over-compression.** Dropped articles, verbless fragments, symbol-speak, and abbreviations that make the reader decode instead of read. "Parser rejects bad date → exit 2, no write" becomes "The parser rejects a bad date, exits with code 2, and writes nothing." Write whole sentences with their articles and verbs, and spell out arrows and abbreviations.

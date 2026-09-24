@@ -21,6 +21,7 @@ export function translateUpload(payload: Uint8Array): ExtractionInput | undefine
       occurrence: { source: event.source, id: event.id },
       timestamp: event.time,
       ...(event.correlationid ? { correlationId: event.correlationid } : {}),
+      ...(event.causationid ? { causationId: event.causationid } : {}),
     };
   }
   const result = WallpaperUploadedEventSchema.safeParse(raw.value);

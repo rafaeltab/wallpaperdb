@@ -1,4 +1,7 @@
 import cors from '@fastify/cors';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { context, propagation, trace } from '@opentelemetry/api';
+import type { IncomingHttpHeaders } from 'node:http';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { Context, Effect, FiberSet, Layer, ManagedRuntime } from 'effect';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -30,7 +33,7 @@ function problem(status: number, name: string, title: string) {
   };
 }
 interface HttpExecution {
-  run<A, E>(effect: Effect.Effect<A, E, Availability>): Promise<A>;
+  run<A, E>(effect: Effect.Effect<A, E, Availability>, headers: IncomingHttpHeaders): Promise<A>;
 }
 const HttpExecution = Context.Service<HttpExecution>('wallpaperdb.color-extractor.http.Execution');
 const executionLayer = Layer.effect(
@@ -39,7 +42,15 @@ const executionLayer = Layer.effect(
     yield* Availability;
     const fibers = yield* FiberSet.make();
     const run = yield* FiberSet.runtimePromise(fibers)<Availability>();
-    return { run };
+    return {
+      run: <A, E>(effect: Effect.Effect<A, E, Availability>, headers: IncomingHttpHeaders) => {
+        const active = context.active();
+        const parent = (
+          trace.getSpan(active) ?? trace.getSpan(propagation.extract(active, headers))
+        )?.spanContext();
+        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect);
+      },
+    };
   })
 );
 export async function createHttpApp<E>(
@@ -128,9 +139,10 @@ export async function createHttpApp<E>(
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
         const result = await run(
-          Availability.use((service) => service.health(app.connectionsState.isShuttingDown))
+          Availability.use((service) => service.health(app.connectionsState.isShuttingDown)),
+          request.headers
         );
         if (result.status === 'healthy') return result;
         return reply
@@ -175,14 +187,15 @@ export async function createHttpApp<E>(
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
         const result = await run(
           Availability.use((service) =>
             service.ready(
               app.connectionsState.isShuttingDown,
               app.connectionsState.connectionsInitialized
             )
-          )
+          ),
+          request.headers
         );
         if (result.ready) return result;
         return reply

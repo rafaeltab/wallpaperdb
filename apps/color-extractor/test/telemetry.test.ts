@@ -3,7 +3,9 @@ import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import { Effect, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import { availabilityLayer, AvailabilityProbe } from '../src/availability/index.js';
+import { createHttpApp } from '../src/http/index.js';
 import { tracingLayer } from '../src/runtime.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
@@ -68,6 +70,31 @@ describe('Telemetry SDK ownership', () => {
               Effect.logInfo('Extraction completed').pipe(Effect.withSpan('effect.contract'))
             )
           );
+          const app = yield* Effect.acquireRelease(
+            Effect.tryPromise(() =>
+              createHttpApp(
+                { nodeEnv: 'test', port: 0 },
+                availabilityLayer.pipe(
+                  Layer.provide(
+                    Layer.succeed(AvailabilityProbe, {
+                      inspect: () =>
+                        Effect.succeed({ s3: true, nats: true, otel: true, consumer: true }),
+                    })
+                  ),
+                  Layer.provideMerge(tracingLayer)
+                )
+              )
+            ),
+            (app) => Effect.promise(() => app.close())
+          );
+          const response = yield* Effect.promise(() =>
+            app.inject({
+              method: 'GET',
+              url: '/health',
+              headers: { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01' },
+            })
+          );
+          expect(response.statusCode).toBe(200);
           return status;
         }).pipe(Effect.scoped)
       );
@@ -76,6 +103,20 @@ describe('Telemetry SDK ownership', () => {
       expect(exported.get('/v1/traces')?.join()).toContain('effect.contract');
       expect(exported.get('/v1/metrics')?.join()).toContain('extraction.contract');
       expect(exported.get('/v1/logs')?.join()).toContain('Extraction completed');
+      const spans: unknown[] = [];
+      for (const body of exported.get('/v1/traces') ?? []) {
+        JSON.parse(body, (key, value: unknown) => {
+          if (key === 'spans' && Array.isArray(value)) spans.push(...value);
+          return value;
+        });
+      }
+      expect(spans).toContainEqual(
+        expect.objectContaining({
+          name: 'availability.health',
+          traceId: '0123456789abcdef0123456789abcdef',
+          parentSpanId: '0123456789abcdef',
+        })
+      );
     } finally {
       collector.closeAllConnections();
       await new Promise<void>((resolve, reject) => {

@@ -256,7 +256,8 @@ it('interrupts unfinished extraction at the shutdown bound and leaves input retr
     await runtime.dispose();
   }
 });
-it('quarantines malformed 64 KiB payloads byte for byte', async () => {
+it('quarantines malformed 64 KiB payloads byte for byte without invoking extraction', async () => {
+  const calls: ExtractionInput[] = [];
   const options = {
     url: tester.nats.config.endpoints.fromHost,
     stream: 'WALLPAPER',
@@ -268,7 +269,10 @@ it('quarantines malformed 64 KiB payloads byte for byte', async () => {
       Layer.provide(natsEventsLayer(options)),
       Layer.provide(
         Layer.succeed(ExtractColors, {
-          extract: () => Effect.die('Invalid input must not cross the driving port'),
+          extract: (input) =>
+            Effect.sync(() => {
+              calls.push(input);
+            }).pipe(Effect.andThen(Effect.die('Invalid input must not cross the driving port'))),
         })
       )
     )
@@ -285,6 +289,8 @@ it('quarantines malformed 64 KiB payloads byte for byte', async () => {
       last_by_subj: 'color-extractor.quarantine',
     });
     expect(message.data).toEqual(payload);
+    expect(calls).toHaveLength(0);
+    expect(message.header.get('ce-reason')).toBe('Invalid');
   } finally {
     await runtime.dispose();
   }

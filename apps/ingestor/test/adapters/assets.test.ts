@@ -1,4 +1,9 @@
-import { CreateBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Effect, ManagedRuntime } from 'effect';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -54,7 +59,7 @@ describe('owned wallpaper assets', () => {
     client?.destroy();
     await container?.stop();
   });
-  it('stores, finds, lists, and idempotently removes an owned asset', async () => {
+  it('preserves original bytes and content type through the owned asset lifecycle', async () => {
     await runtime.runPromise(
       Effect.gen(function* () {
         const assets = yield* AssetStorage;
@@ -74,6 +79,17 @@ describe('owned wallpaper assets', () => {
             extension: reference.extension,
           },
         });
+        const stored = yield* Effect.promise(() =>
+          client.send(
+            new GetObjectCommand({
+              Bucket: 'ingestor-assets',
+              Key: 'wlpr_assets/original.png',
+            })
+          )
+        );
+        const storedBytes = yield* Effect.promise(async () => stored.Body?.transformToByteArray());
+        expect(storedBytes).toEqual(new Uint8Array([1, 2, 3]));
+        expect(stored.ContentType).toBe('image/png');
         expect(yield* assets.exists(reference)).toBe(true);
         expect((yield* assets.list()).assets).toContainEqual(reference);
         yield* assets.remove(reference);

@@ -17,6 +17,8 @@ Create a todo list of the implementation steps.
 
 ### 3. Implement and Commit
 
+When changing code, use TDD for each small behavior change: write one test through the relevant public interface, run it and confirm it fails, write the minimum code to make it pass, then refactor while keeping tests green. Repeat this cycle for the next behavior.
+
 Make small, focused changes following existing code conventions and patterns. After each increment, run the relevant checks and format the affected code with the applicable Make target, then commit that increment with a descriptive message before starting the next one. Keep unrelated work out of each commit.
 
 ### 4. Validate

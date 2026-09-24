@@ -1,0 +1,33 @@
+import { Effect, Schema, type Scope } from 'effect';
+import type { FastifyInstance } from 'fastify';
+import { createApp } from './app.js';
+import type { Config } from './config.js';
+export class StartupFailure extends Schema.TaggedError<StartupFailure>()('StartupFailure', {
+  stage: Schema.Literals(['application', 'listener']),
+  cause: Schema.Defect(),
+}) {}
+const close = (app: FastifyInstance) => Effect.tryPromise(() => app.close()).pipe(Effect.orDie);
+export const startVariantGenerator = Effect.fn('variant-generator.start')(function* (
+  config: Config,
+  options: { readonly otelHealthy?: boolean } = {}
+): Effect.fn.Return<{ readonly address: string }, StartupFailure, Scope.Scope> {
+  const app = yield* Effect.acquireRelease(
+    Effect.callback<FastifyInstance, StartupFailure>((resume, signal) => {
+      const starting = createApp(config, { logger: true, signal, ...options });
+      starting.then(
+        (app) => resume(Effect.succeed(app)),
+        (cause) => resume(Effect.fail(new StartupFailure({ stage: 'application', cause })))
+      );
+      return Effect.tryPromise(() => starting).pipe(
+        Effect.matchEffect({ onFailure: () => Effect.void, onSuccess: close })
+      );
+    }),
+    close,
+    { interruptible: true }
+  );
+  const address = yield* Effect.tryPromise({
+    try: () => app.listen({ port: config.port, host: '0.0.0.0' }),
+    catch: (cause) => new StartupFailure({ stage: 'listener', cause }),
+  });
+  return { address };
+});

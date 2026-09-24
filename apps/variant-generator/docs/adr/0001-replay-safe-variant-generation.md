@@ -1,0 +1,11 @@
+# Replay-safe variant generation with bounded native work
+
+Variant generation uses Effect capabilities and scoped adapter Layers. Generation continues after an individual preset fails, but a batch fails until every selected variant has been stored and its announcement acknowledged by JetStream. Previously the service swallowed publication failures and acknowledged incomplete batches.
+
+S3 and NATS are independent resources. Retrying uses existing deterministic object keys and output occurrence identities derived from the input occurrence and variant. Publication waits for PubAck; an ambiguous publication is safe to retry with the same identity. Stable identities supplement broker deduplication rather than claiming exactly-once delivery. Three failed attempts lead to durable quarantine before acknowledging input; failures to quarantine keep input pending without further generation.
+
+Output uses binary CloudEvents with the existing JSON payload because Media still consumes that payload. Input accepts retained legacy envelopes and Ingestor's structured CloudEvents. Input time supplies stable variant creation and output occurrence times. Object keys, format settings, preset order and nominal dimensions remain compatible. Nominal dimensions describe preset bounds; actual image dimensions can be smaller due to aspect-preserving fit.
+
+Native Sharp work runs in a subprocess because a Promise timeout cannot stop libvips. Interruption kills and reaps the child before releasing the single processing permit. Each source is bounded to 50 MiB, encoded output to 64 MiB, native work to 60 seconds, and one complete variant to 100 seconds. S3 requests and body reads abort on interruption. Deploy the entire dist directory, including encoder.mjs and deferred application chunks. Starting one process per variant adds overhead in exchange for enforceable shutdown and deadline bounds.
+
+Original storage coordinates remain in the retained producer contract. A logical asset resolver needs coordinated producer and history migration and is deferred. Generated variants remain owned by this context; neither this migration nor its cleanup deletes source or generated objects. Changing encoding policy for existing keys requires a future versioned target identity policy.

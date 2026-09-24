@@ -2,28 +2,20 @@ import { defineBaseConfig } from '@wallpaperdb/vitest-config';
 
 export default defineBaseConfig({
   test: {
-    name: 'variant-generator',
+    name: 'variant-generator-all',
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],
-    exclude: ['test/**/*.integration.test.ts', 'test/integration/**/*.test.ts', 'test/health.test.ts'],
     testTimeout: 120000,
     hookTimeout: 60000,
     maxConcurrency: 1,
     maxWorkers: 1,
     fileParallelism: false,
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        maxThreads: 5,
-        minThreads: 2,
-      },
-    },
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
-      reportsDirectory: './coverage/unit',
+      reportsDirectory: './coverage',
     },
   },
 });

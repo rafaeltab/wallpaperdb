@@ -11,7 +11,7 @@
     "start": "node dist/index.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "lint": "biome lint . && node ../../scripts/gateway-architecture.mjs && node --test ../../scripts/gateway-checks.test.mjs",
+    "lint": "biome lint . && node ../../scripts/check-architecture.mjs apps/gateway && node --test ../../scripts/check-architecture.test.mjs",
     "lint:fix": "biome lint --write .",
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",

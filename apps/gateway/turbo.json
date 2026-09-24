@@ -14,8 +14,8 @@
     "lint": {
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/scripts/gateway-architecture.mjs",
-        "$TURBO_ROOT$/scripts/gateway-checks.test.mjs",
+        "$TURBO_ROOT$/scripts/check-architecture.mjs",
+        "$TURBO_ROOT$/scripts/check-architecture.test.mjs",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/packages/*/src/**"
       ]

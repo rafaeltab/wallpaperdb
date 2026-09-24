@@ -1,0 +1,131 @@
+import { createServer } from 'node:http';
+import type { Socket } from 'node:net';
+import { context, metrics, propagation, trace } from '@opentelemetry/api';
+import { logs } from '@opentelemetry/api-logs';
+import { recordCounter } from '@wallpaperdb/core/telemetry';
+import { Effect, ManagedRuntime, Result } from 'effect';
+import { tracingLayer } from '../src/runtime.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { initializeOtel } from '../src/otel-init.js';
+
+afterEach(() => {
+  logs.disable();
+  trace.disable();
+  metrics.disable();
+  context.disable();
+  propagation.disable();
+});
+
+describe('Telemetry SDK ownership', () => {
+  it('allows startup when disabled or when configuration cannot initialize telemetry', async () => {
+    expect(
+      await Effect.runPromise(
+        initializeOtel({ otelServiceName: 'color-extractor' }).pipe(Effect.scoped)
+      )
+    ).toEqual({ _tag: 'Disabled' });
+    expect(
+      await Effect.runPromise(
+        initializeOtel({
+          otelServiceName: 'color-extractor',
+          otelEndpoint: 'invalid URL',
+        }).pipe(Effect.scoped)
+      )
+    ).toEqual({ _tag: 'Unavailable' });
+  });
+
+  it('exports traces, logs and shared core metrics before its owning scope closes', async () => {
+    const exported = new Map<string, string[]>();
+    const collector = createServer((request, response) => {
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        const path = request.url ?? '';
+        exported.set(path, [...(exported.get(path) ?? []), Buffer.concat(chunks).toString()]);
+        response.writeHead(200);
+        response.end();
+      });
+    });
+    await new Promise<void>((resolve) => {
+      collector.listen(0, '127.0.0.1', resolve);
+    });
+    try {
+      const address = collector.address();
+      if (!address || typeof address === 'string') throw new Error('Missing collector TCP address');
+      const status = await Effect.runPromise(
+        Effect.gen(function* () {
+          const status = yield* initializeOtel({
+            otelServiceName: 'color-extractor-contract',
+            otelEndpoint: `http://127.0.0.1:${address.port}/`,
+          });
+          trace.getTracer('contract').startSpan('extraction.contract').end();
+          recordCounter('extraction.contract', 1);
+          const runtime = yield* Effect.acquireRelease(
+            Effect.sync(() => ManagedRuntime.make(tracingLayer)),
+            (runtime) => Effect.promise(() => runtime.dispose())
+          );
+          yield* Effect.promise(() =>
+            runtime.runPromise(
+              Effect.logInfo('Extraction completed').pipe(Effect.withSpan('effect.contract'))
+            )
+          );
+          return status;
+        }).pipe(Effect.scoped)
+      );
+      expect(status).toEqual({ _tag: 'Started' });
+      expect(exported.get('/v1/traces')?.join()).toContain('extraction.contract');
+      expect(exported.get('/v1/traces')?.join()).toContain('effect.contract');
+      expect(exported.get('/v1/metrics')?.join()).toContain('extraction.contract');
+      expect(exported.get('/v1/logs')?.join()).toContain('Extraction completed');
+    } finally {
+      collector.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
+        collector.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  });
+
+  it('closes stalled collector sockets when later application startup fails', async () => {
+    const sockets = new Set<Socket>();
+    const collector = createServer((request, response) => {
+      request.resume();
+      response.writeHead(200);
+      response.write(' ');
+      const interval = setInterval(() => response.write(' '), 50);
+      response.once('close', () => clearInterval(interval));
+    });
+    collector.on('connection', (socket) => {
+      sockets.add(socket);
+      socket.once('close', () => sockets.delete(socket));
+    });
+    await new Promise<void>((resolve) => {
+      collector.listen(0, '127.0.0.1', resolve);
+    });
+    try {
+      const address = collector.address();
+      if (!address || typeof address === 'string') throw new Error('Missing collector TCP address');
+      const started = performance.now();
+      const exit = await Effect.runPromiseExit(
+        Effect.gen(function* () {
+          const status = yield* initializeOtel({
+            otelServiceName: 'color-extractor-stalled',
+            otelEndpoint: `http://127.0.0.1:${address.port}`,
+          });
+          expect(status).toEqual({ _tag: 'Started' });
+          trace.getTracer('contract').startSpan('shutdown.contract').end();
+          recordCounter('shutdown.contract', 1);
+          logs.getLogger('contract').emit({ body: 'Shutdown contract' });
+          return yield* Effect.fail('application startup failed');
+        }).pipe(Effect.scoped)
+      );
+      expect(exit._tag).toBe('Failure');
+      expect(performance.now() - started).toBeLessThan(6000);
+      await vi.waitFor(() => expect(sockets.size).toBe(0), { timeout: 1000 });
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      collector.closeAllConnections();
+      await new Promise<void>((resolve, reject) => {
+        collector.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  });
+});

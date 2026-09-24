@@ -10,7 +10,7 @@
     "start": "node dist/index.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "lint": "biome lint .",
+    "lint": "biome lint . && node ../../scripts/check-architecture.mjs apps/color-extractor",
     "lint:fix": "biome lint --write .",
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
@@ -18,7 +18,8 @@
     "test:unit": "vitest run --coverage",
     "test:integration": "vitest run --coverage --config vitest.integration.config.ts",
     "test:all": "vitest run --coverage --config vitest.all.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "format:files": "biome format --write"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.709.0",
@@ -26,24 +27,28 @@
     "@fastify/swagger": "^9.0.0",
     "@fastify/swagger-ui": "^5.0.0",
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.52.1",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.56.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.56.0",
-    "@opentelemetry/sdk-metrics": "^1.29.0",
-    "@opentelemetry/sdk-node": "^0.56.0",
+    "@opentelemetry/auto-instrumentations-node": "0.80.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/sdk-metrics": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
     "@wallpaperdb/core": "workspace:*",
     "@wallpaperdb/events": "workspace:*",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.0",
-    "fastify-plugin": "^5.1.0",
     "nats": "^2.29.1",
-    "reflect-metadata": "^0.2.2",
     "sharp": "^0.33.5",
-    "tsyringe": "^4.10.0",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.23.0",
     "effect": "4.0.0-rc.115",
-    "@effect/opentelemetry": "4.0.0-rc.115"
+    "@effect/opentelemetry": "4.0.0-rc.115",
+    "@effect/platform-node-shared": "4.0.0-rc.115",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@opentelemetry/sdk-trace-node": "2.11.0",
+    "@opentelemetry/api-logs": "0.222.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.222.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
@@ -58,5 +63,6 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"
-  }
+  },
+  "exports": {}
 }

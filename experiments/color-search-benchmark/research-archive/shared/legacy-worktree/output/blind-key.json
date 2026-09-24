@@ -1,0 +1,45 @@
+{
+  "selectedOnDevelopment": "palette32-06",
+  "queries": {
+    "orange": {
+      "A": "palette32-06",
+      "B": "l2-raw",
+      "C": "cosine-default"
+    },
+    "teal": {
+      "A": "cosine-default",
+      "B": "l2-raw",
+      "C": "palette32-06"
+    },
+    "sky": {
+      "A": "cosine-default",
+      "B": "l2-raw",
+      "C": "palette32-06"
+    },
+    "navy": {
+      "A": "l2-raw",
+      "B": "cosine-default",
+      "C": "palette32-06"
+    },
+    "magenta": {
+      "A": "l2-raw",
+      "B": "cosine-default",
+      "C": "palette32-06"
+    },
+    "rose": {
+      "A": "cosine-default",
+      "B": "palette32-06",
+      "C": "l2-raw"
+    },
+    "cream": {
+      "A": "l2-raw",
+      "B": "cosine-default",
+      "C": "palette32-06"
+    },
+    "black-red": {
+      "A": "palette32-06",
+      "B": "l2-raw",
+      "C": "cosine-default"
+    }
+  }
+}

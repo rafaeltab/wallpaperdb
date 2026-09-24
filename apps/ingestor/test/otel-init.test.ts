@@ -2,9 +2,10 @@ import { createServer } from 'node:http';
 import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
-import { Effect } from 'effect';
+import { Effect, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
+import { ingestorTracingLayer } from '../src/runtime.js';
 
 afterEach(() => {
   logs.disable();
@@ -89,7 +90,13 @@ describe('ingestor telemetry ownership', () => {
           });
           trace.getTracer('ingestor-contract').startSpan('telemetry.contract').end();
           metrics.getMeter('ingestor-contract').createCounter('telemetry.contract').add(1);
-          logs.getLogger('ingestor-contract').emit({ body: 'telemetry contract' });
+          const runtime = yield* Effect.acquireRelease(
+            Effect.sync(() => ManagedRuntime.make(ingestorTracingLayer)),
+            (runtime) => Effect.promise(() => runtime.dispose())
+          );
+          yield* Effect.promise(() =>
+            runtime.runPromise(Effect.logError('Effect diagnostic contract'))
+          );
           return status;
         }).pipe(Effect.scoped)
       );

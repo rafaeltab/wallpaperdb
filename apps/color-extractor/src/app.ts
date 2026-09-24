@@ -58,7 +58,7 @@ export function colorExtractorLayer(config: Config, options: AppOptions = {}) {
       });
     })
   ).pipe(Layer.provide(Layer.mergeAll(image, events, consumer)));
-  return availabilityLayer.pipe(Layer.provide(probe), Layer.provide(tracingLayer));
+  return availabilityLayer.pipe(Layer.provide(probe), Layer.provideMerge(tracingLayer));
 }
 export async function createApp(
   config: Config,

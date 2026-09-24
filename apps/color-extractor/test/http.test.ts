@@ -9,6 +9,35 @@ const services = availabilityLayer.pipe(
     })
   )
 );
+it('documents successful and unavailable health/readiness response bodies', async () => {
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3007 }, services);
+  try {
+    const document = (await app.inject('/documentation/json')).json();
+    for (const [path, success, extension] of [
+      ['/health', 'HealthResponse', 'healthStatus'],
+      ['/ready', 'ReadyResponse', 'ready'],
+    ]) {
+      const responses = document.paths[path].get.responses;
+      expect(responses['200'].content['application/json'].schema).toEqual({
+        $ref: `#/components/schemas/${success}`,
+      });
+      const unavailable = responses['503'].content['application/problem+json'].schema;
+      expect(unavailable.allOf).toContainEqual({ $ref: '#/components/schemas/ProblemDetails' });
+      expect(unavailable.allOf).toContainEqual(
+        expect.objectContaining({
+          required: expect.arrayContaining(['type', 'title', 'status', 'timestamp', extension]),
+          properties: expect.objectContaining({
+            status: { type: 'integer', enum: [503] },
+            timestamp: { type: 'string' },
+            [extension]: expect.any(Object),
+          }),
+        })
+      );
+    }
+  } finally {
+    await app.close();
+  }
+});
 it('serves health, readiness, OpenAPI, CORS and safe errors', async () => {
   const app = await createHttpApp({ nodeEnv: 'development', port: 3007 }, services);
   try {

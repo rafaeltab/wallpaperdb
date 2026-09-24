@@ -17,6 +17,11 @@ export interface HttpConfig {
   readonly nodeEnv: 'development' | 'production' | 'test';
   readonly port: number;
 }
+const unavailableFields = {
+  status: { type: 'integer', enum: [503] },
+  timestamp: { type: 'string' },
+};
+const unavailableRequired = ['type', 'title', 'status', 'timestamp'];
 function problem(status: number, name: string, title: string) {
   return {
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${name}.md`,
@@ -89,7 +94,40 @@ export async function createHttpApp<E>(
     });
     app.get(
       '/health',
-      { schema: { summary: 'Dependency health', tags: ['Health'] } },
+      {
+        schema: {
+          summary: 'Dependency health',
+          tags: ['Health'],
+          response: {
+            200: { $ref: 'HealthResponse#' },
+            503: {
+              description: 'Service is degraded, unhealthy, or shutting down',
+              content: {
+                'application/problem+json': {
+                  schema: {
+                    allOf: [
+                      { $ref: 'ProblemDetails#' },
+                      {
+                        type: 'object',
+                        required: [...unavailableRequired, 'healthStatus', 'checks'],
+                        properties: {
+                          ...unavailableFields,
+                          healthStatus: {
+                            type: 'string',
+                            enum: ['degraded', 'unhealthy', 'shutting_down'],
+                          },
+                          checks: { type: 'object', additionalProperties: { type: 'boolean' } },
+                          totalDurationMs: { type: 'number' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       async (_request, reply) => {
         const result = await run(
           Availability.use((service) => service.health(app.connectionsState.isShuttingDown))
@@ -107,7 +145,36 @@ export async function createHttpApp<E>(
     );
     app.get(
       '/ready',
-      { schema: { summary: 'Readiness', tags: ['Health'] } },
+      {
+        schema: {
+          summary: 'Readiness',
+          tags: ['Health'],
+          response: {
+            200: { $ref: 'ReadyResponse#' },
+            503: {
+              description: 'Service is not initialized or is shutting down',
+              content: {
+                'application/problem+json': {
+                  schema: {
+                    allOf: [
+                      { $ref: 'ProblemDetails#' },
+                      {
+                        type: 'object',
+                        required: [...unavailableRequired, 'ready', 'reason'],
+                        properties: {
+                          ...unavailableFields,
+                          ready: { type: 'boolean', enum: [false] },
+                          reason: { type: 'string' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       async (_request, reply) => {
         const result = await run(
           Availability.use((service) =>

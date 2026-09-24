@@ -3,7 +3,7 @@ import {
   DockerTesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { ConsumerHealth, natsConsumerLayer } from '../src/adapters/events/index.js';
@@ -12,6 +12,10 @@ import {
   GenerationUnavailable,
   type GenerationInput,
 } from '../src/generation/index.js';
+const decodeManifest = Schema.decodeUnknownSync(Schema.Struct({
+  quarantineId: Schema.String, chunkCount: Schema.Number, chunkSize: Schema.Number,
+  totalBytes: Schema.Number, sha256: Schema.String, sequences: Schema.Array(Schema.Number),
+}));
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(NatsTesterBuilder)
@@ -342,5 +346,151 @@ it('translates canonical CloudEvents and retries technical failures without ackn
     expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).state.messages).toBe(0);
   } finally {
     await runtime.dispose();
+  }
+});
+
+it('durably quarantines an invalid body at the broker payload limit without losing bytes', async () => {
+  const options = {
+    url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER',
+    serviceName: 'quarantine-limit-contract', retryDelayMs: 10,
+  };
+  const runtime = ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provide(natsEventsLayer(options)),
+    Layer.provide(Layer.succeed(GenerateVariants, {
+      generate: () => Effect.die('Invalid input must not cross the driving port'),
+    })),
+  ));
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const connection = await tester.nats.getConnection();
+    const limit = connection.info?.max_payload;
+    if (!limit) throw new Error('Broker did not advertise its payload limit');
+    const payload = new Uint8Array(limit).fill(255);
+    const manager = await connection.jetstreamManager();
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    await expect.poll(async () => (await manager.consumers.info(
+      'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
+    )).ack_floor.consumer_seq, { timeout: 3000 }).toBe(1);
+    const info = await manager.streams.info('VARIANT_GENERATOR_QUARANTINE');
+    const manifestMessage = await manager.streams.getMessage('VARIANT_GENERATOR_QUARANTINE', {
+      last_by_subj: 'variant-generator.quarantine',
+    });
+    const manifest = decodeManifest(manifestMessage.json());
+    expect(manifestMessage.header.get('ce-type')).toBe('variant-generator.upload.quarantine-manifest');
+    const chunks: Uint8Array[] = [];
+    for (let sequence = info.state.first_seq; sequence < info.state.last_seq; sequence++) {
+      const chunk = await manager.streams.getMessage('VARIANT_GENERATOR_QUARANTINE', { seq: sequence });
+      expect(chunk.header.get('ce-quarantineid')).toBe(manifest.quarantineId);
+      expect(chunk.header.get('ce-chunkindex')).toBe(String(chunks.length));
+      chunks.push(chunk.data);
+    }
+    expect(chunks).toHaveLength(manifest.chunkCount);
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('leaves exhausted input pending after a chunk rejection and resumes the durable handoff', async () => {
+  let attempts = 0;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER',
+    serviceName: 'quarantine-partial-contract', retryDelayMs: 20,
+  };
+  const runtime = ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provide(natsEventsLayer(options)),
+    Layer.provide(Layer.succeed(GenerateVariants, {
+      generate: () => Effect.suspend(() => {
+        attempts++;
+        return Effect.fail(new GenerationUnavailable({ operation: 'controlled', cause: 'offline' }));
+      }),
+    })),
+  ));
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: 2048, max_msgs: 1 });
+    const event = upload('partial-quarantine');
+    event.wallpaper.originalFilename = 'x'.repeat(8192);
+    const payload = new TextEncoder().encode(JSON.stringify(event));
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    await expect.poll(async () => (await manager.consumers.info(
+      'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
+    )).delivered.consumer_seq, { timeout: 5000 }).toBeGreaterThanOrEqual(4);
+    expect(attempts).toBe(3);
+    expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).state.messages).toBe(1);
+    expect((await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer')).num_ack_pending).toBe(1);
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msgs: -1 });
+    await expect.poll(async () => (await manager.consumers.info(
+      'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
+    )).num_ack_pending, { timeout: 5000 }).toBe(0);
+    expect(attempts).toBe(3);
+    const manifest = decodeManifest((await manager.streams.getMessage('VARIANT_GENERATOR_QUARANTINE', {
+      last_by_subj: 'variant-generator.quarantine',
+    })).json());
+    const chunks = await Promise.all(manifest.sequences.map(async (seq: number) =>
+      (await manager.streams.getMessage('VARIANT_GENERATOR_QUARANTINE', { seq })).data));
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
+    expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).state.messages).toBe(manifest.chunkCount + 1);
+  } finally {
+    await runtime.dispose();
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: -1, max_msgs: -1 });
+  }
+});
+
+it.each([{ max_bytes: -1 }, { max_age: 300 * 1_000_000_000 }, { max_msgs_per_subject: 1 }])('refuses incompatible quarantine policy %j without overwriting it', async (override) => {
+  const options = {
+    url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER', serviceName: 'quarantine-config-contract',
+  };
+  const makeRuntime = () => ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provide(natsEventsLayer(options)),
+    Layer.provide(Layer.succeed(GenerateVariants, { generate: () => Effect.die('no input') })),
+  ));
+  const initial = makeRuntime();
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  await initial.runPromise(ConsumerHealth);
+  await initial.dispose();
+  const config = (await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).config;
+  expect(config).toMatchObject({ retention: 'limits', storage: 'file', discard: 'new',
+    max_bytes: 1024 * 1024 * 1024, max_age: 30 * 24 * 60 * 60 * 1_000_000_000 });
+  await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', override);
+  const incompatible = makeRuntime();
+  try {
+    await expect(incompatible.runPromise(ConsumerHealth)).rejects.toMatchObject({ _tag: 'GenerationUnavailable', operation: 'configure-quarantine' });
+    expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).config).toMatchObject(override);
+  } finally {
+    await incompatible.dispose();
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_bytes: 1024 * 1024 * 1024, max_age: 30 * 24 * 60 * 60 * 1_000_000_000, max_msgs_per_subject: -1 });
+  }
+});
+
+it.each([128, 1024])('keeps input pending when a %i-byte limit cannot hold its durable envelope', async (maxMessageSize) => {
+  const options = {
+    url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER',
+    serviceName: 'quarantine-envelope-contract', retryDelayMs: 20,
+  };
+  const runtime = ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provide(natsEventsLayer(options)),
+    Layer.provide(Layer.succeed(GenerateVariants, {
+      generate: () => Effect.die('invalid input must never generate'),
+    })),
+  ));
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: maxMessageSize });
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', new Uint8Array(64 * 1024).fill(255));
+    await expect.poll(async () => (await manager.consumers.info(
+      'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
+    )).delivered.consumer_seq).toBeGreaterThanOrEqual(2);
+    expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).state.messages).toBe(0);
+    expect((await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer')).num_ack_pending).toBe(1);
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: -1 });
+    await expect.poll(async () => (await manager.consumers.info(
+      'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
+    )).num_ack_pending).toBe(0);
+  } finally {
+    await runtime.dispose();
+    await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: -1 });
   }
 });

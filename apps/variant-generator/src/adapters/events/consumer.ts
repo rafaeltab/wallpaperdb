@@ -1,11 +1,11 @@
-import { createHash } from 'node:crypto';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { Cause, Clock, Context, Effect, Fiber, Layer, Metric, Ref, Schema, Stream } from 'effect';
-import { AckPolicy, DiscardPolicy, headers, StorageType, type JsMsg } from 'nats';
+import { AckPolicy, type JsMsg } from 'nats';
 import { GenerateVariants, GenerationUnavailable } from '../../generation/index.js';
 import { broker, NatsBroker, type NatsEventsOptions } from './broker.js';
 import { translateUpload } from './translation.js';
+import { ensureQuarantine, quarantine } from './quarantine.js';
 
 export interface ConsumerHealth {
   check(): Effect.Effect<boolean>;
@@ -14,54 +14,12 @@ export const ConsumerHealth = Context.Service<ConsumerHealth>(
   'wallpaperdb/variant-generator/ConsumerHealth'
 );
 const durable = 'variant-generator-wallpaper-uploaded-consumer';
-const quarantineStream = 'VARIANT_GENERATOR_QUARANTINE';
-const quarantineSubject = 'variant-generator.quarantine';
 const notFound = Schema.is(Schema.Struct({ code: Schema.Literal('404') }));
 
 function retryDelay(message: JsMsg, options: NatsEventsOptions) {
   return Math.min(
     30_000,
     (options.retryDelayMs ?? 1000) * 2 ** Math.min(message.info.deliveryCount - 1, 5)
-  );
-}
-
-function quarantine(brokerService: NatsBroker, message: JsMsg, reason: string) {
-  const info = message.info;
-  const id = createHash('sha256')
-    .update(
-      JSON.stringify([
-        info.domain,
-        info.account_hash,
-        info.stream,
-        info.consumer,
-        info.streamSequence,
-        info.timestampNanos,
-      ])
-    )
-    .update(message.data)
-    .digest('hex');
-  const metadata = headers();
-  metadata.set('ce-specversion', '1.0');
-  metadata.set('ce-source', 'https://wallpaperdb/variant-generator');
-  metadata.set('ce-id', id);
-  metadata.set('ce-type', 'variant-generator.upload.quarantined');
-  metadata.set('ce-time', new Date(info.timestampNanos / 1_000_000).toISOString());
-  metadata.set('ce-reason', reason);
-  metadata.set('ce-originalsubject', message.subject);
-  metadata.set('ce-consumer', info.consumer);
-  for (const key of ['traceparent', 'tracestate']) {
-    const value = message.headers?.get(key);
-    if (value && value.length <= 512) metadata.set(key, value);
-  }
-  // Preserve exact bytes without base64 expansion. A failed quarantine publication leaves
-  // the original unacknowledged and retries the durable handoff without rerunning generation.
-  return broker('quarantine-upload', () =>
-    brokerService.client.publish(quarantineSubject, message.data, {
-      headers: metadata,
-      msgID: id,
-      expect: { streamName: quarantineStream },
-      timeout: 5000,
-    })
   );
 }
 
@@ -192,20 +150,7 @@ export function natsConsumerLayer(
       const brokerService = yield* NatsBroker;
       const { client, manager, connection } = brokerService;
       const generator = yield* GenerateVariants;
-      yield* broker('inspect-quarantine', () => manager.streams.info(quarantineStream)).pipe(
-        Effect.catchIf(
-          (error) => notFound(error.cause),
-          () =>
-            broker('create-quarantine', () =>
-              manager.streams.add({
-                name: quarantineStream,
-                subjects: [quarantineSubject],
-                storage: StorageType.File,
-                discard: DiscardPolicy.New,
-              })
-            )
-        )
-      );
+      yield* ensureQuarantine(brokerService);
       const config = {
         durable_name: durable,
         ack_policy: AckPolicy.Explicit,

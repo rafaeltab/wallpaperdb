@@ -57,9 +57,9 @@ make run PACKAGE=ingestor SCRIPT=start
 
 Do not start the new ingestor until every upload-event consumer has been upgraded. Older consumer binaries reject the CloudEvents envelope and terminate those deliveries; upgrading them afterward does not trigger ordinary redelivery. Keep consumers on a version that accepts both formats while either can be retained or replayed.
 
-Use `make migrate PACKAGE=ingestor`, which prepares legacy reservations, applies generated Drizzle migrations, and adopts complete records. Do not invoke Drizzle Kit directly on an existing database: preparation must run before the broadened uniqueness constraint.
+`make migrate PACKAGE=ingestor` runs the standard Drizzle Kit migration command. A versioned SQL migration validates existing records, prepares legacy reservations before applying the broadened uniqueness constraint, and backfills recovery metadata and outbox entries. Drizzle records the migration in its journal so this data upgrade runs once.
 
-The upgrade preserves committed originals and their states, resolves duplicate unfinished reservations deterministically, and marks interrupted, uncommitted records with incomplete metadata failed so clients can retry. Incomplete committed records stop migration for repair without becoming eligible for cleanup. Legacy stored uploads receive one stable outbox occurrence. Migration can be rerun safely after a failure. The context ADR records this deployment requirement and the event compatibility scope.
+The upgrade preserves committed originals and their states, resolves duplicate unfinished reservations deterministically, and marks interrupted, uncommitted records with incomplete metadata failed so clients can retry. Incomplete committed records stop migration for repair without becoming eligible for cleanup. Legacy stored uploads receive one stable outbox occurrence. The schema changes and data upgrade share a transaction: a failure rolls them back, allowing the migration to be rerun after repair. The context ADR records this deployment requirement and the event compatibility scope.
 
 Non-test startup also requires `CLERK_SECRET_KEY` and `CLERK_PUBLISHABLE_KEY`. `HTTP_REQUEST_TIMEOUT_MS` bounds request receipt and socket inactivity (default two minutes).
 

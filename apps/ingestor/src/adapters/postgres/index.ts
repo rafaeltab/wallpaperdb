@@ -60,9 +60,6 @@ export interface PostgresUploads {
   check(): Effect.Effect<boolean>;
 }
 export const PostgresUploads = Context.Service<PostgresUploads>('wallpaperdb.ingestor.postgres');
-const PostgresResource = Context.Service<PostgresUploads & { readonly store: IngestionStore }>(
-  'wallpaperdb.ingestor.postgres.resource'
-);
 
 function operation<A>(name: string, run: () => Promise<A>): Effect.Effect<A, IngestionUnavailable> {
   return Effect.tryPromise({
@@ -320,8 +317,7 @@ class PostgresIngestionStore implements IngestionStore {
 }
 
 export function postgresUploadsLayer(config: { readonly databaseUrl: string }) {
-  const resource = Layer.effect(
-    PostgresResource,
+  return Layer.effectContext(
     Effect.gen(function* () {
       const pool = yield* Effect.acquireRelease(
         Effect.sync(
@@ -341,24 +337,15 @@ export function postgresUploadsLayer(config: { readonly databaseUrl: string }) {
       );
       yield* operation('connect', () => pool.query('SELECT 1'));
       const store = new PostgresIngestionStore(drizzle(pool, { schema }));
-      return {
-        store,
-        check: () =>
-          operation('health', () => pool.query('SELECT 1')).pipe(
-            Effect.as(true),
-            Effect.catchTag('IngestionUnavailable', () => Effect.succeed(false))
-          ),
-      };
+      return Context.make(IngestionStore, store).pipe(
+        Context.add(PostgresUploads, {
+          check: () =>
+            operation('health', () => pool.query('SELECT 1')).pipe(
+              Effect.as(true),
+              Effect.catchTag('IngestionUnavailable', () => Effect.succeed(false))
+            ),
+        })
+      );
     })
   );
-  return Layer.mergeAll(
-    Layer.effect(
-      IngestionStore,
-      PostgresResource.use((resource) => Effect.succeed(resource.store))
-    ),
-    Layer.effect(
-      PostgresUploads,
-      PostgresResource.use((resource) => Effect.succeed({ check: resource.check }))
-    )
-  ).pipe(Layer.provide(resource));
 }

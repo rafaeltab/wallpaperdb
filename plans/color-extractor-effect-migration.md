@@ -95,9 +95,9 @@ Base and merge-base: `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Reviewed full `
 
 Round two reviewed the complete PR again after these fixes; see final verification below. The requested video will be attached by the user, as confirmed in the session; provide the final inspected clip locally and leave the PR attachment gate open until attached.
 
-## Final verification
+## Verification before the telemetry follow-up
 
-The second independent Standards and Spec reviews examined the entire PR through `3e059e9`, against `origin/main` and merge-base `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Standards: zero applicable violations or actionable smells. Spec: zero actionable findings. Subsequent changes only record verification evidence.
+The second independent Standards and Spec reviews examined the entire PR through `3e059e9`, against `origin/main` and merge-base `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Standards: zero applicable violations or actionable smells. Spec: zero actionable findings. A subsequent built-artifact audit found that bundled imports bypassed SDK-first initialization and that HTTP trace parents were not passed into Effect. Commit `32c5e0a` fixes both, with regressions that failed first. A third full-PR review and verification run cover these changes.
 
 | Check | Result |
 | --- | --- |
@@ -128,3 +128,15 @@ The running service artifact had SHA256 `2caddea23f7e6b63e6877c37e69218bc8b42394
 Demonstration limits: Ingestor used a disposable test-mode identity; the generated curl block was hidden to avoid showing its fixture bearer value. The unchanged Media neighbor needed a temporary dependency resolver for its undeclared ioredis import. The color worker ran its normal built artifact without that resolver. The native color input used its DOM setter and bubbling input event to invoke the real application handler; no result or network response was mocked. Demo-owned browser, processes and containers were cleaned up.
 
 Remaining limits are explicit: lost-PubAck ambiguity and the elapsed 30-second heartbeat lack dedicated tests; oversized quarantine publications stay pending for repair; storage-coordinate contract migration is deferred. No follow-on service migration was started.
+
+## Final telemetry verification
+
+Commit `32c5e0a` preserves SDK-first initialization in generated JavaScript through deferred application chunks and carries incoming HTTP trace parents into Effect. Both regressions failed before the fix. Deploy the entire `dist` directory. Independent Standards and Spec round-three reviews examined the full PR through that commit against the same base and found zero applicable findings. The later documentation update records these results and the deployment requirement.
+
+- Combined service suite: 60 tests in 17 files, Vitest 5.33 seconds.
+- Unit/integration tiers: 45/15 tests, Vitest 5.00/5.08 seconds in final CI.
+- Whole-source coverage: lines/statements 1141/1187 = 96.12%; functions 49/57 = 85.96%; branches 232/262 = 88.54%. The same 17 source files remain included.
+- CRAP threshold 30: zero of 50 inventoried functions exceed it; maximum remains 27.672 for `consumeMessage`.
+- `GITHUB_ACTIONS=true make ci` passed again: 72 build/check/unit/integration tasks and 10 E2E/dependency tasks. Turbo reused 68 and 8 successful task caches respectively. The CI runner reported 42 seconds, excluding Make prerequisite work. Existing web E2E again passed all three tests.
+
+The recorded video predates this telemetry-only follow-up. Its extraction and ranking evidence remains applicable; the generated-import and collector tests provide evidence for the later telemetry changes. The user will attach the recording, so the PR remains draft pending that manual step. Local full-CI output is `/tmp/color-ci-telemetry-final.log`; round-three reviews are `/tmp/color-standards-review-3.md` and `/tmp/color-spec-review-3.md`.

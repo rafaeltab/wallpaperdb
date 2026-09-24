@@ -57,10 +57,7 @@ async function fixture(
       )
     )
   );
-  const app = await createHttpApp(
-    { nodeEnv: 'test', port: 0, rateLimitMax: 10, ...config },
-    services
-  );
+  const app = await createHttpApp({ nodeEnv: 'test', rateLimitMax: 10, ...config }, services);
   apps.push(app);
   return { app, uploads };
 }

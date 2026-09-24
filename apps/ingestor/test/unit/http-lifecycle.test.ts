@@ -37,7 +37,7 @@ function serve(
 ) {
   const probe = options.probe;
   return createHttpApp(
-    { nodeEnv: 'test', port: 0, rateLimitMax: 2, requestTimeoutMs: options.requestTimeoutMs },
+    { nodeEnv: 'test', rateLimitMax: 2, requestTimeoutMs: options.requestTimeoutMs },
     Layer.mergeAll(
       probe
         ? availabilityLayer.pipe(
@@ -210,7 +210,7 @@ it('releases acquired resources when later startup fails', async () => {
   );
   await expect(
     createHttpApp(
-      { nodeEnv: 'test', port: 0, rateLimitMax: 2 },
+      { nodeEnv: 'test', rateLimitMax: 2 },
       Layer.mergeAll(availability, admission, broken)
     )
   ).rejects.toThrow();

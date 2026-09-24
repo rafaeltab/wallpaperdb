@@ -98,7 +98,6 @@ export async function createApp(
     {
       nodeEnv: config.nodeEnv,
       requestTimeoutMs: config.requestTimeoutMs,
-      port: config.port,
       rateLimitMax: config.rateLimitMax,
       clerkPublishableKey: config.clerkPublishableKey,
       clerkSecretKey:

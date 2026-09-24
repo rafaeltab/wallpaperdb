@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, lt, lte, ne, or } from 'drizzle-orm';
+import { and, eq, exists, isNotNull, isNull, lt, lte, ne, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import pg from 'pg';
@@ -265,8 +265,22 @@ class PostgresIngestionStore implements IngestionStore {
           .where(
             and(
               or(
-                and(eq(wallpapers.uploadState, 'uploading'), lt(wallpapers.uploadAttempts, 3)),
-                and(eq(wallpapers.uploadState, 'stored'), lt(wallpapers.uploadAttempts, 10))
+                eq(wallpapers.uploadState, 'uploading'),
+                and(
+                  eq(wallpapers.uploadState, 'stored'),
+                  exists(
+                    tx
+                      .select()
+                      .from(uploadOutbox)
+                      .where(
+                        and(
+                          eq(uploadOutbox.wallpaperId, wallpapers.id),
+                          isNull(uploadOutbox.quarantinedAt),
+                          isNull(uploadOutbox.publishedAt)
+                        )
+                      )
+                  )
+                )
               ),
               isNotNull(wallpapers.ingestionSnapshot),
               lt(wallpapers.stateChangedAt, staleBefore),

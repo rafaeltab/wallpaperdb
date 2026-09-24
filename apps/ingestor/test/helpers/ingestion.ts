@@ -1,4 +1,5 @@
 import { Clock, Effect, Layer } from 'effect';
+import { TestClock } from 'effect/testing';
 import {
   AssetStorage,
   ContentInspection,
@@ -32,35 +33,38 @@ export class ControlledStore implements IngestionStore {
   readonly outbox = new Map<string, UploadedEvent>();
   readonly deadlines = new Map<string, { changed: number; lease: number }>();
   private readonly quarantined = new Set<string>();
-  constructor(private readonly now: () => number) {}
   private owns(record: UploadRecord) {
     const current = this.records.get(record.wallpaper.id);
     return current?.state === record.state && current.leaseToken === record.leaseToken;
   }
   reserve: IngestionStore['reserve'] = (record, leaseUntil) =>
-    Effect.sync(() => {
-      const existing = [...this.records.values()].find(
-        (entry) =>
-          entry.state !== 'failed' &&
-          entry.wallpaper.profileId === record.wallpaper.profileId &&
-          entry.wallpaper.metadata.contentHash === record.wallpaper.metadata.contentHash
-      );
-      if (existing) return { _tag: 'Existing', record: existing };
-      this.records.set(record.wallpaper.id, record);
-      this.deadlines.set(record.wallpaper.id, { changed: this.now(), lease: leaseUntil.getTime() });
-      return { _tag: 'Reserved', record };
-    });
+    Clock.currentTimeMillis.pipe(
+      Effect.map((now) => {
+        const existing = [...this.records.values()].find(
+          (entry) =>
+            entry.state !== 'failed' &&
+            entry.wallpaper.profileId === record.wallpaper.profileId &&
+            entry.wallpaper.metadata.contentHash === record.wallpaper.metadata.contentHash
+        );
+        if (existing) return { _tag: 'Existing', record: existing };
+        this.records.set(record.wallpaper.id, record);
+        this.deadlines.set(record.wallpaper.id, { changed: now, lease: leaseUntil.getTime() });
+        return { _tag: 'Reserved', record };
+      })
+    );
   stored: IngestionStore['stored'] = (record) =>
-    Effect.sync(() => {
-      if (!this.owns(record) || record.state !== 'uploading') return false;
-      this.records.set(record.wallpaper.id, { ...record, state: 'stored', attempts: 0 });
-      this.deadlines.set(record.wallpaper.id, {
-        changed: this.now(),
-        lease: this.deadlines.get(record.wallpaper.id)?.lease ?? 0,
-      });
-      this.outbox.set(record.event.id, record.event);
-      return true;
-    });
+    Clock.currentTimeMillis.pipe(
+      Effect.map((now) => {
+        if (!this.owns(record) || record.state !== 'uploading') return false;
+        this.records.set(record.wallpaper.id, { ...record, state: 'stored', attempts: 0 });
+        this.deadlines.set(record.wallpaper.id, {
+          changed: now,
+          lease: this.deadlines.get(record.wallpaper.id)?.lease ?? 0,
+        });
+        this.outbox.set(record.event.id, record.event);
+        return true;
+      })
+    );
   published: IngestionStore['published'] = (record) =>
     Effect.sync(() => {
       if (!this.owns({ ...record, state: 'stored' })) return;
@@ -103,7 +107,7 @@ export class ControlledStore implements IngestionStore {
         const claimed = { ...record, leaseToken: `${record.leaseToken}-claimed` };
         this.records.set(record.wallpaper.id, claimed);
         this.deadlines.set(record.wallpaper.id, {
-          changed: this.deadlines.get(record.wallpaper.id)?.changed ?? this.now(),
+          changed: this.deadlines.get(record.wallpaper.id)?.changed ?? now.getTime(),
           lease: leaseUntil.getTime(),
         });
         return claimed;
@@ -123,17 +127,7 @@ export function fixture(
     events?: UploadEvents;
   } = {}
 ) {
-  let now = Date.now();
-  const store = new ControlledStore(() => now);
-  const clock: Clock.Clock = {
-    currentTimeMillisUnsafe: () => now,
-    currentTimeMillis: Effect.sync(() => now),
-    currentTimeNanosUnsafe: () => BigInt(now) * 1_000_000n,
-    currentTimeNanos: Effect.sync(() => BigInt(now) * 1_000_000n),
-    monotonicTimeNanosUnsafe: () => BigInt(now) * 1_000_000n,
-    monotonicTimeNanos: Effect.sync(() => BigInt(now) * 1_000_000n),
-    sleep: () => Effect.void,
-  };
+  const store = new ControlledStore();
   const objects: AssetReference[] = [];
   const published: UploadedEvent[] = [];
   let sequence = 0;
@@ -189,16 +183,13 @@ export function fixture(
         )
       )
     ),
-    Layer.provideMerge(Layer.succeed(Clock.Clock, clock))
+    Layer.provideMerge(TestClock.layer())
   );
   return {
     store,
     objects,
     published,
     layer,
-    advance: (milliseconds = 11 * 60_000) =>
-      Effect.sync(() => {
-        now += milliseconds;
-      }),
+    advance: (milliseconds = 11 * 60_000) => TestClock.adjust(milliseconds),
   };
 }

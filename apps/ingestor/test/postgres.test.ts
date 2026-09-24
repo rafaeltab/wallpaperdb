@@ -290,7 +290,7 @@ describe('PostgreSQL ingestion contract', () => {
     const quarantined = record('wlpr_quarantined', 'quarantined-owner');
     await runtime.runPromise(
       IngestionStore.use((postgres) => {
-        const store = adapter === 'controlled' ? new ControlledStore(Date.now) : postgres;
+        const store = adapter === 'controlled' ? new ControlledStore() : postgres;
         return Effect.gen(function* () {
           yield* store.reserve(failed, new Date());
           yield* store.defer(failed, new Date(), 1);
@@ -319,7 +319,7 @@ describe('PostgreSQL ingestion contract', () => {
   ])('%s permits higher retry limits for uploads and publications', async (adapter) => {
     await runtime.runPromise(
       IngestionStore.use((postgres) => {
-        const store = adapter === 'controlled' ? new ControlledStore(Date.now) : postgres;
+        const store = adapter === 'controlled' ? new ControlledStore() : postgres;
         return Effect.gen(function* () {
           for (const state of ['uploading', 'stored'] as const) {
             let candidate = record(`wlpr_${state}`, `owner-${state}`);

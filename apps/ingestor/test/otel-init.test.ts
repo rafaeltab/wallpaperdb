@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
@@ -8,6 +9,8 @@ import { initializeOtel } from '../src/otel-init.js';
 import { ingestorTracingLayer } from '../src/runtime.js';
 import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
+import { Quota } from '../src/admission/index.js';
+import { GenericContainer } from 'testcontainers';
 
 afterEach(() => {
   logs.disable();
@@ -72,7 +75,10 @@ describe('ingestor telemetry ownership', () => {
     }
   });
   it('exports logs, traces, and metrics before its owning scope finishes', async () => {
+    const redis = await new GenericContainer('redis:7-alpine').withExposedPorts(6379).start();
+    const profileMarker = 'private-profile-otel-quota-regression';
     const requests = new Set<string>();
+    const exportedBodies: string[] = [];
     const metricBodies: string[] = [];
     const logRecords: unknown[] = [];
     const spans: unknown[] = [];
@@ -82,6 +88,7 @@ describe('ingestor telemetry ownership', () => {
       request.on('data', (chunk: Buffer) => chunks.push(chunk));
       request.on('end', () => {
         const body = Buffer.concat(chunks).toString();
+        exportedBodies.push(body);
         if (request.url === '/v1/metrics') metricBodies.push(body);
         JSON.parse(body, (key, value) => {
           if (key === 'logRecords') logRecords.push(...value);
@@ -103,6 +110,36 @@ describe('ingestor telemetry ownership', () => {
             otelServiceName: 'ingestor-contract',
             otelEndpoint: `http://127.0.0.1:${address.port}/`,
           });
+          // Vitest's module loader bypasses the Node require hook used by instrumentation.
+          // Load the real client through that hook only after SDK startup.
+          createRequire(import.meta.url)('ioredis');
+          const { redisQuotaLayer } = yield* Effect.promise(
+            () => import('../src/adapters/quota/index.js')
+          );
+          const quota = yield* Effect.acquireRelease(
+            Effect.sync(() =>
+              ManagedRuntime.make(
+                redisQuotaLayer({
+                  redisEnabled: true,
+                  redisHost: '127.0.0.1',
+                  redisPort: redis.getMappedPort(6379),
+                }).pipe(Layer.provideMerge(ingestorTracingLayer))
+              )
+            ),
+            (runtime) => Effect.promise(() => runtime.dispose())
+          );
+          const admission = yield* Effect.promise(() =>
+            trace.getTracer('ingestor-contract').startActiveSpan('quota.contract', async (span) => {
+              try {
+                return await quota.runPromise(
+                  Quota.use((quota) => quota.take(profileMarker, 1, 60_000))
+                );
+              } finally {
+                span.end();
+              }
+            })
+          );
+          expect(admission._tag).toBe('Allowed');
           const controlled = fixture({
             events: {
               publish: () =>
@@ -139,6 +176,16 @@ describe('ingestor telemetry ownership', () => {
       );
       expect(status).toEqual({ _tag: 'Started' });
       expect(requests).toEqual(new Set(['/v1/logs', '/v1/traces', '/v1/metrics']));
+      expect(spans).toContainEqual(expect.objectContaining({ name: 'eval' }));
+      expect(exportedBodies.some((body) => body.includes(profileMarker))).toBe(false);
+      expect(spans).toContainEqual(
+        expect.objectContaining({
+          name: 'eval',
+          attributes: expect.arrayContaining([
+            { key: 'db.query.text', value: { stringValue: 'eval' } },
+          ]),
+        })
+      );
       const occurrenceAttributes = [
         { key: 'event.source', value: { stringValue: 'urn:wallpaperdb:ingestor' } },
         { key: 'event.id', value: { stringValue: 'event-1' } },
@@ -200,6 +247,7 @@ describe('ingestor telemetry ownership', () => {
         })
       );
     } finally {
+      await redis.stop();
       await new Promise<void>((resolve, reject) =>
         collector.close((error) => (error ? reject(error) : resolve()))
       );

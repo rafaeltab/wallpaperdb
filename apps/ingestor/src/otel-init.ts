@@ -134,6 +134,10 @@ export const initializeOtel = Effect.fn('ingestor.telemetry.initialize')(functio
           instrumentations: [
             getNodeAutoInstrumentations({
               '@opentelemetry/instrumentation-fs': { enabled: false },
+              '@opentelemetry/instrumentation-ioredis': {
+                // Quota keys identify Profiles; dependency diagnostics need only the command.
+                dbStatementSerializer: (command) => command,
+              },
             }),
           ],
         }),

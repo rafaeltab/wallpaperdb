@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Effect, ManagedRuntime } from 'effect';
 import pg from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postgresUploadsLayer } from '../src/adapters/postgres/index.js';
 import { IngestionStore, type UploadRecord } from '../src/ingestion/index.js';
 import { metadata } from './helpers/ingestion.js';
@@ -40,21 +40,22 @@ describe('PostgreSQL ingestion contract', () => {
   let container: StartedPostgreSqlContainer;
   let runtime: ManagedRuntime.ManagedRuntime<IngestionStore, unknown>;
   let databaseUrl: string;
+  let database: pg.Pool;
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
     databaseUrl = container.getConnectionUri().replace('localhost', '127.0.0.1');
-    const pool = new pg.Pool({ connectionString: databaseUrl });
-    try {
-      await migrate(drizzle(pool), {
-        migrationsFolder: new URL('../drizzle', import.meta.url).pathname,
-      });
-    } finally {
-      await pool.end();
-    }
+    database = new pg.Pool({ connectionString: databaseUrl });
+    await migrate(drizzle(database), {
+      migrationsFolder: new URL('../drizzle', import.meta.url).pathname,
+    });
     runtime = ManagedRuntime.make(postgresUploadsLayer({ databaseUrl }));
   }, 60_000);
+  beforeEach(async () => {
+    await database.query('TRUNCATE upload_outbox, wallpapers');
+  });
   afterAll(async () => {
     await runtime?.dispose();
+    await database?.end();
     await container?.stop();
   });
 
@@ -219,21 +220,34 @@ describe('PostgreSQL ingestion contract', () => {
   });
   it('rejects stale transitions and obeys active leases and batch bounds', async () => {
     const candidate = record('wlpr_leased', 'leased-owner');
-    const later = new Date(Date.now() + 3600_000);
+    const second = record('wlpr_leased_second', 'second-leased-owner');
+    const expires = new Date(Date.now() + 3600_000);
+    const renewedUntil = new Date(expires.getTime() + 120_000);
     await runtime.runPromise(
       IngestionStore.use((store) =>
         Effect.gen(function* () {
-          yield* store.reserve(candidate, later);
+          yield* store.reserve(candidate, expires);
+          yield* store.reserve(second, expires);
           expect(yield* store.stored({ ...candidate, leaseToken: 'other-worker' })).toBe(false);
           expect(
-            (yield* store.claim(new Date(), later, later, 1)).some(
-              (entry) => entry.wallpaper.id === candidate.wallpaper.id
-            )
-          ).toBe(false);
-          expect((yield* store.claim(later, later, later, 1)).length).toBeLessThanOrEqual(1);
+            yield* store.claim(new Date(expires.getTime() - 1), expires, renewedUntil, 1)
+          ).toEqual([]);
+          const firstBatch = yield* store.claim(expires, expires, renewedUntil, 1);
+          expect(firstBatch).toHaveLength(1);
+          const secondBatch = yield* store.claim(expires, expires, renewedUntil, 1);
+          expect(secondBatch).toHaveLength(1);
+          expect([...firstBatch, ...secondBatch].map((entry) => entry.wallpaper.id).sort()).toEqual(
+            [candidate.wallpaper.id, second.wallpaper.id].sort()
+          );
+          expect(yield* store.claim(expires, expires, renewedUntil, 1)).toEqual([]);
+          expect(yield* store.stored(candidate)).toBe(false);
           yield* store.published(candidate);
-          expect((yield* store.reserve(candidate, later)).record.state).toBe('uploading');
-          yield* store.expireIntents(later);
+          expect((yield* store.reserve(candidate, renewedUntil)).record.state).toBe('uploading');
+          const reclaimed = yield* store.claim(renewedUntil, expires, renewedUntil, 100);
+          expect(reclaimed.map((entry) => entry.wallpaper.id).sort()).toEqual(
+            [candidate.wallpaper.id, second.wallpaper.id].sort()
+          );
+          yield* store.expireIntents(renewedUntil);
         })
       )
     );

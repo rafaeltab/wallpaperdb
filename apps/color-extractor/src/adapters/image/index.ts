@@ -22,6 +22,9 @@ export interface ImageHealth {
 }
 export const ImageHealth = Context.Service<ImageHealth>('wallpaperdb.color-extractor.image.health');
 
+// Match the largest image accepted by Ingestor; enforce this independently of S3 metadata.
+const maxImageBytes = 50 * 1024 * 1024;
+
 const request = <A>(operation: string, send: (signal: AbortSignal) => Promise<A>) =>
   Effect.tryPromise({
     try: send,
@@ -70,14 +73,24 @@ class StoredImageHistogram implements ImageHistogram {
             abortSignal.addEventListener('abort', cancel, { once: true });
             try {
               abortSignal.throwIfAborted();
+              if (response.ContentLength !== undefined && response.ContentLength > maxImageBytes) {
+                throw new Error('Stored image exceeds 50 MiB');
+              }
+              let totalBytes = 0;
               const chunks: Buffer[] = [];
               for await (const chunk of body) {
                 if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array)) {
                   throw new Error('Object storage returned invalid image bytes');
                 }
+                const chunkBytes =
+                  typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.byteLength;
+                if (chunkBytes > maxImageBytes - totalBytes) {
+                  throw new Error('Stored image exceeds 50 MiB');
+                }
+                totalBytes += chunkBytes;
                 chunks.push(Buffer.from(chunk));
               }
-              return Buffer.concat(chunks);
+              return Buffer.concat(chunks, totalBytes);
             } finally {
               abortSignal.removeEventListener('abort', cancel);
               body.destroy();

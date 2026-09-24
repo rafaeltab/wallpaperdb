@@ -1,5 +1,8 @@
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import * as OtelLogger from '@effect/opentelemetry/OtelLogger';
 import { context, trace } from '@opentelemetry/api';
+import { logs } from '@opentelemetry/api-logs';
+import { logs as sdkLogs } from '@opentelemetry/sdk-node';
 import { Context, Effect, FiberSet, Layer } from 'effect';
 import type { Admission } from './admission/index.js';
 import type { Availability } from './availability/index.js';
@@ -7,9 +10,24 @@ import type { Ingestion } from './ingestion/index.js';
 
 export type HttpServices = Ingestion | Admission | Availability;
 
+/** Reuses the SDK-owned provider; its exporter lifetime belongs to process telemetry. */
+const ingestorLoggingLayer = Layer.unwrap(
+  Effect.sync(() => {
+    const provider = logs.getLoggerProvider();
+    return provider instanceof sdkLogs.LoggerProvider
+      ? OtelLogger.layer({ mergeWithExisting: false }).pipe(
+          Layer.provide(Layer.succeed(OtelLogger.OtelLoggerProvider, provider))
+        )
+      : Layer.empty;
+  })
+);
+
 /** Built once with the application, after the process has initialized the SDK. */
-export const ingestorTracingLayer = OtelTracer.layerWithoutOtelTracer.pipe(
-  Layer.provide(Layer.sync(OtelTracer.OtelTracer, () => trace.getTracer('wallpaperdb.ingestor')))
+export const ingestorTracingLayer = Layer.merge(
+  OtelTracer.layerWithoutOtelTracer.pipe(
+    Layer.provide(Layer.sync(OtelTracer.OtelTracer, () => trace.getTracer('wallpaperdb.ingestor')))
+  ),
+  ingestorLoggingLayer
 );
 
 /** Bind the current transport context at the foreign-framework invocation. */

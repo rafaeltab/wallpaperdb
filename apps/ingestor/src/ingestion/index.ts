@@ -241,6 +241,13 @@ export function ingestionLayer(): Layer.Layer<
         }),
         1
       );
+      const cleanupFailure = Metric.update(
+        Metric.counter('reconciliation.errors.total', {
+          incremental: true,
+          attributes: { 'reconciliation.type': 'assets' },
+        }),
+        1
+      );
       const defer = (record: UploadRecord, maximum: number) =>
         Clock.currentTimeMillis.pipe(
           Effect.flatMap((now) => store.defer(record, new Date(now), maximum)),
@@ -370,7 +377,7 @@ export function ingestionLayer(): Layer.Layer<
                 Effect.gen(function* () {
                   if ((yield* store.assetDisposition(asset.wallpaperId)) === 'remove')
                     yield* assets.remove(asset);
-                }),
+                }).pipe(Effect.catchTag('IngestionUnavailable', () => cleanupFailure)),
               { concurrency: 5, discard: true }
             );
             cleanupCursor = batch.cursor;

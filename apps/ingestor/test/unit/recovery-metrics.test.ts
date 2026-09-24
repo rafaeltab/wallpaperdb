@@ -92,3 +92,14 @@ it.effect('exports an isolated record failure when its asset cannot be inspected
     expect(errors).toEqual([{ type: 'uploads', value: 1 }]);
   });
 });
+
+it.effect('exports an isolated cleanup error while completing the cycle', () => {
+  const controlled = fixture({ storage: { remove: () => Effect.fail(unavailable) } });
+  controlled.objects.push({ wallpaperId: 'orphan', extension: 'png' });
+  return Effect.gen(function* () {
+    const errors = yield* exportedErrors(
+      Ingestion.use((ingestion) => ingestion.cleanup()).pipe(Effect.provide(controlled.layer))
+    );
+    expect(errors).toEqual([{ type: 'assets', value: 1 }]);
+  });
+});

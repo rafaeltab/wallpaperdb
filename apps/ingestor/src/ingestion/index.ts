@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Schema } from 'effect';
+import { Clock, Context, Effect, Layer, Metric, Schema } from 'effect';
 
 export interface ValidationLimits {
   readonly maxFileSizeImage: number;
@@ -199,6 +199,13 @@ export function ingestionLayer(): Layer.Layer<
       const store = yield* IngestionStore;
       const identity = yield* IngestionIdentity;
       let cleanupCursor: string | undefined;
+      const recoveryFailure = Metric.update(
+        Metric.counter('reconciliation.errors.total', {
+          incremental: true,
+          attributes: { 'reconciliation.type': 'uploads' },
+        }),
+        1
+      );
       const publish = Effect.fn('ingestion.publish')(function* (record: UploadRecord) {
         yield* events.publish(record.event);
         yield* store.published(record);
@@ -208,7 +215,10 @@ export function ingestionLayer(): Layer.Layer<
           Effect.flatMap((now) => store.defer(record, new Date(now), maximum))
         );
       const publishOrDefer = (record: UploadRecord) =>
-        publish(record).pipe(Effect.catchTag('IngestionUnavailable', () => defer(record, 10)));
+        publish(record).pipe(
+          Effect.as(true),
+          Effect.catchTag('IngestionUnavailable', () => defer(record, 10).pipe(Effect.as(false)))
+        );
       const recover = Effect.fn('ingestion.recover')(function* (record: UploadRecord) {
         if (record.state === 'uploading') {
           const exists = yield* assets.exists({
@@ -219,11 +229,12 @@ export function ingestionLayer(): Layer.Layer<
           const committed = yield* store.stored(record);
           if (!committed) return;
         }
-        yield* publishOrDefer({
+        const published = yield* publishOrDefer({
           ...record,
           state: 'stored',
           attempts: record.state === 'uploading' ? 0 : record.attempts,
         });
+        if (!published) yield* recoveryFailure;
       });
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
@@ -292,7 +303,7 @@ export function ingestionLayer(): Layer.Layer<
               (record) =>
                 recover(record).pipe(
                   Effect.as(1),
-                  Effect.catchTag('IngestionUnavailable', () => Effect.succeed(0))
+                  Effect.catchTag('IngestionUnavailable', () => recoveryFailure.pipe(Effect.as(0)))
                 ),
               { concurrency: 5 }
             );

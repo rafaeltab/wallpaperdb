@@ -1,13 +1,23 @@
-import { Clock, Effect, Layer } from 'effect';
+import { Cause, Clock, Effect, Layer, Metric } from 'effect';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Ingestion } from './ingestion/index.js';
 
 function scheduled(name: string, intervalMs: number, task: Effect.Effect<unknown, unknown>) {
+  const errors = Metric.counter('reconciliation.errors.total', {
+    incremental: true,
+    attributes: { 'reconciliation.type': name },
+  });
   const cycle = Effect.gen(function* () {
     const start = yield* Clock.currentTimeMillis;
     yield* task.pipe(
-      Effect.catchCause(() =>
-        Effect.logError('Ingestion recovery cycle failed', { operation: name })
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause)
+          ? Effect.failCause(cause)
+          : Metric.update(errors, 1).pipe(
+              Effect.andThen(
+                Effect.logError('Ingestion recovery cycle failed', { operation: name })
+              )
+            )
       )
     );
     const end = yield* Clock.currentTimeMillis;

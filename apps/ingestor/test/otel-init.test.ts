@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
-import { Effect, ManagedRuntime } from 'effect';
+import { Effect, ManagedRuntime, Metric } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { ingestorTracingLayer } from '../src/runtime.js';
@@ -71,11 +71,16 @@ describe('ingestor telemetry ownership', () => {
   });
   it('exports logs, traces, and metrics before its owning scope finishes', async () => {
     const requests = new Set<string>();
+    const metricBodies: string[] = [];
     const collector = createServer((request, response) => {
       requests.add(request.url ?? '');
-      request.resume();
-      response.writeHead(200);
-      response.end();
+      const chunks: Buffer[] = [];
+      request.on('data', (chunk: Buffer) => chunks.push(chunk));
+      request.on('end', () => {
+        if (request.url === '/v1/metrics') metricBodies.push(Buffer.concat(chunks).toString());
+        response.writeHead(200);
+        response.end();
+      });
     });
     await new Promise<void>((resolve) => collector.listen(0, '127.0.0.1', resolve));
     try {
@@ -89,19 +94,63 @@ describe('ingestor telemetry ownership', () => {
             otelEndpoint: `http://127.0.0.1:${address.port}/`,
           });
           trace.getTracer('ingestor-contract').startSpan('telemetry.contract').end();
-          metrics.getMeter('ingestor-contract').createCounter('telemetry.contract').add(1);
           const runtime = yield* Effect.acquireRelease(
             Effect.sync(() => ManagedRuntime.make(ingestorTracingLayer)),
             (runtime) => Effect.promise(() => runtime.dispose())
           );
           yield* Effect.promise(() =>
-            runtime.runPromise(Effect.logError('Effect diagnostic contract'))
+            runtime.runPromise(
+              Effect.logError('Effect diagnostic contract').pipe(
+                Effect.andThen(
+                  Metric.update(
+                    Metric.counter('reconciliation.errors.total', {
+                      incremental: true,
+                      attributes: { 'reconciliation.type': 'uploads' },
+                    }),
+                    3
+                  )
+                )
+              )
+            )
           );
           return status;
         }).pipe(Effect.scoped)
       );
       expect(status).toEqual({ _tag: 'Started' });
       expect(requests).toEqual(new Set(['/v1/logs', '/v1/traces', '/v1/metrics']));
+      expect(metricBodies.map((body) => JSON.parse(body))).toContainEqual(
+        expect.objectContaining({
+          resourceMetrics: expect.arrayContaining([
+            expect.objectContaining({
+              resource: expect.objectContaining({
+                attributes: expect.arrayContaining([
+                  { key: 'service.name', value: { stringValue: 'ingestor-contract' } },
+                ]),
+              }),
+              scopeMetrics: expect.arrayContaining([
+                expect.objectContaining({
+                  metrics: expect.arrayContaining([
+                    expect.objectContaining({
+                      name: 'reconciliation.errors.total',
+                      sum: expect.objectContaining({
+                        isMonotonic: true,
+                        dataPoints: expect.arrayContaining([
+                          expect.objectContaining({
+                            asDouble: 3,
+                            attributes: expect.arrayContaining([
+                              { key: 'reconciliation.type', value: { stringValue: 'uploads' } },
+                            ]),
+                          }),
+                        ]),
+                      }),
+                    }),
+                  ]),
+                }),
+              ]),
+            }),
+          ]),
+        })
+      );
     } finally {
       await new Promise<void>((resolve, reject) =>
         collector.close((error) => (error ? reject(error) : resolve()))

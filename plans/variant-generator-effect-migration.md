@@ -32,7 +32,7 @@ The existing cross-service contract exposes original bucket/key coordinates. Res
 - [x] Run service checks, full CI, coverage and CRAP threshold 30.
 - [x] Review entire migration against base on Standards and Spec axes, fix findings, repeat as needed.
 - [x] Demonstrate real generation through running artifacts and record video.
-- [ ] Push and open PR with validation and accessible video evidence.
+- [x] Push and open PR with validation and accessible video evidence.
 
 ## Baseline
 
@@ -88,3 +88,8 @@ The final full repository CI passed: 73 build/lint/type/unit/integration tasks a
 After CI, `make check-crap PACKAGE=variant-generator CRAP_THRESHOLD=30` passed with zero of 56 inventoried functions above 30. `make crap PACKAGE=variant-generator` confirmed maximum 27.672, still below baseline 52.188. The shared callback/generator attribution limitation is tracked by #217, so these scores supplement the behavior and architecture review.
 
 All demo-owned and worktree application/infrastructure containers were stopped after verification. Persistent worktree volumes were retained. Temporary environment repairs did not change tracked infrastructure or unrelated application code. The final video documents the `ad2274e` successful generation path; later diagnostic/quarantine fixes are covered by the final 74-test suite, CI and second reviews.
+
+
+## Delivery
+
+PR: https://github.com/rafaeltab/wallpaperdb/pull/230. The PR links the committed MP4 and its decoded-image/event verification notes. The published video URL returns HTTP 200. Both review axes have zero remaining findings; all requested local checks are complete.

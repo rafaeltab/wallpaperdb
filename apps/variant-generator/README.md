@@ -1,16 +1,14 @@
-# Variant Generator
+# Variant generator
 
-Consumes `wallpaper.uploaded` events from NATS JetStream and pre-generates lower-resolution variants of uploaded wallpapers for different device classes.
+Generates lower-resolution wallpaper variants so clients can request images suited to their devices.
 
-## Key Capabilities
+## Capabilities
 
-- **Aspect-ratio-aware preset selection** — classifies each wallpaper into a category (standard widescreen, ultrawide, or portrait/phone) and selects only the resolution presets that are applicable to that category and smaller than the original
-- **Streaming image processing** — downloads the original from object storage, pipes it through Sharp, and uploads each variant without loading the full image into memory unnecessarily
-- **Per-format quality control** — applies configurable quality and compression settings per output format (JPEG, WebP, PNG) while preserving aspect ratio and never upscaling
-- **Fault-isolated batch generation** — if one variant fails, the remaining presets in the batch continue; each successfully generated variant immediately triggers a `wallpaper.variant.uploaded` event
-- **Stateless design** — holds no database and no persistent local state; all durability relies on object storage and the NATS JetStream durable consumer
+- Selects smaller resolution presets that match the original aspect ratio.
+- Preserves image proportions and format while applying configured encoding quality.
+- Stores and announces each variant for downstream delivery.
+- Continues remaining presets after an individual failure and retries incomplete batches without losing successful results.
 
-## Technology Choices
+## Technology choices
 
-- **Sharp** — high-performance image processing with streaming support, used for all resize and re-encode operations
-- **NATS JetStream durable consumer** — guarantees at-least-once delivery with a long acknowledgement window to accommodate heavy processing workloads
+Sharp performs image resizing and encoding in an isolated process so deadlines and shutdown can stop native work. NATS JetStream retains generation requests and accepts variant announcements. Object storage holds the original and generated images.

@@ -1,148 +1,75 @@
-import cors from '@fastify/cors';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import Fastify, { type FastifyInstance } from 'fastify';
-import { container } from 'tsyringe';
+import { Effect, Layer } from 'effect';
+import type { FastifyInstance } from 'fastify';
+import {
+  ConsumerHealth,
+  EventsHealth,
+  natsConsumerLayer,
+  natsEventsLayer,
+} from './adapters/events/index.js';
+import { ImageHealth, imageLayer } from './adapters/image/index.js';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
 import type { Config } from './config.js';
-import { NatsConnectionManager } from './connections/nats.js';
-import { S3Connection } from './connections/s3.js';
-import { registerRoutes } from './routes/index.js';
-import { getOtelSdk, shutdownOtel } from './otel-init.js';
-import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
+import { generationLayer } from './generation/index.js';
+import { createHttpApp } from './http/index.js';
+import { tracingLayer } from './runtime.js';
 
-// Connection state interface
-export interface ConnectionsState {
-  isShuttingDown: boolean;
-  connectionsInitialized: boolean;
+interface AppOptions {
+  readonly logger?: boolean;
+  readonly signal?: AbortSignal;
+  readonly otelHealthy?: boolean;
+  readonly shutdownTimeoutMs?: number;
 }
-
-// Extend Fastify instance with our custom state
-declare module 'fastify' {
-  interface FastifyInstance {
-    connectionsState: ConnectionsState;
-    container: typeof container;
-    consumer: WallpaperUploadedConsumerService;
-  }
+export function variantGeneratorLayer(config: Config, options: AppOptions = {}) {
+  const image = imageLayer({
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: config.s3AccessKeyId,
+    secretAccessKey: config.s3SecretAccessKey,
+    bucket: config.s3Bucket,
+    jpegQuality: config.jpegQuality,
+    webpQuality: config.webpQuality,
+    pngCompressionLevel: config.pngCompressionLevel,
+  });
+  const eventOptions = {
+    url: config.natsUrl,
+    stream: config.natsStream,
+    serviceName: config.otelServiceName,
+    shutdownTimeoutMs: options.shutdownTimeoutMs,
+  };
+  const events = natsEventsLayer(eventOptions);
+  const generation = generationLayer.pipe(Layer.provide(Layer.mergeAll(image, events)));
+  const consumer = natsConsumerLayer(eventOptions).pipe(
+    Layer.provide(Layer.mergeAll(generation, events))
+  );
+  const probe = Layer.effect(
+    AvailabilityProbe,
+    Effect.gen(function* () {
+      const storage = yield* ImageHealth;
+      const broker = yield* EventsHealth;
+      const worker = yield* ConsumerHealth;
+      return AvailabilityProbe.of({
+        inspect: () =>
+          Effect.all(
+            {
+              s3: storage.check(),
+              nats: broker.check(),
+              consumer: worker.check(),
+              otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
+            },
+            { concurrency: 'unbounded' }
+          ),
+      });
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(image, events, consumer)));
+  return availabilityLayer.pipe(Layer.provide(probe), Layer.provideMerge(tracingLayer));
 }
-
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean }
+  options: AppOptions = {}
 ): Promise<FastifyInstance> {
-  container.register('config', { useValue: config });
-
-  // Create Fastify server
-  const fastify = Fastify({
-    logger:
-      options?.logger !== false
-        ? {
-            level: config.nodeEnv === 'development' ? 'debug' : 'info',
-            transport:
-              config.nodeEnv === 'development'
-                ? {
-                    target: 'pino-pretty',
-                    options: {
-                      translateTime: 'HH:MM:ss Z',
-                      ignore: 'pid,hostname',
-                    },
-                  }
-                : undefined,
-          }
-        : false,
-  });
-
-  // Register CORS for development (allow docs site to access API)
-  await fastify.register(cors, {
-    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  });
-
-  // Register OpenAPI documentation
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Variant Generator API',
-    version: '1.0.0',
-    description:
-      'Wallpaper variant generation service. Generates lower resolution variants of wallpapers for different device types.',
-    servers:
-      config.nodeEnv === 'production'
-        ? undefined
-        : [
-            {
-              url: `http://localhost:${config.port}`,
-              description: 'Local development server',
-            },
-          ],
-  });
-
-  // Decorate Fastify with container for access in routes
-  fastify.decorate('container', container);
-
-  // Initialize connection state
-  fastify.decorate('connectionsState', {
-    isShuttingDown: false,
-    connectionsInitialized: false,
-  });
-
-  // Register pre-initialized OTEL SDK (initialized in index.ts before app import)
-  // This allows the SDK to be accessed via DI if needed
-  const otelSdk = getOtelSdk();
-  if (otelSdk) {
-    container.register('otelSdk', { useValue: otelSdk });
-  }
-
-  // Initialize connections (no database for stateless service)
-  fastify.log.info('Initializing connections...');
-
-  try {
-    // Initialize S3 connection (for reading originals and uploading variants)
-    await container.resolve(S3Connection).initialize();
-    fastify.log.info('S3 connection created');
-
-    // Initialize NATS connection (for event consumption and publishing)
-    await container.resolve(NatsConnectionManager).initialize();
-    fastify.log.info('NATS connection created');
-
-    fastify.connectionsState.connectionsInitialized = true;
-    fastify.log.info('All connections initialized successfully');
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to initialize connections');
-    throw error;
-  }
-
-  // Start event consumer
-  fastify.log.info('Starting event consumers...');
-  try {
-    const consumer = container.resolve(WallpaperUploadedConsumerService);
-
-    // Start consumer (non-blocking - runs in background)
-    await consumer.start();
-    fastify.log.info('Event consumers started');
-
-    // Store consumer reference for shutdown
-    fastify.decorate('consumer', consumer);
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to start event consumers');
-    throw error;
-  }
-
-  // Add cleanup hook
-  fastify.addHook('onClose', async () => {
-    fastify.connectionsState.isShuttingDown = true;
-
-    // Stop consumer first
-    if (fastify.consumer) {
-      fastify.log.info('Stopping event consumers...');
-      await fastify.consumer.stop();
-    }
-
-    await container.resolve(NatsConnectionManager).close();
-    await container.resolve(S3Connection).close();
-    await shutdownOtel();
-  });
-
-  // Register all routes
-  await registerRoutes(fastify);
-
-  return fastify;
+  return createHttpApp(
+    { nodeEnv: config.nodeEnv, port: config.port },
+    variantGeneratorLayer(config, options),
+    options
+  );
 }

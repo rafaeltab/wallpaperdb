@@ -5,42 +5,17 @@ import {
   type NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import type { FastifyInstance } from 'fastify';
-import { container } from 'tsyringe';
 import { createApp } from '../../src/app.js';
 import type { Config } from '../../src/config.js';
 import { createTestLogger } from '@wallpaperdb/test-logger';
 
 const logger = createTestLogger('InProcessVariantGeneratorBuilder');
 
-/**
- * Options for InProcessVariantGeneratorMixin
- */
 export interface InProcessVariantGeneratorOptions {
-  /** Config overrides (e.g., quality settings) */
   configOverrides?: Partial<Config>;
-  /** Enable Fastify logger (default: false) */
   logger?: boolean;
 }
 
-/**
- * Mixin that creates an in-process Fastify app for the Variant Generator service.
- * This is ideal for integration tests that don't require Docker containers.
- *
- * Note: This service is stateless - no database connection needed.
- *
- * @example
- * ```typescript
- * const tester = await createTesterBuilder()
- *   .with(DockerTesterBuilder)
- *   .with(S3TesterBuilder)
- *   .with(NatsTesterBuilder)
- *   .with(InProcessVariantGeneratorTesterBuilder)
- *   .build();
- *
- * const app = tester.getApp();
- * const response = await app.inject({ method: 'GET', url: '/health' });
- * ```
- */
 export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
   'InProcessVariantGenerator',
   [S3TesterBuilder, NatsTesterBuilder]
@@ -53,84 +28,44 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
     this.options = options;
   }
 
-  addMethods<TBase extends AddMethodsType<[S3TesterBuilder, NatsTesterBuilder]>>(
-    Base: TBase
-  ) {
+  addMethods<TBase extends AddMethodsType<[S3TesterBuilder, NatsTesterBuilder]>>(Base: TBase) {
     const options = this.options;
 
     return class extends Base {
       app: FastifyInstance | null = null;
       _appInitialized = false;
 
-      withVariantGeneratorEnvironment() {
-        this.addSetupHook(async () => {
-          logger.debug('[InProcessVariantGenerator] Setting up environment variables');
-          const s3 = this.getS3();
-          const nats = this.getNats();
-
-          if (!s3 || !nats) {
-            throw new Error(
-              'InProcessVariantGeneratorTesterBuilder requires S3TesterBuilder and NatsTesterBuilder'
-            );
-          }
-
-          logger.debug('Creating in-process Fastify app for Variant Generator service...');
-
-          // Set environment variables for loadConfig()
-          // Note: No DATABASE_URL - this service is stateless
-          process.env.NODE_ENV = 'test';
-          process.env.PORT = '3004';
-          process.env.S3_ENDPOINT = s3.endpoints.fromHost;
-          process.env.S3_ACCESS_KEY_ID = s3.options.accessKey;
-          process.env.S3_SECRET_ACCESS_KEY = s3.options.secretKey;
-          process.env.S3_BUCKET = s3.buckets.length > 0 ? s3.buckets[0] : 'wallpapers';
-          process.env.NATS_URL = nats.endpoints.fromHost;
-          process.env.NATS_STREAM = nats.streams.length > 0 ? nats.streams[0] : 'WALLPAPER';
-          process.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'http://localhost:4318/v1/traces';
-
-          // Apply config overrides
-          if (options.configOverrides) {
-            for (const [key, value] of Object.entries(options.configOverrides)) {
-              if (value !== undefined) {
-                // Convert camelCase to SCREAMING_SNAKE_CASE
-                const envKey = key
-                  .replace(/([A-Z])/g, '_$1')
-                  .toUpperCase()
-                  .replace(/^_/, '');
-                process.env[envKey] = String(value);
-              }
-            }
-          }
-
-          logger.debug('[InProcessVariantGenerator] Environment variables set up');
-        });
-        return this;
-      }
-
-      /**
-       * Enable in-process Fastify app creation during setup.
-       * The app will be created after all infrastructure is ready.
-       */
       withInProcessApp() {
         if (this._appInitialized) {
-          return this; // Already registered
+          return this;
         }
 
         this._appInitialized = true;
-        this.withVariantGeneratorEnvironment();
 
         this.addSetupHook(async () => {
           logger.debug('[InProcessVariantGenerator] Creating app via setup hook');
 
-          // Import config at runtime to pick up environment variables
-          const { loadConfig } = await import('../../src/config.js');
-          const config = loadConfig();
-          container.registerInstance('config', config);
+          const s3 = this.getS3();
+          const nats = this.getNats();
+          if (!s3 || !nats) throw new Error('S3 and NATS are required');
+          const config: Config = {
+            nodeEnv: 'test',
+            jpegQuality: 90, webpQuality: 90, pngCompressionLevel: 6,
+            port: 3006,
+            s3Endpoint: s3.endpoints.fromHost,
+            s3AccessKeyId: s3.options.accessKey,
+            s3SecretAccessKey: s3.options.secretKey,
+            s3Bucket: s3.buckets[0] ?? 'wallpapers',
+            s3Region: 'us-east-1',
+            natsUrl: nats.endpoints.fromHost,
+            natsStream: nats.streams[0] ?? 'WALLPAPER',
+            otelServiceName: 'variant-generator-test',
+            ...options.configOverrides,
+          };
 
-          // Create Fastify app
           this.app = await createApp(config, {
             logger: options.logger ?? false,
-            enableOtel: false,
+            otelHealthy: true,
           });
 
           logger.debug('In-process Variant Generator Fastify app ready');
@@ -147,9 +82,6 @@ export class InProcessVariantGeneratorTesterBuilder extends BaseTesterBuilder<
         return this;
       }
 
-      /**
-       * Get the Fastify app instance
-       */
       getApp(): FastifyInstance {
         if (!this.app) {
           throw new Error(

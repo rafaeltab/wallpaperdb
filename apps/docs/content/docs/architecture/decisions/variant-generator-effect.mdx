@@ -1,0 +1,16 @@
+---
+title: Variant generator Effect migration
+description: Variant generation ownership, replay and bounded native processing
+---
+
+Variant Generator now composes application-owned Effect services and scoped adapter Layers. The generation capability chooses presets and sequences generation and publication. Image and event adapters own Sharp, S3 and JetStream.
+
+Each selected preset must be stored and announced before the input is acknowledged. Failed presets do not prevent the rest of the batch from running. An incomplete batch retries with stable object keys and event identities; after three attempts, durable quarantine accepts responsibility. Failed quarantine publication leaves the input pending. S3 and JetStream do not share a transaction.
+
+The service preserves aspect-ratio categories, strict smaller-dimension selection, encoding options and nominal preset metadata. The generated image fits within the preset and can have smaller actual dimensions. Binary CloudEvents headers retain the payload consumed by Media; retained legacy and structured upload events are both accepted.
+
+A child process owns each native encoding operation. Interruption kills and reaps it, and storage requests abort. The source limit is 50 MiB, output limit is 64 MiB, native deadline is 60 seconds, and complete variant deadline is 100 seconds. Each worker processes one variant at a time. Shutdown stops pulling, allows bounded completion, then interrupts work before closing dependencies.
+
+The deployment must include the complete `dist` directory. It contains `encoder.mjs` and deferred application chunks, which also preserve telemetry initialization before instrumented clients load.
+
+The context decision is recorded in `apps/variant-generator/docs/adr/0001-replay-safe-variant-generation.md`.

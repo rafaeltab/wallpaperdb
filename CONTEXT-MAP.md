@@ -10,6 +10,8 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper color extraction](./apps/color-extractor/CONTEXT.md) - owns wallpaper color histograms
 
+- [Wallpaper variant generation](./apps/variant-generator/CONTEXT.md) - owns lower-resolution wallpaper variants
+
 ## Relationships
 
 - **User -> Gateway**: User publishes Profile events; Gateway projects public Profile reads and search into GraphQL.
@@ -21,3 +23,6 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - **Ingestor -> Color Extractor**: Uploaded wallpaper events identify immutable originals for color extraction.
 - **Color Extractor -> Gateway**: Extracted color histograms support color-ranked discovery.
+
+- **Ingestor -> Variant Generator**: Uploaded wallpaper events identify originals for variant generation.
+- **Variant Generator -> Media**: Stored variant announcements supply renditions for delivery.

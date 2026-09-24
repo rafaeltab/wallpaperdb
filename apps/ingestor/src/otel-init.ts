@@ -1,5 +1,6 @@
 import type { Agent } from 'node:http';
 import type { Duplex } from 'node:stream';
+import { OtelMetrics, Resource } from '@effect/opentelemetry';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
@@ -96,6 +97,9 @@ export const initializeOtel = Effect.fn('ingestor.telemetry.initialize')(functio
     (transports) => transports.close()
   );
   const acquire = Effect.gen(function* () {
+    const effectMetrics = yield* OtelMetrics.makeProducer().pipe(
+      Effect.provide(Resource.layer({ serviceName: config.otelServiceName }))
+    );
     const sdk = yield* Effect.try({
       try: () =>
         new NodeSDK({
@@ -117,6 +121,7 @@ export const initializeOtel = Effect.fn('ingestor.telemetry.initialize')(functio
           }),
           metricReaders: [
             new PeriodicExportingMetricReader({
+              metricProducers: [effectMetrics],
               exporter: new OTLPMetricExporter({
                 url: `${endpoint}/v1/metrics`,
                 timeoutMillis: exportTimeoutMillis,

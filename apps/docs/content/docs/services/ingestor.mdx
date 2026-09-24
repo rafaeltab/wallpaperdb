@@ -35,6 +35,8 @@ A storage failure leaves enough information to check the exact original during r
 
 Recovery considers records unchanged for more than ten minutes on the next scheduled cycle. Each cycle leases up to five eligible records, processes them concurrently, then repeats for at most twenty batches (100 records). Expiring leases and conditional writes prevent stale workers from overwriting newer progress. Database transactions finish before S3 or NATS operations begin. Missing originals receive three attempts; publication is quarantined after ten attempts while retaining the original and occurrence for investigation. Cleanup processes at most ten pages per cycle, resumes pagination, and deletes only ingestor-owned orphaned or failed assets.
 
+An individual cleanup lookup or deletion failure leaves that asset for a later scan, increments the reconciliation error counter, and allows other assets and pages to proceed. If an asset's disposition cannot be checked, cleanup retains it. A listing failure stops that cycle and preserves the cursor for retry; cancellation still interrupts the work.
+
 ## Admission and telemetry
 
 Redis atomically enforces a per-Profile fixed window; denied requests do not extend it. Defaults are 100 uploads per hour. Disabled or unavailable Redis uses bounded instance-local quota state. This fallback does not provide a fleet-wide quota; its metric drives a provisioned degradation alert.
@@ -75,6 +77,19 @@ make run PACKAGE=ingestor SCRIPT=build:docker
 make test-e2e PACKAGE=ingestor-e2e
 ```
 
-Capability tests use controlled adapters and the Effect test clock. Real adapter contracts verify database atomicity and concurrency, storage semantics, durable broker publication, and distributed quota. A representative composition test verifies complete wiring; a small Docker suite verifies the deployed artifact. Tests use observable conditions and controlled clocks instead of fixed sleeps.
+Tests use observable conditions and controlled clocks instead of fixed sleeps. Their main guarantees are:
+
+| Boundary | Covered behavior |
+| --- | --- |
+| Capabilities | Upload validation and ownership, deduplication, recovery after ambiguous storage or publication failure, finite retries, cleanup pagination, retention and isolated failures. |
+| PostgreSQL | Concurrent reservations, metadata constraints, atomic stored-state/outbox writes, leases and stale workers, quarantine, legacy migration rollback, backfills and stable reruns. |
+| Storage, events and Redis | Original bytes and object layout, absence versus outage, bounded stalled requests, real JetStream acknowledgements and deduplication, persisted event identity and trace context, shared quotas and bounded local fallback. |
+| HTTP and lifecycle | Authentication order, multipart and response contracts, safe Problem Details, quota headers, deadlines, disconnect cancellation, graceful and forced shutdown, startup resource cleanup. |
+| Workers and telemetry | Controlled scheduling, non-overlapping cycles, failure retry and scope shutdown; logs, traces and metrics reaching a local OTLP receiver, privacy and exporter cleanup. |
+| Application and Docker | A representative upload through real PostgreSQL, storage and NATS; three Docker smoke tests for packaged startup, public endpoints, authentication rejection, upload/publication and duplicate identity. |
+
+Remaining focused gaps are successful JPEG/WebP inspection and dimension boundaries, legacy intent-expiry selection, and proof that scheduled recovery starts through real application composition. Worker tests use a controlled ingestion service, so they do not detect a missing worker layer in the application. Recovery tests advance beyond the cutoff; they do not pin the change from five-minute stored-event retry eligibility before migration to the current ten minutes.
+
+Docker tests use test authentication and disable Redis. Valid production Clerk authentication, deployed OTLP delivery, downstream consumers and multiple deployed ingestor replicas are outside that suite; real Redis and local OTLP contracts are tested separately. Atomicity, lease and replay tests cover specific failure scenarios, not process crashes at every external boundary.
 
 Coverage reports include all ingestor source files. CRAP is a risk indicator alongside behavioral tests; the shared analyzer's missing callback/generator inventory is tracked in issue #217, so a numeric pass does not establish that every callback was assessed.

@@ -1,4 +1,3 @@
-import 'reflect-metadata';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -19,7 +18,7 @@ const TesterClass = createDefaultTesterBuilder()
 async function createTestImage(
   width: number,
   height: number,
-  options?: { r?: number; g?: number; b?: number },
+  options?: { r?: number; g?: number; b?: number }
 ): Promise<Buffer> {
   const { r = 255, g = 0, b = 0 } = options ?? {};
   return sharp({
@@ -95,22 +94,16 @@ describe('Color Extraction Pipeline', () => {
 
     await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    const nc = await tester.nats.getConnection();
-    const jsm = await nc.jetstreamManager();
-    const streamInfo = await jsm.streams.info('WALLPAPER');
-    const msgCount = streamInfo.state.messages;
-
-    expect(msgCount).toBeGreaterThanOrEqual(2);
-
     const consumer = await js.consumers.get('WALLPAPER', {
       filterSubjects: 'wallpaper.colors.extracted',
     });
     const msg = await consumer.next({ expires: 5000 });
 
     expect(msg).toBeDefined();
-    const data = JSON.parse(new TextDecoder().decode(msg!.data));
+    if (!msg) throw new Error('No extracted event');
+    const envelope = JSON.parse(new TextDecoder().decode(msg.data));
+    expect(envelope.specversion).toBe('1.0');
+    const data = envelope.data;
     expect(data.wallpaperId).toBe(wallpaperId);
     expect(data.colorHistogram).toHaveLength(64);
     expect(data.colorSpace).toBe('hsv');
@@ -119,5 +112,4 @@ describe('Color Extraction Pipeline', () => {
     const redBin = 0 * 4 + 1 * 2 + 1;
     expect(data.colorHistogram[redBin]).toBeCloseTo(1.0, 3);
   });
-
 });

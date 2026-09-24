@@ -108,14 +108,12 @@ const processMessage = Effect.fn('colors.events.consume')(function* (
       message.ack();
       return;
     }
-    const outcome = yield* extractor
-      .extract(input)
-      .pipe(
-        Effect.match({
-          onSuccess: (value) => value,
-          onFailure: () => ({ _tag: 'Failed' as const }),
-        })
-      );
+    const outcome = yield* extractor.extract(input).pipe(
+      Effect.match({
+        onSuccess: (value) => value,
+        onFailure: () => ({ _tag: 'Failed' as const }),
+      })
+    );
     yield* Effect.annotateCurrentSpan('event.outcome', outcome._tag);
     if (outcome._tag !== 'Failed') {
       message.ack();

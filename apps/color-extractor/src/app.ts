@@ -1,151 +1,72 @@
-import cors from '@fastify/cors';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import Fastify, { type FastifyInstance } from 'fastify';
-import { container } from 'tsyringe';
-import type { Config } from './config.js';
-import { S3Connection } from './connections/s3.js';
-import { NatsConnectionManager } from './connections/nats.js';
-import { getOtelSdk, shutdownOtel } from './otel-init.js';
-import { registerRoutes } from './routes/index.js';
-import { WallpaperUploadedConsumerService } from './services/consumers/wallpaper-uploaded-consumer.service.js';
-import { ColorExtractionProcessor } from './services/color-extraction-processor.js';
-import { EventsService } from './services/events.service.js';
-import { HsvEmbeddingStrategy } from './services/hsv-embedding-strategy.js';
-import { S3ImageReader } from './services/s3-image-reader.js';
+import { Effect, Layer } from 'effect';
+import type { FastifyInstance } from 'fastify';
 import {
-  COLORS_EXTRACTED_PUBLISHER,
-  COLOR_EXTRACTION_USE_CASE,
-  HISTOGRAM_PROVIDER,
-  IMAGE_READER,
-} from './services/ports.js';
-import { SharpHistogramProvider } from './services/sharp-histogram-provider.js';
+  ConsumerHealth,
+  EventsHealth,
+  natsConsumerLayer,
+  natsEventsLayer,
+} from './adapters/events/index.js';
+import { ImageHealth, imageLayer } from './adapters/image/index.js';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import type { Config } from './config.js';
+import { extractionLayer } from './extraction/index.js';
+import { createHttpApp } from './http/index.js';
+import { tracingLayer } from './runtime.js';
 
-export interface ConnectionsState {
-  isShuttingDown: boolean;
-  connectionsInitialized: boolean;
+interface AppOptions {
+  readonly logger?: boolean;
+  readonly signal?: AbortSignal;
+  readonly otelHealthy?: boolean;
+  readonly shutdownTimeoutMs?: number;
 }
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    connectionsState: ConnectionsState;
-    container: typeof container;
-    consumer: WallpaperUploadedConsumerService;
-  }
+export function colorExtractorLayer(config: Config, options: AppOptions = {}) {
+  const image = imageLayer({
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: config.s3AccessKeyId,
+    secretAccessKey: config.s3SecretAccessKey,
+    bucket: config.s3Bucket,
+  });
+  const eventOptions = {
+    url: config.natsUrl,
+    stream: config.natsStream,
+    serviceName: config.otelServiceName,
+    shutdownTimeoutMs: options.shutdownTimeoutMs,
+  };
+  const events = natsEventsLayer(eventOptions);
+  const extraction = extractionLayer.pipe(Layer.provide(Layer.mergeAll(image, events)));
+  const consumer = natsConsumerLayer(eventOptions).pipe(
+    Layer.provide(Layer.mergeAll(extraction, events))
+  );
+  const probe = Layer.effect(
+    AvailabilityProbe,
+    Effect.gen(function* () {
+      const storage = yield* ImageHealth;
+      const broker = yield* EventsHealth;
+      const worker = yield* ConsumerHealth;
+      return AvailabilityProbe.of({
+        inspect: () =>
+          Effect.all(
+            {
+              s3: storage.check(),
+              nats: broker.check(),
+              consumer: worker.check(),
+              otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
+            },
+            { concurrency: 'unbounded' }
+          ),
+      });
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(image, events, consumer)));
+  return availabilityLayer.pipe(Layer.provide(probe), Layer.provide(tracingLayer));
 }
-
 export async function createApp(
   config: Config,
-  options?: { logger?: boolean; enableOtel?: boolean }
+  options: AppOptions = {}
 ): Promise<FastifyInstance> {
-  container.register('config', { useValue: config });
-  container.registerSingleton(S3Connection, S3Connection);
-  container.registerSingleton(NatsConnectionManager, NatsConnectionManager);
-  container.register(HsvEmbeddingStrategy, { useClass: HsvEmbeddingStrategy });
-  container.register(IMAGE_READER, { useClass: S3ImageReader });
-  container.register(HISTOGRAM_PROVIDER, { useClass: SharpHistogramProvider });
-  container.register(COLORS_EXTRACTED_PUBLISHER, { useClass: EventsService });
-  container.register(COLOR_EXTRACTION_USE_CASE, { useClass: ColorExtractionProcessor });
-  container.register(WallpaperUploadedConsumerService, {
-    useClass: WallpaperUploadedConsumerService,
-  });
-
-  const fastify = Fastify({
-    logger:
-      options?.logger !== false
-        ? {
-            level: config.nodeEnv === 'development' ? 'debug' : 'info',
-            transport:
-              config.nodeEnv === 'development'
-                ? {
-                    target: 'pino-pretty',
-                    options: {
-                      translateTime: 'HH:MM:ss Z',
-                      ignore: 'pid,hostname',
-                    },
-                  }
-                : undefined,
-          }
-        : false,
-  });
-
-  await fastify.register(cors, {
-    origin: config.nodeEnv === 'development' ? [/localhost:\d+/, /127\.0\.0\.1:\d+/] : false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  });
-
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Color Extractor API',
-    version: '1.0.0',
-    description:
-      'Color extraction service for wallpapers. Extracts dominant color palettes from stored wallpaper images.',
-    servers:
-      config.nodeEnv === 'production'
-        ? undefined
-        : [
-            {
-              url: `http://localhost:${config.port}`,
-              description: 'Local development server',
-            },
-          ],
-  });
-
-  fastify.decorate('container', container);
-
-  fastify.decorate('connectionsState', {
-    isShuttingDown: false,
-    connectionsInitialized: false,
-  });
-
-  const otelSdk = getOtelSdk();
-  if (otelSdk) {
-    container.register('otelSdk', { useValue: otelSdk });
-  }
-
-  fastify.log.info('Initializing connections...');
-
-  try {
-    await container.resolve(S3Connection).initialize();
-    fastify.log.info('S3 connection created');
-
-    await container.resolve(NatsConnectionManager).initialize();
-    fastify.log.info('NATS connection created');
-
-    fastify.connectionsState.connectionsInitialized = true;
-    fastify.log.info('All connections initialized successfully');
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to initialize connections');
-    throw error;
-  }
-
-  fastify.log.info('Starting event consumers...');
-  try {
-    const consumer = container.resolve(WallpaperUploadedConsumerService);
-
-    await consumer.start();
-    fastify.log.info('Event consumers started');
-
-    fastify.decorate('consumer', consumer);
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to start event consumers');
-    throw error;
-  }
-
-  fastify.addHook('onClose', async () => {
-    fastify.connectionsState.isShuttingDown = true;
-
-    if (fastify.consumer) {
-      fastify.log.info('Stopping event consumers...');
-      await fastify.consumer.stop();
-    }
-
-    await container.resolve(NatsConnectionManager).close();
-    await container.resolve(S3Connection).close();
-    await shutdownOtel();
-  });
-
-  await registerRoutes(fastify);
-
-  return fastify;
+  return createHttpApp(
+    { nodeEnv: config.nodeEnv, port: config.port },
+    colorExtractorLayer(config, options),
+    options
+  );
 }

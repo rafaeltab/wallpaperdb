@@ -75,46 +75,55 @@ class StoredImageHistogram implements ImageHistogram {
     this: StoredImageHistogram,
     storage: OriginalImage
   ) {
-    return yield* this.nativeWork.withPermit(
-      Effect.gen({ self: this }, function* () {
-        const bytes = yield* request('read-image', async (abortSignal) => {
-          const response = await this.client.send(
-            new GetObjectCommand({ Bucket: storage.bucket, Key: storage.key }),
-            { abortSignal }
-          );
-          if (!(response.Body instanceof Readable))
-            throw new Error('Object storage returned no readable image');
-          const body = response.Body;
-          const cancel = () => {
-            body.destroy(new Error('Image read interrupted'));
-          };
-          abortSignal.addEventListener('abort', cancel, { once: true });
-          try {
-            abortSignal.throwIfAborted();
-            const chunks: Buffer[] = [];
-            for await (const chunk of body) {
-              if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array)) {
-                throw new Error('Object storage returned invalid image bytes');
+    return yield* this.nativeWork
+      .withPermit(
+        Effect.gen({ self: this }, function* () {
+          const bytes = yield* request('read-image', async (abortSignal) => {
+            const response = await this.client.send(
+              new GetObjectCommand({ Bucket: storage.bucket, Key: storage.key }),
+              { abortSignal }
+            );
+            if (!(response.Body instanceof Readable))
+              throw new Error('Object storage returned no readable image');
+            const body = response.Body;
+            const cancel = () => {
+              body.destroy(new Error('Image read interrupted'));
+            };
+            abortSignal.addEventListener('abort', cancel, { once: true });
+            try {
+              abortSignal.throwIfAborted();
+              const chunks: Buffer[] = [];
+              for await (const chunk of body) {
+                if (typeof chunk !== 'string' && !(chunk instanceof Uint8Array)) {
+                  throw new Error('Object storage returned invalid image bytes');
+                }
+                chunks.push(Buffer.from(chunk));
               }
-              chunks.push(Buffer.from(chunk));
+              return Buffer.concat(chunks);
+            } finally {
+              abortSignal.removeEventListener('abort', cancel);
+              body.destroy();
             }
-            return Buffer.concat(chunks);
-          } finally {
-            abortSignal.removeEventListener('abort', cancel);
-            body.destroy();
-          }
-        });
-        return yield* histogramFromImage(bytes);
-      })
-    ).pipe(
-      Effect.timeoutOrElse({
-        duration: '100 seconds',
-        orElse: () => Effect.fail(new ExtractionUnavailable({
-          operation: 'extract-image',
-          cause: new Error('Image extraction exceeded 100 seconds'),
-        })).pipe(Effect.tapError((error) => Effect.logError('Image extraction timed out', { cause: error.cause }))),
-      }),
-    );
+          });
+          return yield* histogramFromImage(bytes);
+        })
+      )
+      .pipe(
+        Effect.timeoutOrElse({
+          duration: '100 seconds',
+          orElse: () =>
+            Effect.fail(
+              new ExtractionUnavailable({
+                operation: 'extract-image',
+                cause: new Error('Image extraction exceeded 100 seconds'),
+              })
+            ).pipe(
+              Effect.tapError((error) =>
+                Effect.logError('Image extraction timed out', { cause: error.cause })
+              )
+            ),
+        })
+      );
   });
 }
 
@@ -143,9 +152,9 @@ export function imageLayer(config: ImageConfig): Layer.Layer<ImageHistogram | Im
             request('check-image-storage', (abortSignal) =>
               client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
             ).pipe(
-          Effect.timeout('5 seconds'),
-          Effect.match({ onSuccess: () => true, onFailure: () => false }),
-        ),
+              Effect.timeout('5 seconds'),
+              Effect.match({ onSuccess: () => true, onFailure: () => false })
+            ),
         })
       );
     })

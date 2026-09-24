@@ -56,12 +56,32 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
   }
 });
 it('reports rejected publication as a typed failure without claiming completion', async () => {
- const runtime=ManagedRuntime.make(natsEventsLayer({url:tester.nats.config.endpoints.fromHost,stream:'WALLPAPER',serviceName:'events-contract'}));
- try {
-  const manager=await (await tester.nats.getConnection()).jetstreamManager();
-  await manager.streams.update('WALLPAPER',{max_msg_size:1});
-  const result=await runtime.runPromise(Effect.flatMap(ColorEvents,events=>events.publish({input:{...input,occurrence:{...input.occurrence,id:'rejected'}},histogram:[1,0],colorSpace:'hsv'})).pipe(Effect.result));
-  expect(result._tag).toBe('Failure');
-  if(result._tag==='Failure') expect(result.failure).toMatchObject({_tag:'ExtractionUnavailable',operation:'publish-colors'});
- }finally {await runtime.dispose();}
+  const runtime = ManagedRuntime.make(
+    natsEventsLayer({
+      url: tester.nats.config.endpoints.fromHost,
+      stream: 'WALLPAPER',
+      serviceName: 'events-contract',
+    })
+  );
+  try {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await manager.streams.update('WALLPAPER', { max_msg_size: 1 });
+    const result = await runtime.runPromise(
+      Effect.flatMap(ColorEvents, (events) =>
+        events.publish({
+          input: { ...input, occurrence: { ...input.occurrence, id: 'rejected' } },
+          histogram: [1, 0],
+          colorSpace: 'hsv',
+        })
+      ).pipe(Effect.result)
+    );
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure')
+      expect(result.failure).toMatchObject({
+        _tag: 'ExtractionUnavailable',
+        operation: 'publish-colors',
+      });
+  } finally {
+    await runtime.dispose();
+  }
 });

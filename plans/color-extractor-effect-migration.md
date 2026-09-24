@@ -18,7 +18,7 @@ Migrate only Color Extractor, based on `origin/main` commit `5140dd52dbc60fc0cc9
 | 120-second ack wait, stop extraction at existing delivery-count cutoff 3 | Event adapter | Shared consumer redeliveryCount >=3; verify NATS semantics | Real broker retry tests | Replace immediate retries with 1s/2s delay; quarantine invalid/exhausted input durably before terminal ack; unlimited broker delivery allows quarantine retries without repeating extraction |
 | Output wallpaper.colors.extracted is consumed by Gateway | Event adapter | Shared schema and Gateway translator | Broker schema checks and real browser ranking | CloudEvents envelope; stable ID derived from input occurrence, occurrence time inherited from input; payload unchanged |
 | GET /health and /ready, OpenAPI and development CORS | HTTP adapter | Health integration tests | HTTP and composition tests | Include worker state in dependency health; RFC 9457 non-success bodies and anchored development origins |
-| Acquire S3/NATS then start consumer; stop consuming before dependencies close | Composition | createApp source; no failure-cleanup coverage | Startup/close and broker lifecycle tests | Scoped resources, bounded Effect drain, cleanup on startup failure; noncancellable Sharp metadata may delay completion |
+| Acquire S3/NATS then start consumer; stop consuming before dependencies close | Composition | createApp source; no failure-cleanup coverage | Startup/close and broker lifecycle tests | Scoped resources, bounded drain, cleanup on startup failure; killable decoder process bounds native metadata work |
 | Traces across processing and external calls, existing metric names | Runtime/adapters | Existing telemetry calls | Mechanism tests + code audit | Effect spans connected to process SDK |
 
 Storage-coordinate contracts remain deferred as in the Ingestor ADR. No database, shared event-schema redesign, or other service migration belongs here. Extraction is a stateless reaction to an immutable original; repeat computation is safe. Stable result identity and Gateway idempotent projection provide replay safety beyond the broker deduplication window. There is no cross-resource atomicity claim.
@@ -77,4 +77,19 @@ The TSyringe connection subclasses only forwarded configuration to shared client
 
 The previous three-second pipeline sleep and message-count assertion were replaced by a bounded read of the actual extracted result. This retains output identity, histogram length, normalization and red-bin assertions. Production startup now has real listener and bind-failure cleanup tests. Test builders pass explicit configuration instead of mutating process environment.
 
-Intentional resource limits: S3 extraction 100 seconds, health probe 5 seconds, Sharp pixel pipeline 10 seconds, native concurrency one per adapter. Sharp metadata work remains noncancellable; the permit remains held until completion. Quarantine payloads that cannot fit after binary CloudEvents headers remain pending for repair, without further extraction beyond the three-attempt cutoff.
+Intentional resource limits: S3 extraction 100 seconds, health probe 5 seconds, Image decoder process 10 seconds including metadata, native concurrency one per adapter. Deadline/interruption kills and reaps the decoder before releasing its permit. Quarantine payloads that cannot fit after binary CloudEvents headers remain pending for repair, without further extraction beyond the three-attempt cutoff.
+
+## Full-PR review, round one
+
+Base and merge-base: `5140dd52dbc60fc0cc9bd9d022c9ff6717130c84`. Reviewed full `git diff origin/main...HEAD` and eight commits through `b4468f7` with independent Standards and Spec agents.
+
+### Standards
+
+- P1: Uninterruptible Sharp metadata could block scope shutdown and subsequent cleanup. Applicable, fixed in `7061236` with killable process ownership and real SIGSTOP deadline/interruption tests. The native-process ADR records the cost and reason.
+- P2: Bucket/key storage coordinates remain in application input. On examining concrete alternatives, the reviewer withdrew this as a migration blocker. The handoff explicitly defers the storage contract change. Preserving arbitrary retained coordinates through an opaque wrapper would only conceal the same dependency; a genuine logical-ID resolver needs producer-contract or durable-mapping work outside this migration. Keep this as explicit deferred boundary debt.
+
+### Spec
+
+- P2: Health/readiness OpenAPI response schemas were deleted. Applicable, fixed in `71cd29c` with a failing documentation contract test first, then restored 200 and RFC 9457 503 schemas. All four HTTP tests pass.
+
+Round two will review the complete PR again after these fixes. The requested video will be attached by the user, as confirmed in the session; provide the final inspected clip locally and leave the PR attachment gate open until attached.

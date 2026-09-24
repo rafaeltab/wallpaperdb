@@ -70,7 +70,6 @@ export const ingestorConfig = Configuration.all({
   redisPort: Configuration.schema(boundedPort, 'REDIS_PORT').pipe(Configuration.withDefault(6379)),
   redisPassword: optional(Configuration.Redacted('REDIS_PASSWORD')),
   clerkPublishableKey: optional(Configuration.NonEmptyString('CLERK_PUBLISHABLE_KEY')),
-  clerkDomain: optional(Configuration.schema(urlString, 'CLERK_DOMAIN')),
   clerkSecretKey: optional(
     Configuration.schema(Schema.Redacted(Schema.NonEmptyString), 'CLERK_SECRET_KEY')
   ),

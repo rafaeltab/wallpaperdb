@@ -140,3 +140,21 @@ Commit `32c5e0a` preserves SDK-first initialization in generated JavaScript thro
 - `GITHUB_ACTIONS=true make ci` passed again: 72 build/check/unit/integration tasks and 10 E2E/dependency tasks. Turbo reused 68 and 8 successful task caches respectively. The CI runner reported 42 seconds, excluding Make prerequisite work. Existing web E2E again passed all three tests.
 
 The recorded video predates this telemetry-only follow-up. Its extraction and ranking evidence remains applicable; the generated-import and collector tests provide evidence for the later telemetry changes. The user will attach the recording, so the PR remains draft pending that manual step. Local full-CI output is `/tmp/color-ci-telemetry-final.log`; round-three reviews are `/tmp/color-standards-review-3.md` and `/tmp/color-spec-review-3.md`.
+
+## PR comment follow-up
+
+All five inline findings in review `5309167693` were valid and fixed in separate commits:
+
+| Comment | Finding and evidence | Fix |
+| --- | --- | --- |
+| `4097609282` | The production graph handled HTTP requests but omitted the Effect tracer from the resulting runtime. A collector test through real `createApp`, S3 and NATS failed before the fix and passes with the incoming trace and parent IDs afterward. The previous synthetic test graph concealed this defect. | `c4cfe8b` retains `tracingLayer` with `provideMerge`; collector coverage now exercises production composition. |
+| `4097609286` | A mutation that called extraction three times and quarantined as `Exhausted` passed the original malformed-input test. | `7fea657` asserts zero extraction calls and quarantine reason `Invalid`; the same mutation fails. |
+| `4097609289` | Shuffling publication tests with seed 3 reproduced a failure caused by leaked stream configuration. | `3fa3042` restores the prior message-size limit in `finally`; both publication tests pass in the reproduced order. |
+| `4097609300` | Forced opacity passed the original uniformly blue fixture. | `72b2dc0` uses equally sized red and blue regions with unequal alpha and asserts relative contributions; forced opacity fails. |
+| `4097609307` | Parent-process buffering had no byte limit, an inherited resource risk. | `073bffe` caps actual streamed image bytes at 50 MiB, matching Ingestor's accepted image limit; oversized advertised lengths fail early and overflow closes the body. Tests exercise unfinished chunked overflow, header-only rejection and successful extraction at exactly the limit. |
+
+Temporary mutations were removed before final verification. No production decoder or consumer behavior changed for the assertion fixes. Normal image extraction and ranking remain unchanged; stored images above 50 MiB now fail with a typed read error and follow the existing retry/quarantine policy. The existing video remains evidence of the normal upload/extraction/ranking path, while collector and byte-boundary tests cover these fixes.
+
+Follow-up verification: all 63 service tests in 19 files pass. After a host OOM/restart during repository-wide verification, the service suite was rerun with one worker, file parallelism disabled, and a 4 GiB systemd memory cap. That run took 29.14 seconds. Whole-source coverage is 1152/1198 lines = 96.16%, 49/57 functions = 85.96%, and 239/270 branches = 88.51%. Build, lint, architecture and type checks pass. The CRAP check before the restart reported zero of 50 inventoried functions above 30. Independent full-PR Standards and Spec reviews through `72b2dc0` each returned zero actionable findings.
+
+The local full-CI attempt is not reported as passing. Overlapping coverage commands first collided on output directories; a later host OOM killed a Vitest worker. The task's persistent stack was stopped, local verification was serialized and memory-limited, and final repository-wide validation is delegated to GitHub CI on the pushed head. The restart cleared `/tmp`, including transient logs and the local video copy; the earlier recording evidence above is historical. Video attachment remains the user's pending delivery step.

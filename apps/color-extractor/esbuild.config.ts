@@ -25,6 +25,7 @@ await build({
   platform: 'node',
   target: ['node22'],
   bundle: true,
+  splitting: true,
   outdir: 'dist',
   outExtension: { '.js': '.mjs' },
   format: 'esm',

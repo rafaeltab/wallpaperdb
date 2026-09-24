@@ -24,7 +24,7 @@ Authenticated ownership; accepted/duplicate/in-progress uploads; truthful byte-b
 
 CRAP must use the repository analyzer with scoped coverage. Its callback/generator attribution limitations are tracked in #217; report measured scores honestly and do not treat them as proof of complete behavior coverage.
 
-## Final verification
+## Initial migration verification
 
 `make test-integration PACKAGE=ingestor FORCE=1`: 83 tests / 16 files pass; 10.57s Make wall time, 9.07s Vitest (53% and 56% faster respectively than baseline). Controlled clocks replace quota/worker sleeps; adapter fixtures replace repeated whole-service setup; the deployed Docker suite covers three essential flows. These are local measurements, not performance guarantees.
 
@@ -45,6 +45,14 @@ Coverage includes all ingestor source files. Vitest's instrumentation version ch
 - The rebuilt ingestor Docker suite passes 3/3 in 7.18s with telemetry enabled.
 - Agent-browser verifies readiness, dependency health, accepted upload, duplicate identity, invalid content, unauthenticated upload, and the actual authenticated Swagger upload form.
 - The public `make migrate PACKAGE=ingestor` command succeeds twice against fresh PostgreSQL. The populated legacy database regression verifies incomplete committed records stop migration before mutation, followed by repair and successful reruns.
+
+## Cleanup regression and coverage audit
+
+The deletion audit found that an individual asset lookup or deletion failure stopped cleanup before its cursor advanced. Restored failure isolation with regression tests that first failed, then passed: other assets and later pages proceed, uncertain assets remain intact, and later scans retry them. Additional guards verify listing errors retain the cursor, cancellation propagates, and isolated cleanup errors reach the native reconciliation counter.
+
+The updated suite passes 94 tests across 17 files in 9.85s Vitest / 10.44s Make/Turbo. Line coverage is 95.52%, statements 94.63%, branches 86.97%, and functions 93.97%; no inventoried function exceeds CRAP 30. Type checks, lint, formatting, independent review of the cleanup fix, and fresh agent-browser upload/Swagger checks pass. These browser checks verify normal application flows; the focused capability tests establish cleanup failure isolation.
+
+The rendered service documentation now distinguishes verified contracts from gaps. Positive JPEG/WebP inspection and dimension boundaries, legacy intent-expiry selection, and actual application worker activation still need focused coverage. Existing recovery tests also do not pin the five-to-ten-minute stored-event retry change. The Docker smoke suite does not establish production Clerk authentication, deployed Redis/OTLP integration, downstream completion, multiple-process recovery, or every process-crash boundary. These gaps remain outside this cleanup repair.
 
 ## Deployment and compatibility
 

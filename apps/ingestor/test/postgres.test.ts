@@ -10,7 +10,6 @@ import { ControlledStore, metadata } from './helpers/ingestion.js';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { migrateIngestionDatabase } from '../src/adapters/postgres/index.js';
 
 function record(id: string, owner = 'profile'): UploadRecord {
   const wallpaper = {
@@ -82,32 +81,79 @@ describe('PostgreSQL ingestion contract', () => {
         await readFile(join(migrationsFolder, '0000_left_starjammers.sql'))
       );
       await migrate(drizzle(pool), { migrationsFolder: initial });
-      for (const [id, owner, state] of [
-        ['legacy-stored', 'owner', 'stored'],
-        ['legacy-duplicate', 'owner', 'uploading'],
-        ['legacy-completed', 'other', 'completed'],
-      ]) {
+      const uploadedAt = '2026-01-02T03:04:05.678Z';
+      const originals = [
+        {
+          id: 'legacy-stored',
+          owner: 'owner',
+          state: 'stored',
+          mimeType: 'image/png',
+          extension: 'png',
+          storageKey: 'legacy-stored/original.png',
+        },
+        {
+          id: 'legacy-duplicate',
+          owner: 'owner',
+          state: 'uploading',
+          mimeType: 'image/png',
+          extension: 'png',
+          storageKey: 'legacy-duplicate/original.png',
+        },
+        {
+          id: 'legacy-uploading',
+          owner: 'uploading-owner',
+          state: 'uploading',
+          mimeType: 'image/jpeg',
+          extension: 'jpeg',
+          storageKey: 'legacy-uploading/original.jpeg',
+        },
+        {
+          id: 'legacy-processing',
+          owner: 'processing-owner',
+          state: 'processing',
+          mimeType: 'image/jpeg',
+          extension: 'jpg',
+          storageKey: null,
+        },
+        {
+          id: 'legacy-completed',
+          owner: 'completed-owner',
+          state: 'completed',
+          mimeType: 'image/webp',
+          extension: 'webp',
+          storageKey: null,
+        },
+      ];
+      for (const original of originals) {
         await pool.query(
-          `INSERT INTO wallpapers(id, user_id, content_hash, upload_state, file_type, mime_type, width, height, file_size_bytes, original_filename, storage_key) VALUES ($1,$2,'hash',$3,'image','image/png',1920,1080,3,'legacy.png',$4)`,
-          [id, owner, state, `${id}/original.png`]
+          `INSERT INTO wallpapers(id, user_id, content_hash, upload_state, file_type, mime_type, width, height, file_size_bytes, original_filename, storage_key, uploaded_at) VALUES ($1,$2,'hash',$3,'image',$4,1920,1080,3,'legacy-original',$5,$6)`,
+          [
+            original.id,
+            original.owner,
+            original.state,
+            original.mimeType,
+            original.storageKey,
+            uploadedAt,
+          ]
         );
       }
       await pool.query(
-        "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-interrupted','owner','uploading')"
+        "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-interrupted','owner','uploading'), ('legacy-initiated','owner','initiated')"
       );
       await pool.query(
         "INSERT INTO wallpapers(id,user_id,upload_state) VALUES ('legacy-incomplete-stored','repair-owner','stored')"
       );
-      const rejected = await Effect.runPromise(
-        migrateIngestionDatabase(pool, migrationsFolder).pipe(Effect.result)
-      );
-      expect(rejected._tag).toBe('Failure');
+      await expect(migrate(drizzle(pool), { migrationsFolder })).rejects.toMatchObject({
+        code: '23514',
+        message: 'Committed upload metadata is incomplete; repair it before retrying migration',
+      });
       const unchanged = await pool.query(
-        "SELECT id, upload_state FROM wallpapers WHERE id IN ('legacy-incomplete-stored', 'legacy-interrupted', 'legacy-duplicate') ORDER BY id"
+        "SELECT id, upload_state FROM wallpapers WHERE id IN ('legacy-incomplete-stored', 'legacy-interrupted', 'legacy-initiated', 'legacy-duplicate') ORDER BY id"
       );
       expect(unchanged.rows).toEqual([
         { id: 'legacy-duplicate', upload_state: 'uploading' },
         { id: 'legacy-incomplete-stored', upload_state: 'stored' },
+        { id: 'legacy-initiated', upload_state: 'initiated' },
         { id: 'legacy-interrupted', upload_state: 'uploading' },
       ]);
       expect(
@@ -116,24 +162,69 @@ describe('PostgreSQL ingestion contract', () => {
       await pool.query(
         "UPDATE wallpapers SET content_hash = 'repaired-hash', file_type = 'image', mime_type = 'image/png', width = 1920, height = 1080, file_size_bytes = 3, original_filename = 'legacy.png', storage_key = 'legacy-incomplete-stored/original.png' WHERE id = 'legacy-incomplete-stored'"
       );
-      await Effect.runPromise(migrateIngestionDatabase(pool, migrationsFolder));
-      await Effect.runPromise(migrateIngestionDatabase(pool, migrationsFolder));
-      const rows = await pool.query(
-        'SELECT id, upload_state, ingestion_snapshot FROM wallpapers ORDER BY id'
-      );
-      expect(rows.rows.find((row) => row.id === 'legacy-stored')?.upload_state).toBe('stored');
+      await migrate(drizzle(pool), { migrationsFolder });
+      const rows = await pool.query('SELECT * FROM wallpapers ORDER BY id');
+      for (const original of originals.filter(({ id }) => id !== 'legacy-duplicate')) {
+        expect(rows.rows.find((row) => row.id === original.id)).toMatchObject({
+          upload_state: original.state,
+          lease_token: `legacy-lease-${original.id}`,
+          lease_expires_at: null,
+          ingestion_snapshot: {
+            id: `uploaded-${original.id}`,
+            source: 'urn:wallpaperdb:ingestor',
+            occurredAt: uploadedAt,
+            correlationId: `ingestion-${original.id}`,
+            causationId: `legacy-command-${original.id}`,
+            wallpaper: {
+              id: original.id,
+              profileId: original.owner,
+              originalFilename: 'legacy-original',
+              uploadedAt,
+              metadata: {
+                fileType: 'image',
+                mimeType: original.mimeType,
+                width: 1920,
+                height: 1080,
+                fileSizeBytes: 3,
+                contentHash: 'hash',
+                extension: original.extension,
+              },
+            },
+          },
+        });
+      }
       expect(rows.rows.find((row) => row.id === 'legacy-incomplete-stored')?.upload_state).toBe(
         'stored'
       );
-      expect(rows.rows.find((row) => row.id === 'legacy-completed')?.upload_state).toBe(
-        'completed'
+      for (const id of ['legacy-duplicate', 'legacy-interrupted', 'legacy-initiated']) {
+        expect(rows.rows.find((row) => row.id === id)).toMatchObject({
+          upload_state: 'failed',
+          ingestion_snapshot: null,
+        });
+      }
+      const outbox = await pool.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id');
+      expect(outbox.rows).toEqual(
+        rows.rows
+          .filter((row) => row.upload_state === 'stored')
+          .map((row) => ({
+            event_id: row.ingestion_snapshot.id,
+            wallpaper_id: row.id,
+            event: row.ingestion_snapshot,
+            published_at: null,
+            quarantined_at: null,
+          }))
       );
-      expect(rows.rows.find((row) => row.id === 'legacy-duplicate')?.upload_state).toBe('failed');
-      expect(rows.rows.find((row) => row.id === 'legacy-interrupted')?.upload_state).toBe('failed');
-      const outbox = await pool.query('SELECT event_id, event FROM upload_outbox');
-      expect(outbox.rows).toHaveLength(2);
-      expect(outbox.rows[0]?.event.source).toBe('urn:wallpaperdb:ingestor');
-      expect(outbox.rows[0]?.event.wallpaper.metadata.extension).toBe('png');
+      await pool.query(
+        "INSERT INTO wallpapers(id, user_id, content_hash, upload_state, file_type, mime_type, width, height, file_size_bytes, original_filename) VALUES ('later-reservation','later-owner','later-hash','uploading','image','image/png',1920,1080,3,'later.png')"
+      );
+      const beforeRerun = await pool.query('SELECT * FROM wallpapers ORDER BY id');
+      await migrate(drizzle(pool), { migrationsFolder });
+      expect((await pool.query('SELECT * FROM wallpapers ORDER BY id')).rows).toEqual(
+        beforeRerun.rows
+      );
+      expect((await pool.query('SELECT * FROM upload_outbox ORDER BY wallpaper_id')).rows).toEqual(
+        outbox.rows
+      );
     } finally {
       await pool.end();
       await rm(initial, { recursive: true, force: true });

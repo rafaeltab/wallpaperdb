@@ -8,6 +8,8 @@
 
 Additional contexts are documented lazily as their domain language is resolved.
 
+- [Wallpaper color extraction](./apps/color-extractor/CONTEXT.md) - owns wallpaper color histograms
+
 ## Relationships
 
 - **User -> Gateway**: User publishes Profile events; Gateway projects public Profile reads and search into GraphQL.
@@ -16,3 +18,6 @@ Additional contexts are documented lazily as their domain language is resolved.
 - **Ingestor -> User**: Wallpaper ownership records use the Profile ID, which is the authenticated Clerk user ID. User consumes published wallpaper events into a minimal ownership projection to validate Biography embeds.
 - **User -> Web**: User accepts authenticated Profile commands; Web presents and edits Profiles.
 - **User <-> Web**: A [shared Markdown policy](./docs/adr/0005-share-the-profile-markdown-policy.md) keeps Biography acceptance and React rendering aligned.
+
+- **Ingestor -> Color Extractor**: Uploaded wallpaper events identify immutable originals for color extraction.
+- **Color Extractor -> Gateway**: Extracted color histograms support color-ranked discovery.

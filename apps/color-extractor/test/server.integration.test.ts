@@ -39,9 +39,7 @@ function config(port: number): Config {
     otelServiceName: 'color-extractor-server-contract',
   };
 }
-const decodeConnections = Schema.decodeUnknownSync(
-  Schema.Struct({ num_connections: Schema.Int })
-);
+const decodeConnections = Schema.decodeUnknownSync(Schema.Struct({ num_connections: Schema.Int }));
 async function connections(): Promise<number> {
   const container = tester.nats.config.container.getContainer();
   const response = await fetch(`http://127.0.0.1:${container.getMappedPort(8222)}/connz`);
@@ -51,16 +49,20 @@ async function connections(): Promise<number> {
 it('serves readiness through a real listener and releases the listener and broker on scope exit', async () => {
   const baseline = await connections();
   let address = '';
-  await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const server = yield* startColorExtractor(config(0));
-    address = server.address.replace('0.0.0.0', '127.0.0.1');
-    yield* Effect.promise(async () => {
-      const response = await fetch(`${address}/ready`);
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ ready: true });
-      expect(await connections()).toBe(baseline + 1);
-    });
-  })));
+  await Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function* () {
+        const server = yield* startColorExtractor(config(0));
+        address = server.address.replace('0.0.0.0', '127.0.0.1');
+        yield* Effect.promise(async () => {
+          const response = await fetch(`${address}/ready`);
+          expect(response.status).toBe(200);
+          expect(await response.json()).toMatchObject({ ready: true });
+          expect(await connections()).toBe(baseline + 1);
+        });
+      })
+    )
+  );
   await expect.poll(connections).toBe(baseline);
   await expect(fetch(`${address}/ready`)).rejects.toThrow();
 }, 10000);
@@ -82,6 +84,8 @@ it('releases acquired broker resources when its HTTP port is already occupied', 
     }
     await expect.poll(connections).toBe(baseline);
   } finally {
-    await new Promise<void>((resolve, reject) => occupied.close((error) => error ? reject(error) : resolve()));
+    await new Promise<void>((resolve, reject) =>
+      occupied.close((error) => (error ? reject(error) : resolve()))
+    );
   }
 }, 10000);

@@ -17,19 +17,19 @@ Migrate only Color Extractor, based on `origin/main` commit `5140dd52dbc60fc0cc9
 | Acknowledge only after publication PubAck or intentional skip | Event adapter | Shared consumer source | Real broker delivery tests | None |
 | 120-second ack wait, stop extraction at existing delivery-count cutoff 3 | Event adapter | Shared consumer redeliveryCount >=3; verify NATS semantics | Real broker retry tests | Replace immediate retries with 1s/2s delay; quarantine invalid/exhausted input durably before terminal ack; unlimited broker delivery allows quarantine retries without repeating extraction |
 | Output wallpaper.colors.extracted is consumed by Gateway | Event adapter | Shared schema and Gateway translator | Broker schema checks and real browser ranking | CloudEvents envelope; stable ID derived from input occurrence, occurrence time inherited from input; payload unchanged |
-| GET /health and /ready, OpenAPI and development CORS | HTTP adapter | Health integration tests | HTTP and composition tests | Include worker state in dependency health |
-| Acquire S3/NATS then start consumer; stop consuming before dependencies close | Composition | createApp source; no failure-cleanup coverage | Startup/close and broker lifecycle tests | Scoped resources, bounded drain, cleanup on startup failure |
+| GET /health and /ready, OpenAPI and development CORS | HTTP adapter | Health integration tests | HTTP and composition tests | Include worker state in dependency health; RFC 9457 non-success bodies and anchored development origins |
+| Acquire S3/NATS then start consumer; stop consuming before dependencies close | Composition | createApp source; no failure-cleanup coverage | Startup/close and broker lifecycle tests | Scoped resources, bounded Effect drain, cleanup on startup failure; noncancellable Sharp metadata may delay completion |
 | Traces across processing and external calls, existing metric names | Runtime/adapters | Existing telemetry calls | Mechanism tests + code audit | Effect spans connected to process SDK |
 
 Storage-coordinate contracts remain deferred as in the Ingestor ADR. No database, shared event-schema redesign, or other service migration belongs here. Extraction is a stateless reaction to an immutable original; repeat computation is safe. Stable result identity and Gateway idempotent projection provide replay safety beyond the broker deduplication window. There is no cross-resource atomicity claim.
 
 ## Increments
 
-- [ ] Record baseline test/check/coverage/CRAP timing and limits.
-- [ ] Add Effect extraction capability, typed ports and explicit outcomes with focused tests.
-- [ ] Implement image adapter with real Sharp/S3 contract evidence; preserve pure histogram table.
-- [ ] Implement event translation, stable publication and bounded consumer with real NATS evidence.
-- [ ] Route production composition and HTTP through scoped Layers; remove obsolete DI paths after accounting for callers.
+- [x] Record baseline test/check/coverage/CRAP timing and limits.
+- [x] Add Effect extraction capability, typed ports and explicit outcomes with focused tests.
+- [x] Implement image adapter with real Sharp/S3 contract evidence; preserve pure histogram table.
+- [x] Implement event translation, stable publication and bounded consumer with real NATS evidence.
+- [x] Route production composition and HTTP through scoped Layers; remove obsolete DI paths after accounting for callers.
 - [ ] Verify full source coverage, CRAP, service checks and full `make ci`.
 - [ ] Review full PR against origin/main with independent Standards/Spec reviewers; fix applicable findings in tested commits and repeat.
 - [ ] Run fresh actual extraction through Gateway and browser Color ranking; record and publish playable video.
@@ -70,3 +70,11 @@ Docker 29.1.3; Testcontainers manages isolated SeaweedFS `chrislusf/seaweedfs:4.
 No failing baseline tests, lint, type check or build. Pipeline integration has one successful extraction test; retries, malformed payloads, video no-op, and shutdown are not demonstrated through real composition by that suite. Some callbacks are omitted by the CRAP function inventory.
 
  Coverage continues to include all `src/**/*.ts`, including composition and entrypoints. Shared CRAP callback/generator limitation remains tracked by #217; report it alongside manual review rather than treating CRAP as proof.
+
+## Deletion audit
+
+The TSyringe connection subclasses only forwarded configuration to shared clients; the new adapter Layers own clients directly. The event service and publisher wrappers are replaced by one result-publishing adapter. The processor's read-then-publish sequencing and handler's video skip now belong to the extraction capability, tested through its driving port. The HSV class was converted to pure functions without changing its formula or test table. The old health aggregator path is replaced by the availability capability and HTTP translation tests. The unused problem-details helper had no callers. The old telemetry singleton is replaced by the process scope. Existing S3 and Sharp tests now call deliberate adapter entry points. No original deletion or storage mutation was introduced.
+
+The previous three-second pipeline sleep and message-count assertion were replaced by a bounded read of the actual extracted result. This retains output identity, histogram length, normalization and red-bin assertions. Production startup now has real listener and bind-failure cleanup tests. Test builders pass explicit configuration instead of mutating process environment.
+
+Intentional resource limits: S3 extraction 100 seconds, health probe 5 seconds, Sharp pixel pipeline 10 seconds, native concurrency one per adapter. Sharp metadata work remains noncancellable; the permit remains held until completion. Quarantine payloads that cannot fit after binary CloudEvents headers remain pending for repair, without further extraction beyond the three-attempt cutoff.

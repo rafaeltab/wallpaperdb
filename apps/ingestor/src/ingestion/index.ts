@@ -1,4 +1,4 @@
-import { Clock, Context, Effect, Layer, Metric, Schema } from 'effect';
+import { Clock, Context, Effect, Exit, Layer, Metric, Schema } from 'effect';
 
 export interface ValidationLimits {
   readonly maxFileSizeImage: number;
@@ -185,6 +185,41 @@ export const IngestionStore = Context.Service<IngestionStore>(
   'wallpaperdb.ingestor.ingestion.store'
 );
 
+function observeOccurrence<A extends string, E, R>(
+  operation: 'publish' | 'recover',
+  effect: Effect.Effect<A, E, R>,
+  record: UploadRecord
+) {
+  const attributes = {
+    'event.source': record.event.source,
+    'event.id': record.event.id,
+    'event.type': 'wallpaper.uploaded',
+    'event.correlation_id': record.event.correlationId,
+    'event.causation_id': record.event.causationId,
+    'wallpaper.id': record.wallpaper.id,
+    'event.delivery_attempt': record.attempts + 1,
+    'event.operation': operation,
+  };
+  return Effect.gen(function* () {
+    yield* Effect.annotateCurrentSpan(attributes);
+    const started = yield* Clock.currentTimeMillis;
+    return yield* effect.pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* () {
+          const completion = {
+            'event.outcome': Exit.isSuccess(exit) ? exit.value : 'Failed',
+            'event.duration_ms': (yield* Clock.currentTimeMillis) - started,
+          };
+          yield* Effect.annotateCurrentSpan(completion);
+          yield* Effect.logInfo('Upload occurrence attempt finished').pipe(
+            Effect.annotateLogs(completion)
+          );
+        })
+      )
+    );
+  }).pipe(Effect.annotateLogs(attributes), Effect.annotateSpans(attributes));
+}
+
 export function ingestionLayer(): Layer.Layer<
   Ingestion,
   never,
@@ -206,36 +241,48 @@ export function ingestionLayer(): Layer.Layer<
         }),
         1
       );
-      const publish = Effect.fn('ingestion.publish')(function* (record: UploadRecord) {
-        yield* events.publish(record.event);
-        yield* store.published(record);
-      });
       const defer = (record: UploadRecord, maximum: number) =>
         Clock.currentTimeMillis.pipe(
-          Effect.flatMap((now) => store.defer(record, new Date(now), maximum))
+          Effect.flatMap((now) => store.defer(record, new Date(now), maximum)),
+          Effect.as(
+            record.attempts + 1 < maximum
+              ? 'Deferred'
+              : record.state === 'uploading'
+                ? 'Failed'
+                : 'Quarantined'
+          )
         );
-      const publishOrDefer = (record: UploadRecord) =>
-        publish(record).pipe(
-          Effect.as(true),
-          Effect.catchTag('IngestionUnavailable', () => defer(record, 10).pipe(Effect.as(false)))
-        );
-      const recover = Effect.fn('ingestion.recover')(function* (record: UploadRecord) {
-        if (record.state === 'uploading') {
-          const exists = yield* assets.exists({
-            wallpaperId: record.wallpaper.id,
-            extension: record.wallpaper.metadata.extension,
+      const publishOrDefer = Effect.fn('ingestion.publish')(
+        function* (record: UploadRecord) {
+          return yield* events.publish(record.event).pipe(
+            Effect.andThen(() => store.published(record)),
+            Effect.as('Published'),
+            Effect.catchTag('IngestionUnavailable', () => defer(record, 10))
+          );
+        },
+        (effect, record) => observeOccurrence('publish', effect, record)
+      );
+      const recover = Effect.fn('ingestion.recover')(
+        function* (record: UploadRecord) {
+          if (record.state === 'uploading') {
+            const exists = yield* assets.exists({
+              wallpaperId: record.wallpaper.id,
+              extension: record.wallpaper.metadata.extension,
+            });
+            if (!exists) return yield* defer(record, 3);
+            const committed = yield* store.stored(record);
+            if (!committed) return 'Superseded';
+          }
+          const outcome = yield* publishOrDefer({
+            ...record,
+            state: 'stored',
+            attempts: record.state === 'uploading' ? 0 : record.attempts,
           });
-          if (!exists) return yield* defer(record, 3);
-          const committed = yield* store.stored(record);
-          if (!committed) return;
-        }
-        const published = yield* publishOrDefer({
-          ...record,
-          state: 'stored',
-          attempts: record.state === 'uploading' ? 0 : record.attempts,
-        });
-        if (!published) yield* recoveryFailure;
-      });
+          if (outcome !== 'Published') yield* recoveryFailure;
+          return outcome;
+        },
+        (effect, record) => observeOccurrence('recover', effect, record)
+      );
       const upload = Effect.fn('ingestion.upload')(function* (
         input: UploadInput
       ): Effect.fn.Return<UploadOutcome, IngestionUnavailable> {

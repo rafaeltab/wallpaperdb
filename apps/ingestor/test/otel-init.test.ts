@@ -2,10 +2,12 @@ import { createServer } from 'node:http';
 import type { Socket } from 'node:net';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
-import { Effect, ManagedRuntime, Metric } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { ingestorTracingLayer } from '../src/runtime.js';
+import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
+import { fixture, uploadInput } from './helpers/ingestion.js';
 
 afterEach(() => {
   logs.disable();
@@ -72,12 +74,20 @@ describe('ingestor telemetry ownership', () => {
   it('exports logs, traces, and metrics before its owning scope finishes', async () => {
     const requests = new Set<string>();
     const metricBodies: string[] = [];
+    const logRecords: unknown[] = [];
+    const spans: unknown[] = [];
     const collector = createServer((request, response) => {
       requests.add(request.url ?? '');
       const chunks: Buffer[] = [];
       request.on('data', (chunk: Buffer) => chunks.push(chunk));
       request.on('end', () => {
-        if (request.url === '/v1/metrics') metricBodies.push(Buffer.concat(chunks).toString());
+        const body = Buffer.concat(chunks).toString();
+        if (request.url === '/v1/metrics') metricBodies.push(body);
+        JSON.parse(body, (key, value) => {
+          if (key === 'logRecords') logRecords.push(...value);
+          if (key === 'spans') spans.push(...value);
+          return value;
+        });
         response.writeHead(200);
         response.end();
       });
@@ -93,24 +103,35 @@ describe('ingestor telemetry ownership', () => {
             otelServiceName: 'ingestor-contract',
             otelEndpoint: `http://127.0.0.1:${address.port}/`,
           });
-          trace.getTracer('ingestor-contract').startSpan('telemetry.contract').end();
+          const controlled = fixture({
+            events: {
+              publish: () =>
+                Effect.logError('Controlled broker unavailable').pipe(
+                  Effect.andThen(
+                    Effect.fail(
+                      new IngestionUnavailable({
+                        operation: 'publish-upload-event',
+                        cause: 'offline',
+                      })
+                    )
+                  )
+                ),
+            },
+          });
           const runtime = yield* Effect.acquireRelease(
-            Effect.sync(() => ManagedRuntime.make(ingestorTracingLayer)),
+            Effect.sync(() =>
+              ManagedRuntime.make(controlled.layer.pipe(Layer.provideMerge(ingestorTracingLayer)))
+            ),
             (runtime) => Effect.promise(() => runtime.dispose())
           );
           yield* Effect.promise(() =>
             runtime.runPromise(
-              Effect.logError('Effect diagnostic contract').pipe(
-                Effect.andThen(
-                  Metric.update(
-                    Metric.counter('reconciliation.errors.total', {
-                      incremental: true,
-                      attributes: { 'reconciliation.type': 'uploads' },
-                    }),
-                    3
-                  )
-                )
-              )
+              Effect.gen(function* () {
+                const ingestion = yield* Ingestion;
+                yield* ingestion.upload(uploadInput);
+                yield* controlled.advance();
+                yield* ingestion.reconcile();
+              })
             )
           );
           return status;
@@ -118,6 +139,33 @@ describe('ingestor telemetry ownership', () => {
       );
       expect(status).toEqual({ _tag: 'Started' });
       expect(requests).toEqual(new Set(['/v1/logs', '/v1/traces', '/v1/metrics']));
+      const occurrenceAttributes = [
+        { key: 'event.source', value: { stringValue: 'urn:wallpaperdb:ingestor' } },
+        { key: 'event.id', value: { stringValue: 'event-1' } },
+        { key: 'event.type', value: { stringValue: 'wallpaper.uploaded' } },
+        { key: 'event.correlation_id', value: { stringValue: 'workflow-1' } },
+        { key: 'event.causation_id', value: { stringValue: 'command-1' } },
+        { key: 'wallpaper.id', value: { stringValue: 'wlpr_1' } },
+        { key: 'event.delivery_attempt', value: { intValue: 2 } },
+      ];
+      expect(logRecords).toContainEqual(
+        expect.objectContaining({
+          body: { stringValue: 'Controlled broker unavailable' },
+          attributes: expect.arrayContaining(occurrenceAttributes),
+          traceId: expect.any(String),
+        })
+      );
+      const completion = expect.objectContaining({
+        attributes: expect.arrayContaining([
+          ...occurrenceAttributes,
+          { key: 'event.outcome', value: { stringValue: 'Deferred' } },
+          { key: 'event.duration_ms', value: { intValue: 0 } },
+        ]),
+      });
+      expect(logRecords).toContainEqual(completion);
+      expect(spans).toContainEqual(completion);
+      expect(JSON.stringify({ logRecords, spans })).not.toContain(uploadInput.principal.profileId);
+      expect(JSON.stringify({ logRecords, spans })).not.toContain(uploadInput.filename);
       expect(metricBodies.map((body) => JSON.parse(body))).toContainEqual(
         expect.objectContaining({
           resourceMetrics: expect.arrayContaining([
@@ -136,7 +184,7 @@ describe('ingestor telemetry ownership', () => {
                         isMonotonic: true,
                         dataPoints: expect.arrayContaining([
                           expect.objectContaining({
-                            asDouble: 3,
+                            asDouble: 1,
                             attributes: expect.arrayContaining([
                               { key: 'reconciliation.type', value: { stringValue: 'uploads' } },
                             ]),

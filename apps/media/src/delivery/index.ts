@@ -90,8 +90,18 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           id: string,
           options?: ResizeOptions
         ) {
+          if (options && [options.width, options.height].some(n => n !== undefined && (!Number.isSafeInteger(n) || n < 1 || n > limits.maxDimension))) {
+            return { _tag: 'Rejected', reason: 'Requested dimensions exceed media limits' } as const;
+          }
           const wallpaper = yield* catalog.findWallpaper(id);
           if (!wallpaper) return { _tag: 'NotFound' } as const;
+          if (options && (options.width || options.height)) {
+            const width = options.width ?? Math.ceil(wallpaper.width * (options.height ?? wallpaper.height) / wallpaper.height);
+            const height = options.height ?? Math.ceil(wallpaper.height * (options.width ?? wallpaper.width) / wallpaper.width);
+            if (width > limits.maxDimension || height > limits.maxDimension || width * height > limits.maxOutputPixels) {
+              return { _tag: 'Rejected', reason: 'Requested output exceeds media limits' } as const;
+            }
+          }
           const wouldUpscale = options?.fit !== 'fill' && ((options?.width ?? wallpaper.width) > wallpaper.width || (options?.height ?? wallpaper.height) > wallpaper.height);
           const variant =
             options && (options.width || options.height) && !wouldUpscale

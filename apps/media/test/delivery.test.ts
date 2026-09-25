@@ -46,6 +46,11 @@ describe('media delivery', () => {
     expect(await f.run(Effect.flatMap(MediaDelivery, d => d.picture('pic_1')))).toEqual({ _tag: 'NotFound' });
     expect(f.reads).toEqual([]);
   });
+  it('rejects excessive output dimensions before storage access', async () => {
+    const f = fixture();
+    expect(await f.run(Effect.flatMap(MediaDelivery, d => d.wallpaper('wall_1', { width: 20000, fit: 'fill' })))).toMatchObject({ _tag: 'Rejected' });
+    expect(f.reads).toEqual([]);
+  });
   it('delivers original bytes and exact metadata without resizing', async () => {
     const f = fixture();
     const outcome = await f.run(Effect.flatMap(MediaDelivery, delivery => delivery.wallpaper('wall_1')));

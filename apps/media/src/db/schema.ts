@@ -1,4 +1,4 @@
-import { bigint, index, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, jsonb, pgTable, primaryKey, text, timestamp } from 'drizzle-orm/pg-core';
 
 /**
  * Wallpapers table - stores metadata from wallpaper.uploaded events
@@ -93,3 +93,18 @@ export type ProfilePictureAsset = typeof profilePictureAssets.$inferSelect;
 export type NewProfilePictureAsset = typeof profilePictureAssets.$inferInsert;
 export type ProfilePictureHead = typeof profilePictureHeads.$inferSelect;
 export type NewProfilePictureHead = typeof profilePictureHeads.$inferInsert;
+
+
+/** Occurrence and projection effects share one transaction. */
+export const catalogProcessed = pgTable('catalog_processed', {
+  source: text('source').notNull(),
+  occurrenceId: text('occurrence_id').notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [primaryKey({ columns: [table.source, table.occurrenceId] })]);
+
+export const catalogOutbox = pgTable('catalog_outbox', {
+  id: text('id').primaryKey(),
+  wallpaperId: text('wallpaper_id').notNull(),
+  notification: jsonb('notification').notNull().$type<import('../catalog/index.js').AvailableNotification>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

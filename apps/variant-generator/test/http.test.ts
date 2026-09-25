@@ -79,6 +79,26 @@ it('serves health, readiness, OpenAPI, CORS and safe errors', async () => {
     await app.close();
   }
 });
+it.each([
+  { contentType: 'application/json', payload: '{', status: 400 },
+  { contentType: 'application/json', payload: 'x'.repeat(1024 * 1024 + 1), status: 413 },
+])('preserves safe HTTP client error status $status', async ({ contentType, payload, status }) => {
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3006 }, services);
+  try {
+    const response = await app.inject({
+      method: 'POST', url: '/health', headers: { 'content-type': contentType }, payload,
+    });
+    expect(response.statusCode).toBe(status);
+    expect(response.headers['content-type']).toContain('application/problem+json');
+    expect(response.json()).toEqual({
+      status, title: expect.any(String), type: expect.stringContaining('/invalid-request.md'),
+    });
+    expect(response.body).not.toContain('private request data');
+    expect(response.body).not.toContain('FST_ERR');
+  } finally {
+    await app.close();
+  }
+});
 it('hides defects and releases scoped services on close', async () => {
   let closed = false;
   const layer = Layer.effect(

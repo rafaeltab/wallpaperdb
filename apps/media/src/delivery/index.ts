@@ -77,13 +77,14 @@ export interface DeliveryLimits {
   readonly maxOutputPixels: number;
   readonly maxPictureBytes?: number;
 }
-export const deliveryLayer = (_limits: DeliveryLimits) =>
+export const deliveryLayer = (limits: DeliveryLimits) =>
   Layer.effect(
     MediaDelivery,
     Effect.gen(function* () {
       const catalog = yield* Catalog;
       const assets = yield* AssetReader;
       const transformer = yield* ImageTransformer;
+      const authority = yield* PictureAuthority;
       return MediaDelivery.of({
         wallpaper: Effect.fn('media.get_wallpaper_resized')(function* (
           id: string,
@@ -118,7 +119,29 @@ export const deliveryLayer = (_limits: DeliveryLimits) =>
             fileSizeBytes: wallpaper.fileSizeBytes,
           } as const;
         }),
-        picture: () => Effect.succeed({ _tag: 'NotFound' }),
+        picture: Effect.fn('media.get_picture')(function* (id: string) {
+          const asset = yield* catalog.findCurrentPicture(id);
+          if (!asset || !(yield* authority.isAvailable(id))) return { _tag: 'NotFound' } as const;
+          const stream = yield* assets.read(asset);
+          if (!stream) return { _tag: 'NotFound' } as const;
+          const bytes = yield* Effect.tryPromise({
+            try: async () => {
+              const chunks: Uint8Array[] = [];
+              let length = 0;
+              for await (const chunk of stream) {
+                length += chunk.byteLength;
+                if (length > (limits.maxPictureBytes ?? 10 * 1024 * 1024)) throw new Error('Picture exceeds byte limit');
+                chunks.push(chunk);
+              }
+              const result = new Uint8Array(length);
+              let offset = 0;
+              for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength; }
+              return result;
+            },
+            catch: cause => new DeliveryUnavailable({ operation: 'read_picture', cause }),
+          });
+          return { _tag: 'Found', body: (async function* () { yield bytes; })(), mimeType: 'image/webp', fileSizeBytes: bytes.byteLength } as const;
+        }),
       });
     })
   );

@@ -35,6 +35,17 @@ describe('media delivery', () => {
     expect(outcome._tag).toBe('Found');
     expect(f.reads).toEqual(['variant', 'original']);
   });
+  it('verifies picture availability and returns fully read bytes', async () => {
+    const f = fixture();
+    const result = await f.run(Effect.flatMap(MediaDelivery, d => d.picture('pic_1')));
+    expect(result._tag).toBe('Found');
+    if (result._tag !== 'Found') throw new Error('expected picture');
+    expect(result.fileSizeBytes).toBe(3);
+    expect(result.mimeType).toBe('image/webp');
+    f.deny(); f.reads.length = 0;
+    expect(await f.run(Effect.flatMap(MediaDelivery, d => d.picture('pic_1')))).toEqual({ _tag: 'NotFound' });
+    expect(f.reads).toEqual([]);
+  });
   it('delivers original bytes and exact metadata without resizing', async () => {
     const f = fixture();
     const outcome = await f.run(Effect.flatMap(MediaDelivery, delivery => delivery.wallpaper('wall_1')));

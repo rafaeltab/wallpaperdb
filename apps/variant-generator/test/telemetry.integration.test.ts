@@ -8,7 +8,7 @@ import {
   S3TesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer } from 'effect';
+import { Effect, Layer, Metric } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { variantGeneratorLayer } from '../src/app.js';
@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('Production telemetry composition', () => {
-  it('exports traces, logs and shared core metrics before its owning scope closes', async () => {
+  it('exports traces, logs, shared core metrics and Effect metrics before its owning scope closes', async () => {
     const tester = new Tester()
       .withS3()
       .withS3Bucket('wallpapers')
@@ -80,6 +80,9 @@ describe('Production telemetry composition', () => {
             const actual = yield* Availability;
             return Availability.of({
               health: (shuttingDown) => Effect.logInfo('Telemetry contract').pipe(
+                Effect.andThen(Metric.update(
+                  Metric.counter('telemetry.effect.contract', { incremental: true }), 7
+                )),
                 Effect.andThen(actual.health(shuttingDown)),
                 Effect.withSpan('telemetry.http.contract')
               ),
@@ -106,6 +109,20 @@ describe('Production telemetry composition', () => {
       expect(exported.get('/v1/traces')?.join()).toContain('telemetry.http.contract');
       expect(exported.get('/v1/metrics')?.join()).toContain('telemetry.sdk.contract');
       expect(exported.get('/v1/logs')?.join()).toContain('Telemetry contract');
+      const exportedMetrics: unknown[] = [];
+      for (const body of exported.get('/v1/metrics') ?? []) {
+        JSON.parse(body, (key, value: unknown) => {
+          if (key === 'metrics' && Array.isArray(value)) exportedMetrics.push(...value);
+          return value;
+        });
+      }
+      expect(exportedMetrics).toContainEqual(expect.objectContaining({
+        name: 'telemetry.effect.contract',
+        sum: expect.objectContaining({
+          isMonotonic: true,
+          dataPoints: expect.arrayContaining([expect.objectContaining({ asDouble: 7 })]),
+        }),
+      }));
       const spans: unknown[] = [];
       for (const body of exported.get('/v1/traces') ?? []) {
         JSON.parse(body, (key, value: unknown) => {

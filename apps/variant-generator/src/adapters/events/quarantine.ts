@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Effect, Schema } from 'effect';
 import {
   DiscardPolicy,
@@ -104,16 +104,53 @@ function metadata(message: JsMsg, reason: string, id: string, type: string): Msg
   return value;
 }
 
-function publish(service: NatsBroker, data: Uint8Array, value: MsgHdrs) {
-  return broker('quarantine-upload', () =>
-    service.client.publish(subject, data, {
-      headers: value,
-      msgID: value.get('Nats-Msg-Id'),
-      expect: { streamName: stream },
-      timeout: 5000,
+const publish = Effect.fn('variants.quarantine.store')(function* (
+  service: NatsBroker,
+  data: Uint8Array,
+  value: MsgHdrs
+) {
+  // A purge removes records but can leave JetStream's deduplication entries intact.
+  // Verify duplicate references, including manifests whose repaired chunk sequences changed.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ack = yield* broker('quarantine-upload', () =>
+      service.client.publish(subject, data, {
+        headers: value,
+        msgID: value.get('Nats-Msg-Id'),
+        expect: { streamName: stream },
+        timeout: 5000,
+      })
+    );
+    if (!ack.duplicate) return ack;
+    const stored = yield* broker('verify-quarantine-record', () =>
+      service.manager.streams.getMessage(stream, { seq: ack.seq })
+    ).pipe(
+      Effect.catchIf(
+        (error) => notFound(error.cause),
+        () => Effect.succeed(undefined)
+      )
+    );
+    if (
+      stored &&
+      stored.header.get('ce-id') === value.get('ce-id') &&
+      Buffer.from(stored.data).equals(data)
+    )
+      return ack;
+    // This is a replacement storage operation, not a new event occurrence. A fixed-size
+    // fresh broker ID fits the measured envelope and avoids following obsolete repair IDs.
+    value.set('Nats-Msg-Id', createHash('sha256').update(randomUUID()).digest('hex'));
+  }
+  return yield* Effect.fail(
+    new GenerationUnavailable({
+      operation: 'quarantine-recovery',
+      cause: new Error('Quarantine references could not be repaired within three publications'),
     })
+  ).pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Quarantine recovery failed', { cause: error.cause })
+    )
   );
-}
+});
+
 function chunkMetadata(
   message: JsMsg,
   reason: string,

@@ -44,7 +44,8 @@ export const variants = pgTable(
     // Reference to parent wallpaper
     wallpaperId: text('wallpaper_id').notNull(),
 
-    // Storage information
+    // Legacy variants used the parent bucket; new projections keep the asset location.
+    storageBucket: text('storage_bucket'),
     storageKey: text('storage_key').notNull(),
 
     // Variant dimensions

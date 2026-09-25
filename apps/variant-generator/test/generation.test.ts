@@ -155,10 +155,19 @@ describe('resolution policy', () => {
   });
 
   it.each([
-    [3840, 2160, [2560, 1920, 1600, 1280, 854, 640]],
-    [1920, 1080, [1600, 1280, 854, 640]],
-    [640, 360, []], [3440, 1440, [2560]], [1080, 2400, [720, 480]], [2000, 2000, []],
-  ])('selects only strictly smaller presets for %i x %i', (width, height, widths) => {
-    expect(getApplicablePresets(width, height).map((preset) => preset.width)).toEqual(widths);
+    {
+      width: 7680, height: 4320,
+      dimensions: [[3840, 2160], [2560, 1440], [1920, 1080], [1600, 900], [1280, 720], [854, 480], [640, 360]],
+    },
+    { width: 6880, height: 2880, dimensions: [[5120, 2160], [3440, 1440], [2560, 1080]] },
+    { width: 2160, height: 4800, dimensions: [[1440, 3200], [1080, 2400], [1080, 1920], [720, 1280], [480, 854]] },
+    { width: 3840, height: 2160, dimensions: [[2560, 1440], [1920, 1080], [1600, 900], [1280, 720], [854, 480], [640, 360]] },
+    { width: 1920, height: 1080, dimensions: [[1600, 900], [1280, 720], [854, 480], [640, 360]] },
+    { width: 640, height: 360, dimensions: [] },
+    { width: 3440, height: 1440, dimensions: [[2560, 1080]] },
+    { width: 1080, height: 2400, dimensions: [[720, 1280], [480, 854]] },
+    { width: 2000, height: 2000, dimensions: [] },
+  ])('preserves ordered preset dimensions for $width x $height', ({ width, height, dimensions }) => {
+    expect(getApplicablePresets(width, height).map((preset) => [preset.width, preset.height])).toEqual(dimensions);
   });
 });

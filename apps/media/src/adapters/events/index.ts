@@ -6,3 +6,4 @@ export {
   type NatsEventsOptions,
 } from './broker.js';
 export { translateEvent } from './translation.js';
+export { ConsumerHealth, natsConsumerLayer } from './consumer.js';

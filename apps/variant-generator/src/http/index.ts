@@ -1,9 +1,9 @@
 import cors from '@fastify/cors';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
-import type { IncomingHttpHeaders } from 'node:http';
+import { STATUS_CODES, type IncomingHttpHeaders } from 'node:http';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import { Context, Effect, FiberSet, Layer, ManagedRuntime } from 'effect';
+import { Context, Effect, FiberSet, Layer, ManagedRuntime, Schema } from 'effect';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Availability } from '../availability/index.js';
 
@@ -20,6 +20,9 @@ export interface HttpConfig {
   readonly nodeEnv: 'development' | 'production' | 'test';
   readonly port: number;
 }
+const isTransportError = Schema.is(
+  Schema.Struct({ code: Schema.String, statusCode: Schema.Number })
+);
 const unavailableFields = {
   status: { type: 'integer', enum: [503] },
   timestamp: { type: 'string' },
@@ -79,6 +82,24 @@ export async function createHttpApp<E>(
       .send(problem(404, 'not-found', 'Not found'))
   );
   app.setErrorHandler((error, request, reply) => {
+    if (
+      isTransportError(error) &&
+      Object.hasOwn(Fastify.errorCodes, error.code) &&
+      Number.isInteger(error.statusCode) &&
+      error.statusCode >= 400 &&
+      error.statusCode < 500
+    ) {
+      return reply
+        .code(error.statusCode)
+        .type('application/problem+json')
+        .send(
+          problem(
+            error.statusCode,
+            'invalid-request',
+            STATUS_CODES[error.statusCode] ?? 'Invalid request'
+          )
+        );
+    }
     request.log.error({ err: error }, 'Variant generator request failed');
     return reply
       .code(500)

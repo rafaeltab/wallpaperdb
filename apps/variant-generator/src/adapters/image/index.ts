@@ -1,12 +1,8 @@
 import { Readable } from 'node:stream';
-import {
-  GetObjectCommand,
-  HeadBucketCommand,
-  PutObjectCommand,
-  S3Client,
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Clock, Context, Effect, Layer, Metric, Semaphore } from 'effect';
 import { encodeImage } from './process.js';
+import { storeVariant } from './storage.js';
 import {
   GenerationUnavailable,
   VariantImages,
@@ -128,16 +124,21 @@ class StoredVariantImages implements VariantImages {
           });
           const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.slice(6);
           const storageKey = `${input.wallpaperId}/variant_${preset.width}x${preset.height}.${extension}`;
-          yield* request('write-image', (abortSignal) =>
-            this.client.send(
-              new PutObjectCommand({
-                Bucket: input.storage.bucket,
-                Key: storageKey,
-                Body: output,
-                ContentType: mimeType,
-              }),
-              { abortSignal }
-            )
+          const variant = yield* storeVariant(
+            this.client,
+            input,
+            {
+              wallpaperId: input.wallpaperId,
+              width: preset.width,
+              height: preset.height,
+              aspectRatio: preset.width / preset.height,
+              format: mimeType,
+              fileSizeBytes: output.length,
+              storageKey,
+              storageBucket: input.storage.bucket,
+              createdAt: new Date(input.timestamp),
+            },
+            output
           );
           const end = yield* Clock.currentTimeMillis;
           yield* Metric.update(
@@ -147,17 +148,7 @@ class StoredVariantImages implements VariantImages {
             }),
             end - start
           );
-          return {
-            wallpaperId: input.wallpaperId,
-            width: preset.width,
-            height: preset.height,
-            aspectRatio: preset.width / preset.height,
-            format: mimeType,
-            fileSizeBytes: output.length,
-            storageKey,
-            storageBucket: input.storage.bucket,
-            createdAt: new Date(input.timestamp),
-          } satisfies GeneratedVariant;
+          return variant;
         })
       )
       .pipe(

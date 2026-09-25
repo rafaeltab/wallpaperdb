@@ -91,8 +91,9 @@ export const deliveryLayer = (_limits: DeliveryLimits) =>
         ) {
           const wallpaper = yield* catalog.findWallpaper(id);
           if (!wallpaper) return { _tag: 'NotFound' } as const;
+          const wouldUpscale = options?.fit !== 'fill' && ((options?.width ?? wallpaper.width) > wallpaper.width || (options?.height ?? wallpaper.height) > wallpaper.height);
           const variant =
-            options && (options.width || options.height)
+            options && (options.width || options.height) && !wouldUpscale
               ? yield* catalog.findSmallestVariant(
                   id,
                   options.width ?? wallpaper.width,
@@ -100,7 +101,8 @@ export const deliveryLayer = (_limits: DeliveryLimits) =>
                 )
               : null;
           const source = variant ? { ...wallpaper, storageKey: variant.storageKey } : wallpaper;
-          const body = yield* assets.read(source);
+          let body = yield* assets.read(source);
+          if (!body && variant) body = yield* assets.read(wallpaper);
           if (!body) return { _tag: 'NotFound' } as const;
           if (options && (options.width || options.height)) {
             const resized = yield* transformer.resize(body, {

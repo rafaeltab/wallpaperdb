@@ -79,9 +79,10 @@ it('serves health, readiness, OpenAPI, CORS and safe errors', async () => {
     await app.close();
   }
 });
+const privateRequestData = 'private request data';
 it.each([
-  { contentType: 'application/json', payload: '{', status: 400 },
-  { contentType: 'application/json', payload: 'x'.repeat(1024 * 1024 + 1), status: 413 },
+  { contentType: 'application/json', payload: `{"secret":"${privateRequestData}"`, status: 400 },
+  { contentType: 'application/json', payload: privateRequestData + 'x'.repeat(1024 * 1024 + 1), status: 413 },
 ])('preserves safe HTTP client error status $status', async ({ contentType, payload, status }) => {
   const app = await createHttpApp({ nodeEnv: 'test', port: 3006 }, services);
   try {
@@ -93,7 +94,7 @@ it.each([
     expect(response.json()).toEqual({
       status, title: expect.any(String), type: expect.stringContaining('/invalid-request.md'),
     });
-    expect(response.body).not.toContain('private request data');
+    expect(response.body).not.toContain(privateRequestData);
     expect(response.body).not.toContain('FST_ERR');
   } finally {
     await app.close();

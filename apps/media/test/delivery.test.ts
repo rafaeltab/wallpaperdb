@@ -16,6 +16,18 @@ function fixture() {
   return { reads, queries, deny: () => { allowed = false; }, run: <A,E>(effect: Effect.Effect<A,E,MediaDelivery>) => Effect.runPromise(effect.pipe(Effect.provide(deliveryLayer({ maxDimension: 16384, maxOutputPixels: 268435456 }).pipe(Layer.provide(dependencies))))) };
 }
 describe('media delivery', () => {
+  it('uses the original missing dimension when choosing variants', async () => {
+    const f = fixture();
+    await f.run(Effect.flatMap(MediaDelivery, d => d.wallpaper('wall_1', { width: 500, fit: 'contain' })));
+    expect(f.queries).toEqual([[500, 1080]]);
+    expect(f.reads).toEqual(['variant']);
+  });
+  it('avoids selecting a variant when contain would upscale', async () => {
+    const f = fixture();
+    await f.run(Effect.flatMap(MediaDelivery, d => d.wallpaper('wall_1', { width: 2000, fit: 'contain' })));
+    expect(f.queries).toEqual([]);
+    expect(f.reads).toEqual(['original']);
+  });
   it('delivers original bytes and exact metadata without resizing', async () => {
     const f = fixture();
     const outcome = await f.run(Effect.flatMap(MediaDelivery, delivery => delivery.wallpaper('wall_1')));

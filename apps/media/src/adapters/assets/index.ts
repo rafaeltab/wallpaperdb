@@ -2,7 +2,7 @@ import { Readable, PassThrough } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Effect, Layer } from 'effect';
 import sharp from 'sharp';
-import { ImageTransformer } from '../../delivery/index.js';
+import { DeliveryUnavailable, ImageTransformer, PictureAuthority } from '../../delivery/index.js';
 
 export const sharpTransformerLayer = (limits: { maxInputPixels: number }) => Layer.succeed(ImageTransformer, ImageTransformer.of({
   resize: (body, options) => Effect.sync(() => {
@@ -40,3 +40,21 @@ function byteStream(stream: Readable): AsyncIterable<Uint8Array> {
     },
   };
 }
+
+export const pictureAuthorityLayer = (config: { origin?: string; token?: string; timeoutMs?: number }) => Layer.succeed(PictureAuthority, PictureAuthority.of({
+  isAvailable: (id) => Effect.tryPromise({
+    try: async signal => {
+      if (!config.origin || !config.token) throw new Error('Picture authority is not configured');
+      const response = await fetch(`${config.origin.replace(/\/+$/, '')}/internal/profile-pictures/${encodeURIComponent(id)}/availability`, {
+        headers: { Authorization: `Bearer ${config.token}`, 'Cache-Control': 'no-store' },
+        redirect: 'error',
+        signal: AbortSignal.any([signal, AbortSignal.timeout(config.timeoutMs ?? 3000)]),
+      });
+      await response.body?.cancel();
+      if (response.status === 404) return false;
+      if (response.status !== 204) throw new Error('Picture availability could not be verified');
+      return true;
+    },
+    catch: cause => new DeliveryUnavailable({ operation: 'picture_authority', cause }),
+  }),
+}));

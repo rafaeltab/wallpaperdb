@@ -9,7 +9,7 @@ function fixture() {
   let allowed = true;
   let missingVariant = false;
   const dependencies = Layer.mergeAll(
-    Layer.succeed(Catalog, { findWallpaper: () => Effect.succeed(original), findSmallestVariant: (_id, w, h) => { queries.push([w,h]); return Effect.succeed({ id: 'variant', storageKey: 'variant', width: 960, height: 540 }); }, findCurrentPicture: () => Effect.succeed(original) }),
+    Layer.succeed(Catalog, { findWallpaper: () => Effect.succeed(original), findSmallestVariant: (_id, w, h) => { queries.push([w,h]); return Effect.succeed({ id: 'variant', storageBucket: 'media', storageKey: 'variant', width: 960, height: 540 }); }, findCurrentPicture: () => Effect.succeed(original) }),
     Layer.succeed(AssetReader, { read: (asset) => { reads.push(asset.storageKey); if (missingVariant && asset.storageKey === 'variant') return Effect.succeed(null); return Effect.succeed((async function* () { yield new Uint8Array([1,2,3]); })()); } }),
     Layer.succeed(PictureAuthority, { isAvailable: () => Effect.succeed(allowed) }),
     Layer.succeed(ImageTransformer, { resize: (body) => Effect.succeed(body) }),

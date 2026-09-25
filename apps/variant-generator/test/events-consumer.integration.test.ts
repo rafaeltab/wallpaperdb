@@ -391,7 +391,7 @@ it('durably quarantines an invalid body at the broker payload limit without losi
   }
 });
 
-it('leaves exhausted input pending after a chunk rejection and resumes the durable handoff', async () => {
+it.each([false, true])('resumes a rejected chunk handoff after capacity recovery (purge partial records: %s)', async (purgePartial) => {
   let attempts = 0;
   const options = {
     url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER',
@@ -420,6 +420,7 @@ it('leaves exhausted input pending after a chunk rejection and resumes the durab
     expect(attempts).toBe(3);
     expect((await manager.streams.info('VARIANT_GENERATOR_QUARANTINE')).state.messages).toBe(1);
     expect((await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer')).num_ack_pending).toBe(1);
+    if (purgePartial) await manager.streams.purge('VARIANT_GENERATOR_QUARANTINE');
     await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msgs: -1 });
     await expect.poll(async () => (await manager.consumers.info(
       'WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer'
@@ -492,5 +493,52 @@ it.each([128, 1024])('keeps input pending when a %i-byte limit cannot hold its d
   } finally {
     await runtime.dispose();
     await manager.streams.update('VARIANT_GENERATOR_QUARANTINE', { max_msg_size: -1 });
+  }
+});
+
+
+it.each(['single', 'manifest', 'chunk'] as const)('repairs deleted %s records even while their publication IDs remain deduplicated', async (deletedRecord) => {
+  const options = { url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER', serviceName: 'quarantine-repair-contract' };
+  const makeRuntime = () => ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provide(natsEventsLayer(options)),
+    Layer.provide(Layer.succeed(GenerateVariants, { generate: () => Effect.die('Invalid input must not generate') })),
+  ));
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const stream = 'VARIANT_GENERATOR_QUARANTINE';
+  const durable = 'variant-generator-wallpaper-uploaded-consumer';
+  const first = makeRuntime();
+  const replay = makeRuntime();
+  try {
+    await first.runPromise(ConsumerHealth);
+    await manager.streams.update(stream, { max_msg_size: deletedRecord === 'single' ? -1 : 2048 });
+    const payload = new Uint8Array(deletedRecord === 'single' ? 32 : 8192).fill(255);
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    await expect.poll(async () => (await manager.consumers.info('WALLPAPER', durable)).ack_floor.consumer_seq).toBe(1);
+    await first.dispose();
+    const stored = await manager.streams.getMessage(stream, { last_by_subj: 'variant-generator.quarantine' });
+    if (deletedRecord === 'single') await manager.streams.purge(stream);
+    else {
+      const manifest = decodeManifest(stored.json());
+      const sequence = deletedRecord === 'manifest' ? stored.seq : manifest.sequences[0];
+      if (sequence === undefined) throw new Error('Expected a chunk sequence');
+      await manager.streams.deleteMessage(stream, sequence);
+    }
+    // Recreate the durable consumer to replay the retained input with its original identity.
+    await manager.consumers.delete('WALLPAPER', durable);
+    await replay.runPromise(ConsumerHealth);
+    await expect.poll(async () => (await manager.consumers.info('WALLPAPER', durable)).ack_floor.consumer_seq).toBe(1);
+    const repaired = await manager.streams.getMessage(stream, { last_by_subj: 'variant-generator.quarantine' });
+    expect(repaired.header.get('ce-id')).toBe(stored.header.get('ce-id'));
+    if (deletedRecord === 'single') expect(repaired.data).toEqual(payload);
+    else {
+      const manifest = decodeManifest(repaired.json());
+      const chunks = await Promise.all(manifest.sequences.map(async (seq) =>
+        (await manager.streams.getMessage(stream, { seq })).data));
+      expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
+    }
+  } finally {
+    await first.dispose();
+    await replay.dispose();
+    await manager.streams.update(stream, { max_msg_size: -1 });
   }
 });

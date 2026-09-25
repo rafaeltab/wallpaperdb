@@ -7,3 +7,4 @@ export {
 } from './broker.js';
 export { translateEvent } from './translation.js';
 export { ConsumerHealth, natsConsumerLayer } from './consumer.js';
+export { OutboxHealth, natsOutboxLayer } from './outbox.js';

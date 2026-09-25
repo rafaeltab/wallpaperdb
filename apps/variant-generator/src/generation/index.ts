@@ -107,7 +107,9 @@ export class GenerationUnavailable extends Schema.TaggedError<GenerationUnavaila
 
 /**
  * Generates and stores one variant under its stable target identity. Repeating a
- * request preserves its target and metadata, including the input timestamp.
+ * request preserves the first stored target and its metadata across encoding-policy
+ * changes and different occurrences of the same immutable original. New targets
+ * persist the input timestamp; legacy targets retain the input timestamp fallback.
  * Interruption stops the underlying image and storage work before completing.
  */
 export interface VariantImages {

@@ -64,7 +64,7 @@ describe('Stored variant image adapter', () => {
     const original = await sharp({ create: { width: 16, height: 10, channels: 3, background: '#ffffff' } }).png().toBuffer();
     await tester.s3.uploadObject('originals', 'source', original);
     const variant = await runtime.runPromise(Effect.gen(function* () {
-      return yield* (yield* VariantImages).generate({ ...input, mimeType: 'image/png' }, { width: 80, height: 45, label: 'small' });
+      return yield* (yield* VariantImages).generate({ ...input, wallpaperId: 'wlpr_no_upscale', mimeType: 'image/png' }, { width: 80, height: 45, label: 'small' });
     }));
     const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: 'originals', Key: variant.storageKey }));
     const bytes = await object.Body?.transformToByteArray();

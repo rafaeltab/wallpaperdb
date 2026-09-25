@@ -135,3 +135,14 @@ Four real S3/NATS regression cases failed before the image fix. Nine final repla
 Final third-round validation passes all 90 tests in 17 files. Whole-source coverage is 1585/1645 lines, 96.35%; 59/67 functions, 88.05%; 332/362 branches, 91.71%. The new storage adapter remains in coverage scope. CRAP reports zero of 60 inventoried functions above 30, maximum 27.672. The shared callback/generator inventory limitation remains applicable.
 
 Full local CI passed in 73 seconds: 73 build/check/test tasks and 10 E2E/dependency tasks, with 66 and 8 cached tasks respectively. After every container test finished, a separate uncached browser run passed all three tests against the rebuilt healthy stack. No assertions, timeouts or retry settings were relaxed. The browser run was serialized after Docker test activity to avoid the diagnosed network interference from the preceding review round.
+
+## Fourth PR comment follow-up
+
+Both new comments were valid test gaps; this follow-up changes no production source.
+
+- `1a9033e`, [4109070857](https://github.com/rafaeltab/wallpaperdb/pull/230#discussion_r4109070857): both malformed and oversized HTTP request fixtures now contain the private-data marker asserted absent from their responses. All six HTTP tests pass, retaining exact safe response-shape and status checks.
+- `89d0533`, [4109070779](https://github.com/rafaeltab/wallpaperdb/pull/230#discussion_r4109070779): preset selection now checks explicit ordered width/height pairs independently of production constants. Large standard, ultrawide and phone inputs select every family's largest preset; existing smaller-input and exclusion cases remain. Changing the 2560×1440 preset to 2560×1439 passed the previous 21 focused tests and failed two updated assertions. After restoring production code, all 24 focused tests and uncached type checking pass.
+
+Independent Standards and Spec reviews of `83fc97c..89d0533` found zero actionable issues. All temporary production mutations were restored before verification and commits.
+
+Final fourth-round verification passed full local CI in 52 seconds: 73 build/check/test tasks and 10 E2E/dependency tasks, with 69 and 8 cached tasks respectively. The service passed all 93 tests, comprising 49 unit and 44 integration tests. Fresh CRAP verification reports zero of 60 functions above 30. After container test activity finished, all three browser tests passed in a separate uncached run against the healthy local stack. Production source and coverage scope are unchanged.

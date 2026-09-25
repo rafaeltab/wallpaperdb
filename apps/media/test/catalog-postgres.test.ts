@@ -39,4 +39,26 @@ describe('PostgreSQL catalog contract', () => {
       expect(yield* outbox.listPending(10)).toEqual([]);
     }));
   });
+  it('durably retains a variant arriving before its parent and publishes it once the parent arrives', async () => {
+    const input: ProjectionInput = { kind: 'variant', occurrence: { source: 'generator', id: 'variant-early' }, occurredAt: '2026-01-01T00:00:01.000Z', variant: { wallpaperId: 'wlpr_late', storageBucket: 'wallpapers', storageKey: 'small', mimeType: 'image/jpeg', width: 640, height: 360, fileSizeBytes: 100, createdAt: '2026-01-01T00:00:01.000Z' } };
+    await runtime.runPromise(Effect.gen(function* () {
+      const projection = yield* CatalogProjection;
+      const outbox = yield* CatalogOutbox;
+      yield* projection.accept(input);
+      expect(yield* outbox.listPending(10)).toEqual([]);
+      if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
+      yield* projection.accept({ ...wallpaper, occurrence: { source: 'ingestor', id: 'upload-late' }, wallpaper: { ...wallpaper.wallpaper, id: 'wlpr_late' } });
+      yield* projection.accept(input);
+      const pending = yield* outbox.listPending(10);
+      expect(pending).toHaveLength(2);
+      expect(pending.map((entry) => entry.variant.width).sort((a, b) => a - b)).toEqual([640, 1920]);
+      const catalog = yield* Catalog;
+      expect(yield* catalog.findSmallestVariant('wlpr_late', 500, 300)).toMatchObject({ storageKey: 'small', width: 640 });
+      expect(yield* catalog.findSmallestVariant('wlpr_late', 700, 300)).toBeNull();
+      for (const entry of pending) yield* outbox.markPublished(entry.id);
+      yield* projection.accept(input);
+      expect(yield* outbox.listPending(10)).toEqual([]);
+    }));
+  });
+
 });

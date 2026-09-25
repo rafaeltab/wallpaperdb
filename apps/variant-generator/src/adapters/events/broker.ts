@@ -107,6 +107,7 @@ class NatsVariantEvents implements VariantEvents {
             const attributes = { 'event.type': 'wallpaper.variant.uploaded' };
             yield* Metric.update(
               Metric.counter('events.published.total', {
+                incremental: true,
                 attributes: { ...attributes, status: Exit.isSuccess(exit) ? 'success' : 'error' },
               }),
               1

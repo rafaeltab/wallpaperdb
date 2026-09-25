@@ -112,6 +112,7 @@ const processMessage = Effect.fn('variants.events.consume')(function* (
         yield* Effect.annotateCurrentSpan('event.duration_ms', duration);
         yield* Metric.update(
           Metric.counter('events.consumed.total', {
+            incremental: true,
             attributes: { 'event.type': message.subject, status },
           }),
           1

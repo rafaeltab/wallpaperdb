@@ -3,12 +3,13 @@ import {
   DockerTesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer, ManagedRuntime, Schema } from 'effect';
+import { Deferred, Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
-import { natsEventsLayer } from '../src/adapters/events/index.js';
+import { NatsBroker, natsEventsLayer } from '../src/adapters/events/index.js';
 import { ConsumerHealth, natsConsumerLayer } from '../src/adapters/events/index.js';
 import {
   GenerateVariants,
+  VariantEvents,
   GenerationUnavailable,
   type GenerationInput,
 } from '../src/generation/index.js';
@@ -212,6 +213,66 @@ it('keeps exhausted input pending until quarantine accepts it without processing
     await runtime.dispose();
   }
 });
+it('finishes in-flight generation and acknowledges before graceful shutdown closes its broker', async () => {
+  const release = Effect.runSync(Deferred.make<void>());
+  let started = false;
+  let completed = false;
+  let interrupted = false;
+  let shutdownFinished = false;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost, stream: 'WALLPAPER',
+    serviceName: 'graceful-shutdown-contract', shutdownTimeoutMs: 2000,
+  };
+  const events = natsEventsLayer(options);
+  const generator = Layer.effect(GenerateVariants, Effect.gen(function* () {
+    const publisher = yield* VariantEvents;
+    return GenerateVariants.of({
+      generate: (input) => Effect.gen(function* () {
+        started = true;
+        yield* Deferred.await(release);
+        const variant = {
+          wallpaperId: input.wallpaperId, width: 1, height: 1, aspectRatio: 1,
+          format: 'image/png' as const, fileSizeBytes: 10, storageBucket: 'wallpapers',
+          storageKey: 'wp/variant_1x1.png', createdAt: new Date(input.timestamp),
+        };
+        yield* publisher.publish({ input, variant });
+        completed = true;
+        return { _tag: 'Generated' as const, variants: [variant] };
+      }).pipe(Effect.onInterrupt(() => Effect.sync(() => { interrupted = true; }))),
+    });
+  })).pipe(Layer.provide(events));
+  const runtime = ManagedRuntime.make(natsConsumerLayer(options).pipe(
+    Layer.provideMerge(Layer.mergeAll(events, generator)),
+  ));
+  try {
+    const health = await runtime.runPromise(ConsumerHealth);
+    const broker = await runtime.runPromise(NatsBroker);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', JSON.stringify(upload('graceful-shutdown')));
+    await expect.poll(() => started).toBe(true);
+    const shutdown = runtime.dispose().then(() => { shutdownFinished = true; });
+    // Health becoming false marks the consumer's shutdown finalizer, rather than a guessed delay.
+    await expect.poll(() => Effect.runPromise(health.check())).toBe(false);
+    expect(shutdownFinished).toBe(false);
+    expect(completed).toBe(false);
+    expect(interrupted).toBe(false);
+    expect(broker.connection.isClosed()).toBe(false);
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await shutdown;
+    expect(completed).toBe(true);
+    expect(interrupted).toBe(false);
+    expect(broker.connection.isClosed()).toBe(true);
+    const stored = await manager.streams.getMessage('WALLPAPER', { last_by_subj: 'wallpaper.variant.uploaded' });
+    expect(stored.json()).toMatchObject({ variant: { wallpaperId: 'wp', width: 1, height: 1 } });
+    const consumer = await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer');
+    expect(consumer.num_ack_pending).toBe(0);
+    expect(consumer.ack_floor.consumer_seq).toBe(1);
+  } finally {
+    await Effect.runPromise(Deferred.succeed(release, undefined));
+    await runtime.dispose();
+  }
+});
+
 it('interrupts unfinished generation at the shutdown bound and leaves input retryable', async () => {
   let started = false;
   let interrupted = false;

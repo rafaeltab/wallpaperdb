@@ -1,0 +1,31 @@
+import { Effect, Layer } from 'effect';
+import { describe, expect, it } from 'vitest';
+import { AssetReader, Catalog, ImageTransformer, MediaDelivery, PictureAuthority, deliveryLayer, type Wallpaper } from '../src/delivery/index.js';
+
+const original: Wallpaper = { id: 'wall_1', storageBucket: 'media', storageKey: 'original', mimeType: 'image/png', fileSizeBytes: 3, width: 1920, height: 1080 };
+function fixture() {
+  const reads: string[] = [];
+  const queries: number[][] = [];
+  let allowed = true;
+  const dependencies = Layer.mergeAll(
+    Layer.succeed(Catalog, { findWallpaper: () => Effect.succeed(original), findSmallestVariant: (_id, w, h) => { queries.push([w,h]); return Effect.succeed({ id: 'variant', storageKey: 'variant', width: 960, height: 540 }); }, findCurrentPicture: () => Effect.succeed(original) }),
+    Layer.succeed(AssetReader, { read: (asset) => { reads.push(asset.storageKey); return Effect.succeed((async function* () { yield new Uint8Array([1,2,3]); })()); } }),
+    Layer.succeed(PictureAuthority, { isAvailable: () => Effect.succeed(allowed) }),
+    Layer.succeed(ImageTransformer, { resize: (body) => Effect.succeed(body) }),
+  );
+  return { reads, queries, deny: () => { allowed = false; }, run: <A,E>(effect: Effect.Effect<A,E,MediaDelivery>) => Effect.runPromise(effect.pipe(Effect.provide(deliveryLayer({ maxDimension: 16384, maxOutputPixels: 268435456 }).pipe(Layer.provide(dependencies))))) };
+}
+describe('media delivery', () => {
+  it('delivers original bytes and exact metadata without resizing', async () => {
+    const f = fixture();
+    const outcome = await f.run(Effect.flatMap(MediaDelivery, delivery => delivery.wallpaper('wall_1')));
+    expect(outcome._tag).toBe('Found');
+    if (outcome._tag !== 'Found') throw new Error('expected asset');
+    expect(outcome.mimeType).toBe('image/png');
+    expect(outcome.fileSizeBytes).toBe(3);
+    const chunks = []; for await (const chunk of outcome.body) chunks.push(...chunk);
+    expect(chunks).toEqual([1,2,3]);
+    expect(f.reads).toEqual(['original']);
+    expect(f.queries).toEqual([]);
+  });
+});

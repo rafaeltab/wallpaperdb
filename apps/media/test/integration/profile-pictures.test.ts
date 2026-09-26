@@ -55,6 +55,7 @@ describe('Profile picture delivery', () => {
       .withPostgres((builder) => builder.withDatabase('test_profile_pictures'))
       .withS3()
       .withS3Bucket('profile-pictures')
+      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()

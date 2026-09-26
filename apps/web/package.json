@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "docker compose -p $COMPOSE_PROJECT_NAME -f ../../infra/docker-compose.apps.yml watch web",
-    "build": "tsc && vite build",
+    "build": "tsc -b && vite build",
     "preview": "vite preview --port 3005",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc -b",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
     "test:watch": "vitest"

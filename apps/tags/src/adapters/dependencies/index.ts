@@ -43,7 +43,13 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
       );
       const nats = yield* Effect.acquireRelease(
         Effect.tryPromise({
-          try: () => connect({ servers: config.natsUrl, name: config.serviceName, timeout: 2000 }),
+          try: () =>
+            connect({
+              servers: config.natsUrl,
+              name: config.serviceName,
+              timeout: 2000,
+              ...(new URL(config.natsUrl).protocol === 'tls:' ? { tls: {} } : {}),
+            }),
           catch: (cause) => new DependencyStartupFailure({ cause }),
         }).pipe(
           Effect.tapError((error) =>

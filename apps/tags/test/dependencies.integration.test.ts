@@ -179,6 +179,25 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     );
     expect(result).toBe('DependencyStartupFailure');
   });
+  it('refuses cleartext NATS when the configured URL requires TLS', async () => {
+    const url = new URL(nats.getConnectionUrl());
+    url.protocol = 'tls:';
+    const result = await Effect.runPromise(
+      AvailabilityProbe.pipe(
+        Effect.provide(
+          dependencyProbeLayer({
+            databaseUrl: databaseUrl(),
+            natsUrl: url.toString(),
+            serviceName: 'tags-tls-required',
+            otelHealthy: true,
+          })
+        ),
+        Effect.result
+      )
+    );
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') expect(result.failure._tag).toBe('DependencyStartupFailure');
+  });
 });
 
 /** Forward real PostgreSQL traffic, with an optional network stall after authentication. */

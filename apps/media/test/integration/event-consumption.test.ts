@@ -11,7 +11,7 @@ import {
 } from '@wallpaperdb/test-utils';
 import { eq } from 'drizzle-orm';
 import { headers as natsHeaders } from 'nats';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { wallpapers } from '../../src/db/schema.js';
 import { InProcessMediaTesterBuilder, MediaMigrationsTesterBuilder } from '../builders/index.js';
 
@@ -51,29 +51,28 @@ describe('Media Service - Event Consumption', () => {
     await tester.destroy();
   });
 
-  /**
-   * Test Helper: Wait for NATS event on a subject
-   */
-  async function waitForNatsEvent(subject: string, timeoutMs = 5000): Promise<unknown> {
-    const natsClient = await tester.nats.getConnection();
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        sub.unsubscribe();
-        reject(new Error(`Timeout waiting for event on ${subject}`));
-      }, timeoutMs);
+  async function waitForAccepted(sequence: number) {
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await vi.waitFor(async () => {
+      const info = await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer');
+      expect(info.ack_floor.stream_seq).toBeGreaterThanOrEqual(sequence);
+    }, { timeout: 10000, interval: 25 });
+  }
 
-      const sub = natsClient.subscribe(subject);
-
-      (async () => {
-        for await (const msg of sub) {
-          clearTimeout(timeout);
-          sub.unsubscribe();
-          const data = JSON.parse(new TextDecoder().decode(msg.data));
-          resolve(data);
-          return;
-        }
-      })();
-    });
+  async function observeAvailable(wallpaperId: string) {
+    const connection = await tester.nats.getConnection();
+    const subscription = connection.subscribe('wallpaper.variant.available', { timeout: 10000 });
+    const result = (async () => {
+      for await (const message of subscription) {
+        const event = WallpaperVariantAvailableEventSchema.parse(JSON.parse(new TextDecoder().decode(message.data)));
+        if (event.variant.wallpaperId === wallpaperId) return event;
+      }
+      throw new Error('Availability subscription closed before matching output');
+    })();
+    // Attach a handler immediately while publication is in flight.
+    void result.catch(() => undefined);
+    await connection.flush();
+    return { result, close: () => subscription.unsubscribe() };
   }
 
   it('should consume wallpaper.uploaded event and send wallpaper.variant.available event', async () => {
@@ -99,13 +98,13 @@ describe('Media Service - Event Consumption', () => {
       },
     };
 
-    const eventsPromise = waitForNatsEvent('wallpaper.variant.available', 10000);
+    const observation = await observeAvailable('wlpr_test_001');
 
     // Publish event to NATS
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
     // Wait for event to be processed (with timeout)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify database contains the wallpaper
     const db = tester.getFixtureDatabase();
@@ -114,20 +113,21 @@ describe('Media Service - Event Consumption', () => {
     expect(result).toBeDefined();
     expect(result.id).toBe('wlpr_test_001');
 
-    const publishedEvent = await eventsPromise;
-    const res = WallpaperVariantAvailableEventSchema.parse(publishedEvent);
-    expect(res.variant.wallpaperId).toBe('wlpr_test_001');
+    try {
+      const res = await observation.result;
+      expect(res.variant).toEqual({ wallpaperId: 'wlpr_test_001', width: 1920, height: 1080, aspectRatio: 1920 / 1080, format: 'image/jpeg', fileSizeBytes: 1024000, createdAt: event.wallpaper.uploadedAt });
+    } finally { observation.close(); }
   });
 
   it('should consume wallpaper.uploaded event and store in database', async () => {
     const js = await tester.nats.getJsClient();
 
     const event: WallpaperUploadedEvent = {
-      eventId: 'evt_test_001',
+      eventId: 'evt_store_001',
       eventType: 'wallpaper.uploaded',
       timestamp: new Date().toISOString(),
       wallpaper: {
-        id: 'wlpr_test_001',
+        id: 'wlpr_store_001',
         userId: 'user_test_001',
         fileType: 'image',
         mimeType: 'image/jpeg',
@@ -135,7 +135,7 @@ describe('Media Service - Event Consumption', () => {
         width: 1920,
         height: 1080,
         aspectRatio: 1.777,
-        storageKey: 'wlpr_test_001/original.jpg',
+        storageKey: 'wlpr_store_001/original.jpg',
         storageBucket: 'wallpapers',
         originalFilename: 'test-image.jpg',
         uploadedAt: new Date().toISOString(),
@@ -143,18 +143,18 @@ describe('Media Service - Event Consumption', () => {
     };
 
     // Publish event to NATS
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
     // Wait for event to be processed (with timeout)
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify database contains the wallpaper
     const db = tester.getFixtureDatabase();
-    const [result] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_test_001'));
+    const [result] = await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_store_001'));
 
     expect(result).toBeDefined();
-    expect(result.id).toBe('wlpr_test_001');
-    expect(result.storageKey).toBe('wlpr_test_001/original.jpg');
+    expect(result.id).toBe('wlpr_store_001');
+    expect(result.storageKey).toBe('wlpr_store_001/original.jpg');
     expect(result.storageBucket).toBe('wallpapers');
     expect(result.mimeType).toBe('image/jpeg');
     expect(result.width).toBe(1920);
@@ -186,12 +186,12 @@ describe('Media Service - Event Consumption', () => {
       },
     };
 
-    // Publish same event twice
+    // Wait for the second delivery's acknowledgement, not merely the first insert.
     await js.publish('wallpaper.uploaded', JSON.stringify(event));
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
     // Wait for both events to be processed
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify only one record exists
     const db = tester.getFixtureDatabase();
@@ -202,20 +202,21 @@ describe('Media Service - Event Consumption', () => {
     expect(results[0].height).toBe(1440);
   });
 
-  it('should handle malformed events gracefully', async () => {
+  it('quarantines malformed input before acknowledgement and keeps the service healthy', async () => {
     const js = await tester.nats.getJsClient();
 
     const malformedEvent = {
       eventId: 'evt_test_003',
       eventType: 'wallpaper.uploaded',
-      // Missing timestamp and wallpaper fields
+      wallpaper: { id: 'wlpr_malformed' },
+      // Missing timestamp and required wallpaper metadata
     };
 
     // Publish malformed event
-    await js.publish('wallpaper.uploaded', JSON.stringify(malformedEvent));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(malformedEvent));
 
     // Wait for processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Service should still be healthy (no crash)
     const app = tester.getApp();
@@ -226,14 +227,16 @@ describe('Media Service - Event Consumption', () => {
 
     expect(response.statusCode).toBe(200);
 
-    // And: No record inserted with invalid event ID
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const quarantined = await manager.streams.getMessage('MEDIA_QUARANTINE', { last_by_subj: 'media.quarantine' });
+    expect(JSON.parse(new TextDecoder().decode(quarantined.data))).toEqual(malformedEvent);
+    expect(quarantined.header.get('ce-reason')).toBe('Invalid');
+    expect(quarantined.header.get('ce-originalsubject')).toBe('wallpaper.uploaded');
     const db = tester.getFixtureDatabase();
-    const results = await db.select().from(wallpapers);
-    const malformedRecord = results.find((r) => r.id === 'evt_test_003');
-    expect(malformedRecord).toBeUndefined();
+    expect(await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_malformed'))).toEqual([]);
   });
 
-  it('should maintain trace context from publisher', async () => {
+  it('projects WebP upload metadata when the publisher includes tracing headers', async () => {
     const js = await tester.nats.getJsClient();
 
     const event: WallpaperUploadedEvent = {
@@ -258,14 +261,14 @@ describe('Media Service - Event Consumption', () => {
 
     // Publish with trace headers
     const headers = natsHeaders();
-    headers.set('traceparent', '00-test-trace-id-test-span-id-01');
+    headers.set('traceparent', '00-11111111111111111111111111111111-2222222222222222-01');
 
-    await js.publish('wallpaper.uploaded', JSON.stringify(event), {
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event), {
       headers,
     });
 
     // Wait for processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify event was processed
     const db = tester.getFixtureDatabase();
@@ -273,13 +276,14 @@ describe('Media Service - Event Consumption', () => {
 
     expect(result).toBeDefined();
     expect(result.mimeType).toBe('image/webp');
-    // Note: Actual trace validation would require OTEL mock/inspection
+    expect(result.width).toBe(1280);
+    expect(result.height).toBe(720);
   });
 
   it('should retrieve wallpaper via GET endpoint after event is processed', async () => {
     const js = await tester.nats.getJsClient();
 
-    // Create a test image buffer (simple 1x1 JPEG)
+    // Opaque fixture bytes are returned unchanged by the original-image endpoint.
     const imageBuffer = Buffer.from([
       0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00,
       0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
@@ -310,10 +314,10 @@ describe('Media Service - Event Consumption', () => {
       },
     };
 
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
     // Wait for event processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify database has the record
     const db = tester.getFixtureDatabase();
@@ -365,10 +369,10 @@ describe('Media Service - Event Consumption', () => {
       },
     };
 
-    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    const accepted = await js.publish('wallpaper.uploaded', JSON.stringify(event));
 
     // Wait for event processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForAccepted(accepted.seq);
 
     // Verify database has the record
     const db = tester.getFixtureDatabase();

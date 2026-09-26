@@ -117,7 +117,7 @@ export function userLayer(config: Config, options: AppOptions = {}) {
                 },
                 {
                   name: 'event-retention',
-                  intervalMs: 60_000,
+                  intervalMs: 1000,
                   run: (stopping) =>
                     jobs
                       .cleanupEvents(new Date(), stopping)
@@ -125,7 +125,7 @@ export function userLayer(config: Config, options: AppOptions = {}) {
                 },
                 {
                   name: 'picture-retention',
-                  intervalMs: 60_000,
+                  intervalMs: 1000,
                   run: (stopping) =>
                     assets
                       .cleanupExpired(new Date(), stopping)

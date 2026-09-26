@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import { useState } from 'react';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { clearIntersectionObservers, triggerIntersection } from '../setup';
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 

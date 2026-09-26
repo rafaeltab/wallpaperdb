@@ -62,7 +62,7 @@ describe('App upload notification navigation', () => {
     const notifications = screen.getByRole('region', { name: /Notifications/ });
     await within(notifications).findByText('Uploading 0/1 files');
     await user.click(screen.getByRole('button', { name: 'Toggle Sidebar' }));
-    await user.click(screen.getByRole('link', { name: 'Browse', exact: true }));
+    await user.click(screen.getByRole('link', { name: 'Browse' }));
     await screen.findByText('No wallpapers found. Upload your first one!');
     expect(window.location.pathname).toBe(`${basePath}/`);
 

@@ -23,14 +23,25 @@ const profile: Profile = {
   updatedAt: '2026-07-12T12:00:00.000Z',
 };
 
-function auth(overrides: Record<string, unknown> = {}) {
-  vi.mocked(useAuth).mockReturnValue({
-    getToken: vi.fn().mockResolvedValue('token'),
+function auth(
+  overrides: Partial<Pick<ReturnType<typeof useAuth>, 'isLoaded' | 'isSignedIn' | 'userId'>> = {}
+) {
+  const getToken = vi.fn().mockResolvedValue('token');
+  const mockedAuth = vi.mocked(useAuth, { partial: true });
+  if (overrides.isLoaded === false) {
+    mockedAuth.mockReturnValue({ getToken, isLoaded: false, isSignedIn: undefined, userId: undefined });
+    return;
+  }
+  if (overrides.isSignedIn === false) {
+    mockedAuth.mockReturnValue({ getToken, isLoaded: true, isSignedIn: false, userId: null });
+    return;
+  }
+  mockedAuth.mockReturnValue({
+    getToken,
     isLoaded: true,
     isSignedIn: true,
-    userId: 'user_123',
-    ...overrides,
-  } as ReturnType<typeof useAuth>);
+    userId: overrides.userId ?? 'user_123',
+  });
 }
 
 function renderBootstrap() {
@@ -260,7 +271,7 @@ describe('ProfileBootstrap', () => {
 
     let resolveEnsure: ((profile: Profile) => void) | undefined;
     vi.mocked(userApi.ensureProfile).mockImplementationOnce(
-      ({ signal }) =>
+      ({ signal } = {}) =>
         new Promise((resolve, reject) => {
           resolveEnsure = resolve;
           signal?.addEventListener('abort', () => reject(signal.reason), { once: true });

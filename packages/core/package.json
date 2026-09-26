@@ -54,6 +54,7 @@
   },
   "scripts": {
     "format": "biome format --write .",
+    "format:files": "biome format --write",
     "format:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",

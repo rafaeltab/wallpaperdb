@@ -1,9 +1,8 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 
-export interface OriginalImage {
-  readonly bucket: string;
-  readonly key: string;
-}
+export type OriginalImage =
+  | { readonly owner: 'ingestor'; readonly id: string }
+  | { readonly bucket: string; readonly key: string };
 export interface ExtractionInput {
   readonly wallpaperId: string;
   readonly fileType: 'image' | 'video';

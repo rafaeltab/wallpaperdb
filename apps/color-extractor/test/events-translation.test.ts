@@ -74,3 +74,25 @@ it('preserves binary CloudEvent occurrence and rejects conflicting transport met
   metadata.set('ce-time', '2026-09-25T10:00:00.000Z');
   expect(translateUpload(bytes, metadata)).toBeUndefined();
 });
+it('translates an immutable logical original reference without object storage coordinates', () => {
+  const {
+    storageBucket: _bucket,
+    storageKey: _key,
+    originalFilename: _name,
+    ...metadata
+  } = wallpaper;
+  const asset = { owner: 'ingestor', id: wallpaper.id };
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'logical-original',
+    type: 'wallpaper.uploaded',
+    time: wallpaper.uploadedAt,
+    datacontenttype: 'application/json',
+    data: { wallpaper: { ...metadata, asset } },
+  };
+  expect(translateUpload(new TextEncoder().encode(JSON.stringify(event)))).toMatchObject({
+    wallpaperId: wallpaper.id,
+    storage: asset,
+  });
+});

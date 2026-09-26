@@ -4,7 +4,10 @@ import { initializeOtel } from './otel-init.js';
 /** Parse before accepting work; initialize telemetry before importing external clients. */
 export const userProgram = Effect.gen(function* () {
   const config = yield* Effect.try(() => loadConfig());
-  const telemetry = yield* initializeOtel(config);
+  const telemetry = yield* initializeOtel({
+    otelEndpoint: config.otelEndpoint,
+    otelServiceName: config.otelServiceName,
+  });
   const { startUser } = yield* Effect.tryPromise(() => import('./server.js'));
   const server = yield* startUser(config, {
     otelHealthy: telemetry._tag === 'Started',

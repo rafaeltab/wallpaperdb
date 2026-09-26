@@ -123,8 +123,15 @@ async function applyMutation(tx: Transaction, current: Profile, mutation: Profil
       await tx.delete(handleClaims).where(and(eq(handleClaims.handle, mutation.handle), eq(handleClaims.profileId, current.id), eq(handleClaims.kind, 'alias'), eq(handleClaims.claimGeneration, mutation.claimGeneration)));
       change = { type: 'alias-expired', handle: mutation.handle, claimGeneration: mutation.claimGeneration, before: mutation.before, after: null, reason: mutation.reason };
       break;
-    case 'picture':
-      throw new Error(`Picture transition unavailable for retention ${retentionMs(policy)}`);
+    case 'picture': {
+      changes.pictureAssetId = mutation.asset?.id ?? null;
+      if (current.pictureAssetId) await tx.update(profilePictureAssets).set({ state: 'retired', retiredAt: now, expiresAt: new Date(now.getTime() + retentionMs(policy)) }).where(and(eq(profilePictureAssets.id, current.pictureAssetId), eq(profilePictureAssets.profileId, current.id)));
+      if (mutation.asset) await tx.update(profilePictureAssets).set({ state: 'active', expiresAt: null }).where(and(eq(profilePictureAssets.id, mutation.asset.id), eq(profilePictureAssets.profileId, current.id)));
+      await tx.update(profilePictureImports).set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null }).where(eq(profilePictureImports.profileId, current.id));
+      const asset = mutation.asset;
+      change = { type: 'picture-changed', before: current.pictureAssetId, after: changes.pictureAssetId, source: mutation.source, asset: asset ? { id: asset.id, storageBucket: asset.storageBucket, storageKey: asset.storageKey, mimeType: asset.mimeType, width: asset.width, height: asset.height, fileSizeBytes: asset.fileSizeBytes } : null };
+      break;
+    }
   }
   const [updated] = await tx.update(profiles).set(changes).where(eq(profiles.id, current.id)).returning();
   if (!updated) throw new Error('Locked Profile disappeared');

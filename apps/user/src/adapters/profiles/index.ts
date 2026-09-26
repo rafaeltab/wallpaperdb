@@ -192,7 +192,15 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   : Effect.fail(failure)
             )
           );
-        });
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Profile persistence failed', {
+              operation: error.operation,
+              diagnostic: error.cause,
+            })
+          ),
+          Effect.withSpan(`profiles.store.${name}`)
+        );
       const adapter: ProfileStore = {
         read: (profileId, now) =>
           operation('read-profile', (db) =>

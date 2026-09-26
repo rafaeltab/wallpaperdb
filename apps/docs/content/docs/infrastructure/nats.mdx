@@ -81,21 +81,9 @@ await publisher.publish({
 });
 ```
 
-## Consuming Events
+## Consuming events
 
-```typescript
-import { BaseEventConsumer } from "@wallpaperdb/events";
-
-class MyConsumer extends BaseEventConsumer {
-  protected async handleMessage(event, context) {
-    console.log(`Processing: ${event.wallpaperId}`);
-    // Process event...
-  }
-}
-
-const consumer = new MyConsumer(js);
-await consumer.start();
-```
+Use an application-owned Effect adapter with a durable pull consumer and explicit acknowledgements. Validate the payload and CloudEvents envelope before calling the application port. Retry transient failures with a finite attempt budget and delay; confirm durable quarantine before terminating permanent or exhausted deliveries. Preserve original bytes and headers for replay. See [Events](/docs/packages/events).
 
 ## NATS Monitoring
 

@@ -182,8 +182,6 @@ packages/
 │
 ├── events/                    # Event schemas
 │   ├── schemas/              # Zod schemas for all events
-│   ├── consumer/             # BaseEventConsumer
-│   └── publisher/            # BaseEventPublisher
 │
 ├── test-utils/               # Testing infrastructure
 │   ├── builders/             # TesterBuilder pattern
@@ -223,8 +221,6 @@ packages/
 
 **Exports:**
 - Event schemas (WallpaperUploadedEvent, etc.)
-- BaseEventPublisher (with trace context)
-- BaseEventConsumer (with error handling)
 - Event types (Zod schemas)
 
 **Key features:**
@@ -404,41 +400,9 @@ if (error instanceof ProblemDetailsError) {
 }
 ```
 
-### Event Publishing
+### Event adapters
 
-**Type-safe events with trace context:**
-
-```typescript
-import { BaseEventPublisher } from '@wallpaperdb/events';
-import { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
-
-@injectable()
-export class MyEventPublisher extends BaseEventPublisher {
-  async publishWallpaperUploaded(event: WallpaperUploadedEvent) {
-    await this.publish('wallpaper.uploaded', event);
-  }
-}
-```
-
-### Event Consuming
-
-**Base consumer with error handling:**
-
-```typescript
-import { BaseEventConsumer } from '@wallpaperdb/events';
-import { WallpaperUploadedEvent } from '@wallpaperdb/events/schemas';
-
-@injectable()
-export class WallpaperUploadedConsumer extends BaseEventConsumer<WallpaperUploadedEvent> {
-  protected readonly subject = 'wallpaper.uploaded';
-  protected readonly durableName = 'my-service-wallpaper-uploaded';
-
-  protected async handleMessage(event: WallpaperUploadedEvent): Promise<void> {
-    // Process event
-    await this.myService.processUpload(event);
-  }
-}
-```
+Each application owns its Effect-based publication and consumption adapters. Shared event schemas validate public contracts; adapters translate them into local capability inputs. See [Events](/docs/packages/events) for delivery and replay requirements.
 
 ## Service Communication
 

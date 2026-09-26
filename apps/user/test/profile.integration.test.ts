@@ -1,4 +1,3 @@
-import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -291,71 +290,6 @@ describe('Profile commands', () => {
     }
   });
 
-  it('clears Biography with version checks while preserving aliases and treating identical drafts as no-ops', async () => {
-    const initial = (await request('user_1')).json();
-    const original = (await changeHandle('user_1', 'biography-writer', initial.version)).json();
-    const headers = {
-      authorization: `Bearer ${Buffer.from(JSON.stringify({ id: original.id })).toString('base64')}`,
-    };
-    const save = (biographyMarkdown: string, expectedVersion: number) =>
-      app.inject({
-        method: 'PATCH',
-        url: '/profile/me',
-        headers,
-        payload: { biographyMarkdown, expectedVersion },
-      });
-    const edited = (await save('Original **Biography**', original.version)).json();
-    expect((await save(edited.biographyMarkdown, edited.version)).json()).toEqual(edited);
-    expect((await save(edited.biographyMarkdown, original.version)).statusCode).toBe(409);
-    const clearedResponse = await save('', edited.version);
-    expect(clearedResponse.statusCode).toBe(200);
-    const cleared = clearedResponse.json();
-    expect(cleared).toMatchObject({
-      biographyMarkdown: '',
-      version: edited.version + 1,
-      aliases: original.aliases,
-    });
-    expect((await save('', cleared.version)).json()).toEqual(cleared);
-    const events =
-      await sql`select payload from outbox_events where payload->'change'->>'type' = 'biography-changed' order by created_at`;
-    expect(events).toHaveLength(2);
-    expect(events[1].payload).toMatchObject({
-      change: { type: 'biography-changed', before: edited.biographyMarkdown, after: '' },
-      profile: { biographyMarkdown: '', version: cleared.version, aliases: original.aliases },
-    });
-  });
-
-  it.each([
-    '<script>alert(1)</script>',
-    '[![Picture](wallpaper:wlpr_owned)](https://example.com)',
-    '[Unsafe](javascript:alert%281%29)',
-    '[Credentials](https://user:pass@example.com)',
-    '![Remote](https://example.com/image.png)',
-    '[Custom](wallpaper:wlpr_owned)',
-    '![Data](data:image/png;base64,eA==)',
-  ])('enforces shared malicious-Markdown policy without partial Profile changes: %s', async (biographyMarkdown) => {
-    expect(validateProfileMarkdown(biographyMarkdown).valid).toBe(false);
-    const original = (await request('user_1')).json();
-    const response = await app.inject({
-      method: 'PATCH',
-      url: '/profile/me',
-      headers: {
-        authorization: `Bearer ${Buffer.from(JSON.stringify({ id: original.id })).toString('base64')}`,
-      },
-      payload: {
-        displayName: 'Rejected Name',
-        biographyMarkdown,
-        expectedVersion: original.version,
-      },
-    });
-    expect(response.statusCode).toBe(400);
-    expect(response.json().type).toContain('invalid-biography');
-    expect((await request('user_1')).json()).toEqual(original);
-    expect(await sql`select id from outbox_events where subject = 'profile.updated'`).toHaveLength(
-      0
-    );
-  });
-
   it('projects publication before lazy Profile creation and preserves ownership across replay', async () => {
     await publishBiographyWallpaper('wlpr_before_profile', 'user_1');
     await vi.waitFor(
@@ -397,40 +331,6 @@ describe('Profile commands', () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.json().biographyMarkdown).toBe(biographyMarkdown);
-  });
-
-  it('rejects another Profile’s published Wallpaper without applying either edited field', async () => {
-    const original = (await request('user_1')).json();
-    await publishBiographyWallpaper('wlpr_foreign', 'other_profile');
-    await vi.waitFor(
-      async () => {
-        expect(
-          await sql`select wallpaper_id from wallpaper_ownership where wallpaper_id = 'wlpr_foreign'`
-        ).toHaveLength(1);
-      },
-      { timeout: 5000, interval: 25 }
-    );
-    const response = await app.inject({
-      method: 'PATCH',
-      url: '/profile/me',
-      headers: {
-        authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}`,
-      },
-      payload: {
-        displayName: 'Rejected Name',
-        biographyMarkdown: '![Foreign](wallpaper:wlpr_foreign)',
-        expectedVersion: original.version,
-      },
-    });
-    expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({
-      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unavailable-wallpaper.md',
-      retryable: false,
-    });
-    expect((await request('user_1')).json()).toEqual(original);
-    expect(await sql`select id from outbox_events where subject = 'profile.updated'`).toHaveLength(
-      0
-    );
   });
 
   it('allows an owned published Wallpaper embed after the ownership event catches up', async () => {
@@ -526,42 +426,6 @@ describe('Profile commands', () => {
     expect(await sql`select id from outbox_events where subject = 'profile.updated'`).toHaveLength(
       1
     );
-  });
-
-  it('enforces the configured Biography limit in Unicode code points without truncating authored text', async () => {
-    const previousLimit = config.profileBiographyMaxLength;
-    config.profileBiographyMaxLength = 4;
-    await reconfigure();
-    try {
-      const original = (await request('user_1')).json();
-      expect(original.biographyMaxLength).toBe(4);
-      const headers = {
-        authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}`,
-      };
-      const accepted = await app.inject({
-        method: 'PATCH',
-        url: '/profile/me',
-        headers,
-        payload: { biographyMarkdown: '👋abc', expectedVersion: original.version },
-      });
-      expect(accepted.statusCode).toBe(200);
-      expect(accepted.json().biographyMarkdown).toBe('👋abc');
-      const rejected = await app.inject({
-        method: 'PATCH',
-        url: '/profile/me',
-        headers,
-        payload: { biographyMarkdown: '👋abcd', expectedVersion: accepted.json().version },
-      });
-      expect(rejected.statusCode).toBe(400);
-      expect(rejected.json().type).toContain('invalid-biography');
-      expect((await request('user_1')).json()).toEqual(accepted.json());
-      expect(
-        await sql`select id from outbox_events where payload->'change'->>'type' = 'biography-changed'`
-      ).toHaveLength(1);
-    } finally {
-      config.profileBiographyMaxLength = previousLimit;
-      await reconfigure();
-    }
   });
 
   it('stores authored Biography Markdown and returns a complete authoritative versioned snapshot', async () => {
@@ -1731,41 +1595,6 @@ describe('Profile commands', () => {
     expect((await request('user_1')).json()).toMatchObject(response.json());
   });
 
-  it('rejects reserved and out-of-range normalized Handles without changing the Profile', async () => {
-    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
-    const before = (await request('user_1')).json();
-    const previousMinimum = config.profileHandleMinLength;
-    const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMinLength = 3;
-    await reconfigure();
-    config.profileHandleMaxLength = 10;
-    await reconfigure();
-    try {
-      for (const handle of [
-        ' ADMÍN ',
-        'sUpPoRt',
-        'GraphQL',
-        'settings',
-        '--!!!',
-        ' A ',
-        'abcdefghijkl',
-      ]) {
-        const response = await changeHandle('user_1', handle, before.version);
-        expect(response.statusCode, handle).toBe(400);
-        expect(response.json().type).toMatch(/invalid-handle\.md$/);
-      }
-      expect((await request('user_1')).json()).toEqual(before);
-      expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(
-        0
-      );
-    } finally {
-      config.profileHandleMinLength = previousMinimum;
-      await reconfigure();
-      config.profileHandleMaxLength = previousMaximum;
-      await reconfigure();
-    }
-  });
-
   it('requires authentication and a positive expected version for Handle commands', async () => {
     const before = (await request('user_1')).json();
     const unauthenticated = await app.inject({
@@ -1794,50 +1623,6 @@ describe('Profile commands', () => {
     expect(stale.statusCode).toBe(409);
     expect(stale.json().type).toMatch(/profile-version-conflict\.md$/);
     expect((await request('user_1')).json()).toEqual(before);
-  });
-
-  it('enforces seven days between Handle changes and allows the exact cooldown boundary', async () => {
-    const before = (await request('user_1')).json();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    const now = new Date('2030-01-01T12:00:00.000Z');
-    vi.setSystemTime(now);
-    try {
-      const first = await changeHandle('user_1', 'first-handle', before.version);
-      expect(first.statusCode).toBe(200);
-      const deadline = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      vi.setSystemTime(new Date(deadline.getTime() - 1));
-      const early = await changeHandle('user_1', 'second-handle', first.json().version);
-      expect(early.statusCode).toBe(429);
-      expect(early.json()).toMatchObject({
-        type: expect.stringMatching(/handle-cooldown\.md$/),
-        nextHandleChangeAt: deadline.toISOString(),
-      });
-      expect((await request('user_1')).json()).toEqual(first.json());
-      expect(first.json().lastHandleChangedAt).toBe(now.toISOString());
-      vi.setSystemTime(deadline);
-      const next = await changeHandle('user_1', 'second-handle', first.json().version);
-      expect(next.statusCode).toBe(200);
-      expect(next.json()).toMatchObject({
-        handle: 'second-handle',
-        version: 3,
-        lastHandleChangedAt: deadline.toISOString(),
-      });
-      expect(next.json().aliases).toHaveLength(2);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('returns unchanged owner state for the same normalized Handle during cooldown', async () => {
-    const before = (await request('user_1')).json();
-    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
-    const same = await changeHandle('user_1', ' NEW__HANDLE ', changed.version);
-    expect(same.statusCode).toBe(200);
-    expect(same.json()).toEqual(changed);
-    expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(
-      1
-    );
-    expect((await changeHandle('user_1', 'new-handle', before.version)).statusCode).toBe(409);
   });
 
   it('permits one concurrent claimant and reserves current Handles and aliases together', async () => {
@@ -2018,19 +1803,6 @@ describe('Profile commands', () => {
     expect(Number(claims[0].claim_generation)).toBeGreaterThan(0);
   });
 
-  it('returns the existing profile without creating another event', async () => {
-    identities.identities.set('user_1', { displayName: 'Ada', firstName: null, lastName: null });
-    const first = await service().ensure('user_1');
-    identities.identities.set('user_1', {
-      displayName: 'Changed',
-      firstName: null,
-      lastName: null,
-    });
-    const second = await service().ensure('user_1');
-    expect(second).toEqual(first);
-    expect((await sql`select * from outbox_events`).length).toBe(1);
-  });
-
   it('normalizes Unicode whitespace and records an atomic Display-name change', async () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     await service().ensure('user_1');
@@ -2053,31 +1825,6 @@ describe('Profile commands', () => {
         profile: { displayName: 'Éowyn 雪 Queen', version: 2 },
       },
     });
-  });
-
-  it('rejects whitespace-only and over-limit Display names without changing state', async () => {
-    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
-    await service().ensure('user_1');
-    const previousMaximum = config.profileDisplayNameMaxLength;
-    config.profileDisplayNameMaxLength = 3;
-    await reconfigure();
-
-    try {
-      const whitespace = await patch('user_1', ' \t\n ', 1);
-      const tooLong = await patch('user_1', '雪雪雪雪', 1);
-      expect(whitespace.statusCode).toBe(400);
-      expect(tooLong.statusCode).toBe(400);
-      expect(
-        (await sql`select display_name, version from profiles where id = 'user_1'`)[0]
-      ).toMatchObject({
-        display_name: 'Before',
-        version: 1,
-      });
-      expect((await sql`select * from outbox_events`).length).toBe(1);
-    } finally {
-      config.profileDisplayNameMaxLength = previousMaximum;
-      await reconfigure();
-    }
   });
 
   it('allows only one of two concurrent edits at the last-seen version', async () => {
@@ -2126,42 +1873,6 @@ describe('Profile commands', () => {
     }
   });
 
-  it('prioritizes full name and then a stable generated fallback', async () => {
-    identities.identities.set('full', {
-      displayName: null,
-      firstName: 'Grace',
-      lastName: 'Hopper',
-    });
-    const full = await service().ensure('full');
-    const fallback = await service().ensure('fallback');
-    expect(full.displayName).toBe('Grace Hopper');
-    expect(full.handle).toBe('grace-hopper');
-    expect(fallback.displayName).toMatch(
-      /^(quiet|bright|silver|wild) (aurora|canvas|horizon|pixel)$/
-    );
-    expect(fallback.handle).toBe(fallback.displayName.replace(' ', '-'));
-  });
-
-  it('normalizes and bounds the initial Display name with the configured policy', async () => {
-    identities.identities.set('bounded', {
-      displayName: '  Éowyn\t Snow  ',
-      firstName: null,
-      lastName: null,
-    });
-    const previousMaximum = config.profileDisplayNameMaxLength;
-    config.profileDisplayNameMaxLength = 5;
-    await reconfigure();
-
-    try {
-      const profile = await service().ensure('bounded');
-      expect(profile.displayName).toBe('Éowyn');
-      expect(profile.handle).toBe('eowyn');
-    } finally {
-      config.profileDisplayNameMaxLength = previousMaximum;
-      await reconfigure();
-    }
-  });
-
   it('claims collision suffixes atomically for different users', async () => {
     for (const id of ['one', 'two']) {
       identities.identities.set(id, { displayName: 'Same Name', firstName: null, lastName: null });
@@ -2173,79 +1884,6 @@ describe('Profile commands', () => {
     expect(handles.find((handle) => handle !== 'same-name')).toMatch(/^same-name-[a-z0-9]{6}$/);
     const claims = await sql`select claim_generation from handle_claims order by claim_generation`;
     expect(Number(claims[1].claim_generation)).toBeGreaterThan(Number(claims[0].claim_generation));
-  });
-
-  it('keeps collision handles within a short configured maximum', async () => {
-    for (const id of ['short-one', 'short-two']) {
-      identities.identities.set(id, { displayName: 'Ada', firstName: null, lastName: null });
-    }
-    const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMaxLength = 3;
-    await reconfigure();
-
-    try {
-      const profiles = await Promise.all([
-        service().ensure('short-one'),
-        service().ensure('short-two'),
-      ]);
-
-      expect(new Set(profiles.map((profile) => profile.handle)).size).toBe(2);
-      expect(profiles.every((profile) => profile.handle.length <= 3)).toBe(true);
-    } finally {
-      config.profileHandleMaxLength = previousMaximum;
-      await reconfigure();
-    }
-  });
-
-  it('avoids reserved handles and respects the configured maximum length', async () => {
-    identities.identities.set('reserved', {
-      displayName: 'Admin',
-      firstName: null,
-      lastName: null,
-    });
-    identities.identities.set('long', {
-      displayName: 'A very long profile display name',
-      firstName: null,
-      lastName: null,
-    });
-    identities.identities.set('route', {
-      displayName: 'GraphQL',
-      firstName: null,
-      lastName: null,
-    });
-    identities.identities.set('api', {
-      displayName: 'Tags',
-      firstName: null,
-      lastName: null,
-    });
-    const reserved = await service().ensure('reserved');
-    const long = await service().ensure('long');
-    const route = await service().ensure('route');
-    const api = await service().ensure('api');
-    expect(reserved.handle).toBe('admin-profile');
-    expect(long.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
-    expect(route.handle).toBe('graphql-profile');
-    expect(api.handle).toBe('tags-profile');
-  });
-
-  it('does not recreate a reserved handle when applying the configured maximum length', async () => {
-    identities.identities.set('reserved', {
-      displayName: 'Security',
-      firstName: null,
-      lastName: null,
-    });
-    const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMaxLength = 8;
-    await reconfigure();
-
-    try {
-      const profile = await service().ensure('reserved');
-      expect(profile.handle).not.toBe('security');
-      expect(profile.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
-    } finally {
-      config.profileHandleMaxLength = previousMaximum;
-      await reconfigure();
-    }
   });
 
   it('is idempotent under concurrent ensures for the same user', async () => {

@@ -68,6 +68,10 @@ export interface PictureCursor {
   readonly id: string;
   readonly expiresAt: Date | null;
 }
+export interface PictureImportCursor {
+  readonly profileId: string;
+  readonly nextAttemptAt: Date;
+}
 export interface PictureImport {
   readonly profileId: string;
   readonly sourceUrl: string;
@@ -92,7 +96,12 @@ export interface PictureStore {
   ): Effect.Effect<readonly StoredPicture[], PictureUnavailable>;
   claimDeletion(id: string, now: Date): Effect.Effect<StoredPicture | null, PictureUnavailable>;
   finishDeletion(id: string): Effect.Effect<boolean, PictureUnavailable>;
-  dueImports(now: Date): Effect.Effect<readonly string[], PictureUnavailable>;
+  /** Returns at most 100 due jobs strictly after the cursor, ordered by
+   * (nextAttemptAt, profileId). A short page terminates the current sweep. */
+  dueImports(
+    now: Date,
+    cursor?: PictureImportCursor
+  ): Effect.Effect<readonly PictureImportCursor[], PictureUnavailable>;
   claimImport(
     profileId: string,
     now: Date,
@@ -136,7 +145,9 @@ export interface Pictures {
     expectedVersion: number
   ): Effect.Effect<ProfileOutcome | PictureRejection, PictureUnavailable | ProfileUnavailable>;
   pictureAvailable(id: string): Effect.Effect<boolean, PictureUnavailable>;
-  importPending(isStopping?: () => boolean): Effect.Effect<void, PictureUnavailable>;
+  /** Each due job is isolated; failed counts technical failures even when a retry is persisted.
+   * Discovery failures remain in the error channel because no batch could be inspected. */
+  importPending(isStopping?: () => boolean): Effect.Effect<{ failed: number }, PictureUnavailable>;
   cleanupExpired(
     now: Date,
     isStopping?: () => boolean
@@ -155,6 +166,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
       const profiles = yield* Profiles;
       const retention = yield* Semaphore.make(1);
       let cursor: PictureCursor | undefined;
+      let importCursor: PictureImportCursor | undefined;
       const stage = Effect.fn('pictures.stage')(function* (
         principal: ProfilePrincipal,
         bytes: Buffer
@@ -230,27 +242,48 @@ export const picturesLayer = (policy: PicturesPolicy) =>
         }),
         pictureAvailable: (id) => store.available(id),
         importPending: Effect.fn('pictures.import-pending')(function* (isStopping = () => false) {
-          if (isStopping()) return;
-          const ids = yield* store.dueImports(new Date(yield* Clock.currentTimeMillis));
-          for (const id of ids) {
+          const result = { failed: 0 };
+          if (isStopping()) return result;
+          const candidates = yield* store.dueImports(
+            new Date(yield* Clock.currentTimeMillis),
+            importCursor
+          );
+          for (const candidate of candidates) {
             if (isStopping()) break;
-            const job = yield* store.claimImport(
-              id,
-              new Date(yield* Clock.currentTimeMillis),
-              policy.profilePictureImportTimeoutMs + 60_000
-            );
-            if (job && job.attempts >= 12) {
-              yield* settle(job, true);
-              continue;
-            }
-            if (job)
-              yield* importPicture(job).pipe(
+            importCursor = candidate;
+            const id = candidate.profileId;
+            const failed = yield* Effect.gen(function* () {
+              const job = yield* store.claimImport(
+                id,
+                new Date(yield* Clock.currentTimeMillis),
+                policy.profilePictureImportTimeoutMs + 60_000
+              );
+              if (!job) return false;
+              if (job.attempts >= 12) {
+                yield* settle(job, true);
+                return false;
+              }
+              return yield* importPicture(job).pipe(
+                Effect.as(false),
                 Effect.catchTags({
-                  PictureUnavailable: () => settle(job, false),
-                  ProfileUnavailable: () => settle(job, false),
+                  PictureUnavailable: () => settle(job, false).pipe(Effect.as(true)),
+                  ProfileUnavailable: () => settle(job, false).pipe(Effect.as(true)),
                 })
               );
+            }).pipe(
+              Effect.catchTag('PictureUnavailable', () =>
+                Effect.gen(function* () {
+                  yield* Effect.logError('Initial picture import failed; will retry', {
+                    profileId: id,
+                  });
+                  return true;
+                })
+              )
+            );
+            if (failed) result.failed++;
           }
+          if (candidates.length < 100 && !isStopping()) importCursor = undefined;
+          return result;
         }),
         cleanupExpired: (now, isStopping = () => false) =>
           retention.withPermit(

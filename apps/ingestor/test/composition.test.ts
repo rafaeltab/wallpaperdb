@@ -67,6 +67,7 @@ beforeAll(async () => {
   });
   try {
     await s3.send(new CreateBucketCommand({ Bucket: 'wallpapers' }));
+    await s3.send(new CreateBucketCommand({ Bucket: 'asset-references' }));
   } finally {
     s3.destroy();
   }

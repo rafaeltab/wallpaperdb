@@ -58,6 +58,9 @@ export const ingestorConfig = Configuration.all({
     'S3_SECRET_ACCESS_KEY'
   ),
   s3Bucket: Configuration.NonEmptyString('S3_BUCKET').pipe(Configuration.withDefault('wallpapers')),
+  assetReferenceBucket: Configuration.NonEmptyString('ASSET_REFERENCE_BUCKET').pipe(
+    Configuration.withDefault('asset-references')
+  ),
   s3Region: Configuration.NonEmptyString('S3_REGION').pipe(Configuration.withDefault('us-east-1')),
   natsUrl: Configuration.schema(urlString, 'NATS_URL'),
   natsStream: Configuration.NonEmptyString('NATS_STREAM').pipe(

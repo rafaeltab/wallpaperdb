@@ -16,7 +16,6 @@ export interface AssetsConfig {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
-  readonly assetReferenceBucket?: string;
 }
 
 export interface AssetsHealth {
@@ -189,13 +188,8 @@ export function assetsLayer(
       return Context.make(AssetStorage, new S3Assets(client, config.bucket)).pipe(
         Context.add(AssetsHealth, {
           check: () =>
-            Effect.all(
-              [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
-                request('check-assets', (abortSignal) =>
-                  client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
-                )
-              ),
-              { concurrency: 'unbounded' }
+            request('check-assets', (abortSignal) =>
+              client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
             ).pipe(
               Effect.timeout('1 second'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

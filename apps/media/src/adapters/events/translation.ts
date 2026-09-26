@@ -95,8 +95,9 @@ export function translateEvent(
       kind: 'wallpaper',
       wallpaper: {
         id: w.id,
-        storageBucket: w.storageBucket,
-        storageKey: w.storageKey,
+        ...(w.asset
+          ? { reference: { ...w.asset } }
+          : { storageBucket: w.storageBucket, storageKey: w.storageKey }),
         mimeType: w.mimeType,
         width: w.width,
         height: w.height,
@@ -117,8 +118,9 @@ export function translateEvent(
       kind: 'variant',
       variant: {
         wallpaperId: v.wallpaperId,
-        storageBucket: v.storageBucket,
-        storageKey: v.storageKey,
+        ...(v.asset
+          ? { reference: { ...v.asset } }
+          : { storageBucket: v.storageBucket, storageKey: v.storageKey }),
         mimeType: v.format,
         width: v.width,
         height: v.height,

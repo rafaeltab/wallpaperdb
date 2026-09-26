@@ -21,6 +21,7 @@ const configSchema = z.object({
   ...DatabaseConfigSchema.shape,
   // S3 config (read-only access)
   ...S3ConfigSchema.shape,
+  assetReferenceBucket: z.string().min(1).default('asset-references'),
   // NATS config (event consumer)
   ...NatsConfigSchema.shape,
   // OTEL config
@@ -51,6 +52,7 @@ export function loadConfig(): Config {
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     s3Bucket: getEnv('S3_BUCKET', 'wallpapers'),
     s3Region: getEnv('S3_REGION', 'us-east-1'),
+    assetReferenceBucket: getEnv('ASSET_REFERENCE_BUCKET', 'asset-references'),
 
     // NATS
     natsUrl: process.env.NATS_URL,

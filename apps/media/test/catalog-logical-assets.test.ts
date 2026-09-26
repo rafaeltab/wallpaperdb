@@ -1,3 +1,5 @@
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createTcpServer, connect, type Socket } from 'node:net';
 import { CreateBucketCommand } from '@aws-sdk/client-s3';
 import { registerAssetReference } from '@wallpaperdb/core/assets';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
@@ -10,7 +12,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
 import {
   CatalogHealth,
@@ -59,6 +61,87 @@ describe('Catalog immutable asset reference contract', () => {
     await pool?.end();
     await postgres?.stop();
     await storage.destroy();
+  });
+
+  it('cancels a hanging registry health request when the database probe fails', async () => {
+    let failing = false;
+    let registryEntered = false;
+    let registryClosed = false;
+    let failQuery: (() => void) | undefined;
+    const sockets = new Set<Socket>();
+    const database = new URL(postgres.getConnectionUri());
+    const upstreamAddress = { host: database.hostname, port: Number(database.port) };
+    const proxy = createTcpServer((downstream) => {
+      const upstream = connect(upstreamAddress);
+      sockets.add(downstream);
+      sockets.add(upstream);
+      upstream.pipe(downstream);
+      downstream.on('data', (bytes) => {
+        if (!failing) upstream.write(bytes);
+        else {
+          failQuery = () => {
+            const query = Buffer.from('SELECT 1/0\0');
+            const header = Buffer.alloc(5);
+            header[0] = 81; // PostgreSQL simple-query message.
+            header.writeInt32BE(query.length + 4, 1);
+            upstream.write(Buffer.concat([header, query]));
+          };
+          if (registryEntered) failQuery();
+        }
+      });
+      for (const socket of [upstream, downstream]) {
+        socket.on('error', () => {});
+        socket.on('close', () => {
+          sockets.delete(socket);
+          upstream.destroy();
+          downstream.destroy();
+        });
+      }
+    });
+    const server = createHttpServer((_request, response) => {
+      registryEntered = true;
+      response.on('close', () => {
+        registryClosed = true;
+      });
+      failQuery?.();
+    });
+    await Promise.all([
+      new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve)),
+      new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)),
+    ]);
+    const dbAddress = proxy.address();
+    const s3Address = server.address();
+    if (!dbAddress || typeof dbAddress === 'string' || !s3Address || typeof s3Address === 'string')
+      throw new Error('Missing test listeners');
+    database.hostname = '127.0.0.1';
+    database.port = String(dbAddress.port);
+    const isolated = ManagedRuntime.make(
+      CatalogPostgresLayer({
+        databaseUrl: database.toString(),
+        assetReferences: {
+          endpoint: `http://127.0.0.1:${s3Address.port}`,
+          region: 'us-east-1',
+          accessKeyId: 'test',
+          secretAccessKey: 'test',
+          bucket: 'asset-references',
+        },
+      })
+    );
+    try {
+      const health = await isolated.runPromise(CatalogHealth);
+      failing = true;
+      expect(await isolated.runPromise(health.check)).toBe(false);
+      expect(registryEntered).toBe(true);
+      await vi.waitFor(() => expect(registryClosed).toBe(true), { timeout: 500, interval: 10 });
+    } finally {
+      await isolated.dispose();
+      server.closeAllConnections();
+      for (const socket of sockets) socket.destroy();
+      await Promise.all([
+        new Promise<void>((resolve) => proxy.close(() => resolve())),
+        new Promise<void>((resolve) => server.close(() => resolve())),
+      ]);
+    }
   });
 
   it('reports missing asset reference storage and recovers when restored', async () => {

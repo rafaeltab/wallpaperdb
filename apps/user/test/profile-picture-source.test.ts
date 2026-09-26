@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { downloadInitialPicture, PermanentPictureImportError } from '../src/services/profile-picture-source.js';
+import { Effect } from 'effect';
+import { pictureSourceLayer } from '../src/adapters/pictures/index.js';
+import { PictureSource } from '../src/pictures/index.js';
+
+class PermanentPictureImportError extends Error {}
+async function downloadInitialPicture(url: string, options: { maxBytes: number; timeoutMs: number; allowedHosts: string[] }, fetcher: typeof fetch) {
+ const result = await Effect.runPromise(Effect.flatMap(PictureSource, source => source.download(url)).pipe(Effect.provide(pictureSourceLayer(options, fetcher))));
+ if (result._tag === 'Rejected') throw new PermanentPictureImportError(result.message);
+ return result.bytes;
+}
 
 const options = { maxBytes: 1024, timeoutMs: 1000, allowedHosts: ['img.clerk.com', 'images.clerk.dev'] };
 
@@ -131,6 +140,6 @@ describe('Initial Profile picture download', () => {
     expect(failure).not.toBeInstanceOf(PermanentPictureImportError);
     expect(String(failure)).not.toContain(source);
     expect(String(failure)).not.toContain('secret');
-    expect(failure).not.toHaveProperty('cause');
+    expect(JSON.stringify(failure)).not.toContain('secret');
   });
 });

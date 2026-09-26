@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Clock, Context, Effect, Layer, Metric, Semaphore } from 'effect';
-import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
+import { resolveOriginalAsset, resolveVariantAsset } from '@wallpaperdb/core/assets';
 import { encodeImage } from './process.js';
 import { storeVariant } from './storage.js';
 import {
@@ -19,7 +19,6 @@ export interface ImageConfig {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
-  readonly assetReferenceBucket?: string;
   readonly jpegQuality: number;
   readonly pngCompressionLevel: number;
   readonly webpQuality: number;
@@ -67,14 +66,11 @@ class StoredVariantImages implements VariantImages {
           const storage = input.storage;
           const original =
             'owner' in storage
-              ? yield* request('resolve-original', (abortSignal) =>
-                  resolveAssetReference(
-                    this.client,
-                    this.config.assetReferenceBucket ?? 'asset-references',
-                    storage,
-                    { abortSignal }
-                  )
-                )
+              ? yield* request('resolve-original', async () => {
+                  if (storage.id !== input.wallpaperId)
+                    throw new Error('Original reference identity mismatch');
+                  return resolveOriginalAsset(storage, input.mimeType, this.config.bucket);
+                })
               : storage;
           const bytes = yield* request('read-image', async (abortSignal) => {
             const response = await this.client.send(
@@ -137,8 +133,17 @@ class StoredVariantImages implements VariantImages {
             pngCompressionLevel: this.config.pngCompressionLevel,
             webpQuality: this.config.webpQuality,
           });
-          const extension = mimeType === 'image/jpeg' ? 'jpg' : mimeType.slice(6);
-          const storageKey = `${input.wallpaperId}/variant_${preset.width}x${preset.height}.${extension}`;
+          const location = yield* request('locate-variant', async () =>
+            resolveVariantAsset(
+              variantAssetReference({
+                wallpaperId: input.wallpaperId,
+                target: preset,
+                format: mimeType,
+              }),
+              { wallpaperId: input.wallpaperId, mimeType },
+              'owner' in storage ? this.config.bucket : original.bucket
+            )
+          );
           const variant = yield* storeVariant(
             this.client,
             { ...input, storage: original },
@@ -150,26 +155,20 @@ class StoredVariantImages implements VariantImages {
               aspectRatio: output.width / output.height,
               format: mimeType,
               fileSizeBytes: output.bytes.length,
-              storageKey,
-              storageBucket: original.bucket,
+              storageKey: location.key,
+              storageBucket: location.bucket,
               createdAt: new Date(input.timestamp),
             },
             output.bytes
-          );
-          yield* request('register-variant-asset', (abortSignal) =>
-            registerAssetReference(
-              this.client,
-              this.config.assetReferenceBucket ?? 'asset-references',
-              variantAssetReference(variant),
-              { bucket: variant.storageBucket, key: variant.storageKey },
-              { abortSignal }
-            )
           );
           const end = yield* Clock.currentTimeMillis;
           yield* Metric.update(
             Metric.histogram('variant_generator.single_duration_ms', {
               boundaries: [10, 50, 100, 500, 1000, 5000, 10000, 30000, 60000, 100000],
-              attributes: { preset_label: preset.label, format: extension },
+              attributes: {
+                preset_label: preset.label,
+                format: mimeType === 'image/jpeg' ? 'jpg' : mimeType.slice(6),
+              },
             }),
             end - start
           );
@@ -217,13 +216,8 @@ export function imageLayer(config: ImageConfig): Layer.Layer<VariantImages | Ima
       return Context.make(VariantImages, new StoredVariantImages(client, nativeWork, config)).pipe(
         Context.add(ImageHealth, {
           check: () =>
-            Effect.all(
-              [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
-                request('check-image-storage', (abortSignal) =>
-                  client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
-                )
-              ),
-              { concurrency: 'unbounded' }
+            request('check-image-storage', (abortSignal) =>
+              client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
             ).pipe(
               Effect.timeout('5 seconds'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

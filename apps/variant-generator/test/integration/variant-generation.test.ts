@@ -1,6 +1,6 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { WallpaperVariantUploadedEventSchema } from '@wallpaperdb/events/schemas';
-import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
+import { resolveVariantAsset } from '@wallpaperdb/core/assets';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -19,7 +19,7 @@ const Tester = createDefaultTesterBuilder()
   .build();
 const tester = new Tester()
   .withS3()
-  .withS3Bucket('wallpapers').withS3Bucket('asset-references')
+  .withS3Bucket('wallpapers').withS3Bucket('historical-wallpapers')
   .withNats((builder) => builder.withJetstream())
   .withStream('WALLPAPER')
   .withInProcessApp();
@@ -36,7 +36,6 @@ describe('variant generation composition', () => {
     await tester.s3.uploadObject('wallpapers', storageKey, original);
     const timestamp = '2026-09-24T00:00:00.000Z';
     const asset = { owner: 'ingestor', id: wallpaperId } as const;
-    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', asset, { bucket: 'wallpapers', key: storageKey });
     const event = {
       specversion: '1.0', source: 'https://wallpaperdb/ingestor', id: 'composition-upload-1',
       type: 'wallpaper.uploaded', time: timestamp, datacontenttype: 'application/json',
@@ -70,7 +69,7 @@ describe('variant generation composition', () => {
       expect(message.headers?.get('ce-specversion')).toBe('1.0');
       expect(message.headers?.get('ce-id')).toBe(publication.eventId);
       if (!publication.variant.asset) throw new Error('New variant must have a logical asset reference');
-      const location = await resolveAssetReference(tester.s3.getS3Client(), 'asset-references', publication.variant.asset);
+      const location = resolveVariantAsset(publication.variant.asset, { wallpaperId, mimeType: publication.variant.format }, 'wallpapers');
       const stored = await tester.s3.getS3Client().send(new GetObjectCommand({
         Bucket: location.bucket,
         Key: location.key,
@@ -102,4 +101,41 @@ describe('variant generation composition', () => {
     expect(ready.statusCode).toBe(200);
     expect(ready.json()).toMatchObject({ ready: true });
   });
+  it('replays retained coordinates in a historical bucket and publishes that exact variant location', async () => {
+    const id = 'wlpr_historical_bucket';
+    const original = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#336699' } }).png().toBuffer();
+    await tester.s3.uploadObject('historical-wallpapers', 'custom/source.png', original);
+    const timestamp = '2026-09-24T00:00:00.000Z';
+    const event = { eventId: 'historical-bucket-upload', eventType: 'wallpaper.uploaded', timestamp, wallpaper: {
+      id, userId: 'user_test', fileType: 'image', mimeType: 'image/png', fileSizeBytes: original.length,
+      width: 1280, height: 720, aspectRatio: 1280 / 720, uploadedAt: timestamp,
+      storageBucket: 'historical-wallpapers', storageKey: 'custom/source.png', originalFilename: 'source.png',
+    } };
+    const js = await tester.nats.getJsClient();
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    const before = (await manager.streams.info('WALLPAPER')).state.messages;
+    const consumer = await js.consumers.get('WALLPAPER', { filterSubjects: 'wallpaper.variant.uploaded' });
+    await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    let checked = 0;
+    while (checked < 2) {
+      const message = await consumer.next({ expires: 10000 });
+      if (!message) throw new Error('Missing historical variant publication');
+      const published = WallpaperVariantUploadedEventSchema.parse(message.json());
+      if (published.variant.wallpaperId !== id) continue;
+      expect(published.variant).not.toHaveProperty('asset');
+      if (!('storageBucket' in published.variant)) throw new Error('Historical rendition must retain coordinates');
+      expect(published.variant.storageBucket).toBe('historical-wallpapers');
+      const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: published.variant.storageBucket, Key: published.variant.storageKey }));
+      if (!object.Body) throw new Error('Missing historical variant object');
+      const pixels = await sharp(await object.Body.transformToByteArray()).metadata();
+      expect(pixels).toMatchObject({ width: published.variant.width, height: published.variant.height });
+      if (published.variant.width === 853) expect(published.variant.storageKey).toBe(`${id}/variant_854x480.png`);
+      checked++;
+    }
+    const replay = await js.publish('wallpaper.uploaded', JSON.stringify(event));
+    await expect.poll(async () => (await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer')).ack_floor.stream_seq, { timeout: 15000 }).toBe(replay.seq);
+    expect((await manager.streams.info('WALLPAPER')).state.messages - before).toBe(4);
+    expect(await tester.s3.objectExists('wallpapers', `${id}/variant_854x480.png`)).toBe(false);
+  });
+
 });

@@ -5,6 +5,7 @@ import { AckPolicy, type JsMsg } from 'nats';
 import { Maintenance, MaintenanceFailure } from '../../maintenance/index.js';
 import { broker, EventsBroker, type EventsOptions } from './broker.js';
 import { translateOwnership } from './translation.js';
+import { ensureQuarantine, quarantine } from './quarantine.js';
 
 export interface ConsumerHealth {
   check(): Effect.Effect<boolean>;
@@ -22,8 +23,10 @@ const retryDelay = (message: JsMsg, options: EventsOptions) =>
 
 const processMessage = Effect.fn('profiles.events.consume')(function* (
   message: JsMsg,
+  service: EventsBroker,
   maintenance: Maintenance,
-  options: EventsOptions
+  options: EventsOptions,
+  pendingFailures: Set<number>
 ) {
   const input = translateOwnership(message.subject, message.data, message.headers);
   yield* Effect.annotateCurrentSpan({
@@ -33,13 +36,38 @@ const processMessage = Effect.fn('profiles.events.consume')(function* (
     ...input?.attributes,
   });
   if (!input) {
-    message.nak(retryDelay(message, options));
+    yield* quarantine(service, message, 'invalid');
+    message.ack();
+    pendingFailures.delete(message.info.streamSequence);
     return;
   }
-  yield* maintenance.recordWallpaperOwnership(input.ownership);
+  if (message.info.deliveryCount > 3) {
+    yield* quarantine(service, message, 'exhausted');
+    message.ack();
+    pendingFailures.delete(message.info.streamSequence);
+    return;
+  }
+  const completed = yield* maintenance
+    .recordWallpaperOwnership(input.ownership)
+    .pipe(Effect.match({ onSuccess: () => true, onFailure: () => false }));
+  if (!completed) {
+    pendingFailures.add(message.info.streamSequence);
+    if (message.info.deliveryCount < 3) {
+      message.nak(retryDelay(message, options));
+      return;
+    }
+    yield* quarantine(service, message, 'exhausted');
+  }
   message.ack();
+  pendingFailures.delete(message.info.streamSequence);
 });
-function consumeMessage(message: JsMsg, maintenance: Maintenance, options: EventsOptions) {
+function consumeMessage(
+  message: JsMsg,
+  service: EventsBroker,
+  maintenance: Maintenance,
+  options: EventsOptions,
+  pendingFailures: Set<number>
+) {
   const carrier: Record<string, string> = {};
   for (const key of ['traceparent', 'tracestate']) {
     const value = message.headers?.get(key);
@@ -52,11 +80,12 @@ function consumeMessage(message: JsMsg, maintenance: Maintenance, options: Event
       Effect.forever,
       Effect.forkScoped
     );
-    yield* processMessage(message, maintenance, options);
+    yield* processMessage(message, service, maintenance, options, pendingFailures);
   }).pipe(
     Effect.scoped,
     Effect.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Effect.failCause(cause);
+      pendingFailures.add(message.info.streamSequence);
       message.nak(retryDelay(message, options));
       return Effect.logError('Wallpaper ownership delivery failed', cause);
     }),
@@ -70,6 +99,8 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
     Effect.gen(function* () {
       const service = yield* EventsBroker;
       const maintenance = yield* Maintenance;
+      yield* ensureQuarantine(service);
+      const pendingFailures = new Set<number>();
       const configuration = {
         durable_name: durable,
         ack_policy: AckPolicy.Explicit,
@@ -119,7 +150,9 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
         Stream.runForEach((message) =>
           Ref.get(accepting).pipe(
             Effect.flatMap((accept) =>
-              accept ? consumeMessage(message, maintenance, options) : Effect.void
+              accept
+                ? consumeMessage(message, service, maintenance, options, pendingFailures)
+                : Effect.void
             )
           )
         ),
@@ -147,7 +180,11 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
       );
       return ConsumerHealth.of({
         check: () =>
-          Ref.get(healthy).pipe(Effect.map((running) => running && !service.connection.isClosed())),
+          Ref.get(healthy).pipe(
+            Effect.map(
+              (running) => running && pendingFailures.size === 0 && !service.connection.isClosed()
+            )
+          ),
       });
     })
   );

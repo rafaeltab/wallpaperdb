@@ -1,6 +1,7 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { Pool, type PoolClient } from 'pg';
+import { z } from 'zod';
 import * as schema from '../../db/schema.js';
 
 type Client = NodePgDatabase<typeof schema>;
@@ -15,6 +16,24 @@ export class DatabaseUnavailable extends Schema.TaggedError<DatabaseUnavailable>
   'DatabaseUnavailable',
   { cause: Schema.Defect() }
 ) {}
+
+const driverDiagnostic = z.object({ code: z.string().regex(/^[A-Z0-9]{5}$/) });
+const causalError = z.object({ cause: z.unknown() });
+
+/** Vendor exception messages, details and SQL parameters can contain private data. */
+export function databaseDiagnostic(cause: unknown): { sqlState?: string } {
+  const visited = new Set<unknown>();
+  let current = cause;
+  while (!visited.has(current)) {
+    visited.add(current);
+    const driver = driverDiagnostic.safeParse(current);
+    if (driver.success) return { sqlState: driver.data.code };
+    const wrapped = causalError.safeParse(current);
+    if (!wrapped.success) return {};
+    current = wrapped.data.cause;
+  }
+  return {};
+}
 
 async function withConnection<A>(
   pool: Pool,

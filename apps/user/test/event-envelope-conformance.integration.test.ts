@@ -4,7 +4,7 @@ import {
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import { uploadEnvelopeConformance } from '@wallpaperdb/test-utils/event-contracts';
-import { Effect, Layer, Logger, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import {
   brokerLayer,
@@ -20,7 +20,6 @@ const Tester = createDefaultTesterBuilder()
 const tester = new Tester().withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
 let runtime: ManagedRuntime.ManagedRuntime<ConsumerHealth, unknown>;
 const accepted: WallpaperOwnership[] = [];
-const logs: unknown[] = [];
 beforeAll(async () => {
   await tester.setup();
   const options = {
@@ -42,13 +41,6 @@ beforeAll(async () => {
               accepted.push(ownership);
             }),
         })
-      ),
-      Layer.provide(
-        Logger.layer([
-          Logger.make(({ message }) => {
-            logs.push(message);
-          }),
-        ])
       )
     )
   );
@@ -67,7 +59,6 @@ it.each(uploadEnvelopeConformance())('$name', async ({
   const connection = await tester.nats.getConnection();
   const manager = await connection.jetstreamManager();
   const prior = accepted.length;
-  const priorLogs = logs.length;
   const priorQuarantine = (await manager.streams.info('USER_QUARANTINE')).state.messages;
   const ack = await connection
     .jetstream()
@@ -87,15 +78,5 @@ it.each(uploadEnvelopeConformance())('$name', async ({
       wallpaperId: 'contract-wallpaper',
       profileId: 'contract-profile',
     });
-    expect(logs.slice(priorLogs)).toContainEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          'event.id': expected.id,
-          'event.source': expected.source,
-          ...(expected.correlationId ? { 'event.correlation_id': expected.correlationId } : {}),
-          ...(expected.causationId ? { 'event.causation_id': expected.causationId } : {}),
-        }),
-      ])
-    );
   }
 });

@@ -65,8 +65,8 @@ class NatsVariantEvents implements VariantEvents {
           'variant-uploaded-v1',
           input.occurrence.source,
           input.occurrence.id,
-          variant.width,
-          variant.height,
+          variant.target.width,
+          variant.target.height,
           variant.format,
           variant.storageKey,
         ])

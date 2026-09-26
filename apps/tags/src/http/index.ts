@@ -1,10 +1,10 @@
-import type { IncomingHttpHeaders } from 'node:http';
+import { type IncomingHttpHeaders, STATUS_CODES } from 'node:http';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import cors from '@fastify/cors';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import { Context, Effect, FiberSet, Layer, ManagedRuntime } from 'effect';
-import Fastify, { type FastifyInstance } from 'fastify';
+import { Context, Effect, FiberSet, Layer, ManagedRuntime, Schema } from 'effect';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { Availability } from '../availability/index.js';
 
 export interface ConnectionsState {
@@ -47,6 +47,36 @@ function problem(status: number, name: string, title: string) {
     status,
   };
 }
+const isTransportError = Schema.is(
+  Schema.Struct({ code: Schema.String, statusCode: Schema.Number })
+);
+function sendError(error: unknown, request: FastifyRequest, reply: FastifyReply) {
+  reply.header('Cache-Control', 'no-store');
+  reply.removeHeader('Content-Length');
+  if (
+    isTransportError(error) &&
+    Object.hasOwn(Fastify.errorCodes, error.code) &&
+    Number.isInteger(error.statusCode) &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500
+  ) {
+    return reply
+      .code(error.statusCode)
+      .type('application/problem+json')
+      .send(
+        problem(
+          error.statusCode,
+          'invalid-request',
+          STATUS_CODES[error.statusCode] ?? 'Invalid request'
+        )
+      );
+  }
+  request.log.error({ err: error }, 'Tags request failed');
+  return reply
+    .code(500)
+    .type('application/problem+json')
+    .send(problem(500, 'generic-server', 'Internal server error'));
+}
 function unavailableSchema(properties: Record<string, object>, required: string[]) {
   return {
     description: 'Service unavailable',
@@ -88,6 +118,7 @@ export async function createHttpApp<E>(
     logger: options.logger ?? false,
     requestTimeout: 10000,
     connectionTimeout: 10000,
+    frameworkErrors: sendError,
   });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
@@ -107,19 +138,28 @@ export async function createHttpApp<E>(
       .type('application/problem+json')
       .send(problem(404, 'not-found', 'Not found'))
   );
-  app.setErrorHandler((error, request, reply) => {
-    request.log.error({ err: error }, 'Tags request failed');
-    return reply
-      .code(500)
-      .type('application/problem+json')
-      .send(problem(500, 'generic-server', 'Internal server error'));
-  });
+  app.setErrorHandler(sendError);
   app.addHook('onClose', async () => {
     clearTimeout(shutdownTimer);
     await runtime.dispose();
   });
   try {
     const { run } = await runtime.runPromise(HttpExecution, { signal: options.signal });
+    if (config.nodeEnv === 'development') {
+      // Own preflight validation so failures use the HTTP problem contract.
+      app.addHook('onRequest', async (request, reply) => {
+        if (
+          request.method === 'OPTIONS' &&
+          (!request.headers.origin || !request.headers['access-control-request-method'])
+        ) {
+          return reply
+            .code(400)
+            .type('application/problem+json')
+            .send(problem(400, 'invalid-request', 'Bad Request'));
+        }
+        return undefined;
+      });
+    }
     await app.register(cors, {
       origin:
         config.nodeEnv === 'development'
@@ -128,6 +168,7 @@ export async function createHttpApp<E>(
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
       credentials: true,
+      strictPreflight: false,
     });
     await registerOpenAPI(app, {
       title: 'WallpaperDB Tags API',

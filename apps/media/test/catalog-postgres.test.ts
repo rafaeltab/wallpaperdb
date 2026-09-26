@@ -1,5 +1,15 @@
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import { Effect, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import {
+  ConsumerHealth,
+  natsConsumerLayer,
+  natsEventsLayer,
+} from '../src/adapters/events/index.js';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -44,6 +54,136 @@ describe('PostgreSQL catalog contract', () => {
     await runtime?.dispose();
     await pool?.end();
     await container?.stop();
+  });
+  it('cancels a blocked transaction, releases its connection, and permits replay', async () => {
+    const blocker = await pool.connect();
+    await blocker.query('BEGIN');
+    await blocker.query('LOCK TABLE wallpapers IN ACCESS EXCLUSIVE MODE');
+    const controller = new AbortController();
+    const pending = runtime
+      .runPromise(
+        CatalogProjection.use((service) => service.accept(wallpaper)),
+        { signal: controller.signal }
+      )
+      .then(
+        () => 'completed',
+        () => 'interrupted'
+      );
+    try {
+      await expect
+        .poll(async () => {
+          const { rows } = await pool.query(
+            `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
+          );
+          return rows[0]?.count;
+        })
+        .toBe(1);
+      controller.abort();
+      expect(
+        await Promise.race([
+          pending,
+          new Promise((resolve) => {
+            const timer = setTimeout(() => resolve('deadline-exceeded'), 500);
+            timer.unref();
+          }),
+        ])
+      ).toBe('interrupted');
+      await expect
+        .poll(async () => {
+          const { rows } = await pool.query(
+            `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
+          );
+          return rows[0]?.count;
+        })
+        .toBe(0);
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await pending;
+    }
+    expect(
+      await runtime.runPromise(Catalog.use((service) => service.findWallpaper('wlpr_one')))
+    ).toBeNull();
+    await runtime.runPromise(CatalogProjection.use((service) => service.accept(wallpaper)));
+    expect(
+      await runtime.runPromise(CatalogOutbox.use((service) => service.listPending(10)))
+    ).toHaveLength(1);
+  });
+  it('stops a consumer blocked in PostgreSQL and leaves its delivery pending', async () => {
+    const Tester = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(NatsTesterBuilder)
+      .build();
+    const tester = new Tester()
+      .withNats((n) => n.withJetstream())
+      .withStream('WALLPAPER')
+      .withStream('PROFILE');
+    await tester.setup();
+    const options = {
+      url: tester.nats.config.endpoints.fromHost,
+      stream: 'WALLPAPER',
+      serviceName: 'catalog-shutdown',
+      shutdownTimeoutMs: 50,
+    };
+    const consumer = ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provide(natsEventsLayer(options)),
+        Layer.provide(CatalogPostgresLayer({ databaseUrl: container.getConnectionUri() }))
+      )
+    );
+    const blocker = await pool.connect();
+    try {
+      await consumer.runPromise(ConsumerHealth);
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE wallpapers IN ACCESS EXCLUSIVE MODE');
+      await (await tester.nats.getJsClient()).publish(
+        'wallpaper.uploaded',
+        JSON.stringify({
+          eventId: 'shutdown-real-db',
+          eventType: 'wallpaper.uploaded',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          wallpaper: {
+            id: 'wlpr_shutdown',
+            userId: 'user',
+            fileType: 'image',
+            mimeType: 'image/png',
+            fileSizeBytes: 20,
+            width: 2,
+            height: 2,
+            aspectRatio: 1,
+            storageBucket: 'wallpapers',
+            storageKey: 'shutdown.png',
+            originalFilename: 'shutdown.png',
+            uploadedAt: '2026-01-01T00:00:00.000Z',
+          },
+        })
+      );
+      const blocked = async () =>
+        (
+          await pool.query(
+            `SELECT count(*)::int AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE 'insert into "wallpapers"%'`
+          )
+        ).rows[0]?.count;
+      await expect.poll(blocked).toBe(1);
+      const start = Date.now();
+      await consumer.dispose();
+      expect(Date.now() - start).toBeLessThan(1500);
+      await expect.poll(blocked).toBe(0);
+      const manager = await (await tester.nats.getConnection()).jetstreamManager();
+      expect(
+        (await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer'))
+          .num_ack_pending
+      ).toBe(1);
+      await blocker.query('ROLLBACK');
+      expect(
+        await runtime.runPromise(Catalog.use((service) => service.findWallpaper('wlpr_shutdown')))
+      ).toBeNull();
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await consumer.dispose();
+      await tester.destroy();
+    }
   });
   it('atomically accepts duplicate uploads once and retains a stable notification until acknowledgement', async () => {
     await runtime.runPromise(

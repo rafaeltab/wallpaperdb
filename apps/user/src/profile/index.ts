@@ -198,7 +198,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
       const slug = (slugify(displayName) || `profile-${seed}`).padEnd(policy.profileHandleMinLength, '0');
       const base = reserved.has(slug) ? `${slug}-profile` : slug;
       for (let attempt = 0; attempt < 100; attempt++) {
-        const handle = attempt === 0 ? base.slice(0, policy.profileHandleMaxLength).replace(/-+$/g, '') : collisionHandle(base, policy.profileHandleMaxLength, yield* Random.nextIntBetween(0, 32 ** 6));
+        const handle = attempt === 0 ? base.slice(0, policy.profileHandleMaxLength).replace(/-+$/g, '').padEnd(policy.profileHandleMinLength, '0') : collisionHandle(base, policy.profileHandleMaxLength, yield* Random.nextIntBetween(0, 32 ** 6));
         if (reserved.has(handle)) continue;
         const profile = yield* store.create({ profileId: principal.profileId, displayName, handle, imageUrl: identity.imageUrl ?? null, now });
         if (profile) return { _tag: 'Success', profile } as const;

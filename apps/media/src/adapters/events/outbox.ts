@@ -1,7 +1,7 @@
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { WallpaperVariantAvailableEventSchema } from '@wallpaperdb/events/schemas';
-import { Cause, Clock, Context, Effect, Fiber, Layer, Metric, Ref } from 'effect';
+import { Cause, Clock, Context, Effect, Exit, Fiber, Layer, Metric, Ref } from 'effect';
 import { headers } from 'nats';
 import { CatalogOutbox, type AvailableNotification } from '../../catalog/index.js';
 import { broker, BrokerFailure, NatsBroker, type NatsEventsOptions } from './broker.js';
@@ -64,7 +64,32 @@ function publishNotification(
       tracestate: notification.tracestate,
     })
   );
-  const effect = publish(service, options, notification);
+  const effect = Effect.gen(function* () {
+    const started = yield* Clock.currentTimeMillis;
+    return yield* publish(service, options, notification).pipe(
+      Effect.onExit((exit) =>
+        Effect.gen(function* () {
+          yield* Metric.update(
+            Metric.counter('events.published.total', {
+              incremental: true,
+              attributes: {
+                'event.type': 'wallpaper.variant.available',
+                status: Exit.isSuccess(exit) ? 'success' : 'error',
+              },
+            }),
+            1
+          );
+          yield* Metric.update(
+            Metric.histogram('events.publish_duration_ms', {
+              boundaries: [1, 10, 100, 1000, 5000],
+              attributes: { 'event.type': 'wallpaper.variant.available' },
+            }),
+            (yield* Clock.currentTimeMillis) - started
+          );
+        })
+      )
+    );
+  });
   return parent ? effect.pipe(OtelTracer.withSpanContext(parent)) : effect;
 }
 export function natsOutboxLayer(
@@ -81,34 +106,13 @@ export function natsOutboxLayer(
         const rows = yield* outbox.listPending(16);
         for (const row of rows) {
           if (!(yield* Ref.get(accepting))) return;
-          const started = yield* Clock.currentTimeMillis;
           yield* publishNotification(service, options, row).pipe(
             Effect.andThen(() => outbox.markPublished(row.id)),
-            Effect.tap(() =>
-              Metric.update(
-                Metric.counter('events.published.total', {
-                  incremental: true,
-                  attributes: { 'event.type': 'wallpaper.variant.available', status: 'success' },
-                }),
-                1
-              )
-            ),
             Effect.catch((error) =>
               Effect.logError('Media outbox publication remains pending', {
                 operation: error.operation,
                 cause: error.cause,
                 eventId: row.id,
-              })
-            ),
-            Effect.ensuring(
-              Effect.gen(function* () {
-                yield* Metric.update(
-                  Metric.histogram('events.publish_duration_ms', {
-                    boundaries: [1, 10, 100, 1000, 5000],
-                    attributes: { 'event.type': 'wallpaper.variant.available' },
-                  }),
-                  (yield* Clock.currentTimeMillis) - started
-                );
               })
             )
           );

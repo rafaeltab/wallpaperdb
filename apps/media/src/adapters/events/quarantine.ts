@@ -93,6 +93,21 @@ function metadata(message: JsMsg, reason: string, id: string, type: string): Msg
   value.set('ce-reason', reason);
   value.set('ce-originalsubject', message.subject);
   value.set('ce-consumer', message.info.consumer);
+  // Binary CloudEvent payloads do not carry their occurrence identity. Preserve it
+  // alongside the original bytes so operator replay can reconstruct the envelope.
+  for (const key of [
+    'specversion',
+    'source',
+    'id',
+    'type',
+    'time',
+    'correlationid',
+    'causationid',
+    'causationsource',
+  ]) {
+    const original = message.headers?.get(`ce-${key}`);
+    if (original) value.set(`original-ce-${key}`, original);
+  }
   // Include headers added by JetStream before measuring the complete wire payload.
   value.set('Nats-Msg-Id', id);
   value.set('Nats-Expected-Stream', stream);

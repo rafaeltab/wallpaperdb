@@ -80,15 +80,15 @@ describe('variant generation composition', () => {
       const metadata = await sharp(bytes).metadata();
       expect(metadata.format).toBe('png');
       expect(bytes.byteLength).toBe(publication.variant.fileSizeBytes);
-      expect(metadata.width).toBeLessThanOrEqual(publication.variant.width);
-      expect(metadata.height).toBeLessThanOrEqual(publication.variant.height);
+      expect(metadata.width).toBe(publication.variant.width);
+      expect(metadata.height).toBe(publication.variant.height);
       if (publication.variant.width === 1600) {
         expect(metadata.width).toBe(1600);
         expect(metadata.height).toBe(900);
       }
       widths.push(publication.variant.width);
     }
-    expect(widths).toEqual([1600, 1280, 854, 640]);
+    expect(widths).toEqual([1600, 1280, 853, 640]);
     await js.publish('wallpaper.uploaded', JSON.stringify(event));
     await expect.poll(async () => {
       const info = await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer');

@@ -144,16 +144,17 @@ class StoredVariantImages implements VariantImages {
             { ...input, storage: original },
             {
               wallpaperId: input.wallpaperId,
-              width: preset.width,
-              height: preset.height,
-              aspectRatio: preset.width / preset.height,
+              target: { width: preset.width, height: preset.height },
+              width: output.width,
+              height: output.height,
+              aspectRatio: output.width / output.height,
               format: mimeType,
-              fileSizeBytes: output.length,
+              fileSizeBytes: output.bytes.length,
               storageKey,
               storageBucket: original.bucket,
               createdAt: new Date(input.timestamp),
             },
-            output
+            output.bytes
           );
           yield* request('register-variant-asset', (abortSignal) =>
             registerAssetReference(

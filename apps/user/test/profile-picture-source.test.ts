@@ -142,4 +142,21 @@ describe('Initial Profile picture download', () => {
     expect(String(failure)).not.toContain('secret');
     expect(JSON.stringify(failure)).not.toContain('secret');
   });
+  it('propagates Effect interruption to the source request and streamed body', async () => {
+    const canceled = vi.fn();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(new ReadableStream<Uint8Array>({ cancel: canceled })));
+    const controller = new AbortController();
+    const running = Effect.runPromise(Effect.flatMap(PictureSource, source => source.download('https://img.clerk.com/picture')).pipe(
+      Effect.provide(pictureSourceLayer(options, fetcher)),
+    ), { signal: controller.signal });
+    const settled = running.then(value => ({ value }), error => ({ error }));
+    try {
+      await vi.waitFor(() => expect(fetcher).toHaveBeenCalledOnce());
+      controller.abort();
+      expect(await settled).toHaveProperty('error');
+      expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+      expect(canceled).toHaveBeenCalledOnce();
+    } finally { controller.abort(); await settled; }
+  });
+
 });

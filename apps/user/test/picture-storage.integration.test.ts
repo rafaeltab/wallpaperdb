@@ -21,10 +21,7 @@ describe('Private immutable picture storage', () => {
     .with(S3TesterBuilder)
     .build();
   const tester = new Tester().withS3().withS3Bucket('picture-adapter');
-  let runtime: ManagedRuntime.ManagedRuntime<
-    PictureObjects | PictureStore | Metric.MetricRegistry,
-    unknown
-  >;
+  let runtime: ManagedRuntime.ManagedRuntime<PictureObjects | PictureStore, unknown>;
   let container: StartedPostgreSqlContainer;
   let sql: ReturnType<typeof postgres>;
   let client: S3Client;

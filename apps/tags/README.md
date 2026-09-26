@@ -8,6 +8,6 @@ Health reports database, NATS, and telemetry checks. Healthy and degraded result
 
 Shutdown gives network requests five seconds to finish, then interrupts their effects and closes remaining sockets before releasing dependencies. Database probes have a five-second deadline and destroy checked-out clients on cancellation. NATS has no messages to drain because this skeleton does not publish or subscribe.
 
-Use `make check PACKAGE=tags`, `make test-unit PACKAGE=tags`, and `make test-integration PACKAGE=tags`. Integration tests require Docker and exercise real PostgreSQL, NATS, the built executable, and telemetry. `make run PACKAGE=tags SCRIPT=gen:swagger` generates the contract without external dependencies.
+Use `make check PACKAGE=tags`, `make test-unit PACKAGE=tags`, and `make test-integration PACKAGE=tags`. Integration tests require Docker and exercise real PostgreSQL, NATS, the built executable, and telemetry. `make test-e2e PACKAGE=tags` builds the production image and verifies exported traces, logs, and metrics. `make run PACKAGE=tags SCRIPT=gen:swagger` generates the contract without external dependencies.
 
 See [the migration record](../../plans/tag-service-effect-migration.md) for preservation decisions and validation evidence.

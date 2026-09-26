@@ -66,3 +66,30 @@ it('publishes the original occurrence and leaves completion separate from acknow
     expect(await runtime.runPromise(Effect.flatMap(MaintenanceStore, (store) => store.pendingEvents()))).toEqual([]);
   } finally { await runtime.dispose(); }
 });
+
+it('expires only acknowledged Profile evidence at the exact cutoff and preserves current data and unacknowledged events', async () => {
+  await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at, published_at) values
+    ('old-acknowledged', 'profile.created', 'user_1', '{}'::jsonb, '2030-01-01', '2030-01-01'),
+    ('old-pending', 'profile.updated', 'user_1', '{}'::jsonb, '2030-01-01', null),
+    ('new-acknowledged', 'profile.created', 'user_1', '{}'::jsonb, '2030-01-02', '2030-01-02'),
+    ('unrelated', 'wallpaper.uploaded', 'user_1', '{}'::jsonb, '2030-01-01', '2030-01-01')`;
+  const runtime = ManagedRuntime.make(adapters());
+  try {
+    expect(await runtime.runPromise(Effect.flatMap(MaintenanceStore, (store) => store.expiredEvents(new Date('2029-12-31T23:59:59.999Z'))))).toEqual([]);
+    expect(await runtime.runPromise(Effect.flatMap(MaintenanceStore, (store) => store.expiredEvents(new Date(occurred))))).toEqual([{ id: 'old-acknowledged', createdAt: new Date(occurred) }]);
+    for (const id of ['old-acknowledged', 'old-pending', 'new-acknowledged', 'unrelated']) {
+      expect(await runtime.runPromise(Effect.flatMap(MaintenanceStore, (store) => store.deleteExpiredEvent(id, new Date(occurred))))).toBe(id === 'old-acknowledged');
+    }
+    expect((await sql`select id from outbox_events order by id`).map((row) => row.id)).toEqual(['new-acknowledged', 'old-pending', 'unrelated']);
+  } finally { await runtime.dispose(); }
+});
+
+it('keeps the first recorded wallpaper owner across replay before Profile creation', async () => {
+  const runtime = ManagedRuntime.make(adapters());
+  try {
+    const accept = (profileId: string) => Effect.flatMap(MaintenanceStore, (store) => store.recordWallpaperOwnership({ wallpaperId: 'wp_1', profileId }));
+    await runtime.runPromise(accept('first-owner'));
+    await Promise.all([runtime.runPromise(accept('second-owner')), runtime.runPromise(accept('first-owner'))]);
+    expect(await sql`select wallpaper_id, profile_id from wallpaper_ownership`).toEqual([{ wallpaper_id: 'wp_1', profile_id: 'first-owner' }]);
+  } finally { await runtime.dispose(); }
+});

@@ -6,8 +6,11 @@ it('records publication only after broker acceptance and retries the original du
   const pending = new Set(['event-1', 'event-2']);
   const attempted: string[] = [];
   let unavailable = true;
-  const runtime = ManagedRuntime.make(maintenanceLayer.pipe(Layer.provide(Layer.mergeAll(
+  const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(MaintenanceStore, {
+      recordWallpaperOwnership: () => Effect.void,
+      expiredEvents: () => Effect.succeed([]),
+      deleteExpiredEvent: () => Effect.succeed(false),
       pendingEvents: () => Effect.succeed([...pending].map((id) => ({ id, createdAt: new Date(0) }))),
       markPublished: (id) => Effect.sync(() => { pending.delete(id); }),
     }),
@@ -27,5 +30,34 @@ it('records publication only after broker acceptance and retries the original du
     expect(await runtime.runPromise(Effect.flatMap(Maintenance, (service) => service.publishPending()))).toEqual({ completed: 1, failed: 0 });
     expect(attempted).toEqual(['event-1', 'event-2', 'event-1']);
     expect([...pending]).toEqual([]);
+  } finally { await runtime.dispose(); }
+});
+
+it('advances evidence cleanup beyond failures, wraps for retry, and uses the configured rolling cutoff', async () => {
+  const pending = new Set(Array.from({ length: 102 }, (_, index) => `event-${String(index).padStart(3, '0')}`));
+  const cutoffs: string[] = [];
+  let failing = true;
+  const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
+    Layer.succeed(MaintenanceStore, {
+      recordWallpaperOwnership: () => Effect.void,
+      pendingEvents: () => Effect.succeed([]), markPublished: () => Effect.void,
+      expiredEvents: (cutoff, after) => Effect.sync(() => {
+        cutoffs.push(cutoff.toISOString());
+        return [...pending].filter((id) => !after || id > after.id).slice(0, 100).map((id) => ({ id, createdAt: new Date(0) }));
+      }),
+      deleteExpiredEvent: (id) => Effect.suspend(() => id === 'event-000' && failing
+        ? Effect.fail(new MaintenanceFailure({ operation: 'delete', cause: 'unavailable' }))
+        : Effect.sync(() => pending.delete(id))),
+    }),
+    Layer.succeed(ProfileEvents, { publish: () => Effect.void }),
+  ))));
+  try {
+    const cleanup = Effect.flatMap(Maintenance, (service) => service.cleanupEvents(new Date('2030-01-31T00:00:00.000Z')));
+    expect(await runtime.runPromise(cleanup)).toEqual({ deleted: 99, failed: 1 });
+    expect(await runtime.runPromise(cleanup)).toEqual({ deleted: 2, failed: 0 });
+    expect([...pending]).toEqual(['event-000']);
+    failing = false;
+    expect(await runtime.runPromise(cleanup)).toEqual({ deleted: 1, failed: 0 });
+    expect(cutoffs).toEqual(['2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z']);
   } finally { await runtime.dispose(); }
 });

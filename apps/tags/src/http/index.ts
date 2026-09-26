@@ -120,6 +120,23 @@ export async function createHttpApp<E>(
     requestTimeout: 10000,
     connectionTimeout: 10000,
     frameworkErrors: sendError,
+    clientErrorHandler(error, socket) {
+      if (error.code === 'ECONNRESET' || socket.destroyed) return;
+      const status =
+        error.code === 'ERR_HTTP_REQUEST_TIMEOUT'
+          ? 408
+          : error.code === 'HPE_HEADER_OVERFLOW'
+            ? 431
+            : 400;
+      const title = STATUS_CODES[status] ?? 'Invalid request';
+      if (socket.writable) {
+        const body = JSON.stringify(problem(status, 'invalid-request', title));
+        socket.write(
+          `HTTP/1.1 ${status} ${title}\r\nContent-Length: ${Buffer.byteLength(body)}\r\nContent-Type: application/problem+json\r\nConnection: close\r\n\r\n${body}`
+        );
+      }
+      socket.destroy(error);
+    },
   });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   let shutdownTimer: ReturnType<typeof setTimeout> | undefined;

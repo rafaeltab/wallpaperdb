@@ -164,6 +164,7 @@ const validSpread = Schema.is(Schema.Finite.check(Schema.isBetween({ minimum: 0,
 const nonEmptyColors = Schema.is(Schema.Array(Schema.Unknown).check(Schema.isMinLength(1)));
 
 export function validateColors(colors: ColorPreference[]): string | undefined {
+  if (colors.length > 64) return 'Color search accepts at most 64 preferences';
   if (!nonEmptyColors(colors)) return 'Colors array must not be empty';
   for (const preference of colors) {
     if (!validColor(preference.color)) return 'Invalid hex color: expected #RRGGBB';

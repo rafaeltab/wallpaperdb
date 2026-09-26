@@ -12,6 +12,8 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Wallpaper variant generation](./apps/variant-generator/CONTEXT.md) - owns lower-resolution wallpaper variants
 
+- [Media delivery](./apps/media/CONTEXT.md) - owns the delivery catalog and serves immutable assets
+
 ## Relationships
 
 - **User -> Gateway**: User publishes Profile events; Gateway projects public Profile reads and search into GraphQL.

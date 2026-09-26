@@ -1,0 +1,14 @@
+---
+title: Media Effect migration
+description: Delivery catalog transactions, replay, and scoped resource ownership
+---
+
+Media now composes application-owned Effect ports and scoped adapter Layers. Its PostgreSQL transaction records accepted event occurrences, immutable catalog targets, Profile versions, and availability publication intent. A separate outbox worker publishes that intent with a stable CloudEvent identity and waits for JetStream PubAck before completion.
+
+Variants arriving before their originals remain in the catalog. Publication waits until their parent is present. Replayed events cannot duplicate a new target, and Profile snapshots cannot move a head backwards. Existing legacy rows are reconciled without replacing their metadata or deleting old variants. The first reconciliation can repeat an availability fact because the old service kept no publication ledger.
+
+Profile delivery still checks User authority for each origin GET and HEAD. Missing metadata or denied authority returns 404. Authority and storage failures return uncached 503. Successful picture bodies are fully read before enabling immutable caching.
+
+Native resize workers have process isolation, admission limits, and deadlines. Deploy the complete `dist` directory, including `resize-worker.mjs` and deferred application chunks. Telemetry initializes before instrumented clients load.
+
+Before deploying, apply Media's generated migrations. Legacy consumers with prior redeliveries require coordinated operator recovery; increasing MaxDeliver does not revive already exhausted deliveries. Follow `apps/media/README.md` and preserve retained source streams. The full decision and operating bounds are in `apps/media/docs/adr/0001-replay-safe-delivery-catalog.md`.

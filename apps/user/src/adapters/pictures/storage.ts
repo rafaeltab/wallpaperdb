@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+  S3ServiceException,
+} from '@aws-sdk/client-s3';
 import { Effect, Layer } from 'effect';
 import { PictureObjects, PictureUnavailable } from '../../pictures/index.js';
 
@@ -24,7 +29,6 @@ export function pictureStorageLayer(config: PictureStorageConfig): Layer.Layer<P
               accessKeyId: config.accessKeyId,
               secretAccessKey: config.secretAccessKey,
             },
-            maxAttempts: 1,
           });
         }),
         (client) => Effect.sync(() => client?.destroy())
@@ -36,7 +40,18 @@ export function pictureStorageLayer(config: PictureStorageConfig): Layer.Layer<P
             const abortSignal = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
             await client.send(command, { abortSignal });
           },
-          catch: (cause) => new PictureUnavailable({ operation, cause }),
+          catch: (cause) =>
+            new PictureUnavailable({
+              operation,
+              cause: {
+                // SDK errors can retain HTTP authorization headers and request bodies.
+                // Record their diagnostic identifiers without serializing the response.
+                name: cause instanceof Error ? cause.name : 'UnknownStorageFailure',
+                ...(cause instanceof S3ServiceException
+                  ? { status: cause.$metadata.httpStatusCode, requestId: cause.$metadata.requestId }
+                  : {}),
+              },
+            }),
         }).pipe(
           Effect.tapError((error) =>
             Effect.logError('Picture object operation failed', { operation, cause: error.cause })

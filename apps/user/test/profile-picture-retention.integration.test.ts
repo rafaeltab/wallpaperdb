@@ -1,7 +1,7 @@
-import 'reflect-metadata';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
 import { DeleteObjectCommand, GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { createDefaultTesterBuilder, DockerTesterBuilder, S3TesterBuilder } from '@wallpaperdb/test-utils';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
@@ -9,11 +9,12 @@ import postgres from 'postgres';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config } from '../src/config.js';
-import { DatabaseConnection } from '../src/connections/database.js';
-import { ProfilePictureIngestionService } from '../src/services/profile-picture-ingestion.service.js';
-import { ProfilePictureRetentionService } from '../src/services/profile-picture-retention.service.js';
-import { ProfilePictureStorage } from '../src/services/profile-picture-storage.js';
-import { ProfileService } from '../src/services/profile.service.js';
+import { Effect, Layer, Logger, ManagedRuntime } from 'effect';
+import { databaseLayer } from '../src/adapters/database/index.js';
+import { pictureCodecLayer, pictureSourceLayer, pictureStorageLayer, pictureStoreLayer } from '../src/adapters/pictures/index.js';
+import { profileStoreLayer } from '../src/adapters/profiles/index.js';
+import { Pictures, picturesLayer, type StageOutcome } from '../src/pictures/index.js';
+import { Identities, Profiles, profilesLayer, type OwnerProfile, type ProfileOutcome } from '../src/profile/index.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const day = 24 * 60 * 60 * 1000;
@@ -26,16 +27,22 @@ describe('Private Profile picture retention', () => {
     .build();
   const storageTester = new StorageTester().withS3().withS3Bucket('profile-pictures');
   let sql: ReturnType<typeof postgres>;
-  let database: DatabaseConnection;
   let objectStorage: S3Client;
-  let storage: ProfilePictureStorage;
-  let profiles: ProfileService;
-  let ingestion: ProfilePictureIngestionService;
-  let retention: ProfilePictureRetentionService;
+  let runtime: ManagedRuntime.ManagedRuntime<Profiles | Pictures, unknown>;
+  const profileResult = (result: ProfileOutcome) => { if (result._tag === 'Rejected') throw new Error(result.message); return result.profile; };
+  const stageResult = (result: StageOutcome) => { if (result._tag === 'Rejected') throw new Error(result.message); return result.assetId; };
+  const profiles = {
+    ensure: (profileId: string): Promise<OwnerProfile> => runtime.runPromise(Effect.flatMap(Profiles, profiles => profiles.ensure({ profileId }))).then(profileResult),
+    adoptPicture: (profileId: string, assetId: string | null, version: number) => runtime.runPromise(Effect.flatMap(Profiles, profiles => profiles.adoptPicture({ profileId }, assetId, version))).then(profileResult),
+  };
+  const ingestion = {
+    stage: (profileId: string, bytes: Buffer) => runtime.runPromise(Effect.flatMap(Pictures, pictures => pictures.stage({ profileId }, bytes))).then(stageResult),
+    upload: (profileId: string, bytes: Buffer, version: number) => runtime.runPromise(Effect.flatMap(Pictures, pictures => pictures.upload({ profileId }, bytes, version))).then(result => { if (result._tag === 'Rejected') throw new Error(result.message); return result.profile; }),
+  };
+  const retention = { cleanupExpired: (now: Date) => runtime.runPromise(Effect.flatMap(Pictures, pictures => pictures.cleanupExpired(now)).pipe(Effect.provide(Logger.layer([Logger.make(({ message }) => { logs.push(message); })])))) };
   let config: Config;
   let picture: Buffer;
-  const errors: Array<{ bindings: object; message: string }> = [];
-  const logger = { error: (bindings: object, message: string) => { errors.push({ bindings, message }); } };
+  const logs: unknown[] = [];
 
   beforeAll(async () => {
     await storageTester.setup();
@@ -56,31 +63,38 @@ describe('Private Profile picture retention', () => {
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com'],
     };
-    database = new DatabaseConnection(config);
-    await database.initialize();
     objectStorage = storageTester.s3.getS3Client();
-    storage = new ProfilePictureStorage(config);
-    profiles = new ProfileService(database, {
-      getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null }),
-    }, config);
-    ingestion = new ProfilePictureIngestionService(database, profiles, storage, config);
+    runtime = makeRuntime(config);
     picture = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
   });
 
   beforeEach(async () => {
     await sql`truncate table outbox_events, handle_claims, profiles cascade`;
-    errors.length = 0;
-    retention = new ProfilePictureRetentionService(database, storage, logger);
+    logs.length = 0;
   });
 
   afterAll(async () => {
     vi.useRealTimers();
-    storage?.close();
     objectStorage?.destroy();
-    await database?.close();
+    await runtime?.dispose();
     await sql?.end();
     await Promise.all([postgresContainer?.stop(), storageTester.destroy()]);
   });
+
+  function makeRuntime(policy: Config) {
+    const database = databaseLayer({ databaseUrl: policy.databaseUrl });
+    const profileLayer = profilesLayer(policy).pipe(Layer.provide(Layer.mergeAll(
+      profileStoreLayer(policy).pipe(Layer.provide(database)),
+      Layer.succeed(Identities, { getIdentity: () => Effect.succeed({ displayName: 'Picture Owner', firstName: null, lastName: null }) }),
+    )));
+    const pictures = picturesLayer(policy).pipe(Layer.provide(Layer.mergeAll(
+      profileLayer, pictureStoreLayer({ bucket: policy.profilePictureBucket }).pipe(Layer.provide(database)),
+      pictureCodecLayer({ maxBytes: policy.profilePictureMaxBytes, maxPixels: policy.profilePictureMaxPixels, maxDecodedBytes: policy.profilePictureMaxDecodedBytes }),
+      pictureStorageLayer({ endpoint: policy.s3Endpoint, region: policy.s3Region, accessKeyId: policy.s3AccessKeyId, secretAccessKey: policy.s3SecretAccessKey }),
+      pictureSourceLayer({ maxBytes: policy.profilePictureMaxBytes, timeoutMs: policy.profilePictureImportTimeoutMs, allowedHosts: policy.profilePictureImportHosts }),
+    )));
+    return ManagedRuntime.make(Layer.merge(profileLayer, pictures));
+  }
 
   async function object(assetId: string, profileId = 'user_picture') {
     return objectStorage.send(new GetObjectCommand({
@@ -162,10 +176,10 @@ describe('Private Profile picture retention', () => {
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
     try {
       const owner = await profiles.ensure('user_picture');
-      const shorterIngestion = new ProfilePictureIngestionService(database, profiles, storage, {
-        ...config, profileEvidenceRetentionDays: 7,
-      });
-      const assetId = await shorterIngestion.stage(owner.id, picture);
+      const shorter = makeRuntime({ ...config, profileEvidenceRetentionDays: 7 });
+      let assetId: string;
+      try { assetId = stageResult(await shorter.runPromise(Effect.flatMap(Pictures, pictures => pictures.stage({ profileId: owner.id }, picture)))); }
+      finally { await shorter.dispose(); }
       const [asset] = await sql`select expires_at from profile_picture_assets where id = ${assetId}`;
       expect(asset.expires_at).toEqual(new Date(Date.now() + 7 * day));
       expect(await retention.cleanupExpired(new Date(asset.expires_at.getTime() - 1))).toEqual({ deleted: 0, failed: 0 });
@@ -212,10 +226,8 @@ describe('Private Profile picture retention', () => {
     const unavailable = vi.spyOn(S3Client.prototype, 'send').mockRejectedValueOnce(new Error('private storage credentials'));
     try {
       expect(await retention.cleanupExpired(asset.expires_at)).toEqual({ deleted: 0, failed: 1 });
-      expect(errors).toEqual([{
-        bindings: { category: 'profile-picture-retention', assetId },
-        message: 'Profile picture cleanup failed; will retry',
-      }]);
+      expect(logs).toContainEqual(['Profile picture cleanup failed; will retry', { category: 'profile-picture-retention', assetId }]);
+      expect(inspect(logs, { depth: 10 })).not.toContain('private storage credentials');
     } finally { unavailable.mockRestore(); }
   });
 

@@ -1,9 +1,45 @@
+import type { IncomingHttpHeaders } from 'node:http';
+import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
+import { context, propagation, trace } from '@opentelemetry/api';
 import cors from '@fastify/cors';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import { ManagedRuntime, type Layer } from 'effect';
+import { Context, Effect, FiberSet, Layer, ManagedRuntime } from 'effect';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { Availability } from '../availability/index.js';
 
+export interface ConnectionsState {
+  isShuttingDown: boolean;
+  connectionsInitialized: boolean;
+}
+declare module 'fastify' {
+  interface FastifyInstance {
+    connectionsState: ConnectionsState;
+  }
+}
+
+interface HttpExecution {
+  readonly interrupt: Effect.Effect<void>;
+  run<A, E>(effect: Effect.Effect<A, E, Availability>, headers: IncomingHttpHeaders): Promise<A>;
+}
+const HttpExecution = Context.Service<HttpExecution>('wallpaperdb.tags.http.Execution');
+const executionLayer = Layer.effect(
+  HttpExecution,
+  Effect.gen(function* () {
+    yield* Availability;
+    const fibers = yield* FiberSet.make();
+    const run = yield* FiberSet.runtimePromise(fibers)<Availability>();
+    return {
+      interrupt: FiberSet.clear(fibers),
+      run: <A, E>(effect: Effect.Effect<A, E, Availability>, headers: IncomingHttpHeaders) => {
+        const active = context.active();
+        const parent = (
+          trace.getSpan(active) ?? trace.getSpan(propagation.extract(active, headers))
+        )?.spanContext();
+        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect);
+      },
+    };
+  })
+);
 function problem(status: number, name: string, title: string) {
   return {
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${name}.md`,
@@ -41,10 +77,30 @@ export interface HttpConfig {
 export async function createHttpApp<E>(
   config: HttpConfig,
   services: Layer.Layer<Availability, E>,
-  options: { readonly logger?: boolean; readonly signal?: AbortSignal } = {}
+  options: {
+    readonly logger?: boolean;
+    readonly signal?: AbortSignal;
+    readonly shutdownTimeoutMs?: number;
+  } = {}
 ): Promise<FastifyInstance> {
-  const runtime = ManagedRuntime.make(services);
-  const app = Fastify({ logger: options.logger ?? false });
+  const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
+  const app = Fastify({
+    logger: options.logger ?? false,
+    requestTimeout: 10000,
+    connectionTimeout: 10000,
+  });
+  app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
+  let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+  app.addHook('preClose', async () => {
+    app.connectionsState.isShuttingDown = true;
+    shutdownTimer = setTimeout(() => {
+      void runtime
+        .runPromise(HttpExecution.use((execution) => execution.interrupt))
+        .catch(() => undefined)
+        .finally(() => app.server.closeAllConnections());
+    }, options.shutdownTimeoutMs ?? 5000);
+    shutdownTimer.unref();
+  });
   app.setNotFoundHandler((_request, reply) =>
     reply
       .code(404)
@@ -58,80 +114,101 @@ export async function createHttpApp<E>(
       .type('application/problem+json')
       .send(problem(500, 'generic-server', 'Internal server error'));
   });
-  app.addHook('onClose', () => runtime.dispose());
-  const availability = await runtime.runPromise(Availability, { signal: options.signal });
-  await app.register(cors, {
-    origin:
-      config.nodeEnv === 'development'
-        ? [/^https?:\/\/localhost:\d+$/, /^https?:\/\/127\.0\.0\.1:\d+$/]
-        : false,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+  app.addHook('onClose', async () => {
+    clearTimeout(shutdownTimer);
+    await runtime.dispose();
   });
-  await registerOpenAPI(app, {
-    title: 'WallpaperDB Tags API',
-    version: '1.0.0',
-    description: 'Tags service shell. Only operational endpoints are exposed today.',
-    servers:
-      config.nodeEnv === 'production'
-        ? undefined
-        : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
-  });
-  app.get(
-    '/health',
-    {
-      schema: {
-        tags: ['Health'],
-        response: {
-          200: { $ref: 'HealthResponse#' },
-          503: unavailableSchema(
-            {
-              healthStatus: { type: 'string', enum: ['unhealthy', 'shutting_down'] },
-              checks: { type: 'object', additionalProperties: { type: 'boolean' } },
-              totalDurationMs: { type: 'number' },
-            },
-            ['healthStatus', 'checks']
-          ),
+  try {
+    const { run } = await runtime.runPromise(HttpExecution, { signal: options.signal });
+    await app.register(cors, {
+      origin:
+        config.nodeEnv === 'development'
+          ? [/^https?:\/\/localhost:\d+$/, /^https?:\/\/127\.0\.0\.1:\d+$/]
+          : false,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      credentials: true,
+    });
+    await registerOpenAPI(app, {
+      title: 'WallpaperDB Tags API',
+      version: '1.0.0',
+      description: 'Tags service shell. Only operational endpoints are exposed today.',
+      servers:
+        config.nodeEnv === 'production'
+          ? undefined
+          : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
+    });
+    app.get(
+      '/health',
+      {
+        schema: {
+          tags: ['Health'],
+          response: {
+            200: { $ref: 'HealthResponse#' },
+            503: unavailableSchema(
+              {
+                healthStatus: { type: 'string', enum: ['unhealthy', 'shutting_down'] },
+                checks: { type: 'object', additionalProperties: { type: 'boolean' } },
+                totalDurationMs: { type: 'number' },
+              },
+              ['healthStatus', 'checks']
+            ),
+          },
         },
       },
-    },
-    async (_request, reply) => {
-      const result = await runtime.runPromise(availability.health(false));
-      if (result.status === 'healthy' || result.status === 'degraded') return result;
-      return reply
-        .code(503)
-        .type('application/problem+json')
-        .send({
-          ...result,
-          ...problem(503, 'service-unavailable', 'Service unavailable'),
-          healthStatus: result.status,
-        });
-    }
-  );
-  app.get(
-    '/ready',
-    {
-      schema: {
-        tags: ['Health'],
-        response: {
-          200: { $ref: 'ReadyResponse#' },
-          503: unavailableSchema(
-            { ready: { type: 'boolean', enum: [false] }, reason: { type: 'string' } },
-            ['ready', 'reason']
-          ),
+      async (request, reply) => {
+        const result = await run(
+          Availability.use((service) => service.health(app.connectionsState.isShuttingDown)),
+          request.headers
+        );
+        if (result.status === 'healthy' || result.status === 'degraded') return result;
+        return reply
+          .code(503)
+          .type('application/problem+json')
+          .send({
+            ...result,
+            ...problem(503, 'service-unavailable', 'Service unavailable'),
+            healthStatus: result.status,
+          });
+      }
+    );
+    app.get(
+      '/ready',
+      {
+        schema: {
+          tags: ['Health'],
+          response: {
+            200: { $ref: 'ReadyResponse#' },
+            503: unavailableSchema(
+              { ready: { type: 'boolean', enum: [false] }, reason: { type: 'string' } },
+              ['ready', 'reason']
+            ),
+          },
         },
       },
-    },
-    async (_request, reply) => {
-      const result = await runtime.runPromise(availability.ready(false, true));
-      if (result.ready) return result;
-      return reply
-        .code(503)
-        .type('application/problem+json')
-        .send({ ...problem(503, 'service-unavailable', 'Service unavailable'), ...result });
-    }
-  );
-  await app.ready();
-  return app;
+      async (request, reply) => {
+        const result = await run(
+          Availability.use((service) =>
+            service.ready(
+              app.connectionsState.isShuttingDown,
+              app.connectionsState.connectionsInitialized
+            )
+          ),
+          request.headers
+        );
+        if (result.ready) return result;
+        return reply
+          .code(503)
+          .type('application/problem+json')
+          .send({ ...problem(503, 'service-unavailable', 'Service unavailable'), ...result });
+      }
+    );
+    await app.ready();
+    app.connectionsState.connectionsInitialized = true;
+    return app;
+  } catch (error) {
+    await app.close().catch(() => undefined);
+    await runtime.dispose();
+    throw error;
+  }
 }

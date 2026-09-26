@@ -263,31 +263,46 @@ const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
   );
   const traceHeaders = headers();
   for (const [key, value] of Object.entries(traceCarrier)) traceHeaders.set(key, value);
+  traceHeaders.set('Nats-Msg-Id', identity);
+  const replay = {
+    specversion: '1.0',
+    source: 'wallpaperdb/gateway/projection',
+    id: identity,
+    type: 'gateway.projection.quarantined',
+    time: DateTime.formatIso(DateTime.makeUnsafe(message.info.timestampNanos / 1_000_000)),
+    data: {
+      subject: message.subject,
+      original: Buffer.from(message.data).toString('base64'),
+      ...(message.headers
+        ? { originalHeaders: Buffer.from(message.headers.toString()).toString('base64') }
+        : {}),
+      consumer: message.info.consumer,
+      outcome,
+    },
+  };
+  const diagnostic = JSON.stringify({
+    ...replay,
+    ...(original._tag === 'Translated'
+      ? {
+          causationid: original.change.occurrence.id,
+          causationsource: original.change.occurrence.source,
+          ...(original.correlationId ? { correlationid: original.correlationId } : {}),
+        }
+      : {}),
+  });
+  // Binary header values can expand sixfold when copied into JSON. The complete
+  // original headers stay in the bounded base64 replay record even if duplicated
+  // diagnostic extensions would exceed the quarantine message budget.
+  const payload =
+    Buffer.byteLength(diagnostic) + Buffer.byteLength(traceHeaders.toString()) <=
+    quarantineMessageBytes
+      ? diagnostic
+      : JSON.stringify(replay);
   yield* broker('publish quarantine', () =>
-    js.publish(
-      options.quarantineSubject ?? 'gateway.quarantine',
-      JSON.stringify({
-        specversion: '1.0',
-        source: 'wallpaperdb/gateway/projection',
-        id: identity,
-        type: 'gateway.projection.quarantined',
-        time: DateTime.formatIso(DateTime.makeUnsafe(message.info.timestampNanos / 1_000_000)),
-        ...(original._tag === 'Translated'
-          ? {
-              causationid: original.change.occurrence.id,
-              causationsource: original.change.occurrence.source,
-              ...(original.correlationId ? { correlationid: original.correlationId } : {}),
-            }
-          : {}),
-        data: {
-          subject: message.subject,
-          original: Buffer.from(message.data).toString('base64'),
-          consumer: message.info.consumer,
-          outcome,
-        },
-      }),
-      { msgID: identity, headers: traceHeaders }
-    )
+    js.publish(options.quarantineSubject ?? 'gateway.quarantine', payload, {
+      msgID: identity,
+      headers: traceHeaders,
+    })
   );
 });
 

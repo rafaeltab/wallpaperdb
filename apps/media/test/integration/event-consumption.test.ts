@@ -2,6 +2,7 @@ import {
   WallpaperVariantAvailableEventSchema,
   type WallpaperUploadedEvent,
 } from '@wallpaperdb/events/schemas';
+import { registerAssetReference } from '@wallpaperdb/core/assets';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -32,6 +33,7 @@ describe('Media Service - Event Consumption', () => {
       .withPostgres((builder) => builder.withDatabase(`test_media_events_${Date.now()}`))
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()
@@ -79,6 +81,48 @@ describe('Media Service - Event Consumption', () => {
     await connection.flush();
     return { result, close: () => subscription.unsubscribe() };
   }
+
+  it('consumes an original logical reference through the composed storage and catalogue adapters', async () => {
+    const id = 'wlpr_logical_composition';
+    const reference = { owner: 'ingestor', id } as const;
+    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', reference, {
+      bucket: 'wallpapers',
+      key: 'private/composed-original.webp',
+    });
+    const timestamp = '2026-09-24T10:00:00.000Z';
+    const observation = await observeAvailable(id);
+    try {
+      const accepted = await (await tester.nats.getJsClient()).publish(
+        'wallpaper.uploaded',
+        JSON.stringify({
+          specversion: '1.0',
+          source: 'https://wallpaperdb/ingestor',
+          id: 'logical-composition',
+          type: 'wallpaper.uploaded',
+          time: timestamp,
+          datacontenttype: 'application/json',
+          data: {
+            wallpaper: {
+              id,
+              userId: 'profile-logical',
+              fileType: 'image',
+              mimeType: 'image/webp',
+              fileSizeBytes: 100,
+              width: 20,
+              height: 10,
+              aspectRatio: 2,
+              uploadedAt: timestamp,
+              asset: reference,
+            },
+          },
+        })
+      );
+      await waitForAccepted(accepted.seq);
+      expect((await observation.result).variant.wallpaperId).toBe(id);
+    } finally {
+      observation.close();
+    }
+  });
 
   it('should consume wallpaper.uploaded event and send wallpaper.variant.available event', async () => {
     const js = await tester.nats.getJsClient();

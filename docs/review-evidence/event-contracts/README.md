@@ -13,9 +13,9 @@ The regression tests create fresh uploads, wait for their public projections, an
 
 These additional checks exercised fresh assets after removing descriptor storage. The existing descriptor count remained at 50 after the new wallpaper and Profile-picture uploads. Existing object paths and data were preserved.
 
-- [Duplicate upload completes](deterministic-upload.webm) shows a second upload of the verified fresh fixture reaching Upload complete, 100%, and one duplicate. The original upload returned 200 and its new ID reached catalogue and color results.
-- [Variant selection](deterministic-variant.webm) shows the new wallpaper changing from its 1280×720 original to the 853×480 rendition. Separate browser decoding confirmed exactly 853×480 pixels.
-- [Profile picture lifecycle](deterministic-profile.webm) shows the saved picture, removal confirmation, and restored generated avatar. Anonymous browser requests returned 200 before removal and 404 with `Cache-Control: no-store` afterward.
+- [Duplicate upload completes](deterministic-upload.mp4) shows a second upload of the verified fresh fixture reaching Upload complete, 100%, and one duplicate. The original upload returned 200 and its new ID reached catalogue and color results.
+- [Variant selection](deterministic-variant.mp4) shows the new wallpaper changing from its 1280×720 original to the 853×480 rendition. Separate browser decoding confirmed exactly 853×480 pixels.
+- [Profile picture lifecycle](deterministic-profile.mp4) shows the saved picture, removal confirmation, and restored generated avatar. Anonymous browser requests returned 200 before removal and 404 with `Cache-Control: no-store` afterward.
 - [Settled catalogue filter](deterministic-filter.png) shows the #336699 preference and PNG filter. The exact new wallpaper ID was also found in the public color-ranked response.
 
 The duplicate-upload clip runs in real time. Fast variant and Profile actions are slowed and final frames held for readability; these clips are not performance measurements. The Profile clip omits a development reload between upload and removal. It shows the same saved picture and its completed removal. Final page-error checks were empty, and the original Profile state was restored.

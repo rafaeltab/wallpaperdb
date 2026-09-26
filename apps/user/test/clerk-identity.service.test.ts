@@ -1,5 +1,5 @@
 import { inspect } from 'node:util';
-import { Effect, Fiber } from 'effect';
+import { Effect, Fiber, Layer, Metric } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clerkIdentitiesLayer } from '../src/adapters/profiles/index.js';
 import { Identities } from '../src/profile/index.js';
@@ -14,6 +14,43 @@ const run = (userId = 'user_123') =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Clerk identities adapter', () => {
+  it('keeps a failed identity dependency visible until a later lookup succeeds', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValue(
+          Response.json({ first_name: 'Ada', last_name: null, has_image: false, image_url: '' })
+        )
+    );
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const identities = yield* Identities;
+        yield* identities.getIdentity('owner').pipe(Effect.flip);
+        const failed = yield* Metric.snapshot;
+        expect(failed).toContainEqual(
+          expect.objectContaining({
+            id: 'user.dependency.last_operation_healthy',
+            attributes: { dependency: 'identity' },
+            state: { value: 0 },
+          })
+        );
+        expect(yield* identities.getIdentity('owner')).toMatchObject({ firstName: 'Ada' });
+        const recovered = yield* Metric.snapshot;
+        expect(recovered).toContainEqual(
+          expect.objectContaining({
+            id: 'user.dependency.last_operation_healthy',
+            attributes: { dependency: 'identity' },
+            state: { value: 1 },
+          })
+        );
+      }).pipe(
+        Effect.provide(clerkIdentitiesLayer({ clerkSecretKey: 'test-secret' })),
+        Effect.provide(Layer.succeed(Metric.MetricRegistry, new Map()))
+      )
+    );
+  });
   it('discards private transport diagnostics at the identity boundary', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('private-identity-marker')));
     const failure = await Effect.runPromise(

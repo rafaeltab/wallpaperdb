@@ -59,7 +59,7 @@ for (const filename of [...sourceFiles, ...files(path.join(application, 'test'))
     const location = `${path.relative(repo, filename)}:${line}`;
     const resolved = ts.resolveModuleName(specifier, filename, { moduleResolution: ts.ModuleResolutionKind.Bundler }, ts.sys).resolvedModule?.resolvedFileName;
     if (specifier === 'tsyringe' || specifier === 'reflect-metadata') errors.push(`${location}: ${applicationName} uses Effect service layers; remove ${specifier}`);
-    if (owner && !specifier.startsWith('.') && specifier !== 'effect') errors.push(`${location}: ${owner} depends on external technology ${specifier}`);
+    if (owner && !specifier.startsWith('.') && specifier !== 'effect' && !config.allowedCapabilityDependencies?.[owner]?.includes(specifier)) errors.push(`${location}: ${owner} depends on external technology ${specifier}`);
     if (!resolved || !resolved.startsWith(`${src}${path.sep}`)) continue;
     if (graph.has(filename)) graph.get(filename).push(resolved);
     const module = publicModule(resolved);

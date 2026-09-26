@@ -4,7 +4,8 @@ import { Context, Effect, FiberSet, Layer } from 'effect';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { Profiles } from '../profile/index.js';
 import { Availability } from '../availability/index.js';
-export type HttpServices = Profiles | Availability;
+import { Pictures } from '../pictures/index.js';
+export type HttpServices = Profiles | Pictures | Availability;
 export interface Execution {
   run<A, E>(
     effect: Effect.Effect<A, E, HttpServices>,
@@ -18,6 +19,7 @@ export const executionLayer = Layer.effect(
   Effect.gen(function* () {
     yield* Profiles;
     yield* Availability;
+    yield* Pictures;
     const fibers = yield* FiberSet.make();
     const run = yield* FiberSet.runtimePromise(fibers)<HttpServices>();
     return Execution.of({

@@ -2,10 +2,25 @@ import { createServer } from 'node:http';
 import { context, metrics, propagation, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { recordCounter } from '@wallpaperdb/core/telemetry';
-import { Effect, ManagedRuntime, Metric } from 'effect';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  PostgresTesterBuilder,
+  NatsTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import { Effect, Layer, Metric } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
-import { tracingLayer } from '../src/runtime.js';
+import { tagsLayer } from '../src/app.js';
+import { Availability } from '../src/availability/index.js';
+import { createHttpApp } from '../src/http/index.js';
+import type { Config } from '../src/config.js';
+
+const Tester = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(PostgresTesterBuilder)
+  .with(NatsTesterBuilder)
+  .build();
 
 afterEach(() => {
   logs.disable();
@@ -17,6 +32,9 @@ afterEach(() => {
 
 describe('Production telemetry mechanism', () => {
   it('exports SDK and Effect telemetry before its owning scope closes', async () => {
+    const tester = new Tester()
+      .withPostgres((builder) => builder.withDatabase('tags_telemetry'))
+      .withNats();
     const exported = new Map<string, string[]>();
     const collector = createServer((request, response) => {
       const chunks: Buffer[] = [];
@@ -40,24 +58,58 @@ describe('Production telemetry mechanism', () => {
           });
           trace.getTracer('contract').startSpan('telemetry.sdk.contract').end();
           recordCounter('telemetry.sdk.contract', 1);
-          const runtime = yield* Effect.acquireRelease(
-            Effect.sync(() => ManagedRuntime.make(tracingLayer)),
-            (runtime) => Effect.promise(() => runtime.dispose())
+          yield* Effect.acquireRelease(Effect.succeed(tester), () =>
+            Effect.promise(() => tester.destroy())
           );
-          yield* Effect.promise(() => runtime.runPromise(
-            Effect.logInfo('Telemetry contract').pipe(
-              Effect.andThen(Metric.update(
-                Metric.counter('telemetry.effect.contract', { incremental: true }), 7
-              )),
-              Effect.withSpan('telemetry.effect.contract')
-            )
-          ));
+          yield* Effect.tryPromise(() => tester.setup());
+          const config: Config = {
+            nodeEnv: 'test',
+            port: 0,
+            databaseUrl: tester.getPostgres().connectionStrings.fromHost,
+            natsUrl: tester.getNats().endpoints.fromHost,
+            natsStream: 'WALLPAPER',
+            otelServiceName: 'tags-contract',
+          };
+          // Decorate the public port without replacing production dependencies or tracing.
+          // Only the test-owned span is part of this mechanism contract.
+          const services = Layer.effect(
+            Availability,
+            Effect.gen(function* () {
+              const actual = yield* Availability;
+              return Availability.of({
+                health: (shuttingDown) =>
+                  Effect.logInfo('Telemetry contract').pipe(
+                    Effect.andThen(
+                      Metric.update(
+                        Metric.counter('telemetry.effect.contract', { incremental: true }),
+                        7
+                      )
+                    ),
+                    Effect.andThen(actual.health(shuttingDown)),
+                    Effect.withSpan('telemetry.http.contract')
+                  ),
+                ready: (shuttingDown, initialized) => actual.ready(shuttingDown, initialized),
+              });
+            })
+          ).pipe(Layer.provideMerge(tagsLayer(config, { otelHealthy: true })));
+          const app = yield* Effect.acquireRelease(
+            Effect.tryPromise(() => createHttpApp({ nodeEnv: 'test', port: 0 }, services)),
+            (app) => Effect.promise(() => app.close())
+          );
+          const response = yield* Effect.promise(() =>
+            app.inject({
+              method: 'GET',
+              url: '/health',
+              headers: { traceparent: '00-0123456789abcdef0123456789abcdef-0123456789abcdef-01' },
+            })
+          );
+          expect(response.statusCode).toBe(200);
           return status;
         }).pipe(Effect.scoped)
       );
       expect(status).toEqual({ _tag: 'Started' });
       expect(exported.get('/v1/traces')?.join()).toContain('telemetry.sdk.contract');
-      expect(exported.get('/v1/traces')?.join()).toContain('telemetry.effect.contract');
+      expect(exported.get('/v1/traces')?.join()).toContain('telemetry.http.contract');
       expect(exported.get('/v1/metrics')?.join()).toContain('telemetry.sdk.contract');
       expect(exported.get('/v1/logs')?.join()).toContain('Telemetry contract');
       const exportedMetrics: unknown[] = [];
@@ -67,13 +119,29 @@ describe('Production telemetry mechanism', () => {
           return value;
         });
       }
-      expect(exportedMetrics).toContainEqual(expect.objectContaining({
-        name: 'telemetry.effect.contract',
-        sum: expect.objectContaining({
-          isMonotonic: true,
-          dataPoints: expect.arrayContaining([expect.objectContaining({ asDouble: 7 })]),
-        }),
-      }));
+      expect(exportedMetrics).toContainEqual(
+        expect.objectContaining({
+          name: 'telemetry.effect.contract',
+          sum: expect.objectContaining({
+            isMonotonic: true,
+            dataPoints: expect.arrayContaining([expect.objectContaining({ asDouble: 7 })]),
+          }),
+        })
+      );
+      const spans: unknown[] = [];
+      for (const body of exported.get('/v1/traces') ?? []) {
+        JSON.parse(body, (key, value: unknown) => {
+          if (key === 'spans' && Array.isArray(value)) spans.push(...value);
+          return value;
+        });
+      }
+      expect(spans).toContainEqual(
+        expect.objectContaining({
+          name: 'telemetry.http.contract',
+          traceId: '0123456789abcdef0123456789abcdef',
+          parentSpanId: '0123456789abcdef',
+        })
+      );
     } finally {
       collector.closeAllConnections();
       await new Promise<void>((resolve, reject) => {

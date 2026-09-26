@@ -40,6 +40,7 @@ export const initializeOtel = Effect.fn('tags.telemetry.initialize')(function* (
       try: () => new URL(endpoint),
       catch: (cause) => new OtelInitializationError({ cause }),
     });
+    // Exporter deadlines can leave streaming responses open, so the scope owns their sockets too.
     const agent = yield* Effect.acquireRelease(
       Effect.sync(() =>
         url.protocol === 'https:'

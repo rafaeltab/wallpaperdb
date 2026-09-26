@@ -27,7 +27,6 @@ describe('Telemetry SDK ownership', () => {
     ).toEqual({ _tag: 'Unavailable' });
   });
 
-
   it('closes stalled collector sockets when later application startup fails', async () => {
     const sockets = new Set<Socket>();
     const requests = new Set<string>();

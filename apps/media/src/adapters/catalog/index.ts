@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
 import { Pool } from 'pg';
 import {
+  availableFormat,
   CatalogFailure,
   CatalogOutbox,
   CatalogProjection,
@@ -33,8 +34,10 @@ class Database extends Context.Service<Database, ReturnType<typeof drizzle>>()(
 ) {}
 const stableId = (parts: readonly string[]) =>
   createHash('sha256').update(JSON.stringify(parts)).digest('hex');
-function notification(input: Exclude<ProjectionInput, { kind: 'profile' }>): AvailableNotification {
+function notification(input: Exclude<ProjectionInput, { kind: 'profile' }>): AvailableNotification | null {
   const asset = input.kind === 'wallpaper' ? input.wallpaper : input.variant;
+  const format = availableFormat(asset.mimeType);
+  if (!format) return null;
   return {
     id: stableId([input.occurrence.source, input.occurrence.id]),
     timestamp: input.occurredAt,
@@ -48,7 +51,7 @@ function notification(input: Exclude<ProjectionInput, { kind: 'profile' }>): Ava
       width: asset.width,
       height: asset.height,
       fileSizeBytes: asset.fileSizeBytes,
-      format: asset.mimeType,
+      format,
       createdAt: asset.createdAt,
     },
   };
@@ -192,6 +195,7 @@ const implementations = Layer.effectContext(
                   });
                 }
               }
+              if (!output) return;
               await tx
                 .insert(catalogOutbox)
                 .values({

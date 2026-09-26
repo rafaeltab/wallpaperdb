@@ -46,7 +46,7 @@ function upload(id: string, fileType: 'image' | 'video' = 'image') {
       id: 'wp',
       userId: 'user',
       fileType,
-      mimeType: 'image/png',
+      mimeType: fileType === 'video' ? 'video/mp4' : 'image/png',
       fileSizeBytes: 20,
       width: 2,
       height: 2,
@@ -58,7 +58,7 @@ function upload(id: string, fileType: 'image' | 'video' = 'image') {
     },
   };
 }
-it('translates broker input, acknowledges successful and skipped generation, and closes idle workers', async () => {
+it('projects image and video uploads, acknowledges acceptance, and closes idle workers', async () => {
   const calls: ProjectionInput[] = [];
   const options = {
     url: tester.nats.config.endpoints.fromHost,

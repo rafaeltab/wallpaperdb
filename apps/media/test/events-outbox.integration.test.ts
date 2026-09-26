@@ -61,7 +61,7 @@ it('publishes a stable CloudEvent and retries ambiguous outbox completion withou
     )
   );
   try {
-    expect(await runtime.runPromise(Effect.flatMap(OutboxHealth, (h) => h.check()))).toBe(true);
+    await runtime.runPromise(OutboxHealth);
     await expect.poll(() => pending.length).toBe(0);
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
     expect((await manager.streams.info('WALLPAPER')).state.messages).toBe(1);
@@ -141,12 +141,14 @@ it('keeps a rejected publication pending and resumes after broker capacity recov
     )
   );
   try {
-    await runtime.runPromise(OutboxHealth);
+    const health = await runtime.runPromise(OutboxHealth);
     await expect.poll(() => reads).toBeGreaterThanOrEqual(2);
+    expect(await Effect.runPromise(health.check())).toBe(false);
     expect(marked).toBe(0);
     expect(pending).toHaveLength(1);
     await manager.streams.purge('WALLPAPER');
     await expect.poll(() => marked).toBe(1);
+    await expect.poll(() => Effect.runPromise(health.check())).toBe(true);
     expect(
       (
         await manager.streams.getMessage('WALLPAPER', {
@@ -157,5 +159,43 @@ it('keeps a rejected publication pending and resumes after broker capacity recov
   } finally {
     await runtime.dispose();
     await manager.streams.update('WALLPAPER', { discard: DiscardPolicy.Old, max_msgs: -1 });
+  }
+});
+
+it('reports outbox storage failure and returns healthy after the next successful poll', async () => {
+  let unavailable = true;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'outbox-health',
+    outboxPollMs: 10,
+  };
+  const runtime = ManagedRuntime.make(
+    natsOutboxLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(CatalogOutbox, {
+          listPending: () =>
+            Effect.suspend(() =>
+              unavailable
+                ? Effect.fail(
+                    new CatalogFailure({ operation: 'listPending', cause: 'database offline' })
+                  )
+                : Effect.succeed([])
+            ),
+          markPublished: () => Effect.void,
+        })
+      )
+    )
+  );
+  try {
+    const health = await runtime.runPromise(OutboxHealth);
+    await expect.poll(() => Effect.runPromise(health.check())).toBe(false);
+    unavailable = false;
+    await expect.poll(() => Effect.runPromise(health.check())).toBe(true);
+    unavailable = true;
+    await expect.poll(() => Effect.runPromise(health.check())).toBe(false);
+  } finally {
+    await runtime.dispose();
   }
 });

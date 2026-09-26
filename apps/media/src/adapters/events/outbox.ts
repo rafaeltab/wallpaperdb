@@ -101,33 +101,38 @@ export function natsOutboxLayer(
       const service = yield* NatsBroker;
       const outbox = yield* CatalogOutbox;
       const accepting = yield* Ref.make(true);
-      const healthy = yield* Ref.make(true);
+      const healthy = yield* Ref.make(false);
       const dispatch = Effect.gen(function* () {
         const rows = yield* outbox.listPending(16);
+        let succeeded = true;
         for (const row of rows) {
-          if (!(yield* Ref.get(accepting))) return;
-          yield* publishNotification(service, options, row).pipe(
+          if (!(yield* Ref.get(accepting))) return false;
+          const published = yield* publishNotification(service, options, row).pipe(
             Effect.andThen(() => outbox.markPublished(row.id)),
+            Effect.as(true),
             Effect.catch((error) =>
               Effect.logError('Media outbox publication remains pending', {
                 operation: error.operation,
                 cause: error.cause,
                 eventId: row.id,
-              })
+              }).pipe(Effect.as(false))
             )
           );
+          succeeded = succeeded && published;
         }
+        return succeeded;
       });
       const worker = yield* Effect.gen(function* () {
         while (yield* Ref.get(accepting)) {
-          yield* dispatch.pipe(
+          const succeeded = yield* dispatch.pipe(
             Effect.catch((error) =>
               Effect.logError('Media outbox unavailable', {
                 operation: error.operation,
                 cause: error.cause,
-              })
+              }).pipe(Effect.as(false))
             )
           );
+          yield* Ref.set(healthy, succeeded);
           yield* Effect.sleep(options.outboxPollMs ?? 1000);
         }
       }).pipe(
@@ -152,7 +157,11 @@ export function natsOutboxLayer(
       );
       return {
         check: () =>
-          Ref.get(healthy).pipe(Effect.map((value) => value && !service.connection.isClosed())),
+          Effect.all([Ref.get(healthy), Ref.get(accepting)]).pipe(
+            Effect.map(
+              ([healthy, accepting]) => healthy && accepting && !service.connection.isClosed()
+            )
+          ),
       };
     })
   );

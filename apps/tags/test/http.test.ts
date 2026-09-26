@@ -157,6 +157,43 @@ it('returns safe Problem Details for malformed URL components', async () => {
 });
 
 it.each([
+  [400, 'Bad Request', 'Invalid Header: private-marker'],
+  [431, 'Request Header Fields Too Large', `X-Private: ${'private-marker'.padEnd(20_000, 'x')}`],
+] as const)('returns Problem Details when the HTTP parser rejects headers with status %i', async (status, title, header) => {
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3008 }, services);
+  apps.push(app);
+  const address = new URL(await app.listen({ host: '127.0.0.1', port: 0 }));
+  const socket = createConnection({ host: '127.0.0.1', port: Number(address.port) });
+  socket.setTimeout(2000, () =>
+    socket.destroy(new Error('HTTP parser response deadline exceeded'))
+  );
+  const response = new Promise<string>((resolve, reject) => {
+    let raw = '';
+    socket.on('data', (chunk) => {
+      raw += chunk.toString();
+    });
+    socket.once('close', () => resolve(raw));
+    socket.once('error', reject);
+  });
+  try {
+    await once(socket, 'connect');
+    socket.write(`GET /health HTTP/1.1\r\nHost: localhost\r\n${header}\r\n\r\n`);
+    const raw = await response;
+    const [headers, body] = raw.split('\r\n\r\n');
+    expect(headers).toContain(`HTTP/1.1 ${status} ${title}`);
+    expect(headers?.toLowerCase()).toContain('content-type: application/problem+json');
+    expect(JSON.parse(body ?? '')).toEqual({
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-request.md',
+      status,
+      title,
+    });
+    expect(raw).not.toContain('private-marker');
+  } finally {
+    socket.destroy();
+  }
+});
+
+it.each([
   {},
   { origin: 'http://localhost:3000' },
   { 'access-control-request-method': 'GET' },

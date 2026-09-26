@@ -1,3 +1,4 @@
+import { reconcileEventMetadata } from '@wallpaperdb/events/envelope';
 import {
   WallpaperUploadedEventSchema,
   WallpaperUploadedCloudEventSchema,
@@ -29,47 +30,20 @@ function metadata(
   legacy: { eventId: string; timestamp: string },
   source: string
 ): ProjectionMetadata | undefined {
-  const structured = Predicate.hasProperty(raw, 'specversion')
-    ? binaryEnvelope.safeParse(raw)
-    : undefined;
-  const binary = header?.keys().some((key) => key.toLowerCase().startsWith('ce-'))
-    ? binaryEnvelope.safeParse({
-        specversion: header.get('ce-specversion'),
-        source: header.get('ce-source'),
-        id: header.get('ce-id'),
-        type: header.get('ce-type'),
-        time: header.get('ce-time'),
-        correlationid: header.get('ce-correlationid') || undefined,
-        causationid: header.get('ce-causationid') || undefined,
-        causationsource: header.get('ce-causationsource') || undefined,
-      })
-    : undefined;
-  for (const envelope of [structured, binary]) {
-    if (
-      envelope &&
-      (!envelope.success ||
-        envelope.data.type !== subject ||
-        envelope.data.id !== legacy.eventId ||
-        envelope.data.time !== legacy.timestamp)
-    )
-      return undefined;
-  }
-  if (
-    structured?.success &&
-    binary?.success &&
-    (structured.data.source !== binary.data.source ||
-      structured.data.correlationid !== binary.data.correlationid ||
-      structured.data.causationid !== binary.data.causationid ||
-      structured.data.causationsource !== binary.data.causationsource)
-  )
-    return undefined;
-  const envelope = structured ?? binary;
-  const extensions = envelope?.success ? envelope.data : undefined;
+  const result = reconcileEventMetadata(
+    raw,
+    header,
+    { ...legacy, eventType: subject },
+    (value) => binaryEnvelope.safeParse(value).data
+  );
+  if (!result.valid) return undefined;
+  const envelope = result.value;
+  const extensions = envelope;
   return {
-    occurrence: envelope?.success
-      ? { source: envelope.data.source, id: envelope.data.id }
+    occurrence: envelope
+      ? { source: envelope.source, id: envelope.id }
       : { source, id: legacy.eventId },
-    occurredAt: envelope?.success ? envelope.data.time : legacy.timestamp,
+    occurredAt: envelope ? envelope.time : legacy.timestamp,
     ...(extensions?.correlationid ? { correlationId: extensions.correlationid } : {}),
     ...(extensions?.causationid ? { causationId: extensions.causationid } : {}),
     ...(extensions?.causationsource ? { causationSource: extensions.causationsource } : {}),

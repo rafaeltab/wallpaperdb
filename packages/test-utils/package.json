@@ -5,7 +5,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./fixtures": "./src/fixtures/index.ts",
-    "./helpers": "./src/helpers/index.ts"
+    "./helpers": "./src/helpers/index.ts",
+    "./event-contracts": "./src/event-contracts/index.ts"
   },
   "scripts": {
     "format": "biome format --write .",

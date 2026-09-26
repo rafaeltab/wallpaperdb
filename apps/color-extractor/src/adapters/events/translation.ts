@@ -1,3 +1,4 @@
+import { reconcileEventMetadata } from '@wallpaperdb/events/envelope';
 import {
   WallpaperUploadedCloudEventSchema,
   WallpaperUploadedEventSchema,
@@ -22,47 +23,22 @@ export function translateUpload(
 ): ExtractionInput | undefined {
   const raw = decode(payload);
   if (Option.isNone(raw)) return undefined;
-  const structured = Predicate.hasProperty(raw.value, 'specversion')
-    ? structuredSchema.safeParse(raw.value)
-    : undefined;
-  const binary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'))
-    ? envelopeSchema.safeParse({
-        specversion: headers.get('ce-specversion'),
-        source: headers.get('ce-source'),
-        id: headers.get('ce-id'),
-        type: headers.get('ce-type'),
-        time: headers.get('ce-time'),
-        correlationid: headers.get('ce-correlationid') || undefined,
-        causationid: headers.get('ce-causationid') || undefined,
-        causationsource: headers.get('ce-causationsource') || undefined,
-      })
-    : undefined;
+  if (
+    Predicate.hasProperty(raw.value, 'specversion') &&
+    !structuredSchema.safeParse(raw.value).success
+  )
+    return undefined;
   const result = WallpaperUploadedEventSchema.safeParse(raw.value);
   if (!result.success) return undefined;
   const event = result.data;
-  for (const envelope of [structured, binary]) {
-    if (
-      envelope &&
-      (!envelope.success ||
-        envelope.data.id !== event.eventId ||
-        envelope.data.time !== event.timestamp)
-    )
-      return undefined;
-  }
-  if (
-    structured?.success &&
-    binary?.success &&
-    (structured.data.source !== binary.data.source ||
-      structured.data.correlationid !== binary.data.correlationid ||
-      structured.data.causationid !== binary.data.causationid ||
-      structured.data.causationsource !== binary.data.causationsource)
-  )
-    return undefined;
-  const envelope = structured?.success
-    ? structured.data
-    : binary?.success
-      ? binary.data
-      : undefined;
+  const metadata = reconcileEventMetadata(
+    raw.value,
+    headers,
+    event,
+    (value) => envelopeSchema.safeParse(value).data
+  );
+  if (!metadata.valid) return undefined;
+  const envelope = metadata.value;
   return {
     wallpaperId: event.wallpaper.id,
     fileType: event.wallpaper.fileType,

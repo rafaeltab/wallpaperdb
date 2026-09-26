@@ -28,7 +28,10 @@ describe('Profile picture commands', () => {
     .with(DockerTesterBuilder)
     .with(S3TesterBuilder)
     .build();
-  const storageTester = new StorageTester().withS3().withS3Bucket('profile-pictures');
+  const storageTester = new StorageTester()
+    .withS3()
+    .withS3Bucket('profile-pictures')
+    .withS3Bucket('asset-references');
   let sql: ReturnType<typeof postgres>;
   let storage: S3Client;
   let app: FastifyInstance;

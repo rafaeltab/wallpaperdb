@@ -15,7 +15,7 @@ describe('Picture persistence adapter', () => {
   let sql: ReturnType<typeof postgres>;
   let runtime: ManagedRuntime.ManagedRuntime<PictureStore, unknown>;
   const now = new Date('2030-01-01T00:00:00Z');
-  const asset: StoredPicture & { createdAt: Date } = {
+  let asset: StoredPicture & { createdAt: Date } = {
     id: 'pic_candidate', profileId: 'owner', storageBucket: 'pictures', storageKey: 'owner/pic_candidate.webp',
     mimeType: 'image/webp', width: 2, height: 3, fileSizeBytes: 42, createdAt: now,
     expiresAt: new Date('2030-01-08T00:00:00Z'),
@@ -27,7 +27,7 @@ describe('Picture persistence adapter', () => {
     for (const path of readdirSync(migrations).filter(path => path.endsWith('.sql')).sort()) {
       await sql.unsafe(readFileSync(join(migrations, path), 'utf8'));
     }
-    runtime = ManagedRuntime.make(pictureStoreLayer.pipe(Layer.provide(databaseLayer({ databaseUrl: container.getConnectionUri() }))));
+    runtime = ManagedRuntime.make(pictureStoreLayer({ bucket: 'pictures' }).pipe(Layer.provide(databaseLayer({ databaseUrl: container.getConnectionUri() }))));
   });
   beforeEach(async () => {
     await sql`truncate profiles cascade`;
@@ -36,7 +36,7 @@ describe('Picture persistence adapter', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await container?.stop(); });
 
   it('requires a finished PUT before a durable candidate becomes staged', async () => {
-    await run(store => store.createCandidate(asset));
+    asset = { ...await run(store => store.createCandidate(asset)), createdAt: now };
     expect(await run(store => store.available(asset.id))).toBe(false);
     expect(await run(store => store.beginUpload(asset.id, now))).toBe(true);
     expect(await run(store => store.finishUpload(asset.id, new Date(now.getTime() + 1000)))).toBe(true);
@@ -45,7 +45,7 @@ describe('Picture persistence adapter', () => {
   });
   it('marks expired candidates deleting before storage work and never claims a live PUT', async () => {
     const current = new Date();
-    await run(store => store.createCandidate({ ...asset, createdAt: current, expiresAt: new Date(current.getTime() + 1000) }));
+    asset = { ...await run(store => store.createCandidate({ ...asset, createdAt: current, expiresAt: new Date(current.getTime() + 1000) })), createdAt: current };
     expect(await run(store => store.beginUpload(asset.id, current))).toBe(true);
     const cutoff = new Date(current.getTime() + 2000);
     expect(await run(store => store.claimDeletion(asset.id, cutoff))).toBeNull();
@@ -59,7 +59,7 @@ describe('Picture persistence adapter', () => {
   });
 
   it('preserves active references despite inconsistent asset state and stale sweeps', async () => {
-    await run(store => store.createCandidate(asset));
+    asset = { ...await run(store => store.createCandidate(asset)), createdAt: now };
     await sql`update profile_picture_assets set state = 'retired' where id = ${asset.id}`;
     await sql`update profiles set picture_asset_id = ${asset.id} where id = 'owner'`;
     expect(await run(store => store.claimDeletion(asset.id, new Date('2040-01-01')))).toBeNull();

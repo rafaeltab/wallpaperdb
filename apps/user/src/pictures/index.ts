@@ -1,4 +1,11 @@
-import { Context, Effect, Schema } from 'effect';
+import { Clock, Context, Effect, Layer, Schema, Semaphore } from 'effect';
+import {
+  Profiles,
+  type ProfilePrincipal,
+  type ProfileOutcome,
+  type ProfileRejection,
+  type ProfileUnavailable,
+} from '../profile/index.js';
 
 export class PictureUnavailable extends Schema.TaggedError<PictureUnavailable>()(
   'PictureUnavailable',
@@ -76,8 +83,8 @@ export interface PictureImport {
  * No transaction spans an external resource. Import completion/retry is fenced. */
 export interface PictureStore {
   createCandidate(
-    input: StoredPicture & { readonly createdAt: Date }
-  ): Effect.Effect<void, PictureUnavailable>;
+    input: Omit<StoredPicture, 'id' | 'storageBucket' | 'storageKey'> & { readonly createdAt: Date }
+  ): Effect.Effect<StoredPicture, PictureUnavailable>;
   beginUpload(id: string, now: Date): Effect.Effect<boolean, PictureUnavailable>;
   finishUpload(id: string, now: Date): Effect.Effect<boolean, PictureUnavailable>;
   available(id: string): Effect.Effect<boolean, PictureUnavailable>;
@@ -110,3 +117,165 @@ export interface PictureObjects {
 export const PictureObjects = Context.Service<PictureObjects>(
   'wallpaperdb.user.pictures.PictureObjects'
 );
+
+export interface PicturesPolicy {
+  readonly profileEvidenceRetentionDays: number;
+  readonly profilePictureImportTimeoutMs: number;
+}
+export type StageOutcome =
+  | { readonly _tag: 'Staged'; readonly assetId: string }
+  | PictureRejection
+  | ProfileRejection;
+export interface Pictures {
+  stage(
+    principal: ProfilePrincipal,
+    bytes: Buffer
+  ): Effect.Effect<StageOutcome, PictureUnavailable>;
+  upload(
+    principal: ProfilePrincipal,
+    bytes: Buffer,
+    expectedVersion: number
+  ): Effect.Effect<ProfileOutcome | PictureRejection, PictureUnavailable | ProfileUnavailable>;
+  pictureAvailable(id: string): Effect.Effect<boolean, PictureUnavailable>;
+  importPending(isStopping?: () => boolean): Effect.Effect<void, PictureUnavailable>;
+  cleanupExpired(
+    now: Date,
+    isStopping?: () => boolean
+  ): Effect.Effect<{ deleted: number; failed: number }, PictureUnavailable>;
+}
+export const Pictures = Context.Service<Pictures>('wallpaperdb.user.pictures.Pictures');
+
+export const picturesLayer = (policy: PicturesPolicy) =>
+  Layer.effect(
+    Pictures,
+    Effect.gen(function* () {
+      const store = yield* PictureStore;
+      const codec = yield* PictureCodec;
+      const objects = yield* PictureObjects;
+      const source = yield* PictureSource;
+      const profiles = yield* Profiles;
+      const retention = yield* Semaphore.make(1);
+      let cursor: PictureCursor | undefined;
+      const stage = Effect.fn('pictures.stage')(function* (
+        principal: ProfilePrincipal,
+        bytes: Buffer
+      ) {
+        if (!principal.profileId)
+          return {
+            _tag: 'Rejected',
+            reason: 'unauthorized',
+            message: 'Authentication is required',
+          } as const;
+        const decoded = yield* codec.process(bytes);
+        if (decoded._tag === 'Rejected') return decoded;
+        const { picture } = decoded;
+        const now = new Date(yield* Clock.currentTimeMillis);
+        const asset = yield* store.createCandidate({
+          profileId: principal.profileId,
+          mimeType: picture.mimeType,
+          width: picture.width,
+          height: picture.height,
+          fileSizeBytes: picture.bytes.length,
+          createdAt: now,
+          expiresAt: new Date(now.getTime() + policy.profileEvidenceRetentionDays * 86_400_000),
+        });
+        const id = asset.id;
+        if (!(yield* store.beginUpload(id, now)))
+          return {
+            _tag: 'Rejected',
+            reason: 'picture-unavailable',
+            message: 'Staged Profile picture expired before its upload could start',
+          } as const;
+        yield* objects.put(asset, picture.bytes);
+        const finishedAt = new Date(yield* Clock.currentTimeMillis);
+        if (!(yield* store.finishUpload(id, finishedAt)))
+          return {
+            _tag: 'Rejected',
+            reason: 'picture-unavailable',
+            message: 'Staged Profile picture upload lease expired',
+          } as const;
+        return { _tag: 'Staged', assetId: id } as const;
+      });
+      const settle = (job: PictureImport, permanent: boolean) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis;
+          const delay = Math.min(3_600_000, 1_000 * 2 ** Math.min(job.attempts, 12));
+          yield* store.settleImport(job, permanent, new Date(now + delay));
+        });
+      const importPicture = (job: PictureImport) =>
+        Effect.gen(function* () {
+          const downloaded = yield* source.download(job.sourceUrl);
+          if (downloaded._tag === 'Rejected') return yield* settle(job, true);
+          const candidate = yield* stage({ profileId: job.profileId }, downloaded.bytes);
+          if (candidate._tag === 'Rejected')
+            return yield* settle(job, candidate.reason !== 'picture-unavailable');
+          const result = yield* profiles.adoptImportedPicture(
+            { profileId: job.profileId, leaseToken: job.leaseToken },
+            candidate.assetId
+          );
+          if (result._tag === 'Rejected') yield* settle(job, false);
+        });
+      const deleteExpired = (candidate: StoredPicture, now: Date) =>
+        Effect.gen(function* () {
+          const asset = yield* store.claimDeletion(candidate.id, now);
+          if (!asset) return false;
+          yield* objects.delete(asset);
+          return yield* store.finishDeletion(asset.id);
+        });
+      return Pictures.of({
+        stage,
+        upload: Effect.fn('pictures.upload')(function* (principal, bytes, expectedVersion) {
+          const candidate = yield* stage(principal, bytes);
+          if (candidate._tag === 'Rejected') return candidate;
+          return yield* profiles.adoptPicture(principal, candidate.assetId, expectedVersion);
+        }),
+        pictureAvailable: (id) => store.available(id),
+        importPending: Effect.fn('pictures.import-pending')(function* (isStopping = () => false) {
+          if (isStopping()) return;
+          const ids = yield* store.dueImports(new Date(yield* Clock.currentTimeMillis));
+          for (const id of ids) {
+            if (isStopping()) break;
+            const job = yield* store.claimImport(
+              id,
+              new Date(yield* Clock.currentTimeMillis),
+              policy.profilePictureImportTimeoutMs + 60_000
+            );
+            if (job)
+              yield* importPicture(job).pipe(
+                Effect.catchTags({
+                  PictureUnavailable: () => settle(job, false),
+                  ProfileUnavailable: () => settle(job, false),
+                })
+              );
+          }
+        }),
+        cleanupExpired: (now, isStopping = () => false) =>
+          retention.withPermit(
+            Effect.gen(function* () {
+              const result = { deleted: 0, failed: 0 };
+              if (isStopping()) return result;
+              const candidates = yield* store.expired(now, cursor);
+              for (const candidate of candidates) {
+                if (isStopping()) break;
+                cursor = candidate;
+                const deleted = yield* deleteExpired(candidate, now).pipe(
+                  Effect.catchTag('PictureUnavailable', () =>
+                    Effect.gen(function* () {
+                      result.failed++;
+                      yield* Effect.logError('Profile picture cleanup failed; will retry', {
+                        category: 'profile-picture-retention',
+                        assetId: candidate.id,
+                      });
+                      return false;
+                    })
+                  )
+                );
+                if (deleted) result.deleted++;
+              }
+              if (candidates.length < 100 && !isStopping()) cursor = undefined;
+              return result;
+            }).pipe(Effect.withSpan('pictures.cleanup-expired'))
+          ),
+      });
+    })
+  );

@@ -1,3 +1,4 @@
+import { reconcileEventMetadata } from '@wallpaperdb/events/envelope';
 import {
   BaseEventSchema,
   ProfileUpdatedEventSchema,
@@ -117,30 +118,6 @@ export function translate(
   const raw = Option.flatMap(decodeUtf8(payload), decodeJson);
   if (Option.isNone(raw)) return { _tag: 'Invalid' };
   const envelope = decodeCloud(raw.value);
-  const binary = decodeCloudMetadata({
-    specversion: headers?.get('ce-specversion'),
-    source: headers?.get('ce-source'),
-    id: headers?.get('ce-id'),
-    type: headers?.get('ce-type'),
-    time: headers?.get('ce-time'),
-    ...(headers?.get('ce-correlationid') ? { correlationid: headers.get('ce-correlationid') } : {}),
-    ...(headers?.get('ce-causationid') ? { causationid: headers.get('ce-causationid') } : {}),
-    ...(headers?.get('ce-causationsource')
-      ? { causationsource: headers.get('ce-causationsource') }
-      : {}),
-  });
-  const metadata = Option.orElse(envelope, () => binary);
-  const hasBinary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'));
-  if (hasBinary && Option.isNone(binary)) return { _tag: 'Invalid' };
-  if (
-    Option.isSome(envelope) &&
-    Option.isSome(binary) &&
-    (envelope.value.source !== binary.value.source ||
-      envelope.value.correlationid !== binary.value.correlationid ||
-      envelope.value.causationid !== binary.value.causationid ||
-      envelope.value.causationsource !== binary.value.causationsource)
-  )
-    return { _tag: 'Invalid' };
   if (Predicate.hasProperty(raw.value, 'specversion') && Option.isNone(envelope))
     return { _tag: 'Invalid' };
   const event = parseLegacy(
@@ -154,13 +131,14 @@ export function translate(
       : raw.value
   );
   if (!event || event.eventType !== subject) return { _tag: 'Invalid' };
-  if (
-    Option.isSome(binary) &&
-    (binary.value.id !== event.eventId ||
-      binary.value.type !== event.eventType ||
-      binary.value.time !== occurrenceTime(event.timestamp))
-  )
-    return { _tag: 'Invalid' };
+  const result = reconcileEventMetadata(
+    raw.value,
+    headers,
+    { ...event, timestamp: occurrenceTime(event.timestamp) },
+    (value) => Option.getOrUndefined(decodeCloudMetadata(value))
+  );
+  if (!result.valid) return { _tag: 'Invalid' };
+  const metadata = Option.fromUndefinedOr(result.value);
   const occurrence: Occurrence = {
     source: Option.isSome(metadata) ? metadata.value.source : legacySource(event.eventType),
     id: event.eventId,

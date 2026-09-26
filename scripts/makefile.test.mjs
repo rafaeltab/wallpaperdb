@@ -209,7 +209,9 @@ test('force applies to both CI phases and type checks', () => {
   assert.match(ci, /run build lint check-types test:unit test:integration .*--force/);
   assert.match(ci, /run test:e2e .*--force/);
   assert.match(ci, /run build lint check-types test:unit test:integration .*--concurrency=1/);
-  assert.doesNotMatch(output('ci', 'PACKAGE=web'), /--filter=/);
+  const scopedCi = output('ci', 'PACKAGE=web');
+  assert.doesNotMatch(scopedCi, /run (build lint check-types test:unit test:integration|test:e2e)[^\n]*--filter=/);
+  assert.match(scopedCi, /run build --filter=@wallpaperdb\/vitest-config/);
   assert.match(output('check-types', 'FORCE=1'), /run check-types .*--force/);
 });
 

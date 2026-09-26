@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Effect } from 'effect';
+import { Effect, Layer, ManagedRuntime, Metric } from 'effect';
 import { pictureSourceLayer } from '../src/adapters/pictures/index.js';
 import { PictureSource } from '../src/pictures/index.js';
 
@@ -263,6 +263,52 @@ describe('Initial Profile picture download', () => {
     } finally {
       controller.abort();
       await settled;
+    }
+  });
+  it('keeps a failed provider unhealthy through local source rejection until a download succeeds', async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response('picture bytes'));
+    const runtime = ManagedRuntime.make(
+      pictureSourceLayer(options, fetcher).pipe(
+        Layer.provideMerge(Layer.succeed(Metric.MetricRegistry, new Map()))
+      )
+    );
+    const download = (url: string) =>
+      runtime.runPromise(Effect.flatMap(PictureSource, (source) => source.download(url)));
+    const health = () =>
+      runtime.runPromise(
+        Metric.snapshot.pipe(
+          Effect.map((metrics) => {
+            const metric = metrics.find(
+              (metric) =>
+                metric.id === 'user.dependency.last_operation_healthy' &&
+                metric.attributes?.dependency === 'picture-source'
+            );
+            return metric?.type === 'Gauge' ? metric.state.value : undefined;
+          })
+        )
+      );
+    try {
+      await expect(download('https://img.clerk.com/picture')).rejects.toMatchObject({
+        _tag: 'PictureUnavailable',
+      });
+      expect(await health()).toBe(0);
+      expect(await download('https://disallowed.example/picture')).toMatchObject({
+        _tag: 'Rejected',
+        reason: 'picture-source-rejected',
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(await health()).toBe(0);
+      expect(await download('https://img.clerk.com/picture')).toEqual({
+        _tag: 'Downloaded',
+        bytes: Buffer.from('picture bytes'),
+      });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(await health()).toBe(1);
+    } finally {
+      await runtime.dispose();
     }
   });
 });

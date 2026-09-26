@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 
-function fixture(t) {
+function fixture(t, allowedCapabilityDependencies = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'architecture-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const example = path.join(root, 'apps/example');
@@ -19,6 +19,7 @@ function fixture(t) {
   fs.writeFileSync(path.join(example, 'package.json'), JSON.stringify({ name: '@wallpaperdb/example', type: 'module' }));
   fs.writeFileSync(path.join(example, 'quality.config.json'), JSON.stringify({
     capabilities: ['catalogue', 'projection'],
+    allowedCapabilityDependencies,
     publicModules: ['catalogue', 'projection', 'adapters/search'],
   }));
   fs.symlinkSync(path.join(repository, 'node_modules'), path.join(example, 'node_modules'), 'dir');
@@ -145,3 +146,23 @@ for (const [name, directory, specifier] of [
     assert.match(result.stderr, /another workspace must communicate with the example through its external contracts/);
   });
 }
+
+
+test('architecture permits an explicitly authorized shared policy only in its consuming capability', (t) => {
+  const project = fixture(t, { catalogue: ['@wallpaperdb/profile-markdown'] });
+  project.source('catalogue/index.ts', "import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';\nexport const validate = validateProfileMarkdown;\n");
+  assert.equal(project.run().status, 0);
+  project.source('projection/index.ts', "import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';\nexport const validate = validateProfileMarkdown;\n");
+  const result = project.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /projection depends on external technology @wallpaperdb\/profile-markdown/);
+});
+
+test('architecture shared-policy exception does not allow vendor dependencies or package subpaths', (t) => {
+  const project = fixture(t, { catalogue: ['@wallpaperdb/profile-markdown'] });
+  project.source('catalogue/index.ts', "import { createHash } from 'node:crypto';\nimport { hidden } from '@wallpaperdb/profile-markdown/private';\nexport const value = [createHash, hidden];\n");
+  const result = project.run();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /catalogue depends on external technology node:crypto/);
+  assert.match(result.stderr, /catalogue depends on external technology @wallpaperdb\/profile-markdown\/private/);
+});

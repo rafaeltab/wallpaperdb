@@ -13,7 +13,7 @@ import { userLayer } from '../src/app.js';
 import { createHttpApp } from '../src/http/index.js';
 import type { Config } from '../src/config.js';
 import {
-  Profiles,
+  type Profiles,
   ProfileUnavailable,
   type ExternalIdentity,
   type Identities,

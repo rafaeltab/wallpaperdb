@@ -516,6 +516,8 @@ describe('Profiles capability', () => {
     const scheduled = accepted(
       await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 2))
     );
+    if (!scheduled.aliases[0].expiresAt) throw new Error('Expected scheduled alias');
+    const scheduledDeadline = new Date(scheduled.aliases[0].expiresAt);
     const kept = accepted(await test.run((p) => p.reactivateAlias(principal, before.handle, 3)));
     expect(kept.aliases[0]).toMatchObject({
       claimGeneration: changed.aliases[0]?.claimGeneration,
@@ -527,9 +529,9 @@ describe('Profiles capability', () => {
           {
             profileId: 'owner',
             handle: before.handle,
-            claimGeneration: scheduled.aliases[0]!.claimGeneration,
+            claimGeneration: scheduled.aliases[0].claimGeneration,
           },
-          new Date(scheduled.aliases[0]!.expiresAt!)
+          scheduledDeadline
         )
       )
     ).toBe(false);
@@ -542,8 +544,29 @@ describe('Profiles capability', () => {
       await test.run((p) => p.reactivateAlias(principal, before.handle, 6))
     );
     expect(reactivated).toMatchObject({ version: 7, handle: 'second' });
-    expect(reactivated.aliases[0]!.claimGeneration).toBeGreaterThan(
-      changed.aliases[0]!.claimGeneration
+    expect(reactivated.aliases[0].claimGeneration).toBeGreaterThan(
+      changed.aliases[0].claimGeneration
     );
+  });
+
+  it('adopts a staged picture just before expiry and rejects exactly expired pictures without a transition', async () => {
+    at('2030-01-01T12:00:00.000Z');
+    const test = controlledProfiles();
+    await test.ensure();
+    const expiresAt = new Date('2030-01-01T13:00:00.000Z');
+    test.stagePicture({ id: 'before-deadline', profileId: 'owner', expiresAt });
+    test.stagePicture({ id: 'at-deadline', profileId: 'owner', expiresAt });
+    at('2030-01-01T12:59:59.999Z');
+    const adopted = accepted(
+      await test.run((p) => p.adoptPicture(principal, 'before-deadline', 1))
+    );
+    expect(adopted).toMatchObject({ pictureAssetId: 'before-deadline', version: 2 });
+    at(expiresAt.toISOString());
+    expect(await test.run((p) => p.adoptPicture(principal, 'at-deadline', 2))).toMatchObject({
+      _tag: 'Rejected',
+      reason: 'picture-unavailable',
+    });
+    expect(await test.ensure()).toEqual(adopted);
+    expect(test.transitions.filter((t) => t.mutation.type === 'picture')).toHaveLength(1);
   });
 });

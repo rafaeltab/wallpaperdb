@@ -304,6 +304,10 @@ export function controlledProfiles(overrides: Partial<ProfilePolicy> = {}) {
     setPolicy: (changes: Partial<ProfilePolicy>) => {
       policy = { ...policy, ...changes };
     },
+    stagePicture: (asset: { id: string; profileId: string; expiresAt: Date }) => {
+      if (assets.has(asset.id)) throw new Error('Picture is already staged');
+      assets.set(asset.id, structuredClone({ ...asset, state: 'staged' }));
+    },
     publishWallpaper: (wallpaperId: string, profileId: string) => {
       if (!wallpaperOwners.has(wallpaperId)) wallpaperOwners.set(wallpaperId, profileId);
     },

@@ -14,6 +14,8 @@ Additional contexts are documented lazily as their domain language is resolved.
 
 - [Media delivery](./apps/media/CONTEXT.md) - owns the delivery catalog and serves immutable assets
 
+- [Tagging](./apps/tags/CONTEXT.md) - reserved for wallpaper classification; domain language remains undefined
+
 ## Relationships
 
 - **User -> Gateway**: User publishes Profile events; Gateway projects public Profile reads and search into GraphQL.

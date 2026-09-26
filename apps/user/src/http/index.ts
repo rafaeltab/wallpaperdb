@@ -87,7 +87,10 @@ export async function createHttpApp<E>(
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
   let deadline: ReturnType<typeof setTimeout> | undefined;
   let disposing: Promise<void> | undefined;
-  const dispose = () => (disposing ??= runtime.dispose());
+  const dispose = () => {
+    disposing ??= runtime.dispose();
+    return disposing;
+  };
   app.addHook('preClose', async () => {
     app.connectionsState.isShuttingDown = true;
     deadline = setTimeout(() => {

@@ -11,13 +11,18 @@ import { sendProfile } from './profile.js';
 
 const remove = z.object({ expectedVersion: z.number().int().positive().safe() });
 const pictureParams = z.object({ pictureId: z.string() });
-function sendPicture(reply: FastifyReply, outcome: ProfileOutcome | PictureRejection) {
-  if (
+function isPictureRejection(
+  outcome: ProfileOutcome | PictureRejection
+): outcome is PictureRejection {
+  return (
     outcome._tag === 'Rejected' &&
     (outcome.reason === 'invalid-picture' ||
       outcome.reason === 'picture-too-large' ||
       outcome.reason === 'picture-source-rejected')
-  ) {
+  );
+}
+function sendPicture(reply: FastifyReply, outcome: ProfileOutcome | PictureRejection) {
+  if (isPictureRejection(outcome)) {
     const status = outcome.reason === 'picture-too-large' ? 413 : 400;
     return reply
       .code(status)

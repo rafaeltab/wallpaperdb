@@ -33,7 +33,7 @@ describe('User HTTP adapter', () => {
   });
   it.each([
     'Bearer not-json',
-    'Bearer ' + Buffer.from(JSON.stringify({ id: '' })).toString('base64'),
+    `Bearer ${Buffer.from(JSON.stringify({ id: '' })).toString('base64')}`,
     'Basic anything',
   ])('rejects malformed credentials %s', async (authorization) => {
     const app = await createHttpApp(

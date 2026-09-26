@@ -2,7 +2,7 @@ import { and, eq, gt, inArray, isNull, isNotNull, lte, or } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { handleClaims, outboxEvents, wallpaperOwnership } from '../../db/schema.js';
 import { MaintenanceFailure, MaintenanceStore } from '../../maintenance/index.js';
-import { Database } from '../database/index.js';
+import { Database, databaseDiagnostic } from '../database/index.js';
 
 const expired = (cutoff: Date) =>
   and(
@@ -22,14 +22,15 @@ export const eventStoreLayer = () =>
       ) =>
         Effect.tryPromise({
           try: (signal) => database.run(run, signal),
-          catch: (cause) => new MaintenanceFailure({ operation, cause }),
+          catch: (cause) => new MaintenanceFailure({ operation, cause: databaseDiagnostic(cause) }),
         }).pipe(
           Effect.tapError((failure) =>
             Effect.logError('Profile maintenance persistence unavailable', {
               operation,
               cause: failure.cause,
             })
-          )
+          ),
+          Effect.withSpan(`profiles.maintenance-store.${operation}`)
         );
       return MaintenanceStore.of({
         dueAliases: (now, after) =>

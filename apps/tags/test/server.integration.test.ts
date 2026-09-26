@@ -81,3 +81,58 @@ it('serves health and readiness through a real listener and releases its resourc
   await expect.poll(databaseConnections).toBe(0);
   await expect(fetch(`${address}/ready`, { signal: AbortSignal.timeout(3000) })).rejects.toThrow();
 }, 10000);
+
+it('releases acquired connections when the listener port is already occupied', async () => {
+  const occupied = createServer();
+  occupied.listen(0, '0.0.0.0');
+  await once(occupied, 'listening');
+  const address = occupied.address();
+  if (!address || typeof address === 'string') throw new Error('Expected TCP listener');
+  try {
+    const baseline = await brokerConnections();
+    const result = await Effect.runPromise(
+      startTags(config(address.port)).pipe(Effect.scoped, Effect.result)
+    );
+    expect(result._tag).toBe('Failure');
+    if (result._tag === 'Failure') {
+      expect(result.failure).toMatchObject({ _tag: 'StartupFailure', stage: 'listener' });
+    }
+    await expect.poll(brokerConnections).toBe(baseline);
+    await expect.poll(databaseConnections).toBe(0);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      occupied.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+}, 10000);
+
+it('exits with a safe configuration failure before connecting dependencies', async () => {
+  const baseline = await brokerConnections();
+  const child = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
+    env: {
+      ...process.env,
+      DOTENV_CONFIG_PATH: '/dev/null',
+      DATABASE_URL: 'https://tags:private-configuration-marker@database.example/tags',
+      NATS_URL: nats.getConnectionUrl(),
+      OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const chunks: Buffer[] = [];
+  child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+  child.stderr.on('data', (chunk: Buffer) => chunks.push(chunk));
+  try {
+    const [code] = await once(child, 'exit', { signal: AbortSignal.timeout(5000) });
+    expect(code).toBe(1);
+    const output = Buffer.concat(chunks).toString();
+    expect(output).toContain('Invalid tags configuration');
+    expect(output).not.toContain('private-configuration-marker');
+    expect(await brokerConnections()).toBe(baseline);
+    expect(await databaseConnections()).toBe(0);
+  } finally {
+    if (child.exitCode === null) child.kill('SIGKILL');
+  }
+}, 10000);
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { createServer } from 'node:net';

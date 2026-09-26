@@ -12,6 +12,7 @@ import {
   type WallpaperVariantAvailableEvent,
 } from '@wallpaperdb/events';
 import { DateTime, Option, Predicate, Schema, SchemaGetter } from 'effect';
+import type { MsgHdrs } from 'nats';
 import type { Occurrence, ProjectionChange } from '../../projection/index.js';
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
@@ -45,17 +46,18 @@ const cloudTime = Schema.String.check(
     encode: SchemaGetter.passthrough(),
   })
 );
+const cloudMetadata = Schema.Struct({
+  specversion: Schema.Literal('1.0'),
+  id: Schema.NonEmptyString,
+  source: Schema.NonEmptyString,
+  type: Schema.NonEmptyString,
+  time: cloudTime,
+  correlationid: Schema.optionalKey(Schema.String),
+  causationid: Schema.optionalKey(Schema.String),
+});
+const decodeCloudMetadata = Schema.decodeUnknownOption(cloudMetadata);
 const decodeCloud = Schema.decodeUnknownOption(
-  Schema.Struct({
-    specversion: Schema.Literal('1.0'),
-    id: Schema.NonEmptyString,
-    source: Schema.NonEmptyString,
-    type: Schema.NonEmptyString,
-    time: cloudTime,
-    data: Schema.Record(Schema.String, Schema.Unknown),
-    correlationid: Schema.optionalKey(Schema.String),
-    causationid: Schema.optionalKey(Schema.String),
-  })
+  Schema.Struct({ ...cloudMetadata.fields, data: Schema.Record(Schema.String, Schema.Unknown) })
 );
 const historicalProfile = PublicProfileSnapshotSchema.strip();
 type LegacyEvent =
@@ -105,10 +107,34 @@ export type TranslatedEvent =
     }
   | { readonly _tag: 'Invalid' };
 
-export function translate(subject: string, payload: Uint8Array): TranslatedEvent {
+export function translate(
+  subject: string,
+  payload: Uint8Array,
+  headers?: MsgHdrs
+): TranslatedEvent {
   const raw = Option.flatMap(decodeUtf8(payload), decodeJson);
   if (Option.isNone(raw)) return { _tag: 'Invalid' };
   const envelope = decodeCloud(raw.value);
+  const binary = decodeCloudMetadata({
+    specversion: headers?.get('ce-specversion'),
+    source: headers?.get('ce-source'),
+    id: headers?.get('ce-id'),
+    type: headers?.get('ce-type'),
+    time: headers?.get('ce-time'),
+    ...(headers?.get('ce-correlationid') ? { correlationid: headers.get('ce-correlationid') } : {}),
+    ...(headers?.get('ce-causationid') ? { causationid: headers.get('ce-causationid') } : {}),
+  });
+  const metadata = Option.orElse(envelope, () => binary);
+  const hasBinary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'));
+  if (hasBinary && Option.isNone(binary)) return { _tag: 'Invalid' };
+  if (
+    Option.isSome(envelope) &&
+    Option.isSome(binary) &&
+    (envelope.value.source !== binary.value.source ||
+      envelope.value.correlationid !== binary.value.correlationid ||
+      envelope.value.causationid !== binary.value.causationid)
+  )
+    return { _tag: 'Invalid' };
   if (Predicate.hasProperty(raw.value, 'specversion') && Option.isNone(envelope))
     return { _tag: 'Invalid' };
   const event = parseLegacy(
@@ -122,19 +148,26 @@ export function translate(subject: string, payload: Uint8Array): TranslatedEvent
       : raw.value
   );
   if (!event || event.eventType !== subject) return { _tag: 'Invalid' };
+  if (
+    Option.isSome(binary) &&
+    (binary.value.id !== event.eventId ||
+      binary.value.type !== event.eventType ||
+      binary.value.time !== occurrenceTime(event.timestamp))
+  )
+    return { _tag: 'Invalid' };
   const occurrence: Occurrence = {
-    source: Option.isSome(envelope) ? envelope.value.source : legacySource(event.eventType),
+    source: Option.isSome(metadata) ? metadata.value.source : legacySource(event.eventType),
     id: event.eventId,
     occurredAt: occurrenceTime(event.timestamp),
   };
   return {
     _tag: 'Translated',
     change: toChange(event, occurrence),
-    ...(Option.isSome(envelope) && envelope.value.correlationid
-      ? { correlationId: envelope.value.correlationid }
+    ...(Option.isSome(metadata) && metadata.value.correlationid
+      ? { correlationId: metadata.value.correlationid }
       : {}),
-    ...(Option.isSome(envelope) && envelope.value.causationid
-      ? { causationId: envelope.value.causationid }
+    ...(Option.isSome(metadata) && metadata.value.causationid
+      ? { causationId: metadata.value.causationid }
       : {}),
   };
 }

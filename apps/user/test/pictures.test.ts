@@ -54,8 +54,6 @@ function setup() {
         const asset = {
           ...input,
           id,
-          storageBucket: 'pictures',
-          storageKey: `${input.profileId}/${id}.webp`,
         };
         assets.set(id, { ...asset, state: 'uploading' });
         return asset;
@@ -91,23 +89,23 @@ function setup() {
     settleImport: () => Effect.void,
   };
   const objectStore: PictureObjects = {
-    put: (asset, bytes) =>
+    put: (assetId, bytes) =>
       Effect.gen(function* () {
-        expect(assets.get(asset.id)?.state).toBe('uploading');
+        expect(assets.get(assetId)?.state).toBe('uploading');
         if (storageFailure)
           return yield* Effect.fail(
             new PictureUnavailable({ operation: 'put-picture', cause: new Error('Reply lost') })
           );
-        objects.set(asset.id, bytes);
+        objects.set(assetId, bytes);
       }),
-    delete: (asset) =>
+    delete: (assetId) =>
       Effect.gen(function* () {
-        expect(assets.get(asset.id)?.state).toBe('deleting');
+        expect(assets.get(assetId)?.state).toBe('deleting');
         if (storageFailure)
           return yield* Effect.fail(
             new PictureUnavailable({ operation: 'delete-picture', cause: new Error('Reply lost') })
           );
-        objects.delete(asset.id);
+        objects.delete(assetId);
       }),
   };
   const runtime = ManagedRuntime.make(
@@ -161,7 +159,7 @@ describe('Picture capability', () => {
       test.run((pictures) => pictures.upload({ profileId: 'owner' }, Buffer.from('image'), 4))
     ).rejects.toMatchObject({ _tag: 'PictureUnavailable' });
     expect([...test.assets.values()]).toMatchObject([
-      { profileId: 'owner', state: 'uploading', storageBucket: 'pictures', fileSizeBytes: 5 },
+      { profileId: 'owner', state: 'uploading', fileSizeBytes: 5 },
     ]);
     expect(test.adoptions).toEqual([]);
   });

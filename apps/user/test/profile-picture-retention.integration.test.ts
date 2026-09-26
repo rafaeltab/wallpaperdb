@@ -181,7 +181,7 @@ describe('Private Profile picture retention', () => {
             region: policy.s3Region,
             accessKeyId: policy.s3AccessKeyId,
             secretAccessKey: policy.s3SecretAccessKey,
-          }),
+          }).pipe(Layer.provide(database)),
           pictureSourceLayer({
             maxBytes: policy.profilePictureMaxBytes,
             timeoutMs: policy.profilePictureImportTimeoutMs,

@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, isNull, isNotNull, lte, or } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
-import { outboxEvents, wallpaperOwnership } from '../../db/schema.js';
+import { handleClaims, outboxEvents, wallpaperOwnership } from '../../db/schema.js';
 import { MaintenanceFailure, MaintenanceStore } from '../../maintenance/index.js';
 import { Database } from '../database/index.js';
 
@@ -32,6 +32,37 @@ export const eventStoreLayer = () =>
           )
         );
       return MaintenanceStore.of({
+        dueAliases: (now, after) =>
+          execute('due-aliases', async (db) => {
+            const rows = await db
+              .select({
+                handle: handleClaims.handle,
+                profileId: handleClaims.profileId,
+                claimGeneration: handleClaims.claimGeneration,
+                expiresAt: handleClaims.expiresAt,
+              })
+              .from(handleClaims)
+              .where(
+                and(
+                  eq(handleClaims.kind, 'alias'),
+                  lte(handleClaims.expiresAt, now),
+                  after
+                    ? or(
+                        gt(handleClaims.expiresAt, after.expiresAt),
+                        and(
+                          eq(handleClaims.expiresAt, after.expiresAt),
+                          gt(handleClaims.handle, after.handle)
+                        )
+                      )
+                    : undefined
+                )
+              )
+              .orderBy(handleClaims.expiresAt, handleClaims.handle)
+              .limit(100);
+            return rows.flatMap((row) =>
+              row.expiresAt ? [{ ...row, expiresAt: row.expiresAt }] : []
+            );
+          }),
         recordWallpaperOwnership: (ownership) =>
           execute('record-wallpaper-ownership', async (db) => {
             await db

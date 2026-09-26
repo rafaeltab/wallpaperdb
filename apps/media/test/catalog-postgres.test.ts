@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogOutbox, CatalogProjection, type ProjectionInput } from '../src/catalog/index.js';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
 import { Catalog } from '../src/delivery/index.js';
-import { wallpapers } from '../src/db/schema.js';
+import { wallpapers, variants } from '../src/db/schema.js';
 
 const wallpaper: ProjectionInput = {
   kind: 'wallpaper',
@@ -294,21 +294,106 @@ describe('PostgreSQL catalog contract', () => {
   });
   it('reconciles a pre-migration wallpaper without changing its committed metadata', async () => {
     if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
-    await drizzle(pool).insert(wallpapers).values({ ...wallpaper.wallpaper, createdAt: new Date('2025-12-31T00:00:00.000Z') });
-    const replay: ProjectionInput = { ...wallpaper, wallpaper: { ...wallpaper.wallpaper, width: 800, storageKey: 'must-not-replace' } };
-    await runtime.runPromise(Effect.gen(function* () {
-      const projection = yield* CatalogProjection;
-      yield* projection.accept(replay);
-      const catalog = yield* Catalog;
-      expect(yield* catalog.findWallpaper('wlpr_one')).toMatchObject({ width: 1920, storageKey: 'original' });
-      const outbox = yield* CatalogOutbox;
-      const pending = yield* outbox.listPending(10);
-      expect(pending).toHaveLength(1);
-      expect(pending[0]?.variant).toMatchObject({ width: 1920, createdAt: '2025-12-31T00:00:00.000Z' });
-      for (const item of pending) yield* outbox.markPublished(item.id);
-      yield* projection.accept({ ...replay, occurrence: { source: 'ingestor', id: 'same-legacy-target-new-occurrence' } });
-      expect(yield* outbox.listPending(10)).toEqual([]);
-    }));
+    await drizzle(pool)
+      .insert(wallpapers)
+      .values({ ...wallpaper.wallpaper, createdAt: new Date('2025-12-31T00:00:00.000Z') });
+    const replay: ProjectionInput = {
+      ...wallpaper,
+      wallpaper: { ...wallpaper.wallpaper, width: 800, storageKey: 'must-not-replace' },
+    };
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const projection = yield* CatalogProjection;
+        yield* projection.accept(replay);
+        const catalog = yield* Catalog;
+        expect(yield* catalog.findWallpaper('wlpr_one')).toMatchObject({
+          width: 1920,
+          storageKey: 'original',
+        });
+        const outbox = yield* CatalogOutbox;
+        const pending = yield* outbox.listPending(10);
+        expect(pending).toHaveLength(1);
+        expect(pending[0]?.variant).toMatchObject({
+          width: 1920,
+          createdAt: '2025-12-31T00:00:00.000Z',
+        });
+        for (const item of pending) yield* outbox.markPublished(item.id);
+        yield* projection.accept({
+          ...replay,
+          occurrence: { source: 'ingestor', id: 'same-legacy-target-new-occurrence' },
+        });
+        expect(yield* outbox.listPending(10)).toEqual([]);
+      })
+    );
   });
 
+  it('reuses pre-migration variant identity and metadata under concurrent occurrence replay', async () => {
+    if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
+    const fixture = drizzle(pool);
+    await fixture
+      .insert(wallpapers)
+      .values({ ...wallpaper.wallpaper, createdAt: new Date(wallpaper.wallpaper.createdAt) });
+    await fixture
+      .insert(variants)
+      .values({
+        id: 'var_zzlegacy',
+        wallpaperId: 'wlpr_one',
+        storageKey: 'legacy-small',
+        width: 640,
+        height: 360,
+        fileSizeBytes: 100,
+        createdAt: new Date('2025-12-31T00:00:00.000Z'),
+      });
+    const input: ProjectionInput = {
+      kind: 'variant',
+      occurrence: { source: 'generator', id: 'legacy-variant-replay' },
+      occurredAt: '2026-01-01T00:00:01.000Z',
+      variant: {
+        wallpaperId: 'wlpr_one',
+        storageBucket: 'wallpapers',
+        storageKey: 'legacy-small',
+        mimeType: 'image/webp',
+        width: 320,
+        height: 180,
+        fileSizeBytes: 50,
+        createdAt: '2026-01-01T00:00:01.000Z',
+      },
+    };
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const projection = yield* CatalogProjection;
+        yield* Effect.all(
+          [
+            projection.accept(input),
+            projection.accept({
+              ...input,
+              occurrence: { source: 'generator', id: 'legacy-distinct-replay' },
+            }),
+          ],
+          { concurrency: 2 }
+        );
+        const catalog = yield* Catalog;
+        expect(yield* catalog.findSmallestVariant('wlpr_one', 1, 1)).toMatchObject({
+          id: 'var_zzlegacy',
+          storageBucket: 'wallpapers',
+          width: 640,
+        });
+        const outbox = yield* CatalogOutbox;
+        const pending = yield* outbox.listPending(10);
+        expect(pending).toHaveLength(1);
+        expect(pending[0]?.variant).toMatchObject({
+          width: 640,
+          fileSizeBytes: 100,
+          format: 'image/jpeg',
+          createdAt: '2025-12-31T00:00:00.000Z',
+        });
+        for (const item of pending) yield* outbox.markPublished(item.id);
+        yield* projection.accept({
+          ...input,
+          occurrence: { source: 'generator', id: 'legacy-third-replay' },
+        });
+        expect(yield* outbox.listPending(10)).toEqual([]);
+      })
+    );
+  });
 });

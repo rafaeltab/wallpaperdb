@@ -5,7 +5,7 @@ description: Minimal tagging service shell
 
 The Tags Service is currently a minimal shell that reserves runtime wiring for future tagging work without committing to a domain interface or storage model yet.
 
-**Status:** 🚧 In Development
+The shell uses Effect for dependency composition, request execution, and scoped resource cleanup. There are no tag operations, publications, or consumers.
 
 ## Quick Start
 
@@ -21,16 +21,20 @@ make dev PACKAGE=tags
 
 ## Implemented Today
 
-- Fastify service scaffold with OpenAPI registration
+- Fastify operational endpoints with generated OpenAPI
 - PostgreSQL and NATS connection lifecycle management
 - Health and readiness endpoints only
 
-## Current API Surface
+## Current API
 
 ### Health
 
 - `GET /health`
 - `GET /ready`
+
+Healthy and degraded health results return HTTP 200. Unhealthy and shutdown results return HTTP 503 with Problem Details and a `healthStatus` extension. Readiness reflects completed startup and shutdown state, independently of dependency health.
+
+PostgreSQL connects lazily, while NATS connects before the listener accepts work. Health probes cancel PostgreSQL work at their five-second deadline. Shutdown allows requests five seconds to finish before interrupting remaining work and releasing resources. Telemetry initializes before external clients load and flushes during shutdown.
 
 No domain routes are published yet, and no tags-specific schema is defined. The shell is intentionally limited to operational endpoints until the tagging model is defined.
 
@@ -45,6 +49,18 @@ NATS_STREAM=WALLPAPER
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_SERVICE_NAME=tags
 ```
+
+## Validation
+
+```bash
+make check PACKAGE=tags
+make test-unit PACKAGE=tags
+make test-integration PACKAGE=tags
+make check-crap PACKAGE=tags CRAP_THRESHOLD=30
+make run PACKAGE=tags SCRIPT=gen:swagger
+```
+
+Integration tests use real PostgreSQL and NATS. They also exercise the built Node entrypoint and the production telemetry mechanism. No tagging feature exists to demonstrate in the wallpaper UI.
 
 ## Related Documentation
 

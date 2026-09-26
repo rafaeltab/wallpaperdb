@@ -1,15 +1,13 @@
 # @wallpaperdb/tags
 
-Provides the initial service shell for future tagging work.
+The Tagging service is an operational skeleton. It exposes `/health`, `/ready`, and OpenAPI at `/documentation`, with scoped PostgreSQL and NATS connections. It has no tag routes, persistence schema, publishers, or consumers.
 
-## Key Capabilities
+Fastify runs requests through application-owned Effect ports. Composition owns dependency Layers; the executable owns telemetry and the HTTP listener. Each application instance has its own resources.
 
-- Starts a Fastify service with OpenAPI plus health and readiness endpoints
-- Connects to PostgreSQL and NATS so domain behavior can be added later
-- Intentionally does not expose tag-specific routes or define a persistence schema yet
+Health reports database, NATS, and telemetry checks. Healthy and degraded results return 200 for compatibility. Unhealthy and shutdown results return 503 Problem Details. Readiness reflects startup and shutdown state, independently of live dependency health. PostgreSQL connects lazily; NATS must connect before the listener starts.
 
-## Technology Choices
+Shutdown gives network requests five seconds to finish, then interrupts their effects and closes remaining sockets before releasing dependencies. Database probes have a five-second deadline and destroy checked-out clients on cancellation. NATS has no messages to drain because this skeleton does not publish or subscribe.
 
-- **Fastify + TSyringe** to match the existing service pattern and keep service scaffolding uniform
-- **PostgreSQL + NATS** wiring retained as infrastructure shell only
-- **OpenTelemetry** for consistent service observability
+Use `make check PACKAGE=tags`, `make test-unit PACKAGE=tags`, and `make test-integration PACKAGE=tags`. Integration tests require Docker and exercise real PostgreSQL, NATS, the built executable, and telemetry. `make run PACKAGE=tags SCRIPT=gen:swagger` generates the contract without external dependencies.
+
+See [the migration record](../../plans/tag-service-effect-migration.md) for preservation decisions and validation evidence.

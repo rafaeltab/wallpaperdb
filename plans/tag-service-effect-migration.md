@@ -41,3 +41,12 @@ Intentional corrections: use stable Problem Details for HTTP errors, including 5
 ## Validation and review log
 
 Record completed tests, red/green evidence, review findings and delivery here as work progresses.
+
+### Implementation evidence
+
+- Availability: failing public-port tests added before healthy, mixed/unhealthy, shutdown, and readiness implementations. Eight tests cover the policy without infrastructure.
+- HTTP: red/green cycles for contracts, unavailable health/readiness, safe errors, CORS, and OpenAPI. The two old casted route tests are replaced by exact public HTTP assertions.
+- Configuration: explicit-environment default test failed before removing global reads; invalid port and protocol tests failed before stricter parsing. Defaults and configured values remain explicit literals in tests.
+- Dependencies: real PostgreSQL and NATS without JetStream. A stalled SELECT test originally took 5003 ms against a 1000 ms limit, then passed with client destruction on interruption. Scope disposal removes database sessions and NATS connections. No schema or stream is needed.
+- Telemetry: the production composition test failed on incoming trace identity before the HTTP bridge. Removing only the production tracer or Effect metric producer fails the corresponding mechanism test. A stalled-collector test demonstrated that timeout-only shutdown leaked sockets; owned HTTP agents close them.
+- HTTP lifecycle: a real network request hung before the shutdown timer and passed after the deadline interrupted its Effect and closed sockets. A separate real request completes inside the grace period before dependencies close. Injection-only tests are insufficient for this transport guarantee.

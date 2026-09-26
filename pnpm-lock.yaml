@@ -870,9 +870,6 @@ importers:
       '@aws-sdk/client-s3':
         specifier: ^3.709.0
         version: 3.958.0
-      '@clerk/backend':
-        specifier: ^3.4.1
-        version: 3.4.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@clerk/fastify':
         specifier: ^3.1.19
         version: 3.1.19(fastify@5.6.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
@@ -894,9 +891,6 @@ importers:
       '@fastify/swagger-ui':
         specifier: ^5.0.0
         version: 5.2.3
-      '@kubiks/otel-drizzle':
-        specifier: ^2.1.0
-        version: 2.1.0(@opentelemetry/api@1.9.0)(drizzle-orm@0.38.4(@opentelemetry/api@1.9.0)(@types/pg@8.16.0)(@types/react@19.2.7)(pg@8.16.3)(postgres@3.4.7)(react@19.2.3))
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -933,9 +927,6 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: 1.43.0
         version: 1.43.0
-      '@wallpaperdb/auth':
-        specifier: workspace:*
-        version: link:../../packages/auth
       '@wallpaperdb/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -957,24 +948,15 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.6.2
-      fastify-plugin:
-        specifier: ^5.1.0
-        version: 5.1.0
       nats:
         specifier: ^2.29.1
         version: 2.29.3
       pg:
         specifier: ^8.13.1
         version: 8.16.3
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
       sharp:
         specifier: ^0.33.5
         version: 0.33.5
-      tsyringe:
-        specifier: ^4.10.0
-        version: 4.10.0
       ulid:
         specifier: ^2.3.0
         version: 2.4.0

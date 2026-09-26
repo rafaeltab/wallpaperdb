@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { clearTokenProvider, getAuthToken, setTokenProvider } from '@/lib/auth/token-provider';
 
 describe('token-provider', () => {

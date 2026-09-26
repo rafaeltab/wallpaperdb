@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type UploadQueueAction,
   type UploadQueueState,
   MAX_FILES_PER_BATCH,
   uploadQueueReducer,
 } from '@/contexts/upload-queue-context';
 
 // Helper to create a mock file
-function createMockFile(name = 'test.jpg', size = 1024): File {
+function createMockFile(name = 'test.jpg'): File {
   return new File(['test'], name, { type: 'image/jpeg' });
 }
 

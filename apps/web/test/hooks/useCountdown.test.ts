@@ -58,7 +58,7 @@ describe('useCountdown', () => {
   });
 
   it('updates when pausedUntil changes', () => {
-    const { result, rerender } = renderHook(
+    const { result, rerender } = renderHook<string | null, { pausedUntil: number | null }>(
       ({ pausedUntil }: { pausedUntil: number | null }) => useCountdown(pausedUntil),
       { initialProps: { pausedUntil: null } }
     );

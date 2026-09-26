@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "types": ["node", "vitest/globals"],
     "skipLibCheck": true,
@@ -16,5 +16,10 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "playwright.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "specs/**/*.ts",
+    "playwright.config.ts"
+  ]
 }

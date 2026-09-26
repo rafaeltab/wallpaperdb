@@ -12,7 +12,7 @@ Recovery claims at most 100 records per cycle using expiring row leases and runs
 
 The event adapter emits CloudEvents 1.0 metadata while retaining the shared legacy wallpaper payload fields used by existing enrichment consumers. The local capability uses logical asset identities; the adapter translates them to the legacy bucket/key contract. Replacing that cross-service payload requires coordinated producer, consumer, and retained-event migration and is outside this service's architectural change.
 
-Capability tests exercise upload decisions, recovery, and cleanup failure isolation using controlled adapters and the Effect test clock. PostgreSQL contract tests verify reservations, atomic outbox commits, concurrency, leases, and quarantine against one real database per suite. A representative composed upload path uses the complete infrastructure stack; it does not establish every application wiring path. The rendered ingestor service documentation records the remaining behavioral coverage gaps.
+Capability tests exercise upload decisions, recovery, and cleanup failure isolation using controlled adapters and the Effect test clock. PostgreSQL contract tests verify reservations, atomic outbox commits, concurrency, leases, and quarantine against one real database per suite. A representative composed upload path uses the complete infrastructure stack; it does not establish every application wiring path. The [retained verification gaps](../../../../plans/README.md#verification-gaps-to-reassess) record the remaining behavioral coverage gaps.
 
 ## Deployment and existing records
 

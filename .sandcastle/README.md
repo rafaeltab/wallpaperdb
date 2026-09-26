@@ -1,68 +1,30 @@
-# WallpaperDB Sandcastle
+# Sandcastle
 
-This repo is configured to run Sandcastle with Docker sandboxes and OpenCode.
+Runs issue implementation and review agents in Docker sandboxes. Agent execution rules live in [WORKFLOW.md](WORKFLOW.md); coding requirements live in [CODING_STANDARDS.md](../CODING_STANDARDS.md).
 
-Coding and testing requirements are indexed in the repository's [CODING_STANDARDS.md](../CODING_STANDARDS.md). Sandcastle execution instructions live in [WORKFLOW.md](WORKFLOW.md).
+## Local setup
 
-## One-time/local setup
-
-The sandbox uses ignored local files for credentials:
-
-- `.sandcastle/.env` can contain `GH_TOKEN` from `gh auth token`. If this file is missing, `.sandcastle/main.ts` falls back to the local GitHub CLI credential from `gh auth token`.
-- `.sandcastle/.opencode/auth.json` is a copy of the host OpenCode OAuth credential.
-
-Refresh them with:
+Sign in to GitHub with `gh auth login` and to OpenCode, then refresh the ignored sandbox credentials:
 
 ```sh
 make sandcastle-auth
 ```
 
-Run `gh auth login` and sign in to OpenCode first. The command fails without changing the credential files if
-either source credential is unavailable.
+This copies the host OpenCode credential and GitHub token into `.sandcastle/`. If the local token file is absent, the runner can use the GitHub CLI credential. Keep these files out of Git.
 
-The Docker sandbox talks to the direct host Docker daemon via `DOCKER_HOST=unix:///var/run/docker.sock` and a bind-mounted `/var/run/docker.sock`. The sandbox user is added to the host Docker socket group, so the old LXD TCP Docker API proxy is no longer needed.
+The sandbox mounts the host Docker socket and the WallpaperDB config directory. Repository installation reads the mounted `secrets.env`, falling back to the legacy `secret.env`, and generates application environments before agents start. See [contributor setup](../CONTRIBUTING.md) for those credentials. Set `WALLPAPERDB_CONFIG_DIR` when the host config lives elsewhere.
 
-The sandbox also bind-mounts the host WallpaperDB config directory:
+## Run
 
-- host: `~/.config/wallpaperdb`
-- sandbox: `/home/agent/.config/wallpaperdb`
-
-`pnpm install` runs `scripts/setup-worktree.mjs`, which reads `~/.config/wallpaperdb/secrets.env` (falling back to the legacy `secret.env` filename) and writes ignored per-app `.env` files before any OpenCode agent starts.
-
-Override the host config path with `WALLPAPERDB_CONFIG_DIR=/path/to/config pnpm sandcastle` if needed.
-
-## Build the image
+Build the sandbox image, then start the loop:
 
 ```sh
 pnpm exec sandcastle docker build-image --image-name wallpaperdb-sandcastle:opencode
-```
-
-## Run the loop
-
-```sh
 pnpm sandcastle
 ```
 
-By default it runs up to 10 iterations. Override with:
+Only label issues `ready-for-agent` when they are suitable for unattended implementation. The runner plans issues, creates deterministic issue branches, runs implementation and review, and opens pull requests. Its [phase prompts](plan-prompt.md) and [workflow](WORKFLOW.md) are executable instructions, not background documentation.
 
-```sh
-SANDCASTLE_MAX_ITERATIONS=1 pnpm sandcastle
-```
+Each iteration removes its worktree's Docker containers, networks, and volumes. Use `SANDCASTLE_DOCKER_CLEANUP=false` when you need to retain them for diagnosis. Set `SANDCASTLE_MAX_ITERATIONS=1` for a single iteration and `SANDCASTLE_PR_BASE_BRANCH` to target a different base branch.
 
-OpenCode defaults to `openai/gpt-5.6` with the `medium` reasoning variant. Override either setting with `SANDCASTLE_OPENCODE_MODEL` or `SANDCASTLE_OPENCODE_VARIANT`.
-
-Sandcastle looks for open GitHub issues labeled `ready-for-agent`. Each iteration first runs an OpenCode planning agent, which selects actionable issues and returns deterministic branch assignments. The runner then creates each `sandcastle/issue-<number>` branch and starts a separate OpenCode implementation agent. Only after implementation commits exist does a reviewer agent review, fix, and verify the result on the same branch. The prompts require `make ci` to run inside the Docker sandbox before opening a pull request. The reviewer also writes an outcome-focused Conventional Commit title, summary, and test plan for the pull request. The runner pushes the branch and opens that pull request against the repository default branch with `Closes #<number>` so the issue closes when the change is merged. All phases and iterations run sequentially.
-
-At the end of every iteration, Sandcastle also cleans Docker resources for that worktree. Cleanup uses the same `COMPOSE_PROJECT_NAME` derived by `scripts/setup-worktree.mjs`, runs `docker compose down --volumes --remove-orphans` for both compose files, then removes any remaining containers, networks, and volumes whose names include that project name.
-
-Disable Docker cleanup with:
-
-```sh
-SANDCASTLE_DOCKER_CLEANUP=false pnpm sandcastle
-```
-
-Override the pull request base branch with:
-
-```sh
-SANDCASTLE_PR_BASE_BRANCH=my-base pnpm sandcastle
-```
+Model and reasoning overrides are `SANDCASTLE_OPENCODE_MODEL` and `SANDCASTLE_OPENCODE_VARIANT`. Read [the runner configuration](config.ts) for defaults instead of duplicating them here.

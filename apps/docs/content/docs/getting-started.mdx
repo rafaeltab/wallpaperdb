@@ -1,96 +1,12 @@
 ---
-title: Getting Started
-description: Quick start guide for WallpaperDB local development
+title: Getting started
+description: The maintained local setup and contribution guide.
 ---
 
-Get up and running with WallpaperDB in under 10 minutes.
+Follow [CONTRIBUTING.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTRIBUTING.md) for prerequisites, authentication setup, worktree configuration, and verification.
 
-## Prerequisites
+Run `make help` for available commands and your worktree's ingress address. Service URLs use that ingress; fixed localhost ports copied from older guides may belong to another worktree.
 
-- Docker & Docker Compose
-- Node.js 22+
-- pnpm 8+
-- Make
+For orientation, read the [context map](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTEXT-MAP.md) and the README of the workspace you are changing. Use the [coding standards index](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) to select relevant guidance.
 
-See [Local Setup](/docs/infrastructure/local-setup) for installation instructions.
-
-## Quick Start
-
-```bash
-# 1. Clone and install
-git clone https://github.com/your-org/wallpaperdb.git
-cd wallpaperdb
-pnpm install
-
-# 2. Start infrastructure
-make infra-start
-
-# 3. Run migrations
-pnpm --filter @wallpaperdb/ingestor db:migrate
-
-# 4. Start services
-make dev
-```
-
-**Access points:**
-- Gateway (GraphQL): http://localhost:3000
-- Ingestor: http://localhost:3001
-- Media: http://localhost:3002
-- Variant Generator: http://localhost:3004
-- Web Frontend: http://localhost:3005
-- Grafana: http://localhost:3000 (admin/admin)
-- SeaweedFS S3 API: http://localhost:8002 (slot 0; access key and secret key: `storageadmin`)
-
-The S3 host port is `8002 + 10 × slot` for other worktrees. See [SeaweedFS](/docs/infrastructure/seaweedfs) for S3 client operations and migration of existing S3 data.
-
-## Test the Upload Flow
-
-```bash
-# Create test image
-curl -o test.jpg https://via.placeholder.com/1920x1080.jpg
-
-# Upload wallpaper
-curl -X POST http://localhost:3001/upload \
-  -F "file=@test.jpg" \
-  -F "userId=test_user"
-
-# Response includes wallpaper ID
-# {"wallpaperId": "wlpr_...", "uploadState": "processing"}
-
-# Retrieve wallpaper (use ID from above)
-curl http://localhost:3002/wallpapers/wlpr_... > retrieved.jpg
-
-# Resize on-the-fly
-curl "http://localhost:3002/wallpapers/wlpr_...?w=800&h=600&fit=contain" > resized.jpg
-
-# Query via GraphQL
-curl -X POST http://localhost:3000/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ searchWallpapers(first: 10) { edges { node { wallpaperId } } } }"}'
-```
-
-## View Telemetry
-
-1. Open Grafana: http://localhost:3000
-2. Login: admin/admin
-3. Navigate to **Explore** → **Tempo**
-4. Search for service: `wallpaperdb-ingestor`
-5. View upload traces with full span details
-
-## Next Steps
-
-**Development:**
-- [Coding Standards](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) - Index of authoritative coding guidelines
-- [Development Workflow](/docs/development-guidelines) - TDD, incremental changes, and contributions
-- [Guide: Makefile Commands](/docs/guides/makefile-commands) - All available commands
-- [Testing](/docs/testing) - Test strategies and patterns
-
-**Architecture:**
-- [Services](/docs/services) - Service architecture
-- [Packages](/docs/packages) - Shared packages
-- [Infrastructure](/docs/infrastructure) - Infrastructure services
-
-**Guides:**
-- [Guide: Creating New Service](/docs/guides/creating-new-service) - Build a service
-- [Guide: Database Migrations](/docs/guides/database-migrations) - Schema changes
-- [Guide: Error Handling](/docs/guides/error-handling) - RFC 7807 patterns
+Upgrading an existing installation also requires the [service upgrade procedures](/docs/guides/service-upgrades). Existing MinIO objects need a separate [storage migration](/docs/infrastructure/seaweedfs#existing-minio-data).

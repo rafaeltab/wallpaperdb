@@ -1,124 +1,13 @@
 ---
-title: SeaweedFS
-description: S3-compatible object storage for wallpaper files
+title: Migrate storage to SeaweedFS
+description: Preserve existing MinIO objects and configuration when switching storage providers.
 ---
 
-SeaweedFS provides S3-compatible object storage for storing wallpaper files (originals and variants).
+Local object storage uses SeaweedFS. For connection settings, use the generated `infra/.env` and app environment files. Host S3 clients use the worktree's `S3_API_HOST_PORT`; Docker clients use the Compose service endpoint.
 
-## Quick Reference
+Profile picture buckets must remain private. Follow the [picture storage requirements](/docs/guides/service-upgrades#private-pictures-and-evidence), including when creating a custom bucket.
 
-- **Image**: `chrislusf/seaweedfs:4.47`
-- **Host S3 API**: http://localhost:8002 for worktree slot 0; other slots use `8002 + 10 × slot`
-- **Docker S3 API**: `http://seaweedfs:9000`
-- **Access key / secret key**: `storageadmin` / `storageadmin` (local development defaults)
-- **Buckets**: `wallpapers`, `example-bucket`, `profile-pictures`
-
-The Compose service runs SeaweedFS `mini`, which starts its storage components together and creates all three buckets through `S3_BUCKET`. Readiness checks authenticated access to each bucket. The S3 API is the published interface; administer objects through an S3 client such as the AWS CLI.
-
-## Configuration
-
-`infra/.env` uses `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `S3_API_HOST_PORT`. App configuration uses `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`. Local credentials default to `storageadmin` for both keys. Apps in Docker connect to `http://seaweedfs:9000`; tests on a shared Docker network use the builder's `s3` alias.
-
-Ingestor reconciliation uses `S3_CLEANUP_INTERVAL_MS` to configure the orphaned-object cleanup interval. Service health responses identify storage as `s3`.
-
-Existing environments must migrate their settings and regenerate `.env` files before restarting applications; see [Existing MinIO Data](#existing-minio-data).
-
-## Connection
-
-`S3Connection` uses the AWS SDK S3 client and connects to SeaweedFS without a provider-specific client. Tests compose `S3TesterBuilder`, configure `.withS3()`, and access object helpers through `tester.s3`. Use `tester.s3.getS3Client()` for direct AWS SDK commands.
-
-```typescript
-import { S3Connection } from "@wallpaperdb/core/connections";
-
-const s3 = new S3Connection({
-  s3Endpoint: 'http://localhost:8002',
-  s3AccessKeyId: 'storageadmin',
-  s3SecretAccessKey: 'storageadmin',
-  s3Bucket: 'wallpapers',
-  s3Region: 'us-east-1'
-});
-await s3.initialize();
-
-const client = s3.getClient();
-```
-
-## Buckets
-
-**wallpapers** - Main wallpaper storage
-- Path format: `wlpr_<ulid>/original.<ext>`
-- Public download access (local dev only)
-
-**example-bucket** - Testing/examples
-- Public download access (local dev only)
-
-Anonymous reads are scoped to these two public buckets. Listing and writes require credentials. The `mini` options disable automatic bucket creation on upload and deletion of nonempty buckets.
-
-**profile-pictures** - Private Profile picture assets
-
-User writes immutable Profile pictures here. All direct access requires credentials; anonymous reads, writes, and listing are denied. Media serves current pictures through its public endpoint after checking User's authoritative state. Replaced and removed assets stay private until evidence retention expires. If `PROFILE_PICTURE_BUCKET` is customized, provision that bucket privately and keep it out of the anonymous identity's permissions.
-
-## File Organization
-
-```
-wallpapers/
-└── wlpr_01HABCDEF123456789/
-    ├── original.jpg          # Original uploaded file
-    ├── 1920x1080.jpg         # Pre-generated variant
-    ├── 1280x720.jpg          # Pre-generated variant
-    └── thumbnail_small.jpg   # Thumbnail variant
-```
-
-## Common Operations
-
-**Upload file:**
-```typescript
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-
-await client.send(new PutObjectCommand({
-  Bucket: 'wallpapers',
-  Key: 'wlpr_123/original.jpg',
-  Body: buffer,
-  ContentType: 'image/jpeg'
-}));
-```
-
-**Download file:**
-```typescript
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-
-const response = await client.send(new GetObjectCommand({
-  Bucket: 'wallpapers',
-  Key: 'wlpr_123/original.jpg'
-}));
-
-const stream = response.Body;
-```
-
-**List objects:**
-```typescript
-import { ListObjectsV2Command } from "@aws-sdk/client-s3";
-
-const response = await client.send(new ListObjectsV2Command({
-  Bucket: 'wallpapers',
-  Prefix: 'wlpr_123/'
-}));
-```
-
-## CLI Operations
-
-With the AWS CLI installed, configure the local credentials and use your worktree's host endpoint:
-
-```bash
-export AWS_ACCESS_KEY_ID=storageadmin
-export AWS_SECRET_ACCESS_KEY=storageadmin
-export AWS_DEFAULT_REGION=us-east-1
-
-aws --endpoint-url http://localhost:8002 s3 ls s3://wallpapers/
-aws --endpoint-url http://localhost:8002 s3 cp ./wallpaper.jpg s3://wallpapers/example.jpg
-aws --endpoint-url http://localhost:8002 s3api head-object --bucket wallpapers --key example.jpg
-```
-
-## Existing MinIO Data
+## Existing MinIO data
 
 SeaweedFS uses a new `seaweedfs-data` Docker volume. Its storage format differs from MinIO's, so do not mount the old `minio-data` volume into SeaweedFS. The migration does not copy or delete existing objects; an existing database may therefore reference wallpapers that still need copying.
 
@@ -132,7 +21,7 @@ docker compose -p wallpaperdb -f infra/docker-compose.yml down --remove-orphans
 
 Do not add `--volumes` or `-v`; the old `minio-data` volume must remain intact. This also stops the other infrastructure containers for that project. Update configuration as described below before running `make infra-start` to start the new stack.
 
-### Update Existing Configuration
+### Update existing configuration
 
 Before regenerating environment files, copy any customized values from your existing `.env` files or override sources into the new settings:
 
@@ -147,9 +36,9 @@ Update your shared secrets file (`$XDG_CONFIG_HOME/wallpaperdb/secrets.env`, or 
 
 Run `make install` to regenerate `infra/.env` and per-app `.env` files. This replaces generated files, so save any custom values in the override sources first. Remove or update an overridden `S3_ENDPOINT=http://minio:9000`: Compose clients now use `http://seaweedfs:9000`, and the old network alias is removed. Host clients use their assigned `S3_API_HOST_PORT`.
 
-Update any external health checks that read the old `minio` response field to read `s3`. Code using shared packages must use `S3Connection`, `S3TesterBuilder`, `.withS3()`, `.withS3Bucket()`, `.withS3AutoCleanup()`, `.getS3()`, and `tester.s3`; the old names are removed.
+Update external health checks that read the old `minio` response field to read `s3`.
 
-### Copy and Verify Objects
+### Copy and verify objects
 
 For data you want to retain:
 
@@ -160,8 +49,3 @@ For data you want to retain:
 5. Resume applications against SeaweedFS after verification. Keep the source and backups until you explicitly decide to retire them.
 
 For disposable development data, start with the new empty object store and reset the associated database only if you intend to discard its existing wallpaper records. Avoid `make infra-reset` while preserving data, as it deletes active infrastructure volumes.
-
-## Related Documentation
-
-- [Services: Ingestor](/docs/services/ingestor) - File upload workflow
-- [Services: Media](/docs/services/media) - File retrieval

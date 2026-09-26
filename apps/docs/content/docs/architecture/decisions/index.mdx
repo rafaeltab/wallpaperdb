@@ -1,32 +1,16 @@
 ---
-title: Architecture Decisions
-description: Architecture Decision Records (ADRs) documenting major technical choices for WallpaperDB.
+title: Architecture decisions
+description: Historical decisions and links to the maintained domain records.
 ---
 
-All major architectural decisions are documented as ADRs (Architecture Decision Records).
+System-wide decisions live in [docs/adr](https://github.com/rafaeltab/wallpaperdb/tree/main/docs/adr). The [context map](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTEXT-MAP.md) links each context and its local decisions. Use that layout for new ADRs.
 
-## Available ADRs
+These site records remain available as history. Older implementation details may have been superseded by later decisions.
 
-- [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs) - Framework choice for multi-service architecture
-- [ADR-002: GraphQL Security Hardening](/docs/architecture/decisions/graphql-security-hardening) - Comprehensive GraphQL security without external complexity libraries
-- [Profile picture delivery](/docs/architecture/decisions/profile-picture-delivery) - Private storage and current-state authorization for immutable picture URLs
-- [Shared Biography Markdown policy](/docs/architecture/decisions/profile-markdown) - Shared parsing rules, ownership-checked embeds, and direct React rendering
-
-- [Effect in the Gateway](/docs/architecture/decisions/gateway-effect) - Explicit application ports and scoped execution
-
-## When to Create an ADR
-
-Create an ADR when:
-
-- Choosing between technologies (framework, database, etc.)
-- Major architectural patterns (event sourcing, CQRS, etc.)
-- Significant deviations from established patterns
-- Decisions that affect multiple services
-
-## ADR Format
-
-- **Context**: What problem/decision
-- **Decision**: What was chosen
-- **Rationale**: Why
-- **Alternatives**: What else was considered
-- **Consequences**: Trade-offs and implications
+- [Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs)
+- [GraphQL security hardening](/docs/architecture/decisions/graphql-security-hardening)
+- [Profile picture delivery](/docs/architecture/decisions/profile-picture-delivery)
+- [Shared biography Markdown policy](/docs/architecture/decisions/profile-markdown)
+- [Effect in the Gateway](/docs/architecture/decisions/gateway-effect)
+- [Media Effect migration](/docs/architecture/decisions/media-effect)
+- [Variant generator Effect migration](/docs/architecture/decisions/variant-generator-effect)

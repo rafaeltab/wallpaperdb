@@ -1,158 +1,18 @@
 ---
 name: create-service
-description: Step-by-step guide for creating a new microservice in apps/ or a new shared package in packages/. Use when scaffolding a new service, adding a new shared library, or understanding what a fully integrated service requires.
+description: Integrate a new service or shared package into the repository. Use when adding a workspace under apps/ or packages/.
 ---
 
-# Create Service
+# Create a workspace
 
-Use the [coding guidelines index](../../../CODING_STANDARDS.md) to select architecture and testing requirements relevant to the workspace. This skill covers the work needed to integrate a workspace into the repository.
+Use the [coding guidelines index](../../../CODING_STANDARDS.md) for architecture and testing requirements. An existing workspace is a wiring reference, not an architectural standard.
 
-## Creating a New Microservice (`apps/`)
+1. Define the workspace's purpose, owning context, and public interface. Keep context-specific policy out of shared packages.
+2. Follow an existing workspace's package scripts and configuration. Use `make help` for shared commands and `make run PACKAGE=<workspace> SCRIPT=<script>` for workspace scripts. Do not add per-service aliases. New repository-wide Make targets need `.PHONY` declarations and `##` help descriptions.
+3. Check that the CI workflows discover the workspace and run its tests. Check deployment configuration, startup dependencies, health checks, and ingress when adding a service.
+4. For a service, update environment generation in [setup-worktree.mjs](../../../scripts/setup-worktree.mjs). Check `buildServiceOverrides()` and `generateBrunoEnv()` so Docker-internal addresses and worktree URLs are correct. Add new user secret names to `knownUserSecrets` in [env-pipeline.mjs](../../../scripts/lib/env-pipeline.mjs). Keep example environment files free of real secrets.
+5. Add health requests and requests for public routes to the [Bruno collection](../../../api/). Put the base URL in its environment template and check the generated worktree environment.
+6. Write a short purpose-focused README with the [README skill](../write-readme/SKILL.md). Add domain vocabulary and ADRs only when there is a term or decision to record. A workspace does not need a second description in the documentation site.
+7. Run the relevant workspace checks through Make. For environment or deployment changes, verify the generated environment and startup path too.
 
-### 1. Scaffold the Service
-
-Use existing services such as `apps/ingestor` as references for package scripts, CI, and runtime wiring. Design the application's capabilities and interfaces using the coding standards.
-
-### 2. Wire Up Shared Packages
-
-Available shared packages (select those needed by the service's adapters):
-
-- **`@wallpaperdb/core`** — connection managers (database, SeaweedFS, NATS, Redis, OTEL), config schemas, telemetry helpers (`withSpan`, `recordCounter`, `recordHistogram`), health aggregator, OpenAPI plugin, RFC 7807 error classes
-- **`@wallpaperdb/events`** — event schemas (Zod), `BaseEventPublisher`, `BaseEventConsumer`
-- **`@wallpaperdb/test-utils`** — TesterBuilder pattern for integration and E2E test setup
-- **`@wallpaperdb/testcontainers`** — custom NATS container with JetStream
-- **`@wallpaperdb/url-ipv4-resolver`** — SSRF-safe URL validation
-
-### 3. Register OpenAPI
-
-```typescript
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-
-// Call inside your Fastify app factory
-await registerOpenAPI(app);
-```
-
-### 4. Use Shared Make Commands
-
-Define standard scripts in the service's `package.json`. Shared commands discover workspaces automatically:
-
-- `make dev PACKAGE=<service>`
-- `make build PACKAGE=<service>`
-- `make test PACKAGE=<service>` (or `test-unit`, `test-integration`, `test-e2e` where supported)
-- `make format PACKAGE=<service>`, `make lint PACKAGE=<service>`, `make check-types PACKAGE=<service>`
-- `make apps-start SERVICE=<service>` and `make apps-logs SERVICE=<service>` for Compose containers
-- `make run PACKAGE=<service> SCRIPT=<script>` for less frequent scripts
-
-Do not add per-service aliases. Add a target only for a new repository-wide workflow; declare it `.PHONY` and add a `##` description for generated help.
-
-### 5. Add to CI/CD Workflows
-
-Add the new service to both GitHub Actions workflows:
-
-- `.github/workflows/ci.yml` — build, lint, type-check, unit + integration tests
-- `.github/workflows/e2e.yml` — E2E tests (runs sequentially, `--concurrency=1`) (If there will be any e2e tests)
-
-### 6. Write the README
-
-Use the `write-readme` skill to write `apps/<service>/README.md`.
-
-### 7. Add to the Bruno Collection
-
-The `api/` directory at the repo root is a Bruno API collection used for manual testing and exploration.
-
-**Collection structure:**
-```
-api/
-  bruno.json              # Collection root
-  environments/
-    local.bru             # Environment variables (base URLs, shared values)
-  <service>/              # One folder per service
-    health/
-      health-check.bru
-      readiness-check.bru
-    <feature>/
-      <request>.bru
-```
-
-**Steps:**
-
-1. Create `api/<service>/` folder
-2. Add `api/<service>/health/health-check.bru` and `readiness-check.bru` — copy from `api/ingestor/health/` and update the `docs` block to reflect which dependencies this service checks
-3. Add `.bru` files for every route the service exposes, organised into subfolders by feature area
-4. Add a variable for the service's base URL to `api/environments/local.bru` (e.g. `<service>BaseUrl: http://localhost:<port>`) and reference it via `{{<service>BaseUrl}}` in the request URLs
-
-**`.bru` file format:**
-
-```
-meta {
-  name: Human Readable Name
-  type: http
-  seq: 1
-}
-
-get {
-  url: {{<service>BaseUrl}}/path
-  body: none
-  auth: none
-}
-
-docs {
-  Plain-text description of what this request does,
-  what parameters it accepts, and what responses to expect.
-}
-```
-
-### 8. Document in the Docs Site
-
-Add a new page at `apps/docs/content/docs/services/<service>.mdx` describing the service's role in the system. Follow the pattern of existing service docs pages.
-
-### 9. Update `scripts/setup-worktree.mjs`
-
-This script generates `.env` files for every worktree with Docker-internal hostnames and per-slot ports. When adding a new service, you **must** update it so `pnpm install` produces correct `.env` files in every worktree. There are four places to check:
-
-1. **`buildServiceOverrides()`** — Add an `"apps/<service>"` entry with Docker-internal overrides. Common overrides:
-   - `DATABASE_URL`: Change `localhost` to `postgres` and use the Docker-internal port `5432`, e.g. `"postgresql://wallpaperdb:wallpaperdb@postgres:5432/wallpaperdb_<service>"` (only for services that use PostgreSQL)
-   - Use an empty object `{}` if the global overrides (NATS, S3, OTEL, Redis) are sufficient
-
-2. **`knownUserSecrets`** — If the new service's `.env.example` introduces a new secret key (e.g. API keys, auth tokens), add it here with `undefined` as the value so it gets synced to `~/.config/wallpaperdb/secret.env` for all worktrees.
-
-3. **`generateBrunoEnv()`** — If you added a `<service>BaseUrl` variable to `api/environments/local.bru.example`, add it to the `overrides` object in this function so it gets the correct ingress-based URL for each worktree slot.
-
-4. **`lib/env-pipeline.mjs` `knownUserSecrets` export** — Keep this in sync with the copy in `setup-worktree.mjs`. The exported constant should match the same set of keys.
-
-After editing, run `node scripts/setup-worktree.mjs` to verify the output and check that the new service's `.env` is generated correctly.
-
-### Roadmap
-
-See `plans/multi-service-architecture.md` for the strategic roadmap and rationale.
-
----
-
-## Creating a New Shared Package (`packages/`)
-
-### 1. Create the Directory and `package.json`
-
-```
-packages/<name>/
-  package.json      # name: "@wallpaperdb/<name>", scoped to this monorepo
-  src/
-  tsconfig.json
-```
-
-Follow the `package.json` conventions from an existing package (e.g. `packages/core`).
-
-### 2. Add Tests with Vitest
-
-Use [shared testing principles](../../../docs/coding-standards/project-organization.md#shared-testing-principles) and select subject-specific testing guidance through the [coding guidelines index](../../../CODING_STANDARDS.md). Use existing workspace Vitest configurations and Make targets as references for wiring the selected tests into the repository.
-
-### 3. Use Shared Make Commands
-
-Use `make build PACKAGE=<name>`, `make test-unit PACKAGE=<name>`, and the other shared targets. For a package-specific script, use `make run PACKAGE=<name> SCRIPT=<script>`; no per-package Make targets are needed.
-
-### 4. Write the README
-
-Use the `write-readme` skill to write `packages/<name>/README.md`.
-
-### 5. Document in the Docs Site
-
-Add or update `apps/docs/content/docs/architecture/shared-packages.mdx` to describe the new package and its purpose.
+Shared packages do not need service deployment, environment, or Bruno wiring.

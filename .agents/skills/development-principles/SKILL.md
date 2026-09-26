@@ -17,13 +17,9 @@ description: Core development principles for this repository: TDD, incremental c
 - Never big-bang refactoring; extract or migrate **one piece at a time**
 - Test after each increment before moving to the next
 
-## Document As You Go
+## Documentation
 
-When architecture or significant decisions change:
-
-- Update `apps/docs/content/docs/` (rendered via `make dev PACKAGE=docs`)
-- Create ADRs in `apps/docs/content/docs/architecture/decisions/`
-- Update `plans/` when decisions are made or plans evolve
+Follow [AGENTS.md](../../../AGENTS.md#documentation). Record new system-wide decisions in `docs/adr/` and context-specific decisions beside the context. Preserve existing ADRs. Update the authoritative guide when a workflow or non-obvious constraint changes; code changes do not need a parallel implementation document. Track unfinished work in GitHub issues.
 
 ## Migration Strategy
 

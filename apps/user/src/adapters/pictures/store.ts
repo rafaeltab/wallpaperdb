@@ -5,6 +5,16 @@ import { profilePictureAssets, profilePictureImports, profiles } from '../../db/
 import { PictureStore, PictureUnavailable, type StoredPicture } from '../../pictures/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 
+const logicalPicture = (asset: StoredPicture): StoredPicture => ({
+  id: asset.id,
+  profileId: asset.profileId,
+  mimeType: asset.mimeType,
+  width: asset.width,
+  height: asset.height,
+  fileSizeBytes: asset.fileSizeBytes,
+  expiresAt: asset.expiresAt,
+});
+
 const due = (now: Date) =>
   and(
     inArray(profilePictureImports.status, ['pending', 'retrying']),
@@ -42,7 +52,7 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
               storageKey: `${input.profileId}/${id}.webp`,
             };
             await db.insert(profilePictureAssets).values({ ...asset, state: 'uploading' });
-            return asset;
+            return logicalPicture(asset);
           }),
         beginUpload: (id, now) =>
           query('begin-upload', (db) =>
@@ -111,26 +121,28 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
             return rows.length === 1;
           }),
         expired: (now, cursor) =>
-          query('scan-expired', (db) =>
-            db
-              .select()
-              .from(profilePictureAssets)
-              .where(
-                and(
-                  inArray(profilePictureAssets.state, [
-                    'uploading',
-                    'staged',
-                    'retired',
-                    'deleting',
-                  ]),
-                  lte(profilePictureAssets.expiresAt, now),
-                  cursor?.expiresAt
-                    ? sql`(${profilePictureAssets.expiresAt}, ${profilePictureAssets.id}) > (${cursor.expiresAt.toISOString()}, ${cursor.id})`
-                    : undefined
+          query('scan-expired', async (db) =>
+            (
+              await db
+                .select()
+                .from(profilePictureAssets)
+                .where(
+                  and(
+                    inArray(profilePictureAssets.state, [
+                      'uploading',
+                      'staged',
+                      'retired',
+                      'deleting',
+                    ]),
+                    lte(profilePictureAssets.expiresAt, now),
+                    cursor?.expiresAt
+                      ? sql`(${profilePictureAssets.expiresAt}, ${profilePictureAssets.id}) > (${cursor.expiresAt.toISOString()}, ${cursor.id})`
+                      : undefined
+                  )
                 )
-              )
-              .orderBy(profilePictureAssets.expiresAt, profilePictureAssets.id)
-              .limit(100)
+                .orderBy(profilePictureAssets.expiresAt, profilePictureAssets.id)
+                .limit(100)
+            ).map(logicalPicture)
           ),
         claimDeletion: (id, now) =>
           query<StoredPicture | null>('claim-deletion', (db) =>
@@ -160,7 +172,7 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
                 .update(profilePictureAssets)
                 .set({ state: 'deleting', uploadLeaseUntil: null })
                 .where(eq(profilePictureAssets.id, id));
-              return asset;
+              return logicalPicture(asset);
             })
           ),
         finishDeletion: (id) =>

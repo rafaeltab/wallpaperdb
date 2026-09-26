@@ -58,8 +58,6 @@ export const PictureSource = Context.Service<PictureSource>(
 export interface StoredPicture {
   readonly id: string;
   readonly profileId: string;
-  readonly storageBucket: string;
-  readonly storageKey: string;
   readonly mimeType: 'image/webp';
   readonly width: number;
   readonly height: number;
@@ -83,7 +81,7 @@ export interface PictureImport {
  * No transaction spans an external resource. Import completion/retry is fenced. */
 export interface PictureStore {
   createCandidate(
-    input: Omit<StoredPicture, 'id' | 'storageBucket' | 'storageKey'> & { readonly createdAt: Date }
+    input: Omit<StoredPicture, 'id'> & { readonly createdAt: Date }
   ): Effect.Effect<StoredPicture, PictureUnavailable>;
   beginUpload(id: string, now: Date): Effect.Effect<boolean, PictureUnavailable>;
   finishUpload(id: string, now: Date): Effect.Effect<boolean, PictureUnavailable>;
@@ -108,11 +106,12 @@ export interface PictureStore {
 }
 export const PictureStore = Context.Service<PictureStore>('wallpaperdb.user.pictures.PictureStore');
 
-/** Object keys are immutable. Writes and deletes are abortable and bounded by
+/** Logical IDs resolve to their persisted object address, independently of current configuration.
+ * Object keys are immutable. Writes and deletes are abortable and bounded by
  * ten seconds; failures may be ambiguous and must preserve durable evidence. */
 export interface PictureObjects {
-  put(asset: StoredPicture, bytes: Buffer): Effect.Effect<void, PictureUnavailable>;
-  delete(asset: StoredPicture): Effect.Effect<void, PictureUnavailable>;
+  put(assetId: string, bytes: Buffer): Effect.Effect<void, PictureUnavailable>;
+  delete(assetId: string): Effect.Effect<void, PictureUnavailable>;
 }
 export const PictureObjects = Context.Service<PictureObjects>(
   'wallpaperdb.user.pictures.PictureObjects'
@@ -186,7 +185,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
             reason: 'picture-unavailable',
             message: 'Staged Profile picture expired before its upload could start',
           } as const;
-        yield* objects.put(asset, picture.bytes);
+        yield* objects.put(id, picture.bytes);
         const finishedAt = new Date(yield* Clock.currentTimeMillis);
         if (!(yield* store.finishUpload(id, finishedAt)))
           return {
@@ -219,7 +218,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
         Effect.gen(function* () {
           const asset = yield* store.claimDeletion(candidate.id, now);
           if (!asset) return false;
-          yield* objects.delete(asset);
+          yield* objects.delete(asset.id);
           return yield* store.finishDeletion(asset.id);
         });
       return Pictures.of({

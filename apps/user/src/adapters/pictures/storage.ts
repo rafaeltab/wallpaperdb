@@ -4,6 +4,9 @@ import {
   S3Client,
   S3ServiceException,
 } from '@aws-sdk/client-s3';
+import { eq } from 'drizzle-orm';
+import { profilePictureAssets } from '../../db/schema.js';
+import { Database, databaseDiagnostic } from '../database/index.js';
 import { Effect, Layer } from 'effect';
 import { PictureObjects, PictureUnavailable } from '../../pictures/index.js';
 
@@ -14,10 +17,13 @@ export interface PictureStorageConfig {
   readonly secretAccessKey?: string;
 }
 
-export function pictureStorageLayer(config: PictureStorageConfig): Layer.Layer<PictureObjects> {
+export function pictureStorageLayer(
+  config: PictureStorageConfig
+): Layer.Layer<PictureObjects, never, Database> {
   return Layer.effect(
     PictureObjects,
     Effect.gen(function* () {
+      const database = yield* Database;
       const client = yield* Effect.acquireRelease(
         Effect.sync(() => {
           if (!config.endpoint || !config.accessKeyId || !config.secretAccessKey) return null;
@@ -58,23 +64,58 @@ export function pictureStorageLayer(config: PictureStorageConfig): Layer.Layer<P
           ),
           Effect.withSpan(`pictures.objects.${operation}`)
         );
+      const address = (id: string) =>
+        Effect.tryPromise({
+          try: (signal) =>
+            database.run(async (db) => {
+              const [asset] = await db
+                .select({
+                  bucket: profilePictureAssets.storageBucket,
+                  key: profilePictureAssets.storageKey,
+                  mimeType: profilePictureAssets.mimeType,
+                })
+                .from(profilePictureAssets)
+                .where(eq(profilePictureAssets.id, id));
+              return asset;
+            }, signal),
+          catch: (cause) =>
+            new PictureUnavailable({
+              operation: 'resolve-picture',
+              cause: databaseDiagnostic(cause),
+            }),
+        });
       return PictureObjects.of({
-        put: (asset, bytes) =>
-          request(
-            'put-picture',
-            new PutObjectCommand({
-              Bucket: asset.storageBucket,
-              Key: asset.storageKey,
-              Body: bytes,
-              ContentType: asset.mimeType,
-              IfNoneMatch: '*',
-            })
-          ),
-        delete: (asset) =>
-          request(
-            'delete-picture',
-            new DeleteObjectCommand({ Bucket: asset.storageBucket, Key: asset.storageKey })
-          ),
+        put: (assetId, bytes) =>
+          Effect.gen(function* () {
+            const asset = yield* address(assetId);
+            if (!asset)
+              return yield* Effect.fail(
+                new PictureUnavailable({
+                  operation: 'put-picture',
+                  cause: { reason: 'missing-candidate' },
+                })
+              );
+            yield* request(
+              'put-picture',
+              new PutObjectCommand({
+                Bucket: asset.bucket,
+                Key: asset.key,
+                Body: bytes,
+                ContentType: asset.mimeType,
+                IfNoneMatch: '*',
+              })
+            );
+          }),
+        delete: (assetId) =>
+          Effect.gen(function* () {
+            const asset = yield* address(assetId);
+            // Removal of the row is only allowed after successful remote deletion.
+            if (!asset) return;
+            yield* request(
+              'delete-picture',
+              new DeleteObjectCommand({ Bucket: asset.bucket, Key: asset.key })
+            );
+          }),
       });
     })
   );

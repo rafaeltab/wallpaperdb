@@ -19,8 +19,6 @@ describe('Picture persistence adapter', () => {
   let asset: StoredPicture & { createdAt: Date } = {
     id: 'pic_candidate',
     profileId: 'owner',
-    storageBucket: 'pictures',
-    storageKey: 'owner/pic_candidate.webp',
     mimeType: 'image/webp',
     width: 2,
     height: 3,

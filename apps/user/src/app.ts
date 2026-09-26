@@ -8,6 +8,7 @@ import {
   ownershipConsumerLayer,
   EventsHealth,
   ConsumerHealth,
+  ProfilePublicationHealth,
 } from './adapters/events/index.js';
 import { profileStoreLayer, clerkIdentitiesLayer } from './adapters/profiles/index.js';
 import {
@@ -53,6 +54,13 @@ export function userLayer(config: Config, options: AppOptions = {}) {
     shutdownTimeoutMs: options.shutdownTimeoutMs,
   };
   const broker = brokerLayer(eventOptions);
+  const publisher = eventPublisherLayer({
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: config.s3AccessKeyId,
+    secretAccessKey: config.s3SecretAccessKey,
+    assetReferenceBucket: config.assetReferenceBucket,
+  }).pipe(Layer.provide(Layer.merge(database, broker)));
   const profiles = profilesLayer(profilePolicy).pipe(
     Layer.provide(
       Layer.merge(
@@ -92,17 +100,7 @@ export function userLayer(config: Config, options: AppOptions = {}) {
   );
   const maintenance = maintenanceLayer({ retentionDays: config.profileEvidenceRetentionDays }).pipe(
     Layer.provide(
-      Layer.mergeAll(
-        profiles,
-        eventStoreLayer().pipe(Layer.provide(database)),
-        eventPublisherLayer({
-          endpoint: config.s3Endpoint,
-          region: config.s3Region,
-          accessKeyId: config.s3AccessKeyId,
-          secretAccessKey: config.s3SecretAccessKey,
-          assetReferenceBucket: config.assetReferenceBucket,
-        }).pipe(Layer.provide(Layer.merge(database, broker)))
-      )
+      Layer.mergeAll(profiles, eventStoreLayer().pipe(Layer.provide(database)), publisher)
     )
   );
   const consumer = ownershipConsumerLayer(eventOptions).pipe(
@@ -167,22 +165,25 @@ export function userLayer(config: Config, options: AppOptions = {}) {
       const brokerHealth = yield* EventsHealth;
       const consumerHealth = yield* ConsumerHealth;
       const workerHealth = yield* Workers;
+      const publicationHealth = yield* ProfilePublicationHealth;
       return AvailabilityProbe.of({
         inspect: () =>
           Effect.all(
             {
               database: db.check,
               nats: brokerHealth.check(),
-              workers: Effect.all([consumerHealth.check(), workerHealth.check()]).pipe(
-                Effect.map((checks) => checks.every(Boolean))
-              ),
+              workers: Effect.all([
+                consumerHealth.check(),
+                workerHealth.check(),
+                publicationHealth.check(),
+              ]).pipe(Effect.map((checks) => checks.every(Boolean))),
               otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
             },
             { concurrency: 'unbounded' }
           ),
       });
     })
-  ).pipe(Layer.provide(Layer.mergeAll(database, broker, consumer, workers)));
+  ).pipe(Layer.provide(Layer.mergeAll(database, broker, consumer, workers, publisher)));
   const services = Layer.mergeAll(
     profiles,
     pictures,

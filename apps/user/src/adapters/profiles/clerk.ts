@@ -1,6 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { z } from 'zod';
 import { Identities, ProfileUnavailable } from '../../profile/index.js';
+import { monitorDependency } from '../observations/index.js';
 
 const clerkIdentity = z.object({
   first_name: z.string().nullable(),
@@ -49,6 +50,7 @@ export const clerkIdentitiesLayer = (config: { readonly clerkSecretKey?: string 
                 : { category: cause instanceof z.ZodError ? 'invalid-response' : 'transport' },
           }),
       }).pipe(
+        monitorDependency('identity'),
         Effect.tapError((failure) =>
           Effect.logError('Identity lookup failed', { cause: failure.cause })
         ),

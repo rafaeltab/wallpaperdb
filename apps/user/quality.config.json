@@ -9,7 +9,8 @@
     "adapters/database",
     "adapters/profiles",
     "adapters/pictures",
-    "adapters/events"
+    "adapters/events",
+    "adapters/observations"
   ],
   "allowedCapabilityDependencies": {
     "profile": ["@wallpaperdb/profile-markdown"]

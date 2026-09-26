@@ -132,9 +132,7 @@ describe('owned wallpaper assets', () => {
     );
     expect(found.sort()).toEqual(names.sort());
   });
-  it('reports missing asset reference storage and recovers when restored', async () => {
-    expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(false);
-    await client.send(new CreateBucketCommand({ Bucket: 'asset-references' }));
+  it('checks owned asset storage without a descriptor bucket', async () => {
     expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(true);
   });
   it('distinguishes unavailable storage from an absent object', async () => {

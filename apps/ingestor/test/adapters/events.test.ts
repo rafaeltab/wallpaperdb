@@ -1,11 +1,6 @@
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
-import {
-  createDefaultTesterBuilder,
-  DockerTesterBuilder,
-  S3TesterBuilder,
-} from '@wallpaperdb/test-utils';
 import { WallpaperUploadedEventSchema } from '@wallpaperdb/events/schemas';
-import { resolveAssetReference } from '@wallpaperdb/core/assets';
+import { resolveOriginalAsset } from '@wallpaperdb/core/assets';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { Effect, ManagedRuntime } from 'effect';
@@ -38,16 +33,10 @@ const occurrence: UploadedEvent = {
 };
 
 describe('upload event publication', () => {
-  const StorageTester = createDefaultTesterBuilder()
-    .with(DockerTesterBuilder)
-    .with(S3TesterBuilder)
-    .build();
-  const storage = new StorageTester().withS3().withS3Bucket('asset-references');
   let container: StartedNatsContainer;
   let connection: NatsConnection;
   let runtime: ManagedRuntime.ManagedRuntime<UploadEvents | UploadEventsHealth, unknown>;
   beforeAll(async () => {
-    await storage.setup();
     container = await createNatsContainer();
     const url = container.getConnectionUrl();
     connection = await connect({ servers: url });
@@ -59,11 +48,6 @@ describe('upload event publication', () => {
         stream: 'UPLOADS',
         serviceName: 'ingestor-test',
         assetBucket: 'wallpapers',
-        assetReferenceBucket: 'asset-references',
-        endpoint: storage.s3.config.endpoints.fromHost,
-        region: 'us-east-1',
-        accessKeyId: storage.s3.config.options.accessKey,
-        secretAccessKey: storage.s3.config.options.secretKey,
       })
     );
   });
@@ -71,7 +55,6 @@ describe('upload event publication', () => {
     await runtime?.dispose();
     await connection?.close();
     await container?.stop();
-    await storage.destroy();
   });
   it('confirms persistence and deduplicates retries using the original occurrence identity', async () => {
     expect(await runtime.runPromise(UploadEventsHealth.use((health) => health.check()))).toBe(true);
@@ -103,47 +86,33 @@ describe('upload event publication', () => {
     expect(envelope.data.wallpaper).not.toHaveProperty('storageBucket');
     expect(envelope.data.wallpaper).not.toHaveProperty('originalFilename');
     expect(
-      await resolveAssetReference(storage.s3.getS3Client(), 'asset-references', {
-        owner: 'ingestor',
-        id: occurrence.wallpaper.id,
-      })
+      resolveOriginalAsset(
+        { owner: 'ingestor', id: occurrence.wallpaper.id },
+        'image/png',
+        'wallpapers'
+      )
     ).toEqual({ bucket: 'wallpapers', key: 'wlpr_events/original.png' });
   });
-  it('keeps an upload unpublished when its immutable reference cannot be registered', async () => {
-    const unavailable = ManagedRuntime.make(
-      uploadedEventsLayer({
-        url: container.getConnectionUrl(),
-        stream: 'UPLOADS',
-        serviceName: 'ingestor-manifest-failure',
-        assetBucket: 'wallpapers',
-        assetReferenceBucket: 'missing-asset-references',
-        endpoint: storage.s3.config.endpoints.fromHost,
-        region: 'us-east-1',
-        accessKeyId: storage.s3.config.options.accessKey,
-        secretAccessKey: storage.s3.config.options.secretKey,
-      })
-    );
+  it('refuses to publish a logical reference that would change its recorded original path', async () => {
     const manager = await connection.jetstreamManager();
     const before = (await manager.streams.info('UPLOADS')).state.messages;
-    try {
-      expect(
-        await unavailable.runPromise(
-          UploadEvents.use((events) =>
-            events.publish({
-              ...occurrence,
-              id: 'unregistered-occurrence',
-            })
-          ).pipe(Effect.flip)
-        )
-      ).toMatchObject({
-        _tag: 'IngestionUnavailable',
-        operation: 'register-upload-asset',
-      });
-      expect((await manager.streams.info('UPLOADS')).state.messages).toBe(before);
-    } finally {
-      await unavailable.dispose();
-    }
+    expect(
+      await runtime.runPromise(
+        UploadEvents.use((events) =>
+          events.publish({
+            ...occurrence,
+            id: 'inconsistent-original',
+            wallpaper: {
+              ...occurrence.wallpaper,
+              metadata: { ...occurrence.wallpaper.metadata, extension: 'webp' },
+            },
+          })
+        ).pipe(Effect.flip)
+      )
+    ).toMatchObject({ _tag: 'IngestionUnavailable', operation: 'encode-upload-event' });
+    expect((await manager.streams.info('UPLOADS')).state.messages).toBe(before);
   });
+
   it('preserves durable trace context when publication resumes under another request', async () => {
     const provider = new NodeTracerProvider();
     provider.register();

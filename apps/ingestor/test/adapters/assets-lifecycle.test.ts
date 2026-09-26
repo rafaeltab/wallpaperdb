@@ -63,28 +63,20 @@ it('aborts connected storage requests that exceed their deadline', async () => {
   }
 });
 
-it('cancels a hanging health request when its sibling bucket check fails', async () => {
+it('cancels a hanging owned-bucket health request when its deadline expires', async () => {
   let initialized = false;
-  let failOriginal: (() => void) | undefined;
-  let referenceEntered = false;
-  let referenceClosed = false;
+  let healthEntered = false;
+  let healthClosed = false;
   const server = createServer((request, response) => {
     if (request.url === '/wallpapers/' && !initialized) {
       initialized = true;
       response.writeHead(200).end();
       return;
     }
-    if (request.url?.includes('asset-references')) {
-      referenceEntered = true;
-      response.on('close', () => {
-        referenceClosed = true;
-      });
-    } else {
-      failOriginal = () => {
-        response.writeHead(404).end();
-      };
-    }
-    if (referenceEntered) failOriginal?.();
+    healthEntered = true;
+    response.on('close', () => {
+      healthClosed = true;
+    });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -100,8 +92,8 @@ it('cancels a hanging health request when its sibling bucket check fails', async
   );
   try {
     expect(await runtime.runPromise(AssetsHealth.use((health) => health.check()))).toBe(false);
-    expect(referenceEntered).toBe(true);
-    await vi.waitFor(() => expect(referenceClosed).toBe(true), { timeout: 500, interval: 10 });
+    expect(healthEntered).toBe(true);
+    await vi.waitFor(() => expect(healthClosed).toBe(true), { timeout: 500, interval: 10 });
   } finally {
     await runtime.dispose();
     server.closeAllConnections();

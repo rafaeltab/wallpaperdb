@@ -83,14 +83,12 @@ export const maintenanceLayer = (policy: { retentionDays: number }) =>
           for (const alias of batch) {
             if (isStopping()) break;
             aliasCursor = alias;
-            const result = yield* profiles
-              .expireDueAlias(alias, now)
-              .pipe(
-                Effect.match({
-                  onSuccess: (expired) => (expired ? 'expired' : 'unchanged'),
-                  onFailure: () => 'failed',
-                })
-              );
+            const result = yield* profiles.expireDueAlias(alias, now).pipe(
+              Effect.match({
+                onSuccess: (expired) => (expired ? 'expired' : 'unchanged'),
+                onFailure: () => 'failed',
+              })
+            );
             if (result === 'expired') completed++;
             if (result === 'failed') failed++;
           }

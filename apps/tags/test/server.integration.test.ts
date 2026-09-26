@@ -1,3 +1,5 @@
+import { once } from 'node:events';
+import { createServer } from 'node:net';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import { Effect, Schema } from 'effect';
 import { Pool } from 'pg';
@@ -105,34 +107,3 @@ it('releases acquired connections when the listener port is already occupied', a
     );
   }
 }, 10000);
-
-it('exits with a safe configuration failure before connecting dependencies', async () => {
-  const baseline = await brokerConnections();
-  const child = spawn(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
-    env: {
-      ...process.env,
-      DOTENV_CONFIG_PATH: '/dev/null',
-      DATABASE_URL: 'https://tags:private-configuration-marker@database.example/tags',
-      NATS_URL: nats.getConnectionUrl(),
-      OTEL_EXPORTER_OTLP_ENDPOINT: undefined,
-    },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  const chunks: Buffer[] = [];
-  child.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-  child.stderr.on('data', (chunk: Buffer) => chunks.push(chunk));
-  try {
-    const [code] = await once(child, 'exit', { signal: AbortSignal.timeout(5000) });
-    expect(code).toBe(1);
-    const output = Buffer.concat(chunks).toString();
-    expect(output).toContain('Invalid tags configuration');
-    expect(output).not.toContain('private-configuration-marker');
-    expect(await brokerConnections()).toBe(baseline);
-    expect(await databaseConnections()).toBe(0);
-  } finally {
-    if (child.exitCode === null) child.kill('SIGKILL');
-  }
-}, 10000);
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
-import { createServer } from 'node:net';

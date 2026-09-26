@@ -83,6 +83,7 @@ function projectionAttributes(event: TranslatedEvent) {
     'event.id': event.change.occurrence.id,
     ...(event.correlationId ? { 'event.correlation_id': event.correlationId } : {}),
     ...(event.causationId ? { 'event.causation_id': event.causationId } : {}),
+    ...(event.causationSource ? { 'event.causation_source': event.causationSource } : {}),
     'catalogue.subject_id':
       event.change._tag === 'ProfilePublished' ? event.change.profile.id : event.change.wallpaperId,
   };

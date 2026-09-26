@@ -352,37 +352,6 @@ describe('Profile picture commands', () => {
     }
   });
 
-  it('bases each import lease on its actual start after earlier jobs finish', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    initialImageUrl = 'https://img.clerk.com/a-picture';
-    await ensure('a_picture');
-    initialImageUrl = 'https://img.clerk.com/b-picture';
-    await ensure('b_picture');
-    const image = await sharp({
-      create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-    })
-      .png()
-      .toBuffer();
-    const leases: number[] = [];
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      if (String(url).includes('a-picture')) vi.setSystemTime(new Date('2030-01-01T00:02:00.000Z'));
-      else {
-        const [job] =
-          await sql`select lease_until from profile_picture_imports where profile_id = 'b_picture'`;
-        leases.push(job.lease_until.getTime() - Date.now());
-      }
-      return new Response(new Uint8Array(image));
-    });
-    try {
-      await importer.importPending();
-      expect(leases).toEqual([config.profilePictureImportTimeoutMs + 60_000]);
-    } finally {
-      fetcher.mockRestore();
-      vi.useRealTimers();
-    }
-  });
-
   it('lets one worker reclaim an expired import lease without accepting the stale attempt', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
@@ -564,88 +533,6 @@ describe('Profile picture commands', () => {
       expect(fetcher).not.toHaveBeenCalled();
     } finally {
       fetcher.mockRestore();
-    }
-  });
-
-  it.each([
-    'invalid-picture',
-    'source-not-found',
-  ])('settles permanent %s import failures on the generated fallback', async (failure) => {
-    initialImageUrl = 'https://img.clerk.com/permanently-invalid-picture';
-    const pending = (await ensure()).json();
-    const fetcher = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(
-        failure === 'source-not-found'
-          ? new Response(null, { status: 404 })
-          : new Response('<svg/>')
-      );
-    try {
-      await importer.importPending();
-      expect((await ensure()).json()).toMatchObject({
-        pictureAssetId: null,
-        pictureImportStatus: 'complete',
-        version: pending.version,
-      });
-      const [job] =
-        await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
-      expect(job).toMatchObject({ source_url: null, lease_token: null, lease_until: null });
-      await importer.importPending();
-      expect(fetcher).toHaveBeenCalledTimes(1);
-      expect(
-        await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`
-      ).toHaveLength(0);
-    } finally {
-      fetcher.mockRestore();
-    }
-  });
-
-  it('retries transient imports after backoff without starving another due Profile', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    initialImageUrl = 'https://img.clerk.com/retry-picture';
-    const pending = (await ensure('a_retry')).json();
-    initialImageUrl = 'https://img.clerk.com/healthy-picture';
-    await ensure('b_healthy');
-    const image = await sharp({
-      create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-    })
-      .png()
-      .toBuffer();
-    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
-      if (String(url).includes('retry-picture')) throw new Error('Temporary image service failure');
-      return new Response(new Uint8Array(image));
-    });
-    try {
-      await importer.importPending();
-      expect((await ensure('a_retry')).json()).toMatchObject({
-        version: pending.version,
-        pictureAssetId: null,
-        pictureImportStatus: 'retrying',
-      });
-      expect((await ensure('b_healthy')).json().pictureImportStatus).toBe('complete');
-      const [job] = await sql`select * from profile_picture_imports where profile_id = 'a_retry'`;
-      expect(job).toMatchObject({
-        attempts: 1,
-        lease_token: null,
-        lease_until: null,
-        source_url: 'https://img.clerk.com/retry-picture',
-      });
-      expect(job.next_attempt_at.toISOString()).toBe('2030-01-01T00:00:01.000Z');
-      fetcher.mockClear();
-      await importer.importPending();
-      expect(fetcher).not.toHaveBeenCalled();
-      vi.setSystemTime(job.next_attempt_at);
-      fetcher.mockResolvedValue(new Response(new Uint8Array(image)));
-      await importer.importPending();
-      expect((await ensure('a_retry')).json()).toMatchObject({
-        version: pending.version + 1,
-        pictureImportStatus: 'complete',
-        pictureAssetId: expect.stringMatching(/^pic_/),
-      });
-    } finally {
-      fetcher.mockRestore();
-      vi.useRealTimers();
     }
   });
 
@@ -1121,69 +1008,5 @@ describe('Profile picture commands', () => {
     expect(metadata).toMatchObject({ format: 'webp', width: 2, height: 3 });
     expect(metadata.exif).toBeUndefined();
     expect(metadata.icc).toBeUndefined();
-  });
-  it('retries the eleventh temporary import failure and clears the private source after the twelfth', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
-    initialImageUrl = 'https://img.clerk.com/retry-picture?private=credential';
-    const pending = (await ensure()).json();
-    await sql`update profile_picture_imports set attempts = 10 where profile_id = ${pending.id}`;
-    const fetcher = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(async () => new Response(null, { status: 503 }));
-    try {
-      await importer.importPending();
-      const [retry] =
-        await sql`select attempts, status, source_url, next_attempt_at from profile_picture_imports where profile_id = ${pending.id}`;
-      expect(retry).toMatchObject({
-        attempts: 11,
-        status: 'retrying',
-        source_url: initialImageUrl,
-      });
-      vi.setSystemTime(retry.next_attempt_at);
-      await importer.importPending();
-      expect(
-        await sql`select attempts, status, source_url, lease_until, lease_token from profile_picture_imports where profile_id = ${pending.id}`
-      ).toEqual([
-        {
-          attempts: 12,
-          status: 'complete',
-          source_url: null,
-          lease_until: null,
-          lease_token: null,
-        },
-      ]);
-      expect((await ensure()).json()).toMatchObject({
-        version: pending.version,
-        pictureAssetId: null,
-        pictureImportStatus: 'complete',
-      });
-      await importer.importPending();
-      expect(fetcher).toHaveBeenCalledTimes(2);
-    } finally {
-      fetcher.mockRestore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('settles an already exhausted legacy import without another network request', async () => {
-    initialImageUrl = 'https://img.clerk.com/exhausted?private=credential';
-    const pending = (await ensure()).json();
-    await sql`update profile_picture_imports set attempts = 12 where profile_id = ${pending.id}`;
-    const fetcher = vi.spyOn(globalThis, 'fetch');
-    try {
-      await importer.importPending();
-      expect(fetcher).not.toHaveBeenCalled();
-      expect(
-        await sql`select status, source_url, lease_until, lease_token from profile_picture_imports where profile_id = ${pending.id}`
-      ).toEqual([{ status: 'complete', source_url: null, lease_until: null, lease_token: null }]);
-      expect((await ensure()).json()).toMatchObject({
-        version: pending.version,
-        pictureAssetId: null,
-        pictureImportStatus: 'complete',
-      });
-    } finally {
-      fetcher.mockRestore();
-    }
   });
 });

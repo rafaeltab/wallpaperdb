@@ -124,10 +124,20 @@ const implementations = Layer.effectContext(
                   });
                 return;
               }
-              const target = input.kind === 'wallpaper'
-                ? ['wallpaper', input.wallpaper.id]
-                : ['variant', input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey];
-              const claimed = await tx.insert(catalogTargets).values({ id: stableId(target) }).onConflictDoNothing().returning();
+              const target =
+                input.kind === 'wallpaper'
+                  ? ['wallpaper', input.wallpaper.id]
+                  : [
+                      'variant',
+                      input.variant.wallpaperId,
+                      input.variant.storageBucket,
+                      input.variant.storageKey,
+                    ];
+              const claimed = await tx
+                .insert(catalogTargets)
+                .values({ id: stableId(target) })
+                .onConflictDoNothing()
+                .returning();
               if (claimed.length === 0) return;
               let output = notification(input);
               if (input.kind === 'wallpaper') {
@@ -135,20 +145,52 @@ const implementations = Layer.effectContext(
                   .insert(wallpapers)
                   .values({ ...input.wallpaper, createdAt: new Date(input.wallpaper.createdAt) })
                   .onConflictDoNothing();
-                const [stored] = await tx.select().from(wallpapers).where(eq(wallpapers.id, input.wallpaper.id)).limit(1);
+                const [stored] = await tx
+                  .select()
+                  .from(wallpapers)
+                  .where(eq(wallpapers.id, input.wallpaper.id))
+                  .limit(1);
                 if (!stored) throw new Error('Committed wallpaper is missing');
-                output = notification({ ...input, wallpaper: { ...stored, createdAt: stored.createdAt.toISOString() } });
+                output = notification({
+                  ...input,
+                  wallpaper: { ...stored, createdAt: stored.createdAt.toISOString() },
+                });
               } else {
-                const created = await tx
-                  .insert(variants)
-                  .values({
+                // Old variants have random IDs and may inherit the parent's bucket.
+                // Claiming the logical target serializes reconciliation across replicas.
+                const [existing] = await tx
+                  .select({ asset: variants, parentMimeType: wallpapers.mimeType })
+                  .from(variants)
+                  .leftJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
+                  .where(
+                    and(
+                      eq(variants.wallpaperId, input.variant.wallpaperId),
+                      eq(variants.storageKey, input.variant.storageKey),
+                      eq(
+                        sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
+                        input.variant.storageBucket
+                      )
+                    )
+                  )
+                  .orderBy(asc(variants.createdAt), asc(variants.id))
+                  .limit(1);
+                if (existing) {
+                  output = notification({
+                    ...input,
+                    variant: {
+                      ...existing.asset,
+                      storageBucket: existing.asset.storageBucket ?? input.variant.storageBucket,
+                      mimeType: existing.parentMimeType ?? input.variant.mimeType,
+                      createdAt: existing.asset.createdAt.toISOString(),
+                    },
+                  });
+                } else {
+                  await tx.insert(variants).values({
                     ...input.variant,
                     id: `var_${stableId([input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey])}`,
                     createdAt: new Date(input.variant.createdAt),
-                  })
-                  .onConflictDoNothing()
-                  .returning();
-                if (created.length === 0) return;
+                  });
+                }
               }
               await tx
                 .insert(catalogOutbox)

@@ -1,5 +1,7 @@
+import type { ProjectionInput } from '../../catalog/index.js';
+import { inputAttributes } from './telemetry.js';
 import { createHash, randomUUID } from 'node:crypto';
-import { Effect, Schema } from 'effect';
+import { Clock, Effect, Exit, Schema } from 'effect';
 import {
   DiscardPolicy,
   headers,
@@ -197,7 +199,7 @@ const cannotFit = () =>
   );
 
 /** Store chunks first and a manifest last; callers acknowledge only after every PubAck. */
-export const quarantine = Effect.fn('media.quarantine.publish')(function* (
+const storeQuarantine = Effect.fn('media.quarantine.store-records')(function* (
   service: NatsBroker,
   message: JsMsg,
   reason: string
@@ -258,4 +260,39 @@ export const quarantine = Effect.fn('media.quarantine.publish')(function* (
   }
   const manifest = encodeManifest(sequences);
   yield* publish(service, manifest, manifestHeaders);
+});
+
+export const quarantine = Effect.fn('media.quarantine.publish')(function* (
+  service: NatsBroker,
+  message: JsMsg,
+  reason: string,
+  input?: ProjectionInput
+) {
+  const started = yield* Clock.currentTimeMillis;
+  const attributes = {
+    ...inputAttributes(input),
+    'event.subject': message.subject,
+    'event.consumer': message.info.consumer,
+    'event.delivery_attempt': message.info.deliveryCount,
+    'quarantine.id': identity(message),
+    'quarantine.reason': reason,
+  };
+  yield* Effect.annotateCurrentSpan(attributes);
+  return yield* storeQuarantine(service, message, reason).pipe(
+    Effect.onExit((exit) =>
+      Effect.gen(function* () {
+        const duration = (yield* Clock.currentTimeMillis) - started;
+        const outcome = Exit.isSuccess(exit) ? 'quarantined' : 'failed';
+        yield* Effect.annotateCurrentSpan({
+          'event.outcome': outcome,
+          'event.duration_ms': duration,
+        });
+        yield* Effect.logInfo('Media quarantine handoff finished', {
+          'event.outcome': outcome,
+          'event.duration_ms': duration,
+        });
+      })
+    ),
+    Effect.annotateLogs(attributes)
+  );
 });

@@ -1,3 +1,4 @@
+import { inputAttributes } from './telemetry.js';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { Cause, Clock, Context, Effect, Fiber, Layer, Metric, Ref, Schema, Stream } from 'effect';
@@ -26,17 +27,12 @@ const processMessage = Effect.fn('media.events.consume')(function* (
   const input = translateEvent(message.subject, message.data, message.headers);
   const started = yield* Clock.currentTimeMillis;
   let status = 'error';
+  let outcome = 'retry';
   const attributes = {
     'event.subject': message.subject,
     'event.consumer': message.info.consumer,
     'event.delivery_attempt': message.info.deliveryCount,
-    ...(input
-      ? {
-          'event.source': input.occurrence.source,
-          'event.id': input.occurrence.id,
-          ...(input.correlationId ? { 'event.correlation_id': input.correlationId } : {}),
-        }
-      : {}),
+    ...inputAttributes(input),
   };
   yield* Effect.annotateCurrentSpan(attributes);
   yield* Effect.gen(function* () {
@@ -46,15 +42,17 @@ const processMessage = Effect.fn('media.events.consume')(function* (
       Effect.forkScoped
     );
     if (!input) {
-      yield* quarantine(service, message, 'Invalid');
+      yield* quarantine(service, message, 'Invalid', input);
       message.ack();
+      outcome = 'quarantined_invalid';
       status = 'validation_error';
       return;
     }
     // Broker redelivery remains enabled so failures storing quarantine can recover even after processing is exhausted.
     if (message.info.deliveryCount > 3) {
-      yield* quarantine(service, message, 'Exhausted');
+      yield* quarantine(service, message, 'Exhausted', input);
       message.ack();
+      outcome = 'quarantined_exhausted';
       return;
     }
     const succeeded = yield* projection
@@ -63,6 +61,7 @@ const processMessage = Effect.fn('media.events.consume')(function* (
     if (succeeded) {
       message.ack();
       status = 'success';
+      outcome = 'accepted';
       if (input.kind !== 'profile')
         yield* Metric.update(
           Metric.histogram(
@@ -76,8 +75,9 @@ const processMessage = Effect.fn('media.events.consume')(function* (
       return;
     }
     if (message.info.deliveryCount >= 3) {
-      yield* quarantine(service, message, 'Exhausted');
+      yield* quarantine(service, message, 'Exhausted', input);
       message.ack();
+      outcome = 'quarantined_exhausted';
       return;
     }
     message.nak(retryDelay(message, options));
@@ -90,11 +90,23 @@ const processMessage = Effect.fn('media.events.consume')(function* (
         yield* Effect.logError('Media delivery failed', cause);
       })
     ),
-    Effect.onInterrupt(() => Effect.sync(() => message.nak(retryDelay(message, options)))),
+    Effect.onInterrupt(() =>
+      Effect.sync(() => {
+        outcome = 'interrupted';
+        message.nak(retryDelay(message, options));
+      })
+    ),
     Effect.ensuring(
       Effect.gen(function* () {
         const duration = (yield* Clock.currentTimeMillis) - started;
-        yield* Effect.annotateCurrentSpan('event.duration_ms', duration);
+        yield* Effect.annotateCurrentSpan({
+          'event.duration_ms': duration,
+          'event.outcome': outcome,
+        });
+        yield* Effect.logInfo('Media event delivery finished', {
+          'event.outcome': outcome,
+          'event.duration_ms': duration,
+        });
         yield* Metric.update(
           Metric.counter('events.consumed.total', {
             incremental: true,

@@ -9,7 +9,7 @@ export interface OutboxHealth {
   check(): Effect.Effect<boolean>;
 }
 export const OutboxHealth = Context.Service<OutboxHealth>('wallpaperdb/media/OutboxHealth');
-const publish = Effect.fn('media.events.publish')(function* (
+const publish = Effect.fn('media.events.publish-envelope')(function* (
   service: NatsBroker,
   options: NatsEventsOptions,
   notification: AvailableNotification
@@ -64,11 +64,31 @@ function publishNotification(
       tracestate: notification.tracestate,
     })
   );
+  const attributes = {
+    'event.source': 'https://wallpaperdb/media',
+    'event.id': notification.id,
+    'event.type': 'wallpaper.variant.available',
+    'event.causation_id': notification.causationId,
+    'event.causation_source': notification.causationSource,
+    'wallpaper.id': notification.variant.wallpaperId,
+    ...(notification.correlationId ? { 'event.correlation_id': notification.correlationId } : {}),
+  };
   const effect = Effect.gen(function* () {
+    yield* Effect.annotateCurrentSpan(attributes);
     const started = yield* Clock.currentTimeMillis;
     return yield* publish(service, options, notification).pipe(
       Effect.onExit((exit) =>
         Effect.gen(function* () {
+          const duration = (yield* Clock.currentTimeMillis) - started;
+          const outcome = Exit.isSuccess(exit) ? 'published' : 'failed';
+          yield* Effect.annotateCurrentSpan({
+            'event.duration_ms': duration,
+            'event.outcome': outcome,
+          });
+          yield* Effect.logInfo('Media availability publication finished', {
+            'event.duration_ms': duration,
+            'event.outcome': outcome,
+          });
           yield* Metric.update(
             Metric.counter('events.published.total', {
               incremental: true,
@@ -84,12 +104,12 @@ function publishNotification(
               boundaries: [1, 10, 100, 1000, 5000],
               attributes: { 'event.type': 'wallpaper.variant.available' },
             }),
-            (yield* Clock.currentTimeMillis) - started
+            duration
           );
         })
       )
     );
-  });
+  }).pipe(Effect.annotateLogs(attributes), Effect.withSpan('media.events.publish'));
   return parent ? effect.pipe(OtelTracer.withSpanContext(parent)) : effect;
 }
 export function natsOutboxLayer(
@@ -114,7 +134,12 @@ export function natsOutboxLayer(
               Effect.logError('Media outbox publication remains pending', {
                 operation: error.operation,
                 cause: error.cause,
-                eventId: row.id,
+                'event.id': row.id,
+                'event.source': 'https://wallpaperdb/media',
+                'event.causation_id': row.causationId,
+                'event.causation_source': row.causationSource,
+                'wallpaper.id': row.variant.wallpaperId,
+                ...(row.correlationId ? { 'event.correlation_id': row.correlationId } : {}),
               }).pipe(Effect.as(false))
             )
           );

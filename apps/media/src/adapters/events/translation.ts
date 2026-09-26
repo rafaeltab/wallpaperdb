@@ -18,6 +18,9 @@ const binaryEnvelope = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
   time: z.string().datetime(),
+  correlationid: z.string().min(1).optional(),
+  causationid: z.string().min(1).optional(),
+  causationsource: z.string().min(1).optional(),
 });
 function metadata(
   raw: unknown,
@@ -36,6 +39,9 @@ function metadata(
         id: header.get('ce-id'),
         type: header.get('ce-type'),
         time: header.get('ce-time'),
+        correlationid: header.get('ce-correlationid') || undefined,
+        causationid: header.get('ce-causationid') || undefined,
+        causationsource: header.get('ce-causationsource') || undefined,
       })
     : undefined;
   const envelope = structured ?? binary;
@@ -44,16 +50,15 @@ function metadata(
     (!envelope.success || envelope.data.type !== subject || envelope.data.id !== legacy.eventId)
   )
     return undefined;
-  const correlation =
-    Predicate.hasProperty(raw, 'correlationid') && typeof raw.correlationid === 'string'
-      ? raw.correlationid
-      : header?.get('ce-correlationid');
+  const extensions = envelope?.success ? envelope.data : undefined;
   return {
     occurrence: envelope?.success
       ? { source: envelope.data.source, id: envelope.data.id }
       : { source, id: legacy.eventId },
     occurredAt: envelope?.success ? envelope.data.time : legacy.timestamp,
-    ...(correlation ? { correlationId: correlation } : {}),
+    ...(extensions?.correlationid ? { correlationId: extensions.correlationid } : {}),
+    ...(extensions?.causationid ? { causationId: extensions.causationid } : {}),
+    ...(extensions?.causationsource ? { causationSource: extensions.causationsource } : {}),
     ...(header?.get('traceparent') ? { traceparent: header.get('traceparent') } : {}),
     ...(header?.get('tracestate') ? { tracestate: header.get('tracestate') } : {}),
   };

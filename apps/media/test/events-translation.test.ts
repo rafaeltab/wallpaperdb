@@ -191,3 +191,55 @@ it('rejects a binary envelope whose identity or type disagrees with its payload'
   metadata.set('ce-type', 'profile.updated');
   expect(translateEvent('wallpaper.uploaded', encode(event), metadata)).toBeUndefined();
 });
+it('preserves validated structured and binary causation without confusing it with occurrence identity', () => {
+  const structured = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'upload-1',
+    type: 'wallpaper.uploaded',
+    time: '2026-09-24T10:00:00.000Z',
+    datacontenttype: 'application/json',
+    correlationid: 'workflow-1',
+    causationid: 'command-1',
+    causationsource: 'https://wallpaperdb/uploader',
+    data: { wallpaper },
+  };
+  expect(translateEvent('wallpaper.uploaded', encode(structured))).toMatchObject({
+    occurrence: { source: 'https://wallpaperdb/ingestor', id: 'upload-1' },
+    correlationId: 'workflow-1',
+    causationId: 'command-1',
+    causationSource: 'https://wallpaperdb/uploader',
+  });
+  const metadata = headers();
+  for (const [key, value] of Object.entries({
+    'ce-specversion': '1.0',
+    'ce-source': 'https://wallpaperdb/ingestor',
+    'ce-id': 'upload-1',
+    'ce-type': 'wallpaper.uploaded',
+    'ce-time': '2026-09-24T10:00:00.000Z',
+    'ce-correlationid': 'workflow-1',
+    'ce-causationid': 'command-1',
+    'ce-causationsource': 'https://wallpaperdb/uploader',
+  }))
+    metadata.set(key, value);
+  expect(
+    translateEvent(
+      'wallpaper.uploaded',
+      encode({
+        eventId: 'upload-1',
+        eventType: 'wallpaper.uploaded',
+        timestamp: '2026-09-24T10:00:00.000Z',
+        wallpaper,
+      }),
+      metadata
+    )
+  ).toMatchObject({
+    occurrence: { source: 'https://wallpaperdb/ingestor', id: 'upload-1' },
+    correlationId: 'workflow-1',
+    causationId: 'command-1',
+    causationSource: 'https://wallpaperdb/uploader',
+  });
+  expect(
+    translateEvent('wallpaper.uploaded', encode({ ...structured, causationsource: 42 }))
+  ).toBeUndefined();
+});

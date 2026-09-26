@@ -1,4 +1,7 @@
-import { WallpaperUploadedEventSchema } from '@wallpaperdb/events/schemas';
+import {
+  WallpaperUploadedCloudEventSchema,
+  WallpaperUploadedEventSchema,
+} from '@wallpaperdb/events/schemas';
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
 import { z } from 'zod';
@@ -16,11 +19,17 @@ const envelope = z.object({
   causationid: z.string().min(1).optional(),
 });
 export function translateOwnership(subject: string, bytes: Uint8Array, headers?: MsgHdrs) {
-  if (subject !== 'wallpaper.uploaded') return undefined;
+  if (subject !== 'wallpaper.uploaded')
+    return { kind: 'invalid', reason: 'validation_error' } as const;
   const raw = decode(bytes);
-  if (Option.isNone(raw)) return undefined;
+  if (Option.isNone(raw)) return { kind: 'invalid', reason: 'parse_error' } as const;
   const parsed = WallpaperUploadedEventSchema.safeParse(raw.value);
-  if (!parsed.success) return undefined;
+  if (!parsed.success) return { kind: 'invalid', reason: 'validation_error' } as const;
+  if (
+    Predicate.hasProperty(raw.value, 'specversion') &&
+    !WallpaperUploadedCloudEventSchema.safeParse(raw.value).success
+  )
+    return { kind: 'invalid', reason: 'validation_error' } as const;
   const external = parsed.data;
   const structured = Predicate.hasProperty(raw.value, 'specversion')
     ? envelope.safeParse(raw.value)
@@ -43,16 +52,17 @@ export function translateOwnership(subject: string, bytes: Uint8Array, headers?:
         parsedEnvelope.data.id !== external.eventId ||
         parsedEnvelope.data.time !== external.timestamp)
     )
-      return undefined;
+      return { kind: 'invalid', reason: 'validation_error' } as const;
   }
   if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
-    return undefined;
+    return { kind: 'invalid', reason: 'validation_error' } as const;
   const metadata = structured?.success
     ? structured.data
     : binary?.success
       ? binary.data
       : undefined;
   return {
+    kind: 'ownership' as const,
     ownership: { wallpaperId: external.wallpaper.id, profileId: external.wallpaper.userId },
     attributes: {
       'event.id': external.eventId,

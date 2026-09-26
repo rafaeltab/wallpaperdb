@@ -1,6 +1,18 @@
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
-import { Cause, Context, Effect, Fiber, Layer, Ref, Schema, Stream } from 'effect';
+import {
+  Cause,
+  Clock,
+  Context,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Metric,
+  Ref,
+  Schema,
+  Stream,
+} from 'effect';
 import { AckPolicy, type JsMsg } from 'nats';
 import { Maintenance, MaintenanceFailure } from '../../maintenance/index.js';
 import { broker, EventsBroker, type EventsOptions } from './broker.js';
@@ -29,37 +41,73 @@ const processMessage = Effect.fn('profiles.events.consume')(function* (
   pendingFailures: Set<number>
 ) {
   const input = translateOwnership(message.subject, message.data, message.headers);
-  yield* Effect.annotateCurrentSpan({
+  const started = yield* Clock.currentTimeMillis;
+  const attributes = {
     'event.subject': message.subject,
     'event.consumer': durable,
     'event.delivery_attempt': message.info.deliveryCount,
-    ...input?.attributes,
-  });
-  if (!input) {
-    yield* quarantine(service, message, 'invalid');
-    message.ack();
-    pendingFailures.delete(message.info.streamSequence);
-    return;
-  }
-  if (message.info.deliveryCount > 3) {
-    yield* quarantine(service, message, 'exhausted');
-    message.ack();
-    pendingFailures.delete(message.info.streamSequence);
-    return;
-  }
-  const completed = yield* maintenance
-    .recordWallpaperOwnership(input.ownership)
-    .pipe(Effect.match({ onSuccess: () => true, onFailure: () => false }));
-  if (!completed) {
-    pendingFailures.add(message.info.streamSequence);
-    if (message.info.deliveryCount < 3) {
-      message.nak(retryDelay(message, options));
-      return;
+    ...(input.kind === 'ownership' ? input.attributes : {}),
+  };
+  yield* Effect.annotateCurrentSpan(attributes);
+  return yield* Effect.gen(function* () {
+    if (input.kind === 'invalid') {
+      yield* quarantine(service, message, 'invalid');
+      message.ack();
+      pendingFailures.delete(message.info.streamSequence);
+      return input.reason;
     }
-    yield* quarantine(service, message, 'exhausted');
-  }
-  message.ack();
-  pendingFailures.delete(message.info.streamSequence);
+    if (message.info.deliveryCount > 3) {
+      yield* quarantine(service, message, 'exhausted');
+      message.ack();
+      pendingFailures.delete(message.info.streamSequence);
+      return 'error' as const;
+    }
+    const completed = yield* maintenance
+      .recordWallpaperOwnership(input.ownership)
+      .pipe(Effect.match({ onSuccess: () => true, onFailure: () => false }));
+    if (!completed) {
+      pendingFailures.add(message.info.streamSequence);
+      if (message.info.deliveryCount < 3) {
+        message.nak(retryDelay(message, options));
+        return 'error' as const;
+      }
+      yield* quarantine(service, message, 'exhausted');
+    }
+    message.ack();
+    pendingFailures.delete(message.info.streamSequence);
+    return completed ? ('success' as const) : ('error' as const);
+  }).pipe(
+    Effect.onExit((exit) =>
+      Effect.gen(function* () {
+        const duration = (yield* Clock.currentTimeMillis) - started;
+        const status = Exit.isSuccess(exit) ? exit.value : 'error';
+        yield* Effect.annotateCurrentSpan({
+          'event.outcome': status,
+          'event.duration_ms': duration,
+        });
+        yield* Effect.logInfo('Wallpaper ownership delivery finished', {
+          ...attributes,
+          'event.outcome': status,
+          'event.duration_ms': duration,
+        });
+        yield* Metric.update(
+          Metric.counter('events.consumed.total', {
+            incremental: true,
+            attributes: { 'event.type': message.subject, status },
+          }),
+          1
+        );
+        if (status !== 'parse_error' && status !== 'validation_error')
+          yield* Metric.update(
+            Metric.histogram('events.consume_duration_ms', {
+              boundaries: [1, 10, 100, 1000, 30000],
+              attributes: { 'event.type': message.subject },
+            }),
+            duration
+          );
+      })
+    )
+  );
 });
 function consumeMessage(
   message: JsMsg,

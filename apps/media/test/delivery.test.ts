@@ -8,15 +8,20 @@ function fixture() {
   const queries: number[][] = [];
   let allowed = true;
   let missingVariant = false;
+  let missingOriginal = false;
   const dependencies = Layer.mergeAll(
-    Layer.succeed(Catalog, { findWallpaper: () => Effect.succeed(original), findSmallestVariant: (_id, w, h) => { queries.push([w,h]); return Effect.succeed({ id: 'variant', storageBucket: 'media', storageKey: 'variant', width: 960, height: 540 }); }, findCurrentPicture: () => Effect.succeed(original) }),
-    Layer.succeed(AssetReader, { read: (asset) => { reads.push(asset.storageKey); if (missingVariant && asset.storageKey === 'variant') return Effect.succeed(null); return Effect.succeed((async function* () { yield new Uint8Array([1,2,3]); })()); } }),
+    Layer.succeed(Catalog, { findWallpaper: () => Effect.succeed(original), findSmallestVariant: (_id, w, h) => { queries.push([w,h]); return Effect.succeed(w <= 960 && h <= 1080 ? { id: 'variant', storageBucket: 'media', storageKey: 'variant', width: 960, height: 1080 } : null); }, findCurrentPicture: () => Effect.succeed(original) }),
+    Layer.succeed(AssetReader, { read: (asset) => { reads.push(asset.storageKey); if (missingOriginal && asset.storageKey === 'original') return Effect.succeed(null); if (missingVariant && asset.storageKey === 'variant') return Effect.succeed(null); return Effect.succeed(Object.assign((async function* () { yield new Uint8Array([1,2,3]); })(), { close() {} })); } }),
     Layer.succeed(PictureAuthority, { isAvailable: () => Effect.succeed(allowed) }),
     Layer.succeed(ImageTransformer, { resize: (body) => Effect.succeed(body) }),
   );
-  return { reads, queries, loseVariant: () => { missingVariant = true; }, deny: () => { allowed = false; }, run: <A,E>(effect: Effect.Effect<A,E,MediaDelivery>) => Effect.runPromise(effect.pipe(Effect.provide(deliveryLayer({ maxDimension: 16384, maxOutputPixels: 268435456 }).pipe(Layer.provide(dependencies))))) };
+  return { reads, queries, loseOriginal: () => { missingOriginal = true; }, loseVariant: () => { missingVariant = true; }, deny: () => { allowed = false; }, run: <A,E>(effect: Effect.Effect<A,E,MediaDelivery>) => Effect.runPromise(effect.pipe(Effect.provide(deliveryLayer({ maxResizeWidth: 16384, maxResizeHeight: 16384, maxOutputPixels: 268435456 }).pipe(Layer.provide(dependencies))))) };
 }
 describe('media delivery', () => {
+  it('treats an authorized picture with a missing object as unavailable', async () => {
+    const f = fixture(); f.loseOriginal();
+    await expect(f.run(Effect.flatMap(MediaDelivery, d => d.picture('pic_1')))).rejects.toMatchObject({ _tag: 'DeliveryUnavailable', operation: 'read_picture' });
+  });
   it('uses the original missing dimension when choosing variants', async () => {
     const f = fixture();
     await f.run(Effect.flatMap(MediaDelivery, d => d.wallpaper('wall_1', { width: 500, fit: 'contain' })));

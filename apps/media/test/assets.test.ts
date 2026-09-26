@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
-import { Effect, Layer } from 'effect';
+import { Effect, ManagedRuntime } from 'effect';
 import sharp from 'sharp';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ImageTransformer, PictureAuthority } from '../src/delivery/index.js';
 import { pictureAuthorityLayer, sharpTransformerLayer } from '../src/adapters/assets/index.js';
 
@@ -9,6 +9,24 @@ async function bytes(body: AsyncIterable<Uint8Array>) { const chunks = []; for a
 async function* stream(value: Uint8Array) { yield value; }
 
 describe('production asset adapters', () => {
+  it('releases resize capacity and input on client cancellation', async () => {
+    const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: 100000, maxConcurrent: 1 }));
+    let closed = false;
+    let release = () => {};
+    const waiting = new Promise<void>(resolve => { release = resolve; });
+    const input = { close() { closed = true; release(); }, async *[Symbol.asyncIterator]() { await waiting; } };
+    try {
+      const first = await runtime.runPromise(Effect.flatMap(ImageTransformer, t => t.resize(input, { width: 20, fit: 'contain', mimeType: 'image/png' })));
+      await expect(runtime.runPromise(Effect.flatMap(ImageTransformer, t => t.resize(Object.assign(stream(new Uint8Array()), { close() {} }), { width: 20, fit: 'contain', mimeType: 'image/png' })))).rejects.toMatchObject({ operation: 'resize_capacity' });
+      first.close();
+      await vi.waitFor(() => expect(closed).toBe(true));
+      const image = await sharp({ create: { width: 20, height: 10, channels: 3, background: 'blue' } }).png().toBuffer();
+      await vi.waitFor(async () => {
+        const output = await runtime.runPromise(Effect.flatMap(ImageTransformer, t => t.resize(Object.assign(stream(image), { close() {} }), { width: 10, fit: 'contain', mimeType: 'image/png' })));
+        expect(await sharp(await bytes(output)).metadata()).toMatchObject({ width: 10, height: 5 });
+      });
+    } finally { await runtime.dispose(); }
+  });
   it('uses authoritative availability and fails closed for unexpected responses', async () => {
     let status = 204;
     const seen: string[] = [];
@@ -26,7 +44,7 @@ describe('production asset adapters', () => {
   });
   it('resizes actual image bytes without enlarging contain images', async () => {
     const input = await sharp({ create: { width: 80, height: 40, channels: 3, background: 'red' } }).png().toBuffer();
-    const output = await Effect.runPromise(Effect.flatMap(ImageTransformer, t => t.resize(stream(input), { width: 160, height: 100, fit: 'contain', mimeType: 'image/png' })).pipe(Effect.provide(sharpTransformerLayer({ maxInputPixels: 100000 }))));
-    expect(await sharp(await bytes(output)).metadata()).toMatchObject({ width: 80, height: 40, format: 'png' });
+    const output = await Effect.runPromise(Effect.flatMap(ImageTransformer, t => t.resize(Object.assign(stream(input), { close() {} }), { width: 160, height: 100, fit: 'contain', mimeType: 'image/png' })).pipe(Effect.flatMap(body => Effect.promise(() => bytes(body))), Effect.provide(sharpTransformerLayer({ maxInputPixels: 100000 }))));
+    expect(await sharp(output).metadata()).toMatchObject({ width: 80, height: 40, format: 'png' });
   });
 });

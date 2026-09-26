@@ -28,6 +28,9 @@ COPY . .
 RUN pnpm install --frozen-lockfile && \
     sha256sum pnpm-lock.yaml | cut -d' ' -f1 > .pnpm-lockfile-hash
 
+# Vite imports workspace packages through their built public entry points.
+RUN pnpm exec turbo run build --filter='@wallpaperdb/web^...'
+
 # Install the shared entrypoint script
 RUN cp scripts/entrypoint.sh /entrypoint.sh && chmod +x /entrypoint.sh
 

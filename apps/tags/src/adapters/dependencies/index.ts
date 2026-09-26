@@ -9,6 +9,7 @@ export interface DependencyProbeConfig {
   readonly natsUrl: string;
   readonly serviceName: string;
   readonly otelHealthy: boolean;
+  readonly healthTimeoutMs?: number;
 }
 
 export class DependencyStartupFailure extends Schema.TaggedError<DependencyStartupFailure>()(
@@ -28,7 +29,6 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
             max: 1,
             connectionTimeoutMillis: 2000,
             statement_timeout: 5000,
-            query_timeout: 5000,
           });
           pool.on('error', (cause) =>
             logs.getLogger('tags.dependencies').emit({
@@ -58,6 +58,7 @@ export function dependencyProbeLayer(config: DependencyProbeConfig) {
             try: (signal) => checkDatabase(pool, signal),
             catch: (cause) => cause,
           }).pipe(
+            Effect.timeout(config.healthTimeoutMs ?? 5000),
             Effect.catch((cause) =>
               Effect.logError('Database health check failed', { cause }).pipe(Effect.as(false))
             )

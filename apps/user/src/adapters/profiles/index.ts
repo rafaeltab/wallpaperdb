@@ -1,3 +1,4 @@
+import { context, trace } from '@opentelemetry/api';
 import { PROFILE_CREATED_SUBJECT, ProfileCreatedEventSchema, type ProfileCreatedEvent, PROFILE_UPDATED_SUBJECT, ProfileUpdatedEventSchema, type ProfileUpdatedEvent } from '@wallpaperdb/events';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
@@ -8,6 +9,7 @@ import { Database } from '../database/index.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
+type TraceMetadata = { traceParent: string | null; traceState: string | null };
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 const retentionMs = (policy: ProfilePolicy) => policy.profileEvidenceRetentionDays * 86400000;
 function uniqueViolation(error: unknown): boolean {
@@ -28,24 +30,30 @@ async function ownerProfile(reader: ProfileReader, profile: Profile, policy: Pro
   const claimed = new Set(claims.filter(claim => claim.profileId !== profile.id).map(claim => claim.handle));
   return { ...profile, biographyMaxLength: policy.profileBiographyMaxLength, retainedAliasLimit: policy.profileRetainedAliasLimit, pictureImportStatus: pictureImport?.status ?? 'complete', pictureUploadLimits: { maxBytes: policy.profilePictureMaxBytes, maxPixels: policy.profilePictureMaxPixels, maxDecodedBytes: policy.profilePictureMaxDecodedBytes }, aliases: activeAliases, historicalHandles: history.map(entry => ({ ...entry, unavailableReason: claimed.has(entry.handle) ? 'claimed' : retained.size >= policy.profileRetainedAliasLimit ? 'alias-limit' : null })) };
 }
-async function appendEvent(tx: Transaction, profile: Profile, change: ProfileUpdatedEvent['change'] | { type: 'created' }, now: Date) {
+async function appendEvent(tx: Transaction, profile: Profile, change: ProfileUpdatedEvent['change'] | { type: 'created' }, now: Date, metadata: TraceMetadata) {
   const claim = await tx.query.handleClaims.findFirst({ where: and(eq(handleClaims.handle, profile.handle), eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'profile')) });
   if (!claim) throw new Error('Current Profile Handle claim is missing');
   const snapshot = { id: profile.id, displayName: profile.displayName, handle: profile.handle, claimGeneration: claim.claimGeneration, aliases: await aliases(tx, profile.id), biographyMarkdown: profile.biographyMarkdown, pictureAssetId: profile.pictureAssetId, version: profile.version, createdAt: profile.createdAt.toISOString(), updatedAt: profile.updatedAt.toISOString() };
   const occurrence = { eventId: `evt_${ulid()}`, timestamp: now.toISOString(), profile: snapshot };
   const event: ProfileCreatedEvent | ProfileUpdatedEvent = change.type === 'created' ? ProfileCreatedEventSchema.parse({ ...occurrence, eventType: PROFILE_CREATED_SUBJECT, change }) : ProfileUpdatedEventSchema.parse({ ...occurrence, eventType: PROFILE_UPDATED_SUBJECT, change });
-  await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: profile.id, payload: event, createdAt: now });
+  await tx.insert(outboxEvents).values({ id: event.eventId, subject: event.eventType, aggregateId: profile.id, payload: event, createdAt: now, ...metadata });
 }
 
 export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(ProfileStore, Effect.gen(function* () {
   const database = yield* Database;
-  const operation = <A>(name: string, use: (db: Db) => Promise<A>) => Effect.tryPromise({ try: signal => database.run(use, signal), catch: cause => new ProfileUnavailable({ operation: name, cause }) });
+  const operation = <A>(name: string, use: (db: Db, metadata: TraceMetadata) => Promise<A>) => Effect.gen(function* () {
+    const metadata = yield* Effect.currentSpan.pipe(Effect.match({
+      onFailure: (): TraceMetadata => ({ traceParent: null, traceState: null }),
+      onSuccess: (span): TraceMetadata => ({ traceParent: `00-${span.traceId}-${span.spanId}-${span.sampled ? '01' : '00'}`, traceState: trace.getSpanContext(context.active())?.traceState?.serialize() ?? null }),
+    }));
+    return yield* Effect.tryPromise({ try: signal => database.run(db => use(db, metadata), signal), catch: cause => new ProfileUnavailable({ operation: name, cause }) });
+  });
   const adapter: ProfileStore = {
     read: (profileId, now) => operation('read-profile', db => db.transaction(async tx => {
       const [profile] = await tx.select().from(profiles).where(eq(profiles.id, profileId)).for('share');
       return profile ? ownerProfile(tx, profile, policy, now) : null;
     })),
-    create: input => operation('create-profile', async db => {
+    create: input => operation('create-profile', async (db, metadata) => {
       try {
         return await db.transaction(async tx => {
           const [raced] = await tx.select().from(profiles).where(eq(profiles.id, input.profileId)).for('share');
@@ -54,12 +62,12 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           if (!profile) throw new Error('Profile insert returned no row');
           await tx.insert(handleClaims).values({ handle: input.handle, profileId: input.profileId, kind: 'profile' });
           if (input.imageUrl) await tx.insert(profilePictureImports).values({ profileId: input.profileId, sourceUrl: input.imageUrl, createdAt: input.now, nextAttemptAt: input.now });
-          await appendEvent(tx, profile, { type: 'created' }, input.now);
+          await appendEvent(tx, profile, { type: 'created' }, input.now, metadata);
           return ownerProfile(tx, profile, policy, input.now);
         });
       } catch (cause) { if (uniqueViolation(cause)) return null; throw cause; }
     }),
-    transact: (query, decide) => operation('transition-profile', async db => {
+    transact: (query, decide) => operation('transition-profile', async (db, metadata) => {
       try {
         return await db.transaction(async tx => {
           const [current] = await tx.select().from(profiles).where(eq(profiles.id, query.profileId)).for('update');
@@ -74,7 +82,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
           if (decision._tag === 'Unchanged') return { outcome: { _tag: 'Success', profile } satisfies ProfileOutcome, changed: false };
           const { updated, change } = await applyMutation(tx, current, decision.mutation, query.now, policy);
-          await appendEvent(tx, updated, change, query.now);
+          await appendEvent(tx, updated, change, query.now, metadata);
           return { outcome: { _tag: 'Success', profile: await ownerProfile(tx, updated, policy, query.now) } satisfies ProfileOutcome, changed: true };
         });
       } catch (cause) {

@@ -43,6 +43,7 @@ export interface PictureAsset {
 export interface ProfileSnapshot {
   readonly profile: OwnerProfile;
   readonly targetClaim: { profileId: string; kind: string; claimGeneration: number; expiresAt: Date | null } | null;
+  readonly eligibleHandles: readonly string[];
   readonly wallpaperOwners: readonly { wallpaperId: string; profileId: string }[];
   readonly asset: PictureAsset | null;
   readonly importJob: { status: 'pending' | 'retrying' | 'complete'; leaseToken: string | null } | null;
@@ -71,6 +72,11 @@ export interface ProfileStore {
 export const ProfileStore = Context.Service<ProfileStore>('wallpaperdb.user.profile.ProfileStore');
 export interface Profiles {
   ensure(principal: ProfilePrincipal): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  changeHandle(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  reactivateAlias(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  scheduleAliasExpiry(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  expireAliasImmediately(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  expireDueAlias(reference: AliasClaimReference, now: Date): Effect.Effect<boolean, ProfileUnavailable>;
   updateDetails(principal: ProfilePrincipal, changes: { displayName?: string; biographyMarkdown?: string }, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
 }
 export const Profiles = Context.Service<Profiles>('wallpaperdb.user.profile.Profiles');
@@ -91,6 +97,40 @@ function collisionHandle(base: string, maximumLength: number, entropy: number) {
 export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, Effect.gen(function* () {
   const store = yield* ProfileStore;
   const identities = yield* Identities;
+  const mutateAlias = Effect.fn('profiles.mutate-alias')(function* (principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number, operation: 'reactivate' | 'schedule' | 'expire') {
+    if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) return reject('invalid-alias-command', 'Expected Profile version must be a positive integer');
+    const handle = requestedHandle.toLowerCase();
+    const now = new Date(yield* Clock.currentTimeMillis);
+    const result = yield* store.transact({ profileId: principal.profileId, now, handle }, snapshot => {
+      if (snapshot.profile.version !== expectedVersion) return versionConflict();
+      return decideAlias(snapshot, handle, operation, now, policy);
+    });
+    return result.outcome;
+  });
+  const changeHandle = Effect.fn('profiles.change-handle')(function* (principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number) {
+    if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) return reject('invalid-handle', 'Expected Profile version must be a positive integer');
+    const handle = slugify(requestedHandle);
+    if (handle.length < policy.profileHandleMinLength || handle.length > policy.profileHandleMaxLength) return reject('invalid-handle', `Handle must contain ${policy.profileHandleMinLength}–${policy.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`);
+    if (reserved.has(handle)) return reject('invalid-handle', 'This Handle is reserved; choose another name');
+    const now = new Date(yield* Clock.currentTimeMillis);
+    const result = yield* store.transact({ profileId: principal.profileId, now, handle }, ({ profile, targetClaim }) => {
+      if (profile.version !== expectedVersion) return versionConflict();
+      if (profile.handle === handle) return { _tag: 'Unchanged' };
+      if (profile.lastHandleChangedAt) {
+        const nextHandleChangeAt = new Date(profile.lastHandleChangedAt.getTime() + 7 * 86400000);
+        if (now < nextHandleChangeAt) return { ...reject('handle-cooldown', 'You can change your Handle once every seven days'), nextHandleChangeAt };
+      }
+      if (targetClaim && targetClaim.profileId !== principal.profileId) return reject('handle-unavailable', 'This Handle is already in use; choose another name');
+      const retained = profile.aliases.filter(alias => alias.expiresAt === null && alias.handle !== handle);
+      retained.push({ handle: profile.handle, claimGeneration: 0, createdAt: now.toISOString(), expiresAt: null });
+      retained.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.handle.localeCompare(b.handle));
+      const scheduledAliases = retained.slice(0, Math.max(0, retained.length - policy.profileRetainedAliasLimit)).map(alias => ({ handle: alias.handle, expiresAt: new Date(now.getTime() + 86400000).toISOString() }));
+      return { _tag: 'Change', mutation: { type: 'handle', handle, scheduledAliases } };
+    });
+    return result.outcome;
+  });
   const updateDetails = Effect.fn('profiles.update-details')(function* (principal: ProfilePrincipal, changes: { displayName?: string; biographyMarkdown?: string }, expectedVersion: number) {
     if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
     const displayName = changes.displayName === undefined ? undefined : normalizeName(changes.displayName);
@@ -120,6 +160,14 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
   });
   return Profiles.of({
     updateDetails,
+    changeHandle,
+    reactivateAlias: (principal, handle, version) => mutateAlias(principal, handle, version, 'reactivate'),
+    scheduleAliasExpiry: (principal, handle, version) => mutateAlias(principal, handle, version, 'schedule'),
+    expireAliasImmediately: (principal, handle, version) => mutateAlias(principal, handle, version, 'expire'),
+    expireDueAlias: (reference, now) => store.transact({ profileId: reference.profileId, now, handle: reference.handle }, ({ profile, targetClaim }) => {
+      if (!targetClaim || targetClaim.profileId !== profile.id || targetClaim.kind !== 'alias' || targetClaim.claimGeneration !== reference.claimGeneration || !targetClaim.expiresAt || targetClaim.expiresAt > now) return { _tag: 'Unchanged' };
+      return { _tag: 'Change', mutation: { type: 'expire', handle: reference.handle, claimGeneration: reference.claimGeneration, before: targetClaim.expiresAt.toISOString(), reason: 'scheduled' } };
+    }).pipe(Effect.map(result => result.changed)),
     ensure: Effect.fn('profiles.ensure')(function* (principal: ProfilePrincipal) {
       if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
       const now = new Date(yield* Clock.currentTimeMillis);
@@ -144,3 +192,21 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
     }),
   });
 }));
+
+function decideAlias({ profile, targetClaim, eligibleHandles }: ProfileSnapshot, handle: string, operation: 'reactivate' | 'schedule' | 'expire', now: Date, policy: ProfilePolicy): ProfileDecision {
+  if (operation === 'reactivate') {
+    if (profile.handle === handle) return reject('invalid-alias-command', 'Your current Handle cannot also be an alias');
+    if (!eligibleHandles.includes(handle)) return reject('ineligible-handle', 'This Handle is outside your retained Profile history');
+    if (targetClaim && (targetClaim.profileId !== profile.id || targetClaim.kind !== 'alias')) return reject('handle-unavailable', 'This Handle is already claimed');
+    if (targetClaim && !targetClaim.expiresAt) return { _tag: 'Unchanged' };
+    if (profile.aliases.filter(alias => alias.expiresAt === null).length >= policy.profileRetainedAliasLimit) return reject('alias-limit', 'No retained alias slot is available');
+    return { _tag: 'Change', mutation: { type: 'reactivate', handle, before: targetClaim?.expiresAt?.toISOString() ?? null } };
+  }
+  if (!targetClaim || targetClaim.profileId !== profile.id || targetClaim.kind !== 'alias') return reject('alias-not-found', 'This Handle is not one of your aliases');
+  if (operation === 'schedule') {
+    if (targetClaim.expiresAt) return { _tag: 'Unchanged' };
+    return { _tag: 'Change', mutation: { type: 'schedule', handle, expiresAt: new Date(now.getTime() + 86400000) } };
+  }
+  if (!targetClaim.expiresAt) return reject('alias-not-scheduled', 'Schedule this alias for removal before expiring it immediately');
+  return { _tag: 'Change', mutation: { type: 'expire', handle, claimGeneration: targetClaim.claimGeneration, before: targetClaim.expiresAt.toISOString(), reason: 'immediate' } };
+}

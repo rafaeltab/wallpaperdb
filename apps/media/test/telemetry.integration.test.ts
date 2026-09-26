@@ -41,6 +41,7 @@ describe('Production telemetry composition', () => {
       .withMigrations()
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('asset-references')
       .withNats((nats) => nats.withJetstream())
       .withStream('WALLPAPER')
       .withStream('PROFILE');

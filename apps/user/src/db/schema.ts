@@ -59,6 +59,8 @@ export const outboxEvents = pgTable(
     payload: jsonb('payload').$type<ProfileCreatedEvent | ProfileUpdatedEvent>().notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp('published_at', { withTimezone: true }),
+    traceParent: text('trace_parent'),
+    traceState: text('trace_state'),
   },
   (table) => [
     index('outbox_events_unpublished_idx').on(table.publishedAt),

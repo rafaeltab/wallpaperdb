@@ -1,16 +1,25 @@
-import {
-  DatabaseConfigSchema,
-  NatsConfigSchema,
-  OtelConfigSchema,
-  ServerConfigSchema,
-} from '@wallpaperdb/core/config';
+import { NatsConfigSchema, OtelConfigSchema, ServerConfigSchema } from '@wallpaperdb/core/config';
 import { z } from 'zod';
+
+function serverUrl(protocols: readonly string[]) {
+  return z
+    .string()
+    .url()
+    .pipe(
+      z.string().refine((value) => {
+        const url = new URL(value);
+        return protocols.includes(url.protocol) && url.hostname.length > 0;
+      }, 'Expected a server URL with a supported protocol and hostname')
+    );
+}
 
 const configSchema = z.object({
   ...ServerConfigSchema.shape,
-  ...DatabaseConfigSchema.shape,
+  databaseUrl: serverUrl(['postgres:', 'postgresql:']),
   ...NatsConfigSchema.shape,
+  natsUrl: serverUrl(['nats:', 'tls:']),
   ...OtelConfigSchema.shape,
+  otelEndpoint: serverUrl(['http:', 'https:']).optional(),
   port: z.string().regex(/^\d+$/).transform(Number).pipe(z.number().int().min(1).max(65535)),
 });
 

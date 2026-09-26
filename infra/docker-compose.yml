@@ -36,7 +36,7 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-storageadmin}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-storageadmin}
-      S3_BUCKET: wallpapers,example-bucket,profile-pictures
+      S3_BUCKET: wallpapers,example-bucket,profile-pictures,asset-references
     ports:
       - "${S3_API_HOST_PORT:-9000}:9000"
     volumes:
@@ -57,7 +57,10 @@ services:
           --head http://localhost:9000/example-bucket &&
           curl --fail --silent --aws-sigv4 'aws:amz:us-east-1:s3'
           --user "$${AWS_ACCESS_KEY_ID}:$${AWS_SECRET_ACCESS_KEY}"
-          --head http://localhost:9000/profile-pictures
+          --head http://localhost:9000/profile-pictures &&
+          curl --fail --silent --aws-sigv4 'aws:amz:us-east-1:s3'
+          --user "$${AWS_ACCESS_KEY_ID}:$${AWS_SECRET_ACCESS_KEY}"
+          --head http://localhost:9000/asset-references
       interval: 5s
       timeout: 5s
       retries: 12

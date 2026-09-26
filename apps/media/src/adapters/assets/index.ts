@@ -21,7 +21,8 @@ export const sharpTransformerLayer = (limits: {
   Layer.effect(
     ImageTransformer,
     Effect.gen(function* () {
-      const workers = new Set<{ stop(): void; closed: Promise<void> }>();
+      const scope = yield* Effect.scope;
+      const workers = new Set<{ stop(): void; closed: Promise<unknown> }>();
       yield* Effect.addFinalizer(() =>
         Effect.promise(async () => {
           const pending = [...workers];
@@ -31,17 +32,17 @@ export const sharpTransformerLayer = (limits: {
       );
       return ImageTransformer.of({
         resize: (body, options) =>
-          Effect.suspend(() => {
+          Effect.gen(function* () {
             if (workers.size >= (limits.maxConcurrent ?? 4)) {
               body.close();
-              return Effect.fail(
+              return yield* Effect.fail(
                 new DeliveryUnavailable({
                   operation: 'resize_capacity',
                   cause: new Error('Resize capacity exhausted'),
                 })
               );
             }
-            return Effect.sync(() => {
+            const result = yield* Effect.sync(() => {
               const start = Date.now();
               const workerPath = new URL(
                 import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs',
@@ -54,7 +55,7 @@ export const sharpTransformerLayer = (limits: {
                   fileURLToPath(workerPath),
                   JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels }),
                 ],
-                { stdio: ['pipe', 'pipe', 'ignore'] }
+                { stdio: ['pipe', 'pipe', 'pipe'] }
               );
               const input = Readable.from(body);
               const output = new PassThrough();
@@ -64,8 +65,20 @@ export const sharpTransformerLayer = (limits: {
                 input.destroy();
                 child.kill('SIGKILL');
               };
-              const closed = new Promise<void>((resolve) => {
-                child.once('close', (code) => {
+              let diagnostic = '';
+              let reason = 'worker_failed';
+              child.stderr.on('data', (chunk: Buffer) => {
+                if (Buffer.byteLength(diagnostic) + chunk.byteLength > 1024) {
+                  reason = 'diagnostic_limit';
+                  stop();
+                } else diagnostic += chunk.toString();
+              });
+              const closed = new Promise<{
+                code: number | null;
+                signal: string | null;
+                reason: string;
+              }>((resolve) => {
+                child.once('close', (code, signal) => {
                   clearTimeout(deadline);
                   workers.delete(worker);
                   body.close();
@@ -74,17 +87,29 @@ export const sharpTransformerLayer = (limits: {
                     recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
                     output.destroy(new Error('Image encoding failed'));
                   }
-                  resolve();
+                  const knownReasons = [
+                    'unsupported_input',
+                    'input_pixel_limit',
+                    'corrupt_image',
+                    'encoding_failed',
+                  ];
+                  resolve({
+                    code,
+                    signal,
+                    reason: knownReasons.includes(diagnostic) ? diagnostic : reason,
+                  });
                 });
               });
               const worker = { stop, closed };
               workers.add(worker);
               const deadline = setTimeout(() => {
+                reason = 'deadline_exceeded';
                 output.destroy(new Error('Image encoding deadline exceeded'));
                 stop();
               }, limits.timeoutMs ?? 30000);
               deadline.unref();
               child.once('error', (error) => {
+                reason = 'worker_start_failed';
                 output.destroy(error);
                 stop();
               });
@@ -98,9 +123,45 @@ export const sharpTransformerLayer = (limits: {
                 'resize.fit_mode': options.fit,
                 'image.format': options.mimeType.split('/')[1],
               });
-              return byteStream(output);
+              return { body: byteStream(output), closed, stop };
             });
-          }),
+            yield* Effect.promise(() => result.closed).pipe(
+              Effect.onInterrupt(() =>
+                Effect.promise(async () => {
+                  result.stop();
+                  await result.closed;
+                })
+              ),
+              Effect.flatMap((exit) =>
+                exit.code === 0
+                  ? Effect.void
+                  : Effect.fail(new DeliveryUnavailable({ operation: 'resize', cause: exit }))
+              ),
+              Effect.withSpan('media.resize', {
+                attributes: {
+                  'resize.width': options.width,
+                  'resize.height': options.height,
+                  'resize.fit_mode': options.fit,
+                  'file.mime_type': options.mimeType,
+                },
+              }),
+              Effect.catchTag('DeliveryUnavailable', (error) =>
+                Effect.logError('Media resize failed', {
+                  operation: error.operation,
+                  diagnostic: error.cause,
+                })
+              ),
+              Effect.forkIn(scope)
+            );
+            return result.body;
+          }).pipe(
+            Effect.tapError((error) =>
+              Effect.logError('Media resize admission failed', {
+                operation: error.operation,
+                cause: error.cause,
+              })
+            )
+          ),
       });
     })
   );

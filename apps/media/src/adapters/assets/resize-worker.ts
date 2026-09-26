@@ -25,6 +25,16 @@ try {
   else if (options.mimeType === 'image/png') transformer.png({ compressionLevel: 6 });
   else if (options.mimeType === 'image/webp') transformer.webp({ quality: 90 });
   await pipeline(process.stdin, transformer, process.stdout);
-} catch {
+} catch (cause) {
+  // Native messages can contain input-derived text; export only bounded diagnostic categories.
+  const message = cause instanceof Error ? cause.message : '';
+  const reason = /unsupported image format/i.test(message)
+    ? 'unsupported_input'
+    : /pixel limit/i.test(message)
+      ? 'input_pixel_limit'
+      : /corrupt|invalid|bad header|premature|unexpected end/i.test(message)
+        ? 'corrupt_image'
+        : 'encoding_failed';
+  process.stderr.write(reason);
   process.exitCode = 1;
 }

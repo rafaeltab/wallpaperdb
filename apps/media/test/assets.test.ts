@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { Effect, ManagedRuntime } from 'effect';
+import { Effect, Layer, Logger, ManagedRuntime, Tracer } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { AssetReader, ImageTransformer, PictureAuthority } from '../src/delivery/index.js';
@@ -19,6 +19,76 @@ async function* stream(value: Uint8Array) {
 }
 
 describe('production asset adapters', () => {
+  it('keeps the resize trace open until native work completes', async () => {
+    const spans: Tracer.Span[] = [];
+    const tracer = Tracer.make({
+      span(options) {
+        const span = Tracer.nativeTracer.span(options);
+        spans.push(span);
+        return span;
+      },
+    });
+    const runtime = ManagedRuntime.make(sharpTransformerLayer({ maxInputPixels: 100000 }));
+    let release = () => {};
+    const ready = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const image = await sharp({
+      create: { width: 20, height: 10, channels: 3, background: 'blue' },
+    })
+      .png()
+      .toBuffer();
+    const input = {
+      close() {
+        release();
+      },
+      async *[Symbol.asyncIterator]() {
+        await ready;
+        yield image;
+      },
+    };
+    try {
+      const body = await runtime.runPromise(
+        Effect.flatMap(ImageTransformer, (transformer) =>
+          transformer.resize(input, { width: 10, fit: 'contain', mimeType: 'image/png' })
+        ).pipe(Effect.withTracer(tracer))
+      );
+      await vi.waitFor(() => expect(spans.length).toBeGreaterThan(0));
+      expect(spans.every((span) => span.status._tag === 'Started')).toBe(true);
+      release();
+      await bytes(body);
+      await vi.waitFor(() =>
+        expect(spans.every((span) => span.status._tag === 'Ended')).toBe(true)
+      );
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
+  it('records a bounded actionable diagnostic for rejected native image input', async () => {
+    const entries: unknown[] = [];
+    const logger = Logger.make<unknown, void>((options) => {
+      entries.push(options.message);
+    });
+    const layer = sharpTransformerLayer({ maxInputPixels: 100000 }).pipe(
+      Layer.provideMerge(Logger.layer([logger]))
+    );
+    const runtime = ManagedRuntime.make(layer);
+    try {
+      const input = Object.assign(stream(Buffer.from('private-upload-marker')), { close() {} });
+      const body = await runtime.runPromise(
+        Effect.flatMap(ImageTransformer, (transformer) =>
+          transformer.resize(input, { width: 20, fit: 'contain', mimeType: 'image/png' })
+        )
+      );
+      await expect(bytes(body)).rejects.toThrow('Image encoding failed');
+      await vi.waitFor(() => expect(JSON.stringify(entries)).toContain('unsupported_input'));
+      expect(JSON.stringify(entries)).not.toContain('private-upload-marker');
+    } finally {
+      await runtime.dispose();
+    }
+  });
+
   it('holds storage admission until an open body closes and interrupts stalled bodies', async () => {
     const server = createServer((_request, response) => {
       response.writeHead(200, { 'Content-Type': 'application/octet-stream' });

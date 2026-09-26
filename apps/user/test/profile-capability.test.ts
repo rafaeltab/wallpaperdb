@@ -321,4 +321,229 @@ describe('Profiles capability', () => {
     expect(next.aliases).toHaveLength(2);
     expect(test.transitions).toHaveLength(3);
   });
+
+  it('returns retained dates and preserves a scheduled expiry on retries until release', async () => {
+    at('2030-01-01T12:00:00.000Z');
+    const test = controlledProfiles();
+    const before = await test.ensure();
+    await test.ensure('other');
+    expect(before).toMatchObject({ retainedAliasLimit: 3, aliases: [] });
+    const changed = accepted(await test.run((p) => p.changeHandle(principal, 'new-handle', 1)));
+    expect(changed.aliases).toEqual([
+      {
+        handle: before.handle,
+        claimGeneration: expect.any(Number),
+        createdAt: '2030-01-01T12:00:00.000Z',
+        expiresAt: null,
+      },
+    ]);
+    const scheduled = accepted(
+      await test.run((p) => p.scheduleAliasExpiry(principal, before.handle.toUpperCase(), 2))
+    );
+    expect(scheduled).toMatchObject({
+      version: 3,
+      lastHandleChangedAt: changed.lastHandleChangedAt,
+      aliases: [{ ...changed.aliases[0], expiresAt: '2030-01-02T12:00:00.000Z' }],
+    });
+    at('2030-01-02T12:00:00.001Z');
+    expect(
+      accepted(await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 3)))
+    ).toEqual(scheduled);
+    expect(await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 2))).toMatchObject(
+      { _tag: 'Rejected', reason: 'version-conflict' }
+    );
+    expect(
+      await test.run((p) => p.changeHandle({ profileId: 'other' }, before.handle, 1))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'handle-unavailable' });
+    const renamed = accepted(
+      await test.run((p) => p.updateDetails(principal, { displayName: 'New name' }, 3))
+    );
+    expect(renamed).toMatchObject({ aliases: scheduled.aliases, retainedAliasLimit: 3 });
+    expect(test.transitions.filter((t) => t.mutation.type === 'schedule')).toHaveLength(1);
+  });
+  it('allows only an owner to schedule or immediately expire an existing alias at the last-seen version', async () => {
+    const test = controlledProfiles();
+    const original = await test.ensure();
+    await test.ensure('other');
+    const changed = accepted(await test.run((p) => p.changeHandle(principal, 'current-handle', 1)));
+    for (const command of [
+      () => test.run((p) => p.scheduleAliasExpiry(principal, original.handle, 1)),
+      () => test.run((p) => p.expireAliasImmediately(principal, original.handle, 1)),
+      () => test.run((p) => p.reactivateAlias(principal, original.handle, 1)),
+    ])
+      expect(await command()).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+    for (const handle of [changed.handle, 'unclaimed-alias']) {
+      expect(await test.run((p) => p.scheduleAliasExpiry(principal, handle, 2))).toMatchObject({
+        _tag: 'Rejected',
+        reason: 'alias-not-found',
+      });
+      expect(await test.run((p) => p.expireAliasImmediately(principal, handle, 2))).toMatchObject({
+        _tag: 'Rejected',
+        reason: 'alias-not-found',
+      });
+    }
+    expect(
+      await test.run((p) => p.scheduleAliasExpiry({ profileId: 'other' }, original.handle, 1))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-not-found' });
+    expect(
+      await test.run((p) => p.expireAliasImmediately(principal, original.handle, 2))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-not-scheduled' });
+    expect(await test.ensure()).toEqual(changed);
+    expect(test.transitions).toHaveLength(3);
+    const scheduled = accepted(
+      await test.run((p) => p.scheduleAliasExpiry(principal, original.handle, 2))
+    );
+    expect(
+      await test.run((p) => p.expireAliasImmediately({ profileId: 'other' }, original.handle, 1))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-not-found' });
+    const expired = accepted(
+      await test.run((p) => p.expireAliasImmediately(principal, original.handle, scheduled.version))
+    );
+    expect(expired).toMatchObject({
+      handle: changed.handle,
+      aliases: [],
+      version: 4,
+      lastHandleChangedAt: changed.lastHandleChangedAt,
+    });
+    expect(
+      await test.run((p) => p.expireAliasImmediately(principal, original.handle, 4))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-not-found' });
+  });
+  it.each([
+    0, 1,
+  ])('rejects scheduled and released reactivation with no slot at limit %i', async (limit) => {
+    at('2030-01-01T00:00:00.000Z');
+    const test = controlledProfiles();
+    const original = await test.ensure();
+    const changed = accepted(await test.run((p) => p.changeHandle(principal, 'second-handle', 1)));
+    const scheduled = accepted(
+      await test.run((p) => p.scheduleAliasExpiry(principal, original.handle, changed.version))
+    );
+    at('2030-01-08T00:00:00.000Z');
+    if (limit === 1)
+      accepted(
+        await test.run((p) => p.changeHandle(principal, 'current-handle', scheduled.version))
+      );
+    test.setPolicy({ profileRetainedAliasLimit: limit });
+    const before = await test.ensure();
+    expect(before.historicalHandles).toContainEqual({
+      handle: original.handle,
+      eligibleUntil: '2030-01-31T00:00:00.000Z',
+      unavailableReason: 'alias-limit',
+    });
+    expect(
+      await test.run((p) => p.reactivateAlias(principal, original.handle, before.version))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-limit' });
+    expect(await test.ensure()).toEqual(before);
+    const released = accepted(
+      await test.run((p) => p.expireAliasImmediately(principal, original.handle, before.version))
+    );
+    expect(
+      await test.run((p) => p.reactivateAlias(principal, original.handle, released.version))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'alias-limit' });
+    expect(await test.ensure()).toEqual(released);
+    expect(released.aliases).toEqual(
+      before.aliases.filter((alias) => alias.handle !== original.handle)
+    );
+    expect(test.transitions.filter((t) => t.mutation.type === 'reactivate')).toHaveLength(0);
+  });
+  it('reports another owner claim as unavailable and rejects reactivation', async () => {
+    const test = controlledProfiles();
+    const original = await test.ensure();
+    await test.run((p) => p.changeHandle(principal, 'current-handle', 1));
+    await test.run((p) => p.scheduleAliasExpiry(principal, original.handle, 2));
+    const released = accepted(
+      await test.run((p) => p.expireAliasImmediately(principal, original.handle, 3))
+    );
+    await test.ensure('other');
+    accepted(await test.run((p) => p.changeHandle({ profileId: 'other' }, original.handle, 1)));
+    const before = await test.ensure();
+    expect(before.historicalHandles).toEqual([
+      { ...released.historicalHandles[0], unavailableReason: 'claimed' },
+    ]);
+    expect(
+      await test.run((p) => p.reactivateAlias(principal, original.handle, released.version))
+    ).toMatchObject({ _tag: 'Rejected', reason: 'handle-unavailable' });
+    expect(await test.ensure()).toEqual(before);
+    expect(test.transitions.filter((t) => t.mutation.type === 'reactivate')).toHaveLength(0);
+  });
+  it('excludes expiring aliases from the retained limit immediately', async () => {
+    at('2030-01-01T12:00:00.000Z');
+    const test = controlledProfiles({ profileRetainedAliasLimit: 1 });
+    const before = await test.ensure();
+    await test.run((p) => p.changeHandle(principal, 'first', 1));
+    at('2030-01-08T12:00:00.000Z');
+    const scheduled = accepted(
+      await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 2))
+    );
+    const updated = accepted(await test.run((p) => p.changeHandle(principal, 'second', 3)));
+    expect(updated.aliases).toEqual([
+      scheduled.aliases[0],
+      {
+        handle: 'first',
+        claimGeneration: expect.any(Number),
+        createdAt: '2030-01-08T12:00:00.000Z',
+        expiresAt: null,
+      },
+    ]);
+    expect(test.transitions.at(-1)?.mutation).toEqual({
+      type: 'handle',
+      handle: 'second',
+      scheduledAliases: [],
+    });
+  });
+  it('schedules all excess aliases in one version when the retained limit becomes zero', async () => {
+    at('2030-01-01T12:00:00.000Z');
+    const test = controlledProfiles();
+    const before = await test.ensure();
+    await test.run((p) => p.changeHandle(principal, 'first', 1));
+    test.setPolicy({ profileRetainedAliasLimit: 0 });
+    at('2030-01-08T12:00:00.000Z');
+    const updated = accepted(await test.run((p) => p.changeHandle(principal, 'second', 2)));
+    expect(updated).toMatchObject({ version: 3, retainedAliasLimit: 0 });
+    expect(
+      updated.aliases.map((alias) => ({ handle: alias.handle, expiresAt: alias.expiresAt }))
+    ).toEqual([
+      { handle: before.handle, expiresAt: '2030-01-09T12:00:00.000Z' },
+      { handle: 'first', expiresAt: '2030-01-09T12:00:00.000Z' },
+    ]);
+    expect(test.transitions).toHaveLength(3);
+  });
+  it('retains a kept claim, releases it immediately, and creates a new generation on reactivation', async () => {
+    const test = controlledProfiles();
+    const before = await test.ensure();
+    const changed = accepted(await test.run((p) => p.changeHandle(principal, 'second', 1)));
+    const scheduled = accepted(
+      await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 2))
+    );
+    const kept = accepted(await test.run((p) => p.reactivateAlias(principal, before.handle, 3)));
+    expect(kept.aliases[0]).toMatchObject({
+      claimGeneration: changed.aliases[0]?.claimGeneration,
+      expiresAt: null,
+    });
+    expect(
+      await test.run((p) =>
+        p.expireDueAlias(
+          {
+            profileId: 'owner',
+            handle: before.handle,
+            claimGeneration: scheduled.aliases[0]!.claimGeneration,
+          },
+          new Date(scheduled.aliases[0]!.expiresAt!)
+        )
+      )
+    ).toBe(false);
+    expect(accepted(await test.run((p) => p.reactivateAlias(principal, before.handle, 4)))).toEqual(
+      kept
+    );
+    await test.run((p) => p.scheduleAliasExpiry(principal, before.handle, 4));
+    await test.run((p) => p.expireAliasImmediately(principal, before.handle, 5));
+    const reactivated = accepted(
+      await test.run((p) => p.reactivateAlias(principal, before.handle, 6))
+    );
+    expect(reactivated).toMatchObject({ version: 7, handle: 'second' });
+    expect(reactivated.aliases[0]!.claimGeneration).toBeGreaterThan(
+      changed.aliases[0]!.claimGeneration
+    );
+  });
 });

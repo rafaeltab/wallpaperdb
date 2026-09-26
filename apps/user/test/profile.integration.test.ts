@@ -566,71 +566,6 @@ describe('Profile commands', () => {
     }
   });
 
-  it.each([
-    0, 1,
-  ])('rejects alias reactivation without a retained slot at limit %i', async (limit) => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    const previousLimit = config.profileRetainedAliasLimit;
-    try {
-      const original = (await request('user_1')).json();
-      const changed = (await changeHandle('user_1', 'second-handle', original.version)).json();
-      const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
-      vi.setSystemTime(new Date('2030-01-08T00:00:00.000Z'));
-      const current =
-        limit === 0
-          ? scheduled
-          : (await changeHandle('user_1', 'current-handle', scheduled.version)).json();
-      config.profileRetainedAliasLimit = limit;
-      await reconfigure();
-      const before = (await request('user_1')).json();
-      expect(before.historicalHandles).toContainEqual({
-        handle: original.handle,
-        eligibleUntil: '2030-01-31T00:00:00.000Z',
-        unavailableReason: 'alias-limit',
-      });
-      const rejected = await reactivateAlias('user_1', original.handle, before.version);
-      expect(rejected.statusCode).toBe(409);
-      expect(rejected.json().type).toContain('alias-limit');
-      expect((await request('user_1')).json()).toEqual(before);
-      const released = (await expireAlias('user_1', original.handle, before.version)).json();
-      const rejectedReleased = await reactivateAlias('user_1', original.handle, released.version);
-      expect(rejectedReleased.statusCode).toBe(409);
-      expect(rejectedReleased.json().type).toContain('alias-limit');
-      expect((await request('user_1')).json()).toEqual(released);
-      expect(released.aliases).toEqual(
-        current.aliases.filter((alias: { handle: string }) => alias.handle !== original.handle)
-      );
-      expect(
-        await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`
-      ).toHaveLength(0);
-    } finally {
-      config.profileRetainedAliasLimit = previousLimit;
-      await reconfigure();
-      vi.useRealTimers();
-    }
-  });
-
-  it('reports another Profile claim and rejects reactivating its historical Handle', async () => {
-    const original = (await request('user_1')).json();
-    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
-    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
-    const released = (await expireAlias('user_1', original.handle, scheduled.version)).json();
-    const other = (await request('user_2')).json();
-    expect((await changeHandle('user_2', original.handle, other.version)).statusCode).toBe(200);
-    const before = (await request('user_1')).json();
-    expect(before.historicalHandles).toEqual([
-      { ...released.historicalHandles[0], unavailableReason: 'claimed' },
-    ]);
-    const response = await reactivateAlias('user_1', original.handle, released.version);
-    expect(response.statusCode).toBe(409);
-    expect(response.json().type).toContain('handle-unavailable');
-    expect((await request('user_1')).json()).toEqual(before);
-    expect(
-      await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`
-    ).toHaveLength(0);
-  });
-
   it('uses the configured evidence window for historical Handle eligibility even while events remain unpublished', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
@@ -932,39 +867,6 @@ describe('Profile commands', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('immediately expires a scheduled alias through a versioned owner command', async () => {
-    const original = (await request('user_1')).json();
-    const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
-    const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
-    const response = await expireAlias('user_1', original.handle.toUpperCase(), scheduled.version);
-    expect(response.statusCode).toBe(200);
-    const expired = response.json();
-    expect(expired).toMatchObject({
-      aliases: [],
-      handle: changed.handle,
-      version: scheduled.version + 1,
-    });
-    expect((await request('user_1')).json()).toEqual(expired);
-    const [event] =
-      await sql`select payload from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
-    expect(event.payload).toMatchObject({
-      change: {
-        type: 'alias-expired',
-        handle: original.handle,
-        claimGeneration: scheduled.aliases[0].claimGeneration,
-        before: scheduled.aliases[0].expiresAt,
-        after: null,
-        reason: 'immediate',
-      },
-      profile: { aliases: [], version: expired.version },
-    });
-    expect(Date.parse(event.payload.timestamp)).toBeLessThan(
-      Date.parse(scheduled.aliases[0].expiresAt)
-    );
-    const other = (await request('user_2')).json();
-    expect((await changeHandle('user_2', original.handle, other.version)).statusCode).toBe(200);
   });
 
   it('releases a due alias at its exact expiry and permits a newer claim generation', async () => {
@@ -1281,48 +1183,6 @@ describe('Profile commands', () => {
     }
   });
 
-  it('returns retained alias dates and the configured limit in every owner snapshot', async () => {
-    const before = (await request('user_1')).json();
-    expect(before).toMatchObject({ retainedAliasLimit: 3, aliases: [] });
-    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
-    expect(changed.aliases).toEqual([
-      {
-        handle: before.handle,
-        claimGeneration: expect.any(Number),
-        createdAt: changed.lastHandleChangedAt,
-        expiresAt: null,
-      },
-    ]);
-    const renamed = (await patch('user_1', 'New name', changed.version)).json();
-    expect(renamed).toMatchObject({ aliases: changed.aliases, retainedAliasLimit: 3 });
-    expect((await request('user_1')).json()).toEqual(renamed);
-    const events = await sql`select payload from outbox_events where subject = 'profile.updated'`;
-    expect(events).toHaveLength(2);
-    for (const { payload } of events) expect(payload.profile.aliases).toEqual(changed.aliases);
-  });
-
-  it('keeps a scheduled expiry unchanged on retry and reserves the alias until a later release', async () => {
-    const before = (await request('user_1')).json();
-    const other = (await request('user_2')).json();
-    const changed = (await changeHandle('user_1', 'new-handle', before.version)).json();
-    const scheduled = (await scheduleAlias('user_1', before.handle, changed.version)).json();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date(Date.parse(scheduled.aliases[0].expiresAt) + 1));
-    try {
-      const repeated = await scheduleAlias('user_1', before.handle, scheduled.version);
-      expect(repeated.statusCode).toBe(200);
-      expect(repeated.json()).toEqual(scheduled);
-      expect((await scheduleAlias('user_1', before.handle, changed.version)).statusCode).toBe(409);
-      expect((await changeHandle('user_2', before.handle, other.version)).statusCode).toBe(409);
-      expect((await request('user_1')).json()).toEqual(scheduled);
-      expect(
-        await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expiry-scheduled'`
-      ).toHaveLength(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it('atomically schedules the deterministic oldest retained alias when changing at capacity', async () => {
     identities.identities.set('user_1', { displayName: 'Zulu', firstName: null, lastName: null });
     let owner = (await request('user_1')).json();
@@ -1374,75 +1234,6 @@ describe('Profile commands', () => {
         profile: { version: updated.version, aliases: updated.aliases },
       });
     } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('immediately excludes expiring aliases from a configured retained limit of one', async () => {
-    const previousLimit = config.profileRetainedAliasLimit;
-    config.profileRetainedAliasLimit = 1;
-    await reconfigure();
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
-    try {
-      const before = (await request('user_1')).json();
-      const changed = (await changeHandle('user_1', 'first', before.version)).json();
-      // After cooldown, schedule and immediately use the freed retained slot.
-      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
-      const scheduled = (await scheduleAlias('user_1', before.handle, changed.version)).json();
-      const response = await changeHandle('user_1', 'second', scheduled.version);
-      expect(response.statusCode).toBe(200);
-      const updated = response.json();
-      expect(updated.retainedAliasLimit).toBe(1);
-      expect(updated.aliases).toEqual([
-        scheduled.aliases[0],
-        {
-          handle: 'first',
-          claimGeneration: expect.any(Number),
-          createdAt: updated.lastHandleChangedAt,
-          expiresAt: null,
-        },
-      ]);
-      const [event] =
-        await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
-      expect(event.payload.change.scheduledAliases).toEqual([]);
-    } finally {
-      config.profileRetainedAliasLimit = previousLimit;
-      await reconfigure();
-      vi.useRealTimers();
-    }
-  });
-
-  it('enforces a reduced limit of zero by scheduling all excess aliases in one change', async () => {
-    const previousLimit = config.profileRetainedAliasLimit;
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
-    try {
-      const before = (await request('user_1')).json();
-      const changed = (await changeHandle('user_1', 'first', before.version)).json();
-      config.profileRetainedAliasLimit = 0;
-      await reconfigure();
-      vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
-      const response = await changeHandle('user_1', 'second', changed.version);
-      expect(response.statusCode).toBe(200);
-      const updated = response.json();
-      const expiresAt = '2030-01-09T12:00:00.000Z';
-      expect(updated.retainedAliasLimit).toBe(0);
-      expect(updated.aliases).toHaveLength(2);
-      expect(
-        updated.aliases.every(
-          (alias: { expiresAt: string | null }) => alias.expiresAt === expiresAt
-        )
-      ).toBe(true);
-      const [event] =
-        await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
-      expect(event.payload.change.scheduledAliases).toEqual([
-        { handle: before.handle, expiresAt },
-        { handle: 'first', expiresAt },
-      ]);
-    } finally {
-      config.profileRetainedAliasLimit = previousLimit;
-      await reconfigure();
       vi.useRealTimers();
     }
   });

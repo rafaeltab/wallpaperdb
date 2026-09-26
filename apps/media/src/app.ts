@@ -29,7 +29,16 @@ interface AppOptions {
   readonly shutdownTimeoutMs?: number;
 }
 export function mediaLayer(config: Config, options: AppOptions = {}) {
-  const catalog = CatalogPostgresLayer({ databaseUrl: config.databaseUrl });
+  const catalog = CatalogPostgresLayer({
+    databaseUrl: config.databaseUrl,
+    assetReferences: {
+      endpoint: config.s3Endpoint,
+      region: config.s3Region,
+      accessKeyId: config.s3AccessKeyId,
+      secretAccessKey: config.s3SecretAccessKey,
+      bucket: config.assetReferenceBucket,
+    },
+  });
   const assets = s3AssetsLayer({
     endpoint: config.s3Endpoint,
     region: config.s3Region,

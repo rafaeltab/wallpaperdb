@@ -12,3 +12,5 @@ Generates lower-resolution wallpaper variants so clients can request images suit
 ## Technology choices
 
 Sharp performs image resizing and encoding in an isolated process so deadlines and shutdown can stop native work. NATS JetStream retains generation requests and accepts variant announcements. Object storage holds the original and generated images.
+
+Quarantine records retain binary input metadata in `original-ce-*` headers. Restore these headers with the original body when replaying a record or a reconstructed chunk manifest.

@@ -54,6 +54,7 @@ const cloudMetadata = Schema.Struct({
   time: cloudTime,
   correlationid: Schema.optionalKey(Schema.String),
   causationid: Schema.optionalKey(Schema.String),
+  causationsource: Schema.optionalKey(Schema.String),
 });
 const decodeCloudMetadata = Schema.decodeUnknownOption(cloudMetadata);
 const decodeCloud = Schema.decodeUnknownOption(
@@ -104,6 +105,7 @@ export type TranslatedEvent =
       readonly change: ProjectionChange;
       readonly correlationId?: string;
       readonly causationId?: string;
+      readonly causationSource?: string;
     }
   | { readonly _tag: 'Invalid' };
 
@@ -123,6 +125,9 @@ export function translate(
     time: headers?.get('ce-time'),
     ...(headers?.get('ce-correlationid') ? { correlationid: headers.get('ce-correlationid') } : {}),
     ...(headers?.get('ce-causationid') ? { causationid: headers.get('ce-causationid') } : {}),
+    ...(headers?.get('ce-causationsource')
+      ? { causationsource: headers.get('ce-causationsource') }
+      : {}),
   });
   const metadata = Option.orElse(envelope, () => binary);
   const hasBinary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'));
@@ -132,7 +137,8 @@ export function translate(
     Option.isSome(binary) &&
     (envelope.value.source !== binary.value.source ||
       envelope.value.correlationid !== binary.value.correlationid ||
-      envelope.value.causationid !== binary.value.causationid)
+      envelope.value.causationid !== binary.value.causationid ||
+      envelope.value.causationsource !== binary.value.causationsource)
   )
     return { _tag: 'Invalid' };
   if (Predicate.hasProperty(raw.value, 'specversion') && Option.isNone(envelope))
@@ -168,6 +174,9 @@ export function translate(
       : {}),
     ...(Option.isSome(metadata) && metadata.value.causationid
       ? { causationId: metadata.value.causationid }
+      : {}),
+    ...(Option.isSome(metadata) && metadata.value.causationsource
+      ? { causationSource: metadata.value.causationsource }
       : {}),
   };
 }

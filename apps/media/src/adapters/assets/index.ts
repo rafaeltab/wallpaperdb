@@ -13,54 +13,97 @@ import {
   PictureAuthority,
 } from '../../delivery/index.js';
 
-export const sharpTransformerLayer = (limits: { maxInputPixels: number; maxConcurrent?: number; timeoutMs?: number }) => Layer.effect(ImageTransformer, Effect.gen(function* () {
-  const workers = new Set<{ stop(): void; closed: Promise<void> }>();
-  yield* Effect.addFinalizer(() => Effect.promise(async () => {
-    const pending = [...workers];
-    for (const worker of pending) worker.stop();
-    await Promise.all(pending.map(worker => worker.closed));
-  }));
-  return ImageTransformer.of({
-    resize: (body, options) => Effect.suspend(() => {
-      if (workers.size >= (limits.maxConcurrent ?? 4)) {
-        body.close();
-        return Effect.fail(new DeliveryUnavailable({ operation: 'resize_capacity', cause: new Error('Resize capacity exhausted') }));
-      }
-      return Effect.sync(() => {
-        const start = Date.now();
-        const workerPath = new URL(import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs', import.meta.url);
-        const child = spawn(process.execPath, ['--experimental-strip-types', fileURLToPath(workerPath), JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels })], { stdio: ['pipe', 'pipe', 'ignore'] });
-        const input = Readable.from(body);
-        const output = new PassThrough();
-        output.on('error', () => {});
-        const stop = () => { body.close(); input.destroy(); child.kill('SIGKILL'); };
-        const closed = new Promise<void>(resolve => {
-          child.once('close', code => {
-            clearTimeout(deadline);
-            workers.delete(worker);
-            body.close();
-            if (code === 0) output.end();
-            else {
-              recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
-              output.destroy(new Error('Image encoding failed'));
+export const sharpTransformerLayer = (limits: {
+  maxInputPixels: number;
+  maxConcurrent?: number;
+  timeoutMs?: number;
+}) =>
+  Layer.effect(
+    ImageTransformer,
+    Effect.gen(function* () {
+      const workers = new Set<{ stop(): void; closed: Promise<void> }>();
+      yield* Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          const pending = [...workers];
+          for (const worker of pending) worker.stop();
+          await Promise.all(pending.map((worker) => worker.closed));
+        })
+      );
+      return ImageTransformer.of({
+        resize: (body, options) =>
+          Effect.suspend(() => {
+            if (workers.size >= (limits.maxConcurrent ?? 4)) {
+              body.close();
+              return Effect.fail(
+                new DeliveryUnavailable({
+                  operation: 'resize_capacity',
+                  cause: new Error('Resize capacity exhausted'),
+                })
+              );
             }
-            resolve();
-          });
-        });
-        const worker = { stop, closed };
-        workers.add(worker);
-        const deadline = setTimeout(() => { output.destroy(new Error('Image encoding deadline exceeded')); stop(); }, limits.timeoutMs ?? 30000);
-        deadline.unref();
-        child.once('error', error => { output.destroy(error); stop(); });
-        output.once('close', stop);
-        child.stdout.pipe(output, { end: false });
-        void pipeline(input, child.stdin).catch(error => { output.destroy(error); stop(); });
-        recordHistogram('media.resize.setup_duration_ms', Date.now() - start, { 'resize.fit_mode': options.fit, 'image.format': options.mimeType.split('/')[1] });
-        return byteStream(output);
+            return Effect.sync(() => {
+              const start = Date.now();
+              const workerPath = new URL(
+                import.meta.url.endsWith('.ts') ? './resize-worker.ts' : './resize-worker.mjs',
+                import.meta.url
+              );
+              const child = spawn(
+                process.execPath,
+                [
+                  '--experimental-strip-types',
+                  fileURLToPath(workerPath),
+                  JSON.stringify({ ...options, maxInputPixels: limits.maxInputPixels }),
+                ],
+                { stdio: ['pipe', 'pipe', 'ignore'] }
+              );
+              const input = Readable.from(body);
+              const output = new PassThrough();
+              output.on('error', () => {});
+              const stop = () => {
+                body.close();
+                input.destroy();
+                child.kill('SIGKILL');
+              };
+              const closed = new Promise<void>((resolve) => {
+                child.once('close', (code) => {
+                  clearTimeout(deadline);
+                  workers.delete(worker);
+                  body.close();
+                  if (code === 0) output.end();
+                  else {
+                    recordCounter('media.resize.pipeline.errors', 1, { error_type: 'Error' });
+                    output.destroy(new Error('Image encoding failed'));
+                  }
+                  resolve();
+                });
+              });
+              const worker = { stop, closed };
+              workers.add(worker);
+              const deadline = setTimeout(() => {
+                output.destroy(new Error('Image encoding deadline exceeded'));
+                stop();
+              }, limits.timeoutMs ?? 30000);
+              deadline.unref();
+              child.once('error', (error) => {
+                output.destroy(error);
+                stop();
+              });
+              output.once('close', stop);
+              child.stdout.pipe(output, { end: false });
+              void pipeline(input, child.stdin).catch((error) => {
+                output.destroy(error);
+                stop();
+              });
+              recordHistogram('media.resize.setup_duration_ms', Date.now() - start, {
+                'resize.fit_mode': options.fit,
+                'image.format': options.mimeType.split('/')[1],
+              });
+              return byteStream(output);
+            });
+          }),
       });
-    }),
-  });
-}));
+    })
+  );
 
 /** Closing before the first read must release the already acquired socket/pipeline, too. */
 function byteStream(stream: Readable): AssetBody {

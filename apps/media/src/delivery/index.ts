@@ -41,7 +41,10 @@ export interface AssetBody extends AsyncIterable<Uint8Array> {
 }
 /** Missing objects return null. Failed reads fail; iterators propagate stream errors and release resources on return. */
 export interface AssetReader {
-  read(asset: StoredAsset, context?: { readonly source: 'original' | 'variant'; readonly fallback?: boolean }): Effect.Effect<AssetBody | null, DeliveryUnavailable>;
+  read(
+    asset: StoredAsset,
+    context?: { readonly source: 'original' | 'variant'; readonly fallback?: boolean }
+  ): Effect.Effect<AssetBody | null, DeliveryUnavailable>;
 }
 export const AssetReader = Context.Service<AssetReader>('wallpaperdb.media.delivery.AssetReader');
 export interface PictureAuthority {
@@ -140,14 +143,47 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
                   options.height ?? wallpaper.height
                 )
               : null;
-          yield* Metric.update(Metric.counter('media.variant_selection.total', { incremental: true, attributes: { result: !options || (!options.width && !options.height) ? 'no_resize' : wouldUpscale ? 'upscale_avoided' : variant ? 'hit' : 'miss' } }), 1);
-          if (variant) yield* Metric.update(Metric.histogram('media.variant_selection.efficiency_percent', { boundaries: [0, 25, 50, 75, 90, 100], attributes: { 'wallpaper.id': id } }), Number(((1 - (variant.width * variant.height) / (wallpaper.width * wallpaper.height)) * 100).toFixed(2)));
+          yield* Metric.update(
+            Metric.counter('media.variant_selection.total', {
+              incremental: true,
+              attributes: {
+                result:
+                  !options || (!options.width && !options.height)
+                    ? 'no_resize'
+                    : wouldUpscale
+                      ? 'upscale_avoided'
+                      : variant
+                        ? 'hit'
+                        : 'miss',
+              },
+            }),
+            1
+          );
+          if (variant)
+            yield* Metric.update(
+              Metric.histogram('media.variant_selection.efficiency_percent', {
+                boundaries: [0, 25, 50, 75, 90, 100],
+                attributes: { 'wallpaper.id': id },
+              }),
+              Number(
+                (
+                  (1 - (variant.width * variant.height) / (wallpaper.width * wallpaper.height)) *
+                  100
+                ).toFixed(2)
+              )
+            );
           const source = variant
             ? { ...wallpaper, storageKey: variant.storageKey, storageBucket: variant.storageBucket }
             : wallpaper;
           let body = yield* assets.read(source, { source: variant ? 'variant' : 'original' });
           if (!body && variant) {
-            yield* Metric.update(Metric.counter('media.variant.fallback.total', { incremental: true, attributes: { 'wallpaper.id': id, 'variant.id': variant.id } }), 1);
+            yield* Metric.update(
+              Metric.counter('media.variant.fallback.total', {
+                incremental: true,
+                attributes: { 'wallpaper.id': id, 'variant.id': variant.id },
+              }),
+              1
+            );
             body = yield* assets.read(wallpaper, { source: 'original', fallback: true });
           }
           if (!body) return { _tag: 'NotFound' } as const;
@@ -169,7 +205,13 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           const asset = yield* catalog.findCurrentPicture(id);
           if (!asset || !(yield* authority.isAvailable(id))) return { _tag: 'NotFound' } as const;
           const stream = yield* assets.read(asset);
-          if (!stream) return yield* Effect.fail(new DeliveryUnavailable({ operation: 'read_picture', cause: new Error('Authorized picture object is missing') }));
+          if (!stream)
+            return yield* Effect.fail(
+              new DeliveryUnavailable({
+                operation: 'read_picture',
+                cause: new Error('Authorized picture object is missing'),
+              })
+            );
           const bytes = yield* Effect.tryPromise({
             try: async (signal) => {
               signal.addEventListener('abort', () => stream.close(), { once: true });

@@ -72,7 +72,7 @@ Independent Standards and Spec reviews both re-examined the entire migration fro
 
 ## Browser evidence
 
-The committed recording is [variant-generator-effect.mp4](../docs/evidence/variant-generator-effect.mp4), with [verification details](../docs/evidence/variant-generator-effect.md). It lasts 37.6 seconds and shows an original-only wallpaper, six generated variants after starting the built worker, selection and download. Real S3 objects, all six JetStream events and decoded Media responses were checked. The fixture seeds S3 and NATS; it does not claim authenticated Ingestor upload coverage. No UI response was mocked. Demo-owned processes, browser and isolated infrastructure were cleaned up.
+Browser verification showed an original-only wallpaper, six generated variants after starting the built worker, selection and download. Real S3 objects, all six JetStream events and decoded Media responses were checked. The fixture seeds S3 and NATS; it does not claim authenticated Ingestor upload coverage. No UI response was mocked. Demo-owned processes, browser and isolated infrastructure were cleaned up.
 
 ## Repository verification environment
 

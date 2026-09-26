@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Schema } from 'effect';
+import { Context, Effect, Schema } from 'effect';
 
 export class CatalogFailure extends Schema.TaggedError<CatalogFailure>()('CatalogFailure', {
   operation: Schema.String,
@@ -64,28 +64,12 @@ export interface AvailableNotification {
 /** Atomically accepts an occurrence, projects its facts and persists its notification.
  * Replays are no-ops; variants may precede parents; profile heads only advance.
  */
-export interface ProjectionStorePort {
-  readonly commit: (input: ProjectionInput) => Effect.Effect<void, CatalogFailure>;
-}
-export class ProjectionStore extends Context.Service<ProjectionStore, ProjectionStorePort>()(
-  'media/catalog/ProjectionStore'
-) {}
 export interface CatalogProjectionPort {
   readonly accept: (input: ProjectionInput) => Effect.Effect<void, CatalogFailure>;
 }
 export class CatalogProjection extends Context.Service<CatalogProjection, CatalogProjectionPort>()(
   'media/catalog/CatalogProjection'
 ) {}
-export const CatalogProjectionLayer = Layer.effect(
-  CatalogProjection,
-  Effect.gen(function* () {
-    const store = yield* ProjectionStore;
-    return {
-      accept: (input: ProjectionInput) =>
-        store.commit(input).pipe(Effect.withSpan('media.catalog.accept')),
-    };
-  })
-);
 /** Publications may repeat after an ambiguous broker response. Identity and payload
  * are immutable; acknowledgement deletes only the successfully published record.
  * Pending variants become visible only after the parent is available.
@@ -98,4 +82,11 @@ export interface CatalogOutboxPort {
 }
 export class CatalogOutbox extends Context.Service<CatalogOutbox, CatalogOutboxPort>()(
   'media/catalog/CatalogOutbox'
+) {}
+
+export interface CatalogHealthPort {
+  readonly check: Effect.Effect<boolean>;
+}
+export class CatalogHealth extends Context.Service<CatalogHealth, CatalogHealthPort>()(
+  'media/catalog/CatalogHealth'
 ) {}

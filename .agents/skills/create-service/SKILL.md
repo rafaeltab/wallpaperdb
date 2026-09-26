@@ -18,7 +18,7 @@ Use existing services such as `apps/ingestor` as references for package scripts,
 Available shared packages (select those needed by the service's adapters):
 
 - **`@wallpaperdb/core`** — connection managers (database, SeaweedFS, NATS, Redis, OTEL), config schemas, telemetry helpers (`withSpan`, `recordCounter`, `recordHistogram`), health aggregator, OpenAPI plugin, RFC 7807 error classes
-- **`@wallpaperdb/events`** — event schemas (Zod), `BaseEventPublisher`, `BaseEventConsumer`
+- **`@wallpaperdb/events`** — public event schemas (Zod); applications own their Effect publisher and consumer adapters
 - **`@wallpaperdb/test-utils`** — TesterBuilder pattern for integration and E2E test setup
 - **`@wallpaperdb/testcontainers`** — custom NATS container with JetStream
 - **`@wallpaperdb/url-ipv4-resolver`** — SSRF-safe URL validation

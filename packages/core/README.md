@@ -1,5 +1,7 @@
 # @wallpaperdb/core
 
+The `@wallpaperdb/core/assets` entry point registers and resolves immutable asset references through private S3 descriptors. Registration is conditional and rejects attempts to reassign an identity. Resolution validates identity and limits descriptors to 8 KiB. Callers supply an abort signal and translate failures through their application-owned ports. See `docs/adr/0006-resolve-immutable-assets-through-storage-descriptors.md`.
+
 Shared infrastructure foundation for all WallpaperDB microservices, providing the connection lifecycle management, configuration, telemetry, error handling, health checks, and OpenAPI registration that every service needs without each one re-implementing the same plumbing.
 
 ## Key Capabilities

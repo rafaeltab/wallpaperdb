@@ -24,7 +24,8 @@
     "db:studio": "drizzle-kit studio",
     "format:files": "biome format --write",
     "test:unit": "vitest run --coverage",
-    "test:all": "vitest run --coverage --config vitest.all.config.ts"
+    "test:all": "vitest run --coverage --config vitest.all.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

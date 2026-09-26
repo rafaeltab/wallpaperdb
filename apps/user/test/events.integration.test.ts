@@ -6,8 +6,8 @@ import { connect, type NatsConnection } from 'nats';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
-import { brokerLayer, eventPublisherLayer, eventStoreLayer } from '../src/adapters/events/index.js';
-import { MaintenanceStore, ProfileEvents } from '../src/maintenance/index.js';
+import { brokerLayer, eventPublisherLayer, eventStoreLayer, ConsumerHealth, ownershipConsumerLayer } from '../src/adapters/events/index.js';
+import { Maintenance, MaintenanceStore, ProfileEvents } from '../src/maintenance/index.js';
 
 let database: StartedPostgreSqlContainer;
 let nats: Awaited<ReturnType<typeof createNatsContainer>>;
@@ -20,6 +20,10 @@ function profileEvent(id: string) {
     claimGeneration: 1, aliases: [], version: 1, createdAt: occurred, updatedAt: occurred,
   } };
 }
+function wallpaperEvent(id: string) { return { eventId: id, eventType: 'wallpaper.uploaded', timestamp: occurred, wallpaper: {
+  id: `wp_${id}`, userId: 'owner-before-profile', fileType: 'image', mimeType: 'image/png', fileSizeBytes: 8,
+  width: 2, height: 2, aspectRatio: 1, storageBucket: 'wallpapers', storageKey: 'private-key', originalFilename: 'wallpaper.png', uploadedAt: occurred,
+} }; }
 beforeAll(async () => {
   [database, nats] = await Promise.all([new PostgreSqlContainer('postgres:16-alpine').start(), createNatsContainer()]);
   sql = postgres(database.getConnectionUri());
@@ -92,4 +96,24 @@ it('keeps the first recorded wallpaper owner across replay before Profile creati
     await Promise.all([runtime.runPromise(accept('second-owner')), runtime.runPromise(accept('first-owner'))]);
     expect(await sql`select wallpaper_id, profile_id from wallpaper_ownership`).toEqual([{ wallpaper_id: 'wp_1', profile_id: 'first-owner' }]);
   } finally { await runtime.dispose(); }
+});
+
+it('accepts validated ownership facts through a durable consumer and acknowledges only completed projection', async () => {
+  const options = { url: nats.getConnectionUrl(), stream: 'WALLPAPER', serviceName: 'user-consumer-contract', retryDelayMs: 10, shutdownTimeoutMs: 200 };
+  const accepted: string[] = [];
+  const unused = () => Effect.die('Unexpected maintenance task');
+  const runtime = ManagedRuntime.make(ownershipConsumerLayer(options).pipe(
+    Layer.provide(brokerLayer(options)),
+    Layer.provide(Layer.succeed(Maintenance, { publishPending: unused, cleanupEvents: unused, expireAliases: unused,
+      recordWallpaperOwnership: (ownership) => Effect.sync(() => { accepted.push(ownership.wallpaperId); }),
+    })),
+  ));
+  const manager = await connection.jetstreamManager();
+  try {
+    expect(await runtime.runPromise(Effect.flatMap(ConsumerHealth, (health) => health.check()))).toBe(true);
+    await connection.jetstream().publish('wallpaper.uploaded', JSON.stringify(wallpaperEvent('first')));
+    await expect.poll(() => accepted).toEqual(['wp_first']);
+    await expect.poll(async () => (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).num_ack_pending).toBe(0);
+    expect((await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).config.max_deliver).toBe(-1);
+  } finally { await runtime.dispose(); await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership'); await manager.streams.purge('WALLPAPER'); }
 });

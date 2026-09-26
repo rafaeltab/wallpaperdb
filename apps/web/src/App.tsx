@@ -5,7 +5,6 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { AuthBridge } from '@/components/auth-bridge';
 import { ProfileBootstrap } from '@/components/profile-bootstrap';
 import { ThemeProvider } from '@/components/theme-provider';
-import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
 import { Toaster } from '@/components/ui/sonner';
 import { UploadQueueProvider } from '@/contexts/upload-queue-context';
 import { routeTree } from './routeTree.gen';
@@ -87,7 +86,6 @@ function App() {
           <ThemeProvider defaultTheme="system" storageKey="wallpaperdb-theme">
             <UploadQueueProvider>
               <RouterProvider router={router} />
-              <UploadQueueToastManager />
               <Toaster />
               <ReactQueryDevtools initialIsOpen={false} />
             </UploadQueueProvider>

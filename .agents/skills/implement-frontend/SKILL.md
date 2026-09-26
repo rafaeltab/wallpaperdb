@@ -1,43 +1,15 @@
 ---
 name: implement-frontend
-description: Frontend feature implementation guide for apps/web. Use when adding a new page, building a UI component, or implementing any React feature.
+description: Workflow for changes to apps/web. Use when adding a page or implementing a React feature.
 ---
 
-# Implement Frontend
+# Implement frontend
 
-All frontend code lives in `apps/web`. The stack is React 19 + Vite + TypeScript + TanStack Router + TanStack Query + shadcn/ui + Tailwind CSS v4.
+Read the relevant [coding guidelines](../../../CODING_STANDARDS.md) and [implementation workflow](../do-work/SKILL.md). Frontend-specific coding standards are not yet defined.
 
-## Guides
+- Inspect nearby routes, UI components, data hooks, and tests before introducing another pattern. The source and package configuration describe the installed stack.
+- Check existing UI components before installing one. Consult upstream documentation for the installed version when adding framework or authentication behavior.
+- Use the route generator; do not edit generated route files.
+- Exercise loading, empty, error, and success states through the public UI. Use the [testing skill](../testing/SKILL.md) for commands and infrastructure.
 
-- [Routing](ROUTING.md) — TanStack Router: adding pages, layouts, dynamic routes
-- [Components](COMPONENTS.md) — shadcn/ui via MCP, Tailwind v4 styling, component patterns
-- [Data Fetching](DATA-FETCHING.md) — TanStack Query, GraphQL, and REST
-- [Testing](TESTING.md) — Vitest, Testing Library, global mocks
-
-## Key Commands
-
-```bash
-make dev PACKAGE=web          # Start dev server (http://localhost:3005)
-make test PACKAGE=web         # Run tests (single pass)
-make run PACKAGE=web SCRIPT=test:watch   # Run tests in watch mode
-make check-types PACKAGE=web        # TypeScript type check
-make lint PACKAGE=web         # Lint
-make build PACKAGE=web        # Production build
-```
-
-## Directory Layout
-
-```
-apps/web/src/
-  routes/          # File-based route files (TanStack Router)
-  components/
-    ui/            # 24 installed shadcn/ui components
-    <feature>/     # Feature-specific components
-  hooks/           # Custom React hooks
-  contexts/        # React Context providers
-  lib/
-    graphql/       # GraphQL client + queries + types
-    api/           # REST API functions
-    utils.ts       # cn() helper (clsx + tailwind-merge)
-apps/web/test/     # All test files (mirror of src/)
-```
+Keep new framework examples and inventories out of repository docs. Record only a project-specific decision or constraint that a future reader could not infer from the implementation.

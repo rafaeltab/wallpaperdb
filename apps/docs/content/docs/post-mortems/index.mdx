@@ -1,12 +1,6 @@
 ---
-title: Post-Mortems
-description: Incident post-mortems documenting root causes, timelines, and action items for notable failures.
+title: Incident records
+description: Failures whose causes are worth remembering.
 ---
 
-A record of significant incidents — what broke, why, how it was resolved, and what changed as a result.
-
-## Incidents
-
-| ID | Title | Date | Severity |
-|----|-------|------|----------|
-| [PM-001](/docs/post-mortems/001-graphql-realm-duplicate-module) | GraphQL "from another module or realm" test failures | 2026-03-30 | Low |
+- [PM-001: GraphQL module-identity test failures](/docs/post-mortems/001-graphql-realm-duplicate-module), 2026-03-30. Cold test runs exposed separate ESM and CommonJS GraphQL instances.

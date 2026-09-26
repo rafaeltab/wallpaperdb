@@ -1,0 +1,96 @@
+---
+title: Service upgrades and retained work
+description: Deployment ordering, legacy recovery, and replay procedures for existing installations.
+---
+
+Use this guide when upgrading an existing installation. Fresh local setup is in [CONTRIBUTING.md](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTRIBUTING.md). These procedures preserve historical data and work that ordinary restarts cannot recover.
+
+Apply generated database migrations before starting the corresponding new service. Deploy each service's complete `dist` directory: native image workers and deferred application chunks are required at runtime.
+
+## Ingestor
+
+The CloudEvents upload migration requires consumer-first deployment:
+
+1. Upgrade every Media, Variant Generator, Color Extractor, and User replica to a revision whose `@wallpaperdb/events` accepts both legacy uploads and CloudEvents. Upgrade Gateway's event intake too if it predates CloudEvents support.
+2. Drain and stop all old Ingestor replicas.
+3. Apply the Ingestor migrations with `make migrate PACKAGE=ingestor`, then start the new Ingestor.
+
+Older upload consumers reject the new envelope and can terminate deliveries. Upgrading them afterward does not trigger ordinary redelivery. Keep support for both formats while either can be retained or replayed.
+
+The migration prepares legacy reservations and outbox recovery metadata in one transaction. Incomplete committed records stop migration for repair; investigate those records and rerun the migration rather than making their originals eligible for cleanup. Keep committed originals and their metadata intact. The [Ingestion context decisions](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/ingestor/docs/adr) explain the compatibility limits.
+
+## Media
+
+Apply migrations without resetting the delivery catalog. Legacy reconciliation preserves stored metadata and can emit one new availability announcement because older releases had no publication ledger.
+
+Startup rejects a legacy consumer with a finite `MaxDeliver` and recorded redeliveries. Increasing that limit cannot revive already exhausted messages. Recover it with every Media replica stopped:
+
+1. Save `manager.consumers.info(stream, durable)` to an operator-owned file. Verify that source history still contains the required messages. Do not purge it.
+2. Record `saved.ack_floor.stream_seq + 1` as the restart sequence. Previously acknowledged legacy omissions need a separately chosen earlier replay point.
+3. Delete only the affected durable and recreate it with the same filter, explicit acknowledgements, unlimited broker delivery, and the recorded sequence:
+
+```ts
+await manager.consumers.delete(stream, durable);
+await manager.consumers.add(stream, {
+  durable_name: durable,
+  ack_policy: AckPolicy.Explicit,
+  max_deliver: -1,
+  filter_subject: saved.config.filter_subject,
+  deliver_policy: DeliverPolicy.StartSequence,
+  opt_start_seq: saved.ack_floor.stream_seq + 1,
+});
+```
+
+4. Restart Media and monitor dependency and consumer health, pending outbox work, and quarantine.
+
+The durables are `media-wallpaper-uploaded-consumer` and `media-wallpaper-variant-uploaded-consumer` on the configured wallpaper stream, and `media-profile-picture-snapshots` on `PROFILE`. New consumers bound application processing attempts while broker redelivery remains unlimited when quarantine is unavailable.
+
+`MEDIA_QUARANTINE` has a thirty-day repair horizon, one-GiB capacity, and discard-new overflow. Startup rejects incompatible policies. Export or repair failures before expiry. Failed quarantine writes leave originals pending; restore NATS or capacity so they can retry.
+
+For chunked quarantine records, read the manifest's sequences in order, reconstruct the original bytes, and verify total length and SHA-256 before replay. Restore `original-ce-*` headers to `ce-*`, keeping the original source and ID. Never publish the quarantine envelope's identity as a new domain occurrence. Restrict access because quarantine contains original events. See the [Media decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/media/docs/adr/0001-replay-safe-delivery-catalog.md).
+
+## Gateway
+
+Upgrading projections does not recover information older versions discarded. Existing color projections lack occurrence ordering metadata, so the first stale result after upgrade can replace their colors. Replay the complete retained color history before reopening catalogue traffic if historical ordering must be preserved. The same applies to timestamp precision lost by older millisecond-only projections.
+
+The wallpaper and Profile source streams admit messages up to 64 KiB including headers. Quarantine and the broker's `max_payload` must each allow at least 256 KiB for the quarantine envelope. Gateway startup fails before subscribing when these limits are incompatible.
+
+Lowering a stream limit does not rewrite retained messages. Gateway audits retained payload and header bytes before first consumption. Its `wallpaperdb.gateway.quarantine-budget` stream metadata records the stream creation time, configured limit, policy version, and audited sequence. Version 2 replaces the earlier payload-only audit. Matching certificates avoid repeated history scans; the initial scan takes time proportional to retained history.
+
+An oversized historical message stops startup and reports its stream, sequence, and byte count. The original remains stored. Export the identified record, for example with `nats stream get WALLPAPER <sequence> --json`, determine its retention and replay requirements, and explicitly resolve that record before restarting. Do not purge the source stream to bypass the failure.
+
+An administrative change that loosens a source limit must remove its audit certificate before larger publications are accepted, even if the old limit will later be restored. Stream recreation or a changed limit also requires another audit. Change the event-size contract, quarantine capacity, and audit policy together. See the [Gateway projection decision](https://github.com/rafaeltab/wallpaperdb/tree/main/apps/gateway/docs/adr).
+
+Deployments retaining `GRAPHQL_MAX_COMPLEXITY=1000` must raise it to admit the web browse query under descendant-aware costing; the current default is 2000. Clients inspecting failed health probes must read the health classification from `healthStatus`; `status` is now the numeric Problem Details HTTP status.
+
+## User
+
+Drain old User replicas before applying `0010_dark_terrax.sql` and `0011_faithful_skrulls.sql`, then start the new image. These migrations add picture upload/deletion recovery states and outbox trace context. Do not run older picture cleanup workers alongside the new state machine.
+
+If startup rejects the legacy `WALLPAPER/user-wallpaper-ownership` consumer for a finite delivery limit and recorded redeliveries:
+
+1. Stop every User replica. Save the consumer configuration and acknowledgement floor, and verify retained history.
+2. Recreate only that durable with explicit acknowledgements, the `wallpaper.uploaded` filter, unlimited broker delivery attempts, and a starting sequence one greater than the saved acknowledgement floor. Startup diagnostics include that sequence. Use the same NATS recovery pattern described for [Media](#media).
+3. Restart User and monitor consumer health. Duplicate projection is safe because the first accepted owner remains authoritative. Application processing still stops after three attempts and requires durable quarantine before acknowledging failed input.
+
+`USER_QUARANTINE` uses discard-new storage with a 64-MiB bound and thirty-day retention. A full or unavailable quarantine leaves delivery unacknowledged. Restore capacity or repair the failure before replaying affected input.
+
+### Private pictures and evidence
+
+Provision the Profile picture bucket without anonymous access, including any custom `PROFILE_PICTURE_BUCKET`. Do not put Profile pictures in a public wallpaper bucket. Set the same `USER_MEDIA_SERVICE_TOKEN` in User and Media, with Media's `USER_SERVICE_URL` pointing to User's internal origin. Worktree setup generates these settings for Docker development. For host-based development, use the reachable host User URL and the same token in both services. Never expose this token in browser configuration. A missing or mismatched token makes picture delivery fail closed.
+
+Removing a picture stops future origin delivery; it cannot recall immutable copies already cached by browsers or a CDN. Replaced and removed originals remain private until their recorded expiry. Changing the configured retention duration does not rewrite existing asset deadlines.
+
+Local evidence cleanup removes only published event rows and expired private picture candidates. It preserves current Profiles, active assets, Handle claims, and undelivered events. Delayed publication does not extend Handle reactivation eligibility. It does not erase downstream projections or retained NATS history; the temporary event-retention policy is tracked in [issue #162](https://github.com/rafaeltab/wallpaperdb/issues/162).
+
+If telemetry is intentionally disabled, also disable the missing-signal alert. Otherwise operators will receive an alert for the absence they configured. See the [User workflow decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/user/docs/adr/0001-effect-profile-workflows.md).
+
+## Enrichment workers
+
+Deploy a Gateway that accepts CloudEvents color results before upgrading Color Extractor. Stop legacy worker replicas before relying on durable quarantine, because they retain their earlier termination behavior. Broker-exhausted legacy messages require operator replay; changing the consumer configuration does not recover them automatically.
+
+Variant Generator quarantine has a thirty-day repair horizon and one-GiB capacity with discard-new overflow. Startup rejects incompatible policies. Reconstruct oversized records from the manifest's ordered chunks and verify byte count and SHA-256 before republishing. Partial chunks without a completed manifest do not establish durable handoff.
+
+Color Extractor quarantine preserves original bytes and the original subject. Replay those bytes to that subject and preserve structured event occurrence identity. If added headers exceed the broker's message-size budget, the source stays pending until the budget is repaired. Monitor pending inputs, quarantine capacity, and publication failures for both workers.
+
+Existing variant object keys are immutable. Changing encoding settings affects new targets; replay does not regenerate an existing rendition with new settings. Deliberate regeneration needs a separately designed versioned target identity. See the [Variant Generator decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/variant-generator/docs/adr/0001-replay-safe-variant-generation.md).

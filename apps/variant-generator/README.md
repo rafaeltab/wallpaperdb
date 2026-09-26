@@ -1,14 +1,5 @@
 # Variant generator
 
-Generates lower-resolution wallpaper variants so clients can request images suited to their devices.
+Generates lower-resolution wallpapers so clients can retrieve an image suited to their device without resizing the original on every request. Successful variants survive retries of an incomplete batch.
 
-## Capabilities
-
-- Selects smaller resolution presets that match the original aspect ratio.
-- Preserves image proportions and format while applying configured encoding quality.
-- Stores and announces each variant for downstream delivery.
-- Continues remaining presets after an individual failure and retries incomplete batches without losing successful results.
-
-## Technology choices
-
-Sharp performs image resizing and encoding in an isolated process so deadlines and shutdown can stop native work. NATS JetStream retains generation requests and accepts variant announcements. Object storage holds the original and generated images.
+See the [domain context](CONTEXT.md), [replay decision](docs/adr/0001-replay-safe-variant-generation.md), and [upgrade procedures](../docs/content/docs/guides/service-upgrades.mdx).

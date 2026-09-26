@@ -1,206 +1,52 @@
 # Contributing to WallpaperDB
 
-Use the [coding guidelines index](CODING_STANDARDS.md) to select the coding and testing requirements relevant to the contribution. This guide covers setup and contribution workflows.
+Start with the [coding guidelines](CODING_STANDARDS.md) for the work you are changing. Run repository tasks through Make; `make help` lists commands and prints this worktree's ingress address.
 
-## Prerequisites
+## Set up a checkout
 
-| Tool | Minimum version | Notes |
-|---|---|---|
-| Node.js | 22 | Use [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm) |
-| pnpm | 9 | `npm install -g pnpm` |
-| Docker Desktop | latest | Compose v2.22+ required for hot reload |
-| git | 2.5+ | For worktree support |
+Use Node.js 22, the pnpm version pinned in [package.json](package.json), Docker with Compose watch support, and Git with worktree support.
 
-Verify your setup:
-```bash
-node --version       # v22.x.x
-pnpm --version       # 9.x.x
-docker compose version  # v2.22.x or higher
-```
-
----
-
-## First-time setup
-
-```bash
-git clone https://github.com/your-org/wallpaperdb.git
+```sh
+git clone https://github.com/rafaeltab/wallpaperdb.git
 cd wallpaperdb
-pnpm install
+make install
 ```
 
-`pnpm install` runs a postinstall script that:
-- Assigns a **worktree slot** (slot 0 for the main checkout)
-- Writes a `.worktree` file with port assignments and the Docker project name
-- Generates `infra/.env` and per-app `.env` files
+Installation assigns an isolated worktree slot and generates `.worktree`, `infra/.env`, and application `.env` files. It also creates `~/.config/wallpaperdb/secrets.env`, or uses `$XDG_CONFIG_HOME/wallpaperdb/secrets.env` when set. The legacy `secret.env` filename is still accepted.
 
-You should see output like:
-```
-[setup-worktree] Worktree slot 0 assigned.
-  Project name : wallpaperdb
-  Ingress      : http://localhost:8000
-  Postgres     : localhost:8001
-  ...
-```
+Fill in the Clerk credentials in that secrets file before running authenticated services. Browser tests also need the seeded test user's email and password. Keep those values outside Git. Run `make install` again after changing them. Installation regenerates application `.env` files, so edits made directly to those files will be lost. Environment variables supplied to installation take precedence over the secrets file.
 
----
-
-## Starting the development environment
-
-### 1. Start infrastructure
-
-```bash
+```sh
 make infra-start
-```
-
-This starts PostgreSQL, SeaweedFS, NATS, Redis, OpenSearch, and Grafana in Docker. First run takes about 2 minutes as images are pulled.
-
-### 2. Start all services
-
-```bash
 make dev
 ```
 
-This starts all 5 application services (ingestor, media, variant-generator, gateway, web) plus the Caddy ingress proxy via Docker Compose. Source changes are synced into containers automatically — no rebuild needed.
+Open the ingress address printed by `make help`, followed by `/web`. The same ingress exposes `/grafana` and the service routes; see [Caddy's routing configuration](infra/caddy/Caddyfile) for the full list. Port assignments vary by worktree, so use the generated values rather than assuming service default ports.
 
----
+`make dev` runs the applications in Docker with source watching. `make dev PACKAGE=<workspace>` runs that workspace's development script; the script determines whether it runs on the host or in Docker. Host-run services need host-accessible dependency endpoints. Use [service upgrade instructions](apps/docs/content/docs/guides/service-upgrades.mdx) and the [storage migration procedure](apps/docs/content/docs/infrastructure/seaweedfs.mdx) when upgrading existing data.
 
-## Accessing the application
+## Check a change
 
-Everything runs behind a single ingress at **http://localhost:8000**.
-
-| URL | Service |
-|---|---|
-| http://localhost:8000/web | Web frontend |
-| http://localhost:8000/ingestor | Ingestor API |
-| http://localhost:8000/media | Media API |
-| http://localhost:8000/gateway | GraphQL gateway |
-| http://localhost:8000/variant-generator | Variant generator API |
-| http://localhost:8000/grafana | Grafana (observability) |
-| http://localhost:8000/pgadmin | pgAdmin |
-| http://localhost:8000/opensearch-dashboards | OpenSearch Dashboards |
-| http://localhost:8000/nats | NATS monitoring |
-
-SeaweedFS exposes its S3 API at **http://localhost:8002** for slot 0 (`8002 + 10 × slot` for other worktrees). The default access key and secret key are both `storageadmin`. Use the AWS CLI or another S3 client to administer objects. Before switching an existing environment, stop application writes and run `make infra-stop` in the old checkout to release the old storage port. See [storage setup and migration](apps/docs/content/docs/infrastructure/seaweedfs.mdx#existing-minio-data) for instructions if you have already switched and for copying existing data without deleting its volumes.
-
-Individual service health checks:
-```bash
-curl http://localhost:8000/ingestor/health
-curl http://localhost:8000/media/health
-curl http://localhost:8000/gateway/health
+```sh
+make check PACKAGE=<workspace>
+make test-focused PACKAGE=<workspace> ARGS='<test path>'
+make ci
 ```
 
----
+Choose tests using the [testing guidelines](docs/coding-standards/project-organization.md#shared-testing-principles). The focused command builds workspace dependencies and runs selected tests serially. `make ci` is the full repository check. Unit tests generally run without Docker; integration and service deployment tests start their own containers.
 
-## Running tests
+The browser E2E suite is different: it expects the ingress-routed application stack and a seeded Clerk test account. Start the stack before `make test-e2e PACKAGE=web-e2e`.
 
-Tests do not require `make dev` to be running. They spin up their own containers via Testcontainers.
+For other scripts use `make run PACKAGE=<workspace> SCRIPT=<script>`. `PACKAGE` selects a workspace, `SERVICE` selects an application container, and `DB` selects a database. Read `make help` instead of maintaining a second command list here.
 
-```bash
-make storage-test      # S3 storage contract against a real SeaweedFS container
-make test-unit         # Fast, no Docker needed (~5s)
-make test-integration  # Integration tests with real infra containers (~30s)
-make test-e2e          # Full E2E tests, sequential (~2min)
-make test              # Workspace test scripts (use the tiers above for full coverage)
-make ci                # Full CI pipeline — use this before opening a PR
-```
+## Stop or remove a worktree
 
----
+`make apps-stop` and `make infra-stop` stop this worktree's containers and preserve its data. `make infra-reset` deletes infrastructure data after confirmation.
 
-## Stopping
+For another checkout, run `git worktree add -b <branch> <path>` and `make install` in that directory. Each worktree gets separate ports, containers, and volumes.
 
-**Stop the application services** (Ctrl+C in the `make dev` terminal, or):
-```bash
-docker compose -p wallpaperdb -f infra/docker-compose.apps.yml down
-```
+Before removing a checkout, run `make worktree-remove` there. It releases the slot and deletes non-main worktree containers and volumes. Then use `git worktree remove <path>` from another checkout. If a directory was already removed, follow the stale-slot cleanup instructions printed by the next installation.
 
-**Stop infrastructure** (preserves volumes/data):
-```bash
-make infra-stop
-```
+## Change the documentation
 
-**Reset infrastructure** (deletes all data):
-```bash
-make infra-reset
-```
-
----
-
-## Working with multiple worktrees
-
-WallpaperDB supports running multiple git worktrees simultaneously with full isolation — each worktree gets its own Docker containers, volumes, and port range.
-
-### Add a new worktree
-
-```bash
-git worktree add ../wallpaperdb-my-feature feat/my-feature
-cd ../wallpaperdb-my-feature
-pnpm install
-```
-
-This assigns the next available slot (e.g., slot 1) and outputs:
-```
-[setup-worktree] Worktree slot 1 assigned.
-  Project name : wallpaperdb-feat-my-feature
-  Ingress      : http://localhost:8010
-  Postgres     : localhost:8011
-  ...
-```
-
-All services for this worktree are then available at **http://localhost:8010** — no conflict with the main worktree on port 8000.
-
-### Work in the worktree
-
-```bash
-make infra-start   # Starts infra for this worktree only
-make dev           # Starts app services for this worktree only
-```
-
-### Tear down a worktree
-
-Before removing a worktree from git, stop its containers and release its slot:
-
-```bash
-make worktree-remove
-```
-
-This stops all containers, removes volumes (non-main worktrees only), and releases the slot so it can be reused.
-
-Then remove the worktree from git:
-```bash
-cd /path/to/main-checkout
-git worktree remove ../wallpaperdb-my-feature
-```
-
-### Stale slot detection
-
-If a worktree directory was deleted without running `make worktree-remove`, the next `pnpm install` will detect the orphaned slot and print instructions:
-```
-⚠️  Stale worktree slot detected:
-   Slot:     1
-   Worktree: /path/to/worktree (no longer exists)
-
-   To release this slot and clean up any Docker containers,
-   run the following from this repository's root directory:
-
-     node scripts/teardown-worktree.mjs --slot-file "<path>"
-```
-
----
-
-## Useful commands
-
-```bash
-make help              # Full list of available commands
-make psql DB=ingestor     # Open a psql shell on the ingestor database
-make psql DB=media        # Open a psql shell on the media database
-make redis-cli         # Open a Redis CLI session
-make nats-stream-list  # List NATS JetStream streams
-make check-types       # Type-check all packages
-make lint              # Lint all packages
-make format            # Format all packages
-make dev PACKAGE=docs          # Start the documentation site (http://localhost:3002)
-```
-
-### Workspace commands
-
-Use shared targets with a workspace selector: `make build PACKAGE=web`, `make test PACKAGE=ingestor`, or `make dev PACKAGE=docs`. For less frequent scripts, use `make run PACKAGE=web SCRIPT=test:watch`. App containers use `SERVICE`, for example `make apps-logs SERVICE=ingestor`. See the [command guide](apps/docs/content/docs/guides/makefile-commands.mdx) for selectors and migration examples.
+Keep human setup here, domain terms in [context documents](CONTEXT-MAP.md), decisions in ADRs, and coding rules under [the guidelines index](CODING_STANDARDS.md). The [documentation site](apps/docs/README.md) holds user guides and operational procedures. Link to these homes instead of repeating them.

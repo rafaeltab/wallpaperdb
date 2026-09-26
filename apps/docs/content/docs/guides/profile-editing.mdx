@@ -1,42 +1,32 @@
 ---
 title: Editing your profile
-description: Update your public identity, biography, picture, and previous handles
+description: Change your public identity, biography, picture, and previous handles.
 ---
 
-## Open your profile editor
+Sign in, open the navigation menu beside your name, choose **Your profile**, then **Edit profile**. Select the pencil beside your name, handle, or picture, or choose **Edit biography**.
 
-1. Sign in and open the navigation menu beside your name.
-2. Choose **Your profile**.
-3. Select **Edit profile** at the top right.
+Save with the checkmark or cancel with the cross. Failed saves keep your draft available. If another session changed your profile, **Refresh profile** loads its current state while preserving unsaved text for another attempt.
 
-The editor starts with an overview in the same layout as your public profile. **View profile** shows a preview of your saved identity and biography, without the wallpaper gallery. Select **Open your profile** inside that preview to open the public page in a new tab.
+## Biography
 
-## Edit your name, handle, or biography
+Use **Write** and **Preview** to check your Markdown. **Formatting help** lists supported features. Preview uses the same renderer as your public profile.
 
-Select the pencil beside your display name or profile handle to edit it in place. Select **Edit biography** to open the Markdown editor below your identity. Use **Write** and **Preview** to switch between authored text and its rendered appearance; **Formatting help** lists the supported features.
+Embed a wallpaper with `![Alt text](wallpaper:<wallpaper-id>)`. Only your own published wallpapers can be embedded; a new upload may take a moment to become available. Ordinary image URLs and raw HTML are not supported. External links require HTTPS.
 
-Select the checkmark to save, or the cross to cancel. Hover over an icon for its action label. While saving, the checkmark becomes a spinner. A successful save shows a brief green check before returning to the overview. A failed save shows a red cross and keeps your editor and draft open so you can correct or retry it. Success and failure notifications appear in the same bottom-right stack as upload notifications.
+**Refresh preview** retries unavailable wallpaper previews without saving your draft.
 
-If your profile changed in another session, use **Refresh profile** in the error message. This loads the current profile and preserves your unsaved text for another save attempt.
+## Handles and old links
 
-Biography previews use the same Markdown renderer as the public page. **Refresh preview** retries embedded wallpaper previews without saving your draft. Only published wallpapers you own can be embedded; newly uploaded wallpapers may take a moment to become available.
+You can change your handle once every seven days. The editor shows when the cooldown ends. Previous handles appear in separate lists:
 
-## Profile handle cooldown and previous handles
+- Retained aliases redirect to your current profile and count toward the retained limit.
+- Expiring aliases stop counting toward that limit immediately. Scheduling removal preserves redirects for another 24 hours. Immediate expiration needs a separate confirmation.
+- Historical handles can be reactivated while eligible and while a retained slot is available. The dialog explains unavailable handles and expired eligibility.
 
-You can change your profile handle once every seven days. During the cooldown, the pencil is disabled and a relative message such as **Available for change in 7 days** appears beside it. Hover over or focus the remaining time to see the full availability date and time.
+A handle change can schedule older aliases for removal when the retained limit is exceeded. The confirmation identifies affected handles. Keeping or reactivating an alias does not change your current handle or its cooldown. Use **Refresh aliases** for current expiry and eligibility information.
 
-The compact previous-handles summary opens a dialog with separate retained, expiring, and historical lists:
+## Pictures
 
-- **Retained aliases** redirect to your current profile handle and count toward your retained limit.
-- **Expiring aliases** stop counting toward that limit immediately. Scheduling removal gives existing links another 24 hours to redirect; immediate expiration requires a separate confirmation.
-- **Historical handles** may be reactivated when eligible and when a retained slot is available. The dialog explains when a handle is unavailable or its eligibility has expired.
+Choose a picture, check the local preview, then upload or replace it. The dialog shows current size and pixel limits. JPEG, PNG, and WebP are supported; animated images are not.
 
-Changing your handle can schedule older aliases for removal if the retained limit is exceeded. A confirmation identifies the affected handles before you save. Keeping or reactivating an alias does not change your current handle or its cooldown. Use **Refresh aliases** to load the latest expiry and eligibility information.
-
-## Change your profile picture
-
-Select the pencil on your picture to open its dialog. **Choose picture** opens the file picker and displays a local preview. Select **Upload picture** or **Replace picture** to save it. JPEG, PNG, and WebP are supported; the dialog shows the current size and pixel limits. Animated images are not supported.
-
-Failed uploads keep the selected picture available for retry. If a version conflict requires **Refresh Profile**, select the picture again after refreshing. Removing a picture requires confirmation and restores your generated avatar; a pending account-picture import can also be cancelled.
-
-Custom profile banners are not supported yet.
+Failed uploads keep the selected picture available for retry. If a version conflict requires **Refresh profile**, select the picture again after refreshing. Removing a picture restores your generated avatar and cancels any pending account-picture import. Already downloaded or cached copies of a removed picture cannot be recalled.

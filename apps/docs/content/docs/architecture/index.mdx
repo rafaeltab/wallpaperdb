@@ -1,59 +1,8 @@
 ---
 title: Architecture
-description: Architectural patterns, shared packages, and design decisions for WallpaperDB.
+description: Domain ownership and the reasons behind architectural decisions.
 ---
 
-This section covers the architectural patterns and decisions for WallpaperDB.
+The [context map](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTEXT-MAP.md) is the starting point for service responsibilities, domain language, and relationships between contexts.
 
-## Overview
-
-WallpaperDB uses a microservices architecture with event-driven communication, shared packages, and standardized service patterns. This allows new services to be built quickly (~1 week) by reusing tested, production-ready code.
-
-**Key Documentation:**
-- **[Multi-Service Architecture](/docs/architecture/multi-service)** - Complete architecture overview, technology stack, service patterns
-- **[Service Registry](/docs/architecture/service-registry)** - Reference of all services, ports, dependencies, events
-- **[Shared Packages](/docs/architecture/shared-packages)** - Package architecture and integration patterns
-
-## Package Structure
-
-```
-packages/
-├── core/                       # Infrastructure patterns
-│   ├── connections/           # Database, SeaweedFS, NATS, Redis, OTEL
-│   ├── config/                # Zod-based configuration
-│   ├── health/                # Health check aggregation
-│   ├── errors/                # RFC 7807 error handling
-│   ├── telemetry/             # OpenTelemetry helpers
-│   └── openapi/               # OpenAPI registration
-├── events/                     # Event schemas and pub/sub
-│   ├── schemas/               # Zod event schemas
-│   ├── publisher/             # BaseEventPublisher
-│   └── consumer/              # BaseEventConsumer
-├── test-utils/                # Testing infrastructure
-│   └── builders/              # TesterBuilder pattern
-├── testcontainers/            # Custom container implementations
-├── url-ipv4-resolver/         # URL validation and SSRF prevention
-└── react-muuri/               # React wrapper for Muuri grid layout
-```
-
-## Key Principles
-
-1. **Event-Driven Communication** - Services communicate via NATS events
-2. **Database per Service** - Each service owns its database schema
-3. **Shared Infrastructure Patterns** - Reusable packages for common functionality
-4. **Type-Safe Everything** - TypeScript, Zod schemas, Drizzle ORM
-5. **Composable Config** - Services compose config from shared schemas
-6. **Comprehensive Testing** - TesterBuilder pattern, real infrastructure in tests
-
-## Architecture Decisions
-
-All major architectural decisions are documented as ADRs:
-
-- [ADR-001: Fastify over NestJS](/docs/architecture/decisions/fastify-over-nestjs) - Framework choice
-
-### When to Create an ADR
-
-- Choosing between technologies (framework, database, etc.)
-- Major architectural patterns (event sourcing, CQRS, etc.)
-- Significant deviations from established patterns
-- Decisions that affect multiple services
+Read [architecture decisions](/docs/architecture/decisions) for historical choices, including links to system-wide and context-local records. Current implementation requirements live in the [coding standards](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md).

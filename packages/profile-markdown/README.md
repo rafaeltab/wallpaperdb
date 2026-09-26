@@ -1,12 +1,5 @@
 # Profile Markdown
 
-The shared Biography policy keeps Profile authoring and public rendering aligned. It gives the User service and web application one definition of safe Markdown while preserving the author's original text.
+One Biography policy keeps server acceptance and browser rendering aligned while preserving the author's original text. Wallpaper embeds have their own navigation action and cannot act as external link labels.
 
-- Validates supported syntax, external destinations, and Wallpaper references.
-- Measures authored text in Unicode characters and separates authoring limits from published content validation.
-- Provides normalized link destinations and the Wallpaper references needed for ownership checks.
-- Prepares dedicated Wallpaper elements and a narrow sanitization policy for safe rendering.
-
-CommonMark and GitHub Flavored Markdown parsing use the unified and remark ecosystem. A shared remark plugin and rehype sanitization schema support direct React rendering without persisting generated HTML.
-
-Wallpaper images have their own navigation action and cannot be used as external link labels. Authors can add a separate text link beside an image.
+See the [shared policy decision](../../docs/adr/0005-share-the-profile-markdown-policy.md) for why validation and rendering must change together.

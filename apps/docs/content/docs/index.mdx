@@ -1,116 +1,27 @@
 ---
-title: WallpaperDB Documentation
-description: Welcome to the WallpaperDB documentation! A wallpaper management system built as a Turborepo monorepo.
+title: WallpaperDB documentation
+description: Setup, user guidance, operating procedures, and architectural decisions.
 ---
 
-Welcome to the WallpaperDB documentation! This guide will help you navigate the documentation structure and find what you need.
+Start with [contributing and local setup](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTRIBUTING.md). Run `make help` for commands and this worktree's ingress address.
 
-## Quick Start
+## Using WallpaperDB
 
-**New to the project?** Start here:
-1. Select relevant guidance from [Coding Standards](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) - Index of authoritative coding guidelines
-2. Read [Development Workflow](/docs/development-guidelines) - TDD, incremental changes, and contributions
-3. Review the [Architecture](/docs/architecture) section - How the system is built
+- [Edit your profile](/docs/guides/profile-editing), including previous handles and biography embeds.
+- Browse the generated [upload](/docs/openapi/ingestor/upload/post) and [wallpaper delivery](/docs/openapi/media/wallpapers/id/get) API references.
 
-**Implementing something?** Go to:
-- [Testing Documentation](/docs/testing) - How-to guides for testing
-- [Architecture](/docs/architecture) - Patterns and decisions
-- [Observability](/docs/observability) - Monitoring and telemetry
+## Operating a deployment
 
-## By Role
+- [Diagnose failures with logs, metrics, and traces](/docs/observability).
+- [Upgrade services and recover retained work](/docs/guides/service-upgrades).
+- [Migrate existing MinIO data to SeaweedFS](/docs/infrastructure/seaweedfs#existing-minio-data).
 
-### AI Agent implementing features
+## Changing the project
 
-1. Read [Development Workflow](/docs/development-guidelines) - TDD, incremental changes
-2. Follow step-by-step instructions
-3. Refer to architecture patterns and decisions
-4. Update documentation as you learn
+- [Coding standards](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md) select the authoritative implementation guidance.
+- [Context map](https://github.com/rafaeltab/wallpaperdb/blob/main/CONTEXT-MAP.md) explains ownership and domain language.
+- [Architecture decisions](/docs/architecture/decisions) preserve the reasons behind earlier choices.
+- [CRAP scores](/docs/guides/crap-scores) help interpret local change-risk reports.
+- [GraphQL module-identity incident](/docs/post-mortems/001-graphql-realm-duplicate-module) explains a test failure that can return after dependency changes.
 
-### Developer joining the project
-
-1. Read [Development Workflow](/docs/development-guidelines) - TDD, incremental changes, and contributions
-2. Review [Architecture Decisions](/docs/architecture/decisions) - Why things are the way they are
-3. Explore [Testing Documentation](/docs/testing) - How testing works
-4. Start with a task and follow the guidelines!
-
-## Key Principles (Always Follow)
-
-### 1. Test-First Development
-- Write tests BEFORE implementation
-- Every change must have tests
-- See [Development Workflow](/docs/development-guidelines)
-
-### 2. Incremental Changes
-- Small, focused changes
-- NEVER big-bang refactoring
-- Test after each increment
-- See [Development Workflow](/docs/development-guidelines)
-
-### 3. Document As You Go
-- Update docs when architecture changes
-- Create ADRs for architectural choices
-- See [Development Workflow](/docs/development-guidelines)
-
-## Documentation Structure
-
-### Core Documentation
-- **[Getting Started](/docs/getting-started)** - 10-minute quick start guide
-- **[Coding Standards](https://github.com/rafaeltab/wallpaperdb/blob/main/CODING_STANDARDS.md)** - Index of authoritative coding guidelines
-- **[Development Workflow](/docs/development-guidelines)** - TDD, incremental changes, documentation, and contributions
-- **[Observability](/docs/observability)** - OpenTelemetry, Grafana LGTM, monitoring
-
-### Guides
-- **[Creating New Service](/docs/guides/creating-new-service)** - Step-by-step service creation guide
-- **[Error Handling](/docs/guides/error-handling)** - RFC 7807 Problem Details patterns
-- **[Rate Limiting](/docs/guides/rate-limiting)** - Redis-based distributed rate limiting
-- **[Testing Strategies](/docs/guides/testing-strategies)** - Unit, integration, E2E test organization
-- **[Makefile Commands](/docs/guides/makefile-commands)** - Complete command reference
-- **[Database Migrations](/docs/guides/database-migrations)** - Drizzle ORM migration workflow
-
-### Architecture
-- **[Multi-Service Architecture](/docs/architecture/multi-service)** - Microservices strategy and patterns
-- **[Service Registry](/docs/architecture/service-registry)** - Complete service reference
-- **[Shared Packages](/docs/architecture/shared-packages)** - Package architecture and integration
-- **[ADRs](/docs/architecture/decisions)** - Architectural decision records
-
-### Packages & Services
-- **[Packages](/docs/packages)** - Shared packages (core, events, test-utils, testcontainers, url-ipv4-resolver, react-muuri)
-- **[Services](/docs/services)** - Production services and planned services
-- **[Infrastructure](/docs/infrastructure)** - PostgreSQL, SeaweedFS, NATS, Redis, OpenSearch, Grafana
-
-### Post-Mortems
-- **[Post-Mortems](/docs/post-mortems)** - Incident records with root causes and action items
-
-## Current Status
-
-### Production Services (5)
-- **✅ Ingestor** - Upload and validation service
-- **✅ Media** - Retrieval and on-demand resizing
-- **✅ Variant Generator** - Pre-generates common resolutions
-- **✅ Gateway** - GraphQL API with OpenSearch
-- **✅ Web Frontend** - React UI for browsing and upload
-
-### Planned Services
-- **📋 Thumbnail Extractor** - Video thumbnail generation
-- **📋 Quality Enrichment** - Image quality analysis
-- **📋 Color Enrichment** - Color extraction and palette generation
-- **🚧 Tagging Service** - Service shell for future tagging work
-
-### Shared Packages
-- **✅ core** - Infrastructure patterns (connections, config, errors, telemetry, health, OpenAPI)
-- **✅ events** - Event schemas, publishers, consumers
-- **✅ test-utils** - TesterBuilder framework
-- **✅ testcontainers** - Custom container implementations
-- **✅ url-ipv4-resolver** - URL validation and SSRF prevention
-- **✅ react-muuri** - React wrapper for Muuri grid layout
-
-## Common Questions
-
-### Why Fastify instead of NestJS?
-See [ADR-001: Fastify over NestJS](/docs/architecture/decisions/001-fastify-over-nestjs). Migration cost exceeds benefit - current stack is excellent.
-
-### How do I create a new service?
-See [Guide: Creating New Service](/docs/guides/creating-new-service). Services take ~1 week to build using shared packages and established patterns.
-
-### What's the testing strategy?
-See [Guide: Testing Strategies](/docs/guides/testing-strategies). TDD always. Unit tests (fast), integration tests (Testcontainers), E2E tests (Docker)
+Agents should start with [AGENTS.md](https://github.com/rafaeltab/wallpaperdb/blob/main/AGENTS.md) and the relevant repository skill. Workspace READMEs explain purpose; code, schemas, and configuration remain the reference for implementation details.

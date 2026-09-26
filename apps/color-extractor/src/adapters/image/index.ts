@@ -156,12 +156,13 @@ export function imageLayer(config: ImageConfig): Layer.Layer<ImageHistogram | Im
       ).pipe(
         Context.add(ImageHealth, {
           check: () =>
-            request('check-image-storage', (abortSignal) =>
-              Promise.all(
-                [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
+            Effect.all(
+              [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
+                request('check-image-storage', (abortSignal) =>
                   client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
                 )
-              )
+              ),
+              { concurrency: 'unbounded' }
             ).pipe(
               Effect.timeout('5 seconds'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

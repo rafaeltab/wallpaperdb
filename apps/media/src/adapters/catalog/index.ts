@@ -18,6 +18,7 @@ import { Catalog, DeliveryUnavailable } from '../../delivery/index.js';
 import {
   catalogOutbox,
   catalogProcessed,
+  catalogTargets,
   profilePictureAssets,
   profilePictureHeads,
   variants,
@@ -79,7 +80,9 @@ const observeProjection =
     if (input.kind === 'profile') return effect;
     const original = input.kind === 'wallpaper';
     // Count successful projection transactions, including accepted replay no-ops.
-    return effect.pipe(observeQuery(original ? 'wallpapers' : 'variants', original ? 'upsert' : 'insert'));
+    return effect.pipe(
+      observeQuery(original ? 'wallpapers' : 'variants', original ? 'upsert' : 'insert')
+    );
   };
 const implementations = Layer.effectContext(
   Effect.gen(function* () {
@@ -121,13 +124,20 @@ const implementations = Layer.effectContext(
                   });
                 return;
               }
+              const target = input.kind === 'wallpaper'
+                ? ['wallpaper', input.wallpaper.id]
+                : ['variant', input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey];
+              const claimed = await tx.insert(catalogTargets).values({ id: stableId(target) }).onConflictDoNothing().returning();
+              if (claimed.length === 0) return;
+              let output = notification(input);
               if (input.kind === 'wallpaper') {
-                const created = await tx
+                await tx
                   .insert(wallpapers)
                   .values({ ...input.wallpaper, createdAt: new Date(input.wallpaper.createdAt) })
-                  .onConflictDoNothing()
-                  .returning();
-                if (created.length === 0) return;
+                  .onConflictDoNothing();
+                const [stored] = await tx.select().from(wallpapers).where(eq(wallpapers.id, input.wallpaper.id)).limit(1);
+                if (!stored) throw new Error('Committed wallpaper is missing');
+                output = notification({ ...input, wallpaper: { ...stored, createdAt: stored.createdAt.toISOString() } });
               } else {
                 const created = await tx
                   .insert(variants)
@@ -140,7 +150,6 @@ const implementations = Layer.effectContext(
                   .returning();
                 if (created.length === 0) return;
               }
-              const output = notification(input);
               await tx
                 .insert(catalogOutbox)
                 .values({

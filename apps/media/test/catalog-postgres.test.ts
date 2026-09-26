@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogOutbox, CatalogProjection, type ProjectionInput } from '../src/catalog/index.js';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
 import { Catalog } from '../src/delivery/index.js';
+import { wallpapers } from '../src/db/schema.js';
 
 const wallpaper: ProjectionInput = {
   kind: 'wallpaper',
@@ -36,7 +37,7 @@ describe('PostgreSQL catalog contract', () => {
   });
   beforeEach(async () => {
     await pool.query(
-      'TRUNCATE catalog_processed, catalog_outbox, variants, wallpapers, profile_picture_assets, profile_picture_heads'
+      'TRUNCATE catalog_targets, catalog_processed, catalog_outbox, variants, wallpapers, profile_picture_assets, profile_picture_heads'
     );
   });
   afterAll(async () => {
@@ -291,4 +292,23 @@ describe('PostgreSQL catalog contract', () => {
       })
     );
   });
+  it('reconciles a pre-migration wallpaper without changing its committed metadata', async () => {
+    if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
+    await drizzle(pool).insert(wallpapers).values({ ...wallpaper.wallpaper, createdAt: new Date('2025-12-31T00:00:00.000Z') });
+    const replay: ProjectionInput = { ...wallpaper, wallpaper: { ...wallpaper.wallpaper, width: 800, storageKey: 'must-not-replace' } };
+    await runtime.runPromise(Effect.gen(function* () {
+      const projection = yield* CatalogProjection;
+      yield* projection.accept(replay);
+      const catalog = yield* Catalog;
+      expect(yield* catalog.findWallpaper('wlpr_one')).toMatchObject({ width: 1920, storageKey: 'original' });
+      const outbox = yield* CatalogOutbox;
+      const pending = yield* outbox.listPending(10);
+      expect(pending).toHaveLength(1);
+      expect(pending[0]?.variant).toMatchObject({ width: 1920, createdAt: '2025-12-31T00:00:00.000Z' });
+      for (const item of pending) yield* outbox.markPublished(item.id);
+      yield* projection.accept({ ...replay, occurrence: { source: 'ingestor', id: 'same-legacy-target-new-occurrence' } });
+      expect(yield* outbox.listPending(10)).toEqual([]);
+    }));
+  });
+
 });

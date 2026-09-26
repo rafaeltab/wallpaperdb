@@ -43,6 +43,13 @@
       "when": 1790380667393,
       "tag": "0005_faithful_secret_warriors",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790381443773,
+      "tag": "0006_lean_bastion",
+      "breakpoints": true
     }
   ]
 }

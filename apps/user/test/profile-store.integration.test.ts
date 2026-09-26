@@ -1,6 +1,7 @@
+import { inspect } from 'node:util';
 import { readFileSync, readdirSync } from 'node:fs';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Effect, Layer, ManagedRuntime, Tracer } from 'effect';
+import { Effect, Layer, Logger, ManagedRuntime, Tracer } from 'effect';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
@@ -33,6 +34,24 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('keeps a private import URL out of diagnostics when its database write fails', async () => {
+    const marker = 'private-profile-source-marker';
+    const logs: unknown[] = [];
+    await sql.unsafe(`create function reject_private_import() returns trigger language plpgsql as $$ begin raise exception 'provider insert rejected for %', NEW.source_url; end $$`);
+    await sql.unsafe(`create trigger reject_private_import before insert on profile_picture_imports for each row execute function reject_private_import()`);
+    try {
+      const result = await runtime.runPromise(Effect.gen(function* () {
+        return yield* (yield* ProfileStore).create({ profileId: 'owner', displayName: 'Ada', handle: 'ada', imageUrl: `https://img.clerk.com/picture?token=${marker}`, now: new Date() });
+      }).pipe(Effect.tapError(error => Effect.logError('Profile persistence failed', { operation: error.operation, cause: error.cause })), Effect.flip, Effect.provide(Logger.layer([Logger.make(({ message }) => { logs.push(message); })]))));
+      expect(logs).toHaveLength(1);
+      expect(inspect(logs, { depth: null })).not.toContain(marker);
+      expect(inspect(result.cause, { depth: null })).not.toContain(marker);
+      expect(result).toMatchObject({ _tag: 'ProfileUnavailable', operation: 'create-profile', cause: { sqlState: 'P0001' } });
+      expect(await sql`select id from profiles`).toEqual([]);
+    } finally {
+      await sql.unsafe('drop trigger reject_private_import on profile_picture_imports; drop function reject_private_import()');
+    }
+  });
   it('rejects a picture that expires while its adoption waits for the owner lock', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }));
     await sql`insert into profile_picture_assets (id, profile_id, storage_bucket, storage_key, mime_type, width, height, file_size_bytes, state, expires_at) values ('queued-picture', 'owner', 'pictures', 'queued.webp', 'image/webp', 1, 1, 24, 'staged', now() + interval '1 hour')`;

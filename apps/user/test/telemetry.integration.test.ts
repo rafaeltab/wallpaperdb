@@ -134,6 +134,9 @@ it('exports production Effect traces, logs and metrics with incoming HTTP trace 
         return value;
       });
     expect(exportedMetrics).toContainEqual(
+      expect.objectContaining({ name: 'user.dependency.healthy' })
+    );
+    expect(exportedMetrics).toContainEqual(
       expect.objectContaining({
         name: 'telemetry.effect.contract',
         sum: expect.objectContaining({

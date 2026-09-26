@@ -23,6 +23,7 @@ import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
 import { createHttpApp } from './http/index.js';
 import { Workers, workerLayer } from './workers.js';
 import { tracingLayer } from './runtime.js';
+import { monitorLayer } from './monitor.js';
 
 export interface AppOptions {
   readonly logger?: boolean;
@@ -159,12 +160,16 @@ export function userLayer(config: Config, options: AppOptions = {}) {
       });
     })
   ).pipe(Layer.provide(Layer.mergeAll(database, broker, consumer, workers)));
-  return Layer.mergeAll(
+  const services = Layer.mergeAll(
     profiles,
     pictures,
     maintenance,
     availabilityLayer.pipe(Layer.provide(probe))
   ).pipe(Layer.provideMerge(database), Layer.provideMerge(tracingLayer));
+  return Layer.merge(
+    services,
+    monitorLayer({ telemetryEnabled: Boolean(config.otelEndpoint) }).pipe(Layer.provide(services))
+  );
 }
 export function createApp(config: Config, options: AppOptions = {}) {
   return createHttpApp(config, userLayer(config, options), options);

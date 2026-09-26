@@ -34,6 +34,7 @@ describe('Production telemetry composition', () => {
     const tester = new Tester()
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('asset-references')
       .withNats((nats) => nats.withJetstream())
       .withStream('WALLPAPER')
       .withInProcessApp();

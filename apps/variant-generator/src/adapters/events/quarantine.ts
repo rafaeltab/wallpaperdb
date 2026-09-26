@@ -1,8 +1,8 @@
+import { quarantineRecordMatches, planQuarantine } from '@wallpaperdb/core/quarantine';
 import { createHash, randomUUID } from 'node:crypto';
 import { Effect, Schema } from 'effect';
 import {
   DiscardPolicy,
-  headers,
   RetentionPolicy,
   StorageType,
   type JsMsg,
@@ -67,57 +67,6 @@ export const ensureQuarantine = Effect.fn('variants.quarantine.initialize')(func
     );
 });
 
-function identity(message: JsMsg) {
-  const info = message.info;
-  return createHash('sha256')
-    .update(
-      JSON.stringify([
-        info.domain,
-        info.account_hash,
-        info.stream,
-        info.consumer,
-        info.streamSequence,
-        info.timestampNanos,
-      ])
-    )
-    .update(message.data)
-    .digest('hex');
-}
-
-function metadata(message: JsMsg, reason: string, id: string, type: string): MsgHdrs {
-  const value = headers();
-  value.set('ce-specversion', '1.0');
-  value.set('ce-source', 'https://wallpaperdb/variant-generator');
-  value.set('ce-id', id);
-  value.set('ce-type', type);
-  value.set('ce-time', new Date(message.info.timestampNanos / 1_000_000).toISOString());
-  value.set('ce-reason', reason);
-  value.set('ce-originalsubject', message.subject);
-  value.set('ce-consumer', message.info.consumer);
-  // Replay restores the input's binary envelope together with its original bytes.
-  for (const key of [
-    'specversion',
-    'source',
-    'id',
-    'type',
-    'time',
-    'correlationid',
-    'causationid',
-    'causationsource',
-  ]) {
-    const original = message.headers?.get(`ce-${key}`);
-    if (original) value.set(`original-ce-${key}`, original);
-  }
-  // Include headers added by JetStream before measuring the complete wire payload.
-  value.set('Nats-Msg-Id', id);
-  value.set('Nats-Expected-Stream', stream);
-  for (const key of ['traceparent', 'tracestate']) {
-    const traceValue = message.headers?.get(key);
-    if (traceValue && traceValue.length <= 512) value.set(key, traceValue);
-  }
-  return value;
-}
-
 const publish = Effect.fn('variants.quarantine.store')(function* (
   service: NatsBroker,
   data: Uint8Array,
@@ -143,12 +92,7 @@ const publish = Effect.fn('variants.quarantine.store')(function* (
         () => Effect.succeed(undefined)
       )
     );
-    if (
-      stored &&
-      stored.header.get('ce-id') === value.get('ce-id') &&
-      Buffer.from(stored.data).equals(data)
-    )
-      return ack;
+    if (stored && quarantineRecordMatches({ data, headers: value }, stored)) return ack;
     // This is a replacement storage operation, not a new event occurrence. A fixed-size
     // fresh broker ID fits the measured envelope and avoids following obsolete repair IDs.
     value.set('Nats-Msg-Id', createHash('sha256').update(randomUUID()).digest('hex'));
@@ -165,37 +109,6 @@ const publish = Effect.fn('variants.quarantine.store')(function* (
   );
 });
 
-function chunkMetadata(
-  message: JsMsg,
-  reason: string,
-  id: string,
-  index: number,
-  count: number,
-  size: number
-) {
-  const value = metadata(
-    message,
-    reason,
-    `${id}:${size}:${index}`,
-    'variant-generator.upload.quarantine-chunk'
-  );
-  value.set('ce-quarantineid', id);
-  value.set('ce-chunkindex', String(index));
-  value.set('ce-chunkcount', String(count));
-  return value;
-}
-const cannotFit = () =>
-  Effect.fail(
-    new GenerationUnavailable({
-      operation: 'quarantine-capacity',
-      cause: new Error('Quarantine message limit cannot accommodate its durable envelope'),
-    })
-  ).pipe(
-    Effect.tapError((error) =>
-      Effect.logError('Quarantine capacity rejected', { cause: error.cause })
-    )
-  );
-
 /** Store chunks first and a manifest last; callers acknowledge only after every PubAck. */
 export const quarantine = Effect.fn('variants.quarantine.publish')(function* (
   service: NatsBroker,
@@ -208,54 +121,31 @@ export const quarantine = Effect.fn('variants.quarantine.publish')(function* (
   const brokerLimit = service.connection.info?.max_payload ?? 0;
   const limit =
     info.config.max_msg_size > 0 ? Math.min(brokerLimit, info.config.max_msg_size) : brokerLimit;
-  const id = identity(message);
-  const single = metadata(message, reason, id, 'variant-generator.upload.quarantined');
-  if (message.data.byteLength + Buffer.byteLength(single.toString()) <= limit) {
-    yield* publish(service, message.data, single);
-    return;
-  }
-  // Reserve a conservative header bound using the maximum possible index/count/size digits.
-  const bound = message.data.byteLength;
-  const overhead = Buffer.byteLength(
-    chunkMetadata(message, reason, id, bound, bound, bound).toString()
+  const plan = yield* Effect.try({
+    try: () =>
+      planQuarantine(
+        {
+          stream,
+          source: 'https://wallpaperdb/variant-generator',
+          eventTypePrefix: 'variant-generator.upload',
+        },
+        message,
+        reason,
+        limit
+      ),
+    catch: (cause) => new GenerationUnavailable({ operation: 'quarantine-capacity', cause }),
+  }).pipe(
+    Effect.tapError((error) =>
+      Effect.logError('Quarantine capacity rejected', { cause: error.cause })
+    )
   );
-  const size = Math.min(128 * 1024, limit - overhead);
-  if (size <= 0) return yield* cannotFit();
-  const count = Math.ceil(message.data.byteLength / size);
-  if (count > 1024) return yield* cannotFit();
-  const digest = createHash('sha256').update(message.data).digest('hex');
-  const encodeManifest = (sequences: readonly number[]) =>
-    new TextEncoder().encode(
-      JSON.stringify({
-        quarantineId: id,
-        chunkCount: count,
-        chunkSize: size,
-        totalBytes: message.data.byteLength,
-        sha256: digest,
-        sequences,
-      })
-    );
-  const manifestHeaders = metadata(
-    message,
-    reason,
-    `${id}:manifest:${size}`,
-    'variant-generator.upload.quarantine-manifest'
-  );
-  // Check the largest sequence references before accepting any partial durable handoff.
-  const envelopeBound = encodeManifest(
-    Array.from({ length: count }, () => Number.MAX_SAFE_INTEGER)
-  );
-  if (envelopeBound.byteLength + Buffer.byteLength(manifestHeaders.toString()) > limit)
-    return yield* cannotFit();
   const sequences: number[] = [];
-  for (let index = 0; index < count; index++) {
-    const ack = yield* publish(
-      service,
-      message.data.subarray(index * size, (index + 1) * size),
-      chunkMetadata(message, reason, id, index, count, size)
-    );
+  for (const record of plan.records) {
+    const ack = yield* publish(service, record.data, record.headers);
     sequences.push(ack.seq);
   }
-  const manifest = encodeManifest(sequences);
-  yield* publish(service, manifest, manifestHeaders);
+  if (plan.manifest) {
+    const manifest = plan.manifest(sequences);
+    yield* publish(service, manifest.data, manifest.headers);
+  }
 });

@@ -46,6 +46,10 @@
     "./assets": {
       "import": "./src/assets/index.ts",
       "types": "./src/assets/index.ts"
+    },
+    "./quarantine": {
+      "import": "./src/quarantine/index.ts",
+      "types": "./src/quarantine/index.ts"
     }
   },
   "scripts": {

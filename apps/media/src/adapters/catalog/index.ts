@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -29,9 +30,38 @@ import {
 export interface CatalogPostgresConfig {
   readonly databaseUrl: string;
 }
-class Database extends Context.Service<Database, ReturnType<typeof drizzle>>()(
-  'media/catalog/Database'
-) {}
+class Database extends Context.Service<Database, Pool>()('media/catalog/Database') {}
+/** Destroying an active PostgreSQL connection rolls back its open transaction.
+ * A lost COMMIT response remains ambiguous; the occurrence/target ledgers resolve replay. */
+async function withConnection<A>(
+  pool: Pool,
+  signal: AbortSignal,
+  run: (db: ReturnType<typeof drizzle>) => Promise<A>
+): Promise<A> {
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(15000)]);
+  const client = await pool.connect();
+  let released = false;
+  const abort = () => {
+    if (!released) {
+      released = true;
+      client.release(true);
+    }
+  };
+  deadline.addEventListener('abort', abort, { once: true });
+  try {
+    if (deadline.aborted) {
+      abort();
+      throw new Error('Catalog operation cancelled');
+    }
+    return await run(drizzle(client));
+  } finally {
+    deadline.removeEventListener('abort', abort);
+    if (!released) {
+      released = true;
+      client.release();
+    }
+  }
+}
 const stableId = (parts: readonly string[]) =>
   createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 function notification(
@@ -91,126 +121,131 @@ const observeProjection =
   };
 const implementations = Layer.effectContext(
   Effect.gen(function* () {
-    const db = yield* Database;
+    const pool = yield* Database;
+    const execute =
+      <A>(run: (db: ReturnType<typeof drizzle>) => Promise<A>) =>
+      (signal: AbortSignal) =>
+        withConnection(pool, signal, run);
     const project: CatalogProjectionPort = {
       accept: (input) =>
         Effect.tryPromise({
-          try: () =>
-            db.transaction(async (tx) => {
-              const inserted = await tx
-                .insert(catalogProcessed)
-                .values({ source: input.occurrence.source, occurrenceId: input.occurrence.id })
-                .onConflictDoNothing()
-                .returning();
-              if (inserted.length === 0) return;
-              if (input.kind === 'profile') {
-                if (input.asset)
+          try: (signal) =>
+            withConnection(pool, signal, (db) =>
+              db.transaction(async (tx) => {
+                const inserted = await tx
+                  .insert(catalogProcessed)
+                  .values({ source: input.occurrence.source, occurrenceId: input.occurrence.id })
+                  .onConflictDoNothing()
+                  .returning();
+                if (inserted.length === 0) return;
+                if (input.kind === 'profile') {
+                  if (input.asset)
+                    await tx
+                      .insert(profilePictureAssets)
+                      .values({
+                        ...input.asset,
+                        profileId: input.profile.id,
+                        createdAt: new Date(input.asset.createdAt),
+                      })
+                      .onConflictDoNothing();
+                  const head = {
+                    profileId: input.profile.id,
+                    version: input.profile.version,
+                    pictureId: input.profile.pictureId,
+                    updatedAt: new Date(input.profile.updatedAt),
+                  };
                   await tx
-                    .insert(profilePictureAssets)
-                    .values({
-                      ...input.asset,
-                      profileId: input.profile.id,
-                      createdAt: new Date(input.asset.createdAt),
-                    })
+                    .insert(profilePictureHeads)
+                    .values(head)
+                    .onConflictDoUpdate({
+                      target: profilePictureHeads.profileId,
+                      set: head,
+                      setWhere: lt(profilePictureHeads.version, input.profile.version),
+                    });
+                  return;
+                }
+                const target =
+                  input.kind === 'wallpaper'
+                    ? ['wallpaper', input.wallpaper.id]
+                    : [
+                        'variant',
+                        input.variant.wallpaperId,
+                        input.variant.storageBucket,
+                        input.variant.storageKey,
+                      ];
+                const claimed = await tx
+                  .insert(catalogTargets)
+                  .values({ id: stableId(target) })
+                  .onConflictDoNothing()
+                  .returning();
+                if (claimed.length === 0) return;
+                let output = notification(input);
+                if (input.kind === 'wallpaper') {
+                  await tx
+                    .insert(wallpapers)
+                    .values({ ...input.wallpaper, createdAt: new Date(input.wallpaper.createdAt) })
                     .onConflictDoNothing();
-                const head = {
-                  profileId: input.profile.id,
-                  version: input.profile.version,
-                  pictureId: input.profile.pictureId,
-                  updatedAt: new Date(input.profile.updatedAt),
-                };
-                await tx
-                  .insert(profilePictureHeads)
-                  .values(head)
-                  .onConflictDoUpdate({
-                    target: profilePictureHeads.profileId,
-                    set: head,
-                    setWhere: lt(profilePictureHeads.version, input.profile.version),
-                  });
-                return;
-              }
-              const target =
-                input.kind === 'wallpaper'
-                  ? ['wallpaper', input.wallpaper.id]
-                  : [
-                      'variant',
-                      input.variant.wallpaperId,
-                      input.variant.storageBucket,
-                      input.variant.storageKey,
-                    ];
-              const claimed = await tx
-                .insert(catalogTargets)
-                .values({ id: stableId(target) })
-                .onConflictDoNothing()
-                .returning();
-              if (claimed.length === 0) return;
-              let output = notification(input);
-              if (input.kind === 'wallpaper') {
-                await tx
-                  .insert(wallpapers)
-                  .values({ ...input.wallpaper, createdAt: new Date(input.wallpaper.createdAt) })
-                  .onConflictDoNothing();
-                const [stored] = await tx
-                  .select()
-                  .from(wallpapers)
-                  .where(eq(wallpapers.id, input.wallpaper.id))
-                  .limit(1);
-                if (!stored) throw new Error('Committed wallpaper is missing');
-                output = notification({
-                  ...input,
-                  wallpaper: { ...stored, createdAt: stored.createdAt.toISOString() },
-                });
-              } else {
-                // Old variants have random IDs and may inherit the parent's bucket.
-                // Claiming the logical target serializes reconciliation across replicas.
-                const [existing] = await tx
-                  .select({ asset: variants, parentMimeType: wallpapers.mimeType })
-                  .from(variants)
-                  .leftJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
-                  .where(
-                    and(
-                      eq(variants.wallpaperId, input.variant.wallpaperId),
-                      eq(variants.storageKey, input.variant.storageKey),
-                      eq(
-                        sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
-                        input.variant.storageBucket
-                      )
-                    )
-                  )
-                  .orderBy(asc(variants.createdAt), asc(variants.id))
-                  .limit(1);
-                if (existing) {
+                  const [stored] = await tx
+                    .select()
+                    .from(wallpapers)
+                    .where(eq(wallpapers.id, input.wallpaper.id))
+                    .limit(1);
+                  if (!stored) throw new Error('Committed wallpaper is missing');
                   output = notification({
                     ...input,
-                    variant: {
-                      ...existing.asset,
-                      storageBucket: existing.asset.storageBucket ?? input.variant.storageBucket,
-                      mimeType: existing.parentMimeType ?? input.variant.mimeType,
-                      createdAt: existing.asset.createdAt.toISOString(),
-                    },
+                    wallpaper: { ...stored, createdAt: stored.createdAt.toISOString() },
                   });
                 } else {
-                  await tx.insert(variants).values({
-                    ...input.variant,
-                    id: `var_${stableId([input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey])}`,
-                    createdAt: new Date(input.variant.createdAt),
-                  });
+                  // Old variants have random IDs and may inherit the parent's bucket.
+                  // Claiming the logical target serializes reconciliation across replicas.
+                  const [existing] = await tx
+                    .select({ asset: variants, parentMimeType: wallpapers.mimeType })
+                    .from(variants)
+                    .leftJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
+                    .where(
+                      and(
+                        eq(variants.wallpaperId, input.variant.wallpaperId),
+                        eq(variants.storageKey, input.variant.storageKey),
+                        eq(
+                          sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
+                          input.variant.storageBucket
+                        )
+                      )
+                    )
+                    .orderBy(asc(variants.createdAt), asc(variants.id))
+                    .limit(1);
+                  if (existing) {
+                    output = notification({
+                      ...input,
+                      variant: {
+                        ...existing.asset,
+                        storageBucket: existing.asset.storageBucket ?? input.variant.storageBucket,
+                        mimeType: existing.parentMimeType ?? input.variant.mimeType,
+                        createdAt: existing.asset.createdAt.toISOString(),
+                      },
+                    });
+                  } else {
+                    await tx.insert(variants).values({
+                      ...input.variant,
+                      id: `var_${stableId([input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey])}`,
+                      createdAt: new Date(input.variant.createdAt),
+                    });
+                  }
                 }
-              }
-              if (!output) return;
-              await tx
-                .insert(catalogOutbox)
-                .values({
-                  id: output.id,
-                  wallpaperId: output.variant.wallpaperId,
-                  notification: output,
-                })
-                .onConflictDoNothing();
-            }),
+                if (!output) return;
+                await tx
+                  .insert(catalogOutbox)
+                  .values({
+                    id: output.id,
+                    wallpaperId: output.variant.wallpaperId,
+                    notification: output,
+                  })
+                  .onConflictDoNothing();
+              })
+            ),
           catch: (cause) => new CatalogFailure({ operation: 'commit', cause }),
         }).pipe(
           observeProjection(input),
-          Effect.uninterruptible,
           Effect.tapError((error) => Effect.logError('Catalog projection failed', error)),
           Effect.withSpan('media.catalog.accept')
         ),
@@ -218,7 +253,7 @@ const implementations = Layer.effectContext(
     const outbox: CatalogOutboxPort = {
       listPending: (limit) =>
         Effect.tryPromise({
-          try: async () => {
+          try: execute(async (db) => {
             const rows = await db
               .select({ notification: catalogOutbox.notification })
               .from(catalogOutbox)
@@ -226,7 +261,7 @@ const implementations = Layer.effectContext(
               .orderBy(asc(catalogOutbox.createdAt), asc(catalogOutbox.id))
               .limit(Math.max(1, Math.min(100, Math.floor(limit) || 1)));
             return rows.map((row) => row.notification);
-          },
+          }),
           catch: (cause) => new CatalogFailure({ operation: 'list-pending', cause }),
         }).pipe(
           Effect.tapError((error) => Effect.logError('Catalog outbox read failed', error)),
@@ -234,9 +269,9 @@ const implementations = Layer.effectContext(
         ),
       markPublished: (id) =>
         Effect.tryPromise({
-          try: async () => {
+          try: execute(async (db) => {
             await db.delete(catalogOutbox).where(eq(catalogOutbox.id, id));
-          },
+          }),
           catch: (cause) => new CatalogFailure({ operation: 'mark-published', cause }),
         }).pipe(
           Effect.tapError((error) =>
@@ -248,8 +283,10 @@ const implementations = Layer.effectContext(
     const catalog: Catalog = {
       findWallpaper: (id) =>
         Effect.tryPromise({
-          try: async () =>
-            (await db.select().from(wallpapers).where(eq(wallpapers.id, id)).limit(1))[0] ?? null,
+          try: execute(
+            async (db) =>
+              (await db.select().from(wallpapers).where(eq(wallpapers.id, id)).limit(1))[0] ?? null
+          ),
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-wallpaper', cause }),
         }).pipe(
           observeQuery('wallpapers', 'find_by_id'),
@@ -258,31 +295,33 @@ const implementations = Layer.effectContext(
         ),
       findSmallestVariant: (id, minWidth, minHeight) =>
         Effect.tryPromise({
-          try: async () =>
-            (
-              await db
-                .select({
-                  id: variants.id,
-                  storageKey: variants.storageKey,
-                  storageBucket: sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
-                  width: variants.width,
-                  height: variants.height,
-                })
-                .from(variants)
-                .innerJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
-                .where(
-                  and(
-                    eq(variants.wallpaperId, id),
-                    gte(variants.width, minWidth),
-                    gte(variants.height, minHeight)
+          try: execute(
+            async (db) =>
+              (
+                await db
+                  .select({
+                    id: variants.id,
+                    storageKey: variants.storageKey,
+                    storageBucket: sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
+                    width: variants.width,
+                    height: variants.height,
+                  })
+                  .from(variants)
+                  .innerJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
+                  .where(
+                    and(
+                      eq(variants.wallpaperId, id),
+                      gte(variants.width, minWidth),
+                      gte(variants.height, minHeight)
+                    )
                   )
-                )
-                .orderBy(
-                  sql`${variants.width}::bigint * ${variants.height}::bigint`,
-                  asc(variants.id)
-                )
-                .limit(1)
-            )[0] ?? null,
+                  .orderBy(
+                    sql`${variants.width}::bigint * ${variants.height}::bigint`,
+                    asc(variants.id)
+                  )
+                  .limit(1)
+              )[0] ?? null
+          ),
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-variant', cause }),
         }).pipe(
           observeQuery('variants', 'find_smallest_suitable'),
@@ -291,21 +330,23 @@ const implementations = Layer.effectContext(
         ),
       findCurrentPicture: (id) =>
         Effect.tryPromise({
-          try: async () =>
-            (
-              await db
-                .select({ asset: profilePictureAssets })
-                .from(profilePictureAssets)
-                .innerJoin(
-                  profilePictureHeads,
-                  and(
-                    eq(profilePictureHeads.pictureId, profilePictureAssets.id),
-                    eq(profilePictureHeads.profileId, profilePictureAssets.profileId)
+          try: execute(
+            async (db) =>
+              (
+                await db
+                  .select({ asset: profilePictureAssets })
+                  .from(profilePictureAssets)
+                  .innerJoin(
+                    profilePictureHeads,
+                    and(
+                      eq(profilePictureHeads.pictureId, profilePictureAssets.id),
+                      eq(profilePictureHeads.profileId, profilePictureAssets.profileId)
+                    )
                   )
-                )
-                .where(eq(profilePictureAssets.id, id))
-                .limit(1)
-            )[0]?.asset ?? null,
+                  .where(eq(profilePictureAssets.id, id))
+                  .limit(1)
+              )[0]?.asset ?? null
+          ),
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-picture', cause }),
         }).pipe(
           Effect.tapError((error) => Effect.logError('Catalog read failed', error)),
@@ -317,7 +358,7 @@ const implementations = Layer.effectContext(
       Context.add(Catalog, catalog),
       Context.add(CatalogHealth, {
         check: Effect.tryPromise({
-          try: () => db.execute(sql`SELECT 1`),
+          try: execute((db) => db.execute(sql`SELECT 1`)),
           catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
         }).pipe(
           Effect.as(true),
@@ -340,19 +381,26 @@ export function CatalogPostgresLayer(config: CatalogPostgresConfig) {
             statement_timeout: 10000,
             idle_in_transaction_session_timeout: 10000,
             query_timeout: 15000,
+            options: '-c client_connection_check_interval=100',
           });
           // Idle connections can fail outside a query. Handle the pool event so
           // the next health/read operation can report database unavailability.
-          pool.on('error', (cause) => console.error('Catalog idle connection failed', cause));
+          pool.on('error', (cause) =>
+            logs.getLogger('media.catalog').emit({
+              severityNumber: SeverityNumber.ERROR,
+              body: 'Catalog idle connection failed',
+              attributes: { 'error.type': cause.name, 'error.message': cause.message },
+            })
+          );
           return pool;
         }),
         (pool) => Effect.promise(() => pool.end())
       );
       yield* Effect.tryPromise({
-        try: () => pool.query('SELECT 1'),
+        try: (signal) => withConnection(pool, signal, (db) => db.execute(sql`SELECT 1`)),
         catch: (cause) => new CatalogFailure({ operation: 'connect', cause }),
       });
-      return drizzle(pool);
+      return pool;
     })
   );
   return implementations.pipe(Layer.provide(database));

@@ -39,6 +39,9 @@ jobs:
       - name: Verify Make command interface
         run: make test-make
 
+      - name: Verify shared CRAP analyzer
+        run: make test-crap crap-check-types
+
       - name: Build, lint, and type-check
         run: turbo run build lint check-types
 

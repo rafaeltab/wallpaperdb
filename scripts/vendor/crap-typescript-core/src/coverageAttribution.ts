@@ -1,16 +1,11 @@
+// Modified by WallpaperDB: bound ownership to source bodies and reject synthetic coverage; see ../UPSTREAM.md.
 import type { CoverageUnknownReason, MethodDescriptor, SourceSpan } from "./types.js";
 import { computeMethodCoverage, unavailableMethodCoverage } from "./coverageNormalization.js";
-import type { FileCoverage, FunctionCoverageUnit } from "./coverageUnits.js";
+import type { BranchCoverageUnit, FileCoverage, FunctionCoverageUnit } from "./coverageUnits.js";
 import type { MethodCoverage } from "./coverageNormalization.js";
 
 const MAX_COLUMN = Number.MAX_SAFE_INTEGER;
 
-interface AttributableMethod {
-  span: SourceSpan;
-  fnMapConflict: boolean;
-}
-
-const AMBIGUOUS_MATCH = Symbol("ambiguous_match");
 type MatchOutcome = FunctionCoverageUnit | null | undefined;
 
 export function coverageForMethods(
@@ -22,104 +17,97 @@ export function coverageForMethods(
     return methods.map((method) => unavailableMethodCoverage(method, fileUnknownReason));
   }
 
-  const attributableMethods = buildAttributableMethods(methods, fileCoverage.functions);
+  const matches = matchFunctionEntries(methods, fileCoverage.functions);
   const attributed = methods.map(() => ({
     statements: [] as FileCoverage["statements"],
     branches: [] as FileCoverage["branches"]
   }));
 
   for (const statement of fileCoverage.statements) {
-    const owner = findOwningMethodIndex(attributableMethods, statement.span);
+    const owner = findOwningMethodIndex(methods, statement.span);
     if (owner !== null) {
       attributed[owner]!.statements.push(statement);
     }
   }
 
   for (const branch of fileCoverage.branches) {
-    const owner = findOwningMethodIndex(attributableMethods, branch.span);
+    if (isFunctionEntry(branch, methods, fileCoverage.functions)) {
+      continue;
+    }
+    const owner = findOwningMethodIndex(methods, branch.span);
     if (owner !== null) {
       attributed[owner]!.branches.push(branch);
     }
   }
 
-  return methods.map((method, index) =>
-    attributableMethods[index]!.fnMapConflict
-      ? unavailableMethodCoverage(method, "fnmap_conflict")
-      : computeMethodCoverage(method, attributed[index]!.statements, attributed[index]!.branches)
-  );
-}
-
-function buildAttributableMethods(
-  methods: MethodDescriptor[],
-  functions: FunctionCoverageUnit[]
-): AttributableMethod[] {
-  if (functions.length === 0) {
-    return methods.map((method) => ({
-      span: method.bodySpan,
-      fnMapConflict: false
-    }));
-  }
-
-  return methods.map((method) => {
-    const matchedFunction = matchFunctionCoverage(method, functions);
-    return {
-      span: matchedFunction?.span ?? method.bodySpan,
-      fnMapConflict: matchedFunction === null
-    };
+  return methods.map((method, index) => {
+    const matched = matches[index];
+    if (matched === null) {
+      return unavailableMethodCoverage(method, "fnmap_conflict");
+    }
+    // Legacy reports omit anonymous fnMap entries and count closing wrapper lines.
+    // Their line counters cannot prove execution of an unmatched callback body.
+    if (fileCoverage.legacyV8 && matched === undefined) {
+      return unavailableMethodCoverage(method, "statement_unattributed");
+    }
+    const { statements, branches } = attributed[index]!;
+    return computeMethodCoverage(
+      method,
+      matched?.hits === 0 ? statements.map((statement) => ({ ...statement, hits: 0 })) : statements,
+      matched?.hits === 0 ? branches.map((branch) => ({ ...branch, hits: branch.hits.map(() => 0) })) : branches
+    );
   });
 }
 
-function matchFunctionCoverage(method: MethodDescriptor, functions: FunctionCoverageUnit[]): MatchOutcome {
-  return resolveMatchOutcome([
-    matchByCandidateSpans(method.bodySpan, functions),
-    matchByContainingSpan(method.bodySpan, functions),
-    matchByDeclaration(method, functions)
-  ]);
-}
-
-function fnMapMatchSpans(methodSpan: SourceSpan): SourceSpan[] {
-  const normalized = normalizeMethodSpanForFnMap(methodSpan);
-  return spansEqual(methodSpan, normalized) ? [methodSpan] : [methodSpan, normalized];
-}
-
-function matchByCandidateSpans(methodSpan: SourceSpan, functions: FunctionCoverageUnit[]): MatchOutcome {
-  for (const candidateSpan of fnMapMatchSpans(methodSpan)) {
-    const exactMatch = uniqueMatchOutcome(functions.filter((entry) => spansEqual(entry.span, candidateSpan)));
-    if (exactMatch !== undefined) {
-      return exactMatch;
-    }
-
-    const lineAlignedMatch = uniqueMatchOutcome(
-      functions.filter(
-        (entry) => spansShareBoundaryLines(entry.span, candidateSpan) && spansOverlap(entry.span, candidateSpan)
-      )
-    );
-    if (lineAlignedMatch !== undefined) {
-      return lineAlignedMatch;
+function matchFunctionEntries(methods: MethodDescriptor[], functions: FunctionCoverageUnit[]): MatchOutcome[] {
+  const matches = methods.map((method) => matchFunctionCoverage(method, functions));
+  const owners = new Map<FunctionCoverageUnit, number>();
+  for (const match of matches) {
+    if (match) {
+      owners.set(match, (owners.get(match) ?? 0) + 1);
     }
   }
-
-  return undefined;
+  // Without a declaration position, an outer body may equal an inner full span.
+  // One fnMap entry cannot prove invocation of both functions.
+  return matches.map((match) => (match && owners.get(match)! > 1 ? null : match));
 }
 
-function matchByContainingSpan(methodSpan: SourceSpan, functions: FunctionCoverageUnit[]): MatchOutcome {
-  return uniqueMatchOutcome(
-    functions.filter((entry) => spanContains(entry.span, normalizeMethodSpanForFnMap(methodSpan)))
+function matchFunctionCoverage(method: MethodDescriptor, functions: FunctionCoverageUnit[]): MatchOutcome {
+  // Resolve precise coordinates before considering declaration fallbacks. Function
+  // spans help identify entries but never replace the source body's ownership span.
+  const candidates = [method.bodySpan, method.functionSpan, normalizeMethodSpanForFnMap(method.bodySpan)];
+  const eligible = functions.filter((entry) => declarationBelongsToMethod(entry, method));
+  for (const span of candidates) {
+    if (!span) {
+      continue;
+    }
+    const match = uniqueMatchOutcome(eligible.filter((entry) => spansEqual(entry.span, span)));
+    if (match !== undefined) {
+      return match;
+    }
+  }
+  return uniqueMatchOutcome(eligible.filter((entry) => matchesMethodDeclaration(entry, method)));
+}
+
+function matchesMethodDeclaration(entry: FunctionCoverageUnit, method: MethodDescriptor): boolean {
+  const declaration = entry.declarationStart;
+  return (
+    declaration !== undefined && declaration.line === method.startLine &&
+    (!entry.name || entry.name.startsWith("(") || entry.name === method.functionName) &&
+    method.functionSpan !== undefined
   );
 }
 
-function matchByDeclaration(method: MethodDescriptor, functions: FunctionCoverageUnit[]): MatchOutcome {
-  return uniqueMatchOutcome(functions.filter((entry) => matchesMethodDeclaration(entry, method)));
-}
-
-function resolveMatchOutcome(outcomes: MatchOutcome[]): MatchOutcome {
-  for (const outcome of outcomes) {
-    if (outcome === undefined) {
-      continue;
-    }
-    return outcome;
+function declarationBelongsToMethod(entry: FunctionCoverageUnit, method: MethodDescriptor): boolean {
+  const declaration = entry.declarationStart;
+  const full = method.functionSpan;
+  if (!declaration || !full) {
+    return true;
   }
-  return undefined;
+  return (
+    comparePosition(full.startLine, full.startColumn, declaration.line, declaration.column) <= 0 &&
+    comparePosition(declaration.line, declaration.column, method.bodySpan.startLine, method.bodySpan.startColumn) < 0
+  );
 }
 
 function normalizeMethodSpanForFnMap(methodSpan: SourceSpan): SourceSpan {
@@ -135,31 +123,45 @@ function normalizeMethodSpanForFnMap(methodSpan: SourceSpan): SourceSpan {
   };
 }
 
-function findOwningMethodIndex(methods: AttributableMethod[], span: SourceSpan): number | null {
+function isFunctionEntry(
+  branch: BranchCoverageUnit,
+  methods: MethodDescriptor[],
+  functions: FunctionCoverageUnit[]
+): boolean {
+  if (branch.type !== "branch") {
+    return false;
+  }
+  if (functions.some((entry) => spansEqual(entry.span, branch.span))) {
+    return true;
+  }
+  // Anonymous V8 entries may have no fnMap. Their first block starts in the
+  // function declaration and extends through its body, unlike a source decision.
+  return methods.some((method) => {
+    const full = method.functionSpan;
+    const body = method.bodySpan;
+    return (
+      full !== undefined && branch.span.startLine === full.startLine &&
+      comparePosition(full.startLine, full.startColumn, branch.span.startLine, branch.span.startColumn) <= 0 &&
+      comparePosition(branch.span.startLine, branch.span.startColumn, body.startLine, body.startColumn) <= 0 &&
+      branch.span.endLine === body.endLine && branch.span.endColumn >= body.endColumn
+    );
+  });
+}
+
+function findOwningMethodIndex(methods: MethodDescriptor[], span: SourceSpan): number | null {
   let bestMatch: number | null = null;
 
   for (let index = 0; index < methods.length; index += 1) {
-    const method = methods[index]!;
-    if (!isCandidateMethod(method, span)) {
+    const body = methods[index]!.bodySpan;
+    if (!spanContains(body, span) && !spanContainsPosition(body, span.startLine, span.startColumn)) {
       continue;
     }
-    if (isPreferredMethod(methods, bestMatch, index)) {
+    if (bestMatch === null || spanContains(methods[bestMatch]!.bodySpan, body)) {
       bestMatch = index;
     }
   }
 
   return bestMatch;
-}
-
-function isCandidateMethod(method: AttributableMethod, span: SourceSpan): boolean {
-  if (method.fnMapConflict) {
-    return false;
-  }
-  return spanContains(method.span, span) || spanContainsPosition(method.span, span.startLine, span.startColumn);
-}
-
-function isPreferredMethod(methods: AttributableMethod[], bestMatch: number | null, candidateIndex: number): boolean {
-  return bestMatch === null || spanContains(methods[bestMatch]!.span, methods[candidateIndex]!.span);
 }
 
 function spanContains(container: SourceSpan, candidate: SourceSpan): boolean {
@@ -192,40 +194,9 @@ function spansEqual(left: SourceSpan, right: SourceSpan): boolean {
   );
 }
 
-function spansShareBoundaryLines(left: SourceSpan, right: SourceSpan): boolean {
-  return left.startLine === right.startLine && left.endLine === right.endLine;
-}
-
-function spansOverlap(left: SourceSpan, right: SourceSpan): boolean {
-  return (
-    comparePosition(left.startLine, left.startColumn, right.endLine, right.endColumn) < 0 &&
-    comparePosition(right.startLine, right.startColumn, left.endLine, left.endColumn) < 0
-  );
-}
-
-function matchesMethodDeclaration(entry: FunctionCoverageUnit, method: MethodDescriptor): boolean {
-  const declarationLine = entry.declarationStart?.line ?? entry.span.startLine;
-  if (declarationLine !== method.startLine) {
-    return false;
-  }
-
-  return !entry.name || entry.name.startsWith("(") || entry.name === method.functionName;
-}
-
-function resolveUniqueMatch(matches: FunctionCoverageUnit[]): FunctionCoverageUnit | typeof AMBIGUOUS_MATCH | null {
-  if (matches.length === 1) {
-    return matches[0] ?? null;
-  }
-  if (matches.length > 1) {
-    return AMBIGUOUS_MATCH;
-  }
-  return null;
-}
-
 function uniqueMatchOutcome(matches: FunctionCoverageUnit[]): MatchOutcome {
-  const resolved = resolveUniqueMatch(matches);
-  if (resolved === AMBIGUOUS_MATCH) {
+  if (matches.length > 1) {
     return null;
   }
-  return resolved ?? undefined;
+  return matches[0];
 }

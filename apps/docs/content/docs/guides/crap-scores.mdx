@@ -24,6 +24,12 @@ Coverage is a fraction from zero to one. The report uses the lower applicable st
 
 Only unit and integration coverage contributes. Libraries tested exclusively through E2E can therefore receive high scores despite having tests. Inspect the behavior and its tests before deciding what to change.
 
-The analyzer's callback and generator limitation is tracked in [issue #217](https://github.com/rafaeltab/wallpaperdb/issues/217). A passing threshold does not establish that every function was assessed.
+The inventory includes ordinary, async, and generator callbacks, including nested callbacks and curried wrappers such as `Effect.fn`. Each body receives its own score; nested decisions belong to the nested function. Source positions distinguish anonymous callbacks on the same line. Calling a wrapper or constructing an Effect does not establish coverage of its callback body.
+
+The shared Vitest configuration enables AST-aware coverage remapping for Vitest 3; Vitest 5 already uses it. This preserves callback locations and source branches. Older V8 reports can omit anonymous function metadata or contain only function-entry branch counters. When those records cannot establish a function's own statement or source-branch coverage, the analyzer treats the measurement as missing and uses zero. A passing threshold does not prove that the tests establish correct behavior.
+
+V8 can mark a generator's first yield covered when only its iterator has been created, before `.next()` runs. This provider limitation can overstate coverage for short generators. The [provider regression fixture](https://github.com/rafaeltab/wallpaperdb/blob/main/scripts/fixtures/crap/callbacks.test.ts) checks iterator creation separately from resumed execution.
+
+The analyzer is maintained in the repository. Its [upstream provenance and Apache-2.0 license](https://github.com/rafaeltab/wallpaperdb/blob/main/scripts/vendor/crap-typescript-core/UPSTREAM.md) record the vendored baseline. [Issue #239](https://github.com/rafaeltab/wallpaperdb/issues/239) tracks evaluating an upstream contribution after sustained repository use.
 
 For scope and exclusions, read [crap.config.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/crap.config.mts). For orchestration and coverage handling, read [scripts/crap.mts](https://github.com/rafaeltab/wallpaperdb/blob/main/scripts/crap.mts). If a killed process leaves `coverage/.crap-lock`, confirm it is no longer running before removing the lock.

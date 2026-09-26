@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["crap.mts", "../crap.config.mts"]
+  "include": ["crap.mts", "crap.test.ts", "crap-vitest.config.ts", "../crap.config.mts"]
 }

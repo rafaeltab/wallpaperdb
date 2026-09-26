@@ -12,6 +12,7 @@ function runCi(force: string, failingStage: string) {
     // Keep the real orchestration recipe; replace only its external checks.
     const prechecks = [
       'test-make',
+      'test-crap',
       'crap-check-types',
       'worktree-env-test',
       'nats-stream-setup-test',

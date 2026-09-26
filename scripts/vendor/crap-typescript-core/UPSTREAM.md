@@ -11,4 +11,6 @@ WallpaperDB maintains this copy so callback discovery and coverage attribution c
 
 [Issue #239](https://github.com/rafaeltab/wallpaperdb/issues/239) tracks evaluation and a possible contribution after sustained repository use.
 
+Local changes include callback discovery and display names, full source ranges for function identity, source-body coverage ownership, conservative handling of incomplete legacy V8 reports, synthetic function-entry branch filtering, and retention of function counters. The new regressions live beside the imported tests. [Live provider tests](../../crap.test.ts) exercise the repository's installed Vitest versions and Effect generator behavior. Repository-specific orchestration and coverage policy stay outside the vendored modules.
+
 Keep imports and unrelated upstream code stable when making changes. Modified upstream files carry a notice referring to this document. Run the vendored tests through `make test-crap` and type checking through `make crap-check-types`; command definitions remain in the root Makefile. Compare changes against the pinned revision before preparing an upstream contribution, retaining the license and any future upstream notices when refreshing this copy.

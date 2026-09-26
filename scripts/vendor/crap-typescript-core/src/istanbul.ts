@@ -1,3 +1,4 @@
+// Modified by WallpaperDB: preserve legacy provenance, branch types and function hits; see ../UPSTREAM.md.
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -119,9 +120,18 @@ function parseCoverageEntry(
     coverage: {
       statements: parseStatements(entryValue.statementMap, entryValue.s),
       branches: parseBranches(entryValue.branchMap, entryValue.b),
-      functions: parseFunctions(entryValue.fnMap)
+      functions: parseFunctions(entryValue.fnMap, entryValue.f),
+      ...(isLegacyV8(entryValue) ? { legacyV8: true } : {})
     }
   };
+}
+
+function isLegacyV8(entry: JsonRecord): boolean {
+  return typeof entry.all === "boolean" || (
+    isRecord(entry.branchMap) && Object.values(entry.branchMap).some(
+      (branch) => isRecord(branch) && branch.type === "branch"
+    )
+  );
 }
 
 function mergeCoverageEntry(
@@ -135,20 +145,22 @@ function mergeCoverageEntry(
   records.set(entry.normalizedPath, {
     statements: deduplicateStatements(merged.statements),
     branches: deduplicateBranches(merged.branches),
-    functions: deduplicateFunctions(merged.functions)
+    functions: deduplicateFunctions(merged.functions),
+    ...(merged.legacyV8 || entry.coverage.legacyV8 ? { legacyV8: true } : {})
   });
 }
 
-function parseFunctions(fnMapValue: unknown): FunctionCoverageUnit[] {
+function parseFunctions(fnMapValue: unknown, hitsValue: unknown): FunctionCoverageUnit[] {
   if (!isRecord(fnMapValue)) {
     return [];
   }
 
   const functions: FunctionCoverageUnit[] = [];
-  for (const entryValue of Object.values(fnMapValue)) {
+  for (const [id, entryValue] of Object.entries(fnMapValue)) {
     const entry = resolveFunctionEntry(entryValue);
     if (entry) {
-      functions.push(entry);
+      const hits = isRecord(hitsValue) ? parseFiniteNumber(hitsValue[id]) : null;
+      functions.push({ ...entry, ...(hits === null ? {} : { hits }) });
     }
   }
 
@@ -265,14 +277,14 @@ function deduplicateStatements(statements: StatementCoverageUnit[]): StatementCo
 function deduplicateBranches(branches: BranchCoverageUnit[]): BranchCoverageUnit[] {
   const deduplicated = new Map<string, BranchCoverageUnit>();
   for (const branch of branches) {
-    const key = stringifySpan(branch.span);
+    const key = `${branch.type ?? ""}:${stringifySpan(branch.span)}`;
     const existing = deduplicated.get(key);
     if (!existing) {
       deduplicated.set(key, branch);
       continue;
     }
     deduplicated.set(key, {
-      span: branch.span,
+      ...branch,
       hits: mergeBranchHits(existing.hits, branch.hits)
     });
   }
@@ -308,7 +320,7 @@ function toBranchCoverageUnit(branchValue: unknown, hitsValue: unknown): BranchC
   if (hits.length === 0 || span === null) {
     return null;
   }
-  return { span, hits };
+  return { span, hits, ...(typeof branchValue.type === "string" ? { type: branchValue.type } : {}) };
 }
 
 function resolveBranchSpan(branchValue: JsonRecord): SourceSpan | null {
@@ -392,7 +404,13 @@ function selectCanonicalFunctionEntry(entries: FunctionCoverageUnit[]): Function
     }
   }
 
-  return [...uniqueBySpan.values()].sort(compareFunctionSpecificity)[0]!;
+  const canonical = [...uniqueBySpan.values()].sort(compareFunctionSpecificity)[0]!;
+  // A zero count is reliable only when every merged variant supplies a count.
+  const hits = entries.every((entry) => entry.hits !== undefined)
+    ? Math.max(...entries.map((entry) => entry.hits!))
+    : undefined;
+  const { hits: _previousHits, ...identity } = canonical;
+  return { ...identity, ...(hits === undefined ? {} : { hits }) };
 }
 
 function compareFunctionSpecificity(left: FunctionCoverageUnit, right: FunctionCoverageUnit): number {

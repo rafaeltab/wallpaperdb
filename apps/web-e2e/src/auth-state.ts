@@ -125,7 +125,7 @@ export async function ensureAuthPersonaBypassesClientTrust(
   }
 }
 
-function resolveClerkSecretKey(env: WebE2EEnv): string {
+export function resolveClerkSecretKey(env: WebE2EEnv): string {
   const configuredSecret = env.CLERK_SECRET_KEY?.trim();
   if (configuredSecret) {
     return configuredSecret;

@@ -43,4 +43,18 @@ The user requested migration to Effect and the current coding guidelines, TDD, s
 
 ## Review and validation log
 
-Updates will record completed increments, review findings and final evidence here.
+The first complete migrated suite passes 214 tests across 23 files. `make check PACKAGE=user` passes the build, lint, type checker and architecture dependency check. Coverage still includes every production source file.
+
+The original 78 Profile integration cases map to 71 retained command scenarios and the replacement maintenance/event adapter contracts. The picture command suite retains its original 25 cases and adds expiry/import boundary evidence. The former timer tests map to scoped-worker tests for nonoverlap, failure recovery, graceful completion, shared shutdown deadlines and interruption. The literal-true health test is replaced with dependency and shutdown assertions.
+
+The migration also corrects two existing invariant failures. Truncating a generated Handle at a hyphen could leave it shorter than the configured minimum; generation now pads the normalized result. Mutation acceptance time is captured after acquiring the Profile row lock, so waiting commands cannot adopt pictures after their deadline using a stale pre-lock timestamp.
+
+Initial picture imports now stop after twelve attempts and erase the captured private URL. The Profile remains usable with its fallback picture and accepts a manual upload. Existing exhausted jobs clear their URL without making another network request. This intentionally replaces indefinite retry. Event and picture retention retain their original one-second cadence, with bounded batches and no overlapping cycles.
+
+Database cancellation was tested with a real blocked server query. Destroying the client socket did not stop PostgreSQL work, so the resource now uses a separate bounded cancellation connection to terminate its own leased backend. HTTP tests prove partial startup rollback, normal completion during shutdown, interruption at the deadline and cancellation after client disconnect.
+
+Telemetry tests use the production graph, SDK/exporters and real PostgreSQL/NATS. They verify test-owned SDK/Effect spans, structured logs, a monotonic Effect counter and incoming trace context. Independently disconnecting the production tracer, HTTP context bridge and Effect metric producer fails the corresponding assertions. Every mutation was restored. The native picture cancellation test likewise detects omission of process termination. PostgreSQL failures are sanitized before span/log recording; tests use distinctive private URL markers in actual trigger failures to detect disclosure.
+
+Production build verification exercises the emitted picture encoder. The Docker image build also caught and removed a legacy dependency overlay that would have replaced the service's new telemetry packages with the core package's older SDK.
+
+The local PostgreSQL initialization bind mount was unreadable to Docker. A readable temporary copy of public SQL and NATS initialization scripts, selected through `/tmp/user-infra-override.yml`, repairs this environment without changing tracked infrastructure or deleting volumes. The task's Compose project is `wallpaperdb-t3code-user-service-effect-migration`; other worktree stacks remain untouched.

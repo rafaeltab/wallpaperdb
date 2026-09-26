@@ -1,3 +1,9 @@
+import { CreateBucketCommand } from '@aws-sdk/client-s3';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  S3TesterBuilder,
+} from '@wallpaperdb/test-utils';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -114,6 +120,44 @@ describe('Profile production composition', () => {
       logger: false,
     });
   }
+
+  it('reports unavailable picture publication storage and recovers without pending events', async () => {
+    const StorageTester = createDefaultTesterBuilder()
+      .with(DockerTesterBuilder)
+      .with(S3TesterBuilder)
+      .build();
+    const storage = new StorageTester().withS3().withS3Bucket('profile-pictures');
+    await storage.setup();
+    const previous = config;
+    const s3 = storage.getS3();
+    config = {
+      ...config,
+      s3Endpoint: s3.endpoints.fromHost,
+      s3AccessKeyId: s3.options.accessKey,
+      s3SecretAccessKey: s3.options.secretKey,
+    };
+    try {
+      await reconfigure();
+      const unavailable = await app.inject('/health');
+      expect(unavailable.statusCode).toBe(503);
+      expect(unavailable.json()).toMatchObject({
+        status: 503,
+        healthStatus: 'degraded',
+        checks: { database: true, nats: true, workers: false },
+      });
+      await storage.s3
+        .getS3Client()
+        .send(new CreateBucketCommand({ Bucket: config.assetReferenceBucket }));
+      expect((await app.inject('/health')).json()).toMatchObject({
+        status: 'healthy',
+        checks: { database: true, nats: true, workers: true },
+      });
+    } finally {
+      config = previous;
+      await reconfigure();
+      await storage.destroy();
+    }
+  });
 
   const maintenance = <A, E>(use: (maintenance: Maintenance) => Effect.Effect<A, E>) =>
     runtime.runPromise(

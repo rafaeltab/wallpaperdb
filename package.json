@@ -19,7 +19,6 @@
     },
     "devDependencies": {
         "@ai-hero/sandcastle": "npm:@rafaeltab/sandcastle@0.13.0-fork.1",
-        "@barney-media/crap-typescript-core": "0.5.2",
         "@types/istanbul-lib-coverage": "2.0.6",
         "@types/node": "^26.0.1",
         "@vitest/coverage-v8": "^3.0.0",

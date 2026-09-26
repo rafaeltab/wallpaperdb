@@ -1,0 +1,242 @@
+import { readdir, stat } from "node:fs/promises";
+import type { Dirent } from "node:fs";
+import path from "node:path";
+
+import { IGNORED_DIRECTORIES, IGNORED_SOURCE_ROOT_DISCOVERY_DIRECTORIES } from "./constants.js";
+import { normalizeSlashes, runCommand, toRelativePath } from "./utils.js";
+
+const ANALYZABLE_EXTENSIONS = [".ts", ".tsx"];
+const TEST_FILE_MARKERS = [".test.", ".spec."];
+const BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS = new Set(["build", "out", "target"]);
+const EXCLUDED_PATH_SEGMENTS = [
+  "/__tests__/",
+  "/.next/",
+  "/.nuxt/",
+  "/.svelte-kit/",
+  "/.turbo/",
+  "/.vite/",
+  "/dist/",
+  "/coverage/",
+  "/node_modules/"
+];
+
+export async function findAllTypeScriptFilesUnderSourceRoots(projectRoot: string): Promise<string[]> {
+  const files = new Set<string>();
+  await walkForSourceRoots(projectRoot, async (sourceRoot) => {
+    await walkSourceTree(sourceRoot, async (filePath) => {
+      files.add(path.resolve(filePath));
+    });
+  });
+  return Array.from(files).sort();
+}
+
+export async function expandExplicitPaths(projectRoot: string, values: string[]): Promise<string[]> {
+  const files = new Set<string>();
+  for (const value of values) {
+    const resolvedPath = path.resolve(projectRoot, value);
+    const fileStats = await stat(resolvedPath);
+    if (fileStats.isDirectory()) {
+      await expandDirectoryPath(resolvedPath, files);
+      continue;
+    }
+    if (isAnalyzableFile(resolvedPath)) {
+      files.add(resolvedPath);
+    }
+  }
+  return Array.from(files).sort();
+}
+
+export async function changedTypeScriptFilesUnderSourceRoots(projectRoot: string): Promise<string[]> {
+  const result = await runCommand("git", ["status", "--porcelain", "-z"], projectRoot, {
+    rejectOnTruncatedOutput: true
+  });
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.trim() || "git status --porcelain failed");
+  }
+  return Array.from(collectChangedFilesFromStatus(projectRoot, result.stdout.split("\0"))).sort();
+}
+
+export function isAnalyzableFile(filePath: string): boolean {
+  const normalized = toRelativePath(path.parse(filePath).root, filePath).toLowerCase();
+  const baseName = path.basename(normalized);
+  if (!hasAnySuffix(normalized, ANALYZABLE_EXTENSIONS)) {
+    return false;
+  }
+  if (normalized.endsWith(".d.ts")) {
+    return false;
+  }
+  if (containsAny(baseName, TEST_FILE_MARKERS)) {
+    return false;
+  }
+  if (isGeneratedSourceRootPath(normalized)) {
+    return false;
+  }
+  if (containsAny(`/${normalized}`, EXCLUDED_PATH_SEGMENTS)) {
+    return false;
+  }
+  return true;
+}
+
+interface GitStatusEntry {
+  status: string;
+  pathValue: string;
+}
+
+function parseGitStatusEntry(entry: string): GitStatusEntry | null {
+  if (!entry) {
+    return null;
+  }
+  return {
+    status: entry.slice(0, 2),
+    pathValue: entry.slice(3)
+  };
+}
+
+function collectChangedFile(projectRoot: string, entry: GitStatusEntry, files: Set<string>): void {
+  if (!isIncludedGitStatus(entry.status)) {
+    return;
+  }
+  const resolvedPath = path.resolve(projectRoot, entry.pathValue);
+  if (isAnalyzableFile(resolvedPath) && isUnderSourceTree(projectRoot, resolvedPath)) {
+    files.add(resolvedPath);
+  }
+}
+
+function collectChangedFilesFromStatus(projectRoot: string, entries: string[]): Set<string> {
+  const files = new Set<string>();
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = parseGitStatusEntry(entries[index]!);
+    if (!entry) {
+      continue;
+    }
+    collectChangedFile(projectRoot, entry, files);
+    if (isRenameOrCopyStatus(entry.status)) {
+      index += 1;
+    }
+  }
+  return files;
+}
+
+function isUnderSourceTree(projectRoot: string, filePath: string): boolean {
+  const relative = toRelativePath(projectRoot, filePath).toLowerCase();
+  return relative.includes("/src/") || relative.startsWith("src/");
+}
+
+function isIncludedGitStatus(status: string): boolean {
+  if (status === "??") {
+    return true;
+  }
+  return !status.includes("D") && /[AMRCU]/.test(status);
+}
+
+function isRenameOrCopyStatus(status: string): boolean {
+  return status.includes("R") || status.includes("C");
+}
+
+function containsAny(value: string, fragments: string[]): boolean {
+  return fragments.some((fragment) => value.includes(fragment));
+}
+
+function hasAnySuffix(value: string, suffixes: string[]): boolean {
+  return suffixes.some((suffix) => value.endsWith(suffix));
+}
+
+function isGeneratedSourceRootPath(normalizedPath: string): boolean {
+  const segments = normalizedPath.split("/").filter(Boolean);
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    if (
+      BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS.has(segments[index]!) &&
+      segments[index + 1] === "src" &&
+      !segments.slice(0, index).includes("src")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function shouldSkipSourceRootDiscoveryDirectory(directoryPath: string): boolean {
+  const baseName = path.basename(directoryPath).toLowerCase();
+  if (!IGNORED_SOURCE_ROOT_DISCOVERY_DIRECTORIES.has(baseName)) {
+    return false;
+  }
+  if (!BUILD_OUTPUT_SOURCE_ROOT_SEGMENTS.has(baseName)) {
+    return true;
+  }
+  return !hasSourceAncestor(directoryPath);
+}
+
+function hasSourceAncestor(directoryPath: string): boolean {
+  const normalized = normalizeSlashes(path.resolve(directoryPath)).toLowerCase();
+  return normalized.split("/").filter(Boolean).slice(0, -1).includes("src");
+}
+
+async function walkForSourceRoots(
+  currentDir: string,
+  onSourceRoot: (sourceRoot: string) => Promise<void>
+): Promise<void> {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const absolutePath = path.join(currentDir, entry.name);
+    if (shouldSkipSourceRootDiscoveryDirectory(absolutePath)) {
+      continue;
+    }
+    if (entry.name.toLowerCase() === "src") {
+      await onSourceRoot(absolutePath);
+      continue;
+    }
+    await walkForSourceRoots(absolutePath, onSourceRoot);
+  }
+}
+
+async function walkSourceTree(currentDir: string, onFile: (filePath: string) => Promise<void>): Promise<void> {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+  for (const entry of entries) {
+    await walkSourceTreeEntry(currentDir, entry, onFile);
+  }
+}
+
+async function walkSourceTreeEntry(
+  currentDir: string,
+  entry: Dirent,
+  onFile: (filePath: string) => Promise<void>
+): Promise<void> {
+  const absolutePath = path.join(currentDir, entry.name);
+  if (entry.isDirectory()) {
+    await walkDirectory(absolutePath, onFile);
+    return;
+  }
+  if (!entry.isFile() || !isAnalyzableFile(absolutePath)) {
+    return;
+  }
+  await onFile(absolutePath);
+}
+
+async function walkDirectory(directoryPath: string, onFile: (filePath: string) => Promise<void>): Promise<void> {
+  if (IGNORED_DIRECTORIES.has(path.basename(directoryPath).toLowerCase())) {
+    return;
+  }
+  await walkSourceTree(directoryPath, onFile);
+}
+
+async function expandDirectoryPath(directoryPath: string, files: Set<string>): Promise<void> {
+  if (shouldSkipSourceRootDiscoveryDirectory(directoryPath)) {
+    return;
+  }
+
+  if (path.basename(directoryPath).toLowerCase() === "src" || hasSourceAncestor(directoryPath)) {
+    await walkSourceTree(directoryPath, async (filePath) => {
+      files.add(path.resolve(filePath));
+    });
+    return;
+  }
+
+  await walkForSourceRoots(directoryPath, async (sourceRoot) => {
+    await walkSourceTree(sourceRoot, async (filePath) => {
+      files.add(path.resolve(filePath));
+    });
+  });
+}

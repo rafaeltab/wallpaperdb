@@ -5,14 +5,14 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
-import { Identities, Profiles, profilesLayer, type ProfilePolicy } from '../src/profile/index.js';
+import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy } from '../src/profile/index.js';
 
 const policy: ProfilePolicy = {
   profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80,
   profileBiographyMaxLength: 5000, profileRetainedAliasLimit: 3, profileEvidenceRetentionDays: 30,
   profilePictureMaxBytes: 5242880, profilePictureMaxPixels: 16000000, profilePictureMaxDecodedBytes: 67108864,
 };
-const testLayer = (databaseUrl: string) => profilesLayer(policy).pipe(Layer.provide(Layer.mergeAll(
+const testLayer = (databaseUrl: string) => profilesLayer(policy).pipe(Layer.provideMerge(Layer.mergeAll(
   profileStoreLayer(policy).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
   Layer.succeed(Identities, { getIdentity: () => Effect.succeed({ displayName: 'Ada Lovelace', firstName: null, lastName: null, imageUrl: 'https://img.clerk.com/ada' }) }),
 )));
@@ -20,7 +20,7 @@ const testLayer = (databaseUrl: string) => profilesLayer(policy).pipe(Layer.prov
 describe('PostgreSQL profile transactions', () => {
   let database: StartedPostgreSqlContainer;
   let sql: ReturnType<typeof postgres>;
-  let runtime: ManagedRuntime.ManagedRuntime<Profiles, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<Profiles | ProfileStore | Identities, unknown>;
   beforeAll(async () => {
     database = await new PostgreSqlContainer('postgres:16-alpine').start();
     const databaseUrl = database.getConnectionUri().replace('localhost', '127.0.0.1');
@@ -33,6 +33,16 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('rolls back a defective domain decision without turning it into an expected technical failure', async () => {
+    await run(profiles => profiles.ensure({ profileId: 'owner' }));
+    const defect = new Error('invalid decision implementation');
+    const decision = Effect.gen(function* () {
+      return yield* (yield* ProfileStore).transact({ profileId: 'owner', now: new Date() }, () => { throw defect; });
+    }).pipe(Effect.catchTag('ProfileUnavailable', () => Effect.succeed('unexpected-conversion')));
+    await expect(runtime.runPromise(decision)).rejects.toBe(defect);
+    expect(await sql`select version from profiles where id = 'owner'`).toEqual([{ version: 1 }]);
+    expect(await sql`select id from outbox_events`).toHaveLength(1);
+  });
   it('records the originating trace with the durable outbox occurrence', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }).pipe(Effect.withParentSpan(Tracer.externalSpan({ traceId: '12345678901234567890123456789012', spanId: '1234567890123456', sampled: true }))));
     const [event] = await sql`select trace_parent from outbox_events`;

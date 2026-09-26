@@ -140,7 +140,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
       if (targetClaim && targetClaim.profileId !== principal.profileId) return reject('handle-unavailable', 'This Handle is already in use; choose another name');
       const retained = profile.aliases.filter(alias => alias.expiresAt === null && alias.handle !== handle);
       retained.push({ handle: profile.handle, claimGeneration: 0, createdAt: now.toISOString(), expiresAt: null });
-      retained.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.handle.localeCompare(b.handle));
+      retained.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.handle < b.handle ? -1 : a.handle > b.handle ? 1 : 0));
       const scheduledAliases = retained.slice(0, Math.max(0, retained.length - policy.profileRetainedAliasLimit)).map(alias => ({ handle: alias.handle, expiresAt: new Date(now.getTime() + 86400000).toISOString() }));
       return { _tag: 'Change', mutation: { type: 'handle', handle, scheduledAliases } };
     });
@@ -226,4 +226,24 @@ function decideAlias({ profile, targetClaim, eligibleHandles }: ProfileSnapshot,
   }
   if (!targetClaim.expiresAt) return reject('alias-not-scheduled', 'Schedule this alias for removal before expiring it immediately');
   return { _tag: 'Change', mutation: { type: 'expire', handle, claimGeneration: targetClaim.claimGeneration, before: targetClaim.expiresAt.toISOString(), reason: 'immediate' } };
+}
+
+/** Resolve all owner-facing limits and historical-handle availability in one place. */
+export function describeOwnerProfile(
+  profile: Profile,
+  aliases: OwnerProfile['aliases'],
+  history: Array<{ handle: string; eligibleUntil: string }>,
+  claims: readonly { handle: string; profileId: string }[],
+  pictureImportStatus: OwnerProfile['pictureImportStatus'],
+  policy: ProfilePolicy
+): OwnerProfile {
+  const retained = new Set(aliases.filter(alias => alias.expiresAt === null).map(alias => alias.handle));
+  const claimedByOthers = new Set(claims.filter(claim => claim.profileId !== profile.id).map(claim => claim.handle));
+  return {
+    ...profile, aliases, pictureImportStatus,
+    biographyMaxLength: policy.profileBiographyMaxLength,
+    retainedAliasLimit: policy.profileRetainedAliasLimit,
+    pictureUploadLimits: { maxBytes: policy.profilePictureMaxBytes, maxPixels: policy.profilePictureMaxPixels, maxDecodedBytes: policy.profilePictureMaxDecodedBytes },
+    historicalHandles: history.filter(entry => entry.handle !== profile.handle && !retained.has(entry.handle)).map(entry => ({ ...entry, unavailableReason: claimedByOthers.has(entry.handle) ? 'claimed' : retained.size >= policy.profileRetainedAliasLimit ? 'alias-limit' : null })),
+  };
 }

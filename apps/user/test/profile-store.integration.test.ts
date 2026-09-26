@@ -74,6 +74,36 @@ describe('PostgreSQL profile transactions', () => {
       })
     );
 
+  it('does not disguise an unrelated unique constraint failure as a Handle collision', async () => {
+    await sql.unsafe(
+      `create function reject_outbox_identity() returns trigger language plpgsql as $$ begin raise exception using errcode = '23505', constraint = 'outbox_events_pkey', message = 'outbox identity collision'; end $$`
+    );
+    await sql.unsafe(
+      `create trigger reject_outbox_identity before insert on outbox_events for each row execute function reject_outbox_identity()`
+    );
+    try {
+      const creation = Effect.gen(function* () {
+        return yield* (yield* ProfileStore).create({
+          profileId: 'owner',
+          displayName: 'Ada',
+          handle: 'ada',
+          imageUrl: null,
+          now: new Date(),
+        });
+      });
+      await expect(runtime.runPromise(creation)).rejects.toMatchObject({
+        _tag: 'ProfileUnavailable',
+        operation: 'create-profile',
+        cause: { sqlState: '23505' },
+      });
+      expect(await sql`select id from profiles`).toEqual([]);
+      expect(await sql`select handle from handle_claims`).toEqual([]);
+    } finally {
+      await sql.unsafe(
+        'drop trigger reject_outbox_identity on outbox_events; drop function reject_outbox_identity()'
+      );
+    }
+  });
   it('keeps a private import URL out of diagnostics when its database write fails', async () => {
     const marker = 'private-profile-source-marker';
     const logs: unknown[] = [];
@@ -165,17 +195,15 @@ describe('PostgreSQL profile transactions', () => {
   });
   it('records the originating trace with the durable outbox occurrence', async () => {
     await run((profiles) =>
-      profiles
-        .ensure({ profileId: 'owner' })
-        .pipe(
-          Effect.withParentSpan(
-            Tracer.externalSpan({
-              traceId: '12345678901234567890123456789012',
-              spanId: '1234567890123456',
-              sampled: true,
-            })
-          )
+      profiles.ensure({ profileId: 'owner' }).pipe(
+        Effect.withParentSpan(
+          Tracer.externalSpan({
+            traceId: '12345678901234567890123456789012',
+            spanId: '1234567890123456',
+            sampled: true,
+          })
         )
+      )
     );
     const [event] = await sql`select trace_parent from outbox_events`;
     expect(event.trace_parent).toMatch(/^00-12345678901234567890123456789012-[0-9a-f]{16}-01$/);

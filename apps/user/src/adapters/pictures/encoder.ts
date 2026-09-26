@@ -17,16 +17,23 @@ interface ProcessedPicture {
   height: number;
 }
 
+function readPngChunk(input: Buffer, offset: number): { type: string; nextOffset: number } {
+  const length = input.readUInt32BE(offset);
+  if (length > input.length - offset - 12)
+    throw new InvalidProfilePictureError('Picture could not be decoded');
+  return {
+    type: input.toString('ascii', offset + 4, offset + 8),
+    nextOffset: offset + length + 12,
+  };
+}
+
 function hasPngAnimation(input: Buffer): boolean {
   if (!input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return false;
   for (let offset = 8; offset + 12 <= input.length; ) {
-    const length = input.readUInt32BE(offset);
-    if (length > input.length - offset - 12)
-      throw new InvalidProfilePictureError('Picture could not be decoded');
-    const type = input.toString('ascii', offset + 4, offset + 8);
-    if (type === 'acTL') return true;
-    if (type === 'IEND') break;
-    offset += length + 12;
+    const chunk = readPngChunk(input, offset);
+    if (chunk.type === 'acTL') return true;
+    if (chunk.type === 'IEND') break;
+    offset = chunk.nextOffset;
   }
   return false;
 }
@@ -47,12 +54,14 @@ function hasSupportedSignature(input: Buffer): boolean {
   return input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP';
 }
 
+function hasAnimation(metadata: Metadata): boolean {
+  return (metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined;
+}
+
 function validateStillFormat(metadata: Metadata): void {
   if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? ''))
     throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
-  if (metadata.pages !== undefined && metadata.pages > 1)
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
-  if (metadata.loop !== undefined || metadata.delay !== undefined)
+  if (hasAnimation(metadata))
     throw new InvalidProfilePictureError('Animated pictures are not accepted');
 }
 
@@ -63,8 +72,8 @@ function decodedByteCount(metadata: Metadata, pixels: number): number {
 
 function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): void {
   validateStillFormat(metadata);
-  const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
-  if (!pixels || pixels > limits.maxPixels)
+  const pixels = Number(metadata.width) * Number(metadata.height);
+  if (!(pixels > 0) || pixels > limits.maxPixels)
     throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
   if (decodedByteCount(metadata, pixels) > limits.maxDecodedBytes)
     throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');

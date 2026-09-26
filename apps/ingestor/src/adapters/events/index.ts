@@ -1,4 +1,6 @@
 import { context, propagation } from '@opentelemetry/api';
+import { S3Client, S3ServiceException } from '@aws-sdk/client-s3';
+import { registerAssetReference } from '@wallpaperdb/core/assets';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import {
   WallpaperUploadedCloudEventSchema,
@@ -13,6 +15,11 @@ export interface UploadedEventsConfig {
   readonly stream: string;
   readonly serviceName: string;
   readonly assetBucket: string;
+  readonly assetReferenceBucket: string;
+  readonly endpoint: string;
+  readonly region: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
 }
 
 export interface UploadEventsHealth {
@@ -34,7 +41,7 @@ const broker = <A>(operation: string, send: () => Promise<A>) =>
     )
   );
 
-function envelope(event: UploadedEvent, bucket: string) {
+function envelope(event: UploadedEvent) {
   const { wallpaper } = event;
   const { metadata } = wallpaper;
   return WallpaperUploadedCloudEventSchema.parse({
@@ -56,9 +63,7 @@ function envelope(event: UploadedEvent, bucket: string) {
         width: metadata.width,
         height: metadata.height,
         aspectRatio: metadata.width / metadata.height,
-        storageKey: `${wallpaper.id}/original.${metadata.extension}`,
-        storageBucket: bucket,
-        originalFilename: wallpaper.originalFilename,
+        asset: { owner: 'ingestor', id: wallpaper.id },
         uploadedAt: wallpaper.uploadedAt,
       },
     },
@@ -69,19 +74,51 @@ class NatsUploadEvents implements UploadEvents {
   constructor(
     private readonly client: JetStreamClient,
     private readonly config: UploadedEventsConfig,
-    private readonly permits: Semaphore.Semaphore
+    private readonly permits: Semaphore.Semaphore,
+    private readonly assets: S3Client
   ) {}
   readonly publish = Effect.fn('ingestion.events.publish')(function* (
     this: NatsUploadEvents,
     event: UploadedEvent
   ) {
     const value = yield* Effect.try({
-      try: () => envelope(event, this.config.assetBucket),
+      try: () => envelope(event),
       catch: (cause) => new IngestionUnavailable({ operation: 'encode-upload-event', cause }),
     }).pipe(
       Effect.tapError((error) =>
         Effect.logError('Upload event encoding failed', { cause: error.cause })
       )
+    );
+    yield* Effect.tryPromise({
+      try: (signal) =>
+        registerAssetReference(
+          this.assets,
+          this.config.assetReferenceBucket,
+          { owner: 'ingestor', id: event.wallpaper.id },
+          {
+            bucket: this.config.assetBucket,
+            key: `${event.wallpaper.id}/original.${event.wallpaper.metadata.extension}`,
+          },
+          { abortSignal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) }
+        ),
+      catch: (cause) =>
+        new IngestionUnavailable({
+          operation: 'register-upload-asset',
+          cause: {
+            name: cause instanceof Error ? cause.name : 'UnknownStorageFailure',
+            ...(cause instanceof S3ServiceException
+              ? { status: cause.$metadata.httpStatusCode, requestId: cause.$metadata.requestId }
+              : {}),
+          },
+        }),
+    }).pipe(
+      Effect.tapError((failure) =>
+        Effect.logError('Upload asset reference registration failed', {
+          operation: failure.operation,
+          cause: failure.cause,
+        })
+      ),
+      Effect.withSpan('ingestion.events.register-asset')
     );
     const started = yield* Clock.currentTimeMillis;
     const metadata = headers();
@@ -133,6 +170,22 @@ export function uploadedEventsLayer(
 ): Layer.Layer<UploadEvents | UploadEventsHealth, IngestionUnavailable> {
   return Layer.effectContext(
     Effect.gen(function* () {
+      const assets = yield* Effect.acquireRelease(
+        Effect.sync(
+          () =>
+            new S3Client({
+              endpoint: config.endpoint,
+              region: config.region,
+              credentials: {
+                accessKeyId: config.accessKeyId,
+                secretAccessKey: config.secretAccessKey,
+              },
+              forcePathStyle: true,
+              maxAttempts: 1,
+            })
+        ),
+        (client) => Effect.sync(() => client.destroy())
+      );
       const connection = yield* Effect.acquireRelease(
         broker('connect-upload-events', () =>
           connect({ servers: config.url, name: config.serviceName, timeout: 5000 })
@@ -150,7 +203,7 @@ export function uploadedEventsLayer(
       const permits = yield* Semaphore.make(32);
       return Context.make(
         UploadEvents,
-        new NatsUploadEvents(connection.jetstream({ timeout: 5000 }), config, permits)
+        new NatsUploadEvents(connection.jetstream({ timeout: 5000 }), config, permits, assets)
       ).pipe(
         Context.add(UploadEventsHealth, {
           check: () =>

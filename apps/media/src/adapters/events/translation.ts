@@ -44,12 +44,19 @@ function metadata(
         causationsource: header.get('ce-causationsource') || undefined,
       })
     : undefined;
-  const envelope = structured ?? binary;
-  if (
-    envelope &&
-    (!envelope.success || envelope.data.type !== subject || envelope.data.id !== legacy.eventId)
-  )
+  for (const envelope of [structured, binary]) {
+    if (
+      envelope &&
+      (!envelope.success ||
+        envelope.data.type !== subject ||
+        envelope.data.id !== legacy.eventId ||
+        envelope.data.time !== legacy.timestamp)
+    )
+      return undefined;
+  }
+  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
     return undefined;
+  const envelope = structured ?? binary;
   const extensions = envelope?.success ? envelope.data : undefined;
   return {
     occurrence: envelope?.success

@@ -1,6 +1,8 @@
 # Resolve immutable assets through storage descriptors
 
-Status: accepted
+Status: superseded by [ADR 0007](0007-resolve-assets-through-stable-object-layouts.md).
+
+The decision below records the former design and its rationale. It no longer describes the current implementation.
 
 ## Context
 

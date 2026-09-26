@@ -1,6 +1,10 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { expect, it } from 'vitest';
 import { Maintenance, MaintenanceFailure, MaintenanceStore, ProfileEvents, maintenanceLayer } from '../src/maintenance/index.js';
+import { Profiles, ProfileUnavailable } from '../src/profile/index.js';
+
+const unused = () => Effect.die('Unexpected Profile command');
+const profiles: Profiles = { ensure: unused, changeHandle: unused, reactivateAlias: unused, scheduleAliasExpiry: unused, expireAliasImmediately: unused, updateDetails: unused, expireDueAlias: () => Effect.succeed(false) };
 
 it('records publication only after broker acceptance and retries the original durable event', async () => {
   const pending = new Set(['event-1', 'event-2']);
@@ -8,6 +12,7 @@ it('records publication only after broker acceptance and retries the original du
   let unavailable = true;
   const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(MaintenanceStore, {
+      dueAliases: () => Effect.succeed([]),
       recordWallpaperOwnership: () => Effect.void,
       expiredEvents: () => Effect.succeed([]),
       deleteExpiredEvent: () => Effect.succeed(false),
@@ -22,6 +27,7 @@ it('records publication only after broker acceptance and retries the original du
           : Effect.void;
       }),
     }),
+    Layer.succeed(Profiles, profiles),
   ))));
   try {
     expect(await runtime.runPromise(Effect.flatMap(Maintenance, (service) => service.publishPending()))).toEqual({ completed: 1, failed: 1 });
@@ -39,6 +45,7 @@ it('advances evidence cleanup beyond failures, wraps for retry, and uses the con
   let failing = true;
   const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(MaintenanceStore, {
+      dueAliases: () => Effect.succeed([]),
       recordWallpaperOwnership: () => Effect.void,
       pendingEvents: () => Effect.succeed([]), markPublished: () => Effect.void,
       expiredEvents: (cutoff, after) => Effect.sync(() => {
@@ -50,6 +57,7 @@ it('advances evidence cleanup beyond failures, wraps for retry, and uses the con
         : Effect.sync(() => pending.delete(id))),
     }),
     Layer.succeed(ProfileEvents, { publish: () => Effect.void }),
+    Layer.succeed(Profiles, profiles),
   ))));
   try {
     const cleanup = Effect.flatMap(Maintenance, (service) => service.cleanupEvents(new Date('2030-01-31T00:00:00.000Z')));
@@ -59,5 +67,28 @@ it('advances evidence cleanup beyond failures, wraps for retry, and uses the con
     failing = false;
     expect(await runtime.runPromise(cleanup)).toEqual({ deleted: 1, failed: 0 });
     expect(cutoffs).toEqual(['2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z', '2030-01-01T00:00:00.000Z']);
+  } finally { await runtime.dispose(); }
+});
+
+it('expires due claims independently and drains only the current claim when stopping', async () => {
+  const attempted: string[] = [];
+  let stopping = false;
+  const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
+    Layer.succeed(MaintenanceStore, {
+      pendingEvents: () => Effect.succeed([]), markPublished: () => Effect.void,
+      expiredEvents: () => Effect.succeed([]), deleteExpiredEvent: () => Effect.succeed(false), recordWallpaperOwnership: () => Effect.void,
+      dueAliases: () => Effect.succeed(['broken', 'completed', 'skipped'].map((handle) => ({ handle, profileId: handle, claimGeneration: 7, expiresAt: new Date(0) }))),
+    }),
+    Layer.succeed(ProfileEvents, { publish: () => Effect.void }),
+    Layer.succeed(Profiles, { ...profiles, expireDueAlias: (claim) => Effect.suspend(() => {
+      attempted.push(claim.handle);
+      if (claim.handle === 'broken') return Effect.fail(new ProfileUnavailable({ operation: 'expire', cause: 'offline' }));
+      stopping = true;
+      return Effect.succeed(true);
+    }) }),
+  ))));
+  try {
+    expect(await runtime.runPromise(Effect.flatMap(Maintenance, (service) => service.expireAliases(new Date(), () => stopping)))).toEqual({ completed: 1, failed: 1 });
+    expect(attempted).toEqual(['broken', 'completed']);
   } finally { await runtime.dispose(); }
 });

@@ -1,4 +1,5 @@
 import { Clock, Context, Data, Effect, Layer } from 'effect';
+import { type AliasClaimReference, Profiles } from '../profile/index.js';
 
 export class MaintenanceFailure extends Data.TaggedError('MaintenanceFailure')<{
   readonly operation: string;
@@ -7,6 +8,9 @@ export class MaintenanceFailure extends Data.TaggedError('MaintenanceFailure')<{
 export interface EventReference {
   readonly id: string;
   readonly createdAt: Date;
+}
+export interface DueAlias extends AliasClaimReference {
+  readonly expiresAt: Date;
 }
 export interface BatchResult {
   readonly completed: number;
@@ -18,6 +22,8 @@ export interface WallpaperOwnership {
 }
 /** Reads only unpublished Profile events in stable creation/identity order, in pages of 100. */
 export interface MaintenanceStore {
+  /** Due aliases in expiry/Handle order, at most 100. Expiry must recheck the claim before changing it. */
+  dueAliases(now: Date, after?: DueAlias): Effect.Effect<readonly DueAlias[], MaintenanceFailure>;
   pendingEvents(
     after?: EventReference
   ): Effect.Effect<readonly EventReference[], MaintenanceFailure>;
@@ -42,6 +48,10 @@ export interface ProfileEvents {
 }
 export const ProfileEvents = Context.Service<ProfileEvents>('wallpaperdb.user.ProfileEvents');
 export interface Maintenance {
+  expireAliases(
+    now: Date,
+    isStopping?: () => boolean
+  ): Effect.Effect<BatchResult, MaintenanceFailure>;
   publishPending(isStopping?: () => boolean): Effect.Effect<BatchResult, MaintenanceFailure>;
   cleanupEvents(
     now: Date,
@@ -57,9 +67,36 @@ export const maintenanceLayer = (policy: { retentionDays: number }) =>
     Effect.gen(function* () {
       const store = yield* MaintenanceStore;
       const events = yield* ProfileEvents;
+      const profiles = yield* Profiles;
       let cursor: EventReference | undefined;
       let cleanupCursor: EventReference | undefined;
+      let aliasCursor: DueAlias | undefined;
       return Maintenance.of({
+        expireAliases: Effect.fn('profiles.expire-aliases')(function* (
+          now: Date,
+          isStopping = () => false
+        ) {
+          if (isStopping()) return { completed: 0, failed: 0 };
+          const batch = yield* store.dueAliases(now, aliasCursor);
+          let completed = 0;
+          let failed = 0;
+          for (const alias of batch) {
+            if (isStopping()) break;
+            aliasCursor = alias;
+            const result = yield* profiles
+              .expireDueAlias(alias, now)
+              .pipe(
+                Effect.match({
+                  onSuccess: (expired) => (expired ? 'expired' : 'unchanged'),
+                  onFailure: () => 'failed',
+                })
+              );
+            if (result === 'expired') completed++;
+            if (result === 'failed') failed++;
+          }
+          if (batch.length < 100 && !isStopping()) aliasCursor = undefined;
+          return { completed, failed };
+        }),
         recordWallpaperOwnership: Effect.fn('profiles.record-wallpaper-ownership')(
           (ownership: WallpaperOwnership) => store.recordWallpaperOwnership(ownership)
         ),
@@ -75,14 +112,12 @@ export const maintenanceLayer = (policy: { retentionDays: number }) =>
           for (const event of batch) {
             if (isStopping()) break;
             cleanupCursor = event;
-            const result = yield* store
-              .deleteExpiredEvent(event.id, cutoff)
-              .pipe(
-                Effect.match({
-                  onSuccess: (removed) => (removed ? 'deleted' : 'unchanged'),
-                  onFailure: () => 'failed',
-                })
-              );
+            const result = yield* store.deleteExpiredEvent(event.id, cutoff).pipe(
+              Effect.match({
+                onSuccess: (removed) => (removed ? 'deleted' : 'unchanged'),
+                onFailure: () => 'failed',
+              })
+            );
             if (result === 'deleted') deleted++;
             if (result === 'failed') failed++;
           }

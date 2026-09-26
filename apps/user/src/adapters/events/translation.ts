@@ -18,6 +18,60 @@ const envelope = z.object({
   correlationid: z.string().min(1).optional(),
   causationid: z.string().min(1).optional(),
 });
+type Envelope = z.infer<typeof envelope>;
+type EventIdentity = { readonly eventId: string; readonly timestamp: string };
+type MetadataResult =
+  | { readonly valid: false }
+  | { readonly valid: true; readonly value: Envelope | undefined };
+
+/** Binary CloudEvents carry their structural envelope in headers instead of JSON. */
+function binaryEnvelope(headers: MsgHdrs | undefined) {
+  if (!headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'))) return undefined;
+  return envelope.safeParse({
+    specversion: headers.get('ce-specversion'),
+    source: headers.get('ce-source'),
+    id: headers.get('ce-id'),
+    type: headers.get('ce-type'),
+    time: headers.get('ce-time'),
+    correlationid: headers.get('ce-correlationid') || undefined,
+    causationid: headers.get('ce-causationid') || undefined,
+  });
+}
+
+/** Multiple representations must identify the same occurrence before metadata is trusted. */
+function eventMetadata(
+  raw: unknown,
+  headers: MsgHdrs | undefined,
+  event: EventIdentity
+): MetadataResult {
+  const structured = Predicate.hasProperty(raw, 'specversion')
+    ? WallpaperUploadedCloudEventSchema.safeParse(raw)
+    : undefined;
+  const binary = binaryEnvelope(headers);
+  for (const parsed of [structured, binary]) {
+    if (
+      parsed &&
+      (!parsed.success || parsed.data.id !== event.eventId || parsed.data.time !== event.timestamp)
+    )
+      return { valid: false };
+  }
+  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
+    return { valid: false };
+  if (structured?.success) return { valid: true, value: structured.data };
+  if (binary?.success) return { valid: true, value: binary.data };
+  return { valid: true, value: undefined };
+}
+
+function ownershipAttributes(eventId: string, wallpaperId: string, metadata: Envelope | undefined) {
+  return {
+    'event.id': eventId,
+    'event.source': metadata?.source ?? 'wallpaperdb/ingestor',
+    'wallpaper.id': wallpaperId,
+    ...(metadata?.correlationid ? { 'event.correlation_id': metadata.correlationid } : {}),
+    ...(metadata?.causationid ? { 'event.causation_id': metadata.causationid } : {}),
+  };
+}
+
 export function translateOwnership(subject: string, bytes: Uint8Array, headers?: MsgHdrs) {
   if (subject !== 'wallpaper.uploaded')
     return { kind: 'invalid', reason: 'validation_error' } as const;
@@ -25,51 +79,12 @@ export function translateOwnership(subject: string, bytes: Uint8Array, headers?:
   if (Option.isNone(raw)) return { kind: 'invalid', reason: 'parse_error' } as const;
   const parsed = WallpaperUploadedEventSchema.safeParse(raw.value);
   if (!parsed.success) return { kind: 'invalid', reason: 'validation_error' } as const;
-  if (
-    Predicate.hasProperty(raw.value, 'specversion') &&
-    !WallpaperUploadedCloudEventSchema.safeParse(raw.value).success
-  )
-    return { kind: 'invalid', reason: 'validation_error' } as const;
   const external = parsed.data;
-  const structured = Predicate.hasProperty(raw.value, 'specversion')
-    ? envelope.safeParse(raw.value)
-    : undefined;
-  const binary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'))
-    ? envelope.safeParse({
-        specversion: headers.get('ce-specversion'),
-        source: headers.get('ce-source'),
-        id: headers.get('ce-id'),
-        type: headers.get('ce-type'),
-        time: headers.get('ce-time'),
-        correlationid: headers.get('ce-correlationid') || undefined,
-        causationid: headers.get('ce-causationid') || undefined,
-      })
-    : undefined;
-  for (const parsedEnvelope of [structured, binary]) {
-    if (
-      parsedEnvelope &&
-      (!parsedEnvelope.success ||
-        parsedEnvelope.data.id !== external.eventId ||
-        parsedEnvelope.data.time !== external.timestamp)
-    )
-      return { kind: 'invalid', reason: 'validation_error' } as const;
-  }
-  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
-    return { kind: 'invalid', reason: 'validation_error' } as const;
-  const metadata = structured?.success
-    ? structured.data
-    : binary?.success
-      ? binary.data
-      : undefined;
+  const metadata = eventMetadata(raw.value, headers, external);
+  if (!metadata.valid) return { kind: 'invalid', reason: 'validation_error' } as const;
   return {
     kind: 'ownership' as const,
     ownership: { wallpaperId: external.wallpaper.id, profileId: external.wallpaper.userId },
-    attributes: {
-      'event.id': external.eventId,
-      'event.source': metadata?.source ?? 'wallpaperdb/ingestor',
-      'wallpaper.id': external.wallpaper.id,
-      ...(metadata?.correlationid ? { 'event.correlation_id': metadata.correlationid } : {}),
-      ...(metadata?.causationid ? { 'event.causation_id': metadata.causationid } : {}),
-    },
+    attributes: ownershipAttributes(external.eventId, external.wallpaper.id, metadata.value),
   };
 }

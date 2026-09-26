@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { Effect, Layer, ManagedRuntime, Result } from 'effect';
 import { TestClock } from 'effect/testing';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
 import { ImageHistogram } from '../src/extraction/index.js';
 
@@ -114,4 +114,44 @@ describe('Image storage request ownership', () => {
       });
     }
   }, 5000);
+});
+
+it('cancels a hanging health request when its sibling bucket check fails', async () => {
+  let failOriginal: (() => void) | undefined;
+  let referenceEntered = false;
+  let referenceClosed = false;
+  const server = createServer((request, response) => {
+    if (request.url?.includes('asset-references')) {
+      referenceEntered = true;
+      response.on('close', () => {
+        referenceClosed = true;
+      });
+    } else {
+      failOriginal = () => {
+        response.writeHead(404).end();
+      };
+    }
+    if (referenceEntered) failOriginal?.();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing HTTP address');
+  const runtime = ManagedRuntime.make(
+    imageLayer({
+      endpoint: `http://127.0.0.1:${address.port}`,
+      region: 'us-east-1',
+      accessKeyId: 'test',
+      secretAccessKey: 'test',
+      bucket: 'wallpapers',
+    })
+  );
+  try {
+    expect(await runtime.runPromise(ImageHealth.use((health) => health.check()))).toBe(false);
+    expect(referenceEntered).toBe(true);
+    await vi.waitFor(() => expect(referenceClosed).toBe(true), { timeout: 500, interval: 10 });
+  } finally {
+    await runtime.dispose();
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

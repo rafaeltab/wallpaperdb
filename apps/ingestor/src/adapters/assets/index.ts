@@ -189,12 +189,13 @@ export function assetsLayer(
       return Context.make(AssetStorage, new S3Assets(client, config.bucket)).pipe(
         Context.add(AssetsHealth, {
           check: () =>
-            request('check-assets', (abortSignal) =>
-              Promise.all(
-                [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
+            Effect.all(
+              [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
+                request('check-assets', (abortSignal) =>
                   client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
                 )
-              )
+              ),
+              { concurrency: 'unbounded' }
             ).pipe(
               Effect.timeout('1 second'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

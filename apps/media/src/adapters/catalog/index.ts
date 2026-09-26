@@ -78,23 +78,8 @@ const observeProjection =
   <E>(effect: Effect.Effect<void, E>) => {
     if (input.kind === 'profile') return effect;
     const original = input.kind === 'wallpaper';
-    return Effect.suspend(() => {
-      const started = Date.now();
-      return effect.pipe(
-        observeQuery(original ? 'wallpapers' : 'variants', original ? 'upsert' : 'insert'),
-        Effect.tap(() =>
-          Effect.sync(() =>
-            recordHistogram(
-              original
-                ? 'media.consumer.upsert_duration_ms'
-                : 'media.consumer.variant_insert_duration_ms',
-              Date.now() - started,
-              { 'event.type': original ? 'wallpaper.uploaded' : 'wallpaper.variant.uploaded' }
-            )
-          )
-        )
-      );
-    });
+    // Count successful projection transactions, including accepted replay no-ops.
+    return effect.pipe(observeQuery(original ? 'wallpapers' : 'variants', original ? 'upsert' : 'insert'));
   };
 const implementations = Layer.effectContext(
   Effect.gen(function* () {

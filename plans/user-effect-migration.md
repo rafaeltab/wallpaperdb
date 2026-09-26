@@ -67,14 +67,14 @@ All reviewers used the original pinned base and reviewed the full branch. The St
 
 1. Full runtime configuration retained unrelated secrets in capability closures. Fixed by constructing explicit Profile/Picture policies, adapter configurations, HTTP configuration and telemetry configuration.
 2. Capability picture models exposed bucket/key addresses. Fixed by using logical asset identities and resolving durable addresses in adapters. Event storage metadata remains compatible, and a real S3/PostgreSQL test checks recorded addresses survive configuration changes.
-3. Most policy tests still used the full production graph. Moving business matrices to controlled capability adapters, retaining real persistence guarantees and representative composition coverage.
+3. Most policy tests still used the full production graph. Moved business matrices to controlled capability adapters, retaining real persistence guarantees and representative composition coverage.
 4. Picture-import failures could produce healthy worker results, and identity/storage failures lacked operational signals. Added last-operation health gauges and alerts which retain failures through idle periods and retry backoff. Import batch results now report technical failures.
 5. A duplication heuristic identified three copies of maintenance cursor handling. Replaced them with one private batch processor. Existing poison-page, ambiguous-completion, shutdown and retention-cutoff tests pass before and after the refactor.
 
 ### Spec
 
 1. Automatic instrumentation bypassed private-URL sanitization. Fresh-process production-export tests reproduced private fetch URL attributes and PostgreSQL span status messages containing trigger diagnostics. Disabled those two automatic instrumentations while retaining explicit Effect adapter spans and safe diagnostics. Both regression tests fail with the old wiring and pass after the fix.
-2. Import claim or settlement failure aborted the batch and could starve later work. Adding per-item recovery and cursor fairness tests, including work beyond a full failed page.
+2. Import claim or settlement failure aborted the batch and could starve later work. Added per-item recovery and cursor fairness tests, including work beyond a full failed page.
 
 ### Deep review
 
@@ -82,13 +82,13 @@ All reviewers used the original pinned base and reviewed the full branch. The St
 2. A replica's local failed-delivery set stayed unhealthy after another replica successfully retried and acknowledged the delivery. A real PostgreSQL/NATS two-runtime regression reproduced the failure. Bounded sequence tracking now reconciles with the shared durable acknowledgement floor.
 3. Collision Handle generation could still trim below the configured minimum after adding its suffix. A controlled real-collision regression now covers the equal minimum/maximum boundary; the first-attempt fix alone was insufficient.
 
-The first round reported four Standards violations and one heuristic, two Spec findings, and three deep-review findings. The private URL finding overlaps across reviewers. All confirmed findings are being fixed before the next full review.
+The first round reported four Standards violations and one heuristic, two Spec findings, and three deep-review findings. The private URL finding overlaps across reviewers. All confirmed findings were fixed before the next full review.
 
 The same review work found that Clerk transport exceptions could carry private diagnostics. A marked exception test failed before boundary sanitization and now passes. Identity failures retain only safe response status/category and have an explicit adapter span.
 
 ## Validation environment
 
-A fresh CRAP run after the first implementation reports zero of 196 functions over 30. This must be repeated after review fixes. The first repository CI attempt collided with a separately launched User coverage job; rerunning without overlapping coverage avoided the missing temporary coverage file. The next run passed all 73 build/check/unit/integration tasks, then the browser auth setup timed out. Its trace contains a Clerk development initialization `Failed to fetch` error before any sign-in POST. Browser validation will be repeated after Docker test activity ends; assertions and retry settings remain unchanged.
+A fresh CRAP run after the first implementation reported zero of 196 functions over 30. The final run below includes the review fixes. The first repository CI attempt collided with a separately launched User coverage job; rerunning without overlapping coverage avoided the missing temporary coverage file. The next run passed all 73 build/check/unit/integration tasks, then the browser auth setup timed out. Its trace contains a Clerk development initialization `Failed to fetch` error before any sign-in POST. Browser validation passed after Docker test activity ended; assertions and retry settings remained unchanged.
 
 ## Independent review, round two
 
@@ -100,4 +100,16 @@ Reviewed `fc5d22a50e6678cb119c08ee59dce0d17987b263` against the original base. S
 
 The capability-test split is complete. Profile policy runs through controlled stateful adapters; PostgreSQL tests retain exact history deadlines, typed history references, claim races, atomic snapshots and rollback evidence. Picture policy, HTTP parsing, real storage/lease recovery and production composition use separate suites. HTTP version parsing tests were mutation-checked: temporarily coercing string versions made all four replacement command matrices fail, then the exact source was restored.
 
-Fresh coverage at the second-round head passed 253 tests in 29 files, with zero of 202 functions over CRAP 30. Final checks must include the subsequent observability fixes. Browser sign-in now succeeds without changing assertions or retry configuration, and the repository CI browser suite passes all three tests.
+Fresh coverage at the second-round head passed 253 tests in 29 files, with zero of 202 functions over CRAP 30. Browser sign-in succeeded without changing assertions or retry configuration, and the repository CI browser suite passed all three tests. The final results below include the subsequent observability fixes.
+
+## Independent review, round three
+
+All three reviewers rechecked `7d20588c015a70f3049a31343fa80733c081f152` against the original pinned base. The code-review skill's independent Standards and Spec reviews each reported zero findings. The separate reviewer using the user's in-depth prompt also reported zero remaining actionable findings. The reviews covered the complete migration and the prior fixes, including real failure diagnostics, dependency-health recovery, cancellation, picture state races, event replay, quarantine and test quality. No implementation changed after this reviewed source head.
+
+## Final validation and browser evidence
+
+Final `make ci` passed all 73 build/check/unit/integration tasks and all 10 E2E/dependency tasks in 107 seconds. User passed 257 tests across 29 files. `make check-crap PACKAGE=user CRAP_THRESHOLD=30` reports zero of 203 functions above 30. Coverage jobs ran sequentially. The Linux Docker environment used `GITHUB_ACTIONS=true`, single Vitest workers, and a Turbo wrapper forwarding `--env-mode=loose`; no assertions or retry settings changed. The CI-generated Media Swagger diff was restored because it was unrelated to this migration.
+
+Built the production User image from the reviewed source, replaced only this worktree's User container, and verified that it runs as the non-root `user` with healthy dependencies. After Docker test activity finished, uncached `make run PACKAGE=web-e2e SCRIPT=test:e2e` passed all three browser tests against that image in 7.1 seconds.
+
+The 50-second browser recording shows display-name and Biography edits, a picture upload, the public Profile, and picture removal. The native encoder in the production image produced a valid 1600×900 WebP with no EXIF or ICC metadata. Each recorded mutation published its durable event with trace context. Removal restored the generated avatar, retired the asset for its recorded thirty-day period, and made fresh Media requests return a non-cacheable 404. The recording uses the existing seeded test identity and committed image fixture, with no mocked responses or direct database fixture writes. The PR links the recording and detailed artifact checks from the separate `evidence/user-effect-migration` branch, keeping them out of the application source tree in accordance with main's evidence cleanup.

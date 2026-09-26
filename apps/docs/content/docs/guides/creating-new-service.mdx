@@ -464,55 +464,7 @@ import { HealthAggregator } from "@wallpaperdb/core/health";
 
 ### @wallpaperdb/events
 
-**Publishing events:**
-
-```typescript
-import { BaseEventPublisher } from "@wallpaperdb/events";
-import { z } from "zod";
-
-const MyEventSchema = z.object({
-  id: z.string(),
-  data: z.string()
-});
-
-class MyEventPublisher extends BaseEventPublisher<typeof MyEventSchema> {
-  constructor(js: JetStreamClient) {
-    super({
-      js,
-      subject: "my.event",
-      schema: MyEventSchema,
-      serviceName: "my-service"
-    });
-  }
-}
-
-// Usage
-const publisher = new MyEventPublisher(jetstream);
-await publisher.publish({ id: "123", data: "hello" });
-```
-
-**Consuming events:**
-
-```typescript
-import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
-
-class MyEventConsumer extends BaseEventConsumer<typeof MyEventSchema> {
-  constructor(js: JetStreamClient) {
-    super({
-      js,
-      stream: "MY_STREAM",
-      consumer: "my-consumer",
-      schema: MyEventSchema,
-      serviceName: "my-service"
-    });
-  }
-
-  protected async handleMessage(event: MyEvent, context: MessageContext) {
-    console.log(`Processing: ${event.id}`);
-    // Handle event...
-  }
-}
-```
+Import public event schemas from `@wallpaperdb/events/schemas`. Implement publishers and consumers as application-owned Effect adapters. Preserve occurrence identity and trace context, await publication acknowledgement, and durably quarantine invalid or exhausted deliveries. See [Events](/docs/packages/events).
 
 ## Workflow and Infrastructure Examples
 

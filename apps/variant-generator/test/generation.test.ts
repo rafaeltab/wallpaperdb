@@ -41,13 +41,14 @@ function controlledAdapters(
         if (preset.width === failGeneration) return yield* Effect.fail(failure);
         const variant: GeneratedVariant = {
           wallpaperId: original.wallpaperId,
+          target: { width: preset.width, height: preset.height },
           width: preset.width,
           height: preset.height,
           aspectRatio: preset.width / preset.height,
           format: 'image/png',
           fileSizeBytes: 100,
           storageKey: `${original.wallpaperId}/variant_${preset.width}x${preset.height}.png`,
-          storageBucket: original.storage.bucket,
+          storageBucket: 'wallpapers',
           createdAt: new Date(original.timestamp),
         };
         generated.push(variant);

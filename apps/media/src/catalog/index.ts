@@ -18,22 +18,28 @@ export interface ProjectionMetadata {
   readonly traceparent?: string;
   readonly tracestate?: string;
 }
-export interface Asset {
-  readonly id: string;
-  readonly storageBucket: string;
-  readonly storageKey: string;
+export type AssetLocation =
+  | {
+      readonly reference: {
+        readonly owner: 'ingestor' | 'variant-generator' | 'user';
+        readonly id: string;
+      };
+    }
+  | { readonly storageBucket: string; readonly storageKey: string };
+interface AssetMetadata {
   readonly mimeType: string;
   readonly width: number;
   readonly height: number;
   readonly fileSizeBytes: number;
   readonly createdAt: string;
 }
+export type Asset = AssetMetadata & AssetLocation & { readonly id: string };
 export type ProjectionInput = ProjectionMetadata &
   (
     | { readonly kind: 'wallpaper'; readonly wallpaper: Asset }
     | {
         readonly kind: 'variant';
-        readonly variant: Omit<Asset, 'id'> & { readonly wallpaperId: string };
+        readonly variant: AssetMetadata & AssetLocation & { readonly wallpaperId: string };
       }
     | {
         readonly kind: 'profile';

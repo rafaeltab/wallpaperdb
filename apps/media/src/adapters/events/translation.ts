@@ -44,12 +44,26 @@ function metadata(
         causationsource: header.get('ce-causationsource') || undefined,
       })
     : undefined;
-  const envelope = structured ?? binary;
+  for (const envelope of [structured, binary]) {
+    if (
+      envelope &&
+      (!envelope.success ||
+        envelope.data.type !== subject ||
+        envelope.data.id !== legacy.eventId ||
+        envelope.data.time !== legacy.timestamp)
+    )
+      return undefined;
+  }
   if (
-    envelope &&
-    (!envelope.success || envelope.data.type !== subject || envelope.data.id !== legacy.eventId)
+    structured?.success &&
+    binary?.success &&
+    (structured.data.source !== binary.data.source ||
+      structured.data.correlationid !== binary.data.correlationid ||
+      structured.data.causationid !== binary.data.causationid ||
+      structured.data.causationsource !== binary.data.causationsource)
   )
     return undefined;
+  const envelope = structured ?? binary;
   const extensions = envelope?.success ? envelope.data : undefined;
   return {
     occurrence: envelope?.success
@@ -88,8 +102,9 @@ export function translateEvent(
       kind: 'wallpaper',
       wallpaper: {
         id: w.id,
-        storageBucket: w.storageBucket,
-        storageKey: w.storageKey,
+        ...(w.asset
+          ? { reference: { ...w.asset } }
+          : { storageBucket: w.storageBucket, storageKey: w.storageKey }),
         mimeType: w.mimeType,
         width: w.width,
         height: w.height,
@@ -110,8 +125,9 @@ export function translateEvent(
       kind: 'variant',
       variant: {
         wallpaperId: v.wallpaperId,
-        storageBucket: v.storageBucket,
-        storageKey: v.storageKey,
+        ...(v.asset
+          ? { reference: { ...v.asset } }
+          : { storageBucket: v.storageBucket, storageKey: v.storageKey }),
         mimeType: v.format,
         width: v.width,
         height: v.height,

@@ -122,37 +122,9 @@ const MyEventSchema = createEventSchema({
 });
 ```
 
-### Publishers
+### Delivery adapters
 
-```typescript
-import { BaseEventPublisher } from "@wallpaperdb/events";
-
-class WallpaperUploadedPublisher extends BaseEventPublisher<typeof WallpaperUploadedEventSchema> {
-  constructor(js: JetStreamClient) {
-    super({
-      js,
-      subject: WALLPAPER_UPLOADED_SUBJECT,
-      schema: WallpaperUploadedEventSchema,
-      serviceName: "ingestor",
-    });
-  }
-}
-```
-
-### Consumers
-
-```typescript
-import { BaseEventConsumer, type MessageContext } from "@wallpaperdb/events";
-
-class WallpaperUploadedConsumer extends BaseEventConsumer<typeof WallpaperUploadedEventSchema> {
-  protected async handleMessage(
-    event: WallpaperUploadedEvent,
-    context: MessageContext
-  ): Promise<void> {
-    // Process the event
-  }
-}
-```
+Applications own Effect-based publishers and consumers. The shared package exports contracts only. See [Events](/docs/packages/events) for validation, identity, acknowledgement, and quarantine requirements.
 
 ## Service Integration Pattern
 

@@ -15,13 +15,20 @@ export interface EncodingOptions {
 // Largest preset is 5120 × 2160; 64 MiB leaves room beyond its RGBA size.
 const maxPixelBytes = 64 * 1024 * 1024;
 const maxDiagnosticBytes = 64 * 1024;
+const dimensionFrameBytes = 8;
+
+export interface EncodedImage {
+  readonly bytes: Buffer;
+  readonly width: number;
+  readonly height: number;
+}
 
 /** Own the operating-system process until close, including interrupted execution. */
 export function encodeImage(
   bytes: Uint8Array,
   options: EncodingOptions
-): Effect.Effect<Buffer, GenerationUnavailable> {
-  return Effect.callback<Buffer, GenerationUnavailable>((resume) => {
+): Effect.Effect<EncodedImage, GenerationUnavailable> {
+  return Effect.callback<EncodedImage, GenerationUnavailable>((resume) => {
     const worker = new URL(
       import.meta.url.endsWith('.ts') ? './encoder.ts' : './encoder.mjs',
       import.meta.url
@@ -58,14 +65,31 @@ export function encodeImage(
               })
             )
           );
-        } else resume(Effect.succeed(Buffer.concat(chunks)));
+        } else {
+          const output = Buffer.concat(chunks);
+          const width = output.length > dimensionFrameBytes ? output.readUInt32BE(0) : 0;
+          const height = output.length > dimensionFrameBytes ? output.readUInt32BE(4) : 0;
+          if (width <= 0 || height <= 0 || width > options.width || height > options.height) {
+            resume(
+              Effect.fail(
+                new GenerationUnavailable({
+                  operation: 'encode-image',
+                  cause: new Error('Image encoder returned invalid dimensions'),
+                })
+              )
+            );
+          } else {
+            resume(Effect.succeed({ bytes: output.subarray(dimensionFrameBytes), width, height }));
+          }
+        }
       });
     });
     child.once('error', stop);
     child.stdin.once('error', stop);
     child.stdout.on('data', (chunk: Buffer) => {
       size += chunk.byteLength;
-      if (size > maxPixelBytes) stop(new Error('Image encoder output exceeds the pixel limit'));
+      if (size > maxPixelBytes + dimensionFrameBytes)
+        stop(new Error('Image encoder output exceeds the pixel limit'));
       else chunks.push(chunk);
     });
     child.stderr.on('data', (chunk: Buffer) => {

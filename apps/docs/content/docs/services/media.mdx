@@ -21,6 +21,8 @@ Successful delivery has `Cache-Control: public, max-age=31536000, immutable`. Or
 
 Media consumes `wallpaper.uploaded`, `wallpaper.variant.uploaded`, and Profile snapshots. Wallpaper catalog changes, occurrence acceptance, logical target acceptance, and availability publication intent commit in one PostgreSQL transaction. An outbox publishes availability events with stable CloudEvent and NATS identities, then records PubAck completion. Delivery remains at least once across the database and broker.
 
+Current events identify immutable assets by their producer and logical ID. The catalog adapter resolves the producer's immutable storage descriptor before opening its PostgreSQL transaction. A missing or unavailable descriptor leaves the occurrence unprocessed for retry. Retained events containing bucket/key coordinates continue using their recorded location.
+
 Variants arriving before their parent remain stored; their availability publication waits for that parent. Profile heads advance by producer version, while late picture metadata remains useful. Legacy assets retain their committed metadata and identity during reconciliation.
 
 Consumers allow three processing attempts. Invalid or exhausted inputs require durable quarantine acceptance before acknowledgement. The file-backed `MEDIA_QUARANTINE` stream retains records for thirty days, has a one-GiB capacity, and rejects new writes when full. Failed quarantine writes leave source inputs pending.
@@ -48,6 +50,6 @@ make test-focused PACKAGE=media
 make check-crap PACKAGE=media CRAP_THRESHOLD=30
 ```
 
-Worktree ingress and dependency ports come from the generated environment. Set `USER_SERVICE_URL` and the shared `USER_MEDIA_SERVICE_TOKEN` for Profile delivery. Storage credentials should grant read access to the required private asset buckets. Restrict quarantine access because it retains original event bytes.
+Worktree ingress and dependency ports come from the generated environment. Set `USER_SERVICE_URL` and the shared `USER_MEDIA_SERVICE_TOKEN` for Profile delivery. Storage credentials should grant read access to the required private asset buckets and `ASSET_REFERENCE_BUCKET`, which defaults to `asset-references`. Restrict quarantine access because it retains original event bytes.
 
 Tests cover delivery policy, decoded image behavior, real PostgreSQL/S3/NATS contracts, replay and legacy recovery, HTTP cancellation and shutdown, emitted build artifacts, and production telemetry wiring.

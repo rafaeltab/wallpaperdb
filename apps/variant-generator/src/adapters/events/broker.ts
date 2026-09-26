@@ -9,7 +9,11 @@ import {
   type JetStreamManager,
   type NatsConnection,
 } from 'nats';
-import { VariantEvents, GenerationUnavailable } from '../../generation/index.js';
+import {
+  VariantEvents,
+  GenerationUnavailable,
+  variantAssetReference,
+} from '../../generation/index.js';
 
 export interface NatsEventsOptions {
   readonly url: string;
@@ -61,8 +65,8 @@ class NatsVariantEvents implements VariantEvents {
           'variant-uploaded-v1',
           input.occurrence.source,
           input.occurrence.id,
-          variant.width,
-          variant.height,
+          variant.target.width,
+          variant.target.height,
           variant.format,
           variant.storageKey,
         ])
@@ -72,7 +76,16 @@ class NatsVariantEvents implements VariantEvents {
       eventId: id,
       eventType: 'wallpaper.variant.uploaded',
       timestamp: input.timestamp,
-      variant: { ...variant, createdAt: variant.createdAt.toISOString() },
+      variant: {
+        wallpaperId: variant.wallpaperId,
+        width: variant.width,
+        height: variant.height,
+        aspectRatio: variant.aspectRatio,
+        format: variant.format,
+        fileSizeBytes: variant.fileSizeBytes,
+        asset: variantAssetReference(variant),
+        createdAt: variant.createdAt.toISOString(),
+      },
     };
     const carrier: Record<string, string> = {};
     const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);

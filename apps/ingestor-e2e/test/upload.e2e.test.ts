@@ -31,6 +31,7 @@ describe('deployed ingestor', () => {
       .withPostgres()
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()
@@ -122,12 +123,16 @@ describe('deployed ingestor', () => {
     const stored = await manager.streams.getMessage('WALLPAPER', {
       last_by_subj: 'wallpaper.uploaded',
     });
-    expect(JSON.parse(new TextDecoder().decode(stored.data))).toMatchObject({
+    const event = JSON.parse(new TextDecoder().decode(stored.data));
+    expect(event).toMatchObject({
       specversion: '1.0',
       source: 'urn:wallpaperdb:ingestor',
       type: 'wallpaper.uploaded',
       id: expect.any(String),
-      data: { wallpaper: { id, userId: 'user_deployed', storageKey: `${id}/original.png` } },
+      data: { wallpaper: { id, userId: 'user_deployed', asset: { owner: 'ingestor', id } } },
     });
+    expect(event.data.wallpaper).not.toHaveProperty('storageBucket');
+    expect(event.data.wallpaper).not.toHaveProperty('storageKey');
+    expect(event.data.wallpaper).not.toHaveProperty('originalFilename');
   });
 });

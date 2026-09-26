@@ -42,6 +42,10 @@
     "./timer": {
       "import": "./src/timer/index.ts",
       "types": "./src/timer/index.ts"
+    },
+    "./assets": {
+      "import": "./src/assets/index.ts",
+      "types": "./src/assets/index.ts"
     }
   },
   "scripts": {

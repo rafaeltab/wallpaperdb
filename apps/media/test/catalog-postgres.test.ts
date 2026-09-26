@@ -19,7 +19,7 @@ import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
 import { Catalog } from '../src/delivery/index.js';
 import { wallpapers, variants } from '../src/db/schema.js';
 
-const wallpaper: ProjectionInput = {
+const wallpaper = {
   kind: 'wallpaper',
   occurrence: { source: 'ingestor', id: 'upload-1' },
   occurredAt: '2026-01-01T00:00:00.000Z',
@@ -33,7 +33,7 @@ const wallpaper: ProjectionInput = {
     fileSizeBytes: 500,
     createdAt: '2026-01-01T00:00:00.000Z',
   },
-};
+} satisfies ProjectionInput;
 describe('PostgreSQL catalog contract', () => {
   let container: Awaited<ReturnType<PostgreSqlContainer['start']>>;
   let pool: Pool;

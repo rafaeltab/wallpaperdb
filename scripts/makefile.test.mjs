@@ -17,6 +17,17 @@ function output(...args) {
   assert.equal(result.status, 0, result.stderr);
   return result.stdout;
 }
+function plannedTask(target, workspace, taskName) {
+  const result = spawnSync('make', [
+    '--no-print-directory', target, `PACKAGE=${workspace}`,
+    `TURBO_FLAGS=--filter=@wallpaperdb/${workspace} --dry=json`,
+  ], { encoding: 'utf8', env });
+  assert.equal(result.status, 0, result.stderr);
+  const plan = JSON.parse(result.stdout);
+  const task = plan.tasks.find((entry) => entry.taskId === `@wallpaperdb/${workspace}#${taskName}`);
+  assert.ok(task, `${workspace} must plan ${taskName}`);
+  return task;
+}
 
 test('workspace actions support optional package scoping', () => {
   assert.match(output('build'), /run build(?!.*--filter)/);
@@ -33,6 +44,20 @@ test('test tiers preserve sequential container execution', () => {
   for (const tier of ['integration', 'e2e']) {
     assert.match(output(`test-${tier}`, 'PACKAGE=ingestor-e2e'), /--concurrency=1/);
   }
+});
+
+test('browser E2E always executes against the current deployed environment', () => {
+  const task = plannedTask('test-e2e', 'web-e2e', 'test:e2e');
+  assert.equal(task.resolvedTaskDefinition.cache, false,
+    'source hashes cannot prove that the deployed application, infrastructure, and credentials are unchanged');
+});
+
+test('typecheck cache inputs include test files compiled by the workspace', () => {
+  const task = plannedTask('check-types', 'media', 'check-types');
+  const tsconfig = JSON.parse(readFileSync('apps/media/tsconfig.json', 'utf8'));
+  assert.ok(tsconfig.include.includes('test/**/*'));
+  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.test.ts'),
+    'test-only TypeScript errors must invalidate a cached successful typecheck');
 });
 
 test('CRAP commands pass the optional workspace selector to the shared analyzer', () => {

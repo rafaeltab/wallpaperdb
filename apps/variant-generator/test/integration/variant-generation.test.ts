@@ -1,5 +1,6 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { WallpaperVariantUploadedEventSchema } from '@wallpaperdb/events/schemas';
+import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -18,7 +19,7 @@ const Tester = createDefaultTesterBuilder()
   .build();
 const tester = new Tester()
   .withS3()
-  .withS3Bucket('wallpapers')
+  .withS3Bucket('wallpapers').withS3Bucket('asset-references')
   .withNats((builder) => builder.withJetstream())
   .withStream('WALLPAPER')
   .withInProcessApp();
@@ -34,11 +35,12 @@ describe('variant generation composition', () => {
     }).png().toBuffer();
     await tester.s3.uploadObject('wallpapers', storageKey, original);
     const timestamp = '2026-09-24T00:00:00.000Z';
+    const asset = { owner: 'ingestor', id: wallpaperId } as const;
+    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', asset, { bucket: 'wallpapers', key: storageKey });
     const event = {
-      eventId: 'composition-upload-1',
-      eventType: 'wallpaper.uploaded',
-      timestamp,
-      wallpaper: {
+      specversion: '1.0', source: 'https://wallpaperdb/ingestor', id: 'composition-upload-1',
+      type: 'wallpaper.uploaded', time: timestamp, datacontenttype: 'application/json',
+      data: { wallpaper: {
         id: wallpaperId,
         userId: 'user_test',
         fileType: 'image',
@@ -47,11 +49,9 @@ describe('variant generation composition', () => {
         width: 1920,
         height: 1080,
         aspectRatio: 1920 / 1080,
-        storageKey,
-        storageBucket: 'wallpapers',
-        originalFilename: 'test.png',
+        asset,
         uploadedAt: timestamp,
-      },
+      } },
     };
     const js = await tester.nats.getJsClient();
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
@@ -69,24 +69,26 @@ describe('variant generation composition', () => {
       expect(publication.variant.wallpaperId).toBe(wallpaperId);
       expect(message.headers?.get('ce-specversion')).toBe('1.0');
       expect(message.headers?.get('ce-id')).toBe(publication.eventId);
+      if (!publication.variant.asset) throw new Error('New variant must have a logical asset reference');
+      const location = await resolveAssetReference(tester.s3.getS3Client(), 'asset-references', publication.variant.asset);
       const stored = await tester.s3.getS3Client().send(new GetObjectCommand({
-        Bucket: publication.variant.storageBucket,
-        Key: publication.variant.storageKey,
+        Bucket: location.bucket,
+        Key: location.key,
       }));
       if (!stored.Body) throw new Error('Published variant object has no body');
       const bytes = await stored.Body.transformToByteArray();
       const metadata = await sharp(bytes).metadata();
       expect(metadata.format).toBe('png');
       expect(bytes.byteLength).toBe(publication.variant.fileSizeBytes);
-      expect(metadata.width).toBeLessThanOrEqual(publication.variant.width);
-      expect(metadata.height).toBeLessThanOrEqual(publication.variant.height);
+      expect(metadata.width).toBe(publication.variant.width);
+      expect(metadata.height).toBe(publication.variant.height);
       if (publication.variant.width === 1600) {
         expect(metadata.width).toBe(1600);
         expect(metadata.height).toBe(900);
       }
       widths.push(publication.variant.width);
     }
-    expect(widths).toEqual([1600, 1280, 854, 640]);
+    expect(widths).toEqual([1600, 1280, 853, 640]);
     await js.publish('wallpaper.uploaded', JSON.stringify(event));
     await expect.poll(async () => {
       const info = await manager.consumers.info('WALLPAPER', 'variant-generator-wallpaper-uploaded-consumer');

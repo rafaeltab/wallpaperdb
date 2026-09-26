@@ -77,7 +77,9 @@ export interface GenerationInput {
   readonly mimeType: string;
   readonly width: number;
   readonly height: number;
-  readonly storage: { readonly bucket: string; readonly key: string };
+  readonly storage:
+    | { readonly owner: 'ingestor'; readonly id: string }
+    | { readonly bucket: string; readonly key: string };
   readonly occurrence: { readonly source: string; readonly id: string };
   readonly timestamp: string;
   readonly correlationId?: string;
@@ -86,6 +88,8 @@ export interface GenerationInput {
 
 export interface GeneratedVariant {
   readonly wallpaperId: string;
+  /** Stable preset bounds identify the rendition independently of its encoded pixels. */
+  readonly target: { readonly width: number; readonly height: number };
   readonly width: number;
   readonly height: number;
   readonly aspectRatio: number;
@@ -94,6 +98,16 @@ export interface GeneratedVariant {
   readonly storageKey: string;
   readonly storageBucket: string;
   readonly createdAt: Date;
+}
+
+/** A rendition keeps one public identity independently of its storage provider and encoding policy. */
+export function variantAssetReference(
+  variant: Pick<GeneratedVariant, 'wallpaperId' | 'target' | 'format'>
+) {
+  return {
+    owner: 'variant-generator' as const,
+    id: `${variant.wallpaperId}:${variant.target.width}x${variant.target.height}:${variant.format}`,
+  };
 }
 
 export type GenerationOutcome =
@@ -109,7 +123,8 @@ export class GenerationUnavailable extends Schema.TaggedError<GenerationUnavaila
  * Generates and stores one variant under its stable target identity. Repeating a
  * request preserves the first stored target and its metadata across encoding-policy
  * changes and different occurrences of the same immutable original. New targets
- * persist the input timestamp; legacy targets retain the input timestamp fallback.
+ * persist exact encoded dimensions and the input timestamp. Legacy targets retain
+ * their nominal preset dimensions and, when absent, the input timestamp fallback.
  * Interruption stops the underlying image and storage work before completing.
  */
 export interface VariantImages {

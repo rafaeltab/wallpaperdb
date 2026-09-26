@@ -1,8 +1,9 @@
 import { useAuth } from '@clerk/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileBootstrap, profileQueryKey } from '@/components/profile-bootstrap';
+import { ProfilePicture } from '@/components/profile/profile-picture';
 import { userApi, type Profile } from '@/lib/api/user';
 
 vi.mock('@clerk/react', () => ({ useAuth: vi.fn() }));
@@ -62,6 +63,64 @@ describe('ProfileBootstrap', () => {
 
     await act(async () => {});
     expect(userApi.ensureProfile).not.toHaveBeenCalled();
+  });
+
+  it('adopts an owner picture after authentication becomes ready without updating its subscriber during bootstrap render', async () => {
+    auth({ isLoaded: false, isSignedIn: false, userId: null });
+    vi.mocked(userApi.ensureProfile).mockResolvedValue({ ...profile, pictureAssetId: 'owner_picture' });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = () => (
+      <QueryClientProvider client={queryClient}>
+        <ProfileBootstrap />
+        <ProfilePicture profile={{ id: profile.id, displayName: 'Public profile', picture: null }} />
+      </QueryClientProvider>
+    );
+    const rendered = render(view());
+    try {
+      expect(screen.getByRole('img', { name: "Public profile's profile picture" })).not.toHaveAttribute('src');
+      auth();
+      rendered.rerender(view());
+      expect(await screen.findByRole('img', { name: "Wallpaper Fan's profile picture" })).toHaveAttribute(
+        'src',
+        expect.stringContaining('/profile-pictures/owner_picture')
+      );
+      expect(consoleError.mock.calls.flat().join(' ')).not.toContain('Cannot update a component');
+    } finally {
+      rendered.unmount();
+      queryClient.clear();
+      consoleError.mockRestore();
+    }
+  });
+
+  it.each([
+    ['sign-out', { isSignedIn: false, userId: null }],
+    ['owner switch', { userId: 'user_456' }],
+  ])('removes the previous owner picture synchronously on %s', async (_label, overrides) => {
+    vi.mocked(userApi.ensureProfile).mockResolvedValueOnce({ ...profile, pictureAssetId: 'private_owner_picture' });
+    vi.mocked(userApi.ensureProfile).mockImplementation(() => new Promise(() => {}));
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = () => (
+      <QueryClientProvider client={queryClient}>
+        <ProfileBootstrap />
+        <ProfilePicture profile={{ id: profile.id, displayName: 'Public profile', picture: null }} />
+      </QueryClientProvider>
+    );
+    const rendered = render(view());
+    try {
+      expect(await screen.findByRole('img', { name: "Wallpaper Fan's profile picture" })).toHaveAttribute(
+        'src',
+        expect.stringContaining('/profile-pictures/private_owner_picture')
+      );
+      auth(overrides);
+      rendered.rerender(view());
+
+      expect(screen.queryByRole('img', { name: "Wallpaper Fan's profile picture" })).not.toBeInTheDocument();
+      expect(screen.getByRole('img', { name: "Public profile's profile picture" })).not.toHaveAttribute('src');
+    } finally {
+      rendered.unmount();
+      queryClient.clear();
+    }
   });
 
   it('refreshes pending and retrying picture imports until the authoritative picture is complete', async () => {

@@ -2,6 +2,12 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { inspect } from 'node:util';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createNatsContainer } from '@wallpaperdb/testcontainers';
+import { resolveAssetReference } from '@wallpaperdb/core/assets';
+import {
+  createDefaultTesterBuilder,
+  DockerTesterBuilder,
+  S3TesterBuilder,
+} from '@wallpaperdb/test-utils';
 import { Deferred, Effect, Layer, Logger, ManagedRuntime } from 'effect';
 import { connect, DiscardPolicy, headers, type NatsConnection } from 'nats';
 import postgres from 'postgres';
@@ -25,6 +31,11 @@ let database: StartedPostgreSqlContainer;
 let nats: Awaited<ReturnType<typeof createNatsContainer>>;
 let connection: NatsConnection;
 let sql: ReturnType<typeof postgres>;
+const StorageTester = createDefaultTesterBuilder()
+  .with(DockerTesterBuilder)
+  .with(S3TesterBuilder)
+  .build();
+const storage = new StorageTester().withS3().withS3Bucket('asset-references');
 const occurred = '2030-01-01T00:00:00.000Z';
 function profileEvent(id: string) {
   return {
@@ -67,7 +78,26 @@ function wallpaperEvent(id: string) {
     },
   };
 }
+function pictureEvent(id: string) {
+  const asset = {
+    id: `picture_${id}`,
+    storageBucket: 'historical-picture-bucket',
+    storageKey: `historical-picture-prefix/${id}.webp`,
+    mimeType: 'image/webp',
+    width: 1280,
+    height: 720,
+    fileSizeBytes: 123,
+  };
+  const created = profileEvent(id);
+  return {
+    ...created,
+    eventType: 'profile.updated',
+    change: { type: 'picture-changed', before: null, after: asset.id, source: 'upload', asset },
+    profile: { ...created.profile, pictureAssetId: asset.id, version: 2 },
+  };
+}
 beforeAll(async () => {
+  await storage.setup();
   [database, nats] = await Promise.all([
     new PostgreSqlContainer('postgres:16-alpine').start(),
     createNatsContainer(),
@@ -96,18 +126,85 @@ afterAll(async () => {
   await sql?.end();
   await nats?.stop();
   await database?.stop();
+  await storage.destroy();
 });
-function adapters() {
+function adapters(referenceBucket = 'asset-references') {
   const options = {
     url: nats.getConnectionUrl(),
     stream: 'WALLPAPER',
     serviceName: 'user-contract',
   };
-  return Layer.mergeAll(eventStoreLayer(), eventPublisherLayer(options)).pipe(
+  return Layer.mergeAll(
+    eventStoreLayer(),
+    eventPublisherLayer({
+      ...options,
+      assetReferenceBucket: referenceBucket,
+      endpoint: storage.s3.config.endpoints.fromHost,
+      region: 'us-east-1',
+      accessKeyId: storage.s3.config.options.accessKey,
+      secretAccessKey: storage.s3.config.options.secretKey,
+    })
+  ).pipe(
     Layer.provide(brokerLayer(options)),
     Layer.provide(databaseLayer({ databaseUrl: database.getConnectionUri() }))
   );
 }
+it('publishes retained picture outboxes with a stable logical reference and no storage coordinates', async () => {
+  const payload = pictureEvent('picture-publication');
+  const asset = payload.change.asset;
+  await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
+    values (${payload.eventId}, 'profile.updated', 'user_1', ${sql.json(payload)}, ${occurred})`;
+  const runtime = ManagedRuntime.make(adapters());
+  try {
+    const publish = ProfileEvents.use((events) => events.publish(payload.eventId));
+    await runtime.runPromise(publish);
+    await runtime.runPromise(publish);
+    const manager = await connection.jetstreamManager();
+    expect((await manager.streams.info('PROFILE')).state.messages).toBe(1);
+    const stored = await manager.streams.getMessage('PROFILE', { last_by_subj: 'profile.updated' });
+    const published = JSON.parse(new TextDecoder().decode(stored.data));
+    expect(published.change.asset).toEqual({
+      id: asset.id,
+      reference: { owner: 'user', id: asset.id },
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      fileSizeBytes: asset.fileSizeBytes,
+    });
+    expect(published.eventId).toBe(payload.eventId);
+    expect(stored.header.get('ce-id')).toBe(payload.eventId);
+    expect(
+      await resolveAssetReference(storage.s3.getS3Client(), 'asset-references', {
+        owner: 'user',
+        id: asset.id,
+      })
+    ).toEqual({ bucket: asset.storageBucket, key: asset.storageKey });
+    expect(await sql`select payload, published_at from outbox_events`).toEqual([
+      { payload, published_at: null },
+    ]);
+  } finally {
+    await runtime.dispose();
+  }
+});
+it('leaves picture events unpublished until their immutable references can be registered', async () => {
+  const payload = pictureEvent('picture-registration-failure');
+  await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
+    values (${payload.eventId}, 'profile.updated', 'user_1', ${sql.json(payload)}, ${occurred})`;
+  const runtime = ManagedRuntime.make(adapters('missing-reference-bucket'));
+  try {
+    expect(
+      await runtime.runPromise(
+        ProfileEvents.use((events) => events.publish(payload.eventId)).pipe(Effect.flip)
+      )
+    ).toMatchObject({ _tag: 'MaintenanceFailure', operation: 'register-picture-asset' });
+    expect(
+      (await (await connection.jetstreamManager()).streams.info('PROFILE')).state.messages
+    ).toBe(0);
+    expect(await sql`select published_at from outbox_events`).toEqual([{ published_at: null }]);
+  } finally {
+    await runtime.dispose();
+  }
+});
 it('retains SQLSTATE without disclosing vendor diagnostics when recording publication fails', async () => {
   const payload = profileEvent('event-diagnostic');
   await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
@@ -772,7 +869,7 @@ it('accepts structured and binary CloudEvents while quarantining contradictory o
   }
 });
 
-it('requires envelope agreement on source and time and a validated wallpaper owner before projection', async () => {
+it('requires envelope agreement on identity and extensions before ownership projection', async () => {
   const options = {
     url: nats.getConnectionUrl(),
     stream: 'WALLPAPER',
@@ -808,6 +905,7 @@ it('requires envelope agreement on source and time and a validated wallpaper own
     datacontenttype: 'application/json',
     correlationid: 'upload-command',
     causationid: 'upload-accepted',
+    causationsource: 'https://wallpaperdb/uploader',
     data: { wallpaper: wallpaperEvent('agreed').wallpaper },
   };
   const metadata = headers();
@@ -819,6 +917,7 @@ it('requires envelope agreement on source and time and a validated wallpaper own
     time: occurred,
     correlationid: 'upload-command',
     causationid: 'upload-accepted',
+    causationsource: 'https://wallpaperdb/uploader',
   }))
     metadata.set(`ce-${key}`, value);
   try {
@@ -842,9 +941,22 @@ it('requires envelope agreement on source and time and a validated wallpaper own
       wallpaper: { ...wallpaperEvent('missing-owner').wallpaper, userId: null },
     };
     await js.publish('wallpaper.uploaded', JSON.stringify(invalidOwner));
+    metadata.set('ce-source', structured.source);
+    for (const extension of ['correlationid', 'causationid', 'causationsource'] as const) {
+      metadata.set(`ce-${extension}`, 'contradiction');
+      await js.publish('wallpaper.uploaded', JSON.stringify(structured), { headers: metadata });
+      metadata.delete(`ce-${extension}`);
+      await js.publish('wallpaper.uploaded', JSON.stringify(structured), { headers: metadata });
+      metadata.set(`ce-${extension}`, structured[extension]);
+      await js.publish(
+        'wallpaper.uploaded',
+        JSON.stringify({ ...structured, [extension]: undefined }),
+        { headers: metadata }
+      );
+    }
     await expect
       .poll(async () => (await manager.streams.info('USER_QUARANTINE')).state.messages)
-      .toBe(4);
+      .toBe(13);
     await expect
       .poll(
         async () =>

@@ -16,6 +16,40 @@ const wallpaper = {
   originalFilename: 'wp.png',
   uploadedAt: '2026-09-24T10:00:00.000Z',
 };
+it('translates a logical original asset reference without storage coordinates', () => {
+  const {
+    storageBucket: _bucket,
+    storageKey: _key,
+    originalFilename: _filename,
+    ...publicWallpaper
+  } = wallpaper;
+  const input = translateEvent(
+    'wallpaper.uploaded',
+    encode({
+      specversion: '1.0',
+      source: 'https://wallpaperdb/ingestor',
+      id: 'logical-upload',
+      type: 'wallpaper.uploaded',
+      time: wallpaper.uploadedAt,
+      datacontenttype: 'application/json',
+      data: { wallpaper: { ...publicWallpaper, asset: { owner: 'ingestor', id: wallpaper.id } } },
+    })
+  );
+  expect(input).toEqual({
+    kind: 'wallpaper',
+    occurrence: { source: 'https://wallpaperdb/ingestor', id: 'logical-upload' },
+    occurredAt: wallpaper.uploadedAt,
+    wallpaper: {
+      id: wallpaper.id,
+      reference: { owner: 'ingestor', id: wallpaper.id },
+      mimeType: wallpaper.mimeType,
+      width: wallpaper.width,
+      height: wallpaper.height,
+      fileSizeBytes: wallpaper.fileSizeBytes,
+      createdAt: wallpaper.uploadedAt,
+    },
+  });
+});
 it('translates a structured upload CloudEvent without losing its occurrence and correlation', () => {
   expect(
     translateEvent(
@@ -86,6 +120,39 @@ it('translates binary variant events with producer identity and the variant MIME
     traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
   });
 });
+it('translates a generated variant logical reference without storage coordinates', () => {
+  const input = translateEvent(
+    'wallpaper.variant.uploaded',
+    encode({
+      eventId: 'logical-variant',
+      eventType: 'wallpaper.variant.uploaded',
+      timestamp: wallpaper.uploadedAt,
+      variant: {
+        wallpaperId: wallpaper.id,
+        width: 1,
+        height: 1,
+        aspectRatio: 1,
+        format: 'image/webp',
+        fileSizeBytes: 10,
+        createdAt: wallpaper.uploadedAt,
+        asset: { owner: 'variant-generator', id: 'logical-rendition' },
+      },
+    })
+  );
+  expect(input).toMatchObject({
+    kind: 'variant',
+    variant: {
+      wallpaperId: wallpaper.id,
+      reference: { owner: 'variant-generator', id: 'logical-rendition' },
+      mimeType: 'image/webp',
+      width: 1,
+      height: 1,
+      fileSizeBytes: 10,
+      createdAt: wallpaper.uploadedAt,
+    },
+  });
+  expect(input && input.kind === 'variant' && input.variant).not.toHaveProperty('storageBucket');
+});
 it('rejects malformed payloads, mismatched event types, and incomplete binary envelopes', () => {
   const event = {
     eventId: 'event-1',
@@ -104,6 +171,35 @@ it('rejects malformed payloads, mismatched event types, and incomplete binary en
   const header = headers();
   header.set('ce-source', 'https://wallpaperdb/ingestor');
   expect(translateEvent('wallpaper.uploaded', encode(event), header)).toBeUndefined();
+});
+it('rejects contradictory binary metadata even when a valid structured upload is present', () => {
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'event-1',
+    type: 'wallpaper.uploaded',
+    time: wallpaper.uploadedAt,
+    datacontenttype: 'application/json',
+    data: { wallpaper },
+  };
+  for (const override of [
+    { 'ce-source': 'https://wallpaperdb/another-producer' },
+    { 'ce-id': 'another-occurrence' },
+    { 'ce-time': '2026-09-25T10:00:00.000Z' },
+    { 'ce-specversion': '0.3' },
+  ]) {
+    const metadata = headers();
+    for (const [key, value] of Object.entries({
+      'ce-specversion': event.specversion,
+      'ce-source': event.source,
+      'ce-id': event.id,
+      'ce-type': event.type,
+      'ce-time': event.time,
+      ...override,
+    }))
+      metadata.set(key, value);
+    expect(translateEvent('wallpaper.uploaded', encode(event), metadata)).toBeUndefined();
+  }
 });
 it('translates profile picture changes and retained snapshots without leaking other profile details', () => {
   const profile = {
@@ -169,6 +265,20 @@ it('translates profile picture changes and retained snapshots without leaking ot
     profile: { id: 'profile-1', version: 2, pictureId: 'picture-1' },
   });
   expect(translateEvent('profile.created', encode(event))).toBeUndefined();
+  const { storageBucket: _bucket, storageKey: _key, ...picture } = event.change.asset;
+  const reference = { owner: 'user', id: picture.id };
+  expect(
+    translateEvent(
+      'profile.updated',
+      encode({
+        ...event,
+        change: { ...event.change, asset: { ...picture, reference } },
+      })
+    )
+  ).toMatchObject({
+    kind: 'profile',
+    asset: { ...picture, reference, createdAt: event.timestamp },
+  });
 });
 it('rejects a binary envelope whose identity or type disagrees with its payload', () => {
   const event = {
@@ -242,4 +352,40 @@ it('preserves validated structured and binary causation without confusing it wit
   expect(
     translateEvent('wallpaper.uploaded', encode({ ...structured, causationsource: 42 }))
   ).toBeUndefined();
+});
+
+it.each([
+  'correlationid',
+  'causationid',
+  'causationsource',
+])('requires matching %s across structured and binary envelopes', (extension) => {
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'extension-agreement',
+    type: 'wallpaper.uploaded',
+    time: wallpaper.uploadedAt,
+    datacontenttype: 'application/json',
+    [extension]: 'https://wallpaperdb/original',
+    data: { wallpaper },
+  };
+  const metadata = headers();
+  for (const [key, value] of Object.entries({
+    specversion: event.specversion,
+    source: event.source,
+    id: event.id,
+    type: event.type,
+    time: event.time,
+    [extension]: 'https://wallpaperdb/original',
+  }))
+    metadata.set(`ce-${key}`, value);
+  let bytes = new TextEncoder().encode(JSON.stringify(event));
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeDefined();
+  metadata.set(`ce-${extension}`, 'https://wallpaperdb/different');
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
+  metadata.delete(`ce-${extension}`);
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
+  metadata.set(`ce-${extension}`, 'https://wallpaperdb/original');
+  bytes = new TextEncoder().encode(JSON.stringify({ ...event, [extension]: undefined }));
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
 });

@@ -1,4 +1,5 @@
 import { Effect } from 'effect';
+import { headers, type MsgHdrs } from 'nats';
 import { describe, expect, it } from 'vitest';
 import { deliverProjection } from '../src/adapters/events/index.js';
 import {
@@ -86,17 +87,95 @@ class ControlledProjection implements ProjectCatalogue {
     });
   }
 }
-function deliver(subject: string, data: unknown, project: ProjectCatalogue, attempt = 1) {
+function deliver(
+  subject: string,
+  data: unknown,
+  project: ProjectCatalogue,
+  attempt = 1,
+  metadata?: MsgHdrs
+) {
   return Effect.runPromise(
     deliverProjection({
       subject,
       payload: new TextEncoder().encode(JSON.stringify(data)),
       attempt,
+      headers: metadata,
     }).pipe(Effect.provideService(ProjectCatalogue, project))
   );
 }
+function binaryMetadata(event: { eventId: string; eventType: string }, source: string): MsgHdrs {
+  const metadata = headers();
+  for (const [name, value] of Object.entries({
+    'ce-specversion': '1.0',
+    'ce-source': source,
+    'ce-id': event.eventId,
+    'ce-type': event.eventType,
+    'ce-time': timestamp,
+  }))
+    metadata.set(name, value);
+  return metadata;
+}
 
 describe('Projection event driving adapter contract', () => {
+  it('preserves a binary CloudEvent producer identity at the driving port', async () => {
+    const project = new ControlledProjection();
+    const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
+    expect(await deliver(variant.eventType, variant, project, 1, metadata)).toEqual({
+      _tag: 'Completed',
+    });
+    expect(project.changes[0]?.occurrence).toEqual({
+      source: 'https://wallpaperdb/media',
+      id: variant.eventId,
+      occurredAt: timestamp,
+    });
+  });
+
+  it.each([
+    ['ce-specversion', '0.3'],
+    ['ce-source', ''],
+    ['ce-id', 'other-event'],
+    ['ce-type', 'wallpaper.uploaded'],
+    ['ce-time', '2026-01-02T00:00:00.000Z'],
+    ['ce-time', 'invalid'],
+  ])('rejects an invalid or conflicting binary %s header before applying an event', async (name, value) => {
+    const project = new ControlledProjection();
+    const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
+    metadata.set(name, value);
+    expect(await deliver(variant.eventType, variant, project, 1, metadata)).toEqual({
+      _tag: 'Invalid',
+    });
+    expect(project.changes).toEqual([]);
+  });
+
+  it.each([
+    ['ce-source', 'https://wallpaperdb/other'],
+    ['ce-correlationid', 'other-workflow'],
+    ['ce-causationid', 'other-cause'],
+    ['ce-causationsource', 'https://wallpaperdb/other-cause'],
+  ])('rejects conflicting structured and binary %s metadata', async (name, value) => {
+    const project = new ControlledProjection();
+    const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
+    metadata.set('ce-correlationid', 'workflow-1');
+    metadata.set('ce-causationid', 'cause-1');
+    metadata.set('ce-causationsource', 'https://wallpaperdb/ingestor');
+    metadata.set(name, value);
+    const structured = {
+      specversion: '1.0',
+      source: 'https://wallpaperdb/media',
+      id: variant.eventId,
+      type: variant.eventType,
+      time: timestamp,
+      correlationid: 'workflow-1',
+      causationid: 'cause-1',
+      causationsource: 'https://wallpaperdb/ingestor',
+      data: { variant: variant.variant },
+    };
+    expect(await deliver(variant.eventType, structured, project, 1, metadata)).toEqual({
+      _tag: 'Invalid',
+    });
+    expect(project.changes).toEqual([]);
+  });
+
   it('translates uploads into local ownership and stable occurrence without passing storage metadata inward', async () => {
     const project = new ControlledProjection();
     expect(await deliver(upload.eventType, upload, project)).toEqual({ _tag: 'Completed' });

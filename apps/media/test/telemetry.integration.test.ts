@@ -41,6 +41,7 @@ describe('Production telemetry composition', () => {
       .withMigrations()
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('asset-references')
       .withNats((nats) => nats.withJetstream())
       .withStream('WALLPAPER')
       .withStream('PROFILE');
@@ -83,6 +84,7 @@ describe('Production telemetry composition', () => {
             s3Endpoint: s3.endpoints.fromHost,
             s3Region: 'us-east-1',
             s3Bucket: 'wallpapers',
+            assetReferenceBucket: 'asset-references',
             s3AccessKeyId: s3.options.accessKey,
             s3SecretAccessKey: s3.options.secretKey,
             natsUrl: tester.getNats().endpoints.fromHost,

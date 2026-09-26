@@ -26,6 +26,7 @@ export function colorExtractorLayer(config: Config, options: AppOptions = {}) {
     accessKeyId: config.s3AccessKeyId,
     secretAccessKey: config.s3SecretAccessKey,
     bucket: config.s3Bucket,
+    assetReferenceBucket: config.assetReferenceBucket,
   });
   const eventOptions = {
     url: config.natsUrl,

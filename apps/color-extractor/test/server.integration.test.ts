@@ -19,6 +19,7 @@ const Tester = createDefaultTesterBuilder()
 const tester = new Tester()
   .withS3()
   .withS3Bucket('wallpapers')
+  .withS3Bucket('asset-references')
   .withNats((nats) => nats.withJetstream())
   .withStream('WALLPAPER');
 beforeAll(() => tester.setup());
@@ -33,6 +34,7 @@ function config(port: number): Config {
     s3AccessKeyId: s3.options.accessKey,
     s3SecretAccessKey: s3.options.secretKey,
     s3Bucket: 'wallpapers',
+    assetReferenceBucket: 'asset-references',
     s3Region: 'us-east-1',
     natsUrl: tester.nats.config.endpoints.fromHost,
     natsStream: 'WALLPAPER',

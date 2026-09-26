@@ -11,6 +11,16 @@ import { recentHistoricalHandles, type ProfileReader } from './history.js';
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
 class DecisionDefect { constructor(readonly cause: unknown) {} }
 class ProfileInvariant extends Error {}
+function persistenceDiagnostic(cause: unknown): { sqlState?: string } {
+  const visited = new Set<unknown>();
+  let current = cause;
+  while (typeof current === 'object' && current !== null && !visited.has(current)) {
+    visited.add(current);
+    if ('code' in current && typeof current.code === 'string' && /^[A-Z0-9]{5}$/.test(current.code)) return { sqlState: current.code };
+    current = 'cause' in current ? current.cause : null;
+  }
+  return {};
+}
 type TraceMetadata = { traceParent: string | null; traceState: string | null };
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 const retentionMs = (policy: ProfilePolicy) => policy.profileEvidenceRetentionDays * 86400000;
@@ -46,7 +56,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
       onFailure: (): TraceMetadata => ({ traceParent: null, traceState: null }),
       onSuccess: (span): TraceMetadata => ({ traceParent: `00-${span.traceId}-${span.spanId}-${span.sampled ? '01' : '00'}`, traceState: trace.getSpanContext(context.active())?.traceState?.serialize() ?? null }),
     }));
-    return yield* Effect.tryPromise({ try: signal => database.run(db => use(db, metadata), signal), catch: cause => new ProfileUnavailable({ operation: name, cause }) }).pipe(Effect.catchTag('ProfileUnavailable', failure => failure.cause instanceof DecisionDefect ? Effect.die(failure.cause.cause) : failure.cause instanceof ProfileInvariant ? Effect.die(failure.cause) : Effect.fail(failure)));
+    return yield* Effect.tryPromise({ try: signal => database.run(db => use(db, metadata), signal), catch: cause => new ProfileUnavailable({ operation: name, cause: cause instanceof DecisionDefect || cause instanceof ProfileInvariant ? cause : persistenceDiagnostic(cause) }) }).pipe(Effect.catchTag('ProfileUnavailable', failure => failure.cause instanceof DecisionDefect ? Effect.die(failure.cause.cause) : failure.cause instanceof ProfileInvariant ? Effect.die(failure.cause) : Effect.fail(failure)));
   });
   const adapter: ProfileStore = {
     read: (profileId, now) => operation('read-profile', db => db.transaction(async tx => {

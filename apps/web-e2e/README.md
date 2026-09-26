@@ -2,6 +2,8 @@
 
 Browser-based end-to-end workspace for the WallpaperDB web application using Playwright against the ingress-routed local stack.
 
+`make test-e2e PACKAGE=web-e2e` always runs against the current stack. Turbo does not cache E2E results because the deployed services, infrastructure state, and credentials can change independently of this workspace.
+
 ## Key Capabilities
 
 - Dedicated home for browser E2E journeys without adding Playwright to the default `make test` path

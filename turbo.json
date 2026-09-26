@@ -104,7 +104,7 @@
             ]
         },
         "test:e2e": {
-            "cache": true,
+            "cache": false,
             "inputs": [
                 "src/**",
                 "test/**",

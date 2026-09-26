@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy, type OwnerProfile, type ProfileStore as Store } from '../src/profile/index.js';
+import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy, type OwnerProfile, type ProfileStore as Store, type ProfileMutation } from '../src/profile/index.js';
 
 const policy: ProfilePolicy = {
   profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80,
@@ -15,6 +15,8 @@ const owner: OwnerProfile = {
 };
 
 function controlled() {
+  const mutations: ProfileMutation[] = [];
+  let current = { ...owner };
   const created: Array<{ profileId: string; displayName: string; handle: string; imageUrl: string | null }> = [];
   const store: Store = {
     read: () => Effect.succeed(null),
@@ -22,16 +24,40 @@ function controlled() {
       created.push(input);
       return { ...owner, id: input.profileId, displayName: input.displayName, handle: input.handle };
     }),
-    transact: () => Effect.die('Unexpected transaction'),
+    transact: (_query, decide) => Effect.sync(() => {
+      const decision = decide({ profile: current, targetClaim: null, wallpaperOwners: [], asset: null, importJob: null });
+      if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
+      if (decision._tag === 'Change') {
+        if (decision.mutation.type !== 'details') throw new Error('Unsupported controlled transition');
+        mutations.push(decision.mutation);
+        current = { ...current, displayName: decision.mutation.displayName, biographyMarkdown: decision.mutation.biographyMarkdown, version: current.version + 1, updatedAt: _query.now };
+      }
+      return { outcome: { _tag: 'Success', profile: current }, changed: decision._tag === 'Change' };
+    }),
   };
   const layer = profilesLayer(policy).pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(ProfileStore, store),
     Layer.succeed(Identities, { getIdentity: () => Effect.succeed({ displayName: null, firstName: '  Ada ', lastName: ' Lovelace  ', imageUrl: null }) }),
   )));
-  return { created, run: <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => Effect.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }).pipe(Effect.provide(layer))) };
+  return { created, mutations, run: <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => Effect.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }).pipe(Effect.provide(layer))) };
 }
 
 describe('Profiles capability', () => {
+  it('normalizes changed details once and preserves the version on a repeated no-op', async () => {
+    const test = controlled();
+    expect(await test.run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName: '  Ada   Lovelace ' }, 1))).toMatchObject({ _tag: 'Success', profile: { displayName: 'Ada Lovelace', version: 2 } });
+    expect(await test.run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName: 'Ada Lovelace' }, 2))).toMatchObject({ _tag: 'Success', profile: { version: 2 } });
+    expect(test.mutations).toEqual([{ type: 'details', displayName: 'Ada Lovelace', biographyMarkdown: '' }]);
+  });
+  it('rejects a stale command even when its values would be unchanged', async () => {
+    const test = controlled();
+    expect(await test.run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName: 'Ada' }, 2))).toMatchObject({ _tag: 'Rejected', reason: 'version-conflict' });
+    expect(test.mutations).toEqual([]);
+  });
+  it('rejects a blank display name before persistence', async () => {
+    const test = controlled();
+    expect(await test.run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName: '  ' }, 1))).toEqual({ _tag: 'Rejected', reason: 'invalid-display-name', message: 'Display name must not be blank' });
+  });
   it('creates the authenticated owner with normalized identity and a public handle', async () => {
     const test = controlled();
     expect(await test.run(profiles => profiles.ensure({ profileId: 'owner' }))).toMatchObject({

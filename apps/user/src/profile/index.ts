@@ -1,3 +1,4 @@
+import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { Clock, Context, Effect, Layer, Schema } from 'effect';
 import { ulid } from 'ulid';
 
@@ -71,11 +72,13 @@ export interface ProfileStore {
 export const ProfileStore = Context.Service<ProfileStore>('wallpaperdb.user.profile.ProfileStore');
 export interface Profiles {
   ensure(principal: ProfilePrincipal): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  updateDetails(principal: ProfilePrincipal, changes: { displayName?: string; biographyMarkdown?: string }, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
 }
 export const Profiles = Context.Service<Profiles>('wallpaperdb.user.profile.Profiles');
 
 const reserved = new Set(['admin','api','color-extractor','documentation','docs','gateway','graphql','help','health','ingestor','login','media','openapi','profile','profiles','ready','security','settings','sign-in','sign-up','sso-callback','support','tags','upload','user','variant-generator','wallpapers']);
 export function reject(reason: RejectionReason, message: string): ProfileRejection { return { _tag: 'Rejected', reason, message }; }
+export function versionConflict() { return reject('version-conflict', 'Profile has changed since it was last loaded'); }
 function normalizeName(value: string) { return value.replace(/\s+/gu, ' ').trim(); }
 function slugify(value: string) { return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
 function hash(value: string) { let result = 0; for (const character of value) result = (result * 31 + character.charCodeAt(0)) >>> 0; return result; }
@@ -88,7 +91,35 @@ function collisionHandle(base: string, maximumLength: number) {
 export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, Effect.gen(function* () {
   const store = yield* ProfileStore;
   const identities = yield* Identities;
+  const updateDetails = Effect.fn('profiles.update-details')(function* (principal: ProfilePrincipal, changes: { displayName?: string; biographyMarkdown?: string }, expectedVersion: number) {
+    if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
+    const displayName = changes.displayName === undefined ? undefined : normalizeName(changes.displayName);
+    if (displayName !== undefined) {
+      if (!displayName) return reject('invalid-display-name', 'Display name must not be blank');
+      if ([...displayName].length > policy.profileDisplayNameMaxLength) return reject('invalid-display-name', `Display name must be at most ${policy.profileDisplayNameMaxLength} characters`);
+    }
+    const biographyMarkdown = changes.biographyMarkdown;
+    let wallpaperIds: string[] = [];
+    if (biographyMarkdown !== undefined) {
+      const validation = validateProfileMarkdown(biographyMarkdown, { maxCharacters: policy.profileBiographyMaxLength });
+      if (!validation.valid) return reject('invalid-biography', validation.errors[0]?.message ?? 'Biography Markdown is invalid');
+      wallpaperIds = validation.wallpaperIds;
+    }
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) return reject('invalid-display-name', 'Expected Profile version must be a positive integer');
+    const now = new Date(yield* Clock.currentTimeMillis);
+    const result = yield* store.transact({ profileId: principal.profileId, now, wallpaperIds }, ({ profile, wallpaperOwners }) => {
+      if (profile.version !== expectedVersion) return versionConflict();
+      if ((displayName === undefined || profile.displayName === displayName) && (biographyMarkdown === undefined || profile.biographyMarkdown === biographyMarkdown)) return { _tag: 'Unchanged' };
+      if (biographyMarkdown !== profile.biographyMarkdown && wallpaperIds.length > 0) {
+        if (wallpaperOwners.some(wallpaper => wallpaper.profileId !== principal.profileId)) return { ...reject('unavailable-biography-wallpaper', 'Biography images must be published wallpapers owned by this Profile.'), retryable: false };
+        if (wallpaperOwners.length !== wallpaperIds.length) return { ...reject('unavailable-biography-wallpaper', 'A referenced wallpaper is not available yet. Check the ID or wait for publication and try again.'), retryable: true };
+      }
+      return { _tag: 'Change', mutation: { type: 'details', displayName: displayName ?? profile.displayName, biographyMarkdown: biographyMarkdown ?? profile.biographyMarkdown } };
+    });
+    return result.outcome;
+  });
   return Profiles.of({
+    updateDetails,
     ensure: Effect.fn('profiles.ensure')(function* (principal: ProfilePrincipal) {
       if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
       const now = new Date(yield* Clock.currentTimeMillis);

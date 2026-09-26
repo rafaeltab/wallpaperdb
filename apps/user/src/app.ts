@@ -128,7 +128,10 @@ export function userLayer(config: Config, options: AppOptions = {}) {
                 {
                   name: 'picture-import',
                   intervalMs: 1000,
-                  run: (stopping) => assets.importPending(stopping).pipe(Effect.as(true)),
+                  run: (stopping) =>
+                    assets
+                      .importPending(stopping)
+                      .pipe(Effect.map((result) => result.failed === 0)),
                 },
                 {
                   name: 'event-retention',

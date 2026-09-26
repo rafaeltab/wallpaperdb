@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { Effect, Fiber } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clerkIdentitiesLayer } from '../src/adapters/profiles/index.js';
@@ -13,6 +14,17 @@ const run = (userId = 'user_123') =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Clerk identities adapter', () => {
+  it('discards private transport diagnostics at the identity boundary', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('private-identity-marker')));
+    const failure = await Effect.runPromise(
+      Identities.use((identities) => identities.getIdentity('owner')).pipe(
+        Effect.flip,
+        Effect.provide(clerkIdentitiesLayer({ clerkSecretKey: 'test-secret' }))
+      )
+    );
+    expect(failure).toMatchObject({ _tag: 'ProfileUnavailable', operation: 'identity-lookup' });
+    expect(inspect(failure, { depth: null })).not.toContain('private-identity-marker');
+  });
   it('aborts the underlying identity request when its caller is interrupted', async () => {
     let announceStart = () => {};
     const started = new Promise<void>((resolve) => {
@@ -49,16 +61,14 @@ describe('Clerk identities adapter', () => {
   ])('imports only a custom identity picture when has_image is %s', async (hasImage) => {
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({
-            first_name: null,
-            last_name: null,
-            has_image: hasImage,
-            image_url: 'https://img.clerk.com/initial-picture',
-          })
-        )
+      vi.fn().mockResolvedValue(
+        Response.json({
+          first_name: null,
+          last_name: null,
+          has_image: hasImage,
+          image_url: 'https://img.clerk.com/initial-picture',
+        })
+      )
     );
     expect(await run()).toEqual({
       displayName: null,
@@ -68,17 +78,15 @@ describe('Clerk identities adapter', () => {
     });
   });
   it('keeps usernames out of display names and encodes the user identifier in the authenticated request', async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          username: 'ada123',
-          first_name: 'Ada',
-          last_name: 'Lovelace',
-          has_image: false,
-          image_url: '',
-        })
-      );
+    const fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        username: 'ada123',
+        first_name: 'Ada',
+        last_name: 'Lovelace',
+        has_image: false,
+        image_url: '',
+      })
+    );
     vi.stubGlobal('fetch', fetch);
     expect(await run('user/a')).toEqual({
       displayName: null,

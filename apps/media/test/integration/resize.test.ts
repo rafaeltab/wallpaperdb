@@ -31,7 +31,6 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       .withPostgres((builder) => builder.withDatabase(`test_media_resize_${Date.now()}`))
       .withS3()
       .withS3Bucket('wallpapers')
-      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()

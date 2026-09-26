@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
-import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
-import { resolveAssetReference } from '@wallpaperdb/core/assets';
+import {
+  resolveOriginalAsset,
+  resolveVariantAsset,
+  resolveProfilePictureAsset,
+  type AssetReference,
+  type AssetLocation as StoredLocation,
+} from '@wallpaperdb/core/assets';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
@@ -32,50 +37,58 @@ import {
 
 export interface CatalogPostgresConfig {
   readonly databaseUrl: string;
-  readonly assetReferences?: {
-    readonly endpoint: string;
-    readonly region: string;
-    readonly accessKeyId: string;
-    readonly secretAccessKey: string;
-    readonly bucket: string;
+  readonly assetBuckets?: {
+    readonly wallpapers: string;
+    readonly profilePictures: string;
   };
 }
-interface AssetReferenceReader {
-  readonly client: S3Client;
-  readonly bucket: string;
-}
-async function resolveAsset<A extends AssetLocation>(
+function resolveAsset<A extends AssetLocation>(
   asset: A,
-  reader: AssetReferenceReader | undefined,
-  signal: AbortSignal
+  locate: (reference: AssetReference) => StoredLocation
 ) {
-  if (!('reference' in asset))
-    return { ...asset, storageBucket: asset.storageBucket, storageKey: asset.storageKey };
-  if (!reader) throw new Error('Immutable asset references are not configured');
-  const location = await resolveAssetReference(reader.client, reader.bucket, asset.reference, {
-    abortSignal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
-  });
+  const location =
+    'reference' in asset
+      ? locate(asset.reference)
+      : { bucket: asset.storageBucket, key: asset.storageKey };
   return { ...asset, storageBucket: location.bucket, storageKey: location.key };
 }
-async function resolveInput(
-  input: ProjectionInput,
-  reader: AssetReferenceReader | undefined,
-  signal: AbortSignal
-) {
+function resolveInput(input: ProjectionInput, buckets: CatalogPostgresConfig['assetBuckets']) {
   if (input.kind === 'wallpaper')
-    return { ...input, wallpaper: await resolveAsset(input.wallpaper, reader, signal) };
+    return {
+      ...input,
+      wallpaper: resolveAsset(input.wallpaper, (reference) => {
+        if (reference.id !== input.wallpaper.id)
+          throw new Error('Original reference identity mismatch');
+        return resolveOriginalAsset(reference, input.wallpaper.mimeType, buckets?.wallpapers ?? '');
+      }),
+    };
   if (input.kind === 'variant')
-    return { ...input, variant: await resolveAsset(input.variant, reader, signal) };
+    return {
+      ...input,
+      variant: resolveAsset(input.variant, (reference) =>
+        resolveVariantAsset(reference, input.variant, buckets?.wallpapers ?? '')
+      ),
+    };
+  const asset = input.asset;
   return {
     ...input,
-    asset: input.asset ? await resolveAsset(input.asset, reader, signal) : undefined,
+    asset: asset
+      ? resolveAsset(asset, (reference) => {
+          if (reference.id !== asset.id) throw new Error('Picture reference identity mismatch');
+          return resolveProfilePictureAsset(
+            reference,
+            input.profile.id,
+            buckets?.profilePictures ?? ''
+          );
+        })
+      : undefined,
   };
 }
 class CatalogResources extends Context.Service<
   CatalogResources,
   {
     readonly pool: Pool;
-    readonly reader: AssetReferenceReader | undefined;
+    readonly assetBuckets: CatalogPostgresConfig['assetBuckets'];
   }
 >()('media/catalog/Resources') {}
 /** Destroying an active PostgreSQL connection rolls back its open transaction.
@@ -168,7 +181,7 @@ const observeProjection =
   };
 const implementations = Layer.effectContext(
   Effect.gen(function* () {
-    const { pool, reader } = yield* CatalogResources;
+    const { pool, assetBuckets } = yield* CatalogResources;
     const execute =
       <A>(run: (db: ReturnType<typeof drizzle>) => Promise<A>) =>
       (signal: AbortSignal) =>
@@ -177,8 +190,8 @@ const implementations = Layer.effectContext(
       accept: (external) =>
         Effect.tryPromise({
           try: async (signal) => {
-            // Asset descriptors are immutable; finish object-storage I/O before the database transaction.
-            const input = await resolveInput(external, reader, signal);
+            // Resolve the storage convention before opening the catalog transaction.
+            const input = resolveInput(external, assetBuckets);
             return withConnection(pool, signal, (db) =>
               db.transaction(async (tx) => {
                 const inserted = await tx
@@ -410,24 +423,10 @@ const implementations = Layer.effectContext(
       Context.add(CatalogOutbox, outbox),
       Context.add(Catalog, catalog),
       Context.add(CatalogHealth, {
-        check: Effect.all(
-          [
-            Effect.tryPromise({
-              try: execute((db) => db.execute(sql`SELECT 1`)),
-              catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
-            }),
-            reader
-              ? Effect.tryPromise({
-                  try: (signal) =>
-                    reader.client.send(new HeadBucketCommand({ Bucket: reader.bucket }), {
-                      abortSignal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
-                    }),
-                  catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
-                })
-              : Effect.void,
-          ],
-          { concurrency: 'unbounded' }
-        ).pipe(
+        check: Effect.tryPromise({
+          try: execute((db) => db.execute(sql`SELECT 1`)),
+          catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
+        }).pipe(
           Effect.as(true),
           Effect.catch(() => Effect.succeed(false))
         ),
@@ -467,28 +466,7 @@ export function CatalogPostgresLayer(config: CatalogPostgresConfig) {
         try: (signal) => withConnection(pool, signal, (db) => db.execute(sql`SELECT 1`)),
         catch: (cause) => new CatalogFailure({ operation: 'connect', cause }),
       });
-      const assetReferences = config.assetReferences;
-      const reader = assetReferences
-        ? {
-            client: yield* Effect.acquireRelease(
-              Effect.sync(
-                () =>
-                  new S3Client({
-                    endpoint: assetReferences.endpoint,
-                    region: assetReferences.region,
-                    credentials: {
-                      accessKeyId: assetReferences.accessKeyId,
-                      secretAccessKey: assetReferences.secretAccessKey,
-                    },
-                    forcePathStyle: true,
-                  })
-              ),
-              (client) => Effect.sync(() => client.destroy())
-            ),
-            bucket: assetReferences.bucket,
-          }
-        : undefined;
-      return { pool, reader };
+      return { pool, assetBuckets: config.assetBuckets };
     })
   );
   return implementations.pipe(Layer.provide(resources));

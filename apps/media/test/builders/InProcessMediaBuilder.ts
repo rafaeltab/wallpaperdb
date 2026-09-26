@@ -49,7 +49,7 @@ export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
             s3SecretAccessKey: s3.options.secretKey,
             s3Bucket: s3.buckets[0] ?? 'wallpapers',
             s3Region: 'us-east-1',
-            assetReferenceBucket: 'asset-references',
+            profilePictureBucket: 'profile-pictures',
             natsUrl: nats.endpoints.fromHost,
             natsStream: nats.streams[0] ?? 'WALLPAPER',
             otelServiceName: 'media-test',

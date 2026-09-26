@@ -2,7 +2,6 @@ import {
   WallpaperVariantAvailableEventSchema,
   type WallpaperUploadedEvent,
 } from '@wallpaperdb/events/schemas';
-import { registerAssetReference } from '@wallpaperdb/core/assets';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -33,7 +32,6 @@ describe('Media Service - Event Consumption', () => {
       .withPostgres((builder) => builder.withDatabase(`test_media_events_${Date.now()}`))
       .withS3()
       .withS3Bucket('wallpapers')
-      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()
@@ -85,10 +83,8 @@ describe('Media Service - Event Consumption', () => {
   it('consumes an original logical reference through the composed storage and catalogue adapters', async () => {
     const id = 'wlpr_logical_composition';
     const reference = { owner: 'ingestor', id } as const;
-    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', reference, {
-      bucket: 'wallpapers',
-      key: 'private/composed-original.webp',
-    });
+    const original = Buffer.from('logical original bytes');
+    await tester.s3.uploadObject('wallpapers', `${id}/original.webp`, original);
     const timestamp = '2026-09-24T10:00:00.000Z';
     const observation = await observeAvailable(id);
     try {
@@ -119,6 +115,9 @@ describe('Media Service - Event Consumption', () => {
       );
       await waitForAccepted(accepted.seq);
       expect((await observation.result).variant.wallpaperId).toBe(id);
+      const delivered = await tester.getApp().inject({ method: 'GET', url: `/wallpapers/${id}` });
+      expect(delivered.statusCode).toBe(200);
+      expect(delivered.rawPayload).toEqual(original);
     } finally {
       observation.close();
     }

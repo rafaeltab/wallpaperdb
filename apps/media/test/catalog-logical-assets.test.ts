@@ -1,53 +1,29 @@
-import { createServer as createHttpServer } from 'node:http';
-import { createServer as createTcpServer, connect, type Socket } from 'node:net';
-import { CreateBucketCommand } from '@aws-sdk/client-s3';
-import { registerAssetReference } from '@wallpaperdb/core/assets';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import {
-  createDefaultTesterBuilder,
-  DockerTesterBuilder,
-  S3TesterBuilder,
-} from '@wallpaperdb/test-utils';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
-import {
-  CatalogHealth,
-  CatalogOutbox,
-  CatalogProjection,
-  type ProjectionInput,
-} from '../src/catalog/index.js';
+import { CatalogHealth, CatalogOutbox, CatalogProjection } from '../src/catalog/index.js';
 import { Catalog } from '../src/delivery/index.js';
 
 const timestamp = '2026-09-24T10:00:00.000Z';
-const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
-const storage = new Tester().withS3().withS3Bucket('asset-references');
-
-describe('Catalog immutable asset reference contract', () => {
+describe('Catalog logical asset locations', () => {
   let postgres: Awaited<ReturnType<PostgreSqlContainer['start']>>;
   let pool: Pool;
-  let runtime: ManagedRuntime.ManagedRuntime<Catalog | CatalogProjection | CatalogOutbox, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<
+    Catalog | CatalogProjection | CatalogOutbox | CatalogHealth,
+    unknown
+  >;
   beforeAll(async () => {
-    [postgres] = await Promise.all([
-      new PostgreSqlContainer('postgres:16-alpine').start(),
-      storage.setup(),
-    ]);
+    postgres = await new PostgreSqlContainer('postgres:16-alpine').start();
     pool = new Pool({ connectionString: postgres.getConnectionUri() });
     await migrate(drizzle(pool), { migrationsFolder: './drizzle' });
-    const s3 = storage.getS3();
     runtime = ManagedRuntime.make(
       CatalogPostgresLayer({
         databaseUrl: postgres.getConnectionUri(),
-        assetReferences: {
-          endpoint: s3.endpoints.fromHost,
-          region: 'us-east-1',
-          accessKeyId: s3.options.accessKey,
-          secretAccessKey: s3.options.secretKey,
-          bucket: 'asset-references',
-        },
+        assetBuckets: { wallpapers: 'private-originals', profilePictures: 'private-pictures' },
       })
     );
   });
@@ -60,120 +36,9 @@ describe('Catalog immutable asset reference contract', () => {
     await runtime?.dispose();
     await pool?.end();
     await postgres?.stop();
-    await storage.destroy();
   });
 
-  it('cancels a hanging registry health request when the database probe fails', async () => {
-    let failing = false;
-    let registryEntered = false;
-    let registryClosed = false;
-    let failQuery: (() => void) | undefined;
-    const sockets = new Set<Socket>();
-    const database = new URL(postgres.getConnectionUri());
-    const upstreamAddress = { host: database.hostname, port: Number(database.port) };
-    const proxy = createTcpServer((downstream) => {
-      const upstream = connect(upstreamAddress);
-      sockets.add(downstream);
-      sockets.add(upstream);
-      upstream.pipe(downstream);
-      downstream.on('data', (bytes) => {
-        if (!failing) upstream.write(bytes);
-        else {
-          failQuery = () => {
-            const query = Buffer.from('SELECT 1/0\0');
-            const header = Buffer.alloc(5);
-            header[0] = 81; // PostgreSQL simple-query message.
-            header.writeInt32BE(query.length + 4, 1);
-            upstream.write(Buffer.concat([header, query]));
-          };
-          if (registryEntered) failQuery();
-        }
-      });
-      for (const socket of [upstream, downstream]) {
-        socket.on('error', () => {});
-        socket.on('close', () => {
-          sockets.delete(socket);
-          upstream.destroy();
-          downstream.destroy();
-        });
-      }
-    });
-    const server = createHttpServer((_request, response) => {
-      registryEntered = true;
-      response.on('close', () => {
-        registryClosed = true;
-      });
-      failQuery?.();
-    });
-    await Promise.all([
-      new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve)),
-      new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve)),
-    ]);
-    const dbAddress = proxy.address();
-    const s3Address = server.address();
-    if (!dbAddress || typeof dbAddress === 'string' || !s3Address || typeof s3Address === 'string')
-      throw new Error('Missing test listeners');
-    database.hostname = '127.0.0.1';
-    database.port = String(dbAddress.port);
-    const isolated = ManagedRuntime.make(
-      CatalogPostgresLayer({
-        databaseUrl: database.toString(),
-        assetReferences: {
-          endpoint: `http://127.0.0.1:${s3Address.port}`,
-          region: 'us-east-1',
-          accessKeyId: 'test',
-          secretAccessKey: 'test',
-          bucket: 'asset-references',
-        },
-      })
-    );
-    try {
-      const health = await isolated.runPromise(CatalogHealth);
-      failing = true;
-      expect(await isolated.runPromise(health.check)).toBe(false);
-      expect(registryEntered).toBe(true);
-      await vi.waitFor(() => expect(registryClosed).toBe(true), { timeout: 500, interval: 10 });
-    } finally {
-      await isolated.dispose();
-      server.closeAllConnections();
-      for (const socket of sockets) socket.destroy();
-      await Promise.all([
-        new Promise<void>((resolve) => proxy.close(() => resolve())),
-        new Promise<void>((resolve) => server.close(() => resolve())),
-      ]);
-    }
-  });
-
-  it('reports missing asset reference storage and recovers when restored', async () => {
-    const s3 = storage.getS3();
-    const referenceBucket = 'recovered-health-references';
-    const isolated = ManagedRuntime.make(
-      CatalogPostgresLayer({
-        databaseUrl: postgres.getConnectionUri(),
-        assetReferences: {
-          endpoint: s3.endpoints.fromHost,
-          region: 'us-east-1',
-          accessKeyId: s3.options.accessKey,
-          secretAccessKey: s3.options.secretKey,
-          bucket: referenceBucket,
-        },
-      })
-    );
-    try {
-      expect(await isolated.runPromise(CatalogHealth.use((health) => health.check))).toBe(false);
-      await storage.s3.getS3Client().send(new CreateBucketCommand({ Bucket: referenceBucket }));
-      expect(await isolated.runPromise(CatalogHealth.use((health) => health.check))).toBe(true);
-    } finally {
-      await isolated.dispose();
-    }
-  });
-
-  it('resolves an immutable original reference before persisting its delivery location', async () => {
-    const reference = { owner: 'ingestor', id: 'logical-original' } as const;
-    await registerAssetReference(storage.s3.getS3Client(), 'asset-references', reference, {
-      bucket: 'private-originals',
-      key: 'actual/original.webp',
-    });
+  it('accepts logical originals and reports catalog health without object-storage access', async () => {
     await runtime.runPromise(
       CatalogProjection.use((catalog) =>
         catalog.accept({
@@ -181,8 +46,8 @@ describe('Catalog immutable asset reference contract', () => {
           occurrence: { source: 'https://wallpaperdb/ingestor', id: 'logical-upload' },
           occurredAt: timestamp,
           wallpaper: {
-            id: 'logical-original',
-            reference,
+            id: 'wlpr_logical_original',
+            reference: { owner: 'ingestor', id: 'wlpr_logical_original' },
             mimeType: 'image/webp',
             width: 1600,
             height: 900,
@@ -193,60 +58,68 @@ describe('Catalog immutable asset reference contract', () => {
       )
     );
     expect(
-      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper('logical-original')))
-    ).toMatchObject({ storageBucket: 'private-originals', storageKey: 'actual/original.webp' });
+      await runtime.runPromise(
+        Catalog.use((catalog) => catalog.findWallpaper('wlpr_logical_original'))
+      )
+    ).toMatchObject({
+      storageBucket: 'private-originals',
+      storageKey: 'wlpr_logical_original/original.webp',
+    });
     expect(
       await runtime.runPromise(CatalogOutbox.use((outbox) => outbox.listPending(10)))
     ).toHaveLength(1);
+    expect(await runtime.runPromise(CatalogHealth.use((health) => health.check))).toBe(true);
   });
 
-  it('leaves an unavailable reference unprocessed so its original occurrence can be replayed', async () => {
-    const reference = { owner: 'ingestor', id: 'delayed-original' } as const;
-    const input: ProjectionInput = {
-      kind: 'wallpaper',
-      occurrence: { source: 'https://wallpaperdb/ingestor', id: 'delayed-upload' },
+  it('rejects mismatched original identity before accepting its occurrence', async () => {
+    const wallpaper = {
+      id: 'wlpr_identity',
+      reference: { owner: 'ingestor' as const, id: 'wlpr_another' },
+      mimeType: 'image/png',
+      width: 20,
+      height: 10,
+      fileSizeBytes: 50,
+      createdAt: timestamp,
+    };
+    const event = {
+      kind: 'wallpaper' as const,
+      occurrence: { source: 'ingestor', id: 'identity' },
       occurredAt: timestamp,
-      wallpaper: {
-        id: reference.id,
-        reference,
-        mimeType: 'image/webp',
-        width: 20,
-        height: 10,
-        fileSizeBytes: 100,
-        createdAt: timestamp,
-      },
+      wallpaper,
     };
     await expect(
-      runtime.runPromise(CatalogProjection.use((catalog) => catalog.accept(input)))
+      runtime.runPromise(CatalogProjection.use((catalog) => catalog.accept(event)))
     ).rejects.toMatchObject({ _tag: 'CatalogFailure' });
     expect(
-      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper(reference.id)))
+      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper(wallpaper.id)))
     ).toBeNull();
     expect(await runtime.runPromise(CatalogOutbox.use((outbox) => outbox.listPending(10)))).toEqual(
       []
     );
-    await registerAssetReference(storage.s3.getS3Client(), 'asset-references', reference, {
-      bucket: 'originals',
-      key: 'delayed.webp',
+    await runtime.runPromise(
+      CatalogProjection.use((catalog) =>
+        catalog.accept({
+          ...event,
+          wallpaper: { ...wallpaper, reference: { ...wallpaper.reference, id: wallpaper.id } },
+        })
+      )
+    );
+    expect(
+      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper(wallpaper.id)))
+    ).toMatchObject({
+      storageBucket: 'private-originals',
+      storageKey: 'wlpr_identity/original.png',
     });
-    await runtime.runPromise(CatalogProjection.use((catalog) => catalog.accept(input)));
-    expect(
-      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper(reference.id)))
-    ).toMatchObject({ storageBucket: 'originals', storageKey: 'delayed.webp' });
-    expect(
-      await runtime.runPromise(CatalogOutbox.use((outbox) => outbox.listPending(10)))
-    ).toHaveLength(1);
   });
 
-  it('resolves generated renditions and profile pictures through their owning producers', async () => {
-    const rendition = { owner: 'variant-generator', id: 'logical-rendition' } as const;
-    const picture = { owner: 'user', id: 'logical-picture' } as const;
-    for (const reference of [rendition, picture]) {
-      await registerAssetReference(storage.s3.getS3Client(), 'asset-references', reference, {
-        bucket: reference.owner,
-        key: `${reference.id}.webp`,
-      });
-    }
+  it('maps nominal rendition targets and Profile pictures to their configured buckets', async () => {
+    const metadata = {
+      mimeType: 'image/webp',
+      width: 853,
+      height: 480,
+      fileSizeBytes: 100,
+      createdAt: timestamp,
+    };
     await runtime.runPromise(
       CatalogProjection.use((catalog) =>
         catalog.accept({
@@ -254,14 +127,9 @@ describe('Catalog immutable asset reference contract', () => {
           occurrence: { source: 'ingestor', id: 'parent' },
           occurredAt: timestamp,
           wallpaper: {
-            id: 'parent',
-            storageBucket: 'originals',
-            storageKey: 'parent.webp',
-            mimeType: 'image/webp',
-            width: 20,
-            height: 10,
-            fileSizeBytes: 100,
-            createdAt: timestamp,
+            ...metadata,
+            id: 'wlpr_parent',
+            reference: { owner: 'ingestor', id: 'wlpr_parent' },
           },
         })
       )
@@ -270,16 +138,12 @@ describe('Catalog immutable asset reference contract', () => {
       CatalogProjection.use((catalog) =>
         catalog.accept({
           kind: 'variant',
-          occurrence: { source: 'variant-generator', id: 'rendition' },
+          occurrence: { source: 'variant-generator', id: 'variant' },
           occurredAt: timestamp,
           variant: {
-            wallpaperId: 'parent',
-            reference: rendition,
-            mimeType: 'image/webp',
-            width: 10,
-            height: 5,
-            fileSizeBytes: 50,
-            createdAt: timestamp,
+            ...metadata,
+            wallpaperId: 'wlpr_parent',
+            reference: { owner: 'variant-generator', id: 'wlpr_parent:854x480:image/webp' },
           },
         })
       )
@@ -290,26 +154,61 @@ describe('Catalog immutable asset reference contract', () => {
           kind: 'profile',
           occurrence: { source: 'user', id: 'picture' },
           occurredAt: timestamp,
-          profile: { id: 'profile', version: 1, pictureId: picture.id, updatedAt: timestamp },
+          profile: {
+            id: 'profile_owner',
+            version: 1,
+            pictureId: 'pic_current',
+            updatedAt: timestamp,
+          },
           asset: {
-            id: picture.id,
-            reference: picture,
-            mimeType: 'image/webp',
-            width: 256,
-            height: 256,
-            fileSizeBytes: 300,
-            createdAt: timestamp,
+            ...metadata,
+            id: 'pic_current',
+            reference: { owner: 'user', id: 'pic_current' },
           },
         })
       )
     );
     expect(
       await runtime.runPromise(
-        Catalog.use((catalog) => catalog.findSmallestVariant('parent', 1, 1))
+        Catalog.use((catalog) => catalog.findSmallestVariant('wlpr_parent', 1, 1))
       )
-    ).toMatchObject({ storageBucket: 'variant-generator', storageKey: `${rendition.id}.webp` });
+    ).toMatchObject({
+      storageBucket: 'private-originals',
+      storageKey: 'wlpr_parent/variant_854x480.webp',
+      width: 853,
+      height: 480,
+    });
     expect(
-      await runtime.runPromise(Catalog.use((catalog) => catalog.findCurrentPicture(picture.id)))
-    ).toMatchObject({ storageBucket: 'user', storageKey: `${picture.id}.webp` });
+      await runtime.runPromise(Catalog.use((catalog) => catalog.findCurrentPicture('pic_current')))
+    ).toMatchObject({
+      storageBucket: 'private-pictures',
+      storageKey: 'profile_owner/pic_current.webp',
+    });
+  });
+
+  it('preserves retained coordinates instead of applying the current storage layout', async () => {
+    const event = {
+      kind: 'wallpaper' as const,
+      occurrence: { source: 'legacy', id: 'legacy-original' },
+      occurredAt: timestamp,
+      wallpaper: {
+        id: 'wlpr_legacy',
+        storageBucket: 'historical-bucket',
+        storageKey: 'custom/old-image.webp',
+        mimeType: 'image/webp',
+        width: 20,
+        height: 10,
+        fileSizeBytes: 40,
+        createdAt: timestamp,
+      },
+    };
+    await runtime.runPromise(CatalogProjection.use((catalog) => catalog.accept(event)));
+    await runtime.runPromise(CatalogProjection.use((catalog) => catalog.accept(event)));
+    expect(
+      await runtime.runPromise(Catalog.use((catalog) => catalog.findWallpaper('wlpr_legacy')))
+    ).toMatchObject({ storageBucket: 'historical-bucket', storageKey: 'custom/old-image.webp' });
+    expect(
+      await runtime.runPromise(CatalogOutbox.use((outbox) => outbox.listPending(10)))
+    ).toHaveLength(1);
   });
 });

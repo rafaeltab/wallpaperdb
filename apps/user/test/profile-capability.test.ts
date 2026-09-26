@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy, type OwnerProfile, type ProfileStore as Store, type ProfileMutation } from '../src/profile/index.js';
+import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy, type OwnerProfile, type ProfileStore as Store, type ProfileMutation, type ExternalIdentity } from '../src/profile/index.js';
 
 const policy: ProfilePolicy = {
   profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80,
@@ -14,7 +14,7 @@ const owner: OwnerProfile = {
   pictureImportStatus: 'complete', pictureUploadLimits: { maxBytes: 5242880, maxPixels: 16000000, maxDecodedBytes: 67108864 },
 };
 
-function controlled() {
+function controlled(customPolicy: ProfilePolicy = policy, identity: ExternalIdentity = { displayName: null, firstName: '  Ada ', lastName: ' Lovelace  ', imageUrl: null }) {
   const mutations: ProfileMutation[] = [];
   let current = { ...owner };
   const created: Array<{ profileId: string; displayName: string; handle: string; imageUrl: string | null }> = [];
@@ -35,14 +35,18 @@ function controlled() {
       return { outcome: { _tag: 'Success', profile: current }, changed: decision._tag === 'Change' };
     }),
   };
-  const layer = profilesLayer(policy).pipe(Layer.provide(Layer.mergeAll(
+  const layer = profilesLayer(customPolicy).pipe(Layer.provide(Layer.mergeAll(
     Layer.succeed(ProfileStore, store),
-    Layer.succeed(Identities, { getIdentity: () => Effect.succeed({ displayName: null, firstName: '  Ada ', lastName: ' Lovelace  ', imageUrl: null }) }),
+    Layer.succeed(Identities, { getIdentity: () => Effect.succeed(identity) }),
   )));
   return { created, mutations, run: <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => Effect.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }).pipe(Effect.provide(layer))) };
 }
 
 describe('Profiles capability', () => {
+  it('keeps a generated handle inside the configured minimum when truncation removes a trailing hyphen', async () => {
+    const test = controlled({ ...policy, profileHandleMinLength: 3, profileHandleMaxLength: 3 }, { displayName: 'Ab cd', firstName: null, lastName: null });
+    expect(await test.run(profiles => profiles.ensure({ profileId: 'owner' }))).toMatchObject({ _tag: 'Success', profile: { handle: 'ab0' } });
+  });
   it('normalizes changed details once and preserves the version on a repeated no-op', async () => {
     const test = controlled();
     expect(await test.run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName: '  Ada   Lovelace ' }, 1))).toMatchObject({ _tag: 'Success', profile: { displayName: 'Ada Lovelace', version: 2 } });

@@ -1,9 +1,9 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
+import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer, Schema } from 'effect';
 import { Pool, type PoolClient } from 'pg';
 import * as schema from '../../db/schema.js';
 
-type Client = ReturnType<typeof drizzle<typeof schema>>;
+type Client = NodePgDatabase<typeof schema>;
 export interface Database {
   /** A leased connection belongs to this operation until completion. Aborting
    * destroys it, rolling back an open transaction. COMMIT may be ambiguous. */

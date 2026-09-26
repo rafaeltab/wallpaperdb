@@ -8,13 +8,15 @@ import { and, eq, gt, lte, or, sql } from 'drizzle-orm';
 import type { Database } from '../database/index.js';
 import { outboxEvents } from '../../db/schema.js';
 
-export type ProfileReader = Pick<
-  Parameters<Parameters<Database['run']>[0]>[0],
-  'query' | 'select'
->;
+export type ProfileReader = Pick<Parameters<Parameters<Database['run']>[0]>[0], 'query' | 'select'>;
 
 /** Read typed Handle references without loading the full public snapshots. */
-export async function recentHistoricalHandles(reader: ProfileReader, profileId: string, now: Date, retentionMs: number) {
+export async function recentHistoricalHandles(
+  reader: ProfileReader,
+  profileId: string,
+  now: Date,
+  retentionMs: number
+) {
   const events = await reader
     .select({
       createdAt: outboxEvents.createdAt,

@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from 'effect';
 
 export type OriginalImage =
-  | { readonly owner: 'ingestor'; readonly id: string }
+  | { readonly owner: 'ingestor'; readonly id: string; readonly mimeType: string }
   | { readonly bucket: string; readonly key: string };
 export interface ExtractionInput {
   readonly wallpaperId: string;

@@ -16,7 +16,6 @@ const configSchema = z.object({
   ...S3ConfigSchema.shape,
   ...NatsConfigSchema.shape,
   ...OtelConfigSchema.shape,
-  assetReferenceBucket: z.string().min(1).default('asset-references'),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -33,7 +32,6 @@ export function loadConfig(): Config {
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     s3Bucket: getEnv('S3_BUCKET', 'wallpapers'),
     s3Region: getEnv('S3_REGION', 'us-east-1'),
-    assetReferenceBucket: getEnv('ASSET_REFERENCE_BUCKET', 'asset-references'),
 
     natsUrl: process.env.NATS_URL,
     natsStream: getEnv('NATS_STREAM', 'WALLPAPER'),

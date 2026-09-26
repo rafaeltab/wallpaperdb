@@ -14,7 +14,6 @@ it('parses infrastructure configuration once with existing defaults', () => {
     'PORT',
     'S3_BUCKET',
     'S3_REGION',
-    'ASSET_REFERENCE_BUCKET',
     'NATS_STREAM',
     'OTEL_SERVICE_NAME',
     'OTEL_EXPORTER_OTLP_ENDPOINT',
@@ -25,7 +24,6 @@ it('parses infrastructure configuration once with existing defaults', () => {
     nodeEnv: 'test',
     s3Bucket: 'wallpapers',
     s3Region: 'us-east-1',
-    assetReferenceBucket: 'asset-references',
     natsStream: 'WALLPAPER',
     otelServiceName: 'wallpaperdb-color-extractor',
   });

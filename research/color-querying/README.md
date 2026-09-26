@@ -7,7 +7,7 @@ calculation into indexing so OpenSearch can rank wallpapers efficiently.
 
 This directory consolidates what the research established, what changed along
 the way, and what still needs validation. It accompanies
-[ADR 0004](../../docs/adr/0004-use-precomputed-color-utilities-with-three-quality-levels.md).
+[ADR 0006](../../docs/adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md).
 No production implementation, migration, or rollout is part of this change.
 
 ## Read this research
@@ -79,12 +79,12 @@ model.
 
 The complete prototype archive was committed and pushed first as
 [`30edcb2`](https://github.com/rafaeltab/wallpaperdb/commit/30edcb2a61e6c4cc915a61807210a3ab5e924d96)
-on `t3code/improve-color-filtering`. This documentation branch builds on that
-snapshot. Runnable sources, evaluation cases, submitted judgments, diagrams,
-configuration, and historical findings live in
-[`experiments/color-search-benchmark`](../../experiments/color-search-benchmark/README.md).
+on `t3code/improve-color-filtering`. The archive remains on that separate branch;
+links below are pinned to the preserved commit. Runnable sources, evaluation
+cases, submitted judgments, diagrams, configuration, and historical findings live in
+[`experiments/color-search-benchmark`](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/README.md).
 
-The [research evidence archive](../../experiments/color-search-benchmark/research-archive/README.md)
+The [research evidence archive](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/README.md)
 also preserves external research notes, audit scripts, frozen source bundles,
 generated reports, and the exact favorite source tarball. Large reports use
 lossless gzip compression; the inventory records original hashes and duplicate

@@ -17,7 +17,7 @@ The feedback dataset has **38 logical records**, including the later red-pagoda
 comparison. It contains one observer's preferences, reused images, uncertain
 comparisons, and a quickly completed batch. These are development judgments;
 they are not independent population samples or a held-out accuracy estimate.
-The [evaluation contract](../../experiments/color-search-benchmark/evaluation/loop/README.md)
+The [evaluation contract](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/loop/README.md)
 preserves supplied ties, uncertainty, unsupported cases, and eligibility errors.
 
 The linked-slider run evaluated all eight positions across the three- and
@@ -40,10 +40,10 @@ query, then across queries. These percentages do not mean that this fraction of
 all retrieved wallpapers is relevant. The strictest position's higher value on
 this small development set does not override the user's preferred default.
 
-Sources: [linked prototype record](../../experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md),
-[archived run summary](../../experiments/color-search-benchmark/research-archive/run-summaries/2026-09-23T22-53-05.476Z-115e5722/summary.json),
-[full report](../../experiments/color-search-benchmark/research-archive/shared/runs/2026-09-23T22-53-05.476Z-115e5722/report.md),
-and [per-case parity audit](../../experiments/color-search-benchmark/research-archive/shared/exploration/linked-strictness/2026-09-23/feedback-parity.json).
+Sources: [linked prototype record](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md),
+[archived run summary](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/run-summaries/2026-09-23T22-53-05.476Z-115e5722/summary.json),
+[full report](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/shared/runs/2026-09-23T22-53-05.476Z-115e5722/report.md),
+and [per-case parity audit](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/shared/exploration/linked-strictness/2026-09-23/feedback-parity.json).
 The preceding run failed adapter setup because the harness normalized absent
 parameters to an empty object. Its failed report remains in the archive; a
 regression test and fresh run establish the corrected result.
@@ -66,7 +66,7 @@ differences concern very close float ties and evaluation order. The field
 representation preserves the intended arithmetic within this observed floating
 precision; it is not bit-identical to every original arithmetic path.
 
-The [full verification evidence](../../experiments/color-search-benchmark/research-archive/shared/exploration/linked-strictness/2026-09-23/verification-v1/verification.json.gz)
+The [full verification evidence](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/shared/exploration/linked-strictness/2026-09-23/verification-v1/verification.json.gz)
 records the entire returned rankings and stable index generations. This suite
 uses distinct resolved targets. It does not cover the inherited duplicate-field
 weighting bug; the separate multiplicity prototype and production follow-up
@@ -75,7 +75,7 @@ must remain explicit.
 Desktop/mobile browser checks additionally passed for tab state, favorite
 parity, live/manual searches, percentage-copy confirmation, all-523 results,
 named queries, multiple colors, and image modals. Archive-time checks passed
-53 targeted tests. See [archive validation](../../experiments/color-search-benchmark/ARCHIVE-VALIDATION.md).
+53 targeted tests. See [archive validation](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/ARCHIVE-VALIDATION.md).
 
 ## Performance: what was actually measured
 
@@ -91,7 +91,7 @@ limits and exposed an additional two-color failure.
 
 That million-record benchmark used a **70-measurement-field projection** needed
 by its workload, not a fully populated raw bin bank. The full raw banks were
-tested at up to 100,000 records. [Original performance report](../../experiments/color-search-benchmark/exploration/FAVORITE-PERFORMANCE.md).
+tested at up to 100,000 records. [Original performance report](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-PERFORMANCE.md).
 
 ### Precomputed single-favorite execution
 
@@ -122,9 +122,9 @@ universal executor, unseen-query/cold-cache latency, production throughput, or
 100-million-record capacity. The gateway, production event ingestion, replicas,
 and distributed deployment were outside this capacity experiment.
 
-Sources: [final optimization results](../../experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md),
-[resource review](../../experiments/color-search-benchmark/exploration/FAVORITE-FINAL-RESOURCES.md),
-and [capacity criteria](../../experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-CAPACITY.md).
+Sources: [final optimization results](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md),
+[resource review](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-FINAL-RESOURCES.md),
+and [capacity criteria](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-CAPACITY.md).
 
 ### Accepted three-option bank
 
@@ -160,13 +160,13 @@ relative to the nine-preset/5% design. That is a schema calculation, not a
 measured disk-saving percentage. Per-field overhead, compression, zero density,
 and merges prevent reliable extrapolation from 545-record bytes per wallpaper.
 
-Sources: [storage correction and blocked campaign](../../experiments/color-search-benchmark/exploration/FAVORITE-NINE-PRESETS-CURRENT.md)
-and [compact-bank measurements](../../experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md).
+Sources: [storage correction and blocked campaign](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-NINE-PRESETS-CURRENT.md)
+and [compact-bank measurements](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md).
 
 ## Evidence preservation
 
-[Archive manifest](../../experiments/color-search-benchmark/research-archive/manifest.json)
-and [verification](../../experiments/color-search-benchmark/research-archive/verification.json)
+[Archive manifest](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/manifest.json)
+and [verification](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/research-archive/verification.json)
 record 856 preserved source records, including 405 exact-duplicate references,
 all external research documents and frozen source bundles, and 39 readable run
 summaries. Large text reports are compressed losslessly. Historical links and

@@ -29,7 +29,7 @@ Under one independent pixel-coverage proxy, held-out query-color nDCG@10 was
 0.290 for the current cosine method, 0.410 for raw L2, and 0.871 for a 32-color
 perceptual palette. These were automated proxy results on the same 100 images,
 not human satisfaction percentages. The palette was a useful next experiment,
-not the final architecture. [Initial findings](../../experiments/color-search-benchmark/FINDINGS.md)
+not the final architecture. [Initial findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/FINDINGS.md)
 retain all candidates and explain the proxy's limitations.
 
 **Lesson:** a better vector distance cannot recover color detail already lost
@@ -47,7 +47,7 @@ Palette transport and direct area-error prototypes explored those semantics.
 Transport assigns each part of an image to one requested portion or a remainder,
 which prevents the same area from being spent twice. It demonstrated useful
 controlled behavior, but shade tolerance, palette compression, and computation
-cost remained concerns. [Proportion findings](../../experiments/color-search-benchmark/PROPORTIONS-FINDINGS.md)
+cost remained concerns. [Proportion findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/PROPORTIONS-FINDINGS.md)
 record that stage separately.
 
 The user also required global search ordering. Retrieving a small candidate set
@@ -74,8 +74,8 @@ The project first collected individual comparisons, then a batch of comparisons
 to reduce review effort. The user explicitly warned that the quick batch was
 uncertain and that other people could disagree. Controlled swatches were useful
 for isolating behavior but did not reliably predict preferences for real
-wallpapers. The [query goals](../../experiments/color-search-benchmark/COLOR-QUERY-GOALS.md)
-and [submitted batch](../../experiments/color-search-benchmark/evaluation/batch-001-results.md)
+wallpapers. The [query goals](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/COLOR-QUERY-GOALS.md)
+and [submitted batch](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/batch-001-results.md)
 preserve those qualifications.
 
 The feedback loop was built to compare any registered candidate, parameter
@@ -83,7 +83,7 @@ setting, or combination. It keeps accuracy, query support, timing, errors, and
 per-case regressions visible rather than hiding them in one aggregate score.
 It uses strict human preference pairs, preserves ties and uncertainty, and
 reports unsupported cases explicitly. Large-window diagnostic rankings are
-separate from timed top-20 searches. See the [feedback-loop contract](../../experiments/color-search-benchmark/evaluation/loop/README.md).
+separate from timed top-20 searches. See the [feedback-loop contract](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/loop/README.md).
 
 **Lesson:** do not turn a small, reused, single-reviewer development set into a
 claim of universal accuracy. Do not compare headline percentages across methods
@@ -114,9 +114,9 @@ quality, and 16/64/256/1,024-bin comparisons.
 The original overlap experiment also exposed limitations: nearest-anchor
 boundaries can cause large membership errors, and broad named-color behavior is
 not interchangeable with literal swatch matching. The later direction does not
-erase those observations. [Method inventory](../../experiments/color-search-benchmark/exploration/METHODS.md),
-[overlap findings](../../experiments/color-search-benchmark/exploration/OVERLAPPING-REGIONS.md),
-and [accuracy findings](../../experiments/color-search-benchmark/exploration/ACCURACY-FINDINGS.md)
+erase those observations. [Method inventory](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/METHODS.md),
+[overlap findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/OVERLAPPING-REGIONS.md),
+and [accuracy findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/ACCURACY-FINDINGS.md)
 retain the alternatives and counterexamples.
 
 **Lesson:** more bins alone are not a guarantee of better perception. Preserve
@@ -133,7 +133,7 @@ Two controls affect different parts of this calculation. Quality influence
 penalizes weak mean quality within a layer. Cutoff weighting changes how strongly
 strict layers contribute relative to broad ones. Weighting all layers equally
 and favoring strict layers produce different, useful rankings without changing
-the underlying pixel measurements. [All-cutoff notes](../../experiments/color-search-benchmark/exploration/ALL-CUTOFFS.md)
+the underlying pixel measurements. [All-cutoff notes](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/ALL-CUTOFFS.md)
 explain the weighting and inspection behavior.
 
 The linear quality formula at high influence could clip many contributions to
@@ -162,13 +162,13 @@ gap, reduced credit to zero by 30 degrees, and preserved neutral behavior. This
 fixed that reported pair in all 24 tested settings, compared with four for the
 previous shade-only method. Historical real-image agreement improved in nine
 settings and declined in fifteen, so the selected example did not prove a
-universal improvement. [Shade-aware findings](../../experiments/color-search-benchmark/exploration/SHADE-AWARE.md)
-and [hue-tolerance findings](../../experiments/color-search-benchmark/exploration/HUE-TOLERANCE.md)
+universal improvement. [Shade-aware findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/SHADE-AWARE.md)
+and [hue-tolerance findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/HUE-TOLERANCE.md)
 record both progress and regressions.
 
 The user then endorsed a strong snapshot: **all cutoffs, shade-aware plus strict
 hue**, cutoff weighting 1, linear quality influence 0.5. Both 256 and 1,024 bins
-were liked, with little visible difference to the user. The [frozen favorite](../../experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md)
+were liked, with little visible difference to the user. The [frozen favorite](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md)
 preserves exact settings and source fingerprints.
 
 **Lesson:** query-time score tuning cannot always repair the wrong definition of
@@ -181,7 +181,7 @@ The original favorite calculated five layer scores for each requested color on
 every eligible document. Several-color queries became expensive at a million
 records. Reducing the stored bank from 1,024 to 256 did little to reduce this
 per-query work because each requested color still selected one anchor and five
-layers. [Original performance findings](../../experiments/color-search-benchmark/exploration/FAVORITE-PERFORMANCE.md)
+layers. [Original performance findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-PERFORMANCE.md)
 record the failed profiles as well as successful selective queries.
 
 Optimization experiments tried fused scripts, precomputed numeric utilities,
@@ -196,7 +196,7 @@ float32 grouping differences that can reorder nearly tied results. It provided
 the most useful broad-query baseline. Global bounds were also useful for some
 combination workloads, but no universal dispatcher was established. Direct
 sorting was extremely fast on repeated single-target requests yet failed a
-broader arrival workload. The [optimization results](../../experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md)
+broader arrival workload. The [optimization results](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md)
 are evidence for workload-specific choices, not a promise that every query is
 fast at any load.
 
@@ -215,7 +215,7 @@ index was **not built** because disk capacity was insufficient.
 This discussion also corrected a scope misunderstanding: the original roughly
 20 GB measurement covered the full **1,024-bin schema at 100,000 records**, not
 one million. The much smaller original million-record index was only a workload
-projection. [Storage-scope correction](../../experiments/color-search-benchmark/exploration/FAVORITE-NINE-PRESETS-CURRENT.md#original-approximately-20-gb-claim-scope-correction)
+projection. [Storage-scope correction](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-NINE-PRESETS-CURRENT.md#original-approximately-20-gb-claim-scope-correction)
 keeps the record counts, schemas, and measured-versus-estimated distinction.
 
 The user accepted 10% requested-amount steps and proposed combining influence
@@ -240,7 +240,7 @@ and precomputed numeric scores ranked globally by OpenSearch. The middle setting
 retains the endorsed favorite. The positions are a useful preference path, not
 equal steps on a calibrated perceptual scale.
 
-The [linked-slider prototype](../../experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md)
+The [linked-slider prototype](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md)
 contains all 523 real wallpapers plus 22 indexed fixtures excluded from its
 gallery. It preserves matched original feedback results at the offered settings.
 Its three-preset million-record storage, performance, ingestion, and production

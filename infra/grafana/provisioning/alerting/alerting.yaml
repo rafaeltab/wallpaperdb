@@ -327,3 +327,112 @@ groups:
         labels:
           severity: critical
           service: ingestor
+
+      - uid: user-dependency-unhealthy
+        title: User Dependency or Protective Worker Unavailable
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: min by (dependency) (user_dependency_healthy{required="true"})
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: A required User dependency or protective worker is unavailable
+          description: "Inspect the dependency label and User logs. Database and NATS failures prevent durable Profile operations. Worker failures can stop event publication, ownership updates, initial picture imports, or retention cleanup while HTTP requests continue to succeed. Intentionally disabled telemetry is marked optional and does not trigger this rule."
+        labels:
+          severity: critical
+          service: user
+
+      - uid: user-dependency-signal-missing
+        title: User Dependency Monitoring Signal Missing
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: >-
+                (time() - user_dependency_observed_at_seconds > bool 120)
+                or absent_over_time(user_dependency_observed_at_seconds[5m])
+                or absent_over_time(user_dependency_healthy{dependency="database",required="true"}[5m])
+                or absent_over_time(user_dependency_healthy{dependency="nats",required="true"}[5m])
+                or absent_over_time(user_dependency_healthy{dependency="workers",required="true"}[5m])
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: User dependency observations are stale or absent
+          description: "The monitored User deployment has stopped reporting fresh dependency observations. Check process availability, the scoped monitor, telemetry initialization, and the collector. This rule expects telemetry-enabled deployments; disable this missing-signal rule for deployments that intentionally turn all telemetry off. Optional telemetry is excluded from dependency-failure alerts, but an absent stream alone cannot distinguish intentional disablement from a dead service."
+        labels:
+          severity: critical
+          service: user

@@ -93,3 +93,11 @@ The reviewer noted possible duplicated chunk-sizing and repair logic in Color an
 No confirmed behavioral findings remain. The reviewer checked ADR 0006, Color and Variant context contracts, User and Media picture availability, and public event schemas. Failed storage operations remain retryable, immutable source identity survives replay, transparent images produce no unusable histogram, retired pictures remain gated, and quarantined messages retain their envelopes.
 
 Final review totals: Standards has zero hard findings and one optional duplication observation; Spec has zero findings. Neither axis has an unresolved confirmed defect.
+
+## Follow-up review
+
+A subsequent assessment at `bec2b1a6` found a validation gap missed by the initial review. Web's `check-types` ran plain `tsc --noEmit` against a solution configuration with an empty file list. It succeeded without checking its referenced application or test files. Explicitly selecting `tsconfig.app.json` exposed production and test diagnostics. The earlier CI result remains a successful pipeline run, but it is not evidence that Web passed typechecking.
+
+The requested follow-up fixes that command and the exposed errors, adds deployed browser regressions for the manually checked cross-service flows, and reduces drift in CloudEvent validation and quarantine mechanics. Reviews of this follow-up compare against `bec2b1a6`.
+
+Deployment and recovery work is tracked in [issue #236](https://github.com/rafaeltab/wallpaperdb/issues/236). Profile editing concurrency and cache ownership are tracked in [issue #237](https://github.com/rafaeltab/wallpaperdb/issues/237).

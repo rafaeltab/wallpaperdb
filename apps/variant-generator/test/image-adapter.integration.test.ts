@@ -1,10 +1,11 @@
 import { createDefaultTesterBuilder, DockerTesterBuilder, S3TesterBuilder } from '@wallpaperdb/test-utils';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
 import { VariantImages, type GenerationInput } from '../src/generation/index.js';
+import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
 
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const input: GenerationInput = {
@@ -18,7 +19,7 @@ describe('Stored variant image adapter', () => {
   let runtime: ManagedRuntime.ManagedRuntime<VariantImages | ImageHealth, never>;
   beforeAll(async () => {
     tester = new Tester();
-    tester.withS3().withS3Bucket('wallpapers').withS3Bucket('originals');
+    tester.withS3().withS3Bucket('wallpapers').withS3Bucket('originals').withS3Bucket('asset-references');
     await tester.setup();
     const s3 = tester.getS3();
     runtime = ManagedRuntime.make(imageLayer({
@@ -108,5 +109,49 @@ describe('Stored variant image adapter', () => {
   });
   it('checks configured storage health', async () => {
     expect(await runtime.runPromise(Effect.gen(function* () { return yield* (yield* ImageHealth).check(); }))).toBe(true);
+  });
+  it('resolves logical originals and registers an immutable rendition before returning', async () => {
+    const original = await sharp({ create: { width: 160, height: 100, channels: 3, background: '#aa3377' } }).jpeg().toBuffer();
+    const reference = { owner: 'ingestor', id: 'logical-original' } as const;
+    await tester.s3.uploadObject('originals', 'logical-source.jpg', original);
+    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', reference, {
+      bucket: 'originals', key: 'logical-source.jpg',
+    });
+    const variant = await runtime.runPromise(Effect.flatMap(VariantImages, (images) => images.generate({
+      ...input, wallpaperId: reference.id, storage: reference,
+    }, { width: 80, height: 45, label: 'small' })));
+    expect(await resolveAssetReference(tester.s3.getS3Client(), 'asset-references', {
+      owner: 'variant-generator', id: `${reference.id}:80x45:image/jpeg`,
+    })).toEqual({ bucket: 'originals', key: variant.storageKey });
+    const replay = await runtime.runPromise(Effect.flatMap(VariantImages, (images) => images.generate({
+      ...input, wallpaperId: reference.id, storage: { bucket: 'originals', key: 'logical-source.jpg' },
+    }, { width: 80, height: 45, label: 'small' })));
+    expect(replay).toEqual(variant);
+  });
+  it('reports descriptor publication failure and resumes the stored variant after registry recovery', async () => {
+    const s3 = tester.getS3();
+    const app = ManagedRuntime.make(imageLayer({
+      endpoint: s3.endpoints.fromHost, region: 'us-east-1', accessKeyId: s3.options.accessKey,
+      secretAccessKey: s3.options.secretKey, bucket: 'wallpapers', assetReferenceBucket: 'recovered-reference-bucket',
+      jpegQuality: 83, pngCompressionLevel: 4, webpQuality: 76,
+    }));
+    const value = { ...input, wallpaperId: 'registry-retry' };
+    const generate = Effect.flatMap(VariantImages, (images) => images.generate(value, { width: 80, height: 45, label: 'small' }));
+    try {
+      const result = await app.runPromise(Effect.result(generate));
+      expect(Result.isFailure(result)).toBe(true);
+      if (Result.isFailure(result)) expect(result.failure).toMatchObject({
+        _tag: 'GenerationUnavailable', operation: 'register-variant-asset',
+      });
+      const client = tester.s3.getS3Client();
+      const before = await client.send(new GetObjectCommand({ Bucket: 'originals', Key: 'registry-retry/variant_80x45.jpg' }));
+      const bytes = await before.Body?.transformToByteArray();
+      await client.send(new CreateBucketCommand({ Bucket: 'recovered-reference-bucket' }));
+      const variant = await app.runPromise(generate);
+      const location = await resolveAssetReference(client, 'recovered-reference-bucket', { owner: 'variant-generator', id: 'registry-retry:80x45:image/jpeg' });
+      const after = await client.send(new GetObjectCommand({ Bucket: location.bucket, Key: location.key }));
+      expect(await after.Body?.transformToByteArray()).toEqual(bytes);
+      expect(variant.fileSizeBytes).toBe(bytes?.byteLength);
+    } finally { await app.dispose(); }
   });
 });

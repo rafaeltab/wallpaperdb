@@ -34,7 +34,7 @@ describe('Production telemetry composition', () => {
   it('exports traces, logs, shared core metrics and Effect metrics before its owning scope closes', async () => {
     const tester = new Tester()
       .withS3()
-      .withS3Bucket('wallpapers')
+      .withS3Bucket('wallpapers').withS3Bucket('asset-references')
       .withNats((nats) => nats.withJetstream())
       .withStream('WALLPAPER');
     const exported = new Map<string, string[]>();
@@ -69,7 +69,7 @@ describe('Production telemetry composition', () => {
           const s3 = tester.getS3();
           const config: Config = {
             nodeEnv: 'test', port: 0, jpegQuality: 90, webpQuality: 90, pngCompressionLevel: 6,
-            s3Endpoint: s3.endpoints.fromHost, s3Region: 'us-east-1', s3Bucket: 'wallpapers',
+            s3Endpoint: s3.endpoints.fromHost, s3Region: 'us-east-1', s3Bucket: 'wallpapers', assetReferenceBucket: 'asset-references',
             s3AccessKeyId: s3.options.accessKey, s3SecretAccessKey: s3.options.secretKey,
             natsUrl: tester.getNats().endpoints.fromHost, natsStream: 'WALLPAPER',
             otelServiceName: 'variant-generator-contract',

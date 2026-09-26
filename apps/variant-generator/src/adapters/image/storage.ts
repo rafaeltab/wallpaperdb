@@ -6,11 +6,7 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { Effect, Schema } from 'effect';
-import {
-  GenerationUnavailable,
-  type GeneratedVariant,
-  type GenerationInput,
-} from '../../generation/index.js';
+import { GenerationUnavailable, type GeneratedVariant } from '../../generation/index.js';
 
 const preconditionFailed = Schema.is(
   Schema.Struct({
@@ -19,14 +15,15 @@ const preconditionFailed = Schema.is(
 );
 const sourceField = 'variant-source';
 const createdField = 'variant-created-at';
-const sourceIdentity = (input: GenerationInput) =>
+type StoredOriginal = { readonly storage: { readonly bucket: string; readonly key: string } };
+const sourceIdentity = (input: StoredOriginal) =>
   createHash('sha256')
     .update(JSON.stringify([input.storage.bucket, input.storage.key]))
     .digest('hex');
 
 function storedMetadata(
   stored: HeadObjectCommandOutput,
-  input: GenerationInput,
+  input: StoredOriginal,
   candidate: GeneratedVariant
 ): GeneratedVariant {
   const length = stored.ContentLength;
@@ -58,7 +55,7 @@ function storedMetadata(
 /** The first writer owns the immutable target; a conflicting writer adopts its stored result. */
 export function storeVariant(
   client: S3Client,
-  input: GenerationInput,
+  input: StoredOriginal,
   candidate: GeneratedVariant,
   bytes: Uint8Array
 ): Effect.Effect<GeneratedVariant, GenerationUnavailable> {

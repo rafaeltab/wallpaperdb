@@ -31,13 +31,7 @@ interface AppOptions {
 export function mediaLayer(config: Config, options: AppOptions = {}) {
   const catalog = CatalogPostgresLayer({
     databaseUrl: config.databaseUrl,
-    assetReferences: {
-      endpoint: config.s3Endpoint,
-      region: config.s3Region,
-      accessKeyId: config.s3AccessKeyId,
-      secretAccessKey: config.s3SecretAccessKey,
-      bucket: config.assetReferenceBucket,
-    },
+    assetBuckets: { wallpapers: config.s3Bucket, profilePictures: config.profilePictureBucket },
   });
   const assets = s3AssetsLayer({
     endpoint: config.s3Endpoint,

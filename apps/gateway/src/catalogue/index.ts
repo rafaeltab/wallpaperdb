@@ -188,6 +188,8 @@ const validProfileQuery = Schema.is(
   )
 );
 const validProfileCursorInput = Schema.is(Schema.NonEmptyString.check(Schema.isMaxLength(2048)));
+const validWallpaperCursor = Schema.is(Schema.Tuple([Schema.NonEmptyString]));
+const validColorWallpaperCursor = Schema.is(Schema.Tuple([Schema.Finite, Schema.NonEmptyString]));
 const validProfileCursor = Schema.is(
   Schema.Tuple([
     Schema.Literal('profiles'),
@@ -226,6 +228,13 @@ export function catalogueLayer(
         const cursor = query.after || query.before;
         const position = cursor ? yield* cursors.decode(cursor) : undefined;
         if (position?._tag === 'InvalidCursor') return position;
+        if (
+          position &&
+          !(query.colors
+            ? validColorWallpaperCursor(position.values)
+            : validWallpaperCursor(position.values))
+        )
+          return { _tag: 'InvalidCursor' };
         const backward = query.last !== undefined && query.before !== undefined;
         const colorVector = query.colors
           ? buildColorVector(query.colors, config.colorSpreadStrategy)

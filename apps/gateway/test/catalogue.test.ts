@@ -116,6 +116,54 @@ describe('Catalogue capability', () => {
     });
     expect(read.selections).toEqual([]);
   });
+  it('rejects a Profile discovery cursor when paging wallpapers', async () => {
+    const { read, catalogue } = await setup();
+    read.profileResponse = {
+      entries: [{ profile: profile('artist'), cursor: [6, 'artist'] }],
+    };
+    const profiles = await Effect.runPromise(catalogue.searchProfiles({ query: 'artist' }));
+    if (profiles._tag !== 'Found') throw new Error('Expected a Profile page');
+
+    expect(
+      await Effect.runPromise(catalogue.search({ after: profiles.value.pageInfo.endCursor ?? '' }))
+    ).toEqual({ _tag: 'InvalidCursor' });
+    expect(read.selections).toEqual([]);
+  });
+  it.each([
+    { values: [0.8, 'wallpaper'], colors: undefined },
+    { values: ['wallpaper'], colors: [{ color: '#FF0000', amount: 1 }] },
+    { values: ['0.8', 'wallpaper'], colors: [{ color: '#FF0000', amount: 1 }] },
+    { values: [0.8, ''], colors: [{ color: '#FF0000', amount: 1 }] },
+    { values: ['', 'extra'], colors: undefined },
+  ])('rejects cursor values incompatible with the wallpaper sort: %j', async ({
+    values,
+    colors,
+  }) => {
+    const { read, catalogue, cursors } = await setup();
+    const cursor = await Effect.runPromise(cursors.encode(values));
+    for (const pagination of [{ after: cursor }, { last: 2, before: cursor }]) {
+      expect(await Effect.runPromise(catalogue.search({ ...pagination, colors }))).toEqual({
+        _tag: 'InvalidCursor',
+      });
+    }
+    expect(read.selections).toEqual([]);
+  });
+  it('preserves score and wallpaper ID when paging by color in either direction', async () => {
+    const { read, catalogue, cursors } = await setup();
+    const cursor = await Effect.runPromise(cursors.encode([0.8, 'wallpaper']));
+    const colors = [{ color: '#FF0000', amount: 1 }];
+
+    expect(await Effect.runPromise(catalogue.search({ colors, after: cursor }))).toMatchObject({
+      _tag: 'Found',
+    });
+    expect(
+      await Effect.runPromise(catalogue.search({ colors, last: 2, before: cursor }))
+    ).toMatchObject({ _tag: 'Found' });
+    expect(read.selections).toMatchObject([
+      { searchAfter: [0.8, 'wallpaper'], sortOrder: 'desc' },
+      { searchAfter: [0.8, 'wallpaper'], sortOrder: 'asc' },
+    ]);
+  });
   it.each([
     { first: 101, after: 'tampered' },
     { last: 101, before: 'tampered' },

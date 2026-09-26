@@ -1,9 +1,12 @@
-import 'reflect-metadata';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { once } from 'node:events';
 import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { PROFILE_CREATED_SUBJECT, PROFILE_UPDATED_SUBJECT, type ProfileUpdatedEvent } from '@wallpaperdb/events';
+import {
+  PROFILE_CREATED_SUBJECT,
+  PROFILE_UPDATED_SUBJECT,
+  type ProfileUpdatedEvent,
+} from '@wallpaperdb/events';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -13,24 +16,29 @@ import {
 } from '@wallpaperdb/test-utils';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
-import { container } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InProcessMediaTesterBuilder, MediaMigrationsTesterBuilder } from '../builders/index.js';
-import { DatabaseConnection } from '../../src/connections/database.js';
 import { profilePictureHeads } from '../../src/db/schema.js';
 
 describe('Profile picture delivery', () => {
   const availability = new Map<string, number>();
-  const authorityRequests: Array<{ url?: string; authorization?: string; cacheControl?: string }> = [];
+  const authorityRequests: Array<{ url?: string; authorization?: string; cacheControl?: string }> =
+    [];
   const authority = createServer((request, response) => {
-    authorityRequests.push({ url: request.url, authorization: request.headers.authorization, cacheControl: request.headers['cache-control'] });
+    authorityRequests.push({
+      url: request.url,
+      authorization: request.headers.authorization,
+      cacheControl: request.headers['cache-control'],
+    });
     response.setHeader('Cache-Control', 'no-store');
     if (request.headers.authorization !== 'Bearer test-media-token') {
       response.writeHead(401).end();
       return;
     }
-    const pictureId = request.url?.match(/^\/internal\/profile-pictures\/([^/]+)\/availability$/)?.[1];
-    const status = pictureId ? availability.get(pictureId) ?? 404 : 404;
+    const pictureId = request.url?.match(
+      /^\/internal\/profile-pictures\/([^/]+)\/availability$/
+    )?.[1];
+    const status = pictureId ? (availability.get(pictureId) ?? 404) : 404;
     if (status === 0) request.socket.destroy();
     else response.writeHead(status).end();
   });
@@ -61,7 +69,6 @@ describe('Profile picture delivery', () => {
     await once(authority, 'listening');
     process.env.USER_SERVICE_URL = `http://127.0.0.1:${(authority.address() as AddressInfo).port}`;
     process.env.USER_MEDIA_SERVICE_TOKEN = 'test-media-token';
-    container.clearInstances();
     tester = setup();
     await tester.setup();
   }, 60000);
@@ -81,23 +88,51 @@ describe('Profile picture delivery', () => {
     authorityRequests.length = 0;
   });
 
-  async function pictureEvent(profileId: string, pictureId: string, version = 2): Promise<{ event: ProfileUpdatedEvent; bytes: Buffer }> {
-    const bytes = await sharp({ create: { width: 32, height: 32, channels: 3, background: '#4b728a' } }).webp().toBuffer();
+  async function pictureEvent(
+    profileId: string,
+    pictureId: string,
+    version = 2
+  ): Promise<{ event: ProfileUpdatedEvent; bytes: Buffer }> {
+    const bytes = await sharp({
+      create: { width: 32, height: 32, channels: 3, background: '#4b728a' },
+    })
+      .webp()
+      .toBuffer();
     const asset = {
-      id: pictureId, storageBucket: 'profile-pictures', storageKey: `${profileId}/${pictureId}.webp`,
-      mimeType: 'image/webp' as const, width: 32, height: 32, fileSizeBytes: bytes.length,
+      id: pictureId,
+      storageBucket: 'profile-pictures',
+      storageKey: `${profileId}/${pictureId}.webp`,
+      mimeType: 'image/webp' as const,
+      width: 32,
+      height: 32,
+      fileSizeBytes: bytes.length,
     };
     await tester.s3.uploadObject(asset.storageBucket, asset.storageKey, bytes);
     const timestamp = new Date().toISOString();
     return {
       bytes,
       event: {
-        eventId: `evt_${pictureId}_${version}`, eventType: PROFILE_UPDATED_SUBJECT, timestamp,
-        change: { type: 'picture-changed', before: null, after: pictureId, source: 'upload', asset },
+        eventId: `evt_${pictureId}_${version}`,
+        eventType: PROFILE_UPDATED_SUBJECT,
+        timestamp,
+        change: {
+          type: 'picture-changed',
+          before: null,
+          after: pictureId,
+          source: 'upload',
+          asset,
+        },
         profile: {
-          id: profileId, handle: profileId, displayName: 'Picture Owner', claimGeneration: 1,
-          aliases: [], biographyMarkdown: '', pictureAssetId: pictureId, version,
-          createdAt: timestamp, updatedAt: timestamp,
+          id: profileId,
+          handle: profileId,
+          displayName: 'Picture Owner',
+          claimGeneration: 1,
+          aliases: [],
+          biographyMarkdown: '',
+          pictureAssetId: pictureId,
+          version,
+          createdAt: timestamp,
+          updatedAt: timestamp,
         },
       },
     };
@@ -112,11 +147,14 @@ describe('Profile picture delivery', () => {
     availability.set('pic_delivery', 204);
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
 
-    const response = await vi.waitFor(async () => {
-      const response = await getPicture('pic_delivery');
-      expect(response.statusCode).toBe(200);
-      return response;
-    }, { timeout: 5000, interval: 25 });
+    const response = await vi.waitFor(
+      async () => {
+        const response = await getPicture('pic_delivery');
+        expect(response.statusCode).toBe(200);
+        return response;
+      },
+      { timeout: 5000, interval: 25 }
+    );
 
     expect(response.rawPayload).toEqual(bytes);
     expect(response.headers['content-type']).toBe('image/webp');
@@ -125,66 +163,109 @@ describe('Profile picture delivery', () => {
     expect(response.headers.location).toBeUndefined();
     expect(authorityRequests).toContainEqual({
       url: '/internal/profile-pictures/pic_delivery/availability',
-      authorization: 'Bearer test-media-token', cacheControl: 'no-store',
+      authorization: 'Bearer test-media-token',
+      cacheControl: 'no-store',
     });
   });
 
   it('projects creation and newer non-picture snapshots before late picture metadata without losing delivery', async () => {
     const { event, bytes } = await pictureEvent('user_picture_order', 'pic_late_metadata');
     const created = {
-      eventId: 'evt_picture_profile_created', eventType: PROFILE_CREATED_SUBJECT,
-      timestamp: event.timestamp, change: { type: 'created' },
+      eventId: 'evt_picture_profile_created',
+      eventType: PROFILE_CREATED_SUBJECT,
+      timestamp: event.timestamp,
+      change: { type: 'created' },
       profile: { ...event.profile, version: 1, pictureAssetId: null },
     };
     await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, created);
-    const db = container.resolve(DatabaseConnection).getClient().db;
-    await vi.waitFor(async () => {
-      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
-        .toMatchObject({ version: 1, pictureId: null });
-    }, { timeout: 5000, interval: 25 });
+    const db = tester.getFixtureDatabase();
+    await vi.waitFor(
+      async () => {
+        expect(
+          await db.query.profilePictureHeads.findFirst({
+            where: eq(profilePictureHeads.profileId, event.profile.id),
+          })
+        ).toMatchObject({ version: 1, pictureId: null });
+      },
+      { timeout: 5000, interval: 25 }
+    );
 
     availability.set('pic_late_metadata', 204);
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-      ...event, eventId: 'evt_picture_newer_display_name',
+      ...event,
+      eventId: 'evt_picture_newer_display_name',
       change: { type: 'display-name-changed', before: 'Before', after: 'After' },
       profile: { ...event.profile, version: 3, displayName: 'After' },
     });
-    await vi.waitFor(async () => {
-      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
-        .toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
-    }, { timeout: 5000, interval: 25 });
+    await vi.waitFor(
+      async () => {
+        expect(
+          await db.query.profilePictureHeads.findFirst({
+            where: eq(profilePictureHeads.profileId, event.profile.id),
+          })
+        ).toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
+      },
+      { timeout: 5000, interval: 25 }
+    );
     const waiting = await getPicture('pic_late_metadata');
     expect(waiting.statusCode).toBe(404);
     expect(waiting.headers['cache-control']).toBe('no-store');
 
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
-    await vi.waitFor(async () => {
-      const response = await getPicture('pic_late_metadata');
-      expect(response.statusCode).toBe(200);
-      expect(response.rawPayload).toEqual(bytes);
-    }, { timeout: 5000, interval: 25 });
-    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, { ...created, eventId: 'evt_delayed_picture_creation' });
-    const marker = { ...created, eventId: 'evt_picture_order_marker', profile: { ...created.profile, id: 'user_picture_order_marker' } };
+    await vi.waitFor(
+      async () => {
+        const response = await getPicture('pic_late_metadata');
+        expect(response.statusCode).toBe(200);
+        expect(response.rawPayload).toEqual(bytes);
+      },
+      { timeout: 5000, interval: 25 }
+    );
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, {
+      ...created,
+      eventId: 'evt_delayed_picture_creation',
+    });
+    const marker = {
+      ...created,
+      eventId: 'evt_picture_order_marker',
+      profile: { ...created.profile, id: 'user_picture_order_marker' },
+    };
     await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, marker);
-    await vi.waitFor(async () => {
-      expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, marker.profile.id) })).toBeDefined();
-    }, { timeout: 5000, interval: 25 });
+    await vi.waitFor(
+      async () => {
+        expect(
+          await db.query.profilePictureHeads.findFirst({
+            where: eq(profilePictureHeads.profileId, marker.profile.id),
+          })
+        ).toBeDefined();
+      },
+      { timeout: 5000, interval: 25 }
+    );
     expect((await getPicture('pic_late_metadata')).statusCode).toBe(200);
-    expect(await db.query.profilePictureHeads.findFirst({ where: eq(profilePictureHeads.profileId, event.profile.id) }))
-      .toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
+    expect(
+      await db.query.profilePictureHeads.findFirst({
+        where: eq(profilePictureHeads.profileId, event.profile.id),
+      })
+    ).toMatchObject({ version: 3, pictureId: 'pic_late_metadata' });
   });
 
   it('rejects new GET and HEAD requests immediately after retirement despite stale projection and retains private bytes', async () => {
     const { event, bytes } = await pictureEvent('user_picture_retired', 'pic_retired');
     availability.set('pic_retired', 204);
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
-    await vi.waitFor(async () => expect((await getPicture('pic_retired')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+    await vi.waitFor(async () => expect((await getPicture('pic_retired')).statusCode).toBe(200), {
+      timeout: 5000,
+      interval: 25,
+    });
 
     // The User command has committed, but no retirement event has reached Media.
     availability.set('pic_retired', 404);
     const requestsBefore = authorityRequests.length;
     for (const method of ['GET', 'HEAD'] as const) {
-      const response = await tester.getApp().inject({ method, url: '/profile-pictures/pic_retired', headers: { 'if-none-match': '*' } });
+      const response = await tester.getApp().inject({
+        method,
+        url: '/profile-pictures/pic_retired',
+        headers: { 'if-none-match': '*' },
+      });
       expect(response.statusCode).toBe(404);
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.headers.location).toBeUndefined();
@@ -192,11 +273,16 @@ describe('Profile picture delivery', () => {
       expect(response.rawPayload).not.toEqual(bytes);
     }
     expect(authorityRequests).toHaveLength(requestsBefore + 2);
-    const stored = await tester.s3.getS3Client().send(new GetObjectCommand({
-      Bucket: 'profile-pictures', Key: 'user_picture_retired/pic_retired.webp',
-    }));
-    expect(Buffer.from(await stored.Body?.transformToByteArray() ?? [])).toEqual(bytes);
-    const anonymous = await fetch(`${tester.s3.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`);
+    const stored = await tester.s3.getS3Client().send(
+      new GetObjectCommand({
+        Bucket: 'profile-pictures',
+        Key: 'user_picture_retired/pic_retired.webp',
+      })
+    );
+    expect(Buffer.from((await stored.Body?.transformToByteArray()) ?? [])).toEqual(bytes);
+    const anonymous = await fetch(
+      `${tester.s3.config.endpoints.fromHost}/profile-pictures/user_picture_retired/pic_retired.webp`
+    );
     expect(anonymous.status).toBe(403);
     await anonymous.body?.cancel();
   });
@@ -205,7 +291,10 @@ describe('Profile picture delivery', () => {
     const { event, bytes } = await pictureEvent('user_picture_retry', 'pic_retry');
     availability.set('pic_retry', 204);
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, event);
-    await vi.waitFor(async () => expect((await getPicture('pic_retry')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+    await vi.waitFor(async () => expect((await getPicture('pic_retry')).statusCode).toBe(200), {
+      timeout: 5000,
+      interval: 25,
+    });
 
     for (const status of [401, 403, 500, 302, 0]) {
       availability.set('pic_retry', status);
@@ -218,7 +307,9 @@ describe('Profile picture delivery', () => {
     }
     availability.set('pic_retry', 204);
     const key = 'user_picture_retry/pic_retry.webp';
-    await tester.s3.getS3Client().send(new DeleteObjectCommand({ Bucket: 'profile-pictures', Key: key }));
+    await tester.s3
+      .getS3Client()
+      .send(new DeleteObjectCommand({ Bucket: 'profile-pictures', Key: key }));
     const missingObject = await getPicture('pic_retry');
     expect(missingObject.statusCode).toBe(503);
     expect(missingObject.headers['cache-control']).toBe('no-store');
@@ -237,35 +328,75 @@ describe('Profile picture delivery', () => {
     availability.set('pic_before', 204);
     availability.set('pic_after', 204);
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, current.event);
-    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(200), { timeout: 5000, interval: 25 });
+    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(200), {
+      timeout: 5000,
+      interval: 25,
+    });
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, old.event);
-    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...current.event, eventId: 'evt_picture_duplicate' });
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+      ...current.event,
+      eventId: 'evt_picture_duplicate',
+    });
     const marker = {
-      eventId: 'evt_picture_lifecycle_marker', eventType: PROFILE_CREATED_SUBJECT,
-      timestamp: old.event.timestamp, change: { type: 'created' },
-      profile: { ...old.event.profile, id: 'user_picture_lifecycle_marker', version: 1, pictureAssetId: null },
+      eventId: 'evt_picture_lifecycle_marker',
+      eventType: PROFILE_CREATED_SUBJECT,
+      timestamp: old.event.timestamp,
+      change: { type: 'created' },
+      profile: {
+        ...old.event.profile,
+        id: 'user_picture_lifecycle_marker',
+        version: 1,
+        pictureAssetId: null,
+      },
     };
-    const db = container.resolve(DatabaseConnection).getClient().db;
+    const db = tester.getFixtureDatabase();
     await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, marker);
-    await vi.waitFor(async () => expect(await db.query.profilePictureHeads.findFirst({
-      where: eq(profilePictureHeads.profileId, marker.profile.id),
-    })).toBeDefined(), { timeout: 5000, interval: 25 });
+    await vi.waitFor(
+      async () =>
+        expect(
+          await db.query.profilePictureHeads.findFirst({
+            where: eq(profilePictureHeads.profileId, marker.profile.id),
+          })
+        ).toBeDefined(),
+      { timeout: 5000, interval: 25 }
+    );
     expect((await getPicture('pic_before')).statusCode).toBe(404);
     expect((await getPicture('pic_after')).rawPayload).toEqual(current.bytes);
 
     await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
-      ...current.event, eventId: 'evt_picture_removed',
-      change: { type: 'picture-changed', before: 'pic_after', after: null, source: 'remove', asset: null },
+      ...current.event,
+      eventId: 'evt_picture_removed',
+      change: {
+        type: 'picture-changed',
+        before: 'pic_after',
+        after: null,
+        source: 'remove',
+        asset: null,
+      },
       profile: { ...current.event.profile, version: 4, pictureAssetId: null },
     });
-    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(404), { timeout: 5000, interval: 25 });
-    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, { ...current.event, eventId: 'evt_picture_old_replay' });
-    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, {
-      ...marker, eventId: 'evt_picture_removal_marker', profile: { ...marker.profile, version: 2 },
+    await vi.waitFor(async () => expect((await getPicture('pic_after')).statusCode).toBe(404), {
+      timeout: 5000,
+      interval: 25,
     });
-    await vi.waitFor(async () => expect(await db.query.profilePictureHeads.findFirst({
-      where: eq(profilePictureHeads.profileId, marker.profile.id),
-    })).toMatchObject({ version: 2 }), { timeout: 5000, interval: 25 });
+    await tester.nats.publishEvent(PROFILE_UPDATED_SUBJECT, {
+      ...current.event,
+      eventId: 'evt_picture_old_replay',
+    });
+    await tester.nats.publishEvent(PROFILE_CREATED_SUBJECT, {
+      ...marker,
+      eventId: 'evt_picture_removal_marker',
+      profile: { ...marker.profile, version: 2 },
+    });
+    await vi.waitFor(
+      async () =>
+        expect(
+          await db.query.profilePictureHeads.findFirst({
+            where: eq(profilePictureHeads.profileId, marker.profile.id),
+          })
+        ).toMatchObject({ version: 2 }),
+      { timeout: 5000, interval: 25 }
+    );
     expect((await getPicture('pic_after')).statusCode).toBe(404);
     expect((await getPicture('pic_before')).statusCode).toBe(404);
   });

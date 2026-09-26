@@ -1,15 +1,15 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
-	type AddMethodsType,
-	BaseTesterBuilder,
-	type PostgresTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import createPostgresClient from "postgres";
-import { createTestLogger } from "@wallpaperdb/test-logger";
+  type AddMethodsType,
+  BaseTesterBuilder,
+  type PostgresTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import createPostgresClient from 'postgres';
+import { createTestLogger } from '@wallpaperdb/test-logger';
 
-const logger = createTestLogger("MediaMigrationsBuilder");
+const logger = createTestLogger('MediaMigrationsBuilder');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -17,8 +17,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * Options for MediaMigrationsMixin
  */
 export interface MediaMigrationsOptions {
-	/** Path to migration SQL file (relative to workspace root) */
-	migrationPath?: string;
+  /** Path to migration SQL file (relative to workspace root) */
+  migrationPath?: string;
 }
 
 /**
@@ -34,65 +34,65 @@ export interface MediaMigrationsOptions {
  * ```
  */
 export class MediaMigrationsTesterBuilder extends BaseTesterBuilder<
-	"MediaMigrations",
-	[PostgresTesterBuilder]
+  'MediaMigrations',
+  [PostgresTesterBuilder]
 > {
-	readonly name = "MediaMigrations" as const;
-	private options: MediaMigrationsOptions;
+  readonly name = 'MediaMigrations' as const;
+  private options: MediaMigrationsOptions;
 
-	constructor(options: MediaMigrationsOptions = {}) {
-		super();
-		this.options = options;
-	}
+  constructor(options: MediaMigrationsOptions = {}) {
+    super();
+    this.options = options;
+  }
 
-	addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(
-		Base: TBase) {
-		const migrationDirectory = join(__dirname, "../../drizzle");
-		const migrationPaths = this.options.migrationPath ? [this.options.migrationPath] :
-			readdirSync(migrationDirectory).filter((path) => path.endsWith('.sql')).sort().map((path) => join(migrationDirectory, path));
+  addMethods<TBase extends AddMethodsType<[PostgresTesterBuilder]>>(Base: TBase) {
+    const migrationDirectory = join(__dirname, '../../drizzle');
+    const migrationPaths = this.options.migrationPath
+      ? [this.options.migrationPath]
+      : readdirSync(migrationDirectory)
+          .filter((path) => path.endsWith('.sql'))
+          .sort()
+          .map((path) => join(migrationDirectory, path));
 
-		return class extends Base {
-			_migrationsApplied = false;
+    return class extends Base {
+      _migrationsApplied = false;
 
-			/**
-			 * Enable automatic database migration during setup.
-			 * Migrations are idempotent and safe to call multiple times.
-			 */
-			withMigrations() {
-				if (this._migrationsApplied) {
-					return this; // Already registered
-				}
-				this._migrationsApplied = true;
+      /**
+       * Enable automatic database migration during setup.
+       * Migrations are idempotent and safe to call multiple times.
+       */
+      withMigrations() {
+        if (this._migrationsApplied) {
+          return this; // Already registered
+        }
+        this._migrationsApplied = true;
 
-				this.addSetupHook(async () => {
-					logger.debug("[MediaMigrations] Running migration hook");
-					const postgres = this.getPostgres();
+        this.addSetupHook(async () => {
+          logger.debug('[MediaMigrations] Running migration hook');
+          const postgres = this.getPostgres();
 
-					if (!postgres) {
-						throw new Error(
-							"PostgresTesterBuilder must be applied before MediaMigrationsTesterBuilder",
-						);
-					}
+          if (!postgres) {
+            throw new Error(
+              'PostgresTesterBuilder must be applied before MediaMigrationsTesterBuilder'
+            );
+          }
 
-					logger.debug("Applying media service database migrations...");
+          logger.debug('Applying media service database migrations...');
 
-					const sql = createPostgresClient(
-						postgres.connectionStrings.fromHost,
-						{ max: 1 },
-					);
+          const sql = createPostgresClient(postgres.connectionStrings.fromHost, { max: 1 });
 
-					try {
-						for (const migrationPath of migrationPaths) {
-							await sql.unsafe(readFileSync(migrationPath, "utf-8"));
-						}
-						logger.debug("Database migrations applied successfully");
-					} finally {
-						await sql.end();
-					}
-				});
+          try {
+            for (const migrationPath of migrationPaths) {
+              await sql.unsafe(readFileSync(migrationPath, 'utf-8'));
+            }
+            logger.debug('Database migrations applied successfully');
+          } finally {
+            await sql.end();
+          }
+        });
 
-				return this;
-			}
-		};
-	}
+        return this;
+      }
+    };
+  }
 }

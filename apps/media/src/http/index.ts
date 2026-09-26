@@ -40,7 +40,8 @@ function problem(status: number, name: string, title: string) {
 interface HttpExecution {
   run<A, E>(
     effect: Effect.Effect<A, E, Availability | MediaDelivery>,
-    headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
+    signal?: AbortSignal
   ): Promise<A>;
 }
 const HttpExecution = Context.Service<HttpExecution>('wallpaperdb.media.http.Execution');
@@ -54,13 +55,14 @@ const executionLayer = Layer.effect(
     return {
       run: <A, E>(
         effect: Effect.Effect<A, E, Availability | MediaDelivery>,
-        headers: IncomingHttpHeaders
+        headers: IncomingHttpHeaders,
+        signal?: AbortSignal
       ) => {
         const active = context.active();
         const parent = (
           trace.getSpan(active) ?? trace.getSpan(propagation.extract(active, headers))
         )?.spanContext();
-        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect);
+        return run(parent ? OtelTracer.withSpanContext(effect, parent) : effect, { signal });
       },
     };
   })

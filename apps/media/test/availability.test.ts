@@ -32,7 +32,12 @@ it.each([
   [false, true, true, undefined],
   [true, true, false, 'Service is shutting down'],
 ])('readiness uses startup and shutdown state', async (shuttingDown, initialized, ready, reason) => {
-  const result = await Effect.runPromise(Availability.use((service) => service.ready(shuttingDown, initialized)).pipe(Effect.provide(availabilityLayer), Effect.provideService(AvailabilityProbe, { inspect: () => Effect.die('must not probe') })));
+  const result = await Effect.runPromise(
+    Availability.use((service) => service.ready(shuttingDown, initialized)).pipe(
+      Effect.provide(availabilityLayer),
+      Effect.provideService(AvailabilityProbe, { inspect: () => Effect.die('must not probe') })
+    )
+  );
   expect(result.ready).toBe(ready);
   expect(result.reason).toBe(reason);
   expect(Number.isNaN(Date.parse(result.timestamp))).toBe(false);

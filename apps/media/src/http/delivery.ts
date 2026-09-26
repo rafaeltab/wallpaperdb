@@ -37,8 +37,15 @@ function respond(reply: FastifyReply, outcome: MediaOutcome, picture: boolean) {
           : 'Wallpaper was not found or file is missing from storage'
       );
     case 'Found': {
+      if (reply.raw.destroyed) {
+        outcome.body.close();
+        return reply;
+      }
       const stream = Readable.from(outcome.body);
-      reply.raw.once('close', () => stream.destroy());
+      reply.raw.once('close', () => {
+        stream.destroy();
+        outcome.body.close();
+      });
       reply.type(outcome.mimeType).header('Cache-Control', 'public, max-age=31536000, immutable');
       if (outcome.fileSizeBytes !== undefined)
         reply.header('Content-Length', outcome.fileSizeBytes);
@@ -50,10 +57,13 @@ export function registerDeliveryRoutes(
   app: FastifyInstance,
   run: <A, E>(
     effect: Effect.Effect<A, E, MediaDelivery>,
-    headers: IncomingHttpHeaders
+    headers: IncomingHttpHeaders,
+    signal?: AbortSignal
   ) => Promise<A>
 ) {
   app.get<{ Params: { id: string } }>('/wallpapers/:id', async (request, reply) => {
+    const controller = new AbortController();
+    reply.raw.once('close', () => controller.abort());
     const parsed = querySchema.safeParse(request.query);
     if (!parsed.success)
       return problem(
@@ -75,7 +85,8 @@ export function registerDeliveryRoutes(
           Effect.succeed({ _tag: 'Unavailable' } as const)
         )
       ),
-      request.headers
+      request.headers,
+      controller.signal
     );
     if (result._tag === 'Unavailable')
       return problem(
@@ -90,13 +101,16 @@ export function registerDeliveryRoutes(
   app.get<{ Params: { pictureId: string } }>(
     '/profile-pictures/:pictureId',
     async (request, reply) => {
+      const controller = new AbortController();
+      reply.raw.once('close', () => controller.abort());
       const result = await run(
         MediaDelivery.use((service) => service.picture(request.params.pictureId)).pipe(
           Effect.catchTag('DeliveryUnavailable', () =>
             Effect.succeed({ _tag: 'Unavailable' } as const)
           )
         ),
-        request.headers
+        request.headers,
+        controller.signal
       );
       if (result._tag === 'Unavailable')
         return problem(

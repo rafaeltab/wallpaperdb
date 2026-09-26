@@ -1,4 +1,4 @@
-import { Context, Effect, Schema } from 'effect';
+import { Context, type Effect, Schema } from 'effect';
 
 export class CatalogFailure extends Schema.TaggedError<CatalogFailure>()('CatalogFailure', {
   operation: Schema.String,

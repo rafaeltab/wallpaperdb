@@ -1,3 +1,4 @@
+// Modified by WallpaperDB: retain full function ranges for coverage attribution; see ../UPSTREAM.md.
 export type CliMode = "all" | "changed" | "explicit" | "help";
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 export type PackageManagerSelection = PackageManager | "auto";
@@ -62,6 +63,7 @@ export interface MethodDescriptor {
   endLine: number;
   complexity: number;
   bodySpan: SourceSpan;
+  functionSpan?: SourceSpan;
   expectsStatementCoverage: boolean;
   expectsBranchCoverage: boolean;
 }

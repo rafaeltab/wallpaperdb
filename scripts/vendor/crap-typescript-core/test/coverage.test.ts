@@ -1,4 +1,4 @@
-// Modified by WallpaperDB: omit command-runner tests; see ../UPSTREAM.md.
+// Modified by WallpaperDB: omit command-runner tests and enforce source-body ownership; see ../UPSTREAM.md.
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -445,7 +445,7 @@ export function enumDeclOnly(): void {
     ]);
   });
 
-  it("uses fnMap as a secondary matching aid when function columns drift", async () => {
+  it("does not expand source-body ownership when function-map columns drift", async () => {
     const projectRoot = await createTempDir("crap-coverage-");
     tempDirs.push(projectRoot);
     await writeProjectFiles(projectRoot, {
@@ -478,7 +478,7 @@ export function enumDeclOnly(): void {
       {
         coverage: { percent: 100.0, status: "measured", reason: null },
         statement: { percent: 100.0, status: "measured", reason: null },
-        branch: { percent: 100.0, status: "measured", reason: null }
+        branch: { percent: null, status: "unknown", reason: "branch_unattributed" }
       }
     ]);
   });
@@ -664,13 +664,13 @@ export function enumDeclOnly(): void {
           {
             name: "conflict",
             declarationStart: { line: 1, column: 0 },
-            span: { startLine: 1, startColumn: 0, endLine: 7, endColumn: 1 },
+            span: methods[0]!.bodySpan,
             spanSource: "loc"
           },
           {
             name: "conflict_alt",
             declarationStart: { line: 1, column: 1 },
-            span: { startLine: 1, startColumn: 1, endLine: 7, endColumn: 2 },
+            span: methods[0]!.bodySpan,
             spanSource: "loc"
           }
         ]
@@ -684,7 +684,7 @@ export function enumDeclOnly(): void {
     ]);
   });
 
-  it("uses containing fnMap entries when the method body is nested inside a wider function span", async () => {
+  it("matches a function declaration without expanding ownership to the declaration", async () => {
     const projectRoot = await createTempDir("crap-coverage-");
     tempDirs.push(projectRoot);
     await writeProjectFiles(projectRoot, {
@@ -858,7 +858,7 @@ export function enumDeclOnly(): void {
     ]);
   });
 
-  it("rejects line-aligned fnMap matches when the columns do not overlap", async () => {
+  it("retains source-owned statements when unrelated function-map columns do not overlap", async () => {
     const projectRoot = await createTempDir("crap-coverage-");
     tempDirs.push(projectRoot);
     await writeProjectFiles(projectRoot, {
@@ -876,8 +876,8 @@ export function enumDeclOnly(): void {
       }).map(summarizeMethodCoverage)
     ).toEqual([
       {
-        coverage: { percent: null, status: "unknown", reason: "statement_unattributed" },
-        statement: { percent: null, status: "unknown", reason: "statement_unattributed" },
+        coverage: { percent: 100.0, status: "measured", reason: null },
+        statement: { percent: 100.0, status: "measured", reason: null },
         branch: { percent: null, status: "structural_na", reason: null }
       }
     ]);

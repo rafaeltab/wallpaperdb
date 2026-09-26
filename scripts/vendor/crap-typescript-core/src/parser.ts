@@ -1,3 +1,4 @@
+// Modified by WallpaperDB: discover callbacks, retain function ranges and isolate nested branches; see ../UPSTREAM.md.
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
@@ -108,7 +109,7 @@ const DESCRIPTOR_BUILDERS: DescriptorBuilder[] = [
   descriptorFromMethodDeclaration,
   descriptorFromConstructorDeclaration,
   descriptorFromAccessorDeclaration,
-  descriptorFromAssignedFunction
+  descriptorFromFunctionExpression
 ];
 
 function descriptorFromFunctionDeclaration(node: ts.Node, sourceFile: ts.SourceFile): MethodDescriptor | null {
@@ -150,15 +151,38 @@ function descriptorFromAccessorDeclaration(node: ts.Node, sourceFile: ts.SourceF
   return buildMethodDescriptor(accessorName(node), findContainerName(node), node, node.body, sourceFile);
 }
 
-function descriptorFromAssignedFunction(node: ts.Node, sourceFile: ts.SourceFile): MethodDescriptor | null {
+function descriptorFromFunctionExpression(node: ts.Node, sourceFile: ts.SourceFile): MethodDescriptor | null {
   if (!(ts.isFunctionExpression(node) || ts.isArrowFunction(node))) {
     return null;
   }
   const assignedName = findAssignedFunctionName(node);
-  if (!assignedName) {
-    return null;
+  const resolvedName = assignedName ?? {
+    name: fallbackFunctionName(node, sourceFile),
+    containerName: findContainerName(node)
+  };
+  const descriptor = buildMethodDescriptor(resolvedName.name, resolvedName.containerName, node, node.body, sourceFile);
+  if (!assignedName && ts.isFunctionExpression(node) && node.name) {
+    descriptor.functionName = node.name.text;
   }
-  return buildMethodDescriptor(assignedName.name, assignedName.containerName, node, node.body, sourceFile);
+  return descriptor;
+}
+
+function fallbackFunctionName(node: ts.FunctionExpression | ts.ArrowFunction, sourceFile: ts.SourceFile): string {
+  const start = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+  const location = `${start.line + 1}:${start.character + 1}`;
+  if (ts.isFunctionExpression(node) && node.name) {
+    return `${node.name.text}@${location}`;
+  }
+  const parent = node.parent;
+  if (ts.isCallExpression(parent) && parent.arguments.indexOf(node) >= 0) {
+    let callee = parent.expression;
+    while (ts.isCallExpression(callee)) {
+      callee = callee.expression;
+    }
+    const calleeName = dottedAccessName(callee) ?? "<callback>";
+    return `${calleeName} argument ${parent.arguments.indexOf(node) + 1}@${location}`;
+  }
+  return `<anonymous>@${location}`;
 }
 
 function inferFunctionDeclarationName(node: ts.FunctionDeclaration): string | null {
@@ -186,6 +210,7 @@ function buildMethodDescriptor(
     endLine,
     complexity: countCyclomaticComplexity(node),
     bodySpan: toSourceSpan(bodyNode, sourceFile),
+    functionSpan: toSourceSpan(node, sourceFile),
     expectsStatementCoverage: hasAttributableStatements(bodyNode),
     expectsBranchCoverage: hasAttributableBranches(bodyNode)
   };
@@ -505,7 +530,7 @@ function hasAttributableBranches(body: ts.ConciseBody): boolean {
     if (found) {
       return;
     }
-    if (current !== body && isNestedBoundary(current)) {
+    if (isNestedBoundary(current)) {
       return;
     }
     if (hasBranchSyntax(current)) {

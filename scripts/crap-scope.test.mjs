@@ -56,9 +56,9 @@ for (const filter of filters) {
       fs.writeFileSync(path.join(root, 'apps/ingestor/src/index.ts'), source);
       fs.writeFileSync(path.join(root, 'fixture-coverage.json'), JSON.stringify(report));
     },
-    run(workspace = '') {
-      return spawnSync(path.join(repository, 'node_modules/.bin/tsx'), ['scripts/crap.mts', 'report'], {
-        cwd: root, encoding: 'utf8', env: { ...process.env, PACKAGE: workspace }, timeout: 30_000,
+    run(workspace = '', mode = 'report', threshold = '') {
+      return spawnSync(path.join(repository, 'node_modules/.bin/tsx'), ['scripts/crap.mts', mode], {
+        cwd: root, encoding: 'utf8', env: { ...process.env, PACKAGE: workspace, CRAP_THRESHOLD: String(threshold) }, timeout: 30_000,
       });
     },
     selected: () => JSON.parse(fs.readFileSync(path.join(root, 'selected.json'), 'utf8')),
@@ -139,6 +139,47 @@ test('an uncovered implicit else still reduces otherwise complete function cover
   const result = project.run('ingestor');
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /2\.500\t2\t50\.00%\t.*\tidentity/);
+});
+
+test('an uncalled wrapped callback fails threshold 30 and passes equality at 56', (t) => {
+  const project = fixture(t);
+  const line = (start, end = start) => ({
+    start: { line: start, column: 0 }, end: { line: end, column: null },
+  });
+  const declaration = line(1, 9);
+  const statementMap = { 0: declaration };
+  const s = { 0: 1 };
+  const branchMap = {};
+  const b = {};
+  for (let index = 1; index <= 7; index++) {
+    statementMap[index] = line(index + 1);
+    s[index] = 0;
+    if (index <= 6) {
+      branchMap[index] = {
+        type: 'if', line: index + 1, loc: line(index + 1),
+        locations: [line(index + 1), { start: {}, end: {} }],
+      };
+      b[index] = [0, 0];
+    }
+  }
+  project.coverage([
+    'export const choose = wrap((value: number) => {',
+    ...Array.from({ length: 6 }, (_, index) => `  if (value === ${index + 1}) return ${index + 1};`),
+    '  return 0;',
+    '});',
+  ].join('\n'), {
+    statementMap, s, branchMap, b,
+    fnMap: { 0: { name: '(anonymous_0)', decl: line(1), loc: declaration, line: 1 } }, f: { 0: 0 },
+  });
+  const failure = project.run('ingestor', 'check', 30);
+  assert.equal(failure.status, 1, failure.stderr);
+  assert.match(failure.stdout, /56\.000\t7\t0\.00%\tapps\/ingestor\/src\/index.ts:1\t/);
+  assert.match(failure.stderr, /1 of 1 functions exceed 30/);
+
+  const equality = project.run('ingestor', 'check', 56);
+  assert.equal(equality.status, 0, equality.stderr);
+  assert.equal(equality.stdout, '');
+  assert.match(equality.stderr, /0 of 1 functions exceed 56/);
 });
 
 for (const [name, corrupt] of [

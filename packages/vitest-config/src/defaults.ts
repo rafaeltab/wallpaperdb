@@ -6,6 +6,8 @@ export const defaults = {
 		silent: "passed-only",
 		slowTestThreshold: 10000,
 		coverage: {
+			// Vitest 3 otherwise omits anonymous callback metadata. Vitest 5 uses AST remapping by default.
+			experimentalAstAwareRemapping: true,
 			reporter: ["json", "html", "lcov", "json-summary"],
 		},
 	},

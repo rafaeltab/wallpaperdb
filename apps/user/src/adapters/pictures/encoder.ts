@@ -57,7 +57,7 @@ function validateStillFormat(metadata: Metadata): void {
 }
 
 function decodedByteCount(metadata: Metadata, pixels: number): number {
-  const bytesPerSample = ['ushort', 'short'].includes(metadata.depth) ? 2 : 1;
+  const bytesPerSample = ['ushort', 'short'].includes(metadata.depth ?? '') ? 2 : 1;
   return pixels * (metadata.channels ?? 4) * bytesPerSample;
 }
 

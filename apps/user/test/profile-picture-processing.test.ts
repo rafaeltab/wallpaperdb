@@ -1,6 +1,14 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { processProfilePicture } from '../src/services/profile-picture-processing.js';
+import { Effect } from 'effect';
+import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
+import { PictureCodec, type PictureLimits } from '../src/pictures/index.js';
+
+async function processProfilePicture(bytes: Buffer, limits: PictureLimits) {
+  const outcome = await Effect.runPromise(Effect.flatMap(PictureCodec, codec => codec.process(bytes)).pipe(Effect.provide(pictureCodecLayer(limits))));
+  if (outcome._tag === 'Rejected') throw new Error(outcome.message);
+  return outcome.picture;
+}
 
 const limits = { maxBytes: 5 * 1024 * 1024, maxPixels: 16_000_000, maxDecodedBytes: 64 * 1024 * 1024 };
 

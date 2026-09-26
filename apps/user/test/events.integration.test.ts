@@ -373,6 +373,89 @@ it('quarantines invalid messages and exhausted projection failures after three d
   }
 });
 
+it('recovers replica health when another replica acknowledges its failed delivery', async () => {
+  const options = {
+    url: nats.getConnectionUrl(),
+    stream: 'WALLPAPER',
+    serviceName: 'user-replica-recovery-contract',
+    retryDelayMs: 2000,
+    shutdownTimeoutMs: 200,
+  };
+  const blockerStarted = await Effect.runPromise(Deferred.make<void>());
+  const releaseBlocker = await Effect.runPromise(Deferred.make<void>());
+  const unused = () => Effect.die('Unexpected maintenance task');
+  const replica = (failFirst: boolean) => {
+    const maintenance = Layer.effect(
+      Maintenance,
+      Effect.gen(function* () {
+        const store = yield* MaintenanceStore;
+        return Maintenance.of({
+          publishPending: unused,
+          cleanupEvents: unused,
+          expireAliases: unused,
+          recordWallpaperOwnership: (ownership) =>
+            failFirst && ownership.wallpaperId === 'wp_replica-retry'
+              ? Effect.fail(new MaintenanceFailure({ operation: 'project', cause: 'offline' }))
+              : Effect.gen(function* () {
+                  if (failFirst) {
+                    yield* Deferred.succeed(blockerStarted, undefined);
+                    yield* Deferred.await(releaseBlocker);
+                  }
+                  yield* store.recordWallpaperOwnership(ownership);
+                }),
+        });
+      })
+    ).pipe(
+      Layer.provide(
+        eventStoreLayer().pipe(
+          Layer.provide(databaseLayer({ databaseUrl: database.getConnectionUri() }))
+        )
+      )
+    );
+    return ManagedRuntime.make(
+      ownershipConsumerLayer(options).pipe(
+        Layer.provide(brokerLayer(options)),
+        Layer.provide(maintenance)
+      )
+    );
+  };
+  const first = replica(true);
+  const second = replica(false);
+  const manager = await connection.jetstreamManager();
+  const healthy = (runtime: typeof first) =>
+    runtime.runPromise(Effect.flatMap(ConsumerHealth, (health) => health.check()));
+  try {
+    await first.runPromise(ConsumerHealth);
+    await connection
+      .jetstream()
+      .publish('wallpaper.uploaded', JSON.stringify(wallpaperEvent('replica-retry')));
+    await expect.poll(() => healthy(first)).toBe(false);
+    // Keep replica A occupied so replica B receives the delayed retry.
+    await connection
+      .jetstream()
+      .publish('wallpaper.uploaded', JSON.stringify(wallpaperEvent('replica-blocker')));
+    await Effect.runPromise(Deferred.await(blockerStarted));
+    await second.runPromise(ConsumerHealth);
+    await expect
+      .poll(
+        async () =>
+          (await sql`select wallpaper_id from wallpaper_ownership order by wallpaper_id`).map(
+            (row) => row.wallpaper_id
+          ),
+        { timeout: 5000 }
+      )
+      .toEqual(['wp_replica-retry']);
+    await expect.poll(() => healthy(first)).toBe(true);
+    expect(await healthy(second)).toBe(true);
+  } finally {
+    await Effect.runPromise(Deferred.succeed(releaseBlocker, undefined));
+    await first.dispose();
+    await second.dispose();
+    await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership');
+    await manager.streams.purge('WALLPAPER');
+  }
+});
+
 it('keeps quarantine failures unacknowledged and repairs purged partial chunks before accepting responsibility', async () => {
   const options = {
     url: nats.getConnectionUrl(),

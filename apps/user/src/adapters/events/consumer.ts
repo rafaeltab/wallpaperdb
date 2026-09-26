@@ -33,12 +33,19 @@ const retryDelay = (message: JsMsg, options: EventsOptions) =>
     (options.retryDelayMs ?? 1000) * 2 ** Math.min(message.info.deliveryCount - 1, 5)
   );
 
+interface DeliveryFailures {
+  latestSequence: number;
+}
+function recordFailure(failures: DeliveryFailures, message: JsMsg) {
+  failures.latestSequence = Math.max(failures.latestSequence, message.info.streamSequence);
+}
+
 const processMessage = Effect.fn('profiles.events.consume')(function* (
   message: JsMsg,
   service: EventsBroker,
   maintenance: Maintenance,
   options: EventsOptions,
-  pendingFailures: Set<number>
+  pendingFailures: DeliveryFailures
 ) {
   const input = translateOwnership(message.subject, message.data, message.headers);
   const started = yield* Clock.currentTimeMillis;
@@ -53,20 +60,18 @@ const processMessage = Effect.fn('profiles.events.consume')(function* (
     if (input.kind === 'invalid') {
       yield* quarantine(service, message, 'invalid');
       message.ack();
-      pendingFailures.delete(message.info.streamSequence);
       return input.reason;
     }
     if (message.info.deliveryCount > 3) {
       yield* quarantine(service, message, 'exhausted');
       message.ack();
-      pendingFailures.delete(message.info.streamSequence);
       return 'error' as const;
     }
     const completed = yield* maintenance
       .recordWallpaperOwnership(input.ownership)
       .pipe(Effect.match({ onSuccess: () => true, onFailure: () => false }));
     if (!completed) {
-      pendingFailures.add(message.info.streamSequence);
+      recordFailure(pendingFailures, message);
       if (message.info.deliveryCount < 3) {
         message.nak(retryDelay(message, options));
         return 'error' as const;
@@ -74,7 +79,6 @@ const processMessage = Effect.fn('profiles.events.consume')(function* (
       yield* quarantine(service, message, 'exhausted');
     }
     message.ack();
-    pendingFailures.delete(message.info.streamSequence);
     return completed ? ('success' as const) : ('error' as const);
   }).pipe(
     Effect.onExit((exit) =>
@@ -114,7 +118,7 @@ function consumeMessage(
   service: EventsBroker,
   maintenance: Maintenance,
   options: EventsOptions,
-  pendingFailures: Set<number>
+  pendingFailures: DeliveryFailures
 ) {
   const carrier: Record<string, string> = {};
   for (const key of ['traceparent', 'tracestate']) {
@@ -133,7 +137,7 @@ function consumeMessage(
     Effect.scoped,
     Effect.catchCause((cause) => {
       if (Cause.hasInterrupts(cause)) return Effect.failCause(cause);
-      pendingFailures.add(message.info.streamSequence);
+      recordFailure(pendingFailures, message);
       message.nak(retryDelay(message, options));
       return Effect.logError('Wallpaper ownership delivery failed', cause);
     }),
@@ -148,7 +152,9 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
       const service = yield* EventsBroker;
       const maintenance = yield* Maintenance;
       yield* ensureQuarantine(service);
-      const pendingFailures = new Set<number>();
+      // The durable is shared across replicas. A retry can finish elsewhere, so
+      // remember only a bounded high-water mark and reconcile it with broker ACKs.
+      const pendingFailures: DeliveryFailures = { latestSequence: 0 };
       const configuration = {
         durable_name: durable,
         ack_policy: AckPolicy.Explicit,
@@ -228,11 +234,18 @@ export const ownershipConsumerLayer = (options: EventsOptions) =>
       );
       return ConsumerHealth.of({
         check: () =>
-          Ref.get(healthy).pipe(
-            Effect.map(
-              (running) => running && pendingFailures.size === 0 && !service.connection.isClosed()
-            )
-          ),
+          Effect.gen(function* () {
+            if (!(yield* Ref.get(healthy)) || service.connection.isClosed()) return false;
+            const observed = pendingFailures.latestSequence;
+            if (observed === 0) return true;
+            const state = yield* broker('reconcile-ownership-deliveries', () =>
+              service.manager.consumers.info(options.stream, durable)
+            ).pipe(Effect.match({ onSuccess: (state) => state, onFailure: () => null }));
+            if (!state || state.ack_floor.stream_seq < observed) return false;
+            // A later failure may have arrived while querying the shared consumer.
+            if (pendingFailures.latestSequence === observed) pendingFailures.latestSequence = 0;
+            return pendingFailures.latestSequence === 0;
+          }),
       });
     })
   );

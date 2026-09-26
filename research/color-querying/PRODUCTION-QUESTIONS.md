@@ -28,7 +28,7 @@ query issue where identical resolved utility clauses can lose their intended
 multiplicity. Decide how repeated targets and two precise colors resolving to
 the same bin should behave, then validate the implementation against that
 explicit objective. The separate
-[multiplicity refinement](../../experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md)
+[multiplicity refinement](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-OPTIMIZATION-RESULTS.md)
 has arithmetic/service evidence; existing human judgments contain no such
 cases. Accepting the architecture is not accepting a known weighting bug as a
 product rule.
@@ -111,6 +111,6 @@ research measured still images. Additional image versions do not establish a
 video descriptor, nor does larger media storage make index throughput or memory
 constraints disappear.
 
-The retained [feedback loop](../../experiments/color-search-benchmark/evaluation/loop/README.md),
-[favorite snapshot](../../experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md),
+The retained [feedback loop](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/evaluation/loop/README.md),
+[favorite snapshot](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md),
 and [measurement record](EVIDENCE.md) provide the reference for this later work.

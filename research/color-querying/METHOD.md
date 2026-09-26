@@ -51,9 +51,9 @@ OKLab distance. The query therefore uses that anchor's measured behavior rather
 than an exact new measurement around the requested hex. This approximation
 remains even with shade-aware matching.
 
-Sources: [anchor definition](../../experiments/color-search-benchmark/exploration/overlap-regions.mjs),
-[nested banks](../../experiments/color-search-benchmark/exploration/overlap-banks.mjs),
-[shade/hue extraction](../../experiments/color-search-benchmark/exploration/hue-index.mjs).
+Sources: [anchor definition](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/overlap-regions.mjs),
+[nested banks](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/overlap-banks.mjs),
+[shade/hue extraction](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/hue-index.mjs).
 
 ## 2. Measure area and match quality at five levels
 
@@ -83,9 +83,9 @@ float32 value from 0 to 1. Layers overlap, and anchor neighborhoods overlap;
 summing their coverages does not yield a union or a disjoint image palette.
 High-quality pixels can contribute to all five layers of several anchors.
 
-Sources: [shade measurement](../../experiments/color-search-benchmark/exploration/shade-definition.mjs),
-[hue gate](../../experiments/color-search-benchmark/exploration/hue-definition.mjs),
-[extraction and rounding](../../experiments/color-search-benchmark/exploration/hue-index.mjs).
+Sources: [shade measurement](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/shade-definition.mjs),
+[hue gate](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/hue-definition.mjs),
+[extraction and rounding](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/hue-index.mjs).
 
 ## 3. Score the requested intent
 
@@ -114,8 +114,8 @@ weights, then average requested targets equally. A larger requested percentage
 changes the desired amount; it does not automatically give that target more
 weight than another target.
 
-Sources: [query and target resolution](../../experiments/color-search-benchmark/exploration/methods-cutoff.mjs),
-[score reference](../../experiments/color-search-benchmark/exploration/favorite-optimized-scoring.mjs).
+Sources: [query and target resolution](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/methods-cutoff.mjs),
+[score reference](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/favorite-optimized-scoring.mjs).
 
 ## 4. Offer three linked quality preferences
 
@@ -143,8 +143,8 @@ quality multiplier `0.5 + 0.5 × quality` for vibe. There is no single smooth-po
 exponent that reproduces this curve for every quality. The original smooth-power
 prototype remains research history, not a silent substitute for the favorite.
 
-Sources: [linked preset definitions](../../experiments/color-search-benchmark/exploration/linked-strictness.mjs),
-[frozen favorite](../../experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md).
+Sources: [linked preset definitions](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/linked-strictness.mjs),
+[frozen favorite](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-SNAPSHOT.md).
 
 ## 5. Precompute one fit score for each offered request
 
@@ -182,9 +182,9 @@ of floating-point operations relative to the original query. The formula is
 preserved at offered settings, but near-tie order is not promised to be bitwise
 identical. Measured parity and its tolerance are in [evidence](EVIDENCE.md).
 
-Sources: [utility definitions and native query](../../experiments/color-search-benchmark/exploration/favorite-utilities.mjs),
-[linked index builder](../../experiments/color-search-benchmark/exploration/linked-strictness-index.mjs),
-[completed linked prototype](../../experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md).
+Sources: [utility definitions and native query](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/favorite-utilities.mjs),
+[linked index builder](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/linked-strictness-index.mjs),
+[completed linked prototype](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/LINKED-STRICTNESS-PROTOTYPE.md).
 
 ## Named colors, vibes, and unsupported meanings
 
@@ -210,8 +210,8 @@ range controls and arbitrary per-query cutoff geometries are also unsupported
 in this precomputed bank. Tags can constrain eligibility; this method does not
 infer a city, flag, season, or other semantic subject from color alone.
 
-Source: [named-feature definitions](../../experiments/color-search-benchmark/exploration/corpus-colors.mjs)
-and [query support checks](../../experiments/color-search-benchmark/exploration/methods-cutoff.mjs).
+Source: [named-feature definitions](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/corpus-colors.mjs)
+and [query support checks](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/methods-cutoff.mjs).
 
 ## Known duplicate-target limitation
 
@@ -226,7 +226,7 @@ weights prototype corrects it and has arithmetic regression evidence, but it was
 not silently incorporated into the linked snapshot. A production contract must
 explicitly choose duplicate handling and validate that choice. This is an
 implementation defect to resolve, not a desirable part of the color preference.
-See [multiplicity findings](../../experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md).
+See [multiplicity findings](https://github.com/rafaeltab/wallpaperdb/blob/30edcb2a61e6c4cc915a61807210a3ab5e924d96/experiments/color-search-benchmark/exploration/FAVORITE-MULTIPLICITY.md).
 
 ## Appendix: precise mathematical definition
 

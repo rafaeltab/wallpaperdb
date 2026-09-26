@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import ts from 'typescript';
+import sharp from 'sharp';
 import { expect, it } from 'vitest';
 
 async function importsFrom(
@@ -57,4 +59,40 @@ it('keeps production HTTP and storage clients behind the post-SDK dynamic import
   for (const client of instrumentedClients) expect(deferredClients.has(client)).toBe(true);
   // The process encoder remains a sibling artifact after chunking.
   expect(await readFile('dist/picture-encoder.mjs', 'utf8')).toContain('sharp');
+  const encoded = await sharp({
+    create: { width: 2, height: 3, channels: 3, background: '#22aa55' },
+  })
+    .png()
+    .toBuffer();
+  const result = await new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        'dist/picture-encoder.mjs',
+        JSON.stringify({ maxBytes: 10000, maxPixels: 1000, maxDecodedBytes: 10000 }),
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+    const output: Buffer[] = [];
+    const errors: Buffer[] = [];
+    child.stdout.on('data', (chunk: Buffer) => output.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => errors.push(chunk));
+    child.on('error', reject);
+    child.on('close', (code) =>
+      code === 0
+        ? resolve(Buffer.concat(output).toString())
+        : reject(new Error(Buffer.concat(errors).toString()))
+    );
+    child.stdin.end(encoded);
+  });
+  const processed = JSON.parse(result);
+  expect(processed).toMatchObject({
+    _tag: 'Processed',
+    picture: { mimeType: 'image/webp', width: 2, height: 3 },
+  });
+  expect(await sharp(Buffer.from(processed.picture.bytes, 'base64')).metadata()).toMatchObject({
+    format: 'webp',
+    width: 2,
+    height: 3,
+  });
 });

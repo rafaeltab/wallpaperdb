@@ -74,6 +74,15 @@ try {
   assert.equal((await fetch(`${endpoint}/profile-pictures?list-type=2`)).status, 403,
     "Profile pictures reject anonymous listing");
 
+  const descriptorKey = "user/picture-1.json";
+  const descriptorBody = JSON.stringify({ bucket: "profile-pictures", key: pictureKey });
+  await client.send(new PutObjectCommand({
+    Bucket: "asset-references", Key: descriptorKey, Body: descriptorBody,
+    ContentType: "application/json",
+  }));
+  assert.equal((await fetch(`${endpoint}/asset-references/${descriptorKey}`)).status, 403,
+    "Asset descriptors do not expose private storage addresses anonymously");
+
   compose("restart", "seaweedfs");
   compose("up", "-d", "--wait", "--wait-timeout", "120", "seaweedfs");
   // Docker may allocate a new ephemeral host port on restart.
@@ -92,6 +101,11 @@ try {
   assert.equal(picture.ContentType, "image/webp");
   assert.equal((await fetch(`${endpoint}/profile-pictures/${pictureKey}`)).status, 403,
     "Profile pictures remain private after restart");
+  const descriptor = await client.send(new GetObjectCommand({
+    Bucket: "asset-references", Key: descriptorKey,
+  }));
+  assert.equal(await descriptor.Body.transformToString(), descriptorBody,
+    "Asset references survive storage restart");
   console.log("Compose storage checks passed: bucket bootstrap, scoped public reads, authenticated writes, and persistence.");
 } catch (error) {
   console.error(compose("logs", "--no-color", "--tail", "100", "seaweedfs"));

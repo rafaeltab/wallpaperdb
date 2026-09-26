@@ -333,17 +333,15 @@ describe('PostgreSQL catalog contract', () => {
     await fixture
       .insert(wallpapers)
       .values({ ...wallpaper.wallpaper, createdAt: new Date(wallpaper.wallpaper.createdAt) });
-    await fixture
-      .insert(variants)
-      .values({
-        id: 'var_zzlegacy',
-        wallpaperId: 'wlpr_one',
-        storageKey: 'legacy-small',
-        width: 640,
-        height: 360,
-        fileSizeBytes: 100,
-        createdAt: new Date('2025-12-31T00:00:00.000Z'),
-      });
+    await fixture.insert(variants).values({
+      id: 'var_zzlegacy',
+      wallpaperId: 'wlpr_one',
+      storageKey: 'legacy-small',
+      width: 640,
+      height: 360,
+      fileSizeBytes: 100,
+      createdAt: new Date('2025-12-31T00:00:00.000Z'),
+    });
     const input: ProjectionInput = {
       kind: 'variant',
       occurrence: { source: 'generator', id: 'legacy-variant-replay' },
@@ -398,19 +396,27 @@ describe('PostgreSQL catalog contract', () => {
   });
   it('retains unsupported original media without creating an unpublishable notification', async () => {
     if (wallpaper.kind !== 'wallpaper') throw new Error('invalid fixture');
-    const video: ProjectionInput = { ...wallpaper, occurrence: { source: 'older-ingestor', id: 'video-upload' }, wallpaper: { ...wallpaper.wallpaper, id: 'wlpr_video', mimeType: 'video/mp4' } };
-    await runtime.runPromise(Effect.gen(function* () {
-      const projection = yield* CatalogProjection;
-      const outbox = yield* CatalogOutbox;
-      const catalog = yield* Catalog;
-      yield* projection.accept(video);
-      expect(yield* catalog.findWallpaper('wlpr_video')).toMatchObject({ mimeType: 'video/mp4' });
-      expect(yield* outbox.listPending(10)).toEqual([]);
-      yield* projection.accept(wallpaper);
-      const pending = yield* outbox.listPending(10);
-      expect(pending).toHaveLength(1);
-      expect(pending[0]?.variant).toMatchObject({ wallpaperId: 'wlpr_one', format: 'image/jpeg' });
-    }));
+    const video: ProjectionInput = {
+      ...wallpaper,
+      occurrence: { source: 'older-ingestor', id: 'video-upload' },
+      wallpaper: { ...wallpaper.wallpaper, id: 'wlpr_video', mimeType: 'video/mp4' },
+    };
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const projection = yield* CatalogProjection;
+        const outbox = yield* CatalogOutbox;
+        const catalog = yield* Catalog;
+        yield* projection.accept(video);
+        expect(yield* catalog.findWallpaper('wlpr_video')).toMatchObject({ mimeType: 'video/mp4' });
+        expect(yield* outbox.listPending(10)).toEqual([]);
+        yield* projection.accept(wallpaper);
+        const pending = yield* outbox.listPending(10);
+        expect(pending).toHaveLength(1);
+        expect(pending[0]?.variant).toMatchObject({
+          wallpaperId: 'wlpr_one',
+          format: 'image/jpeg',
+        });
+      })
+    );
   });
-
 });

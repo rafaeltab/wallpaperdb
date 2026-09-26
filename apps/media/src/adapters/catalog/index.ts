@@ -34,7 +34,9 @@ class Database extends Context.Service<Database, ReturnType<typeof drizzle>>()(
 ) {}
 const stableId = (parts: readonly string[]) =>
   createHash('sha256').update(JSON.stringify(parts)).digest('hex');
-function notification(input: Exclude<ProjectionInput, { kind: 'profile' }>): AvailableNotification | null {
+function notification(
+  input: Exclude<ProjectionInput, { kind: 'profile' }>
+): AvailableNotification | null {
   const asset = input.kind === 'wallpaper' ? input.wallpaper : input.variant;
   const format = availableFormat(asset.mimeType);
   if (!format) return null;

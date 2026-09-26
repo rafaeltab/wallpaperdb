@@ -53,10 +53,13 @@ describe('Media Service - Event Consumption', () => {
 
   async function waitForAccepted(sequence: number) {
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    await vi.waitFor(async () => {
-      const info = await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer');
-      expect(info.ack_floor.stream_seq).toBeGreaterThanOrEqual(sequence);
-    }, { timeout: 10000, interval: 25 });
+    await vi.waitFor(
+      async () => {
+        const info = await manager.consumers.info('WALLPAPER', 'media-wallpaper-uploaded-consumer');
+        expect(info.ack_floor.stream_seq).toBeGreaterThanOrEqual(sequence);
+      },
+      { timeout: 10000, interval: 25 }
+    );
   }
 
   async function observeAvailable(wallpaperId: string) {
@@ -64,7 +67,9 @@ describe('Media Service - Event Consumption', () => {
     const subscription = connection.subscribe('wallpaper.variant.available', { timeout: 10000 });
     const result = (async () => {
       for await (const message of subscription) {
-        const event = WallpaperVariantAvailableEventSchema.parse(JSON.parse(new TextDecoder().decode(message.data)));
+        const event = WallpaperVariantAvailableEventSchema.parse(
+          JSON.parse(new TextDecoder().decode(message.data))
+        );
         if (event.variant.wallpaperId === wallpaperId) return event;
       }
       throw new Error('Availability subscription closed before matching output');
@@ -115,8 +120,18 @@ describe('Media Service - Event Consumption', () => {
 
     try {
       const res = await observation.result;
-      expect(res.variant).toEqual({ wallpaperId: 'wlpr_test_001', width: 1920, height: 1080, aspectRatio: 1920 / 1080, format: 'image/jpeg', fileSizeBytes: 1024000, createdAt: event.wallpaper.uploadedAt });
-    } finally { observation.close(); }
+      expect(res.variant).toEqual({
+        wallpaperId: 'wlpr_test_001',
+        width: 1920,
+        height: 1080,
+        aspectRatio: 1920 / 1080,
+        format: 'image/jpeg',
+        fileSizeBytes: 1024000,
+        createdAt: event.wallpaper.uploadedAt,
+      });
+    } finally {
+      observation.close();
+    }
   });
 
   it('should consume wallpaper.uploaded event and store in database', async () => {
@@ -228,12 +243,16 @@ describe('Media Service - Event Consumption', () => {
     expect(response.statusCode).toBe(200);
 
     const manager = await (await tester.nats.getConnection()).jetstreamManager();
-    const quarantined = await manager.streams.getMessage('MEDIA_QUARANTINE', { last_by_subj: 'media.quarantine' });
+    const quarantined = await manager.streams.getMessage('MEDIA_QUARANTINE', {
+      last_by_subj: 'media.quarantine',
+    });
     expect(JSON.parse(new TextDecoder().decode(quarantined.data))).toEqual(malformedEvent);
     expect(quarantined.header.get('ce-reason')).toBe('Invalid');
     expect(quarantined.header.get('ce-originalsubject')).toBe('wallpaper.uploaded');
     const db = tester.getFixtureDatabase();
-    expect(await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_malformed'))).toEqual([]);
+    expect(await db.select().from(wallpapers).where(eq(wallpapers.id, 'wlpr_malformed'))).toEqual(
+      []
+    );
   });
 
   it('projects WebP upload metadata when the publisher includes tracing headers', async () => {

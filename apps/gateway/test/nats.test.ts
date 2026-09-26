@@ -429,6 +429,74 @@ describe('NATS projection adapter contract', () => {
     await acknowledged();
   });
 
+  it('retains the complete binary envelope for quarantined event replay', async () => {
+    const project = new ControlledProjection();
+    project.outcomes = [{ _tag: 'Rejected', reason: 'invalid-projection' }];
+    await consumer(project);
+    const original = upload('evt_binary_quarantine');
+    const metadata = headers();
+    for (const [key, value] of Object.entries({
+      'ce-specversion': '1.0',
+      'ce-source': 'https://wallpaperdb/ingestor',
+      'ce-id': 'evt_binary_quarantine',
+      'ce-type': 'wallpaper.uploaded',
+      'ce-time': timestamp,
+      'ce-correlationid': 'upload-workflow',
+      'ce-causationid': 'upload-command',
+      'ce-causationsource': 'https://wallpaperdb/web',
+      traceparent: '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01',
+    }))
+      metadata.set(key, value);
+    metadata.append('ce-custom', 'first');
+    metadata.append('ce-custom', 'second');
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', original, {
+      headers: metadata,
+    });
+    const retained = await quarantine();
+    expect(retained).toMatchObject({
+      causationid: 'evt_binary_quarantine',
+      causationsource: 'https://wallpaperdb/ingestor',
+      data: {
+        original: Buffer.from(original).toString('base64'),
+        originalHeaders: Buffer.from(metadata.toString()).toString('base64'),
+        outcome: 'Rejected',
+      },
+    });
+    expect(project.changes[0]?.occurrence.source).toBe('https://wallpaperdb/ingestor');
+    await acknowledged();
+  });
+
+  it('quarantines a full-size binary header envelope without JSON expansion exhausting its budget', async () => {
+    const project = new ControlledProjection();
+    project.outcomes = [{ _tag: 'Rejected', reason: 'invalid-projection' }];
+    await consumer(project);
+    const original = upload('evt_binary_budget');
+    const metadata = headers();
+    for (const [key, value] of Object.entries({
+      'ce-specversion': '1.0',
+      'ce-source': 'https://wallpaperdb/ingestor',
+      'ce-id': 'evt_binary_budget',
+      'ce-type': 'wallpaper.uploaded',
+      'ce-time': timestamp,
+      'ce-correlationid': 'x',
+    }))
+      metadata.set(key, value);
+    const remaining =
+      64 * 1024 - Buffer.byteLength(original) - Buffer.byteLength(metadata.toString());
+    metadata.set('ce-correlationid', '\u0001'.repeat(remaining + 1));
+    expect(Buffer.byteLength(original) + Buffer.byteLength(metadata.toString())).toBe(64 * 1024);
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', original, {
+      headers: metadata,
+    });
+    expect(await quarantine()).toMatchObject({
+      data: {
+        original: Buffer.from(original).toString('base64'),
+        originalHeaders: Buffer.from(metadata.toString()).toString('base64'),
+      },
+    });
+    await acknowledged();
+  });
+
   it('reserves quarantine capacity for the largest admitted arbitrary payload', async () => {
     const project = new ControlledProjection();
     await consumer(project);

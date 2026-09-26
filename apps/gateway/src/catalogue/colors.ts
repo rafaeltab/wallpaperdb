@@ -177,15 +177,21 @@ export function validateColors(colors: ColorPreference[]): string | undefined {
 
 export function buildColorVector(colors: ColorPreference[], strategy: SpreadStrategy): number[] {
   const vector = new Float64Array(TOTAL_BINS);
+  // Scale before summing so every accepted finite amount yields bounded relative weights.
+  const largestAmount = Math.max(...colors.map((preference) => preference.amount));
+  const scaledTotal = colors.reduce(
+    (total, preference) => total + preference.amount / largestAmount,
+    0
+  );
   for (const preference of colors) {
+    const amount = preference.amount / largestAmount / scaledTotal;
     const oklab = hexToOklab(preference.color);
     const sigma = computeSigma(preference.spread ?? 0.5, strategy, 0.1, 0.5);
     if (strategy === 'exact') {
-      vector[findNearestBin(oklab)] += preference.amount;
+      vector[findNearestBin(oklab)] += amount;
     } else {
       for (let i = 0; i < TOTAL_BINS; i++) {
-        vector[i] +=
-          preference.amount * gaussianWeight(oklabDistance(oklab, BIN_CENTERS[i]), sigma);
+        vector[i] += amount * gaussianWeight(oklabDistance(oklab, BIN_CENTERS[i]), sigma);
       }
     }
   }

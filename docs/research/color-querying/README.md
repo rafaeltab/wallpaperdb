@@ -7,7 +7,7 @@ calculation into indexing so OpenSearch can rank wallpapers efficiently.
 
 This directory consolidates what the research established, what changed along
 the way, and what still needs validation. It accompanies
-[ADR 0006](../../docs/adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md).
+[ADR 0006](../../adr/0006-use-precomputed-color-utilities-with-three-quality-levels.md).
 No production implementation, migration, or rollout is part of this change.
 
 ## Read this research

@@ -114,6 +114,72 @@ it('returns safe Problem Details for absent routes and unexpected defects', asyn
 });
 
 it.each([
+  ['application/json', '{private-marker', 400, 'Bad Request'],
+  ['application/unknown', 'private-marker', 415, 'Unsupported Media Type'],
+  ['text/plain', 'private-marker'.repeat(100_000), 413, 'Payload Too Large'],
+] as const)('preserves client error statuses for %s request bodies', async (contentType, payload, status, title) => {
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3008 }, services);
+  apps.push(app);
+  const response = await app.inject({
+    method: 'OPTIONS',
+    url: '/health',
+    headers: { 'content-type': contentType },
+    payload,
+  });
+  expect(response.statusCode).toBe(status);
+  expect(response.headers['content-type']).toContain('application/problem+json');
+  expect(response.json()).toEqual({
+    type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-request.md',
+    title,
+    status,
+  });
+  expect(response.body).not.toContain('private-marker');
+});
+
+it('returns safe Problem Details for malformed URL components', async () => {
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3008 }, services);
+  apps.push(app);
+  const response = await app.inject('/%zz');
+  expect(response.statusCode).toBe(400);
+  expect(response.headers['content-type']).toContain('application/problem+json');
+  expect(response.json()).toEqual({
+    type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-request.md',
+    title: 'Bad Request',
+    status: 400,
+  });
+});
+
+it.each([
+  {},
+  { origin: 'http://localhost:3000' },
+  { 'access-control-request-method': 'GET' },
+])('returns Problem Details for incomplete development preflight headers %j', async (headers) => {
+  const app = await createHttpApp({ nodeEnv: 'development', port: 3008 }, services);
+  apps.push(app);
+  const response = await app.inject({ method: 'OPTIONS', url: '/health', headers });
+  expect(response.statusCode).toBe(400);
+  expect(response.headers['content-type']).toContain('application/problem+json');
+  expect(response.json()).toEqual({
+    type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-request.md',
+    title: 'Bad Request',
+    status: 400,
+  });
+});
+
+it('continues to accept valid development preflight requests', async () => {
+  const app = await createHttpApp({ nodeEnv: 'development', port: 3008 }, services);
+  apps.push(app);
+  const response = await app.inject({
+    method: 'OPTIONS',
+    url: '/health',
+    headers: { origin: 'http://localhost:3000', 'access-control-request-method': 'GET' },
+  });
+  expect(response.statusCode).toBe(204);
+  expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+  expect(response.headers['access-control-allow-methods']).toBe('GET, POST, PUT, DELETE, OPTIONS');
+});
+
+it.each([
   ['development', 'http://localhost:3000', true],
   ['development', 'https://127.0.0.1:8080', true],
   ['development', 'http://evil-localhost:3000', false],

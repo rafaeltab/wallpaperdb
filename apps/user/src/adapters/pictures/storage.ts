@@ -7,6 +7,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { profilePictureAssets } from '../../db/schema.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
+import { monitorDependency } from '../observations/index.js';
 import { Effect, Layer } from 'effect';
 import { PictureObjects, PictureUnavailable } from '../../pictures/index.js';
 
@@ -105,7 +106,7 @@ export function pictureStorageLayer(
                 IfNoneMatch: '*',
               })
             );
-          }),
+          }).pipe(monitorDependency('picture-storage')),
         delete: (assetId) =>
           Effect.gen(function* () {
             const asset = yield* address(assetId);
@@ -115,7 +116,7 @@ export function pictureStorageLayer(
               'delete-picture',
               new DeleteObjectCommand({ Bucket: asset.bucket, Key: asset.key })
             );
-          }),
+          }).pipe(monitorDependency('picture-storage')),
       });
     })
   );

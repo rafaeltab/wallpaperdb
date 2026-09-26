@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import {
   WallpaperDetailSkeleton,
   WallpaperDisplay,
@@ -273,6 +273,10 @@ export function WallpaperDetailPage() {
           side={isMobile ? 'bottom' : 'right'}
           className={`${isMobile ? 'h-[85vh]' : 'w-full sm:max-w-md lg:max-w-lg'} overflow-y-auto p-6`}
         >
+          <SheetTitle className="sr-only">Wallpaper Details</SheetTitle>
+          <SheetDescription className="sr-only">
+            Wallpaper information, contributor, and available variants.
+          </SheetDescription>
           <WallpaperMetadata
             wallpaper={wallpaper}
             selectedVariantIndex={selectedVariantIndex}

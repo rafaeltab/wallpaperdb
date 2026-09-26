@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import postgres from 'postgres';
 import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
@@ -9,7 +10,7 @@ import {
   DockerTesterBuilder,
   S3TesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer, ManagedRuntime, Metric } from 'effect';
+import { Effect, Layer, Logger, ManagedRuntime, Metric } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { pictureStorageLayer, pictureStoreLayer } from '../src/adapters/pictures/index.js';
@@ -99,6 +100,10 @@ describe('Private immutable picture storage', () => {
         )
       );
     expect(await health()).toBe(0);
+    await runtime.runPromise(
+      Effect.flatMap(PictureObjects, (objects) => objects.delete('pic_already_removed'))
+    );
+    expect(await health()).toBe(0);
     // Reads outside the adapter do not establish recovery from its failed write.
     const object = await client.send(new GetObjectCommand(address));
     expect(await object.Body?.transformToString()).toBe('first');
@@ -116,5 +121,47 @@ describe('Private immutable picture storage', () => {
     await expect(client.send(new GetObjectCommand(address))).rejects.toMatchObject({
       name: 'NoSuchKey',
     });
+  });
+  it.each([
+    'put',
+    'delete',
+  ] as const)('records one safe SQLSTATE diagnostic when %s cannot resolve its persisted address', async (operation) => {
+    // Schema drift makes the real parameterized SELECT fail before reaching S3.
+    await sql`alter table profile_picture_assets rename column storage_key to unavailable_storage_key`;
+    const logs: unknown[] = [];
+    try {
+      const failure = await runtime
+        .runPromise(
+          Effect.flatMap(PictureObjects, (objects) =>
+            operation === 'put'
+              ? objects.put('pic_private_parameter_credential', Buffer.from('private-image-bytes'))
+              : objects.delete('pic_private_parameter_credential')
+          ).pipe(
+            Effect.provide(
+              Logger.layer([
+                Logger.make(({ message }) => {
+                  logs.push(message);
+                }),
+              ])
+            )
+          )
+        )
+        .catch((failure: unknown) => failure);
+      expect(failure).toMatchObject({
+        _tag: 'PictureUnavailable',
+        operation: 'resolve-picture',
+        cause: { sqlState: '42703' },
+      });
+      expect(logs).toHaveLength(1);
+      const diagnostic = inspect(logs, { depth: 10 });
+      expect(diagnostic).toContain('42703');
+      expect(diagnostic).toContain('resolve-picture');
+      expect(diagnostic).not.toContain('private_parameter_credential');
+      expect(diagnostic).not.toContain('private-image-bytes');
+      expect(diagnostic).not.toContain('select');
+      expect(diagnostic).not.toContain('storage_key');
+    } finally {
+      await sql`alter table profile_picture_assets rename column unavailable_storage_key to storage_key`;
+    }
   });
 });

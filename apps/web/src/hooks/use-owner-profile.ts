@@ -10,10 +10,12 @@ export function useOwnerProfile(profileId: string) {
     (onChange: () => void) => client?.getQueryCache().subscribe(onChange) ?? (() => {}),
     [client]
   );
-  const snapshot = useCallback(
-    () => client?.getQueryState<Profile>(profileQueryKey(profileId)),
-    [client, profileId]
-  );
+  const snapshot = useCallback(() => {
+    const state = client?.getQueryState<Profile>(profileQueryKey(profileId));
+    // Query creation can happen during another component's render. An empty query
+    // does not change the owner data this subscriber exposes.
+    return state?.data === undefined ? undefined : state;
+  }, [client, profileId]);
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   return { profile: state?.data, refreshedAt: state?.dataUpdatedAt ?? 0 };
 }

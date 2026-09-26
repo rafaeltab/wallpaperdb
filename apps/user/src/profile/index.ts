@@ -96,16 +96,10 @@ export interface CreateProfile {
   now: Date;
 }
 export interface PictureAsset {
-  id: string;
-  profileId: string;
-  storageBucket: string;
-  storageKey: string;
-  mimeType: 'image/webp';
-  width: number;
-  height: number;
-  fileSizeBytes: number;
-  state: string;
-  expiresAt: Date | null;
+  readonly id: string;
+  readonly profileId: string;
+  readonly state: string;
+  readonly expiresAt: Date | null;
 }
 export interface ProfileSnapshot {
   readonly profile: OwnerProfile;

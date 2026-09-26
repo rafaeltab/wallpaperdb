@@ -124,12 +124,6 @@ describe('PostgreSQL profile transactions', () => {
             now: new Date(),
           });
         }).pipe(
-          Effect.tapError((error) =>
-            Effect.logError('Profile persistence failed', {
-              operation: error.operation,
-              cause: error.cause,
-            })
-          ),
           Effect.flip,
           Effect.provide(
             Logger.layer([

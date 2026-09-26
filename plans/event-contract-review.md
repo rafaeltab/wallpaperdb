@@ -123,3 +123,24 @@ Commit `525cdbbd` moves envelope reconciliation into `@wallpaperdb/events/envelo
 Commits `c9297271` and `484ff026` put pure quarantine planning, identity, receipt matching, and replay decoding in `@wallpaperdb/core/quarantine`. Applications still own resources, stream retention, retries, repair publication IDs, interruption, and acknowledgement. Real broker regressions first demonstrated lost repeated headers and accepted legacy receipts missing replay metadata. Receipts now require matching bytes and complete CloudEvent values; incomplete legacy receipts use the existing repair path before the input is acknowledged.
 
 Header-heavy inputs revealed a further capacity failure: an original broker-accepted message could no longer fit after quarantine metadata was added. The planner now respects both the complete message budget and JetStream's 64 KiB header limit. Its versioned `original-message-v1` frame archives all original header arrays and bytes inside bounded chunks; ordinary record formats and IDs remain unchanged. Replay validates bounded manifests, counts, lengths, SHA-256, header arrays, and canonical base64. It restores CloudEvent and trace headers without reusing stale broker publication controls. The final focused suites passed 88 tests: Core 25, Color 16, Variant 23, and Media 24, plus all four workspace checks.
+
+### Follow-up independent review
+
+Both axes reviewed `bec2b1a6..484ff026` after the fixes.
+
+- **Standards:** no hard violations or material optional smells remained. The shared modules have explicit interfaces and leave delivery policy with the applications. The public replay decoder also removes duplicated reconstruction from the app tests. Web's command checks the referenced projects; browser tests isolate mutable data and wait for observable outcomes.
+- **Spec:** no confirmed missing, incorrect, or out-of-scope behavior remained. The reviewer checked the real typecheck command, retained event formats, application-specific decoding, quarantine identities and capacity, durable replay, and the requested browser journeys. Deployment/recovery and Profile concurrency remain the separately requested issues.
+
+These are review conclusions about the inspected changes, not proof that the entire codebase has no defects.
+
+### Follow-up full validation
+
+`make ci` passed against source commit `484ff026` and the rendered documentation updates recorded in `9f950b9b`. It completed 74 build, lint, typecheck, unit, and integration tasks, then 11 E2E/dependency tasks and the coverage merge. The pipeline reported 650 seconds. Twenty-one unchanged main tasks and three E2E build dependencies used cached results; every E2E test task executed. All five deployed Web tests passed in 22.7 seconds, including both new journeys. The test-utils suite retains its 12 existing skips; no new tests were skipped.
+
+The invocation used the isolated BuildKit configuration, loopback Testcontainers host override, serial workers, and Turbo environment wrapper shown earlier in this report. Its log is `.scratch/event-contract-review/ci-followup-final.log`; merged coverage is `coverage/lcov.info`. These host-specific setup requirements remain within issue #236's scope.
+
+`make infra-start` succeeded with the existing `make dev` process running. All eight application containers were healthy after CI. The generated Media Swagger file was restored only after verifying semantic equality with the committed JSON.
+
+Agent-browser verified upload/duplicate counts, notification navigation back to the preserved queue, color/PNG filtering, keyboard details, and decoded 853×480 variant pixels. After CI, the Profile check uploaded and decoded a 1280×720 picture, confirmed anonymous Media delivery returned 200, removed it through the UI, and confirmed the retired URL returned 404 with `Cache-Control: no-store`. The original generated avatar was restored, and no browser page errors were recorded. The recordings show the UI; the decoded dimensions and HTTP assertions were checked separately through the browser.
+
+The task browser session is closed. The development stack remains running on port 8300.

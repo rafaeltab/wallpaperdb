@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
 import { ImageHistogram } from '../src/extraction/index.js';
+import { registerAssetReference } from '@wallpaperdb/core/assets';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
@@ -20,7 +21,11 @@ describe('Stored image histogram adapter', () => {
 
   beforeAll(async () => {
     tester = new TesterClass();
-    tester.withS3().withS3Bucket('wallpapers').withS3Bucket('other-wallpapers');
+    tester
+      .withS3()
+      .withS3Bucket('wallpapers')
+      .withS3Bucket('other-wallpapers')
+      .withS3Bucket('asset-references');
     await tester.setup();
     const s3 = tester.getS3();
     runtime = ManagedRuntime.make(
@@ -76,6 +81,22 @@ describe('Stored image histogram adapter', () => {
       expect(result.failure.operation).toBe('read-image');
       expect(result.failure.cause).toBeInstanceOf(Error);
     }
+  });
+  it('resolves an immutable logical original before reading its image bytes', async () => {
+    const red = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#ff0000' } })
+      .png()
+      .toBuffer();
+    const reference = { owner: 'ingestor', id: 'logical-red' } as const;
+    await tester.s3.uploadObject('other-wallpapers', 'logical/red.png', red);
+    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', reference, {
+      bucket: 'other-wallpapers',
+      key: 'logical/red.png',
+    });
+    const histogram = await runtime.runPromise(
+      Effect.flatMap(ImageHistogram, (images) => images.extract(reference))
+    );
+    expect(histogram).toHaveLength(64);
+    expect(histogram[3]).toBeCloseTo(1, 5);
   });
 
   it('checks the configured bucket', async () => {

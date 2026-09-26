@@ -199,3 +199,39 @@ it('reports outbox storage failure and returns healthy after the next successful
     await runtime.dispose();
   }
 });
+it('finishes its initial empty poll before reporting startup readiness', async () => {
+  let polls = 0;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'outbox-initialization',
+    outboxPollMs: 60_000,
+    shutdownTimeoutMs: 50,
+  };
+  const runtime = ManagedRuntime.make(
+    natsOutboxLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(CatalogOutbox, {
+          listPending: () =>
+            Effect.sleep(25).pipe(
+              Effect.andThen(
+                Effect.sync(() => {
+                  polls++;
+                  return [];
+                })
+              )
+            ),
+          markPublished: () => Effect.void,
+        })
+      )
+    )
+  );
+  try {
+    const health = await runtime.runPromise(OutboxHealth);
+    expect(await Effect.runPromise(health.check())).toBe(true);
+    expect(polls).toBe(1);
+  } finally {
+    await runtime.dispose();
+  }
+});

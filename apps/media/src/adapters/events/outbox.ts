@@ -122,18 +122,24 @@ export function natsOutboxLayer(
         }
         return succeeded;
       });
+      const poll = Effect.gen(function* () {
+        const succeeded = yield* dispatch.pipe(
+          Effect.catch((error) =>
+            Effect.logError('Media outbox unavailable', {
+              operation: error.operation,
+              cause: error.cause,
+            }).pipe(Effect.as(false))
+          )
+        );
+        yield* Ref.set(healthy, succeeded);
+      });
+      // Resolve the first bounded batch before exposing readiness. Failures leave
+      // the service degraded; normal periodic polling owns recovery.
+      yield* poll;
       const worker = yield* Effect.gen(function* () {
         while (yield* Ref.get(accepting)) {
-          const succeeded = yield* dispatch.pipe(
-            Effect.catch((error) =>
-              Effect.logError('Media outbox unavailable', {
-                operation: error.operation,
-                cause: error.cause,
-              }).pipe(Effect.as(false))
-            )
-          );
-          yield* Ref.set(healthy, succeeded);
           yield* Effect.sleep(options.outboxPollMs ?? 1000);
+          if (yield* Ref.get(accepting)) yield* poll;
         }
       }).pipe(
         Effect.catchCause((cause) =>

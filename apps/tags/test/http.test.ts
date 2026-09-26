@@ -149,3 +149,161 @@ it('documents Problem Details and the health/readiness extensions for 503 respon
     );
   }
 });
+
+it('releases acquired resources when startup fails', async () => {
+  let released = false;
+  const failing = Layer.effect(
+    Availability,
+    Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          released = true;
+        })
+      );
+      return yield* Effect.fail(new Error('startup failed'));
+    })
+  );
+  await expect(createHttpApp({ nodeEnv: 'test', port: 3008 }, failing)).rejects.toThrow(
+    'startup failed'
+  );
+  expect(released).toBe(true);
+});
+
+it('passes the current lifecycle state through the driving port', async () => {
+  const states: unknown[] = [];
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 3008 },
+    Layer.succeed(Availability, {
+      health: (shuttingDown) =>
+        Effect.sync(() => {
+          states.push(shuttingDown);
+          return health;
+        }),
+      ready: (shuttingDown, initialized) =>
+        Effect.sync(() => {
+          states.push({ shuttingDown, initialized });
+          return { ready: true, timestamp };
+        }),
+    })
+  );
+  apps.push(app);
+  await app.inject('/ready');
+  app.connectionsState.isShuttingDown = true;
+  app.connectionsState.connectionsInitialized = false;
+  await app.inject('/health');
+  await app.inject('/ready');
+  expect(states).toEqual([
+    { shuttingDown: false, initialized: true },
+    true,
+    { shuttingDown: true, initialized: false },
+  ]);
+});
+
+it('interrupts an unfinished request at the shutdown deadline and releases its scope', async () => {
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let interrupted = false;
+  let closed = false;
+  const layer = Layer.effect(
+    Availability,
+    Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          closed = true;
+        })
+      );
+      return Availability.of({
+        health: () =>
+          Effect.sync(entered).pipe(
+            Effect.andThen(Effect.promise(() => gate)),
+            Effect.andThen(Effect.succeed(health)),
+            Effect.onInterrupt(() =>
+              Effect.sync(() => {
+                interrupted = true;
+              })
+            )
+          ),
+        ready: () => Effect.succeed({ ready: true, timestamp }),
+      });
+    })
+  );
+  const app = await createHttpApp({ nodeEnv: 'test', port: 3008 }, layer, {
+    shutdownTimeoutMs: 30,
+  });
+  const address = await app.listen({ port: 0, host: '127.0.0.1' });
+  const request = fetch(`${address}/health`).then(
+    (response) => response.text(),
+    () => 'connection closed'
+  );
+  await started;
+  try {
+    const closing = app.close();
+    await expect.poll(() => closed, { timeout: 1000 }).toBe(true);
+    await closing;
+    expect(interrupted).toBe(true);
+    expect(app.connectionsState.isShuttingDown).toBe(true);
+    await request;
+  } finally {
+    release();
+    await request;
+    await app.close();
+  }
+});
+
+it('lets an in-flight network request finish before releasing dependencies', async () => {
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let closed = false;
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 3008 },
+    Layer.effect(
+      Availability,
+      Effect.gen(function* () {
+        yield* Effect.addFinalizer(() =>
+          Effect.sync(() => {
+            closed = true;
+          })
+        );
+        return Availability.of({
+          health: () =>
+            Effect.sync(entered).pipe(
+              Effect.andThen(Effect.promise(() => gate)),
+              Effect.as(health)
+            ),
+          ready: () => Effect.succeed({ ready: true, timestamp }),
+        });
+      })
+    ),
+    { shutdownTimeoutMs: 1000 }
+  );
+  const address = await app.listen({ port: 0, host: '127.0.0.1' });
+  const request = fetch(`${address}/health`).then(async (response) => ({
+    status: response.status,
+    body: await response.json(),
+  }));
+  await started;
+  try {
+    const closing = app.close();
+    await expect.poll(() => app.connectionsState.isShuttingDown).toBe(true);
+    expect(closed).toBe(false);
+    release();
+    expect(await request).toEqual({ status: 200, body: health });
+    await closing;
+    expect(closed).toBe(true);
+  } finally {
+    release();
+    await app.close();
+  }
+}, 5000);

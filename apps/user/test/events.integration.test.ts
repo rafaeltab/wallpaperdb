@@ -869,7 +869,7 @@ it('accepts structured and binary CloudEvents while quarantining contradictory o
   }
 });
 
-it('requires envelope agreement on source and time and a validated wallpaper owner before projection', async () => {
+it('requires envelope agreement on identity and extensions before ownership projection', async () => {
   const options = {
     url: nats.getConnectionUrl(),
     stream: 'WALLPAPER',
@@ -905,6 +905,7 @@ it('requires envelope agreement on source and time and a validated wallpaper own
     datacontenttype: 'application/json',
     correlationid: 'upload-command',
     causationid: 'upload-accepted',
+    causationsource: 'https://wallpaperdb/uploader',
     data: { wallpaper: wallpaperEvent('agreed').wallpaper },
   };
   const metadata = headers();
@@ -916,6 +917,7 @@ it('requires envelope agreement on source and time and a validated wallpaper own
     time: occurred,
     correlationid: 'upload-command',
     causationid: 'upload-accepted',
+    causationsource: 'https://wallpaperdb/uploader',
   }))
     metadata.set(`ce-${key}`, value);
   try {
@@ -939,9 +941,22 @@ it('requires envelope agreement on source and time and a validated wallpaper own
       wallpaper: { ...wallpaperEvent('missing-owner').wallpaper, userId: null },
     };
     await js.publish('wallpaper.uploaded', JSON.stringify(invalidOwner));
+    metadata.set('ce-source', structured.source);
+    for (const extension of ['correlationid', 'causationid', 'causationsource'] as const) {
+      metadata.set(`ce-${extension}`, 'contradiction');
+      await js.publish('wallpaper.uploaded', JSON.stringify(structured), { headers: metadata });
+      metadata.delete(`ce-${extension}`);
+      await js.publish('wallpaper.uploaded', JSON.stringify(structured), { headers: metadata });
+      metadata.set(`ce-${extension}`, structured[extension]);
+      await js.publish(
+        'wallpaper.uploaded',
+        JSON.stringify({ ...structured, [extension]: undefined }),
+        { headers: metadata }
+      );
+    }
     await expect
       .poll(async () => (await manager.streams.info('USER_QUARANTINE')).state.messages)
-      .toBe(4);
+      .toBe(13);
     await expect
       .poll(
         async () =>

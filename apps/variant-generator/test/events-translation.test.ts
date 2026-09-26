@@ -101,3 +101,38 @@ it('translates an immutable logical original reference without object storage co
     storage: asset,
   });
 });
+
+it.each(['correlationid', 'causationid', 'causationsource'])(
+  'requires matching %s across structured and binary envelopes',
+  (extension) => {
+    const event = {
+      specversion: '1.0',
+      source: 'https://wallpaperdb/ingestor',
+      id: 'extension-agreement',
+      type: 'wallpaper.uploaded',
+      time: wallpaper.uploadedAt,
+      datacontenttype: 'application/json',
+      [extension]: 'https://wallpaperdb/original',
+      data: { wallpaper },
+    };
+    const metadata = headers();
+    for (const [key, value] of Object.entries({
+      specversion: event.specversion,
+      source: event.source,
+      id: event.id,
+      type: event.type,
+      time: event.time,
+      [extension]: 'https://wallpaperdb/original',
+    }))
+      metadata.set(`ce-${key}`, value);
+    let bytes = new TextEncoder().encode(JSON.stringify(event));
+    expect(translateUpload(bytes, metadata)).toBeDefined();
+    metadata.set(`ce-${extension}`, 'https://wallpaperdb/different');
+    expect(translateUpload(bytes, metadata)).toBeUndefined();
+    metadata.delete(`ce-${extension}`);
+    expect(translateUpload(bytes, metadata)).toBeUndefined();
+    metadata.set(`ce-${extension}`, 'https://wallpaperdb/original');
+    bytes = new TextEncoder().encode(JSON.stringify({ ...event, [extension]: undefined }));
+    expect(translateUpload(bytes, metadata)).toBeUndefined();
+  }
+);

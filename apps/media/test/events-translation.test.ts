@@ -353,3 +353,39 @@ it('preserves validated structured and binary causation without confusing it wit
     translateEvent('wallpaper.uploaded', encode({ ...structured, causationsource: 42 }))
   ).toBeUndefined();
 });
+
+it.each([
+  'correlationid',
+  'causationid',
+  'causationsource',
+])('requires matching %s across structured and binary envelopes', (extension) => {
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'extension-agreement',
+    type: 'wallpaper.uploaded',
+    time: wallpaper.uploadedAt,
+    datacontenttype: 'application/json',
+    [extension]: 'https://wallpaperdb/original',
+    data: { wallpaper },
+  };
+  const metadata = headers();
+  for (const [key, value] of Object.entries({
+    specversion: event.specversion,
+    source: event.source,
+    id: event.id,
+    type: event.type,
+    time: event.time,
+    [extension]: 'https://wallpaperdb/original',
+  }))
+    metadata.set(`ce-${key}`, value);
+  let bytes = new TextEncoder().encode(JSON.stringify(event));
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeDefined();
+  metadata.set(`ce-${extension}`, 'https://wallpaperdb/different');
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
+  metadata.delete(`ce-${extension}`);
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
+  metadata.set(`ce-${extension}`, 'https://wallpaperdb/original');
+  bytes = new TextEncoder().encode(JSON.stringify({ ...event, [extension]: undefined }));
+  expect(translateEvent('wallpaper.uploaded', bytes, metadata)).toBeUndefined();
+});

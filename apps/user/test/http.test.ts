@@ -20,10 +20,10 @@ const availability = Layer.succeed(Availability, {
 const token = Buffer.from(JSON.stringify({ id: 'user_owner' })).toString('base64');
 const auth = { authorization: `Bearer ${token}` };
 
-function services(ensure: Profiles['ensure']) {
+function services(ensure: Profiles['ensure'], updateDetails: Profiles['updateDetails'] = () => Effect.die('Unexpected details command')) {
   const unexpected = () => Effect.die('Unexpected profile operation');
   return Layer.merge(availability, Layer.succeed(Profiles, {
-    ensure, updateDetails: unexpected, changeHandle: unexpected,
+    ensure, updateDetails, changeHandle: unexpected,
     reactivateAlias: unexpected, scheduleAliasExpiry: unexpected,
     expireAliasImmediately: unexpected, expireDueAlias: unexpected,
     adoptPicture: unexpected, adoptImportedPicture: unexpected,
@@ -31,6 +31,34 @@ function services(ensure: Profiles['ensure']) {
 }
 
 describe('User HTTP adapter', () => {
+  it.each([
+    ['PUT', '/profile/me/handle', { handle: 'new-handle', expectedVersion: 0 }, 'invalid-handle'],
+    ['DELETE', '/profile/me/aliases/old', { expectedVersion: 0 }, 'invalid-alias-command'],
+    ['POST', '/profile/me/aliases/old/expire', {}, 'invalid-alias-command'],
+    ['PUT', '/profile/me/aliases/old', null, 'invalid-alias-command'],
+    ['PATCH', '/profile/me', { expectedVersion: 1 }, 'invalid-profile-update'],
+  ] as const)('rejects malformed %s %s before calling the capability', async (method, url, payload, type) => {
+    const app = await createHttpApp({nodeEnv:'test',port:3009},services(() => Effect.die('Must not run')));
+    try {
+      const response = await app.inject({method,url,headers:auth,payload:payload ?? undefined});
+      expect(response.statusCode).toBe(400);
+      expect(response.json().type).toBe(`https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`);
+    } finally {await app.close();}
+  });
+  it('parses detail commands, discards caller ownership, and sends optimistic conflicts as Problem Details', async () => {
+    const calls: unknown[] = [];
+    const app = await createHttpApp({ nodeEnv: 'test', port: 3009 }, services(() => Effect.die('unexpected'), (principal, changes, version) => {
+      calls.push({ principal, changes, version });
+      return Effect.succeed({ _tag: 'Rejected', reason: 'version-conflict', message: 'Profile has changed since it was last loaded' });
+    }));
+    try {
+      const result = await app.inject({ method: 'PATCH', url: '/profile/me', headers: auth, payload: { displayName: 'Edited', expectedVersion: 7, profileId: 'victim' } });
+      expect(result.statusCode).toBe(409);
+      expect(result.headers['content-type']).toContain('application/problem+json');
+      expect(result.json()).toMatchObject({ status: 409, type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/profile-version-conflict.md' });
+      expect(calls).toEqual([{ principal: { profileId: 'user_owner' }, changes: { displayName: 'Edited' }, version: 7 }]);
+    } finally { await app.close(); }
+  });
   it('uses the authenticated principal and preserves the owner response', async () => {
     const calls: string[] = [];
     const app = await createHttpApp({ nodeEnv: 'test', port: 3009 }, services((principal) => {

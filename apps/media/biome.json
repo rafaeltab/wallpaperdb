@@ -49,6 +49,6 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "*.json"]
+    "includes": ["src/**/*.ts", "test/**/*.ts", "*.ts", "*.json"]
   }
 }

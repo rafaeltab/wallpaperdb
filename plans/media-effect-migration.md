@@ -40,3 +40,9 @@ Intentional corrections: transient wallpaper storage failures become uncached 50
 ## Review findings and validation
 
 To be updated as work completes.
+
+Baseline CRAP was recomputed from the original source snapshot and the repeated original 55-test coverage using the same analyzer and attribution policy as `scripts/crap.mts`. Highest score: 52.188 (`createApp`, 25% effective coverage). Original-source ranking retained during implementation at `/tmp/media-baseline-ranking.tsv`.
+
+Composition cutover passes all original 55 tests plus 13 new HTTP contracts. Build, lint, type checks and architectural dependency checks pass. The first cutover run caught an authorized Profile picture with missing storage being translated to 404; the capability now preserves its retryable 503 and has a narrow regression test. A disconnect regression test failed before request AbortSignals reached the Effect runtime and passes after wiring them.
+
+The production build now defers HTTP, S3, NATS and PostgreSQL imports until telemetry starts, and ships a separate resize worker. A build contract verifies the emitted artifacts. Production telemetry composition exports SDK and Effect spans, incoming trace context, structured logs and monotonic Effect metrics through the owned providers.

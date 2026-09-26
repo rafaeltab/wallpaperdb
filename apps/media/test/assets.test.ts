@@ -71,6 +71,7 @@ describe('production asset adapters', () => {
       },
       async *[Symbol.asyncIterator]() {
         await waiting;
+        yield new Uint8Array();
       },
     };
     try {

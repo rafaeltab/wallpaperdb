@@ -18,9 +18,7 @@ afterEach(() => {
 describe('Telemetry SDK ownership', () => {
   it('allows startup when disabled or when configuration cannot initialize telemetry', async () => {
     expect(
-      await Effect.runPromise(
-        initializeOtel({ otelServiceName: 'media' }).pipe(Effect.scoped)
-      )
+      await Effect.runPromise(initializeOtel({ otelServiceName: 'media' }).pipe(Effect.scoped))
     ).toEqual({ _tag: 'Disabled' });
     expect(
       await Effect.runPromise(

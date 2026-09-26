@@ -1,50 +1,25 @@
-import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import Fastify from 'fastify';
-import { container } from 'tsyringe';
-import { registerRoutes } from './routes/index.js';
-
-async function generateSwagger(): Promise<string> {
-  container.register('config', {
-    useValue: {},
-  });
-
-  // Create Fastify server
-  const fastify = Fastify({
-    logger: false,
-  });
-
-  fastify.decorate('container', container);
-
-  // Register OpenAPI documentation
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Media API',
-    version: '1.0.0',
-    description:
-      'Wallpaper retrieval and serving service. Retrieves wallpapers from object storage with optional resizing and format conversion.',
-    servers: [
-      {
-        url: `http://localhost:3003`,
-        description: 'Local development server',
-      },
-    ],
-  });
-
-  // Register all routes
-  await registerRoutes(fastify);
-
-  await fastify.ready();
-
-  const swagger = fastify.swagger();
-
-  try {
-    await fastify.close();
-  } catch (_) {}
-
-  return JSON.stringify(swagger, null, 2);
+import { Effect, Layer } from 'effect';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { MediaDelivery } from './delivery/index.js';
+import { createHttpApp } from './http/index.js';
+const services = Layer.merge(
+  availabilityLayer.pipe(
+    Layer.provide(
+      Layer.succeed(AvailabilityProbe, {
+        inspect: () =>
+          Effect.succeed({ database: false, s3: false, nats: false, consumer: false, otel: false }),
+      })
+    )
+  ),
+  Layer.succeed(MediaDelivery, {
+    wallpaper: () => Effect.succeed({ _tag: 'NotFound' }),
+    picture: () => Effect.succeed({ _tag: 'NotFound' }),
+  })
+);
+const app = await createHttpApp({ nodeEnv: 'development', port: 3003 }, services);
+try {
+  await writeFile('swagger.json', JSON.stringify(app.swagger(), null, 2));
+} finally {
+  await app.close();
 }
-
-const swagger = await generateSwagger();
-
-writeFile('swagger.json', swagger);

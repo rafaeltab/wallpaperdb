@@ -1,173 +1,85 @@
 import {
-	type AddMethodsType,
-	BaseTesterBuilder,
-	type S3TesterBuilder,
-	type NatsTesterBuilder,
-	type PostgresTesterBuilder,
-} from "@wallpaperdb/test-utils";
-import type { FastifyInstance } from "fastify";
-import { container } from "tsyringe";
-import { createApp } from "../../src/app.js";
-import type { Config } from "../../src/config.js";
-import { createTestLogger } from "@wallpaperdb/test-logger";
+  type AddMethodsType,
+  BaseTesterBuilder,
+  type S3TesterBuilder,
+  type NatsTesterBuilder,
+  type PostgresTesterBuilder,
+} from '@wallpaperdb/test-utils';
+import type { FastifyInstance } from 'fastify';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { createApp } from '../../src/app.js';
+import type { Config } from '../../src/config.js';
+import * as schema from '../../src/db/schema.js';
 
-const logger = createTestLogger("InProcessMediaBuilder");
-
-/**
- * Options for InProcessMediaMixin
- */
 export interface InProcessMediaOptions {
-	/** Config overrides (e.g., resize limits) */
-	configOverrides?: Partial<Config>;
-	/** Enable Fastify logger (default: false) */
-	logger?: boolean;
+  configOverrides?: Partial<Config>;
+  logger?: boolean;
 }
-
-/**
- * Mixin that creates an in-process Fastify app for the Media service.
- * This is ideal for integration tests that don't require Docker containers.
- *
- * @example
- * ```typescript
- * const tester = await createTesterBuilder()
- *   .with(DockerTesterBuilder)
- *   .with(PostgresTesterBuilder)
- *   .with(S3TesterBuilder)
- *   .with(NatsTesterBuilder)
- *   .with(MediaMigrationsTesterBuilder)
- *   .with(InProcessMediaTesterBuilder)
- *   .build();
- *
- * const app = tester.getApp();
- * const response = await app.inject({ method: 'GET', url: '/health' });
- * ```
- */
 export class InProcessMediaTesterBuilder extends BaseTesterBuilder<
-	"InProcessMedia",
-	[PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]
+  'InProcessMedia',
+  [PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]
 > {
-	readonly name = "InProcessMedia" as const;
-	private options: InProcessMediaOptions;
-
-	constructor(options: InProcessMediaOptions = {}) {
-		super();
-		this.options = options;
-	}
-
-	addMethods<
-		TBase extends AddMethodsType<
-			[PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]
-		>,
-	>(Base: TBase) {
-		const options = this.options;
-
-		return class extends Base {
-			app: FastifyInstance | null = null;
-			_appInitialized = false;
-
-			withMediaEnvironment() {
-				this.addSetupHook(async () => {
-					logger.debug("[InProcessMedia] Setting up environment variables");
-					const postgres = this.getPostgres();
-					const s3 = this.getS3();
-					const nats = this.getNats();
-
-					if (!postgres || !s3 || !nats) {
-						throw new Error(
-							"InProcessMediaTesterBuilder requires PostgresTesterBuilder, S3TesterBuilder, and NatsTesterBuilder",
-						);
-					}
-
-					logger.debug("Creating in-process Fastify app for Media service...");
-
-					// Set environment variables for loadConfig()
-					process.env.NODE_ENV = "test";
-					process.env.PORT = "3002"; // Different port from ingestor
-					process.env.DATABASE_URL = postgres.connectionStrings.fromHost;
-					process.env.S3_ENDPOINT = s3.endpoints.fromHost;
-					process.env.S3_ACCESS_KEY_ID = s3.options.accessKey;
-					process.env.S3_SECRET_ACCESS_KEY = s3.options.secretKey;
-					process.env.S3_BUCKET =
-						s3.buckets.length > 0 ? s3.buckets[0] : "wallpapers";
-					process.env.NATS_URL = nats.endpoints.fromHost;
-					process.env.NATS_STREAM =
-						nats.streams.length > 0 ? nats.streams[0] : "WALLPAPER";
-					process.env.OTEL_EXPORTER_OTLP_ENDPOINT =
-						"http://localhost:4318/v1/traces";
-
-					// Apply config overrides
-					if (options.configOverrides) {
-						for (const [key, value] of Object.entries(
-							options.configOverrides,
-						)) {
-							if (value !== undefined) {
-								// Convert camelCase to SCREAMING_SNAKE_CASE
-								const envKey = key
-									.replace(/([A-Z])/g, "_$1")
-									.toUpperCase()
-									.replace(/^_/, "");
-								process.env[envKey] = String(value);
-							}
-						}
-					}
-
-					logger.debug("[InProcessMedia] Environment variables set up");
-				});
-				return this;
-			}
-
-			/**
-			 * Enable in-process Fastify app creation during setup.
-			 * The app will be created after all infrastructure is ready.
-			 */
-			withInProcessApp() {
-				if (this._appInitialized) {
-					return this; // Already registered
-				}
-
-				this._appInitialized = true;
-				this.withStream('PROFILE');
-				this.withMediaEnvironment();
-
-				this.addSetupHook(async () => {
-					logger.debug("[InProcessMedia] Creating app via setup hook");
-
-					// Import config at runtime to pick up environment variables
-					const { loadConfig } = await import("../../src/config.js");
-					const config = loadConfig();
-					container.registerInstance("config", config);
-
-					// Create Fastify app
-					this.app = await createApp(config, {
-						logger: options.logger ?? false,
-						enableOtel: false,
-					});
-
-					logger.debug("In-process Media Fastify app ready");
-				});
-
-				this.addDestroyHook(async () => {
-					if (this.app) {
-						logger.debug("Closing in-process Media Fastify app...");
-						await this.app.close();
-						this.app = null;
-					}
-				});
-
-				return this;
-			}
-
-			/**
-			 * Get the Fastify app instance
-			 */
-			getApp(): FastifyInstance {
-				if (!this.app) {
-					throw new Error(
-						"App not initialized. Did you call withInProcessApp() and setup() first?",
-					);
-				}
-				return this.app;
-			}
-		};
-	}
+  readonly name = 'InProcessMedia' as const;
+  constructor(private readonly options: InProcessMediaOptions = {}) {
+    super();
+  }
+  addMethods<
+    TBase extends AddMethodsType<[PostgresTesterBuilder, S3TesterBuilder, NatsTesterBuilder]>,
+  >(Base: TBase) {
+    const options = this.options;
+    return class extends Base {
+      app: FastifyInstance | null = null;
+      fixturePool: Pool | null = null;
+      _appInitialized = false;
+      withInProcessApp() {
+        if (this._appInitialized) return this;
+        this._appInitialized = true;
+        this.withStream('PROFILE');
+        this.addSetupHook(async () => {
+          const postgres = this.getPostgres();
+          const s3 = this.getS3();
+          const nats = this.getNats();
+          const config: Config = {
+            nodeEnv: 'test',
+            port: 0,
+            databaseUrl: postgres.connectionStrings.fromHost,
+            s3Endpoint: s3.endpoints.fromHost,
+            s3AccessKeyId: s3.options.accessKey,
+            s3SecretAccessKey: s3.options.secretKey,
+            s3Bucket: s3.buckets[0] ?? 'wallpapers',
+            s3Region: 'us-east-1',
+            natsUrl: nats.endpoints.fromHost,
+            natsStream: nats.streams[0] ?? 'WALLPAPER',
+            otelServiceName: 'media-test',
+            maxResizeWidth: 7680,
+            maxResizeHeight: 4320,
+            userServiceUrl: process.env.USER_SERVICE_URL,
+            userMediaServiceToken: process.env.USER_MEDIA_SERVICE_TOKEN,
+            ...options.configOverrides,
+          };
+          this.fixturePool = new Pool({ connectionString: config.databaseUrl });
+          this.app = await createApp(config, { logger: options.logger ?? false });
+        });
+        this.addDestroyHook(async () => {
+          try {
+            await this.app?.close();
+          } finally {
+            await this.fixturePool?.end();
+            this.app = null;
+            this.fixturePool = null;
+          }
+        });
+        return this;
+      }
+      getFixtureDatabase() {
+        if (!this.fixturePool) throw new Error('Fixture database is not initialized');
+        return drizzle(this.fixturePool, { schema });
+      }
+      getApp(): FastifyInstance {
+        if (!this.app) throw new Error('App is not initialized');
+        return this.app;
+      }
+    };
+  }
 }

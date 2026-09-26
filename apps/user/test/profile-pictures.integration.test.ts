@@ -1,24 +1,22 @@
-import 'reflect-metadata';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { createDefaultTesterBuilder, DockerTesterBuilder, S3TesterBuilder } from '@wallpaperdb/test-utils';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { FakeTimerService } from '@wallpaperdb/core/timer';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
 import { connect } from 'nats';
 import sharp from 'sharp';
-import { container } from 'tsyringe';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApp } from '../src/app.js';
+import { userLayer } from '../src/app.js';
+import { createHttpApp } from '../src/http/index.js';
+import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Pictures } from '../src/pictures/index.js';
+import { Profiles } from '../src/profile/index.js';
 import type { Config } from '../src/config.js';
-import { ProfilePictureImportService } from '../src/services/profile-picture-import.service.js';
-import { ProfilePictureIngestionService } from '../src/services/profile-picture-ingestion.service.js';
-import { ProfileService } from '../src/services/profile.service.js';
-import { IdentityProviderToken } from '../src/services/clerk-identity.service.js';
+
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 
@@ -35,7 +33,19 @@ describe('Profile picture commands', () => {
   let app: FastifyInstance;
   let config: Config;
   let initialImageUrl: string | undefined;
-  const pictureImportTimer = new FakeTimerService();
+  let runtime: ReturnType<typeof makeRuntime>;
+  const importer = { importPending: () => runtime.runPromise(Effect.flatMap(Pictures, pictures => pictures.importPending())) };
+  const ingestion = { stage: (profileId: string, bytes: Buffer) => runtime.runPromise(Effect.flatMap(Pictures, pictures => pictures.stage({ profileId }, bytes))).then(result => { if (result._tag === 'Rejected') throw new Error(result.message); return result.assetId; }) };
+  const profiles = { adoptPicture: (profileId: string, assetId: string, version: number) => runtime.runPromise(Effect.flatMap(Profiles, profiles => profiles.adoptPicture({ profileId }, assetId, version))).then(result => { if (result._tag === 'Rejected') throw new Error(result.message); return result.profile; }) };
+  function makeRuntime() {
+    return ManagedRuntime.make(userLayer(config, { workers: false, identities: { getIdentity: () => Effect.succeed({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } }));
+  }
+  async function restart() {
+    await app?.close();
+    await runtime?.dispose();
+    runtime = makeRuntime();
+    app = await createHttpApp(config, Layer.succeedContext(await runtime.context()), { logger: false });
+  }
 
   beforeAll(async () => {
     await storageTester.setup();
@@ -62,14 +72,13 @@ describe('Profile picture commands', () => {
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'], userMediaServiceToken: 'test-media-token',
     };
     storage = storageTester.s3.getS3Client();
-    container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer: new FakeTimerService(), pictureImportTimer, evidenceRetentionTimer: new FakeTimerService() });
-    container.register(IdentityProviderToken, { useValue: { getIdentity: async () => ({ displayName: 'Picture Owner', firstName: null, lastName: null, imageUrl: initialImageUrl }) } });
+    await restart();
   });
 
   beforeEach(async () => { initialImageUrl = undefined; await sql`truncate table outbox_events, handle_claims, profiles cascade`; });
   afterAll(async () => {
     await app?.close();
+    await runtime?.dispose();
     await sql?.end();
     storage?.destroy();
     await Promise.all([postgresContainer?.stop(), natsContainer?.stop(), storageTester.destroy()]);
@@ -94,6 +103,7 @@ describe('Profile picture commands', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
     config.profileEvidenceRetentionDays = 7;
+    await restart();
     try {
       const original = (await ensure()).json();
       const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
@@ -106,6 +116,7 @@ describe('Profile picture commands', () => {
     } finally {
       config.profileEvidenceRetentionDays = 30;
       vi.useRealTimers();
+      await restart();
     }
   });
 
@@ -115,8 +126,6 @@ describe('Profile picture commands', () => {
     try {
       const original = (await ensure()).json();
       const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
-      const ingestion = container.resolve(ProfilePictureIngestionService);
-      const profiles = container.resolve(ProfileService);
       const first = await ingestion.stage(original.id, image);
       const expired = await ingestion.stage(original.id, image);
       vi.setSystemTime(new Date('2030-01-30T23:59:59.999Z'));
@@ -124,7 +133,7 @@ describe('Profile picture commands', () => {
       const before = (await ensure()).json();
       const events = await sql`select id from outbox_events order by id`;
       vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
-      await expect(profiles.adoptPicture(original.id, expired, active.version)).rejects.toThrow('expired');
+      expect(await runtime.runPromise(Effect.flatMap(Profiles, profiles => profiles.adoptPicture({ profileId: original.id }, expired, active.version)))).toMatchObject({ _tag: 'Rejected', reason: 'picture-unavailable' });
       expect((await ensure()).json()).toEqual(before);
       expect(await sql`select id from outbox_events order by id`).toEqual(events);
       expect(await sql`select id from profile_picture_assets where state = 'active'`).toEqual([{ id: first }]);
@@ -159,7 +168,7 @@ describe('Profile picture commands', () => {
     try {
       expect((await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: pending.version } })).statusCode).toBe(500);
       expect((await ensure()).json()).toEqual(pending);
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure()).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'retrying' });
       const [job] = await sql`select source_url, next_attempt_at from profile_picture_imports where profile_id = ${pending.id}`;
       expect(job.source_url).toBe(initialImageUrl);
@@ -167,7 +176,7 @@ describe('Profile picture commands', () => {
       expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(0);
       await sql.unsafe('drop trigger reject_picture_event on outbox_events');
       vi.setSystemTime(job.next_attempt_at);
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure()).json()).toMatchObject({ version: pending.version + 1, pictureAssetId: expect.stringMatching(/^pic_/), pictureImportStatus: 'complete' });
     } finally {
       await sql.unsafe('drop trigger if exists reject_picture_event on outbox_events');
@@ -176,14 +185,14 @@ describe('Profile picture commands', () => {
     }
   });
 
-  it('runs queued picture imports from the application timer without blocking ensure', async () => {
+  it('runs queued picture imports after ensure has returned without waiting for download', async () => {
     initialImageUrl = 'https://img.clerk.com/scheduled-initial-picture';
     const pending = (await ensure()).json();
     expect(pending.pictureImportStatus).toBe('pending');
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array(image)));
     try {
-      await pictureImportTimer.tickAsync(1000);
+      await importer.importPending();
       expect((await ensure()).json()).toMatchObject({ pictureImportStatus: 'complete', pictureAssetId: expect.stringMatching(/^pic_/), version: pending.version + 1 });
     } finally { fetcher.mockRestore(); }
   });
@@ -206,7 +215,7 @@ describe('Profile picture commands', () => {
       return new Response(new Uint8Array(image));
     });
     try {
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect(leases).toEqual([config.profilePictureImportTimeoutMs + 60_000]);
     } finally { fetcher.mockRestore(); vi.useRealTimers(); }
   });
@@ -221,7 +230,6 @@ describe('Profile picture commands', () => {
     let started!: () => void;
     const waiting = new Promise<void>((resolve) => { started = resolve; });
     const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(() => { started(); return new Promise<Response>((resolve) => { release = resolve; }); }).mockImplementation(async () => new Response(new Uint8Array(image)));
-    const importer = container.resolve(ProfilePictureImportService);
     const first = importer.importPending();
     try {
       await waiting;
@@ -253,7 +261,7 @@ describe('Profile picture commands', () => {
     let started!: () => void;
     const waiting = new Promise<void>((resolve) => { started = resolve; });
     const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(() => { started(); return new Promise<Response>((resolve) => { release = resolve; }); });
-    const importing = container.resolve(ProfilePictureImportService).importPending();
+    const importing = importer.importPending();
     try {
       await waiting;
       const response = command === 'upload' ? await upload(image, pending.version) : await app.inject({ method: 'DELETE', url: '/profile/me/picture', headers: auth(), payload: { expectedVersion: pending.version } });
@@ -289,7 +297,7 @@ describe('Profile picture commands', () => {
     const fetcher = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Clerk is no longer authoritative'));
     try {
       initialImageUrl = 'https://img.clerk.com/later-picture';
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure()).json()).toEqual(manual);
       expect(fetcher).not.toHaveBeenCalled();
     } finally { fetcher.mockRestore(); }
@@ -300,11 +308,11 @@ describe('Profile picture commands', () => {
     const pending = (await ensure()).json();
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(failure === 'source-not-found' ? new Response(null, { status: 404 }) : new Response('<svg/>'));
     try {
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure()).json()).toMatchObject({ pictureAssetId: null, pictureImportStatus: 'complete', version: pending.version });
       const [job] = await sql`select * from profile_picture_imports where profile_id = ${pending.id}`;
       expect(job).toMatchObject({ source_url: null, lease_token: null, lease_until: null });
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect(fetcher).toHaveBeenCalledTimes(1);
       expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(0);
     } finally { fetcher.mockRestore(); }
@@ -323,18 +331,18 @@ describe('Profile picture commands', () => {
       return new Response(new Uint8Array(image));
     });
     try {
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure('a_retry')).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'retrying' });
       expect((await ensure('b_healthy')).json().pictureImportStatus).toBe('complete');
       const [job] = await sql`select * from profile_picture_imports where profile_id = 'a_retry'`;
       expect(job).toMatchObject({ attempts: 1, lease_token: null, lease_until: null, source_url: 'https://img.clerk.com/retry-picture' });
       expect(job.next_attempt_at.toISOString()).toBe('2030-01-01T00:00:01.000Z');
       fetcher.mockClear();
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect(fetcher).not.toHaveBeenCalled();
       vi.setSystemTime(job.next_attempt_at);
       fetcher.mockResolvedValue(new Response(new Uint8Array(image)));
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect((await ensure('a_retry')).json()).toMatchObject({ version: pending.version + 1, pictureImportStatus: 'complete', pictureAssetId: expect.stringMatching(/^pic_/) });
     } finally { fetcher.mockRestore(); vi.useRealTimers(); }
   });
@@ -347,7 +355,7 @@ describe('Profile picture commands', () => {
     const image = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#475b83' } }).png().toBuffer();
     const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array(image)));
     try {
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       const imported = (await ensure()).json();
       expect(imported).toMatchObject({ pictureAssetId: expect.stringMatching(/^pic_/), pictureImportStatus: 'complete', version: renamed.version + 1, displayName: renamed.displayName });
       expect(fetcher).toHaveBeenCalledTimes(1);
@@ -356,7 +364,7 @@ describe('Profile picture commands', () => {
       expect(job).toMatchObject({ source_url: null, status: 'complete', lease_token: null, lease_until: null });
       const [event] = await sql`select payload from outbox_events where payload->'change'->>'source' = 'clerk-import'`;
       expect(event.payload).toMatchObject({ change: { type: 'picture-changed', source: 'clerk-import', before: null, after: imported.pictureAssetId }, profile: { version: imported.version, displayName: renamed.displayName, aliases: imported.aliases } });
-      await container.resolve(ProfilePictureImportService).importPending();
+      await importer.importPending();
       expect(fetcher).toHaveBeenCalledTimes(1);
       expect((await ensure()).json()).toEqual(imported);
     } finally { fetcher.mockRestore(); }
@@ -422,16 +430,17 @@ describe('Profile picture commands', () => {
     const uploaded = (await upload(image, original.version)).json();
     const bucket = config.profilePictureBucket;
     config.profilePictureBucket = 'missing-picture-bucket';
+    await restart();
     try {
       const failed = await upload(image, uploaded.version);
       expect(failed.statusCode).toBe(503);
       expect(failed.json().type).toContain('picture-storage-unavailable');
       expect((await ensure()).json()).toEqual(uploaded);
-      const [staged] = await sql`select * from profile_picture_assets where state = 'staged'`;
+      const [staged] = await sql`select * from profile_picture_assets where state = 'uploading'`;
       expect(staged.expires_at.getTime() - staged.created_at.getTime()).toBe(30 * 24 * 60 * 60 * 1000);
       expect((await app.inject({ method: 'GET', url: `/internal/profile-pictures/${staged.id}/availability`, headers: { authorization: 'Bearer test-media-token' } })).statusCode).toBe(404);
       expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'picture-changed'`)).toHaveLength(1);
-    } finally { config.profilePictureBucket = bucket; }
+    } finally { config.profilePictureBucket = bucket; await restart(); }
   });
 
   it('reports invalid and oversized uploads without publishing or staging them', async () => {
@@ -546,4 +555,41 @@ describe('Profile picture commands', () => {
     expect(metadata.exif).toBeUndefined();
     expect(metadata.icc).toBeUndefined();
   });
+  it('retries the eleventh temporary import failure and clears the private source after the twelfth', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
+    initialImageUrl = 'https://img.clerk.com/retry-picture?private=credential';
+    const pending = (await ensure()).json();
+    await sql`update profile_picture_imports set attempts = 10 where profile_id = ${pending.id}`;
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(null, { status: 503 }));
+    try {
+      await importer.importPending();
+      const [retry] = await sql`select attempts, status, source_url, next_attempt_at from profile_picture_imports where profile_id = ${pending.id}`;
+      expect(retry).toMatchObject({ attempts: 11, status: 'retrying', source_url: initialImageUrl });
+      vi.setSystemTime(retry.next_attempt_at);
+      await importer.importPending();
+      expect(await sql`select attempts, status, source_url, lease_until, lease_token from profile_picture_imports where profile_id = ${pending.id}`).toEqual([
+        { attempts: 12, status: 'complete', source_url: null, lease_until: null, lease_token: null },
+      ]);
+      expect((await ensure()).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'complete' });
+      await importer.importPending();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    } finally { fetcher.mockRestore(); vi.useRealTimers(); }
+  });
+
+  it('settles an already exhausted legacy import without another network request', async () => {
+    initialImageUrl = 'https://img.clerk.com/exhausted?private=credential';
+    const pending = (await ensure()).json();
+    await sql`update profile_picture_imports set attempts = 12 where profile_id = ${pending.id}`;
+    const fetcher = vi.spyOn(globalThis, 'fetch');
+    try {
+      await importer.importPending();
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(await sql`select status, source_url, lease_until, lease_token from profile_picture_imports where profile_id = ${pending.id}`).toEqual([
+        { status: 'complete', source_url: null, lease_until: null, lease_token: null },
+      ]);
+      expect((await ensure()).json()).toMatchObject({ version: pending.version, pictureAssetId: null, pictureImportStatus: 'complete' });
+    } finally { fetcher.mockRestore(); }
+  });
+
 });

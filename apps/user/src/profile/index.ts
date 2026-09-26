@@ -72,6 +72,8 @@ export interface ProfileStore {
 export const ProfileStore = Context.Service<ProfileStore>('wallpaperdb.user.profile.ProfileStore');
 export interface Profiles {
   ensure(principal: ProfilePrincipal): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  adoptPicture(principal: ProfilePrincipal, assetId: string | null, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
+  adoptImportedPicture(lease: { profileId: string; leaseToken: string }, assetId: string | null): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
   changeHandle(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
   reactivateAlias(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
   scheduleAliasExpiry(principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number): Effect.Effect<ProfileOutcome, ProfileUnavailable>;
@@ -97,6 +99,19 @@ function collisionHandle(base: string, maximumLength: number, entropy: number) {
 export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, Effect.gen(function* () {
   const store = yield* ProfileStore;
   const identities = yield* Identities;
+  const adopt = Effect.fn('profiles.adopt-picture')(function* (principal: ProfilePrincipal, assetId: string | null, authorization: { type: 'owner'; expectedVersion: number } | { type: 'import'; leaseToken: string }) {
+    if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
+    const now = new Date(yield* Clock.currentTimeMillis);
+    const result = yield* store.transact({ profileId: principal.profileId, assetId, now }, ({ profile, importJob, asset }) => {
+      if (authorization.type === 'import') {
+        if (!authorization.leaseToken || !importJob || importJob.leaseToken !== authorization.leaseToken || importJob.status === 'complete' || profile.pictureAssetId !== null) return { _tag: 'Unchanged' };
+      } else if (profile.version !== authorization.expectedVersion) return versionConflict();
+      if (profile.pictureAssetId === assetId && (!importJob || importJob.status === 'complete')) return { _tag: 'Unchanged' };
+      if (assetId && (!asset || asset.profileId !== principal.profileId || asset.state !== 'staged' || !asset.expiresAt || asset.expiresAt <= now)) return reject('picture-unavailable', 'The staged Profile picture is unavailable');
+      return { _tag: 'Change', mutation: { type: 'picture', asset, source: authorization.type === 'import' ? 'clerk-import' : assetId ? 'upload' : 'remove' } };
+    });
+    return result.outcome;
+  });
   const mutateAlias = Effect.fn('profiles.mutate-alias')(function* (principal: ProfilePrincipal, requestedHandle: string, expectedVersion: number, operation: 'reactivate' | 'schedule' | 'expire') {
     if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) return reject('invalid-alias-command', 'Expected Profile version must be a positive integer');
@@ -160,6 +175,8 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
   });
   return Profiles.of({
     updateDetails,
+    adoptPicture: (principal, assetId, expectedVersion) => adopt(principal, assetId, { type: 'owner', expectedVersion }),
+    adoptImportedPicture: (lease, assetId) => adopt(lease, assetId, { type: 'import', leaseToken: lease.leaseToken }),
     changeHandle,
     reactivateAlias: (principal, handle, version) => mutateAlias(principal, handle, version, 'reactivate'),
     scheduleAliasExpiry: (principal, handle, version) => mutateAlias(principal, handle, version, 'schedule'),

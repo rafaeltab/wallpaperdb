@@ -33,6 +33,15 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('supersedes an import lease when the owner removes a pending picture', async () => {
+    await run(profiles => profiles.ensure({ profileId: 'owner' }));
+    await sql`update profile_picture_imports set lease_token = 'lease-1' where profile_id = 'owner'`;
+    expect(await run(profiles => profiles.adoptPicture({ profileId: 'owner' }, null, 1))).toMatchObject({ _tag: 'Success', profile: { version: 2, pictureImportStatus: 'complete', pictureAssetId: null } });
+    expect(await run(profiles => profiles.adoptImportedPicture({ profileId: 'owner', leaseToken: 'lease-1' }, 'stale-picture'))).toMatchObject({ _tag: 'Success', profile: { version: 2, pictureAssetId: null } });
+    expect(await sql`select source_url, lease_token, status from profile_picture_imports`).toEqual([{ source_url: null, lease_token: null, status: 'complete' }]);
+    const updates = await sql`select payload from outbox_events where subject = 'profile.updated'`;
+    expect(updates).toEqual([expect.objectContaining({ payload: expect.objectContaining({ change: { type: 'picture-changed', before: null, after: null, source: 'remove', asset: null } }) })]);
+  });
   it('changes handles, schedules an alias, and refuses stale expiry after reactivation', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }));
     const changed = await run(profiles => profiles.changeHandle({ profileId: 'owner' }, 'Countess Ada', 1));

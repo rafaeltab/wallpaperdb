@@ -8,6 +8,11 @@ const clerkIdentity = z.object({
   has_image: z.boolean(),
   image_url: z.string(),
 });
+class IdentityResponseFailure extends Error {
+  constructor(readonly status: number) {
+    super('Identity provider rejected the request');
+  }
+}
 
 /** Native fetch makes the request abortable, including response-body consumption. */
 export const clerkIdentitiesLayer = (config: { readonly clerkSecretKey?: string }) =>
@@ -25,7 +30,7 @@ export const clerkIdentitiesLayer = (config: { readonly clerkSecretKey?: string 
           );
           if (!response.ok) {
             await response.body?.cancel();
-            throw new Error(`Identity lookup returned HTTP ${response.status}`);
+            throw new IdentityResponseFailure(response.status);
           }
           const identity = clerkIdentity.parse(await response.json());
           return {
@@ -35,6 +40,18 @@ export const clerkIdentitiesLayer = (config: { readonly clerkSecretKey?: string 
             imageUrl: identity.has_image ? identity.image_url : null,
           };
         },
-        catch: (cause) => new ProfileUnavailable({ operation: 'identity-lookup', cause }),
-      }),
+        catch: (cause) =>
+          new ProfileUnavailable({
+            operation: 'identity-lookup',
+            cause:
+              cause instanceof IdentityResponseFailure
+                ? { category: 'response', status: cause.status }
+                : { category: cause instanceof z.ZodError ? 'invalid-response' : 'transport' },
+          }),
+      }).pipe(
+        Effect.tapError((failure) =>
+          Effect.logError('Identity lookup failed', { cause: failure.cause })
+        ),
+        Effect.withSpan('profiles.identities.lookup')
+      ),
   });

@@ -185,15 +185,25 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
               .returning({ id: profilePictureAssets.id });
             return rows.length === 1;
           }),
-        dueImports: (now) =>
+        dueImports: (now, cursor) =>
           query('scan-imports', async (db) => {
             const jobs = await db
-              .select({ profileId: profilePictureImports.profileId })
+              .select({
+                profileId: profilePictureImports.profileId,
+                nextAttemptAt: profilePictureImports.nextAttemptAt,
+              })
               .from(profilePictureImports)
-              .where(due(now))
+              .where(
+                and(
+                  due(now),
+                  cursor
+                    ? sql`(${profilePictureImports.nextAttemptAt}, ${profilePictureImports.profileId}) > (${cursor.nextAttemptAt.toISOString()}, ${cursor.profileId})`
+                    : undefined
+                )
+              )
               .orderBy(profilePictureImports.nextAttemptAt, profilePictureImports.profileId)
               .limit(100);
-            return jobs.map((job) => job.profileId);
+            return jobs;
           }),
         claimImport: (profileId, now, leaseDurationMs) =>
           query('claim-import', (db) =>

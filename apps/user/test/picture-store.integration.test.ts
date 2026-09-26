@@ -102,6 +102,24 @@ describe('Picture persistence adapter', () => {
     expect(await run((store) => store.available(asset.id))).toBe(true);
   });
 
+  it('pages due imports in stable deadline order without revisiting an earlier failing batch', async () => {
+    await sql`insert into profiles(id, display_name, handle) select 'import_' || lpad(i::text, 3, '0'), 'Import', 'import_' || lpad(i::text, 3, '0') from generate_series(0, 102) i`;
+    await sql`insert into profile_picture_imports(profile_id, source_url, next_attempt_at) select id, 'https://img.clerk.com/source', ${now} from profiles where id like 'import_%'`;
+    await sql`update profile_picture_imports set lease_until = ${new Date(now.getTime() + 1000)} where profile_id = 'import_102'`;
+    const first = await run((store) => store.dueImports(now));
+    expect(first).toHaveLength(100);
+    expect(first[0]).toEqual({ profileId: 'import_000', nextAttemptAt: now });
+    const cursor = first.at(-1);
+    if (!cursor) throw new Error('Expected a full import page');
+    expect(cursor.profileId).toBe('import_099');
+    // Nothing was claimed: a poisoned first page must not prevent later discovery.
+    expect(await run((store) => store.dueImports(now, cursor))).toEqual([
+      { profileId: 'import_100', nextAttemptAt: now },
+      { profileId: 'import_101', nextAttemptAt: now },
+    ]);
+    expect(await run((store) => store.dueImports(now))).toEqual(first);
+  });
+
   it('fences retry writes after a later replica replaces the import lease', async () => {
     await sql`insert into profile_picture_imports(profile_id, source_url, next_attempt_at) values ('owner', 'https://img.clerk.com/private', ${now})`;
     const first = await run((store) => store.claimImport('owner', now, 1000));

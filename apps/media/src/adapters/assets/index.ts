@@ -160,7 +160,12 @@ export const pictureAuthorityLayer = (config: {
             return true;
           },
           catch: (cause) => new DeliveryUnavailable({ operation: 'picture_authority', cause }),
-        }),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Profile picture authority failed', { cause: error.cause })
+          ),
+          Effect.withSpan('media.picture_authority', { attributes: { 'picture.id': id } })
+        ),
     })
   );
 
@@ -175,11 +180,13 @@ export interface S3AssetsConfig {
   secretAccessKey: string;
   bucket: string;
   readTimeoutMs?: number;
+  maxConcurrentReads?: number;
 }
 export const s3AssetsLayer = (config: S3AssetsConfig) =>
   Layer.effectContext(
     Effect.gen(function* () {
       const streams = new Set<Readable>();
+      const requests = new Set<AbortController>();
       const client = yield* Effect.acquireRelease(
         Effect.sync(
           () =>
@@ -196,40 +203,92 @@ export const s3AssetsLayer = (config: S3AssetsConfig) =>
         ),
         (client) =>
           Effect.sync(() => {
+            for (const controller of requests) controller.abort();
             for (const stream of streams) stream.destroy();
             client.destroy();
           })
       );
       const reader: AssetReader = {
-        read: (asset) =>
-          Effect.tryPromise({
-            try: async (signal) => {
-              const response = await client.send(
-                new GetObjectCommand({ Bucket: asset.storageBucket, Key: asset.storageKey }),
-                { abortSignal: signal }
+        read: (asset, context) =>
+          Effect.suspend(() => {
+            if (requests.size >= (config.maxConcurrentReads ?? 128))
+              return Effect.fail(
+                new DeliveryUnavailable({
+                  operation: 'storage_capacity',
+                  cause: new Error('Storage read capacity exhausted'),
+                })
               );
-              if (!(response.Body instanceof Readable))
-                throw new Error('Storage returned no readable body');
-              const body = response.Body;
-              streams.add(body);
-              const deadline = setTimeout(
-                () => body.destroy(new Error('Storage read deadline exceeded')),
-                config.readTimeoutMs ?? 30000
-              );
-              deadline.unref();
-              body.once('close', () => {
-                clearTimeout(deadline);
-                streams.delete(body);
-              });
-              body.on('error', () => {});
-              return byteStream(body);
-            },
-            catch: (cause) => new DeliveryUnavailable({ operation: 'read_asset', cause }),
+            const controller = new AbortController();
+            requests.add(controller);
+            const start = Date.now();
+            const attributes = {
+              'operation.name': 'get_object',
+              ...(context ? { source: context.source } : {}),
+              ...(context?.fallback ? { fallback: 'true' } : {}),
+            };
+            return Effect.tryPromise({
+              try: async (signal) => {
+                let body: Readable | undefined;
+                const abort = () => {
+                  controller.abort();
+                  body?.destroy(new Error('Storage read interrupted'));
+                };
+                signal.addEventListener('abort', abort, { once: true });
+                const deadline = setTimeout(abort, config.readTimeoutMs ?? 30000);
+                deadline.unref();
+                const release = () => {
+                  clearTimeout(deadline);
+                  signal.removeEventListener('abort', abort);
+                  requests.delete(controller);
+                  if (body) streams.delete(body);
+                };
+                try {
+                  signal.throwIfAborted();
+                  const response = await client.send(
+                    new GetObjectCommand({ Bucket: asset.storageBucket, Key: asset.storageKey }),
+                    { abortSignal: controller.signal }
+                  );
+                  if (!(response.Body instanceof Readable))
+                    throw new Error('Storage returned no readable body');
+                  body = response.Body;
+                  if (controller.signal.aborted) {
+                    body.destroy();
+                    throw new Error('Storage read interrupted');
+                  }
+                  streams.add(body);
+                  body.once('close', release);
+                  body.on('error', () => {});
+                  recordCounter('media.s3.operations.total', 1, {
+                    ...attributes,
+                    'operation.success': 'true',
+                  });
+                  recordHistogram('media.s3.get_duration_ms', Date.now() - start, attributes);
+                  return byteStream(body);
+                } catch (cause) {
+                  release();
+                  recordCounter('media.s3.operations.total', 1, {
+                    ...attributes,
+                    'operation.success': 'false',
+                    'error.type': cause instanceof Error ? cause.name : 'UnknownError',
+                  });
+                  if (cause instanceof Error && cause.name === 'NoSuchKey') return null;
+                  throw cause;
+                }
+              },
+              catch: (cause) => new DeliveryUnavailable({ operation: 'read_asset', cause }),
+            });
           }).pipe(
-            Effect.catchTag('DeliveryUnavailable', (failure) => {
-              const cause = failure.cause;
-              if (cause instanceof Error && cause.name === 'NoSuchKey') return Effect.succeed(null);
-              return Effect.fail(failure);
+            Effect.tapError((error) =>
+              Effect.logError('Media asset read failed', {
+                operation: error.operation,
+                cause: error.cause,
+              })
+            ),
+            Effect.withSpan('media.s3.get_object', {
+              attributes: {
+                'storage.bucket': asset.storageBucket,
+                'storage.key': asset.storageKey,
+              },
             })
           ),
       };
@@ -238,7 +297,10 @@ export const s3AssetsLayer = (config: S3AssetsConfig) =>
           Effect.tryPromise({
             try: (signal) =>
               client.send(new HeadBucketCommand({ Bucket: config.bucket }), {
-                abortSignal: signal,
+                abortSignal: AbortSignal.any([
+                  signal,
+                  AbortSignal.timeout(config.readTimeoutMs ?? 30000),
+                ]),
               }),
             catch: (cause) => new DeliveryUnavailable({ operation: 'storage_health', cause }),
           }).pipe(Effect.asVoid),

@@ -46,3 +46,11 @@ Baseline CRAP was recomputed from the original source snapshot and the repeated 
 Composition cutover passes all original 55 tests plus 13 new HTTP contracts. Build, lint, type checks and architectural dependency checks pass. The first cutover run caught an authorized Profile picture with missing storage being translated to 404; the capability now preserves its retryable 503 and has a narrow regression test. A disconnect regression test failed before request AbortSignals reached the Effect runtime and passes after wiring them.
 
 The production build now defers HTTP, S3, NATS and PostgreSQL imports until telemetry starts, and ships a separate resize worker. A build contract verifies the emitted artifacts. Production telemetry composition exports SDK and Effect spans, incoming trace context, structured logs and monotonic Effect metrics through the owned providers.
+
+Legacy upgrade tests exposed exhausted JetStream consumers that remain stranded after increasing MaxDeliver. Startup now preserves and rejects those consumers with an actionable recovery error. A real NATS test proves operator recreation from the saved acknowledgement floor recovers the retained input. Clean legacy consumers upgrade in place.
+
+Legacy catalog tests exposed missing publication intent and duplicate variant identity on replay. A generated target-ledger migration now lets the first replay reconcile stored facts without changing asset metadata or deleting rows. Repeated and concurrent target claims are no-ops. Unsupported original MIME types remain in the delivery catalog but cannot create an invalid image availability event.
+
+Test validity corrections replace fixed sleeps with bounded acknowledgement/projection conditions. Variant fixtures now have different colors, and decoded pixels prove which source was selected. Forcing the catalog to return no variant fails the corrected selection test even though the output dimensions remain correct. The former trace-header test no longer claims to prove propagation; the production telemetry test does that.
+
+Temporary mutations removing the production tracer, logger, Effect metric producer, and HTTP incoming-context bridge each fail the telemetry composition contract. All mutations were restored before normal validation.

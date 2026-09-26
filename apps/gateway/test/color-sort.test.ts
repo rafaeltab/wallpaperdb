@@ -26,6 +26,19 @@ async function vector(
   return result;
 }
 describe('Catalogue color ranking policy', () => {
+  it('accepts at most 64 color preferences before performing a catalogue read', async () => {
+    const { read, catalogue } = await setup();
+    const colors = Array.from({ length: 65 }, () => ({ color: '#FF0000', amount: 1 }));
+    expect(await Effect.runPromise(catalogue.search({ colors }))).toMatchObject({
+      _tag: 'InvalidSearch',
+    });
+    expect(read.selections).toEqual([]);
+
+    expect(
+      await Effect.runPromise(catalogue.search({ colors: colors.slice(0, 64) }))
+    ).toMatchObject({ _tag: 'Found' });
+    expect(read.selections).toHaveLength(1);
+  });
   it.each(fixtures)('preserves the existing $strategy histogram for $color', async ({
     strategy,
     color,

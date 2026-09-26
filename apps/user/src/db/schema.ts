@@ -65,14 +65,22 @@ export const outboxEvents = pgTable(
     index('outbox_events_profile_history_idx').on(table.aggregateId, table.createdAt),
     index('outbox_events_profile_cleanup_idx')
       .on(table.createdAt, table.id)
-      .where(sql`${table.publishedAt} is not null and ${table.subject} in ('profile.created', 'profile.updated')`),
+      .where(
+        sql`${table.publishedAt} is not null and ${table.subject} in ('profile.created', 'profile.updated')`
+      ),
   ]
 );
 
 export type Profile = typeof profiles.$inferSelect;
 export type NewProfile = typeof profiles.$inferInsert;
 
-export const pictureAssetState = pgEnum('picture_asset_state', ['staged', 'active', 'retired']);
+export const pictureAssetState = pgEnum('picture_asset_state', [
+  'staged',
+  'active',
+  'retired',
+  'uploading',
+  'deleting',
+]);
 export const profilePictureAssets = pgTable(
   'profile_picture_assets',
   {
@@ -90,6 +98,7 @@ export const profilePictureAssets = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     retiredAt: timestamp('retired_at', { withTimezone: true }),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
+    uploadLeaseUntil: timestamp('upload_lease_until', { withTimezone: true }),
   },
   (table) => [index('profile_picture_assets_cleanup_idx').on(table.expiresAt, table.id)]
 );

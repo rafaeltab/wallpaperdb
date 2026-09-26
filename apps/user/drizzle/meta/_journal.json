@@ -71,6 +71,13 @@
       "when": 1789444428025,
       "tag": "0009_lyrical_deadpool",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790445698620,
+      "tag": "0010_dark_terrax",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { and, asc, eq, gte, lt, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Context, Effect, Layer } from 'effect';
@@ -6,11 +7,12 @@ import { Pool } from 'pg';
 import {
   CatalogFailure,
   CatalogOutbox,
-  ProjectionStore,
+  CatalogProjection,
+  CatalogHealth,
   type AvailableNotification,
   type CatalogOutboxPort,
   type ProjectionInput,
-  type ProjectionStorePort,
+  type CatalogProjectionPort,
 } from '../../catalog/index.js';
 import { Catalog, DeliveryUnavailable } from '../../delivery/index.js';
 import {
@@ -50,11 +52,55 @@ function notification(input: Exclude<ProjectionInput, { kind: 'profile' }>): Ava
     },
   };
 }
+const observeQuery =
+  (table: string, operation: string) =>
+  <A, E>(effect: Effect.Effect<A, E>) =>
+    Effect.suspend(() => {
+      const started = Date.now();
+      return effect.pipe(
+        Effect.tap((result) =>
+          Effect.sync(() => {
+            const attributes = { table, operation };
+            recordCounter(
+              'db.queries.total',
+              1,
+              operation.startsWith('find_')
+                ? { ...attributes, found: String(result !== null) }
+                : attributes
+            );
+            recordHistogram('db.query_duration_ms', Date.now() - started, attributes);
+          })
+        )
+      );
+    });
+const observeProjection =
+  (input: ProjectionInput) =>
+  <E>(effect: Effect.Effect<void, E>) => {
+    if (input.kind === 'profile') return effect;
+    const original = input.kind === 'wallpaper';
+    return Effect.suspend(() => {
+      const started = Date.now();
+      return effect.pipe(
+        observeQuery(original ? 'wallpapers' : 'variants', original ? 'upsert' : 'insert'),
+        Effect.tap(() =>
+          Effect.sync(() =>
+            recordHistogram(
+              original
+                ? 'media.consumer.upsert_duration_ms'
+                : 'media.consumer.variant_insert_duration_ms',
+              Date.now() - started,
+              { 'event.type': original ? 'wallpaper.uploaded' : 'wallpaper.variant.uploaded' }
+            )
+          )
+        )
+      );
+    });
+  };
 const implementations = Layer.effectContext(
   Effect.gen(function* () {
     const db = yield* Database;
-    const project: ProjectionStorePort = {
-      commit: (input) =>
+    const project: CatalogProjectionPort = {
+      accept: (input) =>
         Effect.tryPromise({
           try: () =>
             db.transaction(async (tx) => {
@@ -94,7 +140,8 @@ const implementations = Layer.effectContext(
                 const created = await tx
                   .insert(wallpapers)
                   .values({ ...input.wallpaper, createdAt: new Date(input.wallpaper.createdAt) })
-                  .onConflictDoNothing().returning();
+                  .onConflictDoNothing()
+                  .returning();
                 if (created.length === 0) return;
               } else {
                 const created = await tx
@@ -104,7 +151,8 @@ const implementations = Layer.effectContext(
                     id: `var_${stableId([input.variant.wallpaperId, input.variant.storageBucket, input.variant.storageKey])}`,
                     createdAt: new Date(input.variant.createdAt),
                   })
-                  .onConflictDoNothing().returning();
+                  .onConflictDoNothing()
+                  .returning();
                 if (created.length === 0) return;
               }
               const output = notification(input);
@@ -118,7 +166,12 @@ const implementations = Layer.effectContext(
                 .onConflictDoNothing();
             }),
           catch: (cause) => new CatalogFailure({ operation: 'commit', cause }),
-        }),
+        }).pipe(
+          observeProjection(input),
+          Effect.uninterruptible,
+          Effect.tapError((error) => Effect.logError('Catalog projection failed', error)),
+          Effect.withSpan('media.catalog.accept')
+        ),
     };
     const outbox: CatalogOutboxPort = {
       listPending: (limit) =>
@@ -133,14 +186,22 @@ const implementations = Layer.effectContext(
             return rows.map((row) => row.notification);
           },
           catch: (cause) => new CatalogFailure({ operation: 'list-pending', cause }),
-        }),
+        }).pipe(
+          Effect.tapError((error) => Effect.logError('Catalog outbox read failed', error)),
+          Effect.withSpan('media.catalog.outbox.pending')
+        ),
       markPublished: (id) =>
         Effect.tryPromise({
           try: async () => {
             await db.delete(catalogOutbox).where(eq(catalogOutbox.id, id));
           },
           catch: (cause) => new CatalogFailure({ operation: 'mark-published', cause }),
-        }),
+        }).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Catalog outbox acknowledgement failed', error)
+          ),
+          Effect.withSpan('media.catalog.outbox.published')
+        ),
     };
     const catalog: Catalog = {
       findWallpaper: (id) =>
@@ -148,13 +209,23 @@ const implementations = Layer.effectContext(
           try: async () =>
             (await db.select().from(wallpapers).where(eq(wallpapers.id, id)).limit(1))[0] ?? null,
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-wallpaper', cause }),
-        }),
+        }).pipe(
+          observeQuery('wallpapers', 'find_by_id'),
+          Effect.tapError((error) => Effect.logError('Catalog read failed', error)),
+          Effect.withSpan('media.catalog.find-wallpaper')
+        ),
       findSmallestVariant: (id, minWidth, minHeight) =>
         Effect.tryPromise({
           try: async () =>
             (
               await db
-                .select({ id: variants.id, storageKey: variants.storageKey, storageBucket: sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`, width: variants.width, height: variants.height })
+                .select({
+                  id: variants.id,
+                  storageKey: variants.storageKey,
+                  storageBucket: sql<string>`coalesce(${variants.storageBucket}, ${wallpapers.storageBucket})`,
+                  width: variants.width,
+                  height: variants.height,
+                })
                 .from(variants)
                 .innerJoin(wallpapers, eq(wallpapers.id, variants.wallpaperId))
                 .where(
@@ -171,7 +242,11 @@ const implementations = Layer.effectContext(
                 .limit(1)
             )[0] ?? null,
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-variant', cause }),
-        }),
+        }).pipe(
+          observeQuery('variants', 'find_smallest_suitable'),
+          Effect.tapError((error) => Effect.logError('Catalog read failed', error)),
+          Effect.withSpan('media.catalog.find-variant')
+        ),
       findCurrentPicture: (id) =>
         Effect.tryPromise({
           try: async () =>
@@ -190,11 +265,23 @@ const implementations = Layer.effectContext(
                 .limit(1)
             )[0]?.asset ?? null,
           catch: (cause) => new DeliveryUnavailable({ operation: 'find-picture', cause }),
-        }),
+        }).pipe(
+          Effect.tapError((error) => Effect.logError('Catalog read failed', error)),
+          Effect.withSpan('media.catalog.find-picture')
+        ),
     };
-    return Context.make(ProjectionStore, project).pipe(
+    return Context.make(CatalogProjection, project).pipe(
       Context.add(CatalogOutbox, outbox),
-      Context.add(Catalog, catalog)
+      Context.add(Catalog, catalog),
+      Context.add(CatalogHealth, {
+        check: Effect.tryPromise({
+          try: () => db.execute(sql`SELECT 1`),
+          catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
+        }).pipe(
+          Effect.as(true),
+          Effect.catch(() => Effect.succeed(false))
+        ),
+      })
     );
   })
 );
@@ -203,16 +290,20 @@ export function CatalogPostgresLayer(config: CatalogPostgresConfig) {
     Database,
     Effect.gen(function* () {
       const pool = yield* Effect.acquireRelease(
-        Effect.sync(
-          () =>
-            new Pool({
-              connectionString: config.databaseUrl,
-              max: 10,
-              connectionTimeoutMillis: 5000,
-              statement_timeout: 10000,
-              query_timeout: 15000,
-            })
-        ),
+        Effect.sync(() => {
+          const pool = new Pool({
+            connectionString: config.databaseUrl,
+            max: 10,
+            connectionTimeoutMillis: 5000,
+            statement_timeout: 10000,
+            idle_in_transaction_session_timeout: 10000,
+            query_timeout: 15000,
+          });
+          // Idle connections can fail outside a query. Handle the pool event so
+          // the next health/read operation can report database unavailability.
+          pool.on('error', (cause) => console.error('Catalog idle connection failed', cause));
+          return pool;
+        }),
         (pool) => Effect.promise(() => pool.end())
       );
       yield* Effect.tryPromise({

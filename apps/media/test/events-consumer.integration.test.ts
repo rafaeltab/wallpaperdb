@@ -1,4 +1,4 @@
-import { headers } from 'nats';
+import { AckPolicy, DeliverPolicy, headers } from 'nats';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -715,6 +715,152 @@ it('retains the original binary CloudEvent identity in quarantine for replay', a
     expect(stored.header.get('original-ce-source')).toBe('https://producer.example/events');
     expect(stored.header.get('original-ce-id')).toBe('original-1');
     expect(stored.header.get('original-ce-correlationid')).toBe('flow-1');
+  } finally {
+    await runtime.dispose();
+  }
+});
+it('requires coordinated recreation before replaying deliveries exhausted by a legacy consumer', async () => {
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const client = await tester.nats.getJsClient();
+  const durable = 'media-wallpaper-uploaded-consumer';
+  await manager.consumers.add('WALLPAPER', {
+    durable_name: durable,
+    ack_policy: AckPolicy.Explicit,
+    ack_wait: 50_000_000,
+    max_deliver: 3,
+    filter_subject: 'wallpaper.uploaded',
+  });
+  await client.publish('wallpaper.uploaded', JSON.stringify(upload('legacy-exhausted')));
+  const old = await client.consumers.get('WALLPAPER', durable);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const message = await old.next({ expires: 1000 });
+    if (!message) throw new Error('Expected legacy delivery');
+    message.nak();
+  }
+  // Asking for another message lets the server reach MaxDeliver and stop the old work.
+  expect(await old.next({ expires: 1000 })).toBeNull();
+  let projected = 0;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'legacy-recovery',
+    retryDelayMs: 10,
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(CatalogProjection, {
+          accept: () =>
+            Effect.suspend(() => {
+              projected++;
+              return Effect.fail(
+                new CatalogFailure({ operation: 'offline', cause: 'unavailable' })
+              );
+            }),
+        })
+      )
+    )
+  );
+  let recovered: typeof runtime | undefined;
+  try {
+    await expect(runtime.runPromise(ConsumerHealth)).rejects.toMatchObject({
+      _tag: 'BrokerFailure',
+      operation: 'migrate-legacy-consumer',
+    });
+    const retained = await manager.consumers.info('WALLPAPER', durable);
+    expect(retained.config.max_deliver).toBe(3);
+    await runtime.dispose();
+    // Operator step with every media replica stopped: retain the durable name and
+    // replay from the first sequence not covered by its contiguous acknowledgement floor.
+    await manager.consumers.delete('WALLPAPER', durable);
+    await manager.consumers.add('WALLPAPER', {
+      durable_name: durable,
+      ack_policy: AckPolicy.Explicit,
+      max_deliver: -1,
+      filter_subject: 'wallpaper.uploaded',
+      deliver_policy: DeliverPolicy.StartSequence,
+      opt_start_seq: retained.ack_floor.stream_seq + 1,
+    });
+    recovered = ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provide(natsEventsLayer(options)),
+        Layer.provide(
+          Layer.succeed(CatalogProjection, {
+            accept: () =>
+              Effect.suspend(() => {
+                projected++;
+                return Effect.fail(
+                  new CatalogFailure({ operation: 'offline', cause: 'unavailable' })
+                );
+              }),
+          })
+        )
+      )
+    );
+    await recovered.runPromise(ConsumerHealth);
+    await expect
+      .poll(async () => (await manager.streams.info('MEDIA_QUARANTINE')).state.messages, {
+        timeout: 3000,
+      })
+      .toBe(1);
+    expect(projected).toBe(3);
+    expect(
+      (
+        await manager.streams.getMessage('MEDIA_QUARANTINE', { last_by_subj: 'media.quarantine' })
+      ).json()
+    ).toEqual(upload('legacy-exhausted'));
+    await expect
+      .poll(async () => (await manager.consumers.info('WALLPAPER', durable)).num_ack_pending)
+      .toBe(0);
+  } finally {
+    await runtime.dispose();
+    await recovered?.dispose();
+  }
+});
+it('upgrades a legacy consumer with no retained redeliveries without replacing its acknowledgement floor', async () => {
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const client = await tester.nats.getJsClient();
+  const durable = 'media-wallpaper-uploaded-consumer';
+  await manager.consumers.add('WALLPAPER', {
+    durable_name: durable,
+    ack_policy: AckPolicy.Explicit,
+    ack_wait: 30_000_000_000,
+    max_deliver: 4,
+    filter_subject: 'wallpaper.uploaded',
+  });
+  await client.publish('wallpaper.uploaded', JSON.stringify(upload('already-done')));
+  const message = await (await client.consumers.get('WALLPAPER', durable)).next({ expires: 1000 });
+  if (!message) throw new Error('Expected initial legacy delivery');
+  await message.ackAck();
+  const before = await manager.consumers.info('WALLPAPER', durable);
+  let projected = 0;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'legacy-clean',
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(CatalogProjection, {
+          accept: () =>
+            Effect.sync(() => {
+              projected++;
+            }),
+        })
+      )
+    )
+  );
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const upgraded = await manager.consumers.info('WALLPAPER', durable);
+    expect(upgraded.created).toBe(before.created);
+    expect(upgraded.config.max_deliver).toBe(-1);
+    expect(upgraded.ack_floor.stream_seq).toBe(before.ack_floor.stream_seq);
+    await client.publish('wallpaper.uploaded', JSON.stringify(upload('new-work')));
+    await expect.poll(() => projected).toBe(1);
   } finally {
     await runtime.dispose();
   }

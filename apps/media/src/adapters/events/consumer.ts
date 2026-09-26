@@ -144,9 +144,26 @@ const startWorker = Effect.fn('media.events.start-consumer')(function* (
     max_ack_pending: 1000,
   };
   yield* broker('inspect-consumer', () => manager.consumers.info(stream, durable)).pipe(
-    Effect.andThen(() =>
-      broker('update-consumer', () => manager.consumers.update(stream, durable, config))
-    ),
+    Effect.flatMap((existing) => {
+      // MaxDeliver removes exhausted deliveries from the pending queue. Increasing
+      // its limit cannot revive them. Never rewrite this evidence before recovery.
+      if ((existing.config.max_deliver ?? -1) > 0 && existing.num_redelivered > 0)
+        return Effect.fail(
+          new BrokerFailure({
+            operation: 'migrate-legacy-consumer',
+            cause: new Error(
+              `Stop all media replicas, then recreate ${stream}/${durable} from stream sequence ${existing.ack_floor.stream_seq + 1} before upgrading. Retained redeliveries may have exhausted the legacy delivery limit.`
+            ),
+          })
+        ).pipe(
+          Effect.tapError((error) =>
+            Effect.logError('Media consumer requires coordinated legacy recovery', {
+              cause: error.cause,
+            })
+          )
+        );
+      return broker('update-consumer', () => manager.consumers.update(stream, durable, config));
+    }),
     Effect.catchIf(
       (error) => notFound(error.cause),
       () => broker('create-consumer', () => manager.consumers.add(stream, config))

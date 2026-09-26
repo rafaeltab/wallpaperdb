@@ -797,9 +797,6 @@ importers:
       '@wallpaperdb/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@wallpaperdb/events':
-        specifier: workspace:*
-        version: link:../../packages/events
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -812,21 +809,12 @@ importers:
       fastify:
         specifier: ^5.2.0
         version: 5.6.2
-      fastify-plugin:
-        specifier: ^5.1.0
-        version: 5.1.0
       nats:
         specifier: ^2.29.1
         version: 2.29.3
       pg:
         specifier: ^8.13.1
         version: 8.16.3
-      reflect-metadata:
-        specifier: ^0.2.2
-        version: 0.2.2
-      tsyringe:
-        specifier: ^4.10.0
-        version: 4.10.0
       zod:
         specifier: ^3.24.1
         version: 3.25.76

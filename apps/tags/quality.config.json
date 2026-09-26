@@ -1,0 +1,4 @@
+{
+  "capabilities": ["availability"],
+  "publicModules": ["availability", "http", "adapters/dependencies"]
+}

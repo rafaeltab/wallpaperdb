@@ -1,39 +1,20 @@
-import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import Fastify from 'fastify';
-import { container } from 'tsyringe';
-import { registerRoutes } from './routes/index.js';
+import { Effect, Layer } from 'effect';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { createHttpApp } from './http/index.js';
 
-async function generateSwagger(): Promise<string> {
-  container.register('config', {
-    useValue: {},
-  });
-
-  const fastify = Fastify({
-    logger: false,
-  });
-
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB Tags API',
-    version: '1.0.0',
-    description:
-      'Tags service shell. Only operational endpoints are exposed today while PostgreSQL and NATS integrations are wired for future work.',
-    servers: [{ url: 'http://localhost:3008', description: 'Local development server' }],
-  });
-
-  await registerRoutes(fastify);
-  await fastify.ready();
-
-  const swagger = fastify.swagger();
-
-  try {
-    await fastify.close();
-  } catch {}
-
-  return JSON.stringify(swagger, null, 2);
+const app = await createHttpApp(
+  { nodeEnv: 'development', port: 3008 },
+  availabilityLayer.pipe(
+    Layer.provide(
+      Layer.succeed(AvailabilityProbe, {
+        inspect: () => Effect.die('OpenAPI generation does not execute health probes'),
+      })
+    )
+  )
+);
+try {
+  await writeFile('swagger.json', JSON.stringify(app.swagger(), null, 2));
+} finally {
+  await app.close();
 }
-
-const swagger = await generateSwagger();
-
-writeFile('swagger.json', swagger);

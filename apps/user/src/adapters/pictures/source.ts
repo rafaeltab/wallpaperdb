@@ -1,4 +1,4 @@
-import { monitorDependency } from '../observations/index.js';
+import { recordDependencyHealth } from '../observations/index.js';
 import { isIP } from 'node:net';
 import { Effect, Layer } from 'effect';
 import { PictureSource, PictureUnavailable } from '../../pictures/index.js';
@@ -172,7 +172,12 @@ export function pictureSourceLayer(
           })
         ),
         Effect.withSpan('pictures.source.download'),
-        monitorDependency('picture-source')
+        Effect.tap((result) =>
+          result._tag === 'Downloaded'
+            ? recordDependencyHealth('picture-source', true)
+            : Effect.void
+        ),
+        Effect.tapError(() => recordDependencyHealth('picture-source', false))
       ),
   });
 }

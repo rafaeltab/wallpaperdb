@@ -257,12 +257,21 @@ function hash(value: string) {
   for (const character of value) result = (result * 31 + character.charCodeAt(0)) >>> 0;
   return result;
 }
-function collisionHandle(base: string, maximumLength: number, entropy: number) {
+function collisionHandle(
+  base: string,
+  minimumLength: number,
+  maximumLength: number,
+  entropy: number
+) {
   const length = Math.min(6, Math.max(1, maximumLength - 2));
   const random = entropy.toString(32).padStart(6, '0').slice(-length);
   if (maximumLength === 1) return random;
   if (maximumLength === 2) return `${base.slice(0, 1)}${random}`;
-  return `${base.slice(0, maximumLength - random.length - 1).replace(/-+$/g, '')}-${random}`;
+  const stem = base
+    .slice(0, maximumLength - random.length - 1)
+    .replace(/-+$/g, '')
+    .padEnd(Math.max(1, minimumLength - random.length - 1), '0');
+  return `${stem}-${random}`;
 }
 export const profilesLayer = (policy: ProfilePolicy) =>
   Layer.effect(
@@ -552,6 +561,7 @@ export const profilesLayer = (policy: ProfilePolicy) =>
                     .padEnd(policy.profileHandleMinLength, '0')
                 : collisionHandle(
                     base,
+                    policy.profileHandleMinLength,
                     policy.profileHandleMaxLength,
                     yield* Random.nextIntBetween(0, 32 ** 6)
                   );

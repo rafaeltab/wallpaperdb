@@ -5,6 +5,18 @@ import { profilePictureAssets, profilePictureImports, profiles } from '../../db/
 import { PictureStore, PictureUnavailable, type StoredPicture } from '../../pictures/index.js';
 import { Database } from '../database/index.js';
 
+function persistenceDiagnostic(cause: unknown): { sqlState?: string } {
+  const visited = new Set<unknown>();
+  let current = cause;
+  while (typeof current === 'object' && current !== null && !visited.has(current)) {
+    visited.add(current);
+    if ('code' in current && typeof current.code === 'string' && /^[A-Z0-9]{5}$/.test(current.code))
+      return { sqlState: current.code };
+    current = 'cause' in current ? current.cause : null;
+  }
+  return {};
+}
+
 const due = (now: Date) =>
   and(
     inArray(profilePictureImports.status, ['pending', 'retrying']),
@@ -24,7 +36,8 @@ export const pictureStoreLayer = (config: { readonly bucket: string }) =>
       ) =>
         Effect.tryPromise({
           try: (signal) => database.run(run, signal),
-          catch: (cause) => new PictureUnavailable({ operation, cause }),
+          catch: (cause) =>
+            new PictureUnavailable({ operation, cause: persistenceDiagnostic(cause) }),
         }).pipe(
           Effect.tapError((error) =>
             Effect.logError('Picture persistence failed', { operation, cause: error.cause })

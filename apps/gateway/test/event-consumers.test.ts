@@ -151,11 +151,13 @@ describe('Projection event driving adapter contract', () => {
     ['ce-source', 'https://wallpaperdb/other'],
     ['ce-correlationid', 'other-workflow'],
     ['ce-causationid', 'other-cause'],
+    ['ce-causationsource', 'https://wallpaperdb/other-cause'],
   ])('rejects conflicting structured and binary %s metadata', async (name, value) => {
     const project = new ControlledProjection();
     const metadata = binaryMetadata(variant, 'https://wallpaperdb/media');
     metadata.set('ce-correlationid', 'workflow-1');
     metadata.set('ce-causationid', 'cause-1');
+    metadata.set('ce-causationsource', 'https://wallpaperdb/ingestor');
     metadata.set(name, value);
     const structured = {
       specversion: '1.0',
@@ -165,6 +167,7 @@ describe('Projection event driving adapter contract', () => {
       time: timestamp,
       correlationid: 'workflow-1',
       causationid: 'cause-1',
+      causationsource: 'https://wallpaperdb/ingestor',
       data: { variant: variant.variant },
     };
     expect(await deliver(variant.eventType, structured, project, 1, metadata)).toEqual({

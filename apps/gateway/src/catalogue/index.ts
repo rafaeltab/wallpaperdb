@@ -54,6 +54,7 @@ export interface VariantSelection {
 export interface SearchWallpapers {
   profileId?: string;
   variants?: VariantSelection;
+  /** Color ranking accepts one through 64 preferences. Amounts express relative contributions. */
   colors?: ColorPreference[];
   first?: number;
   after?: string;

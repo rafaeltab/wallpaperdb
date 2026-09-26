@@ -67,6 +67,24 @@ it('skips videos without reading or publishing', async () => {
   );
   expect(outcome).toEqual({ _tag: 'Skipped' });
 });
+it('skips an original with no visible pixels without publishing an unusable histogram', async () => {
+  const layer = extractionLayer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        Layer.succeed(ImageHistogram, { extract: () => Effect.succeed(Array(64).fill(0)) }),
+        Layer.succeed(ColorEvents, {
+          publish: () => Effect.die('must not publish a colorless original'),
+        })
+      )
+    )
+  );
+  const outcome = await Effect.runPromise(
+    Effect.gen(function* () {
+      return yield* (yield* ExtractColors).extract(input);
+    }).pipe(Effect.provide(layer))
+  );
+  expect(outcome).toEqual({ _tag: 'Skipped' });
+});
 it('preserves the typed extraction failure and does not publish', async () => {
   const failure = new ExtractionUnavailable({
     operation: 'read',

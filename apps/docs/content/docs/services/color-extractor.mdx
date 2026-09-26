@@ -3,13 +3,13 @@ title: Color extractor
 description: Wallpaper color histograms for color-ranked discovery
 ---
 
-Color Extractor reads immutable original wallpaper images and publishes a normalized, alpha-weighted 64-bin HSV histogram. Gateway projects these histograms for the browse page's Color control. Video uploads are intentional no-ops. The service owns no database and never deletes originals.
+Color Extractor reads immutable original wallpaper images and publishes a normalized, alpha-weighted 64-bin HSV histogram. Gateway projects these histograms for the browse page's Color control. Video uploads and images with no visible pixels are intentional no-ops. The service owns no database and never deletes originals.
 
 ## Execution and delivery
 
 The extraction capability uses Effect services for histogram extraction and result publication. The image adapter owns S3 reads and Sharp decoding. The native-process decision is recorded in the context ADR `0001-isolate-native-image-decoding`. The event adapter translates legacy and CloudEvents upload messages into local input. Composition owns the clients, consumer, health request fibers and shutdown scope. Pure HSV calculations remain ordinary TypeScript.
 
-The durable consumer `color-extractor-wallpaper-uploaded-consumer` reads `wallpaper.uploaded` from the configured stream. Each replica pulls one message at a time. The existing acknowledgement deadline is 120 seconds, with an in-progress acknowledgement every 30 seconds while processing. The service acknowledges an image only after JetStream confirms the histogram publication, or acknowledges a video after the skip result.
+The durable consumer `color-extractor-wallpaper-uploaded-consumer` reads `wallpaper.uploaded` from the configured stream. Each replica pulls one message at a time. The existing acknowledgement deadline is 120 seconds, with an in-progress acknowledgement every 30 seconds while processing. The service acknowledges an image only after JetStream confirms the histogram publication, or acknowledges a video or colorless image after the skip result.
 
 Processing runs at most three times, preserving the previous NATS delivery-count cutoff. Failed attempts now use delayed negative acknowledgements, initially one second then two seconds. Invalid and exhausted messages go to `COLOR_EXTRACTOR_QUARANTINE` on `color-extractor.quarantine`. The quarantine body contains exact original bytes; binary CloudEvents headers identify the original subject, consumer and reason. The service acknowledges the input only after quarantine PubAck.
 

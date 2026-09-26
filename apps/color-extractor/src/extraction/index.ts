@@ -51,6 +51,7 @@ export const extractionLayer = Layer.effect(
       extract: Effect.fn('color-extraction.extract')(function* (input: ExtractionInput) {
         if (input.fileType !== 'image') return { _tag: 'Skipped' } as const;
         const histogram = yield* images.extract(input.storage);
+        if (histogram.every((weight) => weight === 0)) return { _tag: 'Skipped' } as const;
         yield* events.publish({ input, histogram, colorSpace: 'hsv' });
         return { _tag: 'Extracted' } as const;
       }),

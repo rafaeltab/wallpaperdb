@@ -42,6 +42,7 @@ export interface PictureAsset {
 }
 export interface ProfileSnapshot {
   readonly profile: OwnerProfile;
+  readonly observedAt: Date;
   readonly targetClaim: { profileId: string; kind: string; claimGeneration: number; expiresAt: Date | null } | null;
   readonly eligibleHandles: readonly string[];
   readonly wallpaperOwners: readonly { wallpaperId: string; profileId: string }[];
@@ -58,7 +59,8 @@ export type ProfileMutation =
 export type ProfileDecision = ProfileRejection | { readonly _tag: 'Unchanged' } | { readonly _tag: 'Change'; readonly mutation: ProfileMutation };
 export interface ProfileQuery { readonly profileId: string; readonly now: Date; readonly handle?: string; readonly wallpaperIds?: readonly string[]; readonly assetId?: string | null }
 /**
- * A locked owner snapshot and a pure decision form one transaction. The adapter
+ * A locked owner snapshot and a pure decision form one transaction. observedAt
+ * is captured after acquiring the transaction locks and is never before query.now. The adapter
  * commits each accepted transition with its handle claims, picture state and
  * durable event. A rejected or unchanged decision writes nothing. A handle
  * conflict is a rejection; unrelated persistence failures are typed failures.
@@ -102,7 +104,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
   const adopt = Effect.fn('profiles.adopt-picture')(function* (principal: ProfilePrincipal, assetId: string | null, authorization: { type: 'owner'; expectedVersion: number } | { type: 'import'; leaseToken: string }) {
     if (!principal.profileId) return reject('unauthorized', 'Authentication is required');
     const now = new Date(yield* Clock.currentTimeMillis);
-    const result = yield* store.transact({ profileId: principal.profileId, assetId, now }, ({ profile, importJob, asset }) => {
+    const result = yield* store.transact({ profileId: principal.profileId, assetId, now }, ({ profile, importJob, asset, observedAt: now }) => {
       if (authorization.type === 'import') {
         if (!authorization.leaseToken || !importJob || importJob.leaseToken !== authorization.leaseToken || importJob.status === 'complete' || profile.pictureAssetId !== null) return { _tag: 'Unchanged' };
       } else if (profile.version !== authorization.expectedVersion) return versionConflict();
@@ -119,7 +121,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
     const now = new Date(yield* Clock.currentTimeMillis);
     const result = yield* store.transact({ profileId: principal.profileId, now, handle }, snapshot => {
       if (snapshot.profile.version !== expectedVersion) return versionConflict();
-      return decideAlias(snapshot, handle, operation, now, policy);
+      return decideAlias(snapshot, handle, operation, snapshot.observedAt, policy);
     });
     return result.outcome;
   });
@@ -130,7 +132,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
     if (handle.length < policy.profileHandleMinLength || handle.length > policy.profileHandleMaxLength) return reject('invalid-handle', `Handle must contain ${policy.profileHandleMinLength}–${policy.profileHandleMaxLength} letters, numbers, or single hyphens after normalization`);
     if (reserved.has(handle)) return reject('invalid-handle', 'This Handle is reserved; choose another name');
     const now = new Date(yield* Clock.currentTimeMillis);
-    const result = yield* store.transact({ profileId: principal.profileId, now, handle }, ({ profile, targetClaim }) => {
+    const result = yield* store.transact({ profileId: principal.profileId, now, handle }, ({ profile, targetClaim, observedAt: now }) => {
       if (profile.version !== expectedVersion) return versionConflict();
       if (profile.handle === handle) return { _tag: 'Unchanged' };
       if (profile.lastHandleChangedAt) {

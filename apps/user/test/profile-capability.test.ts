@@ -25,7 +25,7 @@ function controlled(customPolicy: ProfilePolicy = policy, identity: ExternalIden
       return { ...owner, id: input.profileId, displayName: input.displayName, handle: input.handle };
     }),
     transact: (_query, decide) => Effect.sync(() => {
-      const decision = decide({ profile: current, targetClaim: null, eligibleHandles: [], wallpaperOwners: [], asset: null, importJob: null });
+      const decision = decide({ observedAt: _query.now, profile: current, targetClaim: null, eligibleHandles: [], wallpaperOwners: [], asset: null, importJob: null });
       if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
       if (decision._tag === 'Change') {
         if (decision.mutation.type !== 'details') throw new Error('Unsupported controlled transition');

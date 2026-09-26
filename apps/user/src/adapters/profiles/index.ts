@@ -58,12 +58,13 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
         return await db.transaction(async tx => {
           const [raced] = await tx.select().from(profiles).where(eq(profiles.id, input.profileId)).for('share');
           if (raced) return ownerProfile(tx, raced, policy, input.now);
-          const [profile] = await tx.insert(profiles).values({ id: input.profileId, displayName: input.displayName, handle: input.handle, version: 1, createdAt: input.now, updatedAt: input.now }).returning();
+          const acceptedAt = new Date(Math.max(input.now.getTime(), Date.now()));
+          const [profile] = await tx.insert(profiles).values({ id: input.profileId, displayName: input.displayName, handle: input.handle, version: 1, createdAt: acceptedAt, updatedAt: acceptedAt }).returning();
           if (!profile) throw new ProfileInvariant('Profile insert returned no row');
           await tx.insert(handleClaims).values({ handle: input.handle, profileId: input.profileId, kind: 'profile' });
-          if (input.imageUrl) await tx.insert(profilePictureImports).values({ profileId: input.profileId, sourceUrl: input.imageUrl, createdAt: input.now, nextAttemptAt: input.now });
-          await appendEvent(tx, profile, { type: 'created' }, input.now, metadata);
-          return ownerProfile(tx, profile, policy, input.now);
+          if (input.imageUrl) await tx.insert(profilePictureImports).values({ profileId: input.profileId, sourceUrl: input.imageUrl, createdAt: acceptedAt, nextAttemptAt: acceptedAt });
+          await appendEvent(tx, profile, { type: 'created' }, acceptedAt, metadata);
+          return ownerProfile(tx, profile, policy, acceptedAt);
         });
       } catch (cause) { if (uniqueViolation(cause)) return null; throw cause; }
     }),
@@ -72,20 +73,21 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
         return await db.transaction(async tx => {
           const [current] = await tx.select().from(profiles).where(eq(profiles.id, query.profileId)).for('update');
           if (!current) return { outcome: versionConflict(), changed: false };
-          const profile = await ownerProfile(tx, current, policy, query.now);
           const targetClaim = query.handle ? await tx.query.handleClaims.findFirst({ where: eq(handleClaims.handle, query.handle) }) : null;
           const wallpaperOwners = query.wallpaperIds?.length ? await tx.query.wallpaperOwnership.findMany({ where: inArray(wallpaperOwnership.wallpaperId, [...query.wallpaperIds]) }) : [];
           const [importJob] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, query.profileId)).for('update');
           const [asset] = query.assetId ? await tx.select().from(profilePictureAssets).where(eq(profilePictureAssets.id, query.assetId)).for('update') : [];
-          const eligibleHandles = (await recentHistoricalHandles(tx, current.id, query.now, retentionMs(policy))).map(entry => entry.handle);
-          const snapshot = { profile, eligibleHandles, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null };
+          const observedAt = new Date(Math.max(query.now.getTime(), Date.now()));
+          const profile = await ownerProfile(tx, current, policy, observedAt);
+          const eligibleHandles = (await recentHistoricalHandles(tx, current.id, observedAt, retentionMs(policy))).map(entry => entry.handle);
+          const snapshot = { profile, observedAt, eligibleHandles, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null };
           let decision;
           try { decision = decide(snapshot); } catch (cause) { throw new DecisionDefect(cause); }
           if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
           if (decision._tag === 'Unchanged') return { outcome: { _tag: 'Success', profile } satisfies ProfileOutcome, changed: false };
-          const { updated, change } = await applyMutation(tx, current, decision.mutation, query.now, policy);
-          await appendEvent(tx, updated, change, query.now, metadata);
-          return { outcome: { _tag: 'Success', profile: await ownerProfile(tx, updated, policy, query.now) } satisfies ProfileOutcome, changed: true };
+          const { updated, change } = await applyMutation(tx, current, decision.mutation, observedAt, policy);
+          await appendEvent(tx, updated, change, observedAt, metadata);
+          return { outcome: { _tag: 'Success', profile: await ownerProfile(tx, updated, policy, observedAt) } satisfies ProfileOutcome, changed: true };
         });
       } catch (cause) {
         if (cause instanceof ClaimConflict || uniqueViolation(cause)) return { outcome: reject('handle-unavailable', 'This Handle is already in use; choose another name'), changed: false };

@@ -1,6 +1,5 @@
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
-import { Clock, Context, Effect, Layer, Schema } from 'effect';
-import { ulid } from 'ulid';
+import { Clock, Context, Effect, Layer, Random, Schema } from 'effect';
 
 /** The authenticated actor. The owner is derived from this value, never a command field. */
 export interface ProfilePrincipal { readonly profileId: string }
@@ -82,8 +81,9 @@ export function versionConflict() { return reject('version-conflict', 'Profile h
 function normalizeName(value: string) { return value.replace(/\s+/gu, ' ').trim(); }
 function slugify(value: string) { return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
 function hash(value: string) { let result = 0; for (const character of value) result = (result * 31 + character.charCodeAt(0)) >>> 0; return result; }
-function collisionHandle(base: string, maximumLength: number) {
-  const random = ulid().slice(-Math.min(6, Math.max(1, maximumLength - 2))).toLowerCase();
+function collisionHandle(base: string, maximumLength: number, entropy: number) {
+  const length = Math.min(6, Math.max(1, maximumLength - 2));
+  const random = entropy.toString(32).padStart(6, "0").slice(-length);
   if (maximumLength === 1) return random;
   if (maximumLength === 2) return `${base.slice(0, 1)}${random}`;
   return `${base.slice(0, maximumLength - random.length - 1).replace(/-+$/g, '')}-${random}`;
@@ -133,7 +133,7 @@ export const profilesLayer = (policy: ProfilePolicy) => Layer.effect(Profiles, E
       const slug = (slugify(displayName) || `profile-${seed}`).padEnd(policy.profileHandleMinLength, '0');
       const base = reserved.has(slug) ? `${slug}-profile` : slug;
       for (let attempt = 0; attempt < 100; attempt++) {
-        const handle = attempt === 0 ? base.slice(0, policy.profileHandleMaxLength).replace(/-+$/g, '') : collisionHandle(base, policy.profileHandleMaxLength);
+        const handle = attempt === 0 ? base.slice(0, policy.profileHandleMaxLength).replace(/-+$/g, '') : collisionHandle(base, policy.profileHandleMaxLength, yield* Random.nextIntBetween(0, 32 ** 6));
         if (reserved.has(handle)) continue;
         const profile = yield* store.create({ profileId: principal.profileId, displayName, handle, imageUrl: identity.imageUrl ?? null, now });
         if (profile) return { _tag: 'Success', profile } as const;

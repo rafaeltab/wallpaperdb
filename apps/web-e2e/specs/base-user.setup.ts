@@ -47,12 +47,18 @@ test("authenticates the seeded base user and saves browser state", async ({
       }),
       authError.waitFor({ state: "visible", timeout: 15000 }).then(async () => {
         throw new Error(
-          formatAuthSetupFailure(BASE_USER_AUTH, await authError.textContent()),
+          formatAuthSetupFailure(
+            BASE_USER_AUTH,
+            (await authError.textContent()) ?? undefined,
+          ),
         );
       }),
     ]);
   } catch (error) {
-    if (error instanceof Error && error.message.includes("Browser E2E auth setup failed")) {
+    if (
+      error instanceof Error &&
+      error.message.includes("Browser E2E auth setup failed")
+    ) {
       throw error;
     }
 

@@ -6,7 +6,7 @@ import { Clock, Effect, Exit, Layer, Metric } from 'effect';
 import { headers } from 'nats';
 import { outboxEvents } from '../../db/schema.js';
 import { MaintenanceFailure, ProfileEvents } from '../../maintenance/index.js';
-import { Database } from '../database/index.js';
+import { Database, databaseDiagnostic } from '../database/index.js';
 import { broker, EventsBroker, type EventsOptions } from './broker.js';
 
 export const eventPublisherLayer = (_options: EventsOptions) =>
@@ -23,7 +23,8 @@ export const eventPublisherLayer = (_options: EventsOptions) =>
                 (db) => db.query.outboxEvents.findFirst({ where: eq(outboxEvents.id, eventId) }),
                 signal
               ),
-            catch: (cause) => new MaintenanceFailure({ operation: 'read-event', cause }),
+            catch: (cause) =>
+              new MaintenanceFailure({ operation: 'read-event', cause: databaseDiagnostic(cause) }),
           }).pipe(
             Effect.tapError((failure) =>
               Effect.logError('Profile outbox read failed', {

@@ -65,7 +65,7 @@ describe('Catalogue color ranking policy', () => {
     );
     expect(combined).toEqual(single.map((value) => expect.closeTo(value, 12)));
     const doubled = await vector([{ color: '#FF0000', amount: 2 }], strategy);
-    expect(doubled).toEqual(single.map((value) => expect.closeTo(value * 2, 12)));
+    expect(doubled).toEqual(single.map((value) => expect.closeTo(value, 12)));
   });
   it('supports lowercase hexadecimal colors', async () => {
     expect(await vector([{ color: '#aBcDeF', amount: 1 }])).toEqual(
@@ -88,8 +88,34 @@ describe('Catalogue color ranking policy', () => {
       'exact'
     );
     expect(result.slice(0, 48)).toEqual(Array(48).fill(0));
-    expect(result[48]).toBe(2);
-    expect(result[63]).toBe(3);
+    expect(result[48]).toBeCloseTo(0.4, 12);
+    expect(result[63]).toBeCloseTo(0.6, 12);
+  });
+  it.each([
+    'linear',
+    'exponential',
+    'exact',
+  ] as const)('keeps finite nonzero relative weights for extreme amounts with %s spread', async (strategy) => {
+    const normal = await vector(
+      [
+        { color: '#FF0000', amount: 1 },
+        { color: '#0000FF', amount: 1 },
+      ],
+      strategy
+    );
+    for (const amount of [Number.MAX_VALUE, Number.MIN_VALUE]) {
+      const extreme = await vector(
+        [
+          { color: '#FF0000', amount },
+          { color: '#0000FF', amount },
+        ],
+        strategy
+      );
+      expect(extreme.every(Number.isFinite)).toBe(true);
+      expect(extreme.every((weight) => Number.isFinite(Math.fround(weight)))).toBe(true);
+      expect(extreme.some((weight) => Math.fround(weight) > 0)).toBe(true);
+      expect(extreme).toEqual(normal.map((weight) => expect.closeTo(weight, 12)));
+    }
   });
   it.each(
     [

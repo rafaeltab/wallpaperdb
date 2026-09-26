@@ -61,8 +61,16 @@ describe('dependency probe with PostgreSQL and NATS', () => {
       otel: true,
     });
     expect(await activeDatabaseConnections()).toBe(1);
+    const natsConnections = async () => {
+      const response = await fetch(
+        `http://${nats.getHost()}:${nats.getContainer().getMappedPort(8222)}/connz`
+      );
+      return response.json();
+    };
+    expect(await natsConnections()).toMatchObject({ num_connections: 1 });
     await runtime.dispose();
     await expect.poll(activeDatabaseConnections).toBe(0);
+    await expect.poll(natsConnections).toMatchObject({ num_connections: 0 });
   });
 
   it('bounds a stalled database probe by destroying its connection and permits recovery', async () => {
@@ -95,8 +103,8 @@ describe('dependency probe with PostgreSQL and NATS', () => {
         await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()))
       ).toMatchObject({ database: true });
     } finally {
-      await runtime.dispose();
       await proxy.close();
+      await runtime.dispose();
     }
   });
 
@@ -115,9 +123,12 @@ describe('dependency probe with PostgreSQL and NATS', () => {
     try {
       await runtime.runPromise(AvailabilityProbe.use((probe) => probe.inspect()));
       proxy.block();
-      const pending = runtime.runPromiseExit(AvailabilityProbe.use((probe) => probe.inspect()), {
-        signal: controller.signal,
-      });
+      const pending = runtime.runPromiseExit(
+        AvailabilityProbe.use((probe) => probe.inspect()),
+        {
+          signal: controller.signal,
+        }
+      );
       await expect.poll(proxy.hasBlockedTraffic).toBe(true);
       controller.abort();
       const result = await pending;
@@ -125,8 +136,8 @@ describe('dependency probe with PostgreSQL and NATS', () => {
       await expect.poll(activeDatabaseConnections).toBe(0);
     } finally {
       controller.abort();
-      await runtime.dispose();
       await proxy.close();
+      await runtime.dispose();
     }
   });
 
@@ -152,12 +163,14 @@ describe('dependency probe with PostgreSQL and NATS', () => {
   it('fails startup through the typed channel when NATS cannot connect', async () => {
     const result = await Effect.runPromise(
       AvailabilityProbe.pipe(
-        Effect.provide(dependencyProbeLayer({
-          databaseUrl: databaseUrl(),
-          natsUrl: 'nats://127.0.0.1:1',
-          serviceName: 'tags-failed-startup-test',
-          otelHealthy: true,
-        })),
+        Effect.provide(
+          dependencyProbeLayer({
+            databaseUrl: databaseUrl(),
+            natsUrl: 'nats://127.0.0.1:1',
+            serviceName: 'tags-failed-startup-test',
+            otelHealthy: true,
+          })
+        ),
         Effect.match({
           onFailure: (failure) => failure._tag,
           onSuccess: () => 'unexpected-success',
@@ -198,12 +211,18 @@ async function databaseProxy(host: string, port: number) {
   if (!address || typeof address === 'string') throw new Error('Proxy did not bind a TCP port');
   return {
     port: address.port,
-    block: () => { blocked = true; },
-    unblock: () => { blocked = false; },
+    block: () => {
+      blocked = true;
+    },
+    unblock: () => {
+      blocked = false;
+    },
     hasBlockedTraffic: () => blockedTraffic,
     close: async () => {
       for (const socket of sockets) socket.destroy();
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve()))
+      );
     },
   };
 }

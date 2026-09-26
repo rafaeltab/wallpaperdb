@@ -4,6 +4,7 @@ import {
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import { Effect, ManagedRuntime } from 'effect';
+import { WallpaperVariantUploadedEventSchema } from '@wallpaperdb/events/schemas';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { VariantEvents, type GenerationInput } from '../src/generation/index.js';
@@ -52,11 +53,18 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
     const message = await manager.streams.getMessage('WALLPAPER', {
       last_by_subj: 'wallpaper.variant.uploaded',
     });
-    expect(message.json()).toMatchObject({
+    const publication = WallpaperVariantUploadedEventSchema.parse(message.json());
+    expect(publication).toMatchObject({
       eventType: 'wallpaper.variant.uploaded',
       timestamp: input.timestamp,
-      variant: { ...variant, createdAt: input.timestamp },
+      variant: {
+        wallpaperId: input.wallpaperId, width: 1280, height: 720,
+        asset: { owner: 'variant-generator', id: 'wallpaper-test:1280x720:image/png' },
+        createdAt: input.timestamp,
+      },
     });
+    expect(publication.variant).not.toHaveProperty('storageBucket');
+    expect(publication.variant).not.toHaveProperty('storageKey');
     expect(message.header.get('ce-specversion')).toBe('1.0');
     expect(message.header.get('ce-correlationid')).toBe('workflow-test');
     expect(message.header.get('ce-causationid')).toBe(input.occurrence.id);

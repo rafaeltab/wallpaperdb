@@ -31,6 +31,7 @@ const configSchema = z.object({
   ...OtelConfigSchema.shape,
   // Quality settings for image encoding
   ...QualityConfigSchema.shape,
+  assetReferenceBucket: z.string().min(1).default('asset-references'),
 });
 
 export type Config = z.infer<typeof configSchema>;
@@ -49,6 +50,7 @@ export function loadConfig(): Config {
     s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
     s3Bucket: getEnv('S3_BUCKET', 'wallpapers'),
     s3Region: getEnv('S3_REGION', 'us-east-1'),
+    assetReferenceBucket: getEnv('ASSET_REFERENCE_BUCKET', 'asset-references'),
 
     // NATS
     natsUrl: process.env.NATS_URL,

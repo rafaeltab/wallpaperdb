@@ -92,3 +92,34 @@ it('expires due claims independently and drains only the current claim when stop
     expect(attempted).toEqual(['broken', 'completed']);
   } finally { await runtime.dispose(); }
 });
+
+it('publishes beyond a full poisoned batch and retries ambiguous completion with the same occurrence', async () => {
+  const pending = new Set(Array.from({ length: 101 }, (_, index) => `event-${String(index).padStart(3, '0')}`));
+  const accepted = new Set<string>();
+  let lostAck = true;
+  const runtime = ManagedRuntime.make(maintenanceLayer({ retentionDays: 30 }).pipe(Layer.provide(Layer.mergeAll(
+    Layer.succeed(MaintenanceStore, {
+      dueAliases: () => Effect.succeed([]), expiredEvents: () => Effect.succeed([]), deleteExpiredEvent: () => Effect.succeed(false), recordWallpaperOwnership: () => Effect.void,
+      pendingEvents: (after) => Effect.succeed([...pending].filter((id) => !after || id > after.id).slice(0, 100).map((id) => ({ id, createdAt: new Date(0) }))),
+      markPublished: (id) => Effect.suspend(() => {
+        if (lostAck) { lostAck = false; return Effect.fail(new MaintenanceFailure({ operation: 'mark-published', cause: 'ambiguous commit' })); }
+        pending.delete(id); return Effect.void;
+      }),
+    }),
+    Layer.succeed(ProfileEvents, { publish: (id) => id < 'event-100'
+      ? Effect.fail(new MaintenanceFailure({ operation: 'publish', cause: 'invalid event' }))
+      : Effect.sync(() => { accepted.add(id); }),
+    }),
+    Layer.succeed(Profiles, profiles),
+  ))));
+  try {
+    const publish = Effect.flatMap(Maintenance, (maintenance) => maintenance.publishPending());
+    expect(await runtime.runPromise(publish)).toEqual({ completed: 0, failed: 100 });
+    expect(await runtime.runPromise(publish)).toEqual({ completed: 0, failed: 1 });
+    expect([...accepted]).toEqual(['event-100']);
+    expect(await runtime.runPromise(publish)).toEqual({ completed: 0, failed: 100 });
+    expect(await runtime.runPromise(publish)).toEqual({ completed: 1, failed: 0 });
+    expect([...accepted]).toEqual(['event-100']);
+    expect(pending.size).toBe(100);
+  } finally { await runtime.dispose(); }
+});

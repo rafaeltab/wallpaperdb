@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
 import { DeliveryUnavailable, MediaDelivery, type ResizeOptions } from '../src/delivery/index.js';
 import { createHttpApp } from '../src/http/index.js';
@@ -190,6 +190,91 @@ it('interrupts capability work when the requesting client disconnects', async ()
         t.unref();
       }),
     ]);
+  } finally {
+    await app.close();
+  }
+});
+it('lets an in-flight response complete after shutdown starts', async () => {
+  let started!: () => void;
+  const running = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 0 },
+    services({
+      ...empty,
+      wallpaper: () =>
+        Effect.sync(started).pipe(
+          Effect.andThen(Effect.promise(() => pending)),
+          Effect.as({ _tag: 'NotFound' } as const)
+        ),
+    })
+  );
+  try {
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const response = fetch(address + '/wallpapers/w1');
+    // Attach rejection immediately so a premature socket close is also reported by the assertion.
+    const outcome = response.then(
+      (result) => result.status,
+      () => 0
+    );
+    await running;
+    const shutdown = app.close();
+    await vi.waitFor(() => expect(app.connectionsState.isShuttingDown).toBe(true));
+    finish();
+    expect(await outcome).toBe(404);
+    await shutdown;
+  } finally {
+    finish();
+    await app.close();
+  }
+});
+it('interrupts a stalled request at the shutdown deadline and releases its scoped services', async () => {
+  let started!: () => void;
+  const running = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  let stopped = false;
+  let released = false;
+  const owned = Layer.effect(
+    MediaDelivery,
+    Effect.gen(function* () {
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          released = true;
+        })
+      );
+      return MediaDelivery.of({
+        ...empty,
+        wallpaper: () =>
+          Effect.sync(started).pipe(
+            Effect.andThen(Effect.never),
+            Effect.ensuring(
+              Effect.sync(() => {
+                stopped = true;
+              })
+            )
+          ),
+      });
+    })
+  );
+  const app = await createHttpApp({ nodeEnv: 'test', port: 0 }, Layer.merge(health, owned), {
+    shutdownTimeoutMs: 50,
+  });
+  try {
+    const address = await app.listen({ port: 0, host: '127.0.0.1' });
+    const response = fetch(address + '/wallpapers/w1').catch(() => undefined);
+    await running;
+    const start = performance.now();
+    await app.close();
+    await response;
+    expect(performance.now() - start).toBeLessThan(1000);
+    expect(stopped).toBe(true);
+    expect(released).toBe(true);
   } finally {
     await app.close();
   }

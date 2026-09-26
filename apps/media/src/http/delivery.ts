@@ -1,3 +1,4 @@
+import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Readable } from 'node:stream';
 import type { IncomingHttpHeaders } from 'node:http';
 import { Effect } from 'effect';
@@ -62,10 +63,15 @@ export function registerDeliveryRoutes(
   ) => Promise<A>
 ) {
   app.get<{ Params: { id: string } }>('/wallpapers/:id', async (request, reply) => {
+    const startedAt = performance.now();
     const controller = new AbortController();
     reply.raw.once('close', () => controller.abort());
     const parsed = querySchema.safeParse(request.query);
-    if (!parsed.success)
+    if (!parsed.success) {
+      recordCounter('http.requests.validation_errors', 1, {
+        route: '/wallpapers/:id',
+        error_type: 'query_params',
+      });
       return problem(
         reply,
         400,
@@ -73,6 +79,7 @@ export function registerDeliveryRoutes(
         'Invalid Dimensions',
         'Width and height must be positive integers, and fit must be contain, cover, or fill.'
       );
+    }
     const result = await run(
       MediaDelivery.use((service) =>
         service.wallpaper(request.params.id, {
@@ -81,6 +88,7 @@ export function registerDeliveryRoutes(
           fit: parsed.data.fit,
         })
       ).pipe(
+        Effect.withSpan('http.get_wallpaper'),
         Effect.catchTag('DeliveryUnavailable', () =>
           Effect.succeed({ _tag: 'Unavailable' } as const)
         )
@@ -96,6 +104,25 @@ export function registerDeliveryRoutes(
         'Media unavailable',
         'Wallpaper delivery is temporarily unavailable. Try again.'
       );
+    const resize = parsed.data.w !== undefined || parsed.data.h !== undefined ? 'true' : 'false';
+    if (result._tag === 'NotFound')
+      recordCounter('http.requests.not_found', 1, { route: '/wallpapers/:id' });
+    if (result._tag === 'Found')
+      recordCounter('http.wallpaper_retrievals.total', 1, {
+        status: 'success',
+        resize,
+        fit_mode: parsed.data.fit,
+      });
+    if (result._tag === 'Rejected')
+      recordCounter('http.requests.validation_errors', 1, {
+        route: '/wallpapers/:id',
+        error_type: 'query_params',
+      });
+    if (result._tag !== 'Rejected')
+      recordHistogram('http.wallpaper_retrieval_duration_ms', performance.now() - startedAt, {
+        status: result._tag === 'Found' ? 'success' : 'not_found',
+        resize,
+      });
     return respond(reply, result, false);
   });
   app.get<{ Params: { pictureId: string } }>(

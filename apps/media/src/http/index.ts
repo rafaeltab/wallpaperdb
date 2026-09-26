@@ -70,20 +70,33 @@ const executionLayer = Layer.effect(
 export async function createHttpApp<E>(
   config: HttpConfig,
   services: Layer.Layer<Availability | MediaDelivery, E>,
-  options: { readonly logger?: boolean; readonly signal?: AbortSignal } = {}
+  options: {
+    readonly logger?: boolean;
+    readonly signal?: AbortSignal;
+    readonly shutdownTimeoutMs?: number;
+  } = {}
 ): Promise<FastifyInstance> {
   const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
   const app = Fastify({
     logger: options.logger ?? false,
-    forceCloseConnections: true,
+    forceCloseConnections: 'idle',
     requestTimeout: 10000,
     connectionTimeout: 10000,
   });
   app.decorate('connectionsState', { isShuttingDown: false, connectionsInitialized: false });
+  let shutdownDeadline: ReturnType<typeof setTimeout> | undefined;
   app.addHook('preClose', async () => {
     app.connectionsState.isShuttingDown = true;
+    shutdownDeadline = setTimeout(
+      () => app.server.closeAllConnections(),
+      options.shutdownTimeoutMs ?? 5000
+    );
+    shutdownDeadline.unref();
   });
-  app.addHook('onClose', () => runtime.dispose());
+  app.addHook('onClose', async () => {
+    clearTimeout(shutdownDeadline);
+    await runtime.dispose();
+  });
   app.setNotFoundHandler((_request, reply) =>
     reply
       .code(404)
@@ -92,6 +105,7 @@ export async function createHttpApp<E>(
   );
   app.setErrorHandler((error, request, reply) => {
     reply.header('Cache-Control', 'no-store');
+    reply.removeHeader('Content-Length');
     if (
       isTransportError(error) &&
       Object.hasOwn(Fastify.errorCodes, error.code) &&

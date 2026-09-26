@@ -200,7 +200,7 @@ export const picturesLayer = (policy: PicturesPolicy) =>
         Effect.gen(function* () {
           const now = yield* Clock.currentTimeMillis;
           const delay = Math.min(3_600_000, 1_000 * 2 ** Math.min(job.attempts, 12));
-          yield* store.settleImport(job, permanent, new Date(now + delay));
+          yield* store.settleImport(job, permanent || job.attempts >= 11, new Date(now + delay));
         });
       const importPicture = (job: PictureImport) =>
         Effect.gen(function* () {
@@ -240,6 +240,10 @@ export const picturesLayer = (policy: PicturesPolicy) =>
               new Date(yield* Clock.currentTimeMillis),
               policy.profilePictureImportTimeoutMs + 60_000
             );
+            if (job && job.attempts >= 12) {
+              yield* settle(job, true);
+              continue;
+            }
             if (job)
               yield* importPicture(job).pipe(
                 Effect.catchTags({

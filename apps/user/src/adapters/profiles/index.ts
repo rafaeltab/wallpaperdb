@@ -31,7 +31,7 @@ import {
   type ProfileMutation,
   type ProfileDecision,
 } from '../../profile/index.js';
-import { Database } from '../database/index.js';
+import { Database, databaseDiagnostic } from '../database/index.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
@@ -39,17 +39,7 @@ class DecisionDefect {
   constructor(readonly cause: unknown) {}
 }
 class ProfileInvariant extends Error {}
-function persistenceDiagnostic(cause: unknown): { sqlState?: string } {
-  const visited = new Set<unknown>();
-  let current = cause;
-  while (typeof current === 'object' && current !== null && !visited.has(current)) {
-    visited.add(current);
-    if ('code' in current && typeof current.code === 'string' && /^[A-Z0-9]{5}$/.test(current.code))
-      return { sqlState: current.code };
-    current = 'cause' in current ? current.cause : null;
-  }
-  return {};
-}
+
 type TraceMetadata = { traceParent: string | null; traceState: string | null };
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 const retentionMs = (policy: ProfilePolicy) => policy.profileEvidenceRetentionDays * 86400000;
@@ -191,7 +181,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                 cause:
                   cause instanceof DecisionDefect || cause instanceof ProfileInvariant
                     ? cause
-                    : persistenceDiagnostic(cause),
+                    : databaseDiagnostic(cause),
               }),
           }).pipe(
             Effect.catchTag('ProfileUnavailable', (failure) =>

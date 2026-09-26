@@ -68,8 +68,10 @@ test('typecheck cache inputs include test files compiled by the workspace', () =
 function withCleanWebWorkspace(run) {
   const workspace = mkdtempSync(join(tmpdir(), 'wallpaperdb-web-clean-checkout-'));
   const web = join(workspace, 'apps/web');
+  const markdown = join(workspace, 'packages/profile-markdown');
   try {
     mkdirSync(join(web, 'node_modules'), { recursive: true });
+    mkdirSync(markdown, { recursive: true });
     for (const file of ['Makefile', 'package.json', 'pnpm-workspace.yaml']) {
       copyFileSync(file, join(workspace, file));
     }
@@ -87,14 +89,36 @@ function withCleanWebWorkspace(run) {
         filter: (path) => path !== join('apps/web', 'src/routeTree.gen.ts'),
       });
     }
+    // Vite imports this workspace through dist/index.js. Start without its
+    // output so an earlier local build cannot hide a fresh-checkout failure.
+    for (const file of ['src', 'package.json']) {
+      cpSync(join('packages/profile-markdown', file), join(markdown, file), { recursive: true });
+    }
+    symlinkSync(realpathSync('packages/profile-markdown/node_modules'),
+      join(markdown, 'node_modules'), 'dir');
+    assert.equal(existsSync(join(markdown, 'dist/index.js')), false);
     // Use the installed real compiler and external declarations, but keep source
     // files and TypeScript's node_modules/.tmp build state private to this run.
     symlinkSync(realpathSync('node_modules'), join(workspace, 'node_modules'), 'dir');
     for (const dependency of readdirSync('apps/web/node_modules')) {
       if (dependency.startsWith('.') && dependency !== '.bin') continue;
+      if (dependency === '@wallpaperdb') {
+        mkdirSync(join(web, 'node_modules', dependency));
+        for (const name of readdirSync(join('apps/web/node_modules', dependency))) {
+          symlinkSync(name === 'profile-markdown' ? markdown :
+            realpathSync(join('apps/web/node_modules', dependency, name)),
+          join(web, 'node_modules', dependency, name), 'dir');
+        }
+        continue;
+      }
       symlinkSync(realpathSync(join('apps/web/node_modules', dependency)),
         join(web, 'node_modules', dependency), 'dir');
     }
+    const dependencyBuild = spawnSync('make', [
+      '--no-print-directory', 'run', 'PACKAGE=profile-markdown', 'SCRIPT=build',
+    ], { encoding: 'utf8', env, cwd: workspace, timeout: 60_000 });
+    assert.equal(dependencyBuild.status, 0, dependencyBuild.stdout + dependencyBuild.stderr);
+    assert.equal(existsSync(join(markdown, 'dist/index.js')), true);
     return run({ workspace, web });
   } finally {
     rmSync(workspace, { recursive: true, force: true });

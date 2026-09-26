@@ -116,6 +116,7 @@ export async function createHttpApp<E>(
   const runtime = ManagedRuntime.make(executionLayer.pipe(Layer.provide(services)));
   const app = Fastify({
     logger: options.logger ?? false,
+    return503OnClosing: false,
     requestTimeout: 10000,
     connectionTimeout: 10000,
     frameworkErrors: sendError,

@@ -1,6 +1,13 @@
+import { once } from 'node:events';
+import { createConnection } from 'node:net';
 import { Effect, Layer } from 'effect';
 import { afterEach, expect, it } from 'vitest';
-import { Availability, type Health } from '../src/availability/index.js';
+import {
+  Availability,
+  AvailabilityProbe,
+  availabilityLayer,
+  type Health,
+} from '../src/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
 
 const apps: Awaited<ReturnType<typeof createHttpApp>>[] = [];
@@ -373,3 +380,68 @@ it('lets an in-flight network request finish before releasing dependencies', asy
     await app.close();
   }
 }, 5000);
+
+it('preserves shutdown Problem Details for requests pipelined on an active connection', async () => {
+  let entered!: () => void;
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let probes = 0;
+  const app = await createHttpApp(
+    { nodeEnv: 'test', port: 3008 },
+    availabilityLayer.pipe(
+      Layer.provide(
+        Layer.succeed(AvailabilityProbe, {
+          inspect: () =>
+            Effect.promise(async () => {
+              probes++;
+              entered();
+              await gate;
+              return { database: true, nats: true, otel: true };
+            }),
+        })
+      )
+    )
+  );
+  const address = new URL(await app.listen({ port: 0, host: '127.0.0.1' }));
+  const socket = createConnection({ host: '127.0.0.1', port: Number(address.port) });
+  const response = new Promise<string>((resolve, reject) => {
+    let body = '';
+    socket.on('data', (chunk) => {
+      body += chunk.toString();
+    });
+    socket.once('end', () => resolve(body));
+    socket.once('error', reject);
+  });
+  try {
+    await once(socket, 'connect');
+    socket.write('GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n');
+    await started;
+    const closing = app.close();
+    await expect.poll(() => app.connectionsState.isShuttingDown).toBe(true);
+    const received = once(app.server, 'request');
+    socket.write('GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n');
+    await received;
+    release();
+    const raw = await response;
+    await closing;
+    expect(raw).toContain('HTTP/1.1 200 OK');
+    expect(raw).toContain('HTTP/1.1 503 Service Unavailable');
+    expect(raw).toContain('application/problem+json');
+    expect(JSON.parse(raw.slice(raw.lastIndexOf('\r\n\r\n') + 4))).toMatchObject({
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/service-unavailable.md',
+      status: 503,
+      healthStatus: 'shutting_down',
+      checks: {},
+    });
+    expect(probes).toBe(1);
+  } finally {
+    release();
+    socket.destroy();
+    await app.close();
+  }
+}, 10000);

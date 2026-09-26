@@ -2,8 +2,12 @@ import { createServer } from 'node:http';
 import { Effect, ManagedRuntime } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
-import { ImageTransformer, PictureAuthority } from '../src/delivery/index.js';
-import { pictureAuthorityLayer, sharpTransformerLayer } from '../src/adapters/assets/index.js';
+import { AssetReader, ImageTransformer, PictureAuthority } from '../src/delivery/index.js';
+import {
+  pictureAuthorityLayer,
+  sharpTransformerLayer,
+  s3AssetsLayer,
+} from '../src/adapters/assets/index.js';
 
 async function bytes(body: AsyncIterable<Uint8Array>) {
   const chunks = [];
@@ -15,6 +19,75 @@ async function* stream(value: Uint8Array) {
 }
 
 describe('production asset adapters', () => {
+  it('holds storage admission until an open body closes and interrupts stalled bodies', async () => {
+    const server = createServer((_request, response) => {
+      response.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+      response.write(Buffer.from([4]));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('missing port');
+    const runtime = ManagedRuntime.make(
+      s3AssetsLayer({
+        endpoint: `http://127.0.0.1:${address.port}`,
+        region: 'us-east-1',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        bucket: 'assets',
+        readTimeoutMs: 200,
+        maxConcurrentReads: 1,
+      })
+    );
+    const read = Effect.flatMap(AssetReader, (reader) =>
+      reader.read({ storageBucket: 'assets', storageKey: 'stalled' })
+    );
+    try {
+      const body = await runtime.runPromise(read);
+      if (!body) throw new Error('expected stream');
+      await expect(runtime.runPromise(read)).rejects.toMatchObject({
+        operation: 'storage_capacity',
+      });
+      await expect(bytes(body)).rejects.toThrow('Storage read interrupted');
+      const second = await runtime.runPromise(read);
+      expect(second).not.toBeNull();
+      second?.close();
+    } finally {
+      await runtime.dispose();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('aborts storage requests that stall before response headers', async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('missing port');
+    const runtime = ManagedRuntime.make(
+      s3AssetsLayer({
+        endpoint: `http://127.0.0.1:${address.port}`,
+        region: 'us-east-1',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        bucket: 'assets',
+        readTimeoutMs: 50,
+      })
+    );
+    try {
+      await expect(
+        runtime.runPromise(
+          Effect.flatMap(AssetReader, (reader) =>
+            reader.read({ storageBucket: 'assets', storageKey: 'stalled' })
+          ).pipe(Effect.timeout('1 second'))
+        )
+      ).rejects.toMatchObject({ _tag: 'DeliveryUnavailable', operation: 'read_asset' });
+    } finally {
+      await runtime.dispose();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it.each([
     { fit: 'cover' as const, width: 20, height: 20 },
     { fit: 'fill' as const, width: 160, height: 100 },

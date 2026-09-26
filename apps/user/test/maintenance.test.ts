@@ -4,7 +4,7 @@ import { Maintenance, MaintenanceFailure, MaintenanceStore, ProfileEvents, maint
 import { Profiles, ProfileUnavailable } from '../src/profile/index.js';
 
 const unused = () => Effect.die('Unexpected Profile command');
-const profiles: Profiles = { ensure: unused, changeHandle: unused, reactivateAlias: unused, scheduleAliasExpiry: unused, expireAliasImmediately: unused, updateDetails: unused, expireDueAlias: () => Effect.succeed(false) };
+const profiles: Profiles = { ensure: unused, changeHandle: unused, reactivateAlias: unused, scheduleAliasExpiry: unused, expireAliasImmediately: unused, updateDetails: unused, adoptPicture: unused, adoptImportedPicture: unused, expireDueAlias: () => Effect.succeed(false) };
 
 it('records publication only after broker acceptance and retries the original durable event', async () => {
   const pending = new Set(['event-1', 'event-2']);

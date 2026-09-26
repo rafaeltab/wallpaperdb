@@ -7,7 +7,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { brokerLayer, eventPublisherLayer, eventStoreLayer, ConsumerHealth, ownershipConsumerLayer } from '../src/adapters/events/index.js';
-import { Maintenance, MaintenanceStore, ProfileEvents } from '../src/maintenance/index.js';
+import { Maintenance, MaintenanceFailure, MaintenanceStore, ProfileEvents } from '../src/maintenance/index.js';
 
 let database: StartedPostgreSqlContainer;
 let nats: Awaited<ReturnType<typeof createNatsContainer>>;
@@ -115,5 +115,30 @@ it('accepts validated ownership facts through a durable consumer and acknowledge
     await expect.poll(() => accepted).toEqual(['wp_first']);
     await expect.poll(async () => (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).num_ack_pending).toBe(0);
     expect((await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).config.max_deliver).toBe(-1);
+  } finally { await runtime.dispose(); await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership'); await manager.streams.purge('WALLPAPER'); }
+});
+
+it('quarantines invalid messages and exhausted projection failures after three delayed attempts', async () => {
+  const options = { url: nats.getConnectionUrl(), stream: 'WALLPAPER', serviceName: 'user-consumer-contract', retryDelayMs: 30, shutdownTimeoutMs: 200 };
+  const attempts: number[] = [];
+  const unused = () => Effect.die('Unexpected maintenance task');
+  const runtime = ManagedRuntime.make(ownershipConsumerLayer(options).pipe(Layer.provide(brokerLayer(options)), Layer.provide(Layer.succeed(Maintenance, {
+    publishPending: unused, cleanupEvents: unused, expireAliases: unused,
+    recordWallpaperOwnership: () => Effect.suspend(() => { attempts.push(Date.now()); return Effect.fail(new MaintenanceFailure({ operation: 'project', cause: 'offline' })); }),
+  }))));
+  const manager = await connection.jetstreamManager();
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    await connection.jetstream().publish('wallpaper.uploaded', JSON.stringify(wallpaperEvent('exhausted')));
+    await connection.jetstream().publish('wallpaper.uploaded', 'malformed-json');
+    await expect.poll(async () => (await manager.streams.info('USER_QUARANTINE')).state.messages, { timeout: 3000 }).toBe(2);
+    expect(attempts).toHaveLength(3);
+    expect((attempts[1] ?? 0) - (attempts[0] ?? 0)).toBeGreaterThanOrEqual(25);
+    await expect.poll(async () => (await manager.consumers.info('WALLPAPER', 'user-wallpaper-ownership')).num_ack_pending).toBe(0);
+    const recorded = await manager.streams.getMessage('USER_QUARANTINE', { last_by_subj: 'user.quarantine' });
+    const evidence = JSON.parse(new TextDecoder().decode(recorded.data));
+    expect(evidence.subject).toBe('wallpaper.uploaded');
+    expect(evidence.reason).toBe('exhausted');
+    expect(JSON.parse(Buffer.from(evidence.data, 'base64').toString())).toEqual(wallpaperEvent('exhausted'));
   } finally { await runtime.dispose(); await manager.consumers.delete('WALLPAPER', 'user-wallpaper-ownership'); await manager.streams.purge('WALLPAPER'); }
 });

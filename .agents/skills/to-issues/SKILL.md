@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Break a plan into independently-grabbable issues using vertical slices (tracer bullets).
 
-Use the issue tracker and triage labels in [AGENTS.md](../../../AGENTS.md#issue-tracker).
+The issue tracker and triage label vocabulary should have been provided to you — run `/setup-matt-pocock-skills` if not.
 
 ## Process
 
@@ -39,7 +39,6 @@ Break the plan into **tracer bullet** issues. Each issue is a thin vertical slic
 Present the proposed breakdown as a numbered list. For each slice, show:
 
 - **Title**: short descriptive name
-- **Type**: agent implementation or human work, such as a design decision or review
 - **Blocked by**: which other slices (if any) must complete first
 - **User stories covered**: which user stories this addresses (if the source material has them)
 
@@ -53,7 +52,7 @@ Iterate until the user approves the breakdown.
 
 ### 5. Publish the issues to the issue tracker
 
-For each approved slice, publish a new issue using the [GitHub Markdown skill](../github-markdown-bodies/SKILL.md) and the template below. Label fully specified agent work `ready-for-agent` and work requiring a human `ready-for-human`, unless instructed otherwise.
+For each approved slice, publish a new issue to the issue tracker. Use the issue body template below. These issues are considered ready for AFK agents, so publish them with the correct triage label unless instructed otherwise.
 
 Publish issues in dependency order (blockers first) so you can reference real issue identifiers in the "Blocked by" field.
 
@@ -83,5 +82,3 @@ Or "None - can start immediately" if no blockers.
 </issue-template>
 
 Do NOT close or modify any parent issue.
-
-After publishing, link children to their parent using the [sub-issues skill](../sub-issues/SKILL.md) and record native blocking dependencies. If native links are unavailable, use the references specified in AGENTS.md. Creating these relationships does not authorize changing the parent's body or closing it.

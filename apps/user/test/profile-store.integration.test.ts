@@ -33,6 +33,17 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('changes handles, schedules an alias, and refuses stale expiry after reactivation', async () => {
+    await run(profiles => profiles.ensure({ profileId: 'owner' }));
+    const changed = await run(profiles => profiles.changeHandle({ profileId: 'owner' }, 'Countess Ada', 1));
+    expect(changed).toMatchObject({ _tag: 'Success', profile: { handle: 'countess-ada', version: 2, aliases: [{ handle: 'ada-lovelace', expiresAt: null }] } });
+    const scheduled = await run(profiles => profiles.scheduleAliasExpiry({ profileId: 'owner' }, 'ADA-LOVELACE', 2));
+    expect(scheduled).toMatchObject({ _tag: 'Success', profile: { version: 3, aliases: [{ handle: 'ada-lovelace', expiresAt: expect.any(String) }] } });
+    const [claim] = await sql`select claim_generation from handle_claims where handle = 'ada-lovelace'`;
+    expect(await run(profiles => profiles.reactivateAlias({ profileId: 'owner' }, 'ada-lovelace', 3))).toMatchObject({ _tag: 'Success', profile: { version: 4, aliases: [{ expiresAt: null }] } });
+    expect(await run(profiles => profiles.expireDueAlias({ profileId: 'owner', handle: 'ada-lovelace', claimGeneration: Number(claim.claim_generation) }, new Date(Date.now() + 86400001)))).toBe(false);
+    expect(await sql`select subject from outbox_events`).toHaveLength(4);
+  });
   it('commits the winning details command with its event and rejects the stale concurrent writer', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }));
     const results = await Promise.all(['Grace Hopper', 'Katherine Johnson'].map(displayName => run(profiles => profiles.updateDetails({ profileId: 'owner' }, { displayName }, 1))));

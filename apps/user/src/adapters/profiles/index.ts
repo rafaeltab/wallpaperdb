@@ -1,5 +1,5 @@
 import { PROFILE_CREATED_SUBJECT, ProfileCreatedEventSchema, type ProfileCreatedEvent, PROFILE_UPDATED_SUBJECT, ProfileUpdatedEventSchema, type ProfileUpdatedEvent } from '@wallpaperdb/events';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { ulid } from 'ulid';
 import { handleClaims, outboxEvents, profiles, profilePictureAssets, profilePictureImports, wallpaperOwnership } from '../../db/schema.js';
@@ -69,7 +69,8 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           const wallpaperOwners = query.wallpaperIds?.length ? await tx.query.wallpaperOwnership.findMany({ where: inArray(wallpaperOwnership.wallpaperId, [...query.wallpaperIds]) }) : [];
           const [importJob] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, query.profileId)).for('update');
           const [asset] = query.assetId ? await tx.select().from(profilePictureAssets).where(eq(profilePictureAssets.id, query.assetId)).for('update') : [];
-          const decision = decide({ profile, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null });
+          const eligibleHandles = (await recentHistoricalHandles(tx, current.id, query.now, retentionMs(policy))).map(entry => entry.handle);
+          const decision = decide({ profile, eligibleHandles, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null });
           if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
           if (decision._tag === 'Unchanged') return { outcome: { _tag: 'Success', profile } satisfies ProfileOutcome, changed: false };
           const { updated, change } = await applyMutation(tx, current, decision.mutation, query.now, policy);
@@ -77,7 +78,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           return { outcome: { _tag: 'Success', profile: await ownerProfile(tx, updated, policy, query.now) } satisfies ProfileOutcome, changed: true };
         });
       } catch (cause) {
-        if (uniqueViolation(cause)) return { outcome: reject('handle-unavailable', 'This Handle is already in use; choose another name'), changed: false };
+        if (cause instanceof ClaimConflict || uniqueViolation(cause)) return { outcome: reject('handle-unavailable', 'This Handle is already in use; choose another name'), changed: false };
         throw cause;
       }
     }),
@@ -85,13 +86,47 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
   return adapter;
 }));
 
-async function applyMutation(tx: Transaction, current: Profile, mutation: ProfileMutation, now: Date, _policy: ProfilePolicy): Promise<{ updated: Profile; change: ProfileUpdatedEvent['change'] }> {
-  if (mutation.type !== 'details') throw new Error('Unsupported Profile transition');
-  const [updated] = await tx.update(profiles).set({ displayName: mutation.displayName, biographyMarkdown: mutation.biographyMarkdown, version: current.version + 1, updatedAt: now }).where(eq(profiles.id, current.id)).returning();
+class ClaimConflict extends Error {}
+async function applyMutation(tx: Transaction, current: Profile, mutation: ProfileMutation, now: Date, policy: ProfilePolicy): Promise<{ updated: Profile; change: ProfileUpdatedEvent['change'] }> {
+  const changes: Partial<Profile> = { version: current.version + 1, updatedAt: now };
+  let change: ProfileUpdatedEvent['change'];
+  switch (mutation.type) {
+    case 'details':
+      changes.displayName = mutation.displayName;
+      changes.biographyMarkdown = mutation.biographyMarkdown;
+      change = current.displayName !== mutation.displayName && current.biographyMarkdown !== mutation.biographyMarkdown
+        ? { type: 'profile-details-changed', before: { displayName: current.displayName, biographyMarkdown: current.biographyMarkdown }, after: { displayName: mutation.displayName, biographyMarkdown: mutation.biographyMarkdown } }
+        : current.biographyMarkdown !== mutation.biographyMarkdown ? { type: 'biography-changed', before: current.biographyMarkdown, after: mutation.biographyMarkdown }
+        : { type: 'display-name-changed', before: current.displayName, after: mutation.displayName };
+      break;
+    case 'handle': {
+      changes.handle = mutation.handle;
+      changes.lastHandleChangedAt = now;
+      const [claim] = await tx.insert(handleClaims).values({ handle: mutation.handle, profileId: current.id, kind: 'profile' }).onConflictDoUpdate({ target: handleClaims.handle, set: { kind: 'profile', claimGeneration: sql`excluded.claim_generation`, createdAt: now, expiresAt: null }, setWhere: and(eq(handleClaims.profileId, current.id), eq(handleClaims.kind, 'alias')) }).returning();
+      if (!claim) throw new ClaimConflict();
+      await tx.update(handleClaims).set({ kind: 'alias', createdAt: now, expiresAt: null }).where(eq(handleClaims.handle, current.handle));
+      for (const scheduled of mutation.scheduledAliases) await tx.update(handleClaims).set({ expiresAt: new Date(scheduled.expiresAt) }).where(and(eq(handleClaims.handle, scheduled.handle), eq(handleClaims.profileId, current.id)));
+      change = { type: 'handle-changed', before: current.handle, after: mutation.handle, scheduledAliases: mutation.scheduledAliases };
+      break;
+    }
+    case 'reactivate': {
+      const [claim] = await tx.insert(handleClaims).values({ handle: mutation.handle, profileId: current.id, kind: 'alias', createdAt: now }).onConflictDoUpdate({ target: handleClaims.handle, set: { createdAt: now, expiresAt: null }, setWhere: and(eq(handleClaims.profileId, current.id), eq(handleClaims.kind, 'alias')) }).returning();
+      if (!claim) throw new ClaimConflict();
+      change = { type: 'alias-reactivated', handle: mutation.handle, claimGeneration: claim.claimGeneration, before: mutation.before, after: null };
+      break;
+    }
+    case 'schedule':
+      await tx.update(handleClaims).set({ expiresAt: mutation.expiresAt }).where(and(eq(handleClaims.handle, mutation.handle), eq(handleClaims.profileId, current.id), eq(handleClaims.kind, 'alias')));
+      change = { type: 'alias-expiry-scheduled', handle: mutation.handle, before: null, after: mutation.expiresAt.toISOString() };
+      break;
+    case 'expire':
+      await tx.delete(handleClaims).where(and(eq(handleClaims.handle, mutation.handle), eq(handleClaims.profileId, current.id), eq(handleClaims.kind, 'alias'), eq(handleClaims.claimGeneration, mutation.claimGeneration)));
+      change = { type: 'alias-expired', handle: mutation.handle, claimGeneration: mutation.claimGeneration, before: mutation.before, after: null, reason: mutation.reason };
+      break;
+    case 'picture':
+      throw new Error(`Picture transition unavailable for retention ${retentionMs(policy)}`);
+  }
+  const [updated] = await tx.update(profiles).set(changes).where(eq(profiles.id, current.id)).returning();
   if (!updated) throw new Error('Locked Profile disappeared');
-  const change: ProfileUpdatedEvent['change'] = current.displayName !== updated.displayName && current.biographyMarkdown !== updated.biographyMarkdown
-    ? { type: 'profile-details-changed', before: { displayName: current.displayName, biographyMarkdown: current.biographyMarkdown }, after: { displayName: updated.displayName, biographyMarkdown: updated.biographyMarkdown } }
-    : current.biographyMarkdown !== updated.biographyMarkdown ? { type: 'biography-changed', before: current.biographyMarkdown, after: updated.biographyMarkdown }
-    : { type: 'display-name-changed', before: current.displayName, after: updated.displayName };
   return { updated, change };
 }

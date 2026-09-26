@@ -77,13 +77,12 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       expect(response.statusCode).toBe(404);
     });
 
-    it('should default fit to "contain" when not specified', async () => {
+    it('accepts omitted fit for a dimensioned request', async () => {
       const response = await app.inject({
         method: 'GET',
         url: '/wallpapers/wlpr_test123?w=1920',
       });
 
-      // When we implement this, verify fit defaults to contain
       expect(response.statusCode).toBe(404);
     });
 
@@ -232,7 +231,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       expect(metadata.height).toBe(960);
     });
 
-    it('should stream large image without buffering', async () => {
+    it('returns a successful resized response for a large image', async () => {
       // This test verifies streaming behavior
       const image = await createTestImage(3840, 2160, 'jpeg');
       const wallpaperId = 'wlpr_test_resize_003';
@@ -621,18 +620,35 @@ describe('Phase 4: Resizing & Variant Selection', () => {
     async function createTestImage(
       width: number,
       height: number,
-      format: 'jpeg' | 'png' | 'webp' = 'jpeg'
+      format: 'jpeg' | 'png' | 'webp' = 'jpeg',
+      color: 'red' | 'green' | 'blue' = 'red'
     ): Promise<Buffer> {
       return await sharp({
         create: {
           width,
           height,
           channels: 3,
-          background: { r: 100, g: 150, b: 200 },
+          background:
+            color === 'red'
+              ? { r: 255, g: 0, b: 0 }
+              : color === 'green'
+                ? { r: 0, g: 255, b: 0 }
+                : { r: 0, g: 0, b: 255 },
         },
       })
         .toFormat(format)
         .toBuffer();
+    }
+
+    async function expectSourceColor(bytes: Buffer, color: 'red' | 'green') {
+      const pixel = await sharp(bytes)
+        .extract({ left: 0, top: 0, width: 1, height: 1 })
+        .removeAlpha()
+        .raw()
+        .toBuffer();
+      expect(Math.abs(pixel[0] - (color === 'red' ? 255 : 0))).toBeLessThanOrEqual(3);
+      expect(Math.abs(pixel[1] - (color === 'green' ? 255 : 0))).toBeLessThanOrEqual(3);
+      expect(pixel[2]).toBeLessThanOrEqual(2);
     }
 
     it('should use exact matching variant when dimensions match exactly', async () => {
@@ -640,8 +656,8 @@ describe('Phase 4: Resizing & Variant Selection', () => {
 
       // Create original and variants
       const original = await createTestImage(3840, 2160, 'jpeg');
-      const variant1920 = await createTestImage(1920, 1080, 'jpeg');
-      const variant1280 = await createTestImage(1280, 720, 'jpeg');
+      const variant1920 = await createTestImage(1920, 1080, 'jpeg', 'green');
+      const variant1280 = await createTestImage(1280, 720, 'jpeg', 'blue');
 
       // Upload to S3
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
@@ -687,6 +703,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'green');
 
       // Should use the 1920x1080 variant (no resizing needed)
       const metadata = await sharp(response.rawPayload).metadata();
@@ -698,9 +715,9 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       const wallpaperId = 'wlpr_variant_larger_001';
 
       const original = await createTestImage(3840, 2160, 'jpeg');
-      const variant2560 = await createTestImage(2560, 1440, 'jpeg');
-      const variant1920 = await createTestImage(1920, 1080, 'jpeg');
-      const variant1280 = await createTestImage(1280, 720, 'jpeg');
+      const variant2560 = await createTestImage(2560, 1440, 'jpeg', 'blue');
+      const variant1920 = await createTestImage(1920, 1080, 'jpeg', 'green');
+      const variant1280 = await createTestImage(1280, 720, 'jpeg', 'blue');
 
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/2560x1440.jpg`, variant2560);
@@ -752,6 +769,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'green');
 
       // Should resize 1920x1080 variant down to 1600x900
       const metadata = await sharp(response.rawPayload).metadata();
@@ -763,8 +781,8 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       const wallpaperId = 'wlpr_variant_fallback_001';
 
       const original = await createTestImage(3840, 2160, 'jpeg');
-      const variant1920 = await createTestImage(1920, 1080, 'jpeg');
-      const variant1280 = await createTestImage(1280, 720, 'jpeg');
+      const variant1920 = await createTestImage(1920, 1080, 'jpeg', 'green');
+      const variant1280 = await createTestImage(1280, 720, 'jpeg', 'blue');
 
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/1920x1080.jpg`, variant1920);
@@ -807,6 +825,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'red');
 
       // Should resize original down to 2560x1440
       const metadata = await sharp(response.rawPayload).metadata();
@@ -840,6 +859,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'red');
 
       // Should resize original down to 1920x1080
       const metadata = await sharp(response.rawPayload).metadata();
@@ -851,8 +871,8 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       const wallpaperId = 'wlpr_prefer_smaller_001';
 
       const original = await createTestImage(3840, 2160, 'jpeg');
-      const variant3840 = await createTestImage(3840, 2160, 'jpeg');
-      const variant1920 = await createTestImage(1920, 1080, 'jpeg');
+      const variant3840 = await createTestImage(3840, 2160, 'jpeg', 'blue');
+      const variant1920 = await createTestImage(1920, 1080, 'jpeg', 'green');
 
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/original.jpg`, original);
       await tester.s3.uploadObject('wallpapers', `${wallpaperId}/3840x2160.jpg`, variant3840);
@@ -895,6 +915,7 @@ describe('Phase 4: Resizing & Variant Selection', () => {
       });
 
       expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'green');
 
       // Should use 1920x1080 variant (not 3840x2160)
       const metadata = await sharp(response.rawPayload).metadata();
@@ -937,7 +958,8 @@ describe('Phase 4: Resizing & Variant Selection', () => {
         url: `/wallpapers/${wallpaperId}?w=1920&h=1080`,
       });
 
-      expect(response.statusCode).toBe(200); // Not 404
+      expect(response.statusCode).toBe(200);
+      await expectSourceColor(response.rawPayload, 'red'); // Not 404
 
       // Should have used original and resized it
       const metadata = await sharp(response.rawPayload).metadata();

@@ -4,11 +4,15 @@ import {
 } from '@wallpaperdb/events/schemas';
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
+import { z } from 'zod';
 import type { ExtractionInput } from '../../extraction/index.js';
 const decode = Option.liftThrowable((payload: Uint8Array): unknown =>
   JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(payload))
 );
-const envelopeSchema = WallpaperUploadedCloudEventSchema.omit({
+const structuredSchema = WallpaperUploadedCloudEventSchema.extend({
+  causationsource: z.string().min(1).optional(),
+});
+const envelopeSchema = structuredSchema.omit({
   data: true,
   datacontenttype: true,
 });
@@ -19,7 +23,7 @@ export function translateUpload(
   const raw = decode(payload);
   if (Option.isNone(raw)) return undefined;
   const structured = Predicate.hasProperty(raw.value, 'specversion')
-    ? WallpaperUploadedCloudEventSchema.safeParse(raw.value)
+    ? structuredSchema.safeParse(raw.value)
     : undefined;
   const binary = headers?.keys().some((key) => key.toLowerCase().startsWith('ce-'))
     ? envelopeSchema.safeParse({
@@ -30,6 +34,7 @@ export function translateUpload(
         time: headers.get('ce-time'),
         correlationid: headers.get('ce-correlationid') || undefined,
         causationid: headers.get('ce-causationid') || undefined,
+        causationsource: headers.get('ce-causationsource') || undefined,
       })
     : undefined;
   const result = WallpaperUploadedEventSchema.safeParse(raw.value);
@@ -44,7 +49,14 @@ export function translateUpload(
     )
       return undefined;
   }
-  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
+  if (
+    structured?.success &&
+    binary?.success &&
+    (structured.data.source !== binary.data.source ||
+      structured.data.correlationid !== binary.data.correlationid ||
+      structured.data.causationid !== binary.data.causationid ||
+      structured.data.causationsource !== binary.data.causationsource)
+  )
     return undefined;
   const envelope = structured?.success
     ? structured.data

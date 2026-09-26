@@ -54,7 +54,14 @@ function metadata(
     )
       return undefined;
   }
-  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
+  if (
+    structured?.success &&
+    binary?.success &&
+    (structured.data.source !== binary.data.source ||
+      structured.data.correlationid !== binary.data.correlationid ||
+      structured.data.causationid !== binary.data.causationid ||
+      structured.data.causationsource !== binary.data.causationsource)
+  )
     return undefined;
   const envelope = structured ?? binary;
   const extensions = envelope?.success ? envelope.data : undefined;

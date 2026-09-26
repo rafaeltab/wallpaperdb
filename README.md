@@ -11,7 +11,7 @@ WallpaperDB lets people upload, discover, and download wallpapers, with contribu
 - [Read the coding guidelines](CODING_STANDARDS.md) or [agent workflow rules](AGENTS.md).
 - [Read user guides, recovery procedures, and architecture decisions](apps/docs/content/docs/index.mdx).
 
-Each workspace has a short README explaining its purpose. Use the source, tests, schemas, and `make help` for implementation and command details.
+Workspace READMEs explain their purpose, core capabilities, and relevant technology choices. Use the source, tests, schemas, and `make help` for implementation and command details.
 
 ## What belongs in the docs
 

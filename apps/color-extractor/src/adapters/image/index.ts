@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Context, Effect, Layer, Semaphore } from 'effect';
-import { resolveAssetReference } from '@wallpaperdb/core/assets';
+import { resolveOriginalAsset } from '@wallpaperdb/core/assets';
 import { decodePixels } from './process.js';
 import {
   computeHistogram,
@@ -16,7 +16,6 @@ export interface ImageConfig {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
-  readonly assetReferenceBucket?: string;
 }
 
 export interface ImageHealth {
@@ -52,7 +51,7 @@ class StoredImageHistogram implements ImageHistogram {
   constructor(
     private readonly client: S3Client,
     private readonly nativeWork: Semaphore.Semaphore,
-    private readonly assetReferenceBucket: string
+    private readonly bucket: string
   ) {}
 
   readonly extract = Effect.fn('color-extraction.image.extract')(function* (
@@ -65,9 +64,7 @@ class StoredImageHistogram implements ImageHistogram {
           const bytes = yield* request('read-image', async (abortSignal) => {
             const location =
               'owner' in storage
-                ? await resolveAssetReference(this.client, this.assetReferenceBucket, storage, {
-                    abortSignal,
-                  })
+                ? resolveOriginalAsset(storage, storage.mimeType, this.bucket)
                 : storage;
             const response = await this.client.send(
               new GetObjectCommand({ Bucket: location.bucket, Key: location.key }),
@@ -148,21 +145,12 @@ export function imageLayer(config: ImageConfig): Layer.Layer<ImageHistogram | Im
       const nativeWork = yield* Semaphore.make(1);
       return Context.make(
         ImageHistogram,
-        new StoredImageHistogram(
-          client,
-          nativeWork,
-          config.assetReferenceBucket ?? 'asset-references'
-        )
+        new StoredImageHistogram(client, nativeWork, config.bucket)
       ).pipe(
         Context.add(ImageHealth, {
           check: () =>
-            Effect.all(
-              [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
-                request('check-image-storage', (abortSignal) =>
-                  client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
-                )
-              ),
-              { concurrency: 'unbounded' }
+            request('check-image-storage', (abortSignal) =>
+              client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
             ).pipe(
               Effect.timeout('5 seconds'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

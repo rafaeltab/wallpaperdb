@@ -9,7 +9,6 @@ import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
 import { ImageHistogram } from '../src/extraction/index.js';
-import { registerAssetReference } from '@wallpaperdb/core/assets';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
@@ -22,11 +21,7 @@ describe('Stored image histogram adapter', () => {
 
   beforeAll(async () => {
     tester = new TesterClass();
-    tester
-      .withS3()
-      .withS3Bucket('wallpapers')
-      .withS3Bucket('other-wallpapers')
-      .withS3Bucket('asset-references');
+    tester.withS3().withS3Bucket('wallpapers').withS3Bucket('other-wallpapers');
     await tester.setup();
     const s3 = tester.getS3();
     runtime = ManagedRuntime.make(
@@ -83,16 +78,12 @@ describe('Stored image histogram adapter', () => {
       expect(result.failure.cause).toBeInstanceOf(Error);
     }
   });
-  it('resolves an immutable logical original before reading its image bytes', async () => {
+  it('reads a logical original without a descriptor store', async () => {
     const red = await sharp({ create: { width: 3, height: 2, channels: 3, background: '#ff0000' } })
       .png()
       .toBuffer();
-    const reference = { owner: 'ingestor', id: 'logical-red' } as const;
-    await tester.s3.uploadObject('other-wallpapers', 'logical/red.png', red);
-    await registerAssetReference(tester.s3.getS3Client(), 'asset-references', reference, {
-      bucket: 'other-wallpapers',
-      key: 'logical/red.png',
-    });
+    const reference = { owner: 'ingestor', id: 'logical-red', mimeType: 'image/png' } as const;
+    await tester.s3.uploadObject('wallpapers', 'logical-red/original.png', red);
     const histogram = await runtime.runPromise(
       Effect.flatMap(ImageHistogram, (images) => images.extract(reference))
     );
@@ -100,22 +91,21 @@ describe('Stored image histogram adapter', () => {
     expect(histogram[3]).toBeCloseTo(1, 5);
   });
 
-  it('reports missing asset reference storage and recovers when restored', async () => {
+  it('reports missing image storage and recovers when restored', async () => {
     const s3 = tester.getS3();
-    const referenceBucket = 'recovered-health-references';
+    const imageBucket = 'recovered-health-images';
     const isolated = ManagedRuntime.make(
       imageLayer({
         endpoint: s3.endpoints.fromHost,
         region: 'us-east-1',
         accessKeyId: s3.options.accessKey,
         secretAccessKey: s3.options.secretKey,
-        bucket: 'wallpapers',
-        assetReferenceBucket: referenceBucket,
+        bucket: imageBucket,
       })
     );
     try {
       expect(await isolated.runPromise(ImageHealth.use((health) => health.check()))).toBe(false);
-      await tester.s3.getS3Client().send(new CreateBucketCommand({ Bucket: referenceBucket }));
+      await tester.s3.getS3Client().send(new CreateBucketCommand({ Bucket: imageBucket }));
       expect(await isolated.runPromise(ImageHealth.use((health) => health.check()))).toBe(true);
     } finally {
       await isolated.dispose();

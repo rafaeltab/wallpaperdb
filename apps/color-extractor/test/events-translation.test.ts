@@ -93,7 +93,7 @@ it('translates an immutable logical original reference without object storage co
   };
   expect(translateUpload(new TextEncoder().encode(JSON.stringify(event)))).toMatchObject({
     wallpaperId: wallpaper.id,
-    storage: asset,
+    storage: { ...asset, mimeType: 'image/png' },
   });
 });
 

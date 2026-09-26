@@ -18,4 +18,26 @@ describe('tags configuration', () => {
       otelEndpoint: undefined,
     });
   });
+
+  it.each([
+    '3008oops',
+    '3008.5',
+    '1e3',
+    '',
+    ' ',
+    'Infinity',
+    'NaN',
+    '-1',
+    '0',
+    '65536',
+  ])('rejects invalid listen port %j before startup', (port) => {
+    expect(() => loadConfig({ ...requiredEnvironment, PORT: port })).toThrow();
+  });
+
+  it.each([
+    ['1', 1],
+    ['65535', 65535],
+  ])('accepts listen port %s', (port, expected) => {
+    expect(loadConfig({ ...requiredEnvironment, PORT: port }).port).toBe(expected);
+  });
 });

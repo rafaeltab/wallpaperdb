@@ -151,18 +151,12 @@ describe('Image input byte limits', () => {
   });
 });
 
-it('cancels a hanging health request when its sibling bucket check fails', async () => {
-  let failOriginal: (() => void) | undefined;
-  let referenceEntered = false;
-  let referenceClosed = false;
-  const server = createServer((request, response) => {
-    if (request.url?.includes('asset-references')) {
-      referenceEntered = true;
-      response.on('close', () => { referenceClosed = true; });
-    } else {
-      failOriginal = () => { response.writeHead(404).end(); };
-    }
-    if (referenceEntered) failOriginal?.();
+it('cancels an outstanding storage health request when interrupted', async () => {
+  let entered = false;
+  let closed = false;
+  const server = createServer((_request, response) => {
+    entered = true;
+    response.on('close', () => { closed = true; });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
@@ -171,11 +165,16 @@ it('cancels a hanging health request when its sibling bucket check fails', async
     endpoint: `http://127.0.0.1:${address.port}`, region: 'us-east-1',
     accessKeyId: 'test', secretAccessKey: 'test', bucket: 'wallpapers', jpegQuality: 90, pngCompressionLevel: 6, webpQuality: 90,
   }));
+  const abort = new AbortController();
   try {
-    expect(await runtime.runPromise(ImageHealth.use((health) => health.check()))).toBe(false);
-    expect(referenceEntered).toBe(true);
-    await vi.waitFor(() => expect(referenceClosed).toBe(true), { timeout: 500, interval: 10 });
+    const pending = runtime.runPromise(ImageHealth.use((health) => health.check()), { signal: abort.signal });
+    void pending.catch(() => undefined);
+    await vi.waitFor(() => expect(entered).toBe(true), { timeout: 1000, interval: 10 });
+    abort.abort();
+    await expect(pending).rejects.toBeDefined();
+    await vi.waitFor(() => expect(closed).toBe(true), { timeout: 500, interval: 10 });
   } finally {
+    abort.abort();
     await runtime.dispose();
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));

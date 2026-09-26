@@ -26,7 +26,6 @@ export function variantGeneratorLayer(config: Config, options: AppOptions = {}) 
     accessKeyId: config.s3AccessKeyId,
     secretAccessKey: config.s3SecretAccessKey,
     bucket: config.s3Bucket,
-    assetReferenceBucket: config.assetReferenceBucket,
     jpegQuality: config.jpegQuality,
     webpQuality: config.webpQuality,
     pngCompressionLevel: config.pngCompressionLevel,

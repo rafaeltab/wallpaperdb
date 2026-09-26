@@ -8,7 +8,7 @@ import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { VariantImages, VariantEvents, type GenerationInput } from '../src/generation/index.js';
 
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).with(NatsTesterBuilder).build();
-const tester = new Tester().withS3().withS3Bucket('wallpapers').withS3Bucket('asset-references').withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
+const tester = new Tester().withS3().withS3Bucket('wallpapers').withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
 let sourceFingerprint = '';
 const preset = { width: 80, height: 45, label: 'small' };
 function input(id: string): GenerationInput {
@@ -107,7 +107,7 @@ it.each([
       variant: {
         wallpaperId: value.wallpaperId, width: 80, height: 45, aspectRatio: 80 / 45,
         format: 'image/jpeg', fileSizeBytes: legacy.length, createdAt,
-        asset: { owner: 'variant-generator', id: `${id}:80x45:image/jpeg` },
+        storageBucket: 'wallpapers', storageKey: `${id}/variant_80x45.jpg`,
       },
     });
   } finally { await app.dispose(); await changedPolicy.dispose(); }
@@ -133,7 +133,7 @@ it('adopts the first writer pixel dimensions instead of freshly encoded candidat
     const message = await manager.streams.getMessage('WALLPAPER', { last_by_subj: 'wallpaper.variant.uploaded' });
     expect(message.json()).toMatchObject({ variant: {
       width: 70, height: 43, aspectRatio: 70 / 43,
-      asset: { owner: 'variant-generator', id: `${value.wallpaperId}:80x45:image/jpeg` },
+      storageBucket: 'wallpapers', storageKey: `${value.wallpaperId}/variant_80x45.jpg`,
     } });
     expect(await stored(value.wallpaperId)).toEqual(before);
   } finally { await app.dispose(); }

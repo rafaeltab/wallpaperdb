@@ -23,7 +23,7 @@ describe('Health Endpoints', () => {
     tester = new TesterClass();
     tester
       .withS3()
-      .withS3Bucket('wallpapers').withS3Bucket('asset-references')
+      .withS3Bucket('wallpapers')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withInProcessApp();

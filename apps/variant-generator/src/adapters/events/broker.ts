@@ -83,7 +83,9 @@ class NatsVariantEvents implements VariantEvents {
         aspectRatio: variant.aspectRatio,
         format: variant.format,
         fileSizeBytes: variant.fileSizeBytes,
-        asset: variantAssetReference(variant),
+        ...('owner' in input.storage
+          ? { asset: variantAssetReference(variant) }
+          : { storageBucket: variant.storageBucket, storageKey: variant.storageKey }),
         createdAt: variant.createdAt.toISOString(),
       },
     };

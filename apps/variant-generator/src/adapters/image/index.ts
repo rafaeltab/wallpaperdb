@@ -217,7 +217,11 @@ export function imageLayer(config: ImageConfig): Layer.Layer<VariantImages | Ima
         Context.add(ImageHealth, {
           check: () =>
             request('check-image-storage', (abortSignal) =>
-              client.send(new HeadBucketCommand({ Bucket: config.bucket }), { abortSignal })
+              Promise.all(
+                [config.bucket, config.assetReferenceBucket ?? 'asset-references'].map((Bucket) =>
+                  client.send(new HeadBucketCommand({ Bucket }), { abortSignal })
+                )
+              )
             ).pipe(
               Effect.timeout('5 seconds'),
               Effect.match({ onSuccess: () => true, onFailure: () => false })

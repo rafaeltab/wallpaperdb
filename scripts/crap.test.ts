@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { defaults } from '../packages/vitest-config/src/defaults.js';
+import { defaults } from '@wallpaperdb/vitest-config/defaults';
 import {
   calculateCrapScore,
   coverageForMethods,

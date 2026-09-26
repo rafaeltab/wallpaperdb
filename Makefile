@@ -208,6 +208,7 @@ crap-check-types: ## Type-check CRAP tooling
 	@pnpm crap:check-types
 
 test-crap: ## Test the shared CRAP analyzer and vendored core (optional ARGS)
+	@$(MAKE) build PACKAGE=vitest-config
 	@pnpm exec vitest run --config scripts/crap-vitest.config.ts $(ARGS)
 
 worktree-remove: ## Tear down this worktree and release its slot

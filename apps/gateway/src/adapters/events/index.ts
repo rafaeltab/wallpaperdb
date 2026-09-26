@@ -26,6 +26,7 @@ import {
   type JetStreamClient,
   type JetStreamManager,
   type JsMsg,
+  type MsgHdrs,
   type NatsConnection,
 } from 'nats';
 import { ProjectCatalogue, type ProjectionOutcome } from '../../projection/index.js';
@@ -37,6 +38,7 @@ export interface ProjectionDelivery {
   readonly subject: string;
   readonly payload: Uint8Array;
   readonly attempt: number;
+  readonly headers?: MsgHdrs;
 }
 export type DeliveryDecision =
   | ProjectionOutcome
@@ -48,7 +50,7 @@ export type DeliveryDecision =
 export const deliverProjection = Effect.fn('catalogue.delivery')(function* (
   delivery: ProjectionDelivery
 ): Effect.fn.Return<DeliveryDecision, never, ProjectCatalogue> {
-  const translated = translate(delivery.subject, delivery.payload);
+  const translated = translate(delivery.subject, delivery.payload, delivery.headers);
   if (translated._tag === 'Invalid') return { _tag: 'Invalid' };
   if (delivery.attempt > 4) return { _tag: 'Exhausted' };
   const attributes = {
@@ -252,7 +254,7 @@ const quarantine = Effect.fn('catalogue.events.quarantine')(function* (
     )
     .update(message.data)
     .digest('hex');
-  const original = translate(message.subject, message.data);
+  const original = translate(message.subject, message.data, message.headers);
   const span = yield* OtelTracer.currentOtelSpan.pipe(Effect.option);
   const traceCarrier: Record<string, string> = {};
   propagation.inject(
@@ -302,7 +304,7 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
   const started = yield* Clock.currentTimeMillis;
   let status = 'error';
   const attributes = {
-    ...projectionAttributes(translate(message.subject, message.data)),
+    ...projectionAttributes(translate(message.subject, message.data, message.headers)),
     'event.subject': message.subject,
     'event.consumer': message.info.consumer,
     'event.delivery_attempt': attempt,
@@ -312,6 +314,7 @@ const processMessage = Effect.fn('catalogue.events.consume')(function* (
     const outcome = yield* deliverProjection({
       subject: message.subject,
       payload: message.data,
+      headers: message.headers,
       attempt,
     });
     yield* Effect.annotateCurrentSpan('event.outcome', outcome._tag);

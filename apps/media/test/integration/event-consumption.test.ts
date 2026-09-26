@@ -11,6 +11,7 @@ import {
 } from '@wallpaperdb/test-utils';
 import { eq } from 'drizzle-orm';
 import { headers as natsHeaders } from 'nats';
+import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { wallpapers } from '../../src/db/schema.js';
 import { InProcessMediaTesterBuilder, MediaMigrationsTesterBuilder } from '../builders/index.js';
@@ -32,6 +33,7 @@ describe('Media Service - Event Consumption', () => {
       .withPostgres((builder) => builder.withDatabase(`test_media_events_${Date.now()}`))
       .withS3()
       .withS3Bucket('wallpapers')
+      .withS3Bucket('historical-wallpapers')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()
@@ -121,6 +123,79 @@ describe('Media Service - Event Consumption', () => {
     } finally {
       observation.close();
     }
+  });
+
+  it('delivers a retained variant from its announced historical bucket after broker replay', async () => {
+    const id = 'wlpr_historical_variant';
+    const timestamp = '2026-09-24T10:00:00.000Z';
+    const bytes = await sharp({
+      create: { width: 853, height: 480, channels: 3, background: '#336699' },
+    })
+      .png()
+      .toBuffer();
+    const storageKey = `${id}/variant_854x480.png`;
+    await tester.s3.uploadObject('historical-wallpapers', storageKey, bytes);
+    const js = await tester.nats.getJsClient();
+    const parent = await js.publish(
+      'wallpaper.uploaded',
+      JSON.stringify({
+        eventId: 'historical-parent',
+        eventType: 'wallpaper.uploaded',
+        timestamp,
+        wallpaper: {
+          id,
+          userId: 'user_historical',
+          fileType: 'image',
+          mimeType: 'image/png',
+          width: 1280,
+          height: 720,
+          aspectRatio: 1280 / 720,
+          fileSizeBytes: 100,
+          uploadedAt: timestamp,
+          storageBucket: 'historical-wallpapers',
+          storageKey: 'custom/original.png',
+          originalFilename: 'original.png',
+        },
+      })
+    );
+    await waitForAccepted(parent.seq);
+    const payload = JSON.stringify({
+      eventId: 'historical-variant',
+      eventType: 'wallpaper.variant.uploaded',
+      timestamp,
+      variant: {
+        wallpaperId: id,
+        width: 853,
+        height: 480,
+        aspectRatio: 853 / 480,
+        format: 'image/png',
+        fileSizeBytes: bytes.length,
+        createdAt: timestamp,
+        storageBucket: 'historical-wallpapers',
+        storageKey,
+      },
+    });
+    await js.publish('wallpaper.variant.uploaded', payload);
+    const replay = await js.publish('wallpaper.variant.uploaded', payload);
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'media-wallpaper-variant-uploaded-consumer'))
+            .ack_floor.stream_seq,
+        { timeout: 10000 }
+      )
+      .toBe(replay.seq);
+    // The original is deliberately absent. Only the announced historical variant can satisfy delivery.
+    const response = await tester
+      .getApp()
+      .inject({ method: 'GET', url: `/wallpapers/${id}?w=853&h=480` });
+    expect(response.statusCode).toBe(200);
+    expect(await sharp(response.rawPayload).metadata()).toMatchObject({ width: 853, height: 480 });
+    expect(await sharp(response.rawPayload).raw().toBuffer()).toEqual(
+      await sharp(bytes).raw().toBuffer()
+    );
+    expect(await tester.s3.objectExists('wallpapers', storageKey)).toBe(false);
   });
 
   it('should consume wallpaper.uploaded event and send wallpaper.variant.available event', async () => {

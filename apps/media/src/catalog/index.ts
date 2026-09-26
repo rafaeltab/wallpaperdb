@@ -13,6 +13,8 @@ export interface ProjectionMetadata {
   readonly occurrence: Occurrence;
   readonly occurredAt: string;
   readonly correlationId?: string;
+  readonly causationId?: string;
+  readonly causationSource?: string;
   readonly traceparent?: string;
   readonly tracestate?: string;
 }

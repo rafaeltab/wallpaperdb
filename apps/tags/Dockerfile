@@ -39,7 +39,6 @@ WORKDIR /app/apps/tags
 
 COPY --from=builder --chown=user:nodejs /app/apps/tags/dist ./dist
 COPY --from=builder --chown=user:nodejs /app/apps/tags/node_modules ./node_modules
-COPY --from=builder --chown=user:nodejs /app/packages/core/node_modules ./node_modules
 COPY --from=builder --chown=user:nodejs /app/node_modules /app/node_modules
 
 USER user

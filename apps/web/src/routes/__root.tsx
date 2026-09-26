@@ -12,6 +12,7 @@ import { SearchBar } from '@/components/search-bar';
 import { Button } from '@/components/ui/button';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { UserMenu } from '@/components/user-menu';
+import { UploadQueueToastManager } from '@/components/upload/upload-queue-toast-manager';
 
 interface RouterContext {
   queryClient: QueryClient;
@@ -33,6 +34,7 @@ function RootLayout() {
 
   return (
     <BrowseFilterPanelProvider>
+      <UploadQueueToastManager />
       <RootLayoutContent
         isBrowsePage={isBrowsePage}
         isWallpaperDetailsPage={isWallpaperDetailsPage}

@@ -1221,6 +1221,9 @@ importers:
       '@biomejs/biome':
         specifier: ^2.3.8
         version: 2.3.10
+      '@tanstack/router-generator':
+        specifier: 1.145.2
+        version: 1.145.2
       '@tanstack/router-plugin':
         specifier: ^1.99.1
         version: 1.145.2(@tanstack/react-router@1.144.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(vite@7.3.0(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.46.2)(tsx@4.22.4)(yaml@2.9.1))
@@ -15947,7 +15950,7 @@ snapshots:
       prettier: 3.7.4
       recast: 0.23.11
       source-map: 0.7.6
-      tsx: 4.21.0
+      tsx: 4.22.4
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color

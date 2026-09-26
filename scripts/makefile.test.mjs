@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
+  copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync,
   realpathSync, rmSync, symlinkSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -65,57 +65,80 @@ test('typecheck cache inputs include test files compiled by the workspace', () =
     'test-only TypeScript errors must invalidate a cached successful typecheck');
 });
 
-test('web typecheck rejects application, test, and Vite config errors, then succeeds after cleanup', () => {
-  const workspace = mkdtempSync(join(tmpdir(), 'wallpaperdb-web-typecheck-'));
+function withCleanWebWorkspace(run) {
+  const workspace = mkdtempSync(join(tmpdir(), 'wallpaperdb-web-clean-checkout-'));
   const web = join(workspace, 'apps/web');
-  const fixtures = ['src/typecheck-probe.ts', 'test/typecheck-probe.ts', 'vite.config.ts'];
-  const check = () => spawnSync('make', [
-    '--no-print-directory', 'run', 'PACKAGE=web', 'SCRIPT=check-types', 'ARGS=--pretty false',
-  ], { encoding: 'utf8', env, cwd: workspace, timeout: 60_000 });
-
   try {
-    for (const directory of ['src', 'test', 'node_modules']) {
-      mkdirSync(join(web, directory), { recursive: true });
-    }
+    mkdirSync(join(web, 'node_modules'), { recursive: true });
     for (const file of ['Makefile', 'package.json', 'pnpm-workspace.yaml']) {
       copyFileSync(file, join(workspace, file));
     }
-    for (const file of ['package.json', 'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json']) {
-      copyFileSync(join('apps/web', file), join(web, file));
+    // Copy the real application and configuration, never local build output,
+    // credentials, or the route tree that a prior dev server may have generated.
+    for (const file of [
+      'src', 'test', 'public', 'scripts', 'index.html', 'package.json',
+      'tsconfig.json', 'tsconfig.app.json', 'tsconfig.node.json', 'vite.config.ts',
+      'tsr.config.json',
+    ]) {
+      const source = join('apps/web', file);
+      if (!existsSync(source)) continue;
+      cpSync(source, join(web, file), {
+        recursive: true,
+        filter: (path) => path !== join('apps/web', 'src/routeTree.gen.ts'),
+      });
     }
     // Use the installed real compiler and external declarations, but keep source
-    // fixtures and TypeScript's node_modules/.tmp build state private to this run.
+    // files and TypeScript's node_modules/.tmp build state private to this run.
     symlinkSync(realpathSync('node_modules'), join(workspace, 'node_modules'), 'dir');
     for (const dependency of readdirSync('apps/web/node_modules')) {
       if (dependency.startsWith('.') && dependency !== '.bin') continue;
       symlinkSync(realpathSync(join('apps/web/node_modules', dependency)),
         join(web, 'node_modules', dependency), 'dir');
     }
-    const writeFixtures = (value) => {
-      for (const fixture of fixtures) {
-        writeFileSync(join(web, fixture), `export const typecheckProbe: number = ${value};\n`);
-      }
-    };
-    writeFixtures('1');
-    const initial = check();
-    assert.equal(initial.status, 0, initial.stdout + initial.stderr);
-
-    writeFixtures("'invalid'");
-    const result = check();
-    assert.notEqual(result.status, 0, 'the real typecheck command must reject invalid TypeScript');
-    const diagnostics = result.stdout + result.stderr;
-    for (const fixture of fixtures) {
-      assert.ok(diagnostics.includes(`${fixture}(1,14): error TS2322`),
-        `missing type error for ${fixture}: ${diagnostics}`);
-    }
-
-    writeFixtures('1');
-    const clean = check();
-    assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    return run({ workspace, web });
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
-});
+}
+
+for (const script of ['check-types', 'build']) {
+  test(`web ${script} generates routes from a clean checkout and rejects application, test, and Vite errors`, () => {
+    withCleanWebWorkspace(({ workspace, web }) => {
+      const fixtures = ['src/typecheck-probe.ts', 'test/typecheck-probe.ts', 'vite.config.ts'];
+      const originalViteConfig = readFileSync(join(web, 'vite.config.ts'), 'utf8');
+      const check = () => spawnSync('make', [
+        '--no-print-directory', 'run', 'PACKAGE=web', `SCRIPT=${script}`,
+      ], { encoding: 'utf8', env, cwd: workspace, timeout: 120_000 });
+      const writeFixtures = (value) => {
+        for (const fixture of fixtures) {
+          const prefix = fixture === 'vite.config.ts' ? originalViteConfig : '';
+          writeFileSync(join(web, fixture),
+            `${prefix}\nexport const typecheckProbe: number = ${value};\n`);
+        }
+      };
+
+      assert.equal(existsSync(join(web, 'src/routeTree.gen.ts')), false);
+      writeFixtures('1');
+      const initial = check();
+      assert.equal(initial.status, 0, initial.stdout + initial.stderr);
+      assert.equal(existsSync(join(web, 'src/routeTree.gen.ts')), true);
+      if (script === 'build') assert.equal(existsSync(join(web, 'dist/index.html')), true);
+
+      writeFixtures("'invalid'");
+      const result = check();
+      assert.notEqual(result.status, 0, 'the real command must reject invalid TypeScript');
+      const diagnostics = result.stdout + result.stderr;
+      for (const fixture of fixtures) {
+        assert.match(diagnostics, new RegExp(`${fixture.replaceAll('.', '\\.')}\\(\\d+,14\\): error TS2322`),
+          `missing type error for ${fixture}: ${diagnostics}`);
+      }
+
+      writeFixtures('1');
+      const clean = check();
+      assert.equal(clean.status, 0, clean.stdout + clean.stderr);
+    });
+  });
+}
 
 test('CRAP commands pass the optional workspace selector to the shared analyzer', () => {
   for (const target of ['crap', 'check-crap']) {

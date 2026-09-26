@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "docker compose -p $COMPOSE_PROJECT_NAME -f ../../infra/docker-compose.apps.yml watch web",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/generate-routes.mjs && tsc -b && vite build",
     "preview": "vite preview --port 3005",
     "format": "biome format --write .",
     "lint": "biome lint .",
     "check": "biome check --write .",
-    "check-types": "tsc -b",
+    "check-types": "node scripts/generate-routes.mjs && tsc -b",
     "test": "vitest run",
     "test:unit": "vitest run --coverage",
     "test:watch": "vitest"
@@ -48,6 +48,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",
+    "@tanstack/router-generator": "1.145.2",
     "@tanstack/router-plugin": "^1.99.1",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",

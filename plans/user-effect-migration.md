@@ -58,3 +58,34 @@ Telemetry tests use the production graph, SDK/exporters and real PostgreSQL/NATS
 Production build verification exercises the emitted picture encoder. The Docker image build also caught and removed a legacy dependency overlay that would have replaced the service's new telemetry packages with the core package's older SDK.
 
 The local PostgreSQL initialization bind mount was unreadable to Docker. A readable temporary copy of public SQL and NATS initialization scripts, selected through `/tmp/user-infra-override.yml`, repairs this environment without changing tracked infrastructure or deleting volumes. The task's Compose project is `wallpaperdb-t3code-user-service-effect-migration`; other worktree stacks remain untouched.
+
+## Independent review, round one
+
+All reviewers used the original pinned base and reviewed the full branch. The Standards and Spec axes ran separately under the code-review skill. A third reviewer received the user's exact deeper-review prompt.
+
+### Standards
+
+1. Full runtime configuration retained unrelated secrets in capability closures. Fixed by constructing explicit Profile/Picture policies, adapter configurations, HTTP configuration and telemetry configuration.
+2. Capability picture models exposed bucket/key addresses. Fixed by using logical asset identities and resolving durable addresses in adapters. Event storage metadata remains compatible, and a real S3/PostgreSQL test checks recorded addresses survive configuration changes.
+3. Most policy tests still used the full production graph. Moving business matrices to controlled capability adapters, retaining real persistence guarantees and representative composition coverage.
+4. Picture-import failures could produce healthy worker results, and identity/storage failures lacked operational signals. Added last-operation health gauges and alerts which retain failures through idle periods and retry backoff. Import batch results now report technical failures.
+5. A duplication heuristic identified three copies of maintenance cursor handling. Replaced them with one private batch processor. Existing poison-page, ambiguous-completion, shutdown and retention-cutoff tests pass before and after the refactor.
+
+### Spec
+
+1. Automatic instrumentation bypassed private-URL sanitization. Fresh-process production-export tests reproduced private fetch URL attributes and PostgreSQL span status messages containing trigger diagnostics. Disabled those two automatic instrumentations while retaining explicit Effect adapter spans and safe diagnostics. Both regression tests fail with the old wiring and pass after the fix.
+2. Import claim or settlement failure aborted the batch and could starve later work. Adding per-item recovery and cursor fairness tests, including work beyond a full failed page.
+
+### Deep review
+
+1. Independently confirmed the automatic fetch URL leak above. PostgreSQL exception events were sanitized, but the additional production test established that span status messages were not.
+2. A replica's local failed-delivery set stayed unhealthy after another replica successfully retried and acknowledged the delivery. A real PostgreSQL/NATS two-runtime regression reproduced the failure. Bounded sequence tracking now reconciles with the shared durable acknowledgement floor.
+3. Collision Handle generation could still trim below the configured minimum after adding its suffix. A controlled real-collision regression now covers the equal minimum/maximum boundary; the first-attempt fix alone was insufficient.
+
+The first round reported four Standards violations and one heuristic, two Spec findings, and three deep-review findings. The private URL finding overlaps across reviewers. All confirmed findings are being fixed before the next full review.
+
+The same review work found that Clerk transport exceptions could carry private diagnostics. A marked exception test failed before boundary sanitization and now passes. Identity failures retain only safe response status/category and have an explicit adapter span.
+
+## Validation environment
+
+A fresh CRAP run after the first implementation reports zero of 196 functions over 30. This must be repeated after review fixes. The first repository CI attempt collided with a separately launched User coverage job; rerunning without overlapping coverage avoided the missing temporary coverage file. The next run passed all 73 build/check/unit/integration tasks, then the browser auth setup timed out. Its trace contains a Clerk development initialization `Failed to fetch` error before any sign-in POST. Browser validation will be repeated after Docker test activity ends; assertions and retry settings remain unchanged.

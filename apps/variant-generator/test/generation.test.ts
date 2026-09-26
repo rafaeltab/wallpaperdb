@@ -41,6 +41,7 @@ function controlledAdapters(
         if (preset.width === failGeneration) return yield* Effect.fail(failure);
         const variant: GeneratedVariant = {
           wallpaperId: original.wallpaperId,
+          target: { width: preset.width, height: preset.height },
           width: preset.width,
           height: preset.height,
           aspectRatio: preset.width / preset.height,

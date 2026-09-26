@@ -23,6 +23,14 @@ try {
   else if (options.mimeType === 'image/png')
     transformer.png({ compressionLevel: options.pngCompressionLevel });
   else transformer.webp({ quality: options.webpQuality });
+  // Sharp emits info before image data. Keep native metadata work in this child
+  // and prefix the image with a fixed-size dimension frame for the parent.
+  transformer.once('info', ({ width, height }) => {
+    const dimensions = Buffer.alloc(8);
+    dimensions.writeUInt32BE(width, 0);
+    dimensions.writeUInt32BE(height, 4);
+    process.stdout.write(dimensions);
+  });
   const { pipeline } = await import('node:stream/promises');
   await pipeline(process.stdin, transformer, process.stdout);
 } catch (error) {

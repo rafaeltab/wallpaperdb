@@ -38,7 +38,7 @@ describe('Stored variant image adapter', () => {
     const variant = await runtime.runPromise(Effect.gen(function* () {
       return yield* (yield* VariantImages).generate({ ...input, mimeType }, preset);
     }));
-    expect(variant).toMatchObject({ wallpaperId: input.wallpaperId, width: 80, height: 45,
+    expect(variant).toMatchObject({ wallpaperId: input.wallpaperId, width: 72, height: 45,
       storageBucket: 'originals', storageKey: `${input.wallpaperId}/variant_80x45.${format === 'jpeg' ? 'jpg' : format}`,
       format: mimeType, createdAt: new Date(input.timestamp) });
     const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: 'originals', Key: variant.storageKey }));
@@ -61,6 +61,29 @@ describe('Stored variant image adapter', () => {
     expect(await tester.s3.objectExists('originals', 'source')).toBe(true);
   });
 
+  it('reports exact output pixels while keeping the preset target identity stable', async () => {
+    const original = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#336699' } }).png().toBuffer();
+    await tester.s3.uploadObject('originals', 'sixteen-nine.png', original);
+    const value: GenerationInput = {
+      ...input, wallpaperId: 'wlpr_exact_pixels', mimeType: 'image/png', width: 1280, height: 720,
+      storage: { bucket: 'originals', key: 'sixteen-nine.png' },
+    };
+    const preset = { width: 854, height: 480, label: '480p' };
+    const generate = VariantImages.use((images) => images.generate(value, preset));
+    const variant = await runtime.runPromise(generate);
+    const location = await resolveAssetReference(tester.s3.getS3Client(), 'asset-references', {
+      owner: 'variant-generator', id: `${value.wallpaperId}:854x480:image/png`,
+    });
+    expect(location).toEqual({ bucket: 'originals', key: `${value.wallpaperId}/variant_854x480.png` });
+    const object = await tester.s3.getS3Client().send(new GetObjectCommand({ Bucket: location.bucket, Key: location.key }));
+    if (!object.Body) throw new Error('Missing stored variant');
+    const bytes = await object.Body.transformToByteArray();
+    const actual = await sharp(bytes).metadata();
+    expect(actual).toMatchObject({ width: 853, height: 480 });
+    expect(variant).toMatchObject({ width: actual.width, height: actual.height, aspectRatio: 853 / 480 });
+    expect(await runtime.runPromise(generate)).toEqual(variant);
+  });
+
   it('does not upscale smaller source pixels', async () => {
     const original = await sharp({ create: { width: 16, height: 10, channels: 3, background: '#ffffff' } }).png().toBuffer();
     await tester.s3.uploadObject('originals', 'source', original);
@@ -71,6 +94,7 @@ describe('Stored variant image adapter', () => {
     const bytes = await object.Body?.transformToByteArray();
     if (!bytes) throw new Error('Missing stored variant');
     expect(await sharp(bytes).metadata()).toMatchObject({ width: 16, height: 10 });
+    expect(variant).toMatchObject({ width: 16, height: 10, aspectRatio: 1.6 });
   });
 
   it.each(['missing', 'corrupt'])('returns typed failure for %s originals', async (key) => {

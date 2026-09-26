@@ -29,9 +29,10 @@ const input: GenerationInput = {
 };
 
 const variant = {
-  wallpaperId: input.wallpaperId, width: 1280, height: 720, aspectRatio: 1280 / 720,
+  target: { width: 854, height: 480 },
+  wallpaperId: input.wallpaperId, width: 853, height: 480, aspectRatio: 853 / 480,
   format: 'image/png' as const, fileSizeBytes: 10, storageBucket: 'wallpapers',
-  storageKey: 'test/1280x720.png', createdAt: new Date(input.timestamp),
+  storageKey: 'test/854x480.png', createdAt: new Date(input.timestamp),
 };
 
 it('awaits durable publication and preserves occurrence identity on replay', async () => {
@@ -58,11 +59,13 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
       eventType: 'wallpaper.variant.uploaded',
       timestamp: input.timestamp,
       variant: {
-        wallpaperId: input.wallpaperId, width: 1280, height: 720,
-        asset: { owner: 'variant-generator', id: 'wallpaper-test:1280x720:image/png' },
+        wallpaperId: input.wallpaperId, width: 853, height: 480, aspectRatio: 853 / 480,
+        asset: { owner: 'variant-generator', id: 'wallpaper-test:854x480:image/png' },
         createdAt: input.timestamp,
       },
     });
+    // The v1 occurrence identity remains the recorded preset target, not the encoded width.
+    expect(publication.eventId).toBe('99e4ce16e144a967c03cf544500c52573ca489f058376cccf7e42efcd027de2d');
     expect(publication.variant).not.toHaveProperty('storageBucket');
     expect(publication.variant).not.toHaveProperty('storageKey');
     expect(message.header.get('ce-specversion')).toBe('1.0');
@@ -71,7 +74,7 @@ it('awaits durable publication and preserves occurrence identity on replay', asy
     expect(message.header.get('ce-causationsource')).toBe(input.occurrence.source);
     expect(message.json()).toMatchObject({ eventId: message.header.get('ce-id') });
     await runtime.runPromise(Effect.flatMap(VariantEvents, (events) => events.publish({
-      input, variant: { ...variant, width: 640, height: 360, storageKey: 'test/640x360.png' },
+      input, variant: { ...variant, target: { width: 640, height: 360 }, width: 640, height: 360, aspectRatio: 640 / 360, storageKey: 'test/640x360.png' },
     })));
     expect((await manager.streams.info('WALLPAPER')).state.messages).toBe(2);
   } finally {

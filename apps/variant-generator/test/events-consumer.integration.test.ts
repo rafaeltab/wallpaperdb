@@ -232,6 +232,7 @@ it('finishes in-flight generation and acknowledges before graceful shutdown clos
         started = true;
         yield* Deferred.await(release);
         const variant = {
+          target: { width: 1, height: 1 },
           wallpaperId: input.wallpaperId, width: 1, height: 1, aspectRatio: 1,
           format: 'image/png' as const, fileSizeBytes: 10, storageBucket: 'wallpapers',
           storageKey: 'wp/variant_1x1.png', createdAt: new Date(input.timestamp),

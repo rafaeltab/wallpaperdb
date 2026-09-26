@@ -34,3 +34,16 @@ export interface PictureCodec {
   >;
 }
 export const PictureCodec = Context.Service<PictureCodec>('wallpaperdb.user.pictures.PictureCodec');
+
+/** Downloads only trusted HTTPS destinations with bounded redirects, bytes and total duration. */
+export interface PictureSource {
+  download(
+    url: string
+  ): Effect.Effect<
+    { readonly _tag: 'Downloaded'; readonly bytes: Buffer } | PictureRejection,
+    PictureUnavailable
+  >;
+}
+export const PictureSource = Context.Service<PictureSource>(
+  'wallpaperdb.user.pictures.PictureSource'
+);

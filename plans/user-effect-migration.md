@@ -89,3 +89,15 @@ The same review work found that Clerk transport exceptions could carry private d
 ## Validation environment
 
 A fresh CRAP run after the first implementation reports zero of 196 functions over 30. This must be repeated after review fixes. The first repository CI attempt collided with a separately launched User coverage job; rerunning without overlapping coverage avoided the missing temporary coverage file. The next run passed all 73 build/check/unit/integration tasks, then the browser auth setup timed out. Its trace contains a Clerk development initialization `Failed to fetch` error before any sign-in POST. Browser validation will be repeated after Docker test activity ends; assertions and retry settings remain unchanged.
+
+## Independent review, round two
+
+Reviewed `fc5d22a50e6678cb119c08ee59dce0d17987b263` against the original base. Standards reported one remaining observability violation; Spec reported zero findings. The deep reviewer reported one false-recovery issue in the new dependency metric.
+
+- Picture address resolution translated a database failure without recording its diagnostic cause. Real PostgreSQL regressions through both public object operations failed because no diagnostic was recorded. The resolver now has an adapter span and records exactly one sanitized SQLSTATE diagnostic.
+- A rejected local source URL or an already-absent picture row incorrectly reset dependency health to healthy without external work. Both failure/no-op/recovery sequences failed before the fix. Only an actual successful download or storage request now records recovery.
+- The follow-up audit found raw vendor diagnostics in event persistence errors. A real publication trigger reproduced a marked diagnostic in logs. Event storage and outbox reads now use the shared safe SQLSTATE translator, and event persistence has explicit adapter spans.
+
+The capability-test split is complete. Profile policy runs through controlled stateful adapters; PostgreSQL tests retain exact history deadlines, typed history references, claim races, atomic snapshots and rollback evidence. Picture policy, HTTP parsing, real storage/lease recovery and production composition use separate suites. HTTP version parsing tests were mutation-checked: temporarily coercing string versions made all four replacement command matrices fail, then the exact source was restored.
+
+Fresh coverage at the second-round head passed 253 tests in 29 files, with zero of 202 functions over CRAP 30. Final checks must include the subsequent observability fixes. Browser sign-in now succeeds without changing assertions or retry configuration, and the repository CI browser suite passes all three tests.

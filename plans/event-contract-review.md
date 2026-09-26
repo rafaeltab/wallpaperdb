@@ -101,3 +101,25 @@ A subsequent assessment at `bec2b1a6` found a validation gap missed by the initi
 The requested follow-up fixes that command and the exposed errors, adds deployed browser regressions for the manually checked cross-service flows, and reduces drift in CloudEvent validation and quarantine mechanics. Reviews of this follow-up compare against `bec2b1a6`.
 
 Deployment and recovery work is tracked in [issue #236](https://github.com/rafaeltab/wallpaperdb/issues/236). Profile editing concurrency and cache ownership are tracked in [issue #237](https://github.com/rafaeltab/wallpaperdb/issues/237).
+
+### Web typechecking
+
+Commits `a749f1d0`, `c39fca6d`, and `a305ace5` fix the production and test diagnostics and change Web's build and check commands to `tsc -b`. The filter now narrows ratio-bearing options before reading their ratio, and the persistent-state hook exposes its existing functional setter behavior in its return type. Test fixtures satisfy their actual discriminated types; no diagnostic suppression was added.
+
+The command regression copies the real Makefile and Web project configuration into an isolated temporary workspace. It proves valid application, test, and Vite fixtures pass, that each invalid fixture produces TS2322, and that restored fixtures pass again. It failed against the old command and passed after the fix. Its private fixtures and build information never alter the live workspace. All 23 Make tests, 114 focused Web tests, the final default typecheck, lint, and production build passed.
+
+### Deployed browser regressions
+
+Commits `fd1c927d`, `650df3e3`, and `da59c4ec` add two deployed journeys and include E2E specs in the workspace's typecheck. The catalogue journey follows a fresh random-pixel upload through its public projection, verifies actual variant dimensions, filters its catalogue entry, opens accessible details with the keyboard, and returns from the upload notification to the intact queue. Existing catalogue entries cannot satisfy the new upload's projection assertions.
+
+The Profile journey creates a disposable Clerk test owner, signs in through the UI, uploads a picture, checks settings and anonymous public delivery, removes it, and verifies the retired URL returns 404 with `Cache-Control: no-store`. Its fixture rejects production keys before requests and deletes only its own returned user ID, including after journey failures. Ten lifecycle regressions cover creation, cleanup, and failure handling; all 24 E2E workspace tests passed.
+
+Both journeys passed against `make infra-start` and the running `make dev` stack. Temporary fault injection made them fail when a 640×360 image was served under an 853×480 URL and when a retired picture remained accessible. After removing the fault hooks, both passed again (three Playwright tests including authentication setup, 18.2 seconds). The committed specs contain no service mocks or request interception. Browser recordings are documented in [the evidence directory](../docs/review-evidence/event-contracts/README.md).
+
+### Shared event and quarantine contracts
+
+Commit `525cdbbd` moves envelope reconciliation into `@wallpaperdb/events/envelope`. Each application retains its payload decoder, accepted source/time policy, domain translation, and delivery behavior. A shared 31-case matrix exercises Gateway, Media, User, Color Extractor, and Variant Generator at their public boundaries. It first exposed eight cases where repeated binary headers silently selected the first value. Shared and existing translation tests then passed: 258 focused tests across six workspaces. All seven affected workspaces passed build, lint, and type checks. `d19edd35` aligns User assertions with the telemetry testing policy.
+
+Commits `c9297271` and `484ff026` put pure quarantine planning, identity, receipt matching, and replay decoding in `@wallpaperdb/core/quarantine`. Applications still own resources, stream retention, retries, repair publication IDs, interruption, and acknowledgement. Real broker regressions first demonstrated lost repeated headers and accepted legacy receipts missing replay metadata. Receipts now require matching bytes and complete CloudEvent values; incomplete legacy receipts use the existing repair path before the input is acknowledged.
+
+Header-heavy inputs revealed a further capacity failure: an original broker-accepted message could no longer fit after quarantine metadata was added. The planner now respects both the complete message budget and JetStream's 64 KiB header limit. Its versioned `original-message-v1` frame archives all original header arrays and bytes inside bounded chunks; ordinary record formats and IDs remain unchanged. Replay validates bounded manifests, counts, lengths, SHA-256, header arrays, and canonical base64. It restores CloudEvent and trace headers without reusing stale broker publication controls. The final focused suites passed 88 tests: Core 25, Color 16, Variant 23, and Media 24, plus all four workspace checks.

@@ -46,6 +46,7 @@ function setup(ids = ['a_failed', 'b_healthy']) {
       reason: 'picture-source-rejected',
       message: 'Source was removed',
     });
+  let codec: PictureCodec['process'] = unexpected;
   const store: PictureStore = {
     createCandidate: unexpected,
     beginUpload: unexpected,
@@ -109,7 +110,7 @@ function setup(ids = ['a_failed', 'b_healthy']) {
         Layer.mergeAll(
           Layer.succeed(PictureStore, store),
           Layer.succeed(PictureObjects, { put: unexpected, delete: unexpected }),
-          Layer.succeed(PictureCodec, { process: unexpected }),
+          Layer.succeed(PictureCodec, { process: (bytes) => Effect.suspend(() => codec(bytes)) }),
           Layer.succeed(PictureSource, {
             download: (url) =>
               Effect.suspend(() => {
@@ -140,6 +141,9 @@ function setup(ids = ['a_failed', 'b_healthy']) {
     settlementFailures,
     downloads,
     settlements,
+    codec: (next: PictureCodec['process']) => {
+      codec = next;
+    },
     source: (next: PictureSource['download']) => {
       source = next;
     },
@@ -181,5 +185,117 @@ describe('Initial picture import decisions', () => {
     test.claimFailures.delete('a_000');
     expect(await test.run()).toEqual({ failed: 99 });
     expect(test.jobs.get('a_000')?.status).toBe('complete');
+  });
+  it.each([
+    'source-not-found',
+    'invalid-picture',
+  ])('completes %s imports permanently without staging or adopting a picture', async (failure) => {
+    const test = setup(['owner']);
+    if (failure === 'invalid-picture') {
+      test.source(() => Effect.succeed({ _tag: 'Downloaded', bytes: Buffer.from('<svg/>') }));
+      test.codec(() =>
+        Effect.succeed({
+          _tag: 'Rejected',
+          reason: 'invalid-picture',
+          message: 'Unsupported image',
+        })
+      );
+    }
+    expect(await test.run()).toEqual({ failed: 0 });
+    expect(test.settlements).toMatchObject([{ permanent: true, job: { profileId: 'owner' } }]);
+    await test.run();
+    expect(test.downloads).toEqual(['https://img.clerk.com/owner?secret=captured']);
+  });
+
+  it('persists first retry backoff without preventing another due import from completing', async () => {
+    const test = setup();
+    test.source((url) =>
+      url.includes('a_failed')
+        ? unavailable('download-picture')
+        : Effect.succeed({
+            _tag: 'Rejected',
+            reason: 'picture-source-rejected',
+            message: 'Removed image',
+          })
+    );
+    expect(await test.run()).toEqual({ failed: 1 });
+    expect(test.settlements).toMatchObject([
+      {
+        permanent: false,
+        nextAttemptAt: new Date(1000),
+        job: { profileId: 'a_failed', attempts: 0 },
+      },
+      { permanent: true, job: { profileId: 'b_healthy' } },
+    ]);
+    expect(test.jobs.get('a_failed')?.sourceUrl).toBe(
+      'https://img.clerk.com/a_failed?secret=captured'
+    );
+    await test.tick(999);
+    await test.run();
+    expect(test.downloads).toHaveLength(2);
+    await test.tick(1);
+    test.source(() =>
+      Effect.succeed({
+        _tag: 'Rejected',
+        reason: 'picture-source-rejected',
+        message: 'Removed image',
+      })
+    );
+    expect(await test.run()).toEqual({ failed: 0 });
+    expect(test.downloads).toHaveLength(3);
+    expect(test.settlements.at(-1)).toMatchObject({
+      permanent: true,
+      job: { profileId: 'a_failed', attempts: 1 },
+    });
+  });
+
+  it('retries attempt eleven, settles attempt twelve, and never downloads an exhausted import again', async () => {
+    const test = setup(['owner']);
+    const job = test.jobs.get('owner');
+    if (!job) throw new Error('Expected the import');
+    job.attempts = 10;
+    test.source(() => unavailable('download-picture'));
+    expect(await test.run()).toEqual({ failed: 1 });
+    expect(test.settlements).toMatchObject([
+      { permanent: false, nextAttemptAt: new Date(1_024_000), job: { attempts: 10 } },
+    ]);
+    await test.tick(1_024_000);
+    expect(await test.run()).toEqual({ failed: 1 });
+    expect(test.settlements.at(-1)).toMatchObject({ permanent: true, job: { attempts: 11 } });
+    await test.tick(3_600_000);
+    await test.run();
+    expect(test.downloads).toHaveLength(2);
+  });
+
+  it('settles already exhausted legacy work without accessing its private source', async () => {
+    const test = setup(['owner']);
+    const job = test.jobs.get('owner');
+    if (!job) throw new Error('Expected the import');
+    job.attempts = 12;
+    expect(await test.run()).toEqual({ failed: 0 });
+    expect(test.downloads).toEqual([]);
+    expect(test.settlements).toMatchObject([{ permanent: true, job: { attempts: 12 } }]);
+  });
+
+  it('starts each lease from the current time after a slow preceding import', async () => {
+    const test = setup();
+    const leases: number[] = [];
+    test.source((url) =>
+      Effect.gen(function* () {
+        if (url.includes('a_failed')) yield* TestClock.adjust(120_000);
+        else {
+          const job = test.jobs.get('b_healthy');
+          if (!job) throw new Error('Expected the second import');
+          leases.push(job.leaseUntil.getTime());
+        }
+        return {
+          _tag: 'Rejected',
+          reason: 'picture-source-rejected',
+          message: 'Removed image',
+        } as const;
+      })
+    );
+    expect(await test.run()).toEqual({ failed: 0 });
+    expect(leases).toEqual([181_000]);
   });
 });

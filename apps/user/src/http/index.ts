@@ -1,5 +1,6 @@
 import { Execution, executionLayer, type HttpServices } from './execution.js';
 import { registerProfileRoutes } from './profile.js';
+import { registerPictureRoutes } from './pictures.js';
 import { problem } from './problem.js';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { Effect, Layer, ManagedRuntime } from 'effect';
@@ -13,6 +14,8 @@ export interface HttpConfig {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly port: number;
   readonly clerkSecretKey?: string;
+  readonly profilePictureMaxBytes?: number;
+  readonly userMediaServiceToken?: string;
 }
 export interface ConnectionsState {
   isShuttingDown: boolean;
@@ -99,13 +102,22 @@ export async function createHttpApp<E>(
   });
   app.setErrorHandler((error, request, reply) => {
     reply.header('Cache-Control', 'no-store');
+    const transport = z
+      .object({ statusCode: z.number().int().min(400).max(499), code: z.string() })
+      .safeParse(error);
     const status =
-      typeof error.statusCode === 'number' &&
-      error.statusCode >= 400 &&
-      error.statusCode < 500 &&
-      Object.hasOwn(Fastify.errorCodes, error.code)
-        ? error.statusCode
+      transport.success &&
+      (Object.hasOwn(Fastify.errorCodes, transport.data.code) ||
+        [
+          'FST_REQ_FILE_TOO_LARGE',
+          'FST_FILES_LIMIT',
+          'FST_FIELDS_LIMIT',
+          'FST_PARTS_LIMIT',
+          'FST_INVALID_MULTIPART_CONTENT_TYPE',
+        ].includes(transport.data.code))
+        ? transport.data.statusCode
         : 500;
+    const oversized = transport.success && transport.data.code === 'FST_REQ_FILE_TOO_LARGE';
     if (status === 500) request.log.error({ err: error }, 'User request failed');
     return reply
       .code(status)
@@ -113,8 +125,13 @@ export async function createHttpApp<E>(
       .send(
         problem(
           status,
-          status === 500 ? 'generic-server' : 'invalid-request',
-          status === 500 ? 'Internal server error' : 'Invalid request'
+          oversized ? 'picture-too-large' : status === 500 ? 'generic-server' : 'invalid-request',
+          oversized
+            ? 'Picture too large'
+            : status === 500
+              ? 'Internal server error'
+              : 'Invalid request',
+          oversized ? 'Picture exceeds the upload byte limit' : undefined
         )
       );
   });
@@ -134,6 +151,7 @@ export async function createHttpApp<E>(
       description: 'Profile commands and current picture availability.',
     });
     registerProfileRoutes(app, execution);
+    await registerPictureRoutes(app, execution, config);
     app.get('/health', { config: { skipAuth: true } }, (request, reply) =>
       execution.run(
         Availability.use((service) => service.health(app.connectionsState.isShuttingDown)).pipe(

@@ -9,6 +9,22 @@ import {
 } from '../profile/index.js';
 import type { Execution } from './execution.js';
 import { problem } from './problem.js';
+const titles: Record<RejectionReason, string> = {
+  unauthorized: 'Unauthorized',
+  'invalid-display-name': 'Invalid Display name',
+  'invalid-biography': 'Invalid Biography',
+  'unavailable-biography-wallpaper': 'Wallpaper unavailable',
+  'invalid-handle': 'Invalid Handle',
+  'invalid-alias-command': 'Invalid alias command',
+  'ineligible-handle': 'Handle is not eligible',
+  'alias-limit': 'Retained alias limit reached',
+  'alias-not-found': 'Alias not found',
+  'alias-not-scheduled': 'Alias not scheduled',
+  'handle-unavailable': 'Handle unavailable',
+  'handle-cooldown': 'Handle change cooldown',
+  'version-conflict': 'Profile version conflict',
+  'picture-unavailable': 'Picture unavailable',
+};
 const rejectionStatus: Record<RejectionReason, number> = {
   unauthorized: 401,
   'invalid-display-name': 400,
@@ -34,10 +50,15 @@ export function sendProfile(reply: FastifyReply, outcome: ProfileOutcome) {
     .send({
       ...problem(
         status,
-        outcome.reason === 'version-conflict' ? 'profile-version-conflict' : outcome.reason,
-        'Profile command rejected',
+        outcome.reason === 'version-conflict'
+          ? 'profile-version-conflict'
+          : outcome.reason === 'unavailable-biography-wallpaper'
+            ? 'unavailable-wallpaper'
+            : outcome.reason,
+        titles[outcome.reason],
         outcome.message
       ),
+      instance: reply.request.url,
       ...(outcome.retryable === undefined ? {} : { retryable: outcome.retryable }),
       ...(outcome.nextHandleChangeAt
         ? { nextHandleChangeAt: outcome.nextHandleChangeAt.toISOString() }
@@ -63,19 +84,22 @@ export function profileCommand(
       Profiles.use((profiles) => operation(profiles, principal, request)).pipe(
         Effect.match({
           onSuccess: (result) => sendProfile(reply, result),
-          onFailure: (failure) =>
-            reply
-              .code(503)
+          onFailure: (failure) => {
+            const identity = failure.operation === 'identity-lookup';
+            const status = identity ? 503 : 500;
+            return reply
+              .code(status)
               .type('application/problem+json')
-              .send(
-                problem(
-                  503,
-                  failure.operation === 'identity-lookup'
-                    ? 'identity-unavailable'
-                    : 'profile-unavailable',
-                  'Profile service unavailable'
-                )
-              ),
+              .send({
+                ...problem(
+                  status,
+                  identity ? 'identity-unavailable' : 'generic-server',
+                  identity ? 'Identity service unavailable' : 'Internal server error',
+                  identity ? 'Clerk identity lookup failed' : undefined
+                ),
+                instance: request.url,
+              });
+          },
         })
       ),
       request,

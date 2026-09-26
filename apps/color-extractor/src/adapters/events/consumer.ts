@@ -3,10 +3,11 @@ import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Cause, Clock, Context, Effect, Fiber, Layer, Ref, Schema, Stream } from 'effect';
-import { AckPolicy, DiscardPolicy, headers, StorageType, type JsMsg } from 'nats';
+import { AckPolicy, headers, type JsMsg } from 'nats';
 import { ExtractColors, ExtractionUnavailable } from '../../extraction/index.js';
 import { broker, NatsBroker, type NatsEventsOptions } from './broker.js';
 import { translateUpload } from './translation.js';
+import { ensureQuarantine } from './quarantine.js';
 
 export interface ConsumerHealth {
   check(): Effect.Effect<boolean>;
@@ -194,20 +195,7 @@ export function natsConsumerLayer(
       const brokerService = yield* NatsBroker;
       const { client, manager, connection } = brokerService;
       const extractor = yield* ExtractColors;
-      yield* broker('inspect-quarantine', () => manager.streams.info(quarantineStream)).pipe(
-        Effect.catchIf(
-          (error) => notFound(error.cause),
-          () =>
-            broker('create-quarantine', () =>
-              manager.streams.add({
-                name: quarantineStream,
-                subjects: [quarantineSubject],
-                storage: StorageType.File,
-                discard: DiscardPolicy.New,
-              })
-            )
-        )
-      );
+      yield* ensureQuarantine(brokerService);
       const config = {
         durable_name: durable,
         ack_policy: AckPolicy.Explicit,

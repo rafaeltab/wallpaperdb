@@ -1,3 +1,4 @@
+import { CreateBucketCommand } from '@aws-sdk/client-s3';
 import { registerAssetReference } from '@wallpaperdb/core/assets';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import {
@@ -11,7 +12,12 @@ import { ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
-import { CatalogOutbox, CatalogProjection, type ProjectionInput } from '../src/catalog/index.js';
+import {
+  CatalogHealth,
+  CatalogOutbox,
+  CatalogProjection,
+  type ProjectionInput,
+} from '../src/catalog/index.js';
 import { Catalog } from '../src/delivery/index.js';
 
 const timestamp = '2026-09-24T10:00:00.000Z';
@@ -53,6 +59,30 @@ describe('Catalog immutable asset reference contract', () => {
     await pool?.end();
     await postgres?.stop();
     await storage.destroy();
+  });
+
+  it('reports missing asset reference storage and recovers when restored', async () => {
+    const s3 = storage.getS3();
+    const referenceBucket = 'recovered-health-references';
+    const isolated = ManagedRuntime.make(
+      CatalogPostgresLayer({
+        databaseUrl: postgres.getConnectionUri(),
+        assetReferences: {
+          endpoint: s3.endpoints.fromHost,
+          region: 'us-east-1',
+          accessKeyId: s3.options.accessKey,
+          secretAccessKey: s3.options.secretKey,
+          bucket: referenceBucket,
+        },
+      })
+    );
+    try {
+      expect(await isolated.runPromise(CatalogHealth.use((health) => health.check))).toBe(false);
+      await storage.s3.getS3Client().send(new CreateBucketCommand({ Bucket: referenceBucket }));
+      expect(await isolated.runPromise(CatalogHealth.use((health) => health.check))).toBe(true);
+    } finally {
+      await isolated.dispose();
+    }
   });
 
   it('resolves an immutable original reference before persisting its delivery location', async () => {

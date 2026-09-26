@@ -52,6 +52,14 @@ test('browser E2E always executes against the current deployed environment', () 
     'source hashes cannot prove that the deployed application, infrastructure, and credentials are unchanged');
 });
 
+test('typecheck cache inputs include test files compiled by the workspace', () => {
+  const task = plannedTask('check-types', 'media', 'check-types');
+  const tsconfig = JSON.parse(readFileSync('apps/media/tsconfig.json', 'utf8'));
+  assert.ok(tsconfig.include.includes('test/**/*'));
+  assert.ok(Object.hasOwn(task.inputs, 'test/catalog-postgres.test.ts'),
+    'test-only TypeScript errors must invalidate a cached successful typecheck');
+});
+
 test('CRAP commands pass the optional workspace selector to the shared analyzer', () => {
   for (const target of ['crap', 'check-crap']) {
     assert.match(output(target, 'PACKAGE=ingestor'), /PACKAGE="ingestor".*scripts\/crap\.mts/);

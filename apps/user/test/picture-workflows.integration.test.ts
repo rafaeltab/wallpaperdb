@@ -118,6 +118,7 @@ describe('Profile picture transactions and recovery', () => {
       s3AccessKeyId: s3.options.accessKey,
       s3SecretAccessKey: s3.options.secretKey,
       s3Region: 'us-east-1',
+      assetReferenceBucket: 'asset-references',
       profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024,
       profilePictureMaxPixels: 16_000_000,

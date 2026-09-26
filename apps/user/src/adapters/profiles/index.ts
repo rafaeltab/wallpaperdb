@@ -4,11 +4,13 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { ulid } from 'ulid';
 import { handleClaims, outboxEvents, profiles, profilePictureAssets, profilePictureImports, wallpaperOwnership } from '../../db/schema.js';
-import { ProfileStore, ProfileUnavailable, reject, versionConflict, type Profile, type OwnerProfile, type ProfilePolicy, type ProfileOutcome, type ProfileMutation } from '../../profile/index.js';
+import { ProfileStore, ProfileUnavailable, describeOwnerProfile, reject, versionConflict, type Profile, type OwnerProfile, type ProfilePolicy, type ProfileOutcome, type ProfileMutation } from '../../profile/index.js';
 import { Database } from '../database/index.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 
 type Db = Parameters<Parameters<Database['run']>[0]>[0];
+class DecisionDefect { constructor(readonly cause: unknown) {} }
+class ProfileInvariant extends Error {}
 type TraceMetadata = { traceParent: string | null; traceState: string | null };
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 const retentionMs = (policy: ProfilePolicy) => policy.profileEvidenceRetentionDays * 86400000;
@@ -24,15 +26,13 @@ async function aliases(reader: ProfileReader, profileId: string): Promise<OwnerP
 async function ownerProfile(reader: ProfileReader, profile: Profile, policy: ProfilePolicy, now: Date): Promise<OwnerProfile> {
   const pictureImport = await reader.query.profilePictureImports.findFirst({ where: eq(profilePictureImports.profileId, profile.id), columns: { status: true } });
   const activeAliases = await aliases(reader, profile.id);
-  const retained = new Set(activeAliases.filter(alias => alias.expiresAt === null).map(alias => alias.handle));
-  const history = (await recentHistoricalHandles(reader, profile.id, now, retentionMs(policy))).filter(entry => entry.handle !== profile.handle && !retained.has(entry.handle));
+  const history = await recentHistoricalHandles(reader, profile.id, now, retentionMs(policy));
   const claims = history.length ? await reader.query.handleClaims.findMany({ where: inArray(handleClaims.handle, history.map(entry => entry.handle)), columns: { handle: true, profileId: true } }) : [];
-  const claimed = new Set(claims.filter(claim => claim.profileId !== profile.id).map(claim => claim.handle));
-  return { ...profile, biographyMaxLength: policy.profileBiographyMaxLength, retainedAliasLimit: policy.profileRetainedAliasLimit, pictureImportStatus: pictureImport?.status ?? 'complete', pictureUploadLimits: { maxBytes: policy.profilePictureMaxBytes, maxPixels: policy.profilePictureMaxPixels, maxDecodedBytes: policy.profilePictureMaxDecodedBytes }, aliases: activeAliases, historicalHandles: history.map(entry => ({ ...entry, unavailableReason: claimed.has(entry.handle) ? 'claimed' : retained.size >= policy.profileRetainedAliasLimit ? 'alias-limit' : null })) };
+  return describeOwnerProfile(profile, activeAliases, history, claims, pictureImport?.status ?? 'complete', policy);
 }
 async function appendEvent(tx: Transaction, profile: Profile, change: ProfileUpdatedEvent['change'] | { type: 'created' }, now: Date, metadata: TraceMetadata) {
   const claim = await tx.query.handleClaims.findFirst({ where: and(eq(handleClaims.handle, profile.handle), eq(handleClaims.profileId, profile.id), eq(handleClaims.kind, 'profile')) });
-  if (!claim) throw new Error('Current Profile Handle claim is missing');
+  if (!claim) throw new ProfileInvariant('Current Profile Handle claim is missing');
   const snapshot = { id: profile.id, displayName: profile.displayName, handle: profile.handle, claimGeneration: claim.claimGeneration, aliases: await aliases(tx, profile.id), biographyMarkdown: profile.biographyMarkdown, pictureAssetId: profile.pictureAssetId, version: profile.version, createdAt: profile.createdAt.toISOString(), updatedAt: profile.updatedAt.toISOString() };
   const occurrence = { eventId: `evt_${ulid()}`, timestamp: now.toISOString(), profile: snapshot };
   const event: ProfileCreatedEvent | ProfileUpdatedEvent = change.type === 'created' ? ProfileCreatedEventSchema.parse({ ...occurrence, eventType: PROFILE_CREATED_SUBJECT, change }) : ProfileUpdatedEventSchema.parse({ ...occurrence, eventType: PROFILE_UPDATED_SUBJECT, change });
@@ -46,7 +46,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
       onFailure: (): TraceMetadata => ({ traceParent: null, traceState: null }),
       onSuccess: (span): TraceMetadata => ({ traceParent: `00-${span.traceId}-${span.spanId}-${span.sampled ? '01' : '00'}`, traceState: trace.getSpanContext(context.active())?.traceState?.serialize() ?? null }),
     }));
-    return yield* Effect.tryPromise({ try: signal => database.run(db => use(db, metadata), signal), catch: cause => new ProfileUnavailable({ operation: name, cause }) });
+    return yield* Effect.tryPromise({ try: signal => database.run(db => use(db, metadata), signal), catch: cause => new ProfileUnavailable({ operation: name, cause }) }).pipe(Effect.catchTag('ProfileUnavailable', failure => failure.cause instanceof DecisionDefect ? Effect.die(failure.cause.cause) : failure.cause instanceof ProfileInvariant ? Effect.die(failure.cause) : Effect.fail(failure)));
   });
   const adapter: ProfileStore = {
     read: (profileId, now) => operation('read-profile', db => db.transaction(async tx => {
@@ -59,7 +59,7 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           const [raced] = await tx.select().from(profiles).where(eq(profiles.id, input.profileId)).for('share');
           if (raced) return ownerProfile(tx, raced, policy, input.now);
           const [profile] = await tx.insert(profiles).values({ id: input.profileId, displayName: input.displayName, handle: input.handle, version: 1, createdAt: input.now, updatedAt: input.now }).returning();
-          if (!profile) throw new Error('Profile insert returned no row');
+          if (!profile) throw new ProfileInvariant('Profile insert returned no row');
           await tx.insert(handleClaims).values({ handle: input.handle, profileId: input.profileId, kind: 'profile' });
           if (input.imageUrl) await tx.insert(profilePictureImports).values({ profileId: input.profileId, sourceUrl: input.imageUrl, createdAt: input.now, nextAttemptAt: input.now });
           await appendEvent(tx, profile, { type: 'created' }, input.now, metadata);
@@ -78,7 +78,9 @@ export const profileStoreLayer = (policy: ProfilePolicy) => Layer.effect(Profile
           const [importJob] = await tx.select().from(profilePictureImports).where(eq(profilePictureImports.profileId, query.profileId)).for('update');
           const [asset] = query.assetId ? await tx.select().from(profilePictureAssets).where(eq(profilePictureAssets.id, query.assetId)).for('update') : [];
           const eligibleHandles = (await recentHistoricalHandles(tx, current.id, query.now, retentionMs(policy))).map(entry => entry.handle);
-          const decision = decide({ profile, eligibleHandles, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null });
+          const snapshot = { profile, eligibleHandles, targetClaim: targetClaim ?? null, wallpaperOwners, asset: asset ?? null, importJob: importJob ?? null };
+          let decision;
+          try { decision = decide(snapshot); } catch (cause) { throw new DecisionDefect(cause); }
           if (decision._tag === 'Rejected') return { outcome: decision, changed: false };
           if (decision._tag === 'Unchanged') return { outcome: { _tag: 'Success', profile } satisfies ProfileOutcome, changed: false };
           const { updated, change } = await applyMutation(tx, current, decision.mutation, query.now, policy);
@@ -142,7 +144,7 @@ async function applyMutation(tx: Transaction, current: Profile, mutation: Profil
     }
   }
   const [updated] = await tx.update(profiles).set(changes).where(eq(profiles.id, current.id)).returning();
-  if (!updated) throw new Error('Locked Profile disappeared');
+  if (!updated) throw new ProfileInvariant('Locked Profile disappeared');
   return { updated, change };
 }
 

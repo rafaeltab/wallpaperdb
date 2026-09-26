@@ -1,4 +1,5 @@
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
+import { z } from 'zod';
 
 class ProfilePictureTooLargeError extends Error {}
 class InvalidProfilePictureError extends Error {}
@@ -30,20 +31,50 @@ function hasPngAnimation(input: Buffer): boolean {
   return false;
 }
 
+function validateEncodedPicture(input: Buffer, limits: PictureLimits): void {
+  if (input.length > limits.maxBytes)
+    throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
+  if (!hasSupportedSignature(input))
+    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  if (hasPngAnimation(input))
+    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+}
+
+function hasSupportedSignature(input: Buffer): boolean {
+  const signature = input.subarray(0, 8).toString('hex');
+  if (signature.startsWith('ffd8ff')) return true;
+  if (signature === '89504e470d0a1a0a') return true;
+  return input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP';
+}
+
+function validateStillFormat(metadata: Metadata): void {
+  if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? ''))
+    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
+  if (metadata.pages !== undefined && metadata.pages > 1)
+    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+  if (metadata.loop !== undefined || metadata.delay !== undefined)
+    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+}
+
+function decodedByteCount(metadata: Metadata, pixels: number): number {
+  const bytesPerSample = ['ushort', 'short'].includes(metadata.depth) ? 2 : 1;
+  return pixels * (metadata.channels ?? 4) * bytesPerSample;
+}
+
+function validatePictureMetadata(metadata: Metadata, limits: PictureLimits): void {
+  validateStillFormat(metadata);
+  const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
+  if (!pixels || pixels > limits.maxPixels)
+    throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
+  if (decodedByteCount(metadata, pixels) > limits.maxDecodedBytes)
+    throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
+}
+
 async function processProfilePicture(
   input: Buffer,
   limits: PictureLimits
 ): Promise<ProcessedPicture> {
-  if (input.length > limits.maxBytes)
-    throw new ProfilePictureTooLargeError('Picture exceeds the upload byte limit');
-  const supported =
-    (input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff) ||
-    input.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-    (input.toString('ascii', 0, 4) === 'RIFF' && input.toString('ascii', 8, 12) === 'WEBP');
-  if (!supported)
-    throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
-  if (hasPngAnimation(input))
-    throw new InvalidProfilePictureError('Animated pictures are not accepted');
+  validateEncodedPicture(input, limits);
   try {
     const decoder = sharp(input, {
       limitInputPixels: limits.maxPixels,
@@ -51,19 +82,7 @@ async function processProfilePicture(
       sequentialRead: true,
     });
     const metadata = await decoder.metadata();
-    if (!['jpeg', 'png', 'webp'].includes(metadata.format ?? '')) {
-      throw new InvalidProfilePictureError('Only JPEG, PNG, and WebP pictures are accepted');
-    }
-    if ((metadata.pages ?? 1) > 1 || metadata.loop !== undefined || metadata.delay !== undefined) {
-      throw new InvalidProfilePictureError('Animated pictures are not accepted');
-    }
-    const pixels = (metadata.width ?? 0) * (metadata.height ?? 0);
-    if (!pixels || pixels > limits.maxPixels)
-      throw new InvalidProfilePictureError('Picture exceeds the pixel limit');
-    const bytesPerSample = metadata.depth === 'ushort' || metadata.depth === 'short' ? 2 : 1;
-    if (pixels * (metadata.channels ?? 4) * bytesPerSample > limits.maxDecodedBytes) {
-      throw new InvalidProfilePictureError('Picture exceeds the decoded byte limit');
-    }
+    validatePictureMetadata(metadata, limits);
     const result = await decoder
       .rotate()
       .webp({ quality: 85 })
@@ -85,10 +104,10 @@ async function processProfilePicture(
 }
 
 // The child owns libvips and receives only bounded bytes and validated limits.
-const limitsSchema = (await import('zod')).z.object({
-  maxBytes: (await import('zod')).z.number().int().positive(),
-  maxPixels: (await import('zod')).z.number().int().positive(),
-  maxDecodedBytes: (await import('zod')).z.number().int().positive(),
+const limitsSchema = z.object({
+  maxBytes: z.number().int().positive(),
+  maxPixels: z.number().int().positive(),
+  maxDecodedBytes: z.number().int().positive(),
 });
 try {
   const limits = limitsSchema.parse(JSON.parse(process.argv[2] ?? 'null'));

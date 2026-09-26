@@ -1,4 +1,4 @@
-import { planQuarantine } from '@wallpaperdb/core/quarantine';
+import { planQuarantine, decodeQuarantineReplay } from '@wallpaperdb/core/quarantine';
 import { uploadEnvelopeConformance } from '@wallpaperdb/test-utils/event-contracts';
 import {
   createDefaultTesterBuilder,
@@ -640,24 +640,24 @@ it.each([
       const stored = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
         last_by_subj: 'color-extractor.quarantine',
       });
-      const restored = headers();
-      for (const key of originalHeaders.keys()) {
-        expect(stored.header.values(`original-${key}`)).toEqual(originalHeaders.values(key));
-        for (const value of stored.header.values(`original-${key}`)) restored.append(key, value);
-      }
-      payload =
+      const chunks =
         mode === 'single'
-          ? stored.data
-          : Buffer.concat(
-              await Promise.all(
-                decodeManifest(stored.json()).sequences.map(
-                  async (seq) =>
-                    (await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', { seq })).data
-                )
+          ? []
+          : await Promise.all(
+              decodeManifest(stored.json()).sequences.map(
+                async (seq) =>
+                  (await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', { seq })).data
               )
             );
+      const restored = decodeQuarantineReplay(
+        { data: stored.data, headers: stored.header },
+        chunks
+      );
+      for (const key of originalHeaders.keys())
+        expect(restored.headers.values(key)).toEqual(originalHeaders.values(key));
+      payload = restored.data;
       expect(Buffer.from(payload)).toEqual(Buffer.from(originalBytes));
-      metadata = restored;
+      metadata = restored.headers;
       expect(calls).toBe(0);
     }
   } finally {
@@ -741,5 +741,67 @@ it('repairs a deduplicated legacy quarantine receipt that lost repeated headers'
   } finally {
     await initialize.dispose();
     await replay.dispose();
+  }
+});
+
+it('durably quarantines an accepted input whose original headers nearly fill the broker header limit', async () => {
+  const fixture = uploadEnvelopeConformance().find(
+    (entry) => entry.name === 'repeated binary source'
+  );
+  if (!fixture?.metadata) throw new Error('Missing ambiguous-envelope fixture');
+  const metadata = fixture.metadata;
+  const connection = await tester.nats.getConnection();
+  const limit = Math.min(connection.info?.max_payload ?? 0, 64 * 1024);
+  if (!limit) throw new Error('Missing broker limit');
+  metadata.set('ce-customextension', '');
+  const remaining = limit - fixture.payload.byteLength - Buffer.byteLength(metadata.toString()) - 1;
+  metadata.set('ce-customextension', 'x'.repeat(remaining));
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'header-budget-contract',
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: () => Effect.die('Ambiguous input reached capability'),
+        })
+      )
+    )
+  );
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const ack = await connection
+      .jetstream()
+      .publish('wallpaper.uploaded', fixture.payload, { headers: metadata });
+    const manager = await connection.jetstreamManager();
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .ack_floor.stream_seq,
+        { timeout: 5000 }
+      )
+      .toBe(ack.seq);
+    const stored = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+      last_by_subj: 'color-extractor.quarantine',
+    });
+    expect(stored.json()).toMatchObject({ encoding: 'original-message-v1' });
+    expect(stored.header.get('ce-id')).toContain(':original-message-v1:');
+    const manifest = decodeManifest(stored.json());
+    const chunks = await Promise.all(
+      manifest.sequences.map(
+        async (seq) =>
+          (await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', { seq })).data
+      )
+    );
+    const replay = decodeQuarantineReplay({ data: stored.data, headers: stored.header }, chunks);
+    expect(Buffer.from(replay.data)).toEqual(Buffer.from(fixture.payload));
+    for (const key of metadata.keys())
+      expect(replay.headers.values(key)).toEqual(metadata.values(key));
+  } finally {
+    await runtime.dispose();
   }
 });

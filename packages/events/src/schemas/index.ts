@@ -4,6 +4,8 @@ export {
   createEventSchema,
 } from "./base-event.js";
 
+export { AssetReferenceSchema, type AssetReference } from "./asset-reference.js";
+
 export {
   WallpaperUploadedEventSchema,
   WallpaperUploadedCloudEventSchema,

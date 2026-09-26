@@ -1,11 +1,38 @@
 import { z } from "zod";
 import { PublicProfileSnapshotSchema } from "./profile-created.js";
+import { AssetReferenceSchema } from "./asset-reference.js";
 
 const ProfileDetailsSchema = z
   .object({ displayName: z.string().min(1), biographyMarkdown: z.string() })
   .strict();
 
 export const PROFILE_UPDATED_SUBJECT = "profile.updated" as const;
+
+const pictureMetadata = z.object({
+  id: z.string().min(1),
+  mimeType: z.literal("image/webp"),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  fileSizeBytes: z.number().int().positive(),
+});
+const pictureAsset = z.union([
+  pictureMetadata
+    .extend({
+      reference: AssetReferenceSchema.extend({ owner: z.literal("user") }),
+    })
+    .strict()
+    .refine(
+      (asset) => asset.reference.id === asset.id,
+      "Picture reference must match asset identity"
+    ),
+  pictureMetadata
+    .extend({
+      reference: z.undefined().optional(),
+      storageBucket: z.string().min(1),
+      storageKey: z.string().min(1),
+    })
+    .strict(),
+]);
 
 export const ProfileUpdatedEventSchema = z
   .object({
@@ -29,18 +56,7 @@ export const ProfileUpdatedEventSchema = z
           before: z.string().min(1).nullable(),
           after: z.string().min(1).nullable(),
           source: z.enum(["upload", "clerk-import", "remove"]),
-          asset: z
-            .object({
-              id: z.string().min(1),
-              storageBucket: z.string().min(1),
-              storageKey: z.string().min(1),
-              mimeType: z.literal("image/webp"),
-              width: z.number().int().positive(),
-              height: z.number().int().positive(),
-              fileSizeBytes: z.number().int().positive(),
-            })
-            .strict()
-            .nullable(),
+          asset: pictureAsset.nullable(),
         })
         .strict(),
       z

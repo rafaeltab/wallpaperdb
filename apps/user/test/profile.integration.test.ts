@@ -1,4 +1,3 @@
-import { CreateBucketCommand } from '@aws-sdk/client-s3';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -86,7 +85,6 @@ describe('Profile production composition', () => {
       profileRetainedAliasLimit: 3,
       profileEvidenceRetentionDays: 30,
       s3Region: 'us-east-1',
-      assetReferenceBucket: 'asset-references',
       profilePictureBucket: 'profile-pictures',
       profilePictureMaxBytes: 5 * 1024 * 1024,
       profilePictureMaxPixels: 16_000_000,
@@ -121,7 +119,7 @@ describe('Profile production composition', () => {
     });
   }
 
-  it('reports unavailable picture publication storage and recovers without pending events', async () => {
+  it('remains healthy with picture storage and no descriptor bucket', async () => {
     const StorageTester = createDefaultTesterBuilder()
       .with(DockerTesterBuilder)
       .with(S3TesterBuilder)
@@ -138,16 +136,6 @@ describe('Profile production composition', () => {
     };
     try {
       await reconfigure();
-      const unavailable = await app.inject('/health');
-      expect(unavailable.statusCode).toBe(503);
-      expect(unavailable.json()).toMatchObject({
-        status: 503,
-        healthStatus: 'degraded',
-        checks: { database: true, nats: true, workers: false },
-      });
-      await storage.s3
-        .getS3Client()
-        .send(new CreateBucketCommand({ Bucket: config.assetReferenceBucket }));
       expect((await app.inject('/health')).json()).toMatchObject({
         status: 'healthy',
         checks: { database: true, nats: true, workers: true },

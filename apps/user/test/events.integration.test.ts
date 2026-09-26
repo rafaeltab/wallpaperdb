@@ -2,12 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { inspect } from 'node:util';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createNatsContainer } from '@wallpaperdb/testcontainers';
-import { resolveAssetReference } from '@wallpaperdb/core/assets';
-import {
-  createDefaultTesterBuilder,
-  DockerTesterBuilder,
-  S3TesterBuilder,
-} from '@wallpaperdb/test-utils';
+import { resolveProfilePictureAsset } from '@wallpaperdb/core/assets';
 import { Deferred, Effect, Layer, Logger, ManagedRuntime } from 'effect';
 import { connect, DiscardPolicy, headers, type NatsConnection } from 'nats';
 import postgres from 'postgres';
@@ -31,11 +26,6 @@ let database: StartedPostgreSqlContainer;
 let nats: Awaited<ReturnType<typeof createNatsContainer>>;
 let connection: NatsConnection;
 let sql: ReturnType<typeof postgres>;
-const StorageTester = createDefaultTesterBuilder()
-  .with(DockerTesterBuilder)
-  .with(S3TesterBuilder)
-  .build();
-const storage = new StorageTester().withS3().withS3Bucket('asset-references');
 const occurred = '2030-01-01T00:00:00.000Z';
 function profileEvent(id: string) {
   return {
@@ -81,8 +71,8 @@ function wallpaperEvent(id: string) {
 function pictureEvent(id: string) {
   const asset = {
     id: `picture_${id}`,
-    storageBucket: 'historical-picture-bucket',
-    storageKey: `historical-picture-prefix/${id}.webp`,
+    storageBucket: 'profile-pictures',
+    storageKey: `user_1/picture_${id}.webp`,
     mimeType: 'image/webp',
     width: 1280,
     height: 720,
@@ -97,7 +87,6 @@ function pictureEvent(id: string) {
   };
 }
 beforeAll(async () => {
-  await storage.setup();
   [database, nats] = await Promise.all([
     new PostgreSqlContainer('postgres:16-alpine').start(),
     createNatsContainer(),
@@ -126,9 +115,8 @@ afterAll(async () => {
   await sql?.end();
   await nats?.stop();
   await database?.stop();
-  await storage.destroy();
 });
-function adapters(referenceBucket = 'asset-references') {
+function adapters(pictureBucket = 'profile-pictures') {
   const options = {
     url: nats.getConnectionUrl(),
     stream: 'WALLPAPER',
@@ -138,11 +126,7 @@ function adapters(referenceBucket = 'asset-references') {
     eventStoreLayer(),
     eventPublisherLayer({
       ...options,
-      assetReferenceBucket: referenceBucket,
-      endpoint: storage.s3.config.endpoints.fromHost,
-      region: 'us-east-1',
-      accessKeyId: storage.s3.config.options.accessKey,
-      secretAccessKey: storage.s3.config.options.secretKey,
+      pictureBucket,
     })
   ).pipe(
     Layer.provide(brokerLayer(options)),
@@ -174,10 +158,11 @@ it('publishes retained picture outboxes with a stable logical reference and no s
     expect(published.eventId).toBe(payload.eventId);
     expect(stored.header.get('ce-id')).toBe(payload.eventId);
     expect(
-      await resolveAssetReference(storage.s3.getS3Client(), 'asset-references', {
-        owner: 'user',
-        id: asset.id,
-      })
+      resolveProfilePictureAsset(
+        { owner: 'user', id: asset.id },
+        payload.profile.id,
+        'profile-pictures'
+      )
     ).toEqual({ bucket: asset.storageBucket, key: asset.storageKey });
     expect(await sql`select payload, published_at from outbox_events`).toEqual([
       { payload, published_at: null },
@@ -186,21 +171,58 @@ it('publishes retained picture outboxes with a stable logical reference and no s
     await runtime.dispose();
   }
 });
-it('leaves picture events unpublished until their immutable references can be registered', async () => {
-  const payload = pictureEvent('picture-registration-failure');
+it.each([
+  'bucket',
+  'key',
+])('leaves picture events unpublished when the recorded %s would be remapped', async (field) => {
+  const payload = pictureEvent(`picture-path-failure-${field}`);
+  if (field === 'key') payload.change.asset.storageKey = 'historical/private-path.webp';
   await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
     values (${payload.eventId}, 'profile.updated', 'user_1', ${sql.json(payload)}, ${occurred})`;
-  const runtime = ManagedRuntime.make(adapters('missing-reference-bucket'));
+  const runtime = ManagedRuntime.make(
+    adapters(field === 'bucket' ? 'different-picture-bucket' : 'profile-pictures')
+  );
   try {
     expect(
       await runtime.runPromise(
         ProfileEvents.use((events) => events.publish(payload.eventId)).pipe(Effect.flip)
       )
-    ).toMatchObject({ _tag: 'MaintenanceFailure', operation: 'register-picture-asset' });
+    ).toMatchObject({ _tag: 'MaintenanceFailure', operation: 'validate-picture-asset' });
     expect(
       (await (await connection.jetstreamManager()).streams.info('PROFILE')).state.messages
     ).toBe(0);
     expect(await sql`select published_at from outbox_events`).toEqual([{ published_at: null }]);
+  } finally {
+    await runtime.dispose();
+  }
+});
+it('publishes an already logical picture outbox without resolving storage externally', async () => {
+  const privateEvent = pictureEvent('logical-picture-publication');
+  const storedAsset = privateEvent.change.asset;
+  const asset = {
+    id: storedAsset.id,
+    mimeType: storedAsset.mimeType,
+    width: storedAsset.width,
+    height: storedAsset.height,
+    fileSizeBytes: storedAsset.fileSizeBytes,
+  };
+  const payload = {
+    ...privateEvent,
+    change: {
+      ...privateEvent.change,
+      asset: { ...asset, reference: { owner: 'user', id: asset.id } },
+    },
+  };
+  await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
+    values (${payload.eventId}, 'profile.updated', 'user_1', ${sql.json(payload)}, ${occurred})`;
+  const runtime = ManagedRuntime.make(adapters());
+  try {
+    await runtime.runPromise(ProfileEvents.use((events) => events.publish(payload.eventId)));
+    const published = await (await connection.jetstreamManager()).streams.getMessage('PROFILE', {
+      last_by_subj: 'profile.updated',
+    });
+    expect(JSON.parse(new TextDecoder().decode(published.data))).toEqual(payload);
+    expect(published.header.get('ce-id')).toBe(payload.eventId);
   } finally {
     await runtime.dispose();
   }

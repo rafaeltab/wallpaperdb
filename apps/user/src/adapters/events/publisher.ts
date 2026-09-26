@@ -1,63 +1,26 @@
 import { ProfileCreatedEventSchema, ProfileUpdatedEventSchema } from '@wallpaperdb/events/schemas';
-import { HeadBucketCommand, S3Client, S3ServiceException } from '@aws-sdk/client-s3';
-import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
+import { resolveProfilePictureAsset } from '@wallpaperdb/core/assets';
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { eq } from 'drizzle-orm';
-import { Clock, Context, Effect, Exit, Layer, Metric } from 'effect';
+import { Clock, Effect, Exit, Layer, Metric } from 'effect';
 import { headers } from 'nats';
 import { outboxEvents } from '../../db/schema.js';
 import { MaintenanceFailure, ProfileEvents } from '../../maintenance/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 import { broker, EventsBroker } from './broker.js';
 
-export interface ProfilePublisherAssets {
-  readonly endpoint?: string;
-  readonly region: string;
-  readonly accessKeyId?: string;
-  readonly secretAccessKey?: string;
-  readonly assetReferenceBucket: string;
+export interface ProfilePublisherOptions {
+  readonly pictureBucket: string;
 }
 
-export interface ProfilePublicationHealth {
-  check(): Effect.Effect<boolean>;
-}
-export const ProfilePublicationHealth = Context.Service<ProfilePublicationHealth>(
-  'wallpaperdb.user.adapters.ProfilePublicationHealth'
-);
-
-function storageDiagnostic(cause: unknown) {
-  return {
-    name: cause instanceof Error ? cause.name : 'UnknownStorageFailure',
-    ...(cause instanceof S3ServiceException
-      ? { status: cause.$metadata.httpStatusCode, requestId: cause.$metadata.requestId }
-      : {}),
-  };
-}
-
-export const eventPublisherLayer = (options: ProfilePublisherAssets) =>
-  Layer.effectContext(
+export const eventPublisherLayer = (options: ProfilePublisherOptions) =>
+  Layer.effect(
+    ProfileEvents,
     Effect.gen(function* () {
       const database = yield* Database;
       const service = yield* EventsBroker;
-      const assets = yield* Effect.acquireRelease(
-        Effect.sync(() =>
-          options.endpoint && options.accessKeyId && options.secretAccessKey
-            ? new S3Client({
-                endpoint: options.endpoint,
-                region: options.region,
-                credentials: {
-                  accessKeyId: options.accessKeyId,
-                  secretAccessKey: options.secretAccessKey,
-                },
-                forcePathStyle: true,
-                maxAttempts: 1,
-              })
-            : null
-        ),
-        (client) => Effect.sync(() => client?.destroy())
-      );
-      return Context.make(ProfileEvents, {
+      return ProfileEvents.of({
         publish: Effect.fn('profiles.events.publish')(function* (eventId: string) {
           const stored = yield* Effect.tryPromise({
             try: (signal) =>
@@ -107,40 +70,29 @@ export const eventPublisherLayer = (options: ProfilePublisherAssets) =>
           ) {
             const asset = event.change.asset;
             const reference = { owner: 'user' as const, id: asset.id };
-            yield* Effect.tryPromise({
-              try: async (signal) => {
-                if (!assets) throw new Error('Picture reference storage is not configured');
-                const abortSignal = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
-                if ('storageBucket' in asset)
-                  await registerAssetReference(
-                    assets,
-                    options.assetReferenceBucket,
-                    reference,
-                    { bucket: asset.storageBucket, key: asset.storageKey },
-                    { abortSignal }
-                  );
-                else
-                  await resolveAssetReference(
-                    assets,
-                    options.assetReferenceBucket,
-                    asset.reference,
-                    { abortSignal }
-                  );
+            yield* Effect.try({
+              try: () => {
+                const location = resolveProfilePictureAsset(
+                  reference,
+                  event.profile.id,
+                  options.pictureBucket
+                );
+                if (
+                  'storageBucket' in asset &&
+                  (asset.storageBucket !== location.bucket || asset.storageKey !== location.key)
+                )
+                  throw new Error('Picture asset does not match its recorded storage location');
               },
               catch: (cause) =>
-                new MaintenanceFailure({
-                  operation: 'register-picture-asset',
-                  cause: storageDiagnostic(cause),
-                }),
+                new MaintenanceFailure({ operation: 'validate-picture-asset', cause }),
             }).pipe(
               Effect.tapError((failure) =>
-                Effect.logError('Profile picture reference registration failed', {
+                Effect.logError('Profile picture address validation failed', {
                   operation: failure.operation,
                   cause: failure.cause,
                   'event.id': eventId,
                 })
-              ),
-              Effect.withSpan('profiles.events.register-picture-asset')
+              )
             );
             event = {
               ...event,
@@ -222,32 +174,6 @@ export const eventPublisherLayer = (options: ProfilePublisherAssets) =>
           );
           yield* parent ? publish.pipe(OtelTracer.withSpanContext(parent)) : publish;
         }),
-      }).pipe(
-        Context.add(ProfilePublicationHealth, {
-          check: () =>
-            assets
-              ? Effect.tryPromise({
-                  try: (signal) =>
-                    assets.send(new HeadBucketCommand({ Bucket: options.assetReferenceBucket }), {
-                      abortSignal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
-                    }),
-                  catch: (cause) =>
-                    new MaintenanceFailure({
-                      operation: 'check-picture-reference-storage',
-                      cause: storageDiagnostic(cause),
-                    }),
-                }).pipe(
-                  Effect.tapError((failure) =>
-                    Effect.logError('Profile publication storage unavailable', {
-                      operation: failure.operation,
-                      cause: failure.cause,
-                    })
-                  ),
-                  Effect.withSpan('profiles.events.check-picture-reference-storage'),
-                  Effect.match({ onSuccess: () => true, onFailure: () => false })
-                )
-              : Effect.succeed(true),
-        })
-      );
+      });
     })
   );

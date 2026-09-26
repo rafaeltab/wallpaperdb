@@ -9,7 +9,7 @@ import {
   DockerTesterBuilder,
   S3TesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Metric } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { pictureStorageLayer, pictureStoreLayer } from '../src/adapters/pictures/index.js';
@@ -21,7 +21,10 @@ describe('Private immutable picture storage', () => {
     .with(S3TesterBuilder)
     .build();
   const tester = new Tester().withS3().withS3Bucket('picture-adapter');
-  let runtime: ManagedRuntime.ManagedRuntime<PictureObjects | PictureStore, unknown>;
+  let runtime: ManagedRuntime.ManagedRuntime<
+    PictureObjects | PictureStore | Metric.MetricRegistry,
+    unknown
+  >;
   let container: StartedPostgreSqlContainer;
   let sql: ReturnType<typeof postgres>;
   let client: S3Client;
@@ -48,7 +51,10 @@ describe('Private immutable picture storage', () => {
           accessKeyId: config.options.accessKey,
           secretAccessKey: config.options.secretKey,
         })
-      ).pipe(Layer.provide(databaseLayer({ databaseUrl: container.getConnectionUri() })))
+      ).pipe(
+        Layer.provide(databaseLayer({ databaseUrl: container.getConnectionUri() })),
+        Layer.provideMerge(Layer.succeed(Metric.MetricRegistry, new Map()))
+      )
     );
   });
   afterAll(async () => {
@@ -82,6 +88,21 @@ describe('Private immutable picture storage', () => {
         Effect.flatMap(PictureObjects, (objects) => objects.put(asset.id, Buffer.from('other')))
       )
     ).rejects.toMatchObject({ _tag: 'PictureUnavailable' });
+    const health = () =>
+      runtime.runPromise(
+        Metric.snapshot.pipe(
+          Effect.map((metrics) => {
+            const metric = metrics.find(
+              (metric) =>
+                metric.id === 'user.dependency.last_operation_healthy' &&
+                metric.attributes?.dependency === 'picture-storage'
+            );
+            return metric?.type === 'Gauge' ? metric.state.value : undefined;
+          })
+        )
+      );
+    expect(await health()).toBe(0);
+    // Reads outside the adapter do not establish recovery from its failed write.
     const object = await client.send(new GetObjectCommand(address));
     expect(await object.Body?.transformToString()).toBe('first');
     expect(object.ContentType).toBe('image/webp');
@@ -94,6 +115,7 @@ describe('Private immutable picture storage', () => {
         Effect.flatMap(PictureObjects, (objects) => objects.delete(asset.id))
       );
     }
+    expect(await health()).toBe(1);
     await expect(client.send(new GetObjectCommand(address))).rejects.toMatchObject({
       name: 'NoSuchKey',
     });

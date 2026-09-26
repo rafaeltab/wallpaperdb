@@ -1,3 +1,4 @@
+import { monitorDependency } from '../observations/index.js';
 import { isIP } from 'node:net';
 import { Effect, Layer } from 'effect';
 import { PictureSource, PictureUnavailable } from '../../pictures/index.js';
@@ -170,7 +171,8 @@ export function pictureSourceLayer(
             cause: error.cause,
           })
         ),
-        Effect.withSpan('pictures.source.download')
+        Effect.withSpan('pictures.source.download'),
+        monitorDependency('picture-source')
       ),
   });
 }

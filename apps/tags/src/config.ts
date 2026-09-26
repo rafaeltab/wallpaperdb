@@ -1,15 +1,11 @@
 import {
   DatabaseConfigSchema,
-  getEnv,
   NatsConfigSchema,
   OtelConfigSchema,
   parseIntEnv,
   ServerConfigSchema,
 } from '@wallpaperdb/core/config';
-import { config as loadEnv } from 'dotenv';
 import { z } from 'zod';
-
-loadEnv();
 
 const configSchema = z.object({
   ...ServerConfigSchema.shape,
@@ -20,16 +16,16 @@ const configSchema = z.object({
 
 export type Config = z.infer<typeof configSchema>;
 
-export function loadConfig(): Config {
-  const nodeEnv = getEnv('NODE_ENV', 'development');
-
+export function loadConfig(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): Config {
   return configSchema.parse({
-    port: parseIntEnv(process.env.PORT, 3008),
-    nodeEnv,
-    databaseUrl: process.env.DATABASE_URL,
-    natsUrl: process.env.NATS_URL,
-    natsStream: getEnv('NATS_STREAM', 'WALLPAPER'),
-    otelEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-    otelServiceName: getEnv('OTEL_SERVICE_NAME', 'tags'),
+    port: parseIntEnv(environment.PORT, 3008),
+    nodeEnv: environment.NODE_ENV ?? 'development',
+    databaseUrl: environment.DATABASE_URL,
+    natsUrl: environment.NATS_URL,
+    natsStream: environment.NATS_STREAM ?? 'WALLPAPER',
+    otelEndpoint: environment.OTEL_EXPORTER_OTLP_ENDPOINT,
+    otelServiceName: environment.OTEL_SERVICE_NAME ?? 'tags',
   });
 }

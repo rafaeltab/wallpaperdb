@@ -33,7 +33,7 @@ make dev PACKAGE=user
 ### Observability
 - **OpenTelemetry** traces and metrics
 - **Structured logging** with Pino
-- **Health checks** for all dependencies
+- **Dependency alerts** for failed probes, stale monitoring, and failed identity or picture operations
 
 ## Architecture
 
@@ -165,21 +165,25 @@ Health check with dependency status.
 {
   "status": "healthy",
   "checks": {
-    "database": { "status": "healthy" },
-    "nats": { "status": "healthy" },
-    "otel": { "status": "healthy" }
-  }
+    "database": true,
+    "nats": true,
+    "otel": true,
+    "workers": true
+  },
+  "timestamp": "2026-09-26T18:00:00.000Z",
+  "totalDurationMs": 2
 }
 ```
 
 ### GET /ready
 
-Kubernetes-style readiness probe.
+Readiness reports whether startup completed and shutdown has not begun. Dependency health is reported separately by `/health` and telemetry alerts.
 
 **Response (200):**
 ```json
 {
-  "ready": true
+  "ready": true,
+  "timestamp": "2026-09-26T18:00:00.000Z"
 }
 ```
 

@@ -75,6 +75,11 @@ export const initializeOtel = Effect.fn('user.telemetry.initialize')(function* (
             instrumentations: [
               getNodeAutoInstrumentations({
                 '@opentelemetry/instrumentation-fs': { enabled: false },
+                // These instrumentations serialize private source URLs and raw database
+                // error messages before adapter sanitization. Effect adapter spans own
+                // these interactions and record only their safe diagnostic categories.
+                '@opentelemetry/instrumentation-undici': { enabled: false },
+                '@opentelemetry/instrumentation-pg': { enabled: false },
               }),
             ],
           }),

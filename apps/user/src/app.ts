@@ -95,7 +95,13 @@ export function userLayer(config: Config, options: AppOptions = {}) {
       Layer.mergeAll(
         profiles,
         eventStoreLayer().pipe(Layer.provide(database)),
-        eventPublisherLayer(eventOptions).pipe(Layer.provide(Layer.merge(database, broker)))
+        eventPublisherLayer({
+          endpoint: config.s3Endpoint,
+          region: config.s3Region,
+          accessKeyId: config.s3AccessKeyId,
+          secretAccessKey: config.s3SecretAccessKey,
+          assetReferenceBucket: config.assetReferenceBucket,
+        }).pipe(Layer.provide(Layer.merge(database, broker)))
       )
     )
   );

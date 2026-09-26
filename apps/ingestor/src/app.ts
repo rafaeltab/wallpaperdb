@@ -35,6 +35,11 @@ export function ingestorLayer(config: Config, options: AppOptions = {}) {
     stream: config.natsStream,
     serviceName: config.otelServiceName,
     assetBucket: config.s3Bucket,
+    assetReferenceBucket: config.assetReferenceBucket,
+    endpoint: config.s3Endpoint,
+    region: config.s3Region,
+    accessKeyId: Redacted.value(config.s3AccessKeyId),
+    secretAccessKey: Redacted.value(config.s3SecretAccessKey),
   });
   const identity = Layer.succeed(IngestionIdentity, {
     next: () =>

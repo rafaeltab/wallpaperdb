@@ -53,10 +53,27 @@ function persistenceDiagnostic(cause: unknown): { sqlState?: string } {
 type TraceMetadata = { traceParent: string | null; traceState: string | null };
 type Transaction = Parameters<Parameters<Db['transaction']>[0]>[0];
 const retentionMs = (policy: ProfilePolicy) => policy.profileEvidenceRetentionDays * 86400000;
+const profileClaimConstraints = new Set([
+  'profiles_pkey',
+  'profiles_handle_lower_idx',
+  'handle_claims_pkey',
+  'handle_claims_handle_lower_idx',
+]);
 function uniqueViolation(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  if ('code' in error && error.code === '23505') return true;
-  return 'cause' in error && error.cause !== error && uniqueViolation(error.cause);
+  const visited = new Set<unknown>();
+  let current = error;
+  while (typeof current === 'object' && current !== null && !visited.has(current)) {
+    visited.add(current);
+    if (
+      'code' in current &&
+      current.code === '23505' &&
+      'constraint' in current &&
+      typeof current.constraint === 'string'
+    )
+      return profileClaimConstraints.has(current.constraint);
+    current = 'cause' in current ? current.cause : null;
+  }
+  return false;
 }
 async function aliases(reader: ProfileReader, profileId: string): Promise<OwnerProfile['aliases']> {
   const claims = await reader.query.handleClaims.findMany({
@@ -140,16 +157,14 @@ async function appendEvent(
           eventType: PROFILE_UPDATED_SUBJECT,
           change,
         });
-  await tx
-    .insert(outboxEvents)
-    .values({
-      id: event.eventId,
-      subject: event.eventType,
-      aggregateId: profile.id,
-      payload: event,
-      createdAt: now,
-      ...metadata,
-    });
+  await tx.insert(outboxEvents).values({
+    id: event.eventId,
+    subject: event.eventType,
+    aggregateId: profile.id,
+    payload: event,
+    createdAt: now,
+    ...metadata,
+  });
 }
 
 export const profileStoreLayer = (policy: ProfilePolicy) =>
@@ -227,14 +242,12 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   .insert(handleClaims)
                   .values({ handle: input.handle, profileId: input.profileId, kind: 'profile' });
                 if (input.imageUrl)
-                  await tx
-                    .insert(profilePictureImports)
-                    .values({
-                      profileId: input.profileId,
-                      sourceUrl: input.imageUrl,
-                      createdAt: acceptedAt,
-                      nextAttemptAt: acceptedAt,
-                    });
+                  await tx.insert(profilePictureImports).values({
+                    profileId: input.profileId,
+                    sourceUrl: input.imageUrl,
+                    createdAt: acceptedAt,
+                    nextAttemptAt: acceptedAt,
+                  });
                 await appendEvent(tx, profile, { type: 'created' }, acceptedAt, metadata);
                 return ownerProfile(tx, profile, policy, acceptedAt);
               });

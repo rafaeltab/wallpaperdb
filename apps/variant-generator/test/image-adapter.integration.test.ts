@@ -107,6 +107,23 @@ describe('Stored variant image adapter', () => {
     expect(await tester.s3.listObjects('wallpapers', 'wlpr_unsupported/')).toEqual([]);
     expect(await tester.s3.objectExists('originals', key)).toBe(true);
   });
+  it('reports missing asset reference storage and recovers when restored', async () => {
+    const s3 = tester.getS3();
+    const referenceBucket = 'recovered-health-references';
+    const isolated = ManagedRuntime.make(imageLayer({
+      endpoint: s3.endpoints.fromHost, region: 'us-east-1',
+      accessKeyId: s3.options.accessKey, secretAccessKey: s3.options.secretKey,
+      bucket: 'wallpapers', assetReferenceBucket: referenceBucket, jpegQuality: 83, pngCompressionLevel: 4, webpQuality: 76,
+    }));
+    try {
+      expect(await isolated.runPromise(ImageHealth.use((health) => health.check()))).toBe(false);
+      await tester.s3.getS3Client().send(new CreateBucketCommand({ Bucket: referenceBucket }));
+      expect(await isolated.runPromise(ImageHealth.use((health) => health.check()))).toBe(true);
+    } finally {
+      await isolated.dispose();
+    }
+  });
+
   it('checks configured storage health', async () => {
     expect(await runtime.runPromise(Effect.gen(function* () { return yield* (yield* ImageHealth).check(); }))).toBe(true);
   });

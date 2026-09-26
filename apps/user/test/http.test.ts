@@ -1,3 +1,4 @@
+import { Pictures } from '../src/pictures/index.js';
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { Availability, type Health } from '../src/availability/index.js';
@@ -22,7 +23,7 @@ const auth = { authorization: `Bearer ${token}` };
 
 function services(ensure: Profiles['ensure'], updateDetails: Profiles['updateDetails'] = () => Effect.die('Unexpected details command')) {
   const unexpected = () => Effect.die('Unexpected profile operation');
-  return Layer.merge(availability, Layer.succeed(Profiles, {
+  return Layer.mergeAll(availability, Layer.succeed(Pictures, { stage: unexpected, upload: unexpected, pictureAvailable: () => Effect.succeed(false), importPending: unexpected, cleanupExpired: unexpected }), Layer.succeed(Profiles, {
     ensure, updateDetails, changeHandle: unexpected,
     reactivateAlias: unexpected, scheduleAliasExpiry: unexpected,
     expireAliasImmediately: unexpected, expireDueAlias: unexpected,
@@ -31,6 +32,34 @@ function services(ensure: Profiles['ensure'], updateDetails: Profiles['updateDet
 }
 
 describe('User HTTP adapter', () => {
+  it.each([
+    ['identity-lookup',503,'identity-unavailable'],
+    ['read-profile',500,'generic-server'],
+  ] as const)('translates %s technical failure without disclosing diagnostic causes', async (operation,status,type) => {
+    const app = await createHttpApp({nodeEnv:'test',port:3009},services(() => Effect.fail(new ProfileUnavailable({operation,cause:new Error('PRIVATE_TOKEN_123')}))));
+    try {
+      const response=await app.inject({method:'POST',url:'/profile/me/ensure',headers:auth});
+      expect(response.statusCode).toBe(status);
+      expect(response.json()).toMatchObject({status,type:`https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`});
+      expect(response.body).not.toContain('PRIVATE_TOKEN_123');
+    } finally {await app.close();}
+  });
+  it.each(['Bearer not-json','Bearer '+Buffer.from(JSON.stringify({id:''})).toString('base64'),'Basic anything'])('rejects malformed credentials %s', async authorization => {
+    const app=await createHttpApp({nodeEnv:'test',port:3009},services(()=>Effect.die('Must not run')));
+    try { const response=await app.inject({method:'POST',url:'/profile/me/ensure',headers:{authorization}}); expect(response.statusCode).toBe(401); }
+    finally {await app.close();}
+  });
+  it('protects picture availability with the service token and avoids cached authorization decisions', async () => {
+    const app = await createHttpApp({nodeEnv:'test',port:3009,userMediaServiceToken:'test-token'},services(() => Effect.die('Must not run')));
+    try {
+      const denied = await app.inject({url:'/internal/profile-pictures/pic_missing/availability'});
+      expect(denied.statusCode).toBe(401);
+      expect(denied.headers['cache-control']).toBe('no-store');
+      const missing = await app.inject({url:'/internal/profile-pictures/pic_missing/availability', headers:{authorization:'Bearer test-token'}});
+      expect(missing.statusCode).toBe(404);
+      expect(missing.headers['cache-control']).toBe('no-store');
+    } finally { await app.close(); }
+  });
   it.each([
     ['PUT', '/profile/me/handle', { handle: 'new-handle', expectedVersion: 0 }, 'invalid-handle'],
     ['DELETE', '/profile/me/aliases/old', { expectedVersion: 0 }, 'invalid-alias-command'],

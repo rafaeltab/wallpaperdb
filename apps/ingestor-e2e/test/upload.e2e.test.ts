@@ -31,7 +31,6 @@ describe('deployed ingestor', () => {
       .withPostgres()
       .withS3()
       .withS3Bucket('wallpapers')
-      .withS3Bucket('asset-references')
       .withNats((builder) => builder.withJetstream())
       .withStream('WALLPAPER')
       .withMigrations()

@@ -137,3 +137,5 @@ async function applyMutation(tx: Transaction, current: Profile, mutation: Profil
   if (!updated) throw new Error('Locked Profile disappeared');
   return { updated, change };
 }
+
+export { clerkIdentitiesLayer } from './clerk.js';

@@ -72,7 +72,7 @@ const processMessage = Effect.fn('colors.events.consume')(function* (
   extractor: ExtractColors,
   options: NatsEventsOptions
 ) {
-  const input = translateUpload(message.data);
+  const input = translateUpload(message.data, message.headers);
   const started = yield* Clock.currentTimeMillis;
   let status = 'error';
   const attributes = {

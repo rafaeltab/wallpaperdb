@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { headers } from 'nats';
 import { translateUpload } from '../src/adapters/events/index.js';
 const wallpaper = {
   id: 'wp',
@@ -45,4 +46,31 @@ it('translates historical uploads and preserves CloudEvent occurrence and correl
   });
   expect(translateUpload(encode({ ...cloud, specversion: '0.3' }))).toBeUndefined();
   expect(translateUpload(new Uint8Array([0xff]))).toBeUndefined();
+});
+it('preserves binary CloudEvent occurrence and rejects conflicting transport metadata', () => {
+  const event = {
+    eventId: 'binary-occurrence',
+    eventType: 'wallpaper.uploaded',
+    timestamp: wallpaper.uploadedAt,
+    wallpaper,
+  };
+  const metadata = headers();
+  for (const [key, value] of Object.entries({
+    'ce-specversion': '1.0',
+    'ce-source': 'https://wallpaperdb/ingestor',
+    'ce-id': event.eventId,
+    'ce-type': event.eventType,
+    'ce-time': event.timestamp,
+    'ce-correlationid': 'upload-flow',
+    'ce-causationid': 'upload-command',
+  }))
+    metadata.set(key, value);
+  const bytes = new TextEncoder().encode(JSON.stringify(event));
+  expect(translateUpload(bytes, metadata)).toMatchObject({
+    occurrence: { source: 'https://wallpaperdb/ingestor', id: event.eventId },
+    correlationId: 'upload-flow',
+    causationId: 'upload-command',
+  });
+  metadata.set('ce-time', '2026-09-25T10:00:00.000Z');
+  expect(translateUpload(bytes, metadata)).toBeUndefined();
 });

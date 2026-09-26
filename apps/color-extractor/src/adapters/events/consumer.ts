@@ -50,6 +50,19 @@ function quarantine(brokerService: NatsBroker, message: JsMsg, reason: string) {
   metadata.set('ce-reason', reason);
   metadata.set('ce-originalsubject', message.subject);
   metadata.set('ce-consumer', info.consumer);
+  for (const key of [
+    'specversion',
+    'source',
+    'id',
+    'type',
+    'time',
+    'correlationid',
+    'causationid',
+    'causationsource',
+  ]) {
+    const original = message.headers?.get(`ce-${key}`);
+    if (original) metadata.set(`original-ce-${key}`, original);
+  }
   for (const key of ['traceparent', 'tracestate']) {
     const value = message.headers?.get(key);
     if (value && value.length <= 512) metadata.set(key, value);

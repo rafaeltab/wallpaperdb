@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, Logger, ManagedRuntime } from 'effect';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
@@ -81,6 +82,27 @@ describe('Picture persistence adapter', () => {
     expect(await sql`select source_url, lease_token from profile_picture_imports`).toEqual([{ source_url: 'https://img.clerk.com/private', lease_token: second.leaseToken }]);
     await run(store => store.settleImport(second, true, now));
     expect(await sql`select source_url, status, lease_token, lease_until from profile_picture_imports`).toEqual([{ source_url: null, status: 'complete', lease_token: null, lease_until: null }]);
+  });
+
+  it('preserves diagnostic SQLSTATE without exposing captured source credentials in failures or logs', async () => {
+    await sql`insert into profile_picture_imports(profile_id, source_url, next_attempt_at) values ('owner', 'https://img.clerk.com/private?token=private-credential', ${now})`;
+    const job = await run(store => store.claimImport('owner', now, 1000));
+    if (!job) throw new Error('Expected an import claim');
+    await sql.unsafe(`create function reject_import_retry() returns trigger language plpgsql as $$ begin raise exception 'Rejected source %', NEW.source_url; end $$`);
+    await sql.unsafe(`create trigger reject_import_retry before update on profile_picture_imports for each row execute function reject_import_retry()`);
+    const logs: unknown[] = [];
+    try {
+      const failure = await runtime.runPromise(Effect.flatMap(PictureStore, store => store.settleImport(job, false, now)).pipe(
+        Effect.provide(Logger.layer([Logger.make(({ message }) => { logs.push(message); })])),
+      )).catch((failure: unknown) => failure);
+      expect(failure).toMatchObject({ _tag: 'PictureUnavailable', cause: { sqlState: 'P0001' } });
+      expect(inspect(failure, { depth: 10 })).not.toContain('private-credential');
+      expect(inspect(logs, { depth: 10 })).not.toContain('private-credential');
+      expect(inspect(logs, { depth: 10 })).toContain('P0001');
+    } finally {
+      await sql.unsafe('drop trigger reject_import_retry on profile_picture_imports');
+      await sql.unsafe('drop function reject_import_retry()');
+    }
   });
 
 });

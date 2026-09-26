@@ -1,10 +1,156 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { ProfileUnavailable, type ProfileOutcome } from '../src/profile/index.js';
+import { ProfileUnavailable, type ProfileOutcome, type Profiles } from '../src/profile/index.js';
 import { profile, auth, services } from './http-fixture.js';
 
 describe('User HTTP adapter', () => {
+  it.each([
+    ['unauthorized', 401, 'unauthorized'],
+    ['invalid-display-name', 400, 'invalid-display-name'],
+    ['invalid-biography', 400, 'invalid-biography'],
+    ['unavailable-biography-wallpaper', 400, 'unavailable-wallpaper'],
+    ['invalid-handle', 400, 'invalid-handle'],
+    ['invalid-alias-command', 400, 'invalid-alias-command'],
+    ['ineligible-handle', 400, 'ineligible-handle'],
+    ['alias-limit', 409, 'alias-limit'],
+    ['alias-not-found', 404, 'alias-not-found'],
+    ['alias-not-scheduled', 409, 'alias-not-scheduled'],
+    ['handle-unavailable', 409, 'handle-unavailable'],
+    ['handle-cooldown', 429, 'handle-cooldown'],
+    ['version-conflict', 409, 'profile-version-conflict'],
+    ['picture-unavailable', 400, 'picture-unavailable'],
+  ] as const)('translates the %s decision into its public Problem Details contract', async (reason, status, type) => {
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 0 },
+      services(() =>
+        Effect.succeed({
+          _tag: 'Rejected',
+          reason,
+          message: 'Public rejection detail',
+          ...(reason === 'unavailable-biography-wallpaper' ? { retryable: false } : {}),
+          ...(reason === 'handle-cooldown'
+            ? { nextHandleChangeAt: new Date('2030-01-08T00:00:00.000Z') }
+            : {}),
+        })
+      )
+    );
+    try {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/profile/me/ensure',
+        headers: auth,
+      });
+      expect(response.statusCode).toBe(status);
+      expect(response.headers['content-type']).toContain('application/problem+json');
+      expect(response.json()).toMatchObject({
+        status,
+        type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
+        detail: 'Public rejection detail',
+        instance: '/profile/me/ensure',
+      });
+      if (reason === 'unavailable-biography-wallpaper')
+        expect(response.json().retryable).toBe(false);
+      if (reason === 'handle-cooldown')
+        expect(response.json().nextHandleChangeAt).toBe('2030-01-08T00:00:00.000Z');
+    } finally {
+      await app.close();
+    }
+  });
+  it.each([
+    ['PUT', '/profile/me/handle', 'changeHandle', 'invalid-handle'],
+    ['DELETE', '/profile/me/aliases/old-handle', 'scheduleAliasExpiry', 'invalid-alias-command'],
+    [
+      'POST',
+      '/profile/me/aliases/old-handle/expire',
+      'expireAliasImmediately',
+      'invalid-alias-command',
+    ],
+    ['PUT', '/profile/me/aliases/old-handle', 'reactivateAlias', 'invalid-alias-command'],
+  ] as const)('authenticates and parses the %s %s command at the HTTP boundary', async (method, url, action, type) => {
+    const calls: unknown[] = [];
+    const record =
+      (name: string): Profiles['changeHandle'] =>
+      (principal, handle, expectedVersion) => {
+        calls.push({ action: name, principal, handle, expectedVersion });
+        return Effect.succeed({ _tag: 'Success', profile });
+      };
+    const app = await createHttpApp(
+      { nodeEnv: 'test', port: 0 },
+      services(() => Effect.die('Unexpected ensure'), undefined, {
+        changeHandle: record('changeHandle'),
+        scheduleAliasExpiry: record('scheduleAliasExpiry'),
+        expireAliasImmediately: record('expireAliasImmediately'),
+        reactivateAlias: record('reactivateAlias'),
+      })
+    );
+    try {
+      const unauthenticated = await app.inject({
+        method,
+        url,
+        payload: { handle: 'new-handle', expectedVersion: 7 },
+      });
+      expect(unauthenticated.statusCode).toBe(401);
+      expect(unauthenticated.json().type).toBe(
+        'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unauthorized.md'
+      );
+      for (const expectedVersion of [
+        undefined,
+        null,
+        0,
+        -1,
+        1.5,
+        '1',
+        Number.MAX_SAFE_INTEGER + 1,
+      ]) {
+        const invalid = await app.inject({
+          method,
+          url,
+          headers: auth,
+          payload: { handle: 'new-handle', expectedVersion },
+        });
+        expect(invalid.statusCode).toBe(400);
+        expect(invalid.headers['content-type']).toContain('application/problem+json');
+        expect(invalid.json()).toMatchObject({
+          status: 400,
+          type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,
+        });
+      }
+      if (action === 'changeHandle') {
+        for (const handle of [undefined, null, 1, {}]) {
+          const invalid = await app.inject({
+            method,
+            url,
+            headers: auth,
+            payload: { handle, expectedVersion: 7 },
+          });
+          expect(invalid.statusCode).toBe(400);
+          expect(invalid.json().type).toBe(
+            'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/invalid-handle.md'
+          );
+        }
+      }
+      expect(calls).toEqual([]);
+      const accepted = await app.inject({
+        method,
+        url,
+        headers: auth,
+        payload: { handle: 'new-handle', expectedVersion: 7, profileId: 'victim' },
+      });
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json()).toMatchObject({ id: 'user_owner', version: 1 });
+      expect(calls).toEqual([
+        {
+          action,
+          principal: { profileId: 'user_owner' },
+          handle: action === 'changeHandle' ? 'new-handle' : 'old-handle',
+          expectedVersion: 7,
+        },
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
   it.each([
     ['identity-lookup', 503, 'identity-unavailable'],
     ['read-profile', 500, 'generic-server'],

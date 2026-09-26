@@ -33,7 +33,8 @@ export const auth = { authorization: `Bearer ${token}` };
 
 export function services(
   ensure: Profiles['ensure'],
-  updateDetails: Profiles['updateDetails'] = () => Effect.die('Unexpected details command')
+  updateDetails: Profiles['updateDetails'] = () => Effect.die('Unexpected details command'),
+  overrides: Partial<Profiles> = {}
 ) {
   const unexpected = () => Effect.die('Unexpected profile operation');
   return Layer.mergeAll(
@@ -55,6 +56,7 @@ export function services(
       expireDueAlias: unexpected,
       adoptPicture: unexpected,
       adoptImportedPicture: unexpected,
+      ...overrides,
     })
   );
 }

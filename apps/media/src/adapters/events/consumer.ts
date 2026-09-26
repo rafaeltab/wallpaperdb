@@ -63,6 +63,16 @@ const processMessage = Effect.fn('media.events.consume')(function* (
     if (succeeded) {
       message.ack();
       status = 'success';
+      if (input.kind !== 'profile')
+        yield* Metric.update(
+          Metric.histogram(
+            input.kind === 'wallpaper'
+              ? 'media.consumer.upsert_duration_ms'
+              : 'media.consumer.variant_insert_duration_ms',
+            { boundaries: [1, 10, 100, 1000, 5000], attributes: { 'event.type': message.subject } }
+          ),
+          (yield* Clock.currentTimeMillis) - started
+        );
       return;
     }
     if (message.info.deliveryCount >= 3) {

@@ -1,58 +1,31 @@
-import 'reflect-metadata';
 import { validateProfileMarkdown } from '@wallpaperdb/profile-markdown';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { FakeTimerService } from '@wallpaperdb/core/timer';
 import type { ProfileCreatedEvent, ProfileUpdatedEvent, WallpaperUploadedEvent } from '@wallpaperdb/events';
 import { createNatsContainer, type StartedNatsContainer } from '@wallpaperdb/testcontainers';
 import type { FastifyInstance } from 'fastify';
 import postgres from 'postgres';
-import { connect } from 'nats';
+import { connect, type NatsConnection } from 'nats';
+import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { container } from 'tsyringe';
-import { createApp } from '../src/app.js';
+import { userLayer } from '../src/app.js';
+import { createHttpApp } from '../src/http/index.js';
 import type { Config } from '../src/config.js';
-import { DatabaseConnection } from '../src/connections/database.js';
-import { NatsConnectionManager } from '../src/connections/nats.js';
-import {
-  IdentityProviderToken,
-  type ExternalIdentity,
-  type IdentityProvider,
-} from '../src/services/clerk-identity.service.js';
-import { ProfileService } from '../src/services/profile.service.js';
-import { ProfileAliasExpiryWorker } from '../src/services/profile-alias-expiry.service.js';
-import {
-  type ProfileEventPublisher,
-  ProfileOutboxPublisherWorker,
-} from '../src/services/profile-outbox-publisher.service.js';
+import { Profiles, ProfileUnavailable, type ProfileOutcome, type ExternalIdentity, type Identities, type AliasClaimReference } from '../src/profile/index.js';
+import { Maintenance } from '../src/maintenance/index.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const migrationPaths = readdirSync(migrationDirectory).filter((path) => path.endsWith('.sql')).sort().map((path) => join(migrationDirectory, path));
 
-class FakeIdentityProvider implements IdentityProvider {
+class FakeIdentityProvider implements Identities {
   readonly identities = new Map<string, ExternalIdentity>();
   error: Error | null = null;
-
-  async getIdentity(userId: string): Promise<ExternalIdentity> {
-    if (this.error) throw this.error;
-    return (
-      this.identities.get(userId) ?? { displayName: null, firstName: null, lastName: null }
-    );
-  }
-}
-
-class FakeProfileEventPublisher implements ProfileEventPublisher {
-  readonly events: Array<ProfileCreatedEvent | ProfileUpdatedEvent> = [];
-  failuresRemaining = 0;
-
-  async publish(event: ProfileCreatedEvent | ProfileUpdatedEvent): Promise<void> {
-    if (this.failuresRemaining > 0) {
-      this.failuresRemaining--;
-      throw new Error('NATS unavailable');
-    }
-    this.events.push(event);
+  getIdentity(userId: string) {
+    return Effect.suspend(() => this.error
+      ? Effect.fail(new ProfileUnavailable({ operation: 'identity-lookup', cause: this.error }))
+      : Effect.succeed(this.identities.get(userId) ?? { displayName: null, firstName: null, lastName: null }));
   }
 }
 
@@ -61,10 +34,9 @@ describe('Profile commands', () => {
   let natsContainer: StartedNatsContainer;
   let sql: ReturnType<typeof postgres>;
   let app: FastifyInstance;
-  let database: DatabaseConnection;
+  let runtime: ManagedRuntime.ManagedRuntime<Profiles | Maintenance, unknown>;
+  let nats: NatsConnection;
   const identities = new FakeIdentityProvider();
-  const aliasExpiryTimer = new FakeTimerService();
-  const evidenceRetentionTimer = new FakeTimerService();
   let config: Config;
 
   beforeAll(async () => {
@@ -72,10 +44,10 @@ describe('Profile commands', () => {
       new PostgreSqlContainer('postgres:16-alpine').start(),
       createNatsContainer(),
     ]);
-    const streamConnection = await connect({ servers: natsContainer.getConnectionUrl() });
-    await (await streamConnection.jetstreamManager()).streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
-    await streamConnection.close();
-    const databaseUrl = postgresContainer.getConnectionUri();
+    nats = await connect({ servers: natsContainer.getConnectionUrl() });
+    await (await nats.jetstreamManager()).streams.add({ name: 'WALLPAPER', subjects: ['wallpaper.>'] });
+    await (await nats.jetstreamManager()).streams.add({ name: 'PROFILE', subjects: ['profile.>'] });
+    const databaseUrl = postgresContainer.getConnectionUri().replace('localhost', '127.0.0.1');
     sql = postgres(databaseUrl, { max: 10 });
     for (const migrationPath of migrationPaths) {
       await sql.unsafe(readFileSync(migrationPath, 'utf8'));
@@ -97,10 +69,7 @@ describe('Profile commands', () => {
       profilePictureMaxDecodedBytes: 64 * 1024 * 1024, profilePictureImportTimeoutMs: 10_000,
       profilePictureImportHosts: ['img.clerk.com', 'images.clerk.dev'],
     };
-    container.clearInstances();
-    app = await createApp(config, { logger: false, enableOtel: false, aliasExpiryTimer, evidenceRetentionTimer });
-    container.register(IdentityProviderToken, { useValue: identities });
-    database = container.resolve(DatabaseConnection);
+    await reconfigure();
   });
 
   beforeEach(async () => {
@@ -111,12 +80,32 @@ describe('Profile commands', () => {
 
   afterAll(async () => {
     await app.close();
+    await runtime.dispose();
+    await nats.close();
     await sql.end();
     await Promise.all([postgresContainer.stop(), natsContainer.stop()]);
   });
 
-  function service(): ProfileService {
-    return new ProfileService(database, identities, config);
+  async function reconfigure() {
+    await app?.close();
+    await runtime?.dispose();
+    const services = ManagedRuntime.make(userLayer({ ...config }, { identities, workers: false }));
+    runtime = services;
+    app = await createHttpApp({ ...config }, Layer.succeedContext(await services.context()), { logger: false });
+  }
+
+  const execute = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
+  const maintenance = <A, E>(use: (maintenance: Maintenance) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Maintenance); }));
+  function accepted(outcome: ProfileOutcome) {
+    if (outcome._tag === 'Rejected') throw new Error(outcome.message);
+    return outcome.profile;
+  }
+  function service() {
+    return {
+      ensure: (profileId: string) => execute(profiles => profiles.ensure({ profileId })).then(accepted),
+      updateDisplayName: (profileId: string, displayName: string, version: number) => execute(profiles => profiles.updateDetails({ profileId }, { displayName }, version)).then(accepted),
+      expireDueAlias: (reference: AliasClaimReference, now: Date) => execute(profiles => profiles.expireDueAlias(reference, now)),
+    };
   }
 
   async function request(userId: string) {
@@ -181,17 +170,17 @@ describe('Profile commands', () => {
       wallpaper: { id: wallpaperId, userId: profileId, fileType: 'image', mimeType: 'image/png', fileSizeBytes: 100,
         width: 10, height: 10, aspectRatio: 1, storageKey: `${wallpaperId}.png`, storageBucket: 'wallpapers', originalFilename: 'owned.png', uploadedAt: now },
     };
-    await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
+    await nats.jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
   }
 
-  it('expires acknowledged Profile events from the application retention timer', async () => {
+  it('expires acknowledged Profile events through the retention capability', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
     try {
       const original = (await request('user_1')).json();
-      await new ProfileOutboxPublisherWorker(database, { publish: async () => {} }, { error: vi.fn() }).publishPending();
+      await maintenance(service => service.publishPending());
       vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
-      await evidenceRetentionTimer.tickAsync(1000);
+      await maintenance(service => service.cleanupEvents(new Date()));
       expect(await sql`select id from outbox_events`).toEqual([]);
       expect((await request('user_1')).json()).toEqual(original);
     } finally {
@@ -276,7 +265,7 @@ describe('Profile commands', () => {
     await vi.waitFor(async () => { expect((await sql`select wallpaper_id from wallpaper_ownership where wallpaper_id = 'wlpr_foreign'`)).toHaveLength(1); }, { timeout: 5000, interval: 25 });
     const response = await app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { displayName: 'Rejected Name', biographyMarkdown: '![Foreign](wallpaper:wlpr_foreign)', expectedVersion: original.version } });
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toMatchObject({ type: 'https://wallpaperdb.example/problems/unavailable-wallpaper', retryable: false });
+    expect(response.json()).toMatchObject({ type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unavailable-wallpaper.md', retryable: false });
     expect((await request('user_1')).json()).toEqual(original);
     expect((await sql`select id from outbox_events where subject = 'profile.updated'`)).toHaveLength(0);
   });
@@ -287,7 +276,7 @@ describe('Profile commands', () => {
     const save = () => app.inject({ method: 'PATCH', url: '/profile/me', headers: { authorization: `Bearer ${Buffer.from(JSON.stringify({ id: 'user_1' })).toString('base64')}` }, payload: { biographyMarkdown, expectedVersion: original.version } });
     const waiting = await save();
     expect(waiting.statusCode).toBe(400);
-    expect(waiting.json()).toMatchObject({ type: 'https://wallpaperdb.example/problems/unavailable-wallpaper', retryable: true });
+    expect(waiting.json()).toMatchObject({ type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/unavailable-wallpaper.md', retryable: true });
     expect((await request('user_1')).json()).toEqual(original);
     const now = new Date().toISOString();
     const event: WallpaperUploadedEvent = {
@@ -295,7 +284,7 @@ describe('Profile commands', () => {
       wallpaper: { id: 'wlpr_owned', userId: original.id, fileType: 'image', mimeType: 'image/png', fileSizeBytes: 100,
         width: 10, height: 10, aspectRatio: 1, storageKey: 'wlpr_owned.png', storageBucket: 'wallpapers', originalFilename: 'owned.png', uploadedAt: now },
     };
-    await container.resolve(NatsConnectionManager).getClient().jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
+    await nats.jetstream().publish(event.eventType, new TextEncoder().encode(JSON.stringify(event)));
     const saved = await vi.waitFor(async () => {
       const response = await save();
       expect(response.statusCode).toBe(200);
@@ -321,7 +310,7 @@ describe('Profile commands', () => {
 
   it('enforces the configured Biography limit in Unicode code points without truncating authored text', async () => {
     const previousLimit = config.profileBiographyMaxLength;
-    config.profileBiographyMaxLength = 4;
+    config.profileBiographyMaxLength = 4; await reconfigure();
     try {
       const original = (await request('user_1')).json();
       expect(original.biographyMaxLength).toBe(4);
@@ -334,7 +323,7 @@ describe('Profile commands', () => {
       expect(rejected.json().type).toContain('invalid-biography');
       expect((await request('user_1')).json()).toEqual(accepted.json());
       expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'biography-changed'`)).toHaveLength(1);
-    } finally { config.profileBiographyMaxLength = previousLimit; }
+    } finally { config.profileBiographyMaxLength = previousLimit; await reconfigure(); }
   });
 
   it('stores authored Biography Markdown and returns a complete authoritative versioned snapshot', async () => {
@@ -406,7 +395,7 @@ describe('Profile commands', () => {
       const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
       vi.setSystemTime(new Date('2030-01-08T00:00:00.000Z'));
       const current = limit === 0 ? scheduled : (await changeHandle('user_1', 'current-handle', scheduled.version)).json();
-      config.profileRetainedAliasLimit = limit;
+      config.profileRetainedAliasLimit = limit; await reconfigure();
       const before = (await request('user_1')).json();
       expect(before.historicalHandles).toContainEqual({ handle: original.handle, eligibleUntil: '2030-01-31T00:00:00.000Z', unavailableReason: 'alias-limit' });
       const rejected = await reactivateAlias('user_1', original.handle, before.version);
@@ -421,7 +410,7 @@ describe('Profile commands', () => {
       expect(released.aliases).toEqual(current.aliases.filter((alias: {handle: string}) => alias.handle !== original.handle));
       expect((await sql`select id from outbox_events where payload->'change'->>'type' = 'alias-reactivated'`)).toHaveLength(0);
     } finally {
-      config.profileRetainedAliasLimit = previousLimit;
+      config.profileRetainedAliasLimit = previousLimit; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -445,7 +434,7 @@ describe('Profile commands', () => {
   it('uses the configured evidence window for historical Handle eligibility even while events remain unpublished', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    config.profileEvidenceRetentionDays = 7;
+    config.profileEvidenceRetentionDays = 7; await reconfigure();
     try {
       const original = (await request('user_1')).json();
       const changed = (await changeHandle('user_1', 'current-handle', original.version)).json();
@@ -461,7 +450,7 @@ describe('Profile commands', () => {
       expect((await reactivateAlias('user_1', original.handle, released.version)).statusCode).toBe(400);
       expect((await sql`select id from outbox_events where published_at is null`).length).toBeGreaterThan(0);
     } finally {
-      config.profileEvidenceRetentionDays = 30;
+      config.profileEvidenceRetentionDays = 30; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -507,7 +496,7 @@ describe('Profile commands', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
     const previousLimit = config.profileRetainedAliasLimit;
-    config.profileRetainedAliasLimit = 1;
+    config.profileRetainedAliasLimit = 1; await reconfigure();
     try {
       const original = (await request('user_1')).json();
       const changed = (await changeHandle('user_1', 'second-handle', original.version)).json();
@@ -522,7 +511,7 @@ describe('Profile commands', () => {
       expect(restored.statusCode).toBe(200);
       expect(restored.json().aliases.filter((alias: {expiresAt: string | null}) => alias.expiresAt === null)).toEqual([{ ...changed.aliases[0], createdAt: '2030-02-10T00:00:00.000Z' }]);
     } finally {
-      config.profileRetainedAliasLimit = previousLimit;
+      config.profileRetainedAliasLimit = previousLimit; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -706,13 +695,13 @@ describe('Profile commands', () => {
       const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
       const deadline = new Date(scheduled.aliases[0].expiresAt);
       vi.setSystemTime(new Date(deadline.getTime() - 1));
-      await aliasExpiryTimer.tickAsync(1_000);
+      await maintenance(service => service.expireAliases(new Date()));
       expect((await request('user_1')).json()).toEqual(scheduled);
       vi.setSystemTime(deadline);
-      await aliasExpiryTimer.tickAsync(1_000);
+      await maintenance(service => service.expireAliases(new Date()));
       const expired = (await request('user_1')).json();
       expect(expired).toMatchObject({ aliases: [], version: scheduled.version + 1 });
-      await aliasExpiryTimer.tickAsync(1_000);
+      await maintenance(service => service.expireAliases(new Date()));
       expect((await request('user_1')).json()).toEqual(expired);
       expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(1);
     } finally {
@@ -729,14 +718,14 @@ describe('Profile commands', () => {
     expect((await expireAlias('user_1', original.handle, 0)).statusCode).toBe(400);
     const notScheduled = await expireAlias('user_1', original.handle, retained.version);
     expect(notScheduled.statusCode).toBe(409);
-    expect(notScheduled.json().type).toMatch(/alias-not-scheduled$/);
+    expect(notScheduled.json().type).toMatch(/alias-not-scheduled\.md$/);
     expect((await expireAlias('user_2', original.handle, other.version)).statusCode).toBe(404);
     expect((await expireAlias('user_1', retained.handle, retained.version)).statusCode).toBe(404);
     expect((await request('user_1')).json()).toEqual(retained);
     const scheduled = (await scheduleAlias('user_1', original.handle, retained.version)).json();
     const stale = await expireAlias('user_1', original.handle, retained.version);
     expect(stale.statusCode).toBe(409);
-    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    expect(stale.json().type).toMatch(/profile-version-conflict\.md$/);
     const expired = (await expireAlias('user_1', original.handle, scheduled.version)).json();
     expect((await expireAlias('user_1', original.handle, scheduled.version)).statusCode).toBe(409);
     expect((await expireAlias('user_1', original.handle, expired.version)).statusCode).toBe(404);
@@ -765,7 +754,7 @@ describe('Profile commands', () => {
         expect((await request(bad.id)).json()).toEqual(bad);
         expect((await changeHandle(other.id, bad.aliases[0].handle, other.version)).statusCode).toBe(409);
         vi.setSystemTime(new Date(bad.aliases[0].expiresAt));
-        await aliasExpiryTimer.tickAsync(1_000);
+        await maintenance(service => service.expireAliases(new Date()));
         expect((await request(bad.id)).json()).toEqual(bad);
         expect((await request(good.id)).json()).toMatchObject({ aliases: [], version: good.version + 1 });
         const events = await sql`select aggregate_id from outbox_events where payload->'change'->>'type' = 'alias-expired'`;
@@ -773,7 +762,7 @@ describe('Profile commands', () => {
       } finally {
         await sql.unsafe('drop trigger reject_expiry_event on outbox_events; drop function reject_expiry_event()');
       }
-      await aliasExpiryTimer.tickAsync(1_000);
+      await maintenance(service => service.expireAliases(new Date()));
       expect((await request(bad.id)).json()).toMatchObject({ aliases: [], version: bad.version + 1 });
       expect(await sql`select * from outbox_events where payload->'change'->>'type' = 'alias-expired'`).toHaveLength(2);
     } finally {
@@ -791,7 +780,7 @@ describe('Profile commands', () => {
       const scheduled = (await scheduleAlias('user_1', original.handle, changed.version)).json();
       const reference = { profileId: original.id, handle: original.handle, claimGeneration: scheduled.aliases[0].claimGeneration };
       vi.setSystemTime(new Date(scheduled.aliases[0].expiresAt));
-      const worker = () => new ProfileAliasExpiryWorker(database, (alias, now) => service().expireDueAlias(alias, now), { error: () => {} });
+      const worker = () => ({ expirePending: () => maintenance(service => service.expireAliases(new Date())) });
       const firstWorker = worker();
       const secondWorker = worker();
       const [,,, immediate, claim] = await Promise.all([
@@ -810,28 +799,11 @@ describe('Profile commands', () => {
       expect((await request('user_2')).json()).toEqual(reclaimed);
       const [event] = await sql`select payload from outbox_events where aggregate_id = 'user_2' and subject = 'profile.updated'`;
       expect(event.payload.profile.claimGeneration).toBeGreaterThan(reference.claimGeneration);
-      await Promise.all([firstWorker.stop(), secondWorker.stop()]);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('drains a failed alias scan during shutdown without preventing dependency cleanup', async () => {
-    const failure = new Error('database scan failed');
-    const scan = vi.spyOn(database.getClient().db.query.handleClaims, 'findMany').mockRejectedValue(failure);
-    const timer = new FakeTimerService();
-    const logger = { error: vi.fn() };
-    const worker = new ProfileAliasExpiryWorker(database, async () => false, logger, timer);
-    try {
-      worker.start();
-      await expect(worker.stop()).resolves.toBeUndefined();
-      expect(logger.error).toHaveBeenCalledWith({ err: failure }, 'Profile alias expiry cycle failed');
-      await timer.tickAsync(1_000);
-      expect(scan).toHaveBeenCalledTimes(1);
-    } finally {
-      scan.mockRestore();
-    }
-  });
 
   it('ignores an old expiry scan after the owner promotes and retains a newer claim for that Handle', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
@@ -888,12 +860,7 @@ describe('Profile commands', () => {
       const renamed = (await patch('user_1', 'Renamed', scheduled.version)).json();
       expect(renamed.aliases).toEqual(scheduled.aliases);
       expect((await request('user_1')).json()).toEqual(renamed);
-      const publisher = new FakeProfileEventPublisher();
-      await new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} }).publishPending();
-      expect(publisher.events).toContainEqual(expect.objectContaining({
-        change: events[0].payload.change,
-        profile: expect.objectContaining({ aliases: scheduled.aliases }),
-      }));
+
     } finally {
       vi.useRealTimers();
     }
@@ -978,7 +945,7 @@ describe('Profile commands', () => {
 
   it('immediately excludes expiring aliases from a configured retained limit of one', async () => {
     const previousLimit = config.profileRetainedAliasLimit;
-    config.profileRetainedAliasLimit = 1;
+    config.profileRetainedAliasLimit = 1; await reconfigure();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
     try {
@@ -998,7 +965,7 @@ describe('Profile commands', () => {
       const [event] = await sql`select payload from outbox_events where payload->'profile'->>'version' = ${String(updated.version)}`;
       expect(event.payload.change.scheduledAliases).toEqual([]);
     } finally {
-      config.profileRetainedAliasLimit = previousLimit;
+      config.profileRetainedAliasLimit = previousLimit; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -1010,7 +977,7 @@ describe('Profile commands', () => {
     try {
       const before = (await request('user_1')).json();
       const changed = (await changeHandle('user_1', 'first', before.version)).json();
-      config.profileRetainedAliasLimit = 0;
+      config.profileRetainedAliasLimit = 0; await reconfigure();
       vi.setSystemTime(new Date('2030-01-08T12:00:00.000Z'));
       const response = await changeHandle('user_1', 'second', changed.version);
       expect(response.statusCode).toBe(200);
@@ -1024,7 +991,7 @@ describe('Profile commands', () => {
         { handle: before.handle, expiresAt }, { handle: 'first', expiresAt },
       ]);
     } finally {
-      config.profileRetainedAliasLimit = previousLimit;
+      config.profileRetainedAliasLimit = previousLimit; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -1039,18 +1006,18 @@ describe('Profile commands', () => {
     for (const payload of [{}, { expectedVersion: '2' }, { expectedVersion: 0 }, { expectedVersion: 1.5 }]) {
       const invalid = await app.inject({ method: 'DELETE', url: `/profile/me/aliases/${before.handle}`, headers: { authorization: `Bearer ${token}` }, payload });
       expect(invalid.statusCode).toBe(400);
-      expect(invalid.json().type).toMatch(/invalid-alias-command$/);
+      expect(invalid.json().type).toMatch(/invalid-alias-command\.md$/);
     }
     const stale = await scheduleAlias('user_1', before.handle, before.version);
     expect(stale.statusCode).toBe(409);
-    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    expect(stale.json().type).toMatch(/profile-version-conflict\.md$/);
     for (const response of [
       await scheduleAlias('user_2', before.handle, other.version),
       await scheduleAlias('user_1', owner.handle, owner.version),
       await scheduleAlias('user_1', 'unclaimed-alias', owner.version),
     ]) {
       expect(response.statusCode).toBe(404);
-      expect(response.json().type).toMatch(/alias-not-found$/);
+      expect(response.json().type).toMatch(/alias-not-found\.md$/);
     }
     expect((await request('user_1')).json()).toEqual(owner);
     expect((await request('user_2')).json()).toEqual(other);
@@ -1077,7 +1044,7 @@ describe('Profile commands', () => {
       expect([schedule.statusCode, change.statusCode].sort()).toEqual([200, 409]);
       const accepted = (schedule.statusCode === 200 ? schedule : change).json();
       const stale = (schedule.statusCode === 409 ? schedule : change).json();
-      expect(stale.type).toMatch(/profile-version-conflict$/);
+      expect(stale.type).toMatch(/profile-version-conflict\.md$/);
       expect(accepted.version).toBe(owner.version + 1);
       expect(accepted.aliases.filter((alias: { expiresAt: string | null }) => alias.expiresAt !== null)).toHaveLength(1);
       for (const read of reads) expect(read.json()).toEqual(read.json().version === owner.version ? owner : accepted);
@@ -1090,7 +1057,7 @@ describe('Profile commands', () => {
 
   it('rolls back explicit and automatic scheduling when recording the Profile event fails', async () => {
     const previousLimit = config.profileRetainedAliasLimit;
-    config.profileRetainedAliasLimit = 1;
+    config.profileRetainedAliasLimit = 1; await reconfigure();
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
     const initial = (await request('user_1')).json();
@@ -1107,7 +1074,7 @@ describe('Profile commands', () => {
       expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(1);
     } finally {
       await sql.unsafe('drop trigger reject_alias_event on outbox_events; drop function reject_alias_event()');
-      config.profileRetainedAliasLimit = previousLimit;
+      config.profileRetainedAliasLimit = previousLimit; await reconfigure();
       vi.useRealTimers();
     }
   });
@@ -1142,19 +1109,19 @@ describe('Profile commands', () => {
     const before = (await request('user_1')).json();
     const previousMinimum = config.profileHandleMinLength;
     const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMinLength = 3;
-    config.profileHandleMaxLength = 10;
+    config.profileHandleMinLength = 3; await reconfigure();
+    config.profileHandleMaxLength = 10; await reconfigure();
     try {
       for (const handle of [' ADMÍN ', 'sUpPoRt', 'GraphQL', 'settings', '--!!!', ' A ', 'abcdefghijkl']) {
         const response = await changeHandle('user_1', handle, before.version);
         expect(response.statusCode, handle).toBe(400);
-        expect(response.json().type).toMatch(/invalid-handle$/);
+        expect(response.json().type).toMatch(/invalid-handle\.md$/);
       }
       expect((await request('user_1')).json()).toEqual(before);
       expect(await sql`select * from outbox_events where subject = 'profile.updated'`).toHaveLength(0);
     } finally {
-      config.profileHandleMinLength = previousMinimum;
-      config.profileHandleMaxLength = previousMaximum;
+      config.profileHandleMinLength = previousMinimum; await reconfigure();
+      config.profileHandleMaxLength = previousMaximum; await reconfigure();
     }
   });
 
@@ -1169,7 +1136,7 @@ describe('Profile commands', () => {
     }
     const stale = await changeHandle('user_1', 'new', before.version + 1);
     expect(stale.statusCode).toBe(409);
-    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    expect(stale.json().type).toMatch(/profile-version-conflict\.md$/);
     expect((await request('user_1')).json()).toEqual(before);
   });
 
@@ -1185,7 +1152,7 @@ describe('Profile commands', () => {
       vi.setSystemTime(new Date(deadline.getTime() - 1));
       const early = await changeHandle('user_1', 'second-handle', first.json().version);
       expect(early.statusCode).toBe(429);
-      expect(early.json()).toMatchObject({ type: expect.stringMatching(/handle-cooldown$/), nextHandleChangeAt: deadline.toISOString() });
+      expect(early.json()).toMatchObject({ type: expect.stringMatching(/handle-cooldown\.md$/), nextHandleChangeAt: deadline.toISOString() });
       expect((await request('user_1')).json()).toEqual(first.json());
       expect(first.json().lastHandleChangedAt).toBe(now.toISOString());
       vi.setSystemTime(deadline);
@@ -1221,11 +1188,11 @@ describe('Profile commands', () => {
     const loserIndex = 1 - winnerIndex;
     const winner = responses[winnerIndex].json();
     const loser = before[loserIndex];
-    expect(responses[loserIndex].json().type).toMatch(/handle-unavailable$/);
+    expect(responses[loserIndex].json().type).toMatch(/handle-unavailable\.md$/);
     expect((await request(loser.id)).json()).toEqual(loser);
     const aliasCollision = await changeHandle(loser.id, before[winnerIndex].handle.toUpperCase(), 1);
     expect(aliasCollision.statusCode).toBe(409);
-    expect(aliasCollision.json().type).toMatch(/handle-unavailable$/);
+    expect(aliasCollision.json().type).toMatch(/handle-unavailable\.md$/);
     expect((await request(winner.id)).json()).toEqual(winner);
     const events = await sql`select payload from outbox_events where subject = 'profile.updated'`;
     expect(events).toHaveLength(1);
@@ -1296,7 +1263,7 @@ describe('Profile commands', () => {
     ]);
     expect([first.statusCode, second.statusCode].sort()).toEqual([200, 409]);
     const stale = first.statusCode === 409 ? first : second;
-    expect(stale.json().type).toMatch(/profile-version-conflict$/);
+    expect(stale.json().type).toMatch(/profile-version-conflict\.md$/);
     for (const response of reads) {
       expect(response.statusCode).toBe(200);
       const profile = response.json();
@@ -1378,7 +1345,7 @@ describe('Profile commands', () => {
     identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
     await service().ensure('user_1');
     const previousMaximum = config.profileDisplayNameMaxLength;
-    config.profileDisplayNameMaxLength = 3;
+    config.profileDisplayNameMaxLength = 3; await reconfigure();
 
     try {
       const whitespace = await patch('user_1', ' \t\n ', 1);
@@ -1391,7 +1358,7 @@ describe('Profile commands', () => {
       });
       expect((await sql`select * from outbox_events`).length).toBe(1);
     } finally {
-      config.profileDisplayNameMaxLength = previousMaximum;
+      config.profileDisplayNameMaxLength = previousMaximum; await reconfigure();
     }
   });
 
@@ -1418,9 +1385,7 @@ describe('Profile commands', () => {
     await sql.unsafe(`create trigger reject_update_event before insert on outbox_events for each row execute function reject_update_event()`);
 
     try {
-      await expect(service().updateDisplayName('user_1', 'After', 1)).rejects.toThrow(
-        'update event rejected'
-      );
+      await expect(service().updateDisplayName('user_1', 'After', 1)).rejects.toMatchObject({ _tag: 'ProfileUnavailable', operation: 'transition-profile' });
       expect((await sql`select display_name, version from profiles where id = 'user_1'`)[0]).toMatchObject({
         display_name: 'Before',
         version: 1,
@@ -1453,14 +1418,14 @@ describe('Profile commands', () => {
       lastName: null,
     });
     const previousMaximum = config.profileDisplayNameMaxLength;
-    config.profileDisplayNameMaxLength = 5;
+    config.profileDisplayNameMaxLength = 5; await reconfigure();
 
     try {
       const profile = await service().ensure('bounded');
       expect(profile.displayName).toBe('Éowyn');
       expect(profile.handle).toBe('eowyn');
     } finally {
-      config.profileDisplayNameMaxLength = previousMaximum;
+      config.profileDisplayNameMaxLength = previousMaximum; await reconfigure();
     }
   });
 
@@ -1484,7 +1449,7 @@ describe('Profile commands', () => {
       identities.identities.set(id, { displayName: 'Ada', firstName: null, lastName: null });
     }
     const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMaxLength = 3;
+    config.profileHandleMaxLength = 3; await reconfigure();
 
     try {
       const profiles = await Promise.all([
@@ -1495,7 +1460,7 @@ describe('Profile commands', () => {
       expect(new Set(profiles.map((profile) => profile.handle)).size).toBe(2);
       expect(profiles.every((profile) => profile.handle.length <= 3)).toBe(true);
     } finally {
-      config.profileHandleMaxLength = previousMaximum;
+      config.profileHandleMaxLength = previousMaximum; await reconfigure();
     }
   });
 
@@ -1537,14 +1502,14 @@ describe('Profile commands', () => {
       lastName: null,
     });
     const previousMaximum = config.profileHandleMaxLength;
-    config.profileHandleMaxLength = 8;
+    config.profileHandleMaxLength = 8; await reconfigure();
 
     try {
       const profile = await service().ensure('reserved');
       expect(profile.handle).not.toBe('security');
       expect(profile.handle.length).toBeLessThanOrEqual(config.profileHandleMaxLength);
     } finally {
-      config.profileHandleMaxLength = previousMaximum;
+      config.profileHandleMaxLength = previousMaximum; await reconfigure();
     }
   });
 
@@ -1562,7 +1527,7 @@ describe('Profile commands', () => {
     expect(response.statusCode).toBe(503);
     expect(response.headers['content-type']).toContain('application/problem+json');
     expect(response.json()).toEqual({
-      type: 'https://wallpaperdb.example/problems/identity-unavailable',
+      type: 'https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/identity-unavailable.md',
       title: 'Identity service unavailable',
       status: 503,
       detail: 'Clerk identity lookup failed',
@@ -1578,7 +1543,7 @@ describe('Profile commands', () => {
     await sql.unsafe(`create function reject_outbox() returns trigger language plpgsql as $$ begin raise exception 'outbox rejected'; end $$`);
     await sql.unsafe(`create trigger reject_outbox before insert on outbox_events for each row execute function reject_outbox()`);
     try {
-      await expect(service().ensure('user_1')).rejects.toThrow('outbox rejected');
+      await expect(service().ensure('user_1')).rejects.toMatchObject({ _tag: 'ProfileUnavailable', operation: 'create-profile' });
       expect((await sql`select * from profiles`).length).toBe(0);
       expect((await sql`select * from handle_claims`).length).toBe(0);
     } finally {
@@ -1586,180 +1551,4 @@ describe('Profile commands', () => {
     }
   });
 
-  it('marks an outbox event published only after acknowledged publication', async () => {
-    identities.identities.set('user_1', { displayName: 'Ada', firstName: null, lastName: null });
-    await service().ensure('user_1');
-    const publisher = new FakeProfileEventPublisher();
-    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
-
-    await worker.publishPending();
-
-    const [stored] = await sql`select id, published_at from outbox_events`;
-    expect(publisher.events).toHaveLength(1);
-    expect(publisher.events[0].eventId).toBe(stored.id);
-    expect(stored.published_at).not.toBeNull();
-  });
-
-  it('publishes recorded Display-name updates through the typed outbox publisher', async () => {
-    identities.identities.set('user_1', { displayName: 'Before', firstName: null, lastName: null });
-    await service().ensure('user_1');
-    await service().updateDisplayName('user_1', 'After', 1);
-    const publisher = new FakeProfileEventPublisher();
-    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
-
-    await worker.publishPending();
-
-    expect(publisher.events).toMatchObject([
-      { eventType: 'profile.created' },
-      {
-        eventType: 'profile.updated',
-        change: { type: 'display-name-changed', before: 'Before', after: 'After' },
-        profile: { displayName: 'After', version: 2 },
-      },
-    ]);
-  });
-
-  it('publishes outbox rows recorded before typed changes were added', async () => {
-    const timestamp = new Date().toISOString();
-    await sql`
-      insert into outbox_events (id, subject, aggregate_id, payload)
-      values (
-        'evt_legacy',
-        'profile.created',
-        'user_legacy',
-        ${sql.json({
-          eventId: 'evt_legacy',
-          eventType: 'profile.created',
-          timestamp,
-          profile: {
-            id: 'user_legacy',
-            displayName: 'Legacy Profile',
-            handle: 'legacy-profile',
-            claimGeneration: 1,
-            biographyMarkdown: '',
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          },
-        })}
-      )
-    `;
-    const publisher = new FakeProfileEventPublisher();
-    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
-
-    await worker.publishPending();
-
-    expect(publisher.events).toMatchObject([
-      { eventId: 'evt_legacy', change: { type: 'created' } },
-    ]);
-    expect((await sql`select published_at from outbox_events`)[0].published_at).not.toBeNull();
-  });
-
-  it('leaves failed publications retryable', async () => {
-    identities.identities.set('user_1', { displayName: 'Ada', firstName: null, lastName: null });
-    await service().ensure('user_1');
-    const publisher = new FakeProfileEventPublisher();
-    publisher.failuresRemaining = 1;
-    const timer = new FakeTimerService();
-    const worker = new ProfileOutboxPublisherWorker(
-      database,
-      publisher,
-      { error: () => {} },
-      timer
-    );
-
-    worker.start();
-    await worker.publishPending();
-    expect((await sql`select published_at from outbox_events`)[0].published_at).toBeNull();
-
-    await timer.tickAsync(1_000);
-    expect(publisher.events).toHaveLength(1);
-    expect((await sql`select published_at from outbox_events`)[0].published_at).not.toBeNull();
-    await worker.stop();
-  });
-
-  it('leaves unrelated outbox subjects for their owning publisher', async () => {
-    const timestamp = new Date().toISOString();
-    await sql`
-      insert into outbox_events (id, subject, aggregate_id, payload)
-      values (
-        'evt_unrelated',
-        'wallpaper.uploaded',
-        'wallpaper_1',
-        ${sql.json({
-          eventId: 'evt_unrelated',
-          eventType: 'profile.created',
-          timestamp,
-          change: { type: 'created' },
-          profile: {
-            id: 'user_unrelated',
-            displayName: 'Wrong Publisher',
-            handle: 'wrong-publisher',
-            claimGeneration: 1,
-            biographyMarkdown: '',
-            pictureAssetId: null,
-            version: 1,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          },
-        })}
-      )
-    `;
-    identities.identities.set('user_profile', {
-      displayName: 'Profile Event',
-      firstName: null,
-      lastName: null,
-    });
-    await service().ensure('user_profile');
-    const publisher = new FakeProfileEventPublisher();
-    const worker = new ProfileOutboxPublisherWorker(database, publisher, { error: () => {} });
-
-    await worker.publishPending();
-
-    expect(publisher.events.map((event) => event.profile.id)).toEqual(['user_profile']);
-    const [unrelated] = await sql`
-      select published_at from outbox_events where id = 'evt_unrelated'
-    `;
-    expect(unrelated.published_at).toBeNull();
-  });
-
-  it('publishes created and updated events through the production NATS adapter', async () => {
-    const nats = container.resolve(NatsConnectionManager).getClient();
-    await nats.jetstreamManager().then((manager) =>
-      manager.streams.add({
-        name: 'PROFILE',
-        subjects: ['profile.>'],
-      })
-    );
-    identities.identities.set('user_real_nats', {
-      displayName: 'Real NATS',
-      firstName: null,
-      lastName: null,
-    });
-
-    const ensureResponse = await request('user_real_nats');
-    expect(ensureResponse.statusCode).toBe(200);
-    const updateResponse = await patch('user_real_nats', 'Updated via real NATS', 1);
-    expect(updateResponse.statusCode).toBe(200);
-
-    await expect.poll(
-      async () => {
-        const events = await sql`
-          select subject, published_at
-          from outbox_events
-          where aggregate_id = 'user_real_nats'
-          order by subject
-        `;
-        return events.map((event) => ({
-          subject: event.subject,
-          published: event.published_at !== null,
-        }));
-      },
-      { timeout: 5_000 }
-    ).toEqual([
-      { subject: 'profile.created', published: true },
-      { subject: 'profile.updated', published: true },
-    ]);
-  });
 });

@@ -39,7 +39,7 @@ Intentional corrections: transient wallpaper storage failures become uncached 50
 
 ## Review findings and validation
 
-To be updated as work completes.
+The full migration was independently reviewed from the pinned base through `252043c`. Findings and fixes are recorded below.
 
 Baseline CRAP was recomputed from the original source snapshot and the repeated original 55-test coverage using the same analyzer and attribution policy as `scripts/crap.mts`. Highest score: 52.188 (`createApp`, 25% effective coverage). Original-source ranking retained during implementation at `/tmp/media-baseline-ranking.tsv`.
 
@@ -54,3 +54,26 @@ Legacy catalog tests exposed missing publication intent and duplicate variant id
 Test validity corrections replace fixed sleeps with bounded acknowledgement/projection conditions. Variant fixtures now have different colors, and decoded pixels prove which source was selected. Forcing the catalog to return no variant fails the corrected selection test even though the output dimensions remain correct. The former trace-header test no longer claims to prove propagation; the production telemetry test does that.
 
 Temporary mutations removing the production tracer, logger, Effect metric producer, and HTTP incoming-context bridge each fail the telemetry composition contract. All mutations were restored before normal validation.
+
+
+### Standards review
+
+The first pass found three P2 issues: missing resize diagnostics/lifetime tracing, an idle PostgreSQL error printed outside owned telemetry, and incomplete event identity/outcome annotations. Each was fixed in a focused commit. The second pass reported **zero remaining findings**, including no actionable smell-baseline findings.
+
+### Spec review
+
+The first pass found one P2 issue: an uninterruptible PostgreSQL transaction could exceed the consumer shutdown deadline. A real lock-contention test reproduced it. Connections now close on interruption or the total operation deadline; PostgreSQL checks closed sockets while blocked. Real PostgreSQL and composed NATS/PostgreSQL tests prove connection release, rollback/replay, and retained unacknowledged input. The second pass reported **zero remaining findings**.
+
+### Independent deep review
+
+The user-requested review covered security, tautological/incorrect tests, feature regressions, bugs, and general quality beyond the guidelines. Both passes reported **zero actionable findings**. Reviewers were independent and read-only; these results do not establish absence of defects.
+
+### Final verification
+
+`make check PACKAGE=media` passes build, lint, types, and architecture checks. All 151 Media tests pass across 18 files. `make check-crap PACKAGE=media CRAP_THRESHOLD=30` reports zero of 103 functions above 30; maximum CRAP is 28.012 for metadata translation (baseline maximum 52.188). Coverage includes all production source: 92.74% lines/statements, 92.65% branches, 80.39% functions. Callback/generator attribution limitations remain those tracked in #217.
+
+The production Dockerfile builds successfully and starts the complete emitted artifact as its non-root service user, including deferred chunks and the native resize worker. `/ready` and all `/health` checks pass against the real local stack.
+
+Local validation required a readable temporary copy of the public PostgreSQL init SQL because this worktree's bind-mount permissions are restrictive. The first full CI attempt lacked the local application stack; the next passed browser authentication/upload but exposed the test-utils suite's existing Docker Desktop socket assumption. The Linux run uses `GITHUB_ACTIONS=true` and a temporary Turbo wrapper with `--env-mode=loose` so that setting reaches child tests. No repository assertions or test retry settings were weakened.
+
+Full local CI passed after that environment adjustment: 73 build/check/test tasks and 10 E2E/dependency tasks, in 333 seconds excluding prerequisite checks. Browser authentication, login, and upload passed against the running stack. The production-container recording and independently decoded responses are documented in [the evidence report](../docs/evidence/media-effect.md).

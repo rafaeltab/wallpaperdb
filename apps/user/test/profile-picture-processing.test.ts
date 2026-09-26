@@ -1,5 +1,7 @@
 import sharp from 'sharp';
-import { describe, expect, it } from 'vitest';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
 import { PictureCodec, type PictureLimits } from '../src/pictures/index.js';
@@ -59,5 +61,26 @@ describe('Profile picture processing', () => {
     expect(metadata.icc).toBeUndefined();
     expect(metadata.orientation).toBeUndefined();
     expect(await sharp(picture.bytes).raw().toBuffer()).toHaveLength(2 * 3 * 3);
+  });
+  it('kills and reaps its native encoder before interrupted work completes', async () => {
+    const input = await sharp({ create: { width: 4000, height: 4000, channels: 3, background: '#3578aa' } }).png().toBuffer();
+    const abort = new AbortController();
+    const spawn = vi.spyOn(childProcess, 'spawn');
+    syncBuiltinESMExports();
+    const running = Effect.runPromise(Effect.flatMap(PictureCodec, codec => codec.process(input)).pipe(
+      Effect.provide(pictureCodecLayer(limits)),
+    ), { signal: abort.signal });
+    const settled = running.then(value => ({ value }), error => ({ error }));
+    try {
+      await vi.waitFor(() => expect(spawn).toHaveReturned(), { timeout: 3000, interval: 5 });
+      const result = spawn.mock.results[0];
+      if (!result || result.type !== 'return') throw new Error('Expected native encoder process');
+      const child = result.value;
+      abort.abort();
+      expect(await settled).toHaveProperty('error');
+      expect(child.signalCode).toBe('SIGKILL');
+      expect(child.pid).toBeDefined();
+      expect(() => process.kill(child.pid!, 0)).toThrow();
+    } finally { abort.abort(); await settled; spawn.mockRestore(); syncBuiltinESMExports(); }
   });
 });

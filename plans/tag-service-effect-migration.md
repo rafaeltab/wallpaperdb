@@ -8,7 +8,7 @@ Migrate only the existing service skeleton to Effect and the current coding guid
 
 ## Preservation contract
 
-| Contract | Existing behavior | Evidence planned |
+| Contract | Existing behavior | Evidence |
 | --- | --- | --- |
 | Health | database, nats, otel checks; healthy when all pass, degraded when mixed, unhealthy when none pass; ISO timestamp and duration | Availability and HTTP contracts, real dependency probes |
 | Health status | Healthy and degraded return 200; unhealthy/shutdown return 503 | Exact HTTP responses |
@@ -40,7 +40,7 @@ Intentional corrections: use stable Problem Details for HTTP errors, including 5
 
 ## Validation and review log
 
-Record completed tests, red/green evidence, review findings and delivery here as work progresses.
+The following records the completed behavioral checks and independent review loops.
 
 ### Implementation evidence
 
@@ -55,12 +55,26 @@ Record completed tests, red/green evidence, review findings and delivery here as
 
 The code-review skill reviewed the full diff from the fixed base in separate Standards and Spec agents. A third independent agent used the user's deeper review prompt.
 
-- Standards: one P2 finding. Telemetry initialization/shutdown warnings discarded actionable diagnostic context. A safe diagnostic mechanism is being added without exposing endpoint credentials.
+- Standards: one P2 finding. Telemetry initialization/shutdown warnings discarded actionable diagnostic context. Commit `6ec07d3b` retains bounded diagnostic fields and redacts URLs, credentials, and query values. Disabling redaction makes the privacy regression test fail.
 - Spec: one P2 finding. Fastify's default closing response bypassed Problem Details. A real TCP test held one health request open, began shutdown, and pipelined a second request. It reproduced the plain JSON 503. Commit `4cd68677` lets the operational handlers translate shutdown state, with exactly one dependency probe.
-- Deeper review: three findings, including the same closing-response defect. The production Dockerfile overwrote newer tags OpenTelemetry dependencies with older Core versions; a real image regression is being added. An inherited TLS downgrade allowed `tls://` URLs to use plaintext NATS; commit `95da02cb` requires encryption. The real broker test failed before the fix and passes afterward.
+- Deeper review: three findings, including the same closing-response defect. The production Dockerfile overwrote newer tags OpenTelemetry dependencies with older Core versions. The real-image regression observed zero exported traces despite healthy telemetry, then passed after commit `09acb3c2` removed that overlay. An inherited TLS downgrade allowed `tls://` URLs to use plaintext NATS; commit `95da02cb` requires encryption. The real broker test failed before the fix and passes afterward.
 
-### Repository validation so far
+### Subsequent independent reviews
 
-`make check PACKAGE=tags` passes build, lint, TypeScript and architecture enforcement. The built executable tests found and drove fixes for the OpenAPI runtime dependency and successful signal shutdown exit status. `make check-crap PACKAGE=tags CRAP_THRESHOLD=30` reports zero functions above 30; the first post-migration report has maximum 12.000, down from 90.000. Child-process execution and the shared callback/generator attribution limitation mean line coverage and CRAP are supplementary evidence.
+The second Standards and Spec passes had zero findings. The deeper review found one additional P2 defect: Node HTTP parser errors bypassed Problem Details. Commit `13b00348` translates malformed requests, oversized headers, and timeouts to safe 400, 431, and 408 responses. Raw TCP tests reproduced the previous malformed-request and oversized-header bodies and pass after the fix. The timeout mapping was reviewed but has no dedicated socket regression test.
 
-The first full `make ci` passed all 74 build/lint/type/unit/integration tasks. Browser E2E then reported that the local application stack was absent. The stack was started afterward. PostgreSQL required a readable temporary copy of public initialization SQL at `/tmp/tags-validation-infra/postgres-init`, mounted through a local Compose override. No tracked infrastructure files or persistent volumes were deleted. Final CI and review results follow after the remaining fixes.
+The final full-diff review against `e8c07dd4` through `13b00348` reports zero Standards findings, zero Spec findings, and zero deeper-review findings. Reviewers checked the final image-test cleanup correction in `c31c0849` as well. These are review results, not proof that no defects exist.
+
+### Repository validation
+
+`make check PACKAGE=tags` passes build, lint, TypeScript and architecture enforcement. The built executable tests found and drove fixes for the OpenAPI runtime dependency and successful signal shutdown exit status. The final `make check-crap PACKAGE=tags CRAP_THRESHOLD=30` reports zero of 35 functions above 30. `make crap PACKAGE=tags` reports a maximum of 12.000, down from 90.000. All production source remains in coverage scope. Child-process execution and the shared callback/generator attribution limitation tracked in issue #217 mean line coverage and CRAP are supplementary evidence.
+
+The first full `make ci` passed all 74 build/lint/type/unit/integration tasks. Browser E2E then reported that the local application stack was absent. The stack was started afterward. PostgreSQL required a readable temporary copy of public initialization SQL at `/tmp/tags-validation-infra/postgres-init`, mounted through a local Compose override. No tracked infrastructure files or persistent volumes were deleted.
+
+A later run found an unsafe cleanup pattern in the new image test. Commit `c31c0849` moves cleanup into the test runner's completion hook, retaining original failures and reporting cleanup failures separately. After that fix, all 74 main tasks and all three browser tests passed. Shared test-utils E2E then failed because its default socket is Docker Desktop's absent socket. `GITHUB_ACTIONS=true` selects the existing Linux socket path without changing tests or assertions.
+
+Final `GITHUB_ACTIONS=true make ci` passed. It completed all 74 build/lint/type/unit/integration tasks and all 11 E2E/dependency tasks, with 73 and 6 task-cache hits respectively. The CI runner reported 215 seconds excluding prerequisite checks. Tags has 66 unit tests, 11 integration tests, and one production-image E2E test, all passing. The existing browser suite passed all three tests, and containerized Ingestor E2E passed all three. The shared test-utils suite retains its 12 existing skips. No assertions or retry settings were changed to obtain this result.
+
+### Delivery evidence
+
+[The recording and evidence notes](../docs/evidence/tag-service-effect.md) show the real production container's operational endpoints. The Docker image uses real dependencies, and no browser responses are mocked. This is a service skeleton, so there is no tagging workflow in the wallpaper UI.

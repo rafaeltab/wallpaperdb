@@ -56,11 +56,12 @@ OTEL_SERVICE_NAME=tags
 make check PACKAGE=tags
 make test-unit PACKAGE=tags
 make test-integration PACKAGE=tags
+make test-e2e PACKAGE=tags
 make check-crap PACKAGE=tags CRAP_THRESHOLD=30
 make run PACKAGE=tags SCRIPT=gen:swagger
 ```
 
-Integration tests use real PostgreSQL and NATS. They also exercise the built Node entrypoint and the production telemetry mechanism. No tagging feature exists to demonstrate in the wallpaper UI.
+Integration tests use real PostgreSQL and NATS. They also exercise the built Node entrypoint and the production telemetry mechanism. The E2E test builds the production Docker image and verifies exported traces, logs, and metrics after shutdown. No tagging feature exists to demonstrate in the wallpaper UI.
 
 ## Related Documentation
 

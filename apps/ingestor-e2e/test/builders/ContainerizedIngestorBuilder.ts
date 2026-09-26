@@ -47,6 +47,7 @@ export class ContainerizedIngestorTesterBuilder extends BaseTesterBuilder<
               S3_ACCESS_KEY_ID: s3.options.accessKey,
               S3_SECRET_ACCESS_KEY: s3.options.secretKey,
               S3_BUCKET: 'wallpapers',
+              ASSET_REFERENCE_BUCKET: 'asset-references',
               S3_REGION: 'us-east-1',
               NATS_URL: nats.endpoints.networked,
               NATS_STREAM: 'WALLPAPER',

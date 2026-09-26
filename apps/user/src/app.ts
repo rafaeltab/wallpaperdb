@@ -186,5 +186,15 @@ export function userLayer(config: Config, options: AppOptions = {}) {
   );
 }
 export function createApp(config: Config, options: AppOptions = {}) {
-  return createHttpApp(config, userLayer(config, options), options);
+  return createHttpApp(
+    {
+      nodeEnv: config.nodeEnv,
+      port: config.port,
+      clerkSecretKey: config.clerkSecretKey,
+      profilePictureMaxBytes: config.profilePictureMaxBytes,
+      userMediaServiceToken: config.userMediaServiceToken,
+    },
+    userLayer(config, options),
+    options
+  );
 }

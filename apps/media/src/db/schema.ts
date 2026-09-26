@@ -121,3 +121,9 @@ export const catalogOutbox = pgTable('catalog_outbox', {
     .$type<import('../catalog/index.js').AvailableNotification>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Immutable target acceptance survives outbox acknowledgement and legacy row reconciliation. */
+export const catalogTargets = pgTable('catalog_targets', {
+  id: text('id').primaryKey(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
+});

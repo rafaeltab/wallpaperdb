@@ -3,7 +3,7 @@ import {
   DockerTesterBuilder,
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import { headers } from 'nats';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
@@ -421,5 +421,155 @@ it.each([
       max_age: 30 * 24 * 60 * 60 * 1_000_000_000,
       max_msgs_per_subject: -1,
     });
+  }
+});
+
+const decodeManifest = Schema.decodeUnknownSync(
+  Schema.Struct({
+    quarantineId: Schema.String,
+    chunkCount: Schema.Number,
+    chunkSize: Schema.Number,
+    totalBytes: Schema.Number,
+    sha256: Schema.String,
+    sequences: Schema.Array(Schema.Number),
+  })
+);
+it('durably quarantines an invalid body at the broker payload limit without losing bytes', async () => {
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'quarantine-limit-contract',
+    retryDelayMs: 10,
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: () => Effect.die('Invalid input must not cross the driving port'),
+        })
+      )
+    )
+  );
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const connection = await tester.nats.getConnection();
+    const limit = connection.info?.max_payload;
+    if (!limit) throw new Error('Broker did not advertise its payload limit');
+    const payload = new Uint8Array(limit).fill(255);
+    const manager = await connection.jetstreamManager();
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .ack_floor.consumer_seq,
+        { timeout: 3000 }
+      )
+      .toBe(1);
+    const info = await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE');
+    const manifestMessage = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+      last_by_subj: 'color-extractor.quarantine',
+    });
+    const manifest = decodeManifest(manifestMessage.json());
+    expect(manifestMessage.header.get('ce-type')).toBe(
+      'color-extractor.upload.quarantine-manifest'
+    );
+    const chunks: Uint8Array[] = [];
+    for (let sequence = info.state.first_seq; sequence < info.state.last_seq; sequence++) {
+      const chunk = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+        seq: sequence,
+      });
+      expect(chunk.header.get('ce-quarantineid')).toBe(manifest.quarantineId);
+      expect(chunk.header.get('ce-chunkindex')).toBe(String(chunks.length));
+      chunks.push(chunk.data);
+    }
+    expect(chunks).toHaveLength(manifest.chunkCount);
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it.each([
+  false,
+  true,
+])('resumes a rejected chunk handoff after capacity recovery (purge partial records: %s)', async (purgePartial) => {
+  let attempts = 0;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'quarantine-partial-contract',
+    retryDelayMs: 20,
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: () =>
+            Effect.suspend(() => {
+              attempts++;
+              return Effect.fail(
+                new ExtractionUnavailable({ operation: 'controlled', cause: 'offline' })
+              );
+            }),
+        })
+      )
+    )
+  );
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msg_size: 2048, max_msgs: 1 });
+    const event = upload('partial-quarantine');
+    event.wallpaper.originalFilename = 'x'.repeat(8192);
+    const payload = new TextEncoder().encode(JSON.stringify(event));
+    await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload);
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .delivered.consumer_seq,
+        { timeout: 5000 }
+      )
+      .toBeGreaterThanOrEqual(4);
+    expect(attempts).toBe(3);
+    expect((await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages).toBe(1);
+    expect(
+      (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+        .num_ack_pending
+    ).toBe(1);
+    if (purgePartial) await manager.streams.purge('COLOR_EXTRACTOR_QUARANTINE');
+    await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msgs: -1 });
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .num_ack_pending,
+        { timeout: 5000 }
+      )
+      .toBe(0);
+    expect(attempts).toBe(3);
+    const manifest = decodeManifest(
+      (
+        await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+          last_by_subj: 'color-extractor.quarantine',
+        })
+      ).json()
+    );
+    const chunks = await Promise.all(
+      manifest.sequences.map(
+        async (seq: number) =>
+          (await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', { seq })).data
+      )
+    );
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(payload));
+    expect((await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages).toBe(
+      manifest.chunkCount + 1
+    );
+  } finally {
+    await runtime.dispose();
+    await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msg_size: -1, max_msgs: -1 });
   }
 });

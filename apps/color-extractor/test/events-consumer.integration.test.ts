@@ -374,3 +374,52 @@ it('preserves binary occurrence metadata through quarantine and successful opera
     await runtime.dispose();
   }
 });
+
+it.each([
+  { max_bytes: -1 },
+  { max_age: 300 * 1_000_000_000 },
+  { max_msgs_per_subject: 1 },
+])('refuses incompatible quarantine policy %j without overwriting it', async (override) => {
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'quarantine-config-contract',
+  };
+  const makeRuntime = () =>
+    ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provide(natsEventsLayer(options)),
+        Layer.provide(Layer.succeed(ExtractColors, { extract: () => Effect.die('no input') }))
+      )
+    );
+  const initial = makeRuntime();
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  await initial.runPromise(ConsumerHealth);
+  await initial.dispose();
+  const config = (await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).config;
+  expect(config).toMatchObject({
+    retention: 'limits',
+    storage: 'file',
+    discard: 'new',
+    max_bytes: 1024 * 1024 * 1024,
+    max_age: 30 * 24 * 60 * 60 * 1_000_000_000,
+  });
+  await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', override);
+  const incompatible = makeRuntime();
+  try {
+    await expect(incompatible.runPromise(ConsumerHealth)).rejects.toMatchObject({
+      _tag: 'ExtractionUnavailable',
+      operation: 'configure-quarantine',
+    });
+    expect((await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).config).toMatchObject(
+      override
+    );
+  } finally {
+    await incompatible.dispose();
+    await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', {
+      max_bytes: 1024 * 1024 * 1024,
+      max_age: 30 * 24 * 60 * 60 * 1_000_000_000,
+      max_msgs_per_subject: -1,
+    });
+  }
+});

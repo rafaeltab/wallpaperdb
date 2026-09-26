@@ -29,6 +29,7 @@ export function ingestorLayer(config: Config, options: AppOptions = {}) {
     accessKeyId: Redacted.value(config.s3AccessKeyId),
     secretAccessKey: Redacted.value(config.s3SecretAccessKey),
     bucket: config.s3Bucket,
+    assetReferenceBucket: config.assetReferenceBucket,
   });
   const events = uploadedEventsLayer({
     url: config.natsUrl,

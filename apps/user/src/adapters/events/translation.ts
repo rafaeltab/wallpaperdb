@@ -17,6 +17,10 @@ const envelope = z.object({
   time: z.string().datetime(),
   correlationid: z.string().min(1).optional(),
   causationid: z.string().min(1).optional(),
+  causationsource: z.string().min(1).optional(),
+});
+const structuredEnvelope = WallpaperUploadedCloudEventSchema.extend({
+  causationsource: envelope.shape.causationsource,
 });
 type Envelope = z.infer<typeof envelope>;
 type EventIdentity = { readonly eventId: string; readonly timestamp: string };
@@ -35,6 +39,7 @@ function binaryEnvelope(headers: MsgHdrs | undefined) {
     time: headers.get('ce-time'),
     correlationid: headers.get('ce-correlationid') || undefined,
     causationid: headers.get('ce-causationid') || undefined,
+    causationsource: headers.get('ce-causationsource') || undefined,
   });
 }
 
@@ -45,7 +50,7 @@ function eventMetadata(
   event: EventIdentity
 ): MetadataResult {
   const structured = Predicate.hasProperty(raw, 'specversion')
-    ? WallpaperUploadedCloudEventSchema.safeParse(raw)
+    ? structuredEnvelope.safeParse(raw)
     : undefined;
   const binary = binaryEnvelope(headers);
   for (const parsed of [structured, binary]) {
@@ -55,7 +60,14 @@ function eventMetadata(
     )
       return { valid: false };
   }
-  if (structured?.success && binary?.success && structured.data.source !== binary.data.source)
+  if (
+    structured?.success &&
+    binary?.success &&
+    (structured.data.source !== binary.data.source ||
+      structured.data.correlationid !== binary.data.correlationid ||
+      structured.data.causationid !== binary.data.causationid ||
+      structured.data.causationsource !== binary.data.causationsource)
+  )
     return { valid: false };
   if (structured?.success) return { valid: true, value: structured.data };
   if (binary?.success) return { valid: true, value: binary.data };

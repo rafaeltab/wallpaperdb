@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { S3Client } from '@aws-sdk/client-s3';
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { resolveAssetReference } from '@wallpaperdb/core/assets';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
@@ -411,7 +411,15 @@ const implementations = Layer.effectContext(
       Context.add(Catalog, catalog),
       Context.add(CatalogHealth, {
         check: Effect.tryPromise({
-          try: execute((db) => db.execute(sql`SELECT 1`)),
+          try: (signal) =>
+            Promise.all([
+              execute((db) => db.execute(sql`SELECT 1`))(signal),
+              reader
+                ? reader.client.send(new HeadBucketCommand({ Bucket: reader.bucket }), {
+                    abortSignal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+                  })
+                : Promise.resolve(),
+            ]),
           catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
         }).pipe(
           Effect.as(true),

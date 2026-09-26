@@ -1,3 +1,5 @@
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
 import { OtelMetrics, Resource } from '@effect/opentelemetry';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
@@ -95,5 +97,3 @@ export const initializeOtel = Effect.fn('tags.telemetry.initialize')(function* (
     )
   );
 });
-import { Agent as HttpAgent } from 'node:http';
-import { Agent as HttpsAgent } from 'node:https';

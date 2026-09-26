@@ -1,181 +1,171 @@
-import { registerAuth } from '@wallpaperdb/auth';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import type { TimerService } from '@wallpaperdb/core/timer';
-import Fastify, { type FastifyInstance } from 'fastify';
-import { container } from 'tsyringe';
+import { Effect, Layer } from 'effect';
 import type { Config } from './config.js';
-import { DatabaseConnection } from './connections/database.js';
-import { NatsConnectionManager } from './connections/nats.js';
-import { registerUserCors } from './http/cors.js';
-import { getOtelSdk, shutdownOtel } from './otel-init.js';
-import { registerRoutes } from './routes/index.js';
-import { ClerkIdentityProvider, IdentityProviderToken } from './services/clerk-identity.service.js';
-import { ProfileAliasExpiryWorker } from './services/profile-alias-expiry.service.js';
-import { ProfileEventRetentionService } from './services/profile-event-retention.service.js';
-import { ProfileEvidenceRetentionWorker } from './services/profile-evidence-retention-worker.js';
-import { ProfilePictureRetentionService } from './services/profile-picture-retention.service.js';
-import { ProfileService } from './services/profile.service.js';
-import { ProfilePictureStorage } from './services/profile-picture-storage.js';
-import { ProfilePictureImportService } from './services/profile-picture-import.service.js';
-import { ProfilePictureImportWorker } from './services/profile-picture-import-worker.js';
-import { WallpaperOwnershipConsumer } from './services/consumers/wallpaper-ownership.consumer.js';
+import { Database, databaseLayer } from './adapters/database/index.js';
 import {
-  NatsProfileEventPublisher,
-  ProfileOutboxPublisherWorker,
-} from './services/profile-outbox-publisher.service.js';
+  brokerLayer,
+  eventStoreLayer,
+  eventPublisherLayer,
+  ownershipConsumerLayer,
+  EventsHealth,
+  ConsumerHealth,
+} from './adapters/events/index.js';
+import { profileStoreLayer, clerkIdentitiesLayer } from './adapters/profiles/index.js';
+import {
+  pictureCodecLayer,
+  pictureSourceLayer,
+  pictureStorageLayer,
+  pictureStoreLayer,
+} from './adapters/pictures/index.js';
+import { Identities, profilesLayer } from './profile/index.js';
+import { Pictures, picturesLayer } from './pictures/index.js';
+import { Maintenance, maintenanceLayer } from './maintenance/index.js';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { createHttpApp } from './http/index.js';
+import { Workers, workerLayer } from './workers.js';
+import { tracingLayer } from './runtime.js';
 
-export interface ConnectionsState {
-  isShuttingDown: boolean;
-  connectionsInitialized: boolean;
+export interface AppOptions {
+  readonly logger?: boolean;
+  readonly signal?: AbortSignal;
+  readonly shutdownTimeoutMs?: number;
+  readonly otelHealthy?: boolean;
+  readonly identities?: Identities;
+  readonly workers?: boolean;
 }
-
-declare module 'fastify' {
-  interface FastifyInstance {
-    connectionsState: ConnectionsState;
-    container: typeof container;
-  }
-
-  interface FastifyContextConfig {
-    skipAuth?: boolean;
-  }
+export function userLayer(config: Config, options: AppOptions = {}) {
+  const database = databaseLayer({ databaseUrl: config.databaseUrl });
+  const eventOptions = {
+    url: config.natsUrl,
+    stream: config.natsStream,
+    serviceName: config.otelServiceName,
+    shutdownTimeoutMs: options.shutdownTimeoutMs,
+  };
+  const broker = brokerLayer(eventOptions);
+  const profiles = profilesLayer(config).pipe(
+    Layer.provide(
+      Layer.merge(
+        profileStoreLayer(config).pipe(Layer.provide(database)),
+        options.identities
+          ? Layer.succeed(Identities, options.identities)
+          : clerkIdentitiesLayer(config)
+      )
+    )
+  );
+  const pictures = picturesLayer(config).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        profiles,
+        pictureStoreLayer({ bucket: config.profilePictureBucket }).pipe(Layer.provide(database)),
+        pictureCodecLayer({
+          maxBytes: config.profilePictureMaxBytes,
+          maxPixels: config.profilePictureMaxPixels,
+          maxDecodedBytes: config.profilePictureMaxDecodedBytes,
+        }),
+        pictureSourceLayer({
+          maxBytes: config.profilePictureMaxBytes,
+          timeoutMs: config.profilePictureImportTimeoutMs,
+          allowedHosts: config.profilePictureImportHosts,
+        }),
+        pictureStorageLayer({
+          endpoint: config.s3Endpoint,
+          region: config.s3Region,
+          accessKeyId: config.s3AccessKeyId,
+          secretAccessKey: config.s3SecretAccessKey,
+        })
+      )
+    )
+  );
+  const maintenance = maintenanceLayer({ retentionDays: config.profileEvidenceRetentionDays }).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        profiles,
+        eventStoreLayer().pipe(Layer.provide(database)),
+        eventPublisherLayer(eventOptions).pipe(Layer.provide(Layer.merge(database, broker)))
+      )
+    )
+  );
+  const consumer = ownershipConsumerLayer(eventOptions).pipe(
+    Layer.provide(Layer.merge(maintenance, broker))
+  );
+  const workers =
+    options.workers === false
+      ? Layer.succeed(Workers, { check: () => Effect.succeed(true) })
+      : Layer.unwrap(
+          Effect.gen(function* () {
+            const jobs = yield* Maintenance;
+            const assets = yield* Pictures;
+            return workerLayer(
+              [
+                {
+                  name: 'profile-publication',
+                  intervalMs: 1000,
+                  run: (stopping) =>
+                    jobs.publishPending(stopping).pipe(Effect.map((result) => result.failed === 0)),
+                },
+                {
+                  name: 'alias-expiry',
+                  intervalMs: 1000,
+                  run: (stopping) =>
+                    jobs
+                      .expireAliases(new Date(), stopping)
+                      .pipe(Effect.map((result) => result.failed === 0)),
+                },
+                {
+                  name: 'picture-import',
+                  intervalMs: 1000,
+                  run: (stopping) => assets.importPending(stopping).pipe(Effect.as(true)),
+                },
+                {
+                  name: 'event-retention',
+                  intervalMs: 60_000,
+                  run: (stopping) =>
+                    jobs
+                      .cleanupEvents(new Date(), stopping)
+                      .pipe(Effect.map((result) => result.failed === 0)),
+                },
+                {
+                  name: 'picture-retention',
+                  intervalMs: 60_000,
+                  run: (stopping) =>
+                    assets
+                      .cleanupExpired(new Date(), stopping)
+                      .pipe(Effect.map((result) => result.failed === 0)),
+                },
+              ],
+              options.shutdownTimeoutMs
+            );
+          })
+        ).pipe(Layer.provide(Layer.merge(maintenance, pictures)));
+  const probe = Layer.effect(
+    AvailabilityProbe,
+    Effect.gen(function* () {
+      const db = yield* Database;
+      const brokerHealth = yield* EventsHealth;
+      const consumerHealth = yield* ConsumerHealth;
+      const workerHealth = yield* Workers;
+      return AvailabilityProbe.of({
+        inspect: () =>
+          Effect.all(
+            {
+              database: db.check,
+              nats: brokerHealth.check(),
+              workers: Effect.all([consumerHealth.check(), workerHealth.check()]).pipe(
+                Effect.map((checks) => checks.every(Boolean))
+              ),
+              otel: Effect.succeed(!config.otelEndpoint || options.otelHealthy === true),
+            },
+            { concurrency: 'unbounded' }
+          ),
+      });
+    })
+  ).pipe(Layer.provide(Layer.mergeAll(database, broker, consumer, workers)));
+  return Layer.mergeAll(
+    profiles,
+    pictures,
+    maintenance,
+    availabilityLayer.pipe(Layer.provide(probe))
+  ).pipe(Layer.provideMerge(database), Layer.provideMerge(tracingLayer));
 }
-
-export async function createApp(
-  config: Config,
-  options?: {
-    logger?: boolean;
-    enableOtel?: boolean;
-    aliasExpiryTimer?: TimerService;
-    pictureImportTimer?: TimerService;
-    evidenceRetentionTimer?: TimerService;
-  }
-): Promise<FastifyInstance> {
-  container.register('config', { useValue: config });
-  container.register(IdentityProviderToken, { useClass: ClerkIdentityProvider });
-
-  const otelSdk = getOtelSdk();
-  if (otelSdk) {
-    container.register('otelSdk', { useValue: otelSdk });
-  }
-
-  const fastify = Fastify({
-    logger:
-      options?.logger !== false
-        ? {
-            level: config.nodeEnv === 'development' ? 'debug' : 'info',
-            transport:
-              config.nodeEnv === 'development'
-                ? {
-                    target: 'pino-pretty',
-                    options: {
-                      translateTime: 'HH:MM:ss Z',
-                      ignore: 'pid,hostname',
-                    },
-                  }
-                : undefined,
-          }
-        : false,
-  });
-
-  await registerUserCors(fastify, config.nodeEnv);
-
-  await registerAuth(fastify, {
-    secretKey: config.clerkSecretKey,
-    testMode: config.nodeEnv === 'test',
-  });
-
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB User API',
-    version: '1.0.0',
-    description:
-      'User management service. Tracks user sign-ups, profiles, and publishes user events via NATS.',
-    servers:
-      config.nodeEnv === 'production'
-        ? undefined
-        : [{ url: `http://localhost:${config.port}`, description: 'Local development server' }],
-  });
-
-  fastify.decorate('container', container);
-
-  fastify.decorate('connectionsState', {
-    isShuttingDown: false,
-    connectionsInitialized: false,
-  });
-
-  fastify.log.info('Initializing connections...');
-
-  let outboxPublisher: ProfileOutboxPublisherWorker | null = null;
-  let aliasExpiryWorker: ProfileAliasExpiryWorker | null = null;
-  let pictureImportWorker: ProfilePictureImportWorker | null = null;
-  let evidenceRetentionWorker: ProfileEvidenceRetentionWorker | null = null;
-
-  try {
-    await container.resolve(DatabaseConnection).initialize();
-    fastify.log.info('Database connection pool created');
-
-    await container.resolve(NatsConnectionManager).initialize();
-    fastify.log.info('NATS connection created');
-    await container.resolve(WallpaperOwnershipConsumer).start();
-
-    outboxPublisher = new ProfileOutboxPublisherWorker(
-      container.resolve(DatabaseConnection),
-      new NatsProfileEventPublisher(container.resolve(NatsConnectionManager), config),
-      fastify.log
-    );
-    aliasExpiryWorker = new ProfileAliasExpiryWorker(
-      container.resolve(DatabaseConnection),
-      (reference, now) => container.resolve(ProfileService).expireDueAlias(reference, now),
-      fastify.log,
-      options?.aliasExpiryTimer
-    );
-    pictureImportWorker = new ProfilePictureImportWorker(
-      async (isStopping) =>
-        container.resolve(ProfilePictureImportService).importPending(isStopping),
-      fastify.log,
-      options?.pictureImportTimer
-    );
-    const eventRetention = new ProfileEventRetentionService(
-      container.resolve(DatabaseConnection), config, fastify.log
-    );
-    const pictureRetention = new ProfilePictureRetentionService(
-      container.resolve(DatabaseConnection), container.resolve(ProfilePictureStorage), fastify.log
-    );
-    evidenceRetentionWorker = new ProfileEvidenceRetentionWorker(
-      (now, isStopping) => eventRetention.cleanupExpired(now, isStopping),
-      (now, isStopping) => pictureRetention.cleanupExpired(now, isStopping),
-      fastify.log,
-      options?.evidenceRetentionTimer
-    );
-    fastify.connectionsState.connectionsInitialized = true;
-    fastify.log.info('All connections initialized successfully');
-  } catch (error) {
-    fastify.log.error({ err: error }, 'Failed to initialize connections');
-    throw error;
-  }
-
-  fastify.addHook('onClose', async () => {
-    fastify.connectionsState.isShuttingDown = true;
-    await container.resolve(WallpaperOwnershipConsumer).stop();
-    await aliasExpiryWorker?.stop();
-    await evidenceRetentionWorker?.stop();
-    await pictureImportWorker?.stop();
-    container.resolve(ProfilePictureStorage).close();
-    await outboxPublisher?.stop();
-    await container.resolve(NatsConnectionManager).close();
-    await container.resolve(DatabaseConnection).close();
-    await shutdownOtel();
-  });
-
-  await registerRoutes(fastify, config);
-
-  outboxPublisher?.start();
-  fastify.log.info('Profile outbox publisher started');
-  aliasExpiryWorker?.start();
-  fastify.log.info('Profile alias expiry worker started');
-  pictureImportWorker?.start();
-  fastify.log.info('Profile picture import worker started');
-  evidenceRetentionWorker?.start();
-  fastify.log.info('Profile evidence retention worker started');
-
-  return fastify;
+export function createApp(config: Config, options: AppOptions = {}) {
+  return createHttpApp(config, userLayer(config, options), options);
 }

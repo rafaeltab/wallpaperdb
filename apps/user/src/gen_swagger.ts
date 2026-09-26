@@ -1,40 +1,43 @@
-import 'reflect-metadata';
 import { writeFile } from 'node:fs/promises';
-import { registerOpenAPI } from '@wallpaperdb/core/openapi';
-import Fastify from 'fastify';
-import { registerRoutes } from './routes/index.js';
-import { container } from 'tsyringe';
+import { Effect, Layer } from 'effect';
+import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { Profiles } from './profile/index.js';
+import { Pictures } from './pictures/index.js';
+import { createHttpApp } from './http/index.js';
 
-async function generateSwagger(): Promise<string> {
-  container.register('config', {
-    useValue: {},
-  });
-
-  const fastify = Fastify({
-    logger: false,
-  });
-
-  await registerOpenAPI(fastify, {
-    title: 'WallpaperDB User API',
-    version: '1.0.0',
-    description:
-      'User management service. Tracks user sign-ups, profiles, and publishes user events via NATS.',
-    servers: [{ url: `http://localhost:3009`, description: 'Local development server' }],
-  });
-
-  await registerRoutes(fastify);
-
-  await fastify.ready();
-
-  const swagger = fastify.swagger();
-
-  try {
-    await fastify.close();
-  } catch (_) {}
-
-  return JSON.stringify(swagger, null, 2);
+const unavailable = () => Effect.die('Schema generation does not execute commands');
+const services = Layer.mergeAll(
+  availabilityLayer.pipe(
+    Layer.provide(
+      Layer.succeed(AvailabilityProbe, {
+        inspect: () =>
+          Effect.succeed({ database: false, nats: false, otel: false, workers: false }),
+      })
+    )
+  ),
+  Layer.succeed(Profiles, {
+    ensure: unavailable,
+    updateDetails: unavailable,
+    changeHandle: unavailable,
+    reactivateAlias: unavailable,
+    scheduleAliasExpiry: unavailable,
+    expireAliasImmediately: unavailable,
+    expireDueAlias: unavailable,
+    adoptPicture: unavailable,
+    adoptImportedPicture: unavailable,
+  }),
+  Layer.succeed(Pictures, {
+    stage: unavailable,
+    upload: unavailable,
+    pictureAvailable: unavailable,
+    importPending: unavailable,
+    cleanupExpired: unavailable,
+  })
+);
+const app = await createHttpApp({ nodeEnv: 'test', port: 3009 }, services);
+try {
+  await app.ready();
+  await writeFile('swagger.json', JSON.stringify(app.swagger(), null, 2));
+} finally {
+  await app.close();
 }
-
-const swagger = await generateSwagger();
-
-writeFile('swagger.json', swagger);

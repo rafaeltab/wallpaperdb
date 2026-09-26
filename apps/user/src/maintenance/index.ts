@@ -108,7 +108,7 @@ export const maintenanceLayer = (policy: { retentionDays: number }) =>
         (event, cutoff) => store.deleteExpiredEvent(event.id, cutoff)
       );
       const publishPending = batchProcessor(
-        (_input: void, after?: EventReference) => store.pendingEvents(after),
+        (_input: undefined, after?: EventReference) => store.pendingEvents(after),
         (event) =>
           events.publish(event.id).pipe(
             Effect.andThen(() =>

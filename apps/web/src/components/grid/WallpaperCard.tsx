@@ -66,34 +66,38 @@ export function WallpaperCard({
   };
 
   return (
-    <button
-      type="button"
-      className={`
-        relative overflow-hidden rounded-lg cursor-pointer
-        transition-shadow duration-200 w-full h-full
-        hover:shadow-lg
-        ${isExpanded ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow'}
-      `}
-      onClick={onClick}
+    <fieldset
+      className="relative m-0 min-w-0 border-0 p-0 w-full h-full"
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      aria-expanded={isExpanded}
-      aria-label={`Wallpaper ${item.id}`}
     >
-      {/* Skeleton shown while image is loading */}
-      {!isLoaded && <Skeleton className="absolute inset-0 rounded-lg" />}
-      <img
-        src={item.src}
-        alt={`Wallpaper ${item.id}`}
+      <button
+        type="button"
         className={`
-          w-full h-full object-cover
-          transition-opacity duration-300
-          ${isLoaded ? 'opacity-100' : 'opacity-0'}
+          relative overflow-hidden rounded-lg cursor-pointer
+          transition-shadow duration-200 w-full h-full
+          hover:shadow-lg
+          ${isExpanded ? 'ring-2 ring-blue-500 shadow-xl' : 'shadow'}
         `}
-        loading="lazy"
-        draggable={false}
-        onLoad={() => setIsLoaded(true)}
-      />
+        onClick={onClick}
+        aria-expanded={isExpanded}
+        aria-label={`Wallpaper ${item.id}`}
+      >
+        {/* Skeleton shown while image is loading */}
+        {!isLoaded && <Skeleton className="absolute inset-0 rounded-lg" />}
+        <img
+          src={item.src}
+          alt={`Wallpaper ${item.id}`}
+          className={`
+            w-full h-full object-cover
+            transition-opacity duration-300
+            ${isLoaded ? 'opacity-100' : 'opacity-0'}
+          `}
+          loading="lazy"
+          draggable={false}
+          onLoad={() => setIsLoaded(true)}
+        />
+      </button>
 
       {/* Overlay menu - only show when expanded and not skeleton */}
       {isExpanded && wallpaper && (
@@ -102,6 +106,7 @@ export function WallpaperCard({
           <Tooltip>
             <TooltipTrigger asChild>
               <Link
+                aria-label="View details"
                 to="/wallpapers/$wallpaperId"
                 params={{ wallpaperId: wallpaper.wallpaperId }}
                 target="_blank"
@@ -119,6 +124,7 @@ export function WallpaperCard({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                aria-label="Download original"
                 onClick={handleDownload}
                 className="inline-flex items-center justify-center size-8 rounded-[min(var(--radius-md),10px)] text-white hover:text-white hover:bg-white/20 transition-all"
                 type="button"
@@ -133,6 +139,7 @@ export function WallpaperCard({
           <Tooltip>
             <TooltipTrigger asChild>
               <button
+                aria-label="Share"
                 onClick={handleShare}
                 className="inline-flex items-center justify-center size-8 rounded-[min(var(--radius-md),10px)] text-white hover:text-white hover:bg-white/20 transition-all"
                 type="button"
@@ -144,6 +151,6 @@ export function WallpaperCard({
           </Tooltip>
         </div>
       )}
-    </button>
+    </fieldset>
   );
 }

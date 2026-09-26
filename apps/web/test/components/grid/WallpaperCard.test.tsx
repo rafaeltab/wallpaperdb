@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { WallpaperCard } from '@/components/grid/WallpaperCard';
 import type { GridItem } from '@/components/grid/types';
@@ -25,8 +26,9 @@ vi.mock('sonner', () => ({
 
 // Mock TanStack Router Link
 vi.mock('@tanstack/react-router', () => ({
-	Link: ({ to, params, target, rel, onClick, children, className }: any) => (
+	Link: ({ to, params, target, rel, onClick, children, className, 'aria-label': ariaLabel }: any) => (
 		<a
+			aria-label={ariaLabel}
 			href={`${to.replace('$wallpaperId', params.wallpaperId)}`}
 			target={target}
 			rel={rel}
@@ -84,6 +86,7 @@ describe('WallpaperCard', () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+		vi.unstubAllGlobals();
 	});
 
 	describe('Basic Rendering', () => {
@@ -175,6 +178,41 @@ describe('WallpaperCard', () => {
 
 			// Should have at least 2 action buttons (download, share)
 			expect(actionButtons.length).toBeGreaterThanOrEqual(2);
+		});
+
+		it('keeps expanded controls outside the card button so each action is independently interactive', () => {
+			render(<WallpaperCard {...defaultProps} isExpanded={true} />);
+
+			for (const control of [...screen.getAllByRole('button'), ...screen.getAllByRole('link')]) {
+				expect(control.parentElement?.closest('button')).toBeNull();
+			}
+		});
+
+		it('lets keyboard users activate the named card and each overlay action independently', async () => {
+			vi.stubGlobal('ResizeObserver', class {
+				observe() {}
+				unobserve() {}
+				disconnect() {}
+			});
+			const user = userEvent.setup();
+			const onClick = vi.fn();
+			render(<WallpaperCard {...defaultProps} onClick={onClick} isExpanded={true} />);
+
+			await user.tab();
+			expect(screen.getByRole('button', { name: `Wallpaper ${mockGridItem.id}` })).toHaveFocus();
+			await user.keyboard('{Enter}');
+			expect(onClick).toHaveBeenCalledTimes(1);
+			await user.tab();
+			expect(screen.getByRole('link', { name: 'View details' })).toHaveFocus();
+			await user.tab();
+			expect(screen.getByRole('button', { name: 'Download original' })).toHaveFocus();
+			await user.keyboard(' ');
+			expect(downloadVariant).toHaveBeenCalledWith(mockWallpaper.variants[0]);
+			await user.tab();
+			expect(screen.getByRole('button', { name: 'Share' })).toHaveFocus();
+			await user.keyboard('{Enter}');
+			expect(shareWallpaper).toHaveBeenCalledWith(mockWallpaper.wallpaperId);
+			expect(onClick).toHaveBeenCalledTimes(1);
 		});
 
 		it('does not show menu when wallpaper metadata is missing', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 
 /**
  * React hook that persists state to localStorage with JSON serialization.
@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
  * @param defaultValue - Default value if localStorage is empty or parsing fails
  * @returns Tuple of [state, setState] similar to useState
  */
-export function usePersistentState<T>(key: string, defaultValue: T): [T, (value: T) => void] {
+export function usePersistentState<T>(key: string, defaultValue: T): [T, Dispatch<SetStateAction<T>>] {
   // Initialize state from localStorage or default value
   const [state, setState] = useState<T>(() => {
     try {

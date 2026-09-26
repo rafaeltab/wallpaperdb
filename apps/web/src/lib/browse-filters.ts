@@ -163,8 +163,8 @@ export function getAspectRatioFilterValue(
   }
 
   const preset = aspectRatio === 'device' ? deviceAspectRatioPreset : aspectRatio;
-  return BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === preset && 'ratio' in option)
-    ?.ratio;
+  const option = BROWSE_ASPECT_RATIO_OPTIONS.find((option) => option.value === preset);
+  return option && 'ratio' in option ? option.ratio : undefined;
 }
 
 function isBrowseFormatValue(value: unknown): value is BrowseFormatValue {

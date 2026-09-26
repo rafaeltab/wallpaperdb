@@ -4,6 +4,7 @@ import {
   NatsTesterBuilder,
 } from '@wallpaperdb/test-utils';
 import { Effect, Layer, ManagedRuntime } from 'effect';
+import { headers } from 'nats';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { ConsumerHealth, natsConsumerLayer } from '../src/adapters/events/index.js';
@@ -291,6 +292,84 @@ it('quarantines malformed 64 KiB payloads byte for byte without invoking extract
     expect(message.data).toEqual(payload);
     expect(calls).toHaveLength(0);
     expect(message.header.get('ce-reason')).toBe('Invalid');
+  } finally {
+    await runtime.dispose();
+  }
+});
+
+it('preserves binary occurrence metadata through quarantine and successful operator replay', async () => {
+  const calls: ExtractionInput[] = [];
+  let unavailable = true;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'binary-replay-contract',
+    retryDelayMs: 10,
+  };
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: (input) =>
+            Effect.suspend(() => {
+              calls.push(input);
+              return unavailable
+                ? Effect.fail(
+                    new ExtractionUnavailable({ operation: 'controlled', cause: 'offline' })
+                  )
+                : Effect.succeed({ _tag: 'Extracted' as const });
+            }),
+        })
+      )
+    )
+  );
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    const event = upload('binary-replay');
+    const metadata = headers();
+    const originalHeaders = {
+      specversion: '1.0',
+      source: 'https://wallpaperdb/ingestor',
+      id: event.eventId,
+      type: event.eventType,
+      time: event.timestamp,
+      correlationid: 'upload-flow',
+      causationid: 'upload-command',
+    };
+    for (const [key, value] of Object.entries(originalHeaders)) metadata.set(`ce-${key}`, value);
+    const js = await tester.nats.getJsClient();
+    const bytes = new TextEncoder().encode(JSON.stringify(event));
+    await js.publish('wallpaper.uploaded', bytes, { headers: metadata });
+    const manager = await (await tester.nats.getConnection()).jetstreamManager();
+    await expect
+      .poll(async () => (await manager.streams.info('COLOR_EXTRACTOR_QUARANTINE')).state.messages)
+      .toBe(1);
+    const stored = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+      last_by_subj: 'color-extractor.quarantine',
+    });
+    expect(calls).toHaveLength(3);
+    expect(calls[0]).toMatchObject({
+      occurrence: { source: originalHeaders.source, id: event.eventId },
+      correlationId: 'upload-flow',
+    });
+    expect(stored.data).toEqual(bytes);
+    const replayHeaders = headers();
+    for (const [key, value] of Object.entries(originalHeaders)) {
+      expect(stored.header.get(`original-ce-${key}`)).toBe(value);
+      replayHeaders.set(`ce-${key}`, stored.header.get(`original-ce-${key}`));
+    }
+    unavailable = false;
+    await js.publish('wallpaper.uploaded', stored.data, { headers: replayHeaders });
+    await expect.poll(() => calls.length).toBe(4);
+    expect(calls[3]).toEqual(calls[0]);
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .num_ack_pending
+      )
+      .toBe(0);
   } finally {
     await runtime.dispose();
   }

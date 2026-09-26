@@ -289,7 +289,14 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   eligibleHandles,
                   targetClaim: targetClaim ?? null,
                   wallpaperOwners,
-                  asset: asset ?? null,
+                  asset: asset
+                    ? {
+                        id: asset.id,
+                        profileId: asset.profileId,
+                        state: asset.state,
+                        expiresAt: asset.expiresAt,
+                      }
+                    : null,
                   importJob: importJob ?? null,
                 };
                 let decision: ProfileDecision;
@@ -309,7 +316,8 @@ export const profileStoreLayer = (policy: ProfilePolicy) =>
                   current,
                   decision.mutation,
                   observedAt,
-                  policy
+                  policy,
+                  asset ?? null
                 );
                 await appendEvent(tx, updated, change, observedAt, metadata);
                 return {
@@ -343,7 +351,8 @@ async function applyMutation(
   current: Profile,
   mutation: ProfileMutation,
   now: Date,
-  policy: ProfilePolicy
+  policy: ProfilePolicy,
+  storedAsset: typeof profilePictureAssets.$inferSelect | null
 ): Promise<{ updated: Profile; change: ProfileUpdatedEvent['change'] }> {
   const changes: Partial<Profile> = { version: current.version + 1, updatedAt: now };
   let change: ProfileUpdatedEvent['change'];
@@ -502,7 +511,9 @@ async function applyMutation(
         .update(profilePictureImports)
         .set({ status: 'complete', sourceUrl: null, leaseToken: null, leaseUntil: null })
         .where(eq(profilePictureImports.profileId, current.id));
-      const asset = mutation.asset;
+      const asset = mutation.asset ? storedAsset : null;
+      if (mutation.asset && asset?.id !== mutation.asset.id)
+        throw new ProfileInvariant('Picture decision does not reference its locked asset');
       change = {
         type: 'picture-changed',
         before: current.pictureAssetId,

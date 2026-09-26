@@ -74,7 +74,3 @@ The first full `make ci` passed all 74 build/lint/type/unit/integration tasks. B
 A later run found an unsafe cleanup pattern in the new image test. Commit `c31c0849` moves cleanup into the test runner's completion hook, retaining original failures and reporting cleanup failures separately. After that fix, all 74 main tasks and all three browser tests passed. Shared test-utils E2E then failed because its default socket is Docker Desktop's absent socket. `GITHUB_ACTIONS=true` selects the existing Linux socket path without changing tests or assertions.
 
 Final `GITHUB_ACTIONS=true make ci` passed. It completed all 74 build/lint/type/unit/integration tasks and all 11 E2E/dependency tasks, with 69 and 6 task-cache hits respectively. The CI runner reported 215 seconds excluding prerequisite checks. Tags has 66 unit tests, 11 integration tests, and one production-image E2E test, all passing. The existing browser suite passed all three tests, and containerized Ingestor E2E passed all three. The shared test-utils suite retains its 12 existing skips. No assertions or retry settings were changed to obtain this result.
-
-### Delivery evidence
-
-[The recording and evidence notes](../docs/evidence/tag-service-effect.md) show the real production container's operational endpoints. The Docker image uses real dependencies, and no browser responses are mocked. This is a service skeleton, so there is no tagging workflow in the wallpaper UI.

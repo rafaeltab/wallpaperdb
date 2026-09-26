@@ -105,6 +105,35 @@ it('rejects malformed payloads, mismatched event types, and incomplete binary en
   header.set('ce-source', 'https://wallpaperdb/ingestor');
   expect(translateEvent('wallpaper.uploaded', encode(event), header)).toBeUndefined();
 });
+it('rejects contradictory binary metadata even when a valid structured upload is present', () => {
+  const event = {
+    specversion: '1.0',
+    source: 'https://wallpaperdb/ingestor',
+    id: 'event-1',
+    type: 'wallpaper.uploaded',
+    time: wallpaper.uploadedAt,
+    datacontenttype: 'application/json',
+    data: { wallpaper },
+  };
+  for (const override of [
+    { 'ce-source': 'https://wallpaperdb/another-producer' },
+    { 'ce-id': 'another-occurrence' },
+    { 'ce-time': '2026-09-25T10:00:00.000Z' },
+    { 'ce-specversion': '0.3' },
+  ]) {
+    const metadata = headers();
+    for (const [key, value] of Object.entries({
+      'ce-specversion': event.specversion,
+      'ce-source': event.source,
+      'ce-id': event.id,
+      'ce-type': event.type,
+      'ce-time': event.time,
+      ...override,
+    }))
+      metadata.set(key, value);
+    expect(translateEvent('wallpaper.uploaded', encode(event), metadata)).toBeUndefined();
+  }
+});
 it('translates profile picture changes and retained snapshots without leaking other profile details', () => {
   const profile = {
     id: 'profile-1',

@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import { inspect } from 'node:util';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { createNatsContainer } from '@wallpaperdb/testcontainers';
-import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
+import { Deferred, Effect, Layer, Logger, ManagedRuntime } from 'effect';
 import { connect, DiscardPolicy, headers, type NatsConnection } from 'nats';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
@@ -107,6 +108,53 @@ function adapters() {
     Layer.provide(databaseLayer({ databaseUrl: database.getConnectionUri() }))
   );
 }
+it('retains SQLSTATE without disclosing vendor diagnostics when recording publication fails', async () => {
+  const payload = profileEvent('event-diagnostic');
+  await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)
+    values (${payload.eventId}, 'profile.created', 'user_1', ${sql.json(payload)}, ${occurred})`;
+  await sql.unsafe(
+    `create function reject_publication() returns trigger language plpgsql as $$ begin raise exception 'private-event-diagnostic-marker'; end $$`
+  );
+  await sql.unsafe(
+    `create trigger reject_publication before update on outbox_events for each row execute function reject_publication()`
+  );
+  const runtime = ManagedRuntime.make(
+    eventStoreLayer().pipe(
+      Layer.provide(databaseLayer({ databaseUrl: database.getConnectionUri() }))
+    )
+  );
+  const logs: unknown[] = [];
+  try {
+    const failure = await runtime.runPromise(
+      MaintenanceStore.use((store) =>
+        store.markPublished(payload.eventId, new Date(occurred))
+      ).pipe(
+        Effect.flip,
+        Effect.provide(
+          Logger.layer([
+            Logger.make(({ message }) => {
+              logs.push(message);
+            }),
+          ])
+        )
+      )
+    );
+    expect(logs).toHaveLength(1);
+    expect(inspect(logs, { depth: null })).not.toContain('private-event-diagnostic-marker');
+    expect(inspect(failure, { depth: null })).not.toContain('private-event-diagnostic-marker');
+    expect(failure).toMatchObject({
+      _tag: 'MaintenanceFailure',
+      operation: 'mark-published',
+      cause: { sqlState: 'P0001' },
+    });
+    expect(await sql`select published_at from outbox_events`).toEqual([{ published_at: null }]);
+  } finally {
+    await runtime.dispose();
+    await sql.unsafe(
+      'drop trigger reject_publication on outbox_events; drop function reject_publication()'
+    );
+  }
+});
 it('publishes the original occurrence and leaves completion separate from acknowledged broker storage', async () => {
   const payload = profileEvent('event-publication');
   await sql`insert into outbox_events (id, subject, aggregate_id, payload, created_at)

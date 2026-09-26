@@ -410,18 +410,24 @@ const implementations = Layer.effectContext(
       Context.add(CatalogOutbox, outbox),
       Context.add(Catalog, catalog),
       Context.add(CatalogHealth, {
-        check: Effect.tryPromise({
-          try: (signal) =>
-            Promise.all([
-              execute((db) => db.execute(sql`SELECT 1`))(signal),
-              reader
-                ? reader.client.send(new HeadBucketCommand({ Bucket: reader.bucket }), {
-                    abortSignal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
-                  })
-                : Promise.resolve(),
-            ]),
-          catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
-        }).pipe(
+        check: Effect.all(
+          [
+            Effect.tryPromise({
+              try: execute((db) => db.execute(sql`SELECT 1`)),
+              catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
+            }),
+            reader
+              ? Effect.tryPromise({
+                  try: (signal) =>
+                    reader.client.send(new HeadBucketCommand({ Bucket: reader.bucket }), {
+                      abortSignal: AbortSignal.any([signal, AbortSignal.timeout(5000)]),
+                    }),
+                  catch: (cause) => new CatalogFailure({ operation: 'health', cause }),
+                })
+              : Effect.void,
+          ],
+          { concurrency: 'unbounded' }
+        ).pipe(
           Effect.as(true),
           Effect.catch(() => Effect.succeed(false))
         ),

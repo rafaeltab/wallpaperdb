@@ -1,4 +1,4 @@
-import type { AnalyzeProjectOptions } from '@barney-media/crap-typescript-core';
+import type { AnalyzeProjectOptions } from './scripts/vendor/crap-typescript-core/src/index.ts';
 
 interface CrapConfig {
   workspaceRoots: string[];

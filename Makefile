@@ -53,7 +53,7 @@ TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
-        storage-test storage-infra-test coverage-summary crap check-crap crap-check-types \
+        storage-test storage-infra-test coverage-summary crap check-crap crap-check-types test-crap \
         worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci-runner-test ci clean
 
 help: ## Show commands and selectors
@@ -207,6 +207,9 @@ check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
 crap-check-types: ## Type-check CRAP tooling
 	@pnpm crap:check-types
 
+test-crap: ## Test the shared CRAP analyzer and vendored core (optional ARGS)
+	@pnpm exec vitest run --config scripts/crap-vitest.config.ts $(ARGS)
+
 worktree-remove: ## Tear down this worktree and release its slot
 	@node scripts/teardown-worktree.mjs
 
@@ -249,7 +252,7 @@ worktree-env-test: ## Verify generated service credentials and environment rules
 ci-runner-test: ## Verify CI stops and reports failures correctly
 	@pnpm exec vitest run scripts/ci-runner.test.ts --maxWorkers=1 --no-file-parallelism
 
-ci: test-make crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
+ci: test-make test-crap crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
 	@$(MAKE) ci-runner-test
 	@$(MAKE) worktree-env-test
 	@$(MAKE) nats-stream-setup-test

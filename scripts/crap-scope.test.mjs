@@ -18,7 +18,8 @@ function fixture(t) {
   for (const file of ['scripts/crap.mts', 'crap.config.mts']) {
     fs.copyFileSync(path.join(repository, file), path.join(root, file));
   }
-  for (const dependency of ['@barney-media', 'istanbul-lib-coverage']) {
+  fs.cpSync(path.join(repository, 'scripts/vendor'), path.join(root, 'scripts/vendor'), { recursive: true });
+  for (const dependency of ['typescript', 'istanbul-lib-coverage']) {
     fs.symlinkSync(path.join(repository, 'node_modules', dependency), path.join(root, 'node_modules', dependency));
   }
   fs.writeFileSync(path.join(root, 'node_modules/.bin/turbo'), `#!/usr/bin/env node

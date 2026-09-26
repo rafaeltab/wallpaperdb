@@ -57,7 +57,10 @@ export function translateUpload(
     mimeType: event.wallpaper.mimeType,
     width: event.wallpaper.width,
     height: event.wallpaper.height,
-    storage: { bucket: event.wallpaper.storageBucket, key: event.wallpaper.storageKey },
+    storage:
+      'storageBucket' in event.wallpaper
+        ? { bucket: event.wallpaper.storageBucket, key: event.wallpaper.storageKey }
+        : event.wallpaper.asset,
     occurrence: { source: envelope?.source ?? 'wallpaperdb/ingestor', id: event.eventId },
     timestamp: event.timestamp,
     ...(envelope?.correlationid ? { correlationId: envelope.correlationid } : {}),

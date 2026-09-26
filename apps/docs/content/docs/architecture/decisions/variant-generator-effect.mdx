@@ -7,7 +7,7 @@ Variant Generator now composes application-owned Effect services and scoped adap
 
 Each selected preset must be stored and announced before the input is acknowledged. Failed presets do not prevent the rest of the batch from running. An incomplete batch retries with stable object keys and event identities; after three attempts, durable quarantine accepts responsibility. Failed quarantine publication leaves the input pending. S3 and JetStream do not share a transaction.
 
-The service preserves aspect-ratio categories, strict smaller-dimension selection, encoding options and nominal preset metadata. The generated image fits within the preset and can have smaller actual dimensions. Binary CloudEvents headers retain the payload consumed by Media; retained legacy and structured upload events are both accepted.
+The service preserves aspect-ratio categories, strict smaller-dimension selection, encoding options and nominal preset metadata. The generated image fits within the preset and can have smaller actual dimensions. Binary CloudEvents announce a logical rendition reference. The image adapter registers the immutable storage descriptor before publication. New logical original references and retained coordinate-based upload events are both accepted. Descriptor registration failures keep the input retryable and cannot overwrite an existing mapping.
 
 A child process owns each native encoding operation. Interruption kills and reaps it, and storage requests abort. The source limit is 50 MiB, output limit is 64 MiB, native deadline is 60 seconds, and complete variant deadline is 100 seconds. Each worker processes one variant at a time. Shutdown stops pulling, allows bounded completion, then interrupts work before closing dependencies.
 

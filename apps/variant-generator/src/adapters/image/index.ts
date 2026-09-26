@@ -1,11 +1,13 @@
 import { Readable } from 'node:stream';
 import { GetObjectCommand, HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { Clock, Context, Effect, Layer, Metric, Semaphore } from 'effect';
+import { registerAssetReference, resolveAssetReference } from '@wallpaperdb/core/assets';
 import { encodeImage } from './process.js';
 import { storeVariant } from './storage.js';
 import {
   GenerationUnavailable,
   VariantImages,
+  variantAssetReference,
   type GenerationInput,
   type GeneratedVariant,
   type ResolutionPreset,
@@ -17,6 +19,7 @@ export interface ImageConfig {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly bucket: string;
+  readonly assetReferenceBucket?: string;
   readonly jpegQuality: number;
   readonly pngCompressionLevel: number;
   readonly webpQuality: number;
@@ -61,9 +64,21 @@ class StoredVariantImages implements VariantImages {
       .withPermit(
         Effect.gen({ self: this }, function* () {
           const start = yield* Clock.currentTimeMillis;
+          const storage = input.storage;
+          const original =
+            'owner' in storage
+              ? yield* request('resolve-original', (abortSignal) =>
+                  resolveAssetReference(
+                    this.client,
+                    this.config.assetReferenceBucket ?? 'asset-references',
+                    storage,
+                    { abortSignal }
+                  )
+                )
+              : storage;
           const bytes = yield* request('read-image', async (abortSignal) => {
             const response = await this.client.send(
-              new GetObjectCommand({ Bucket: input.storage.bucket, Key: input.storage.key }),
+              new GetObjectCommand({ Bucket: original.bucket, Key: original.key }),
               { abortSignal }
             );
             if (!(response.Body instanceof Readable))
@@ -126,7 +141,7 @@ class StoredVariantImages implements VariantImages {
           const storageKey = `${input.wallpaperId}/variant_${preset.width}x${preset.height}.${extension}`;
           const variant = yield* storeVariant(
             this.client,
-            input,
+            { ...input, storage: original },
             {
               wallpaperId: input.wallpaperId,
               width: preset.width,
@@ -135,10 +150,19 @@ class StoredVariantImages implements VariantImages {
               format: mimeType,
               fileSizeBytes: output.length,
               storageKey,
-              storageBucket: input.storage.bucket,
+              storageBucket: original.bucket,
               createdAt: new Date(input.timestamp),
             },
             output
+          );
+          yield* request('register-variant-asset', (abortSignal) =>
+            registerAssetReference(
+              this.client,
+              this.config.assetReferenceBucket ?? 'asset-references',
+              variantAssetReference(variant),
+              { bucket: variant.storageBucket, key: variant.storageKey },
+              { abortSignal }
+            )
           );
           const end = yield* Clock.currentTimeMillis;
           yield* Metric.update(

@@ -77,7 +77,9 @@ export interface GenerationInput {
   readonly mimeType: string;
   readonly width: number;
   readonly height: number;
-  readonly storage: { readonly bucket: string; readonly key: string };
+  readonly storage:
+    | { readonly owner: 'ingestor'; readonly id: string }
+    | { readonly bucket: string; readonly key: string };
   readonly occurrence: { readonly source: string; readonly id: string };
   readonly timestamp: string;
   readonly correlationId?: string;
@@ -94,6 +96,16 @@ export interface GeneratedVariant {
   readonly storageKey: string;
   readonly storageBucket: string;
   readonly createdAt: Date;
+}
+
+/** A rendition keeps one public identity independently of its storage provider and encoding policy. */
+export function variantAssetReference(
+  variant: Pick<GeneratedVariant, 'wallpaperId' | 'width' | 'height' | 'format'>
+) {
+  return {
+    owner: 'variant-generator' as const,
+    id: `${variant.wallpaperId}:${variant.width}x${variant.height}:${variant.format}`,
+  };
 }
 
 export type GenerationOutcome =

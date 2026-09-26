@@ -47,7 +47,7 @@ function controlledAdapters(
           format: 'image/png',
           fileSizeBytes: 100,
           storageKey: `${original.wallpaperId}/variant_${preset.width}x${preset.height}.png`,
-          storageBucket: original.storage.bucket,
+          storageBucket: 'wallpapers',
           createdAt: new Date(original.timestamp),
         };
         generated.push(variant);

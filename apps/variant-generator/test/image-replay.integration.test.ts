@@ -8,7 +8,7 @@ import { natsEventsLayer } from '../src/adapters/events/index.js';
 import { VariantImages, VariantEvents, type GenerationInput } from '../src/generation/index.js';
 
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).with(NatsTesterBuilder).build();
-const tester = new Tester().withS3().withS3Bucket('wallpapers').withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
+const tester = new Tester().withS3().withS3Bucket('wallpapers').withS3Bucket('asset-references').withNats((nats) => nats.withJetstream()).withStream('WALLPAPER');
 let sourceFingerprint = '';
 const preset = { width: 80, height: 45, label: 'small' };
 function input(id: string): GenerationInput {

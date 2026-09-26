@@ -1,3 +1,5 @@
+import { planQuarantine } from '@wallpaperdb/core/quarantine';
+import { uploadEnvelopeConformance } from '@wallpaperdb/test-utils/event-contracts';
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -571,5 +573,173 @@ it.each([
   } finally {
     await runtime.dispose();
     await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msg_size: -1, max_msgs: -1 });
+  }
+});
+
+it.each([
+  'single',
+  'chunked',
+])('preserves repeated CloudEvent values through %s quarantine and replay', async (mode) => {
+  const fixture = uploadEnvelopeConformance().find(
+    (entry) => entry.name === 'repeated binary source'
+  );
+  if (!fixture?.metadata) throw new Error('Missing shared ambiguous-envelope fixture');
+  fixture.metadata.set('ce-customextension', 'retained-extension');
+  const originalHeaders = fixture.metadata;
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'repeated-header-replay',
+  };
+  let calls = 0;
+  const runtime = ManagedRuntime.make(
+    natsConsumerLayer(options).pipe(
+      Layer.provide(natsEventsLayer(options)),
+      Layer.provide(
+        Layer.succeed(ExtractColors, {
+          extract: () =>
+            Effect.sync(() => {
+              calls++;
+              throw new Error('Ambiguous input reached capability');
+            }),
+        })
+      )
+    )
+  );
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  try {
+    await runtime.runPromise(ConsumerHealth);
+    if (mode === 'chunked')
+      await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msg_size: 4096 });
+    let payload =
+      mode === 'single'
+        ? fixture.payload
+        : new TextEncoder().encode(
+            JSON.stringify({
+              ...JSON.parse(new TextDecoder().decode(fixture.payload)),
+              padding: 'x'.repeat(16000),
+            })
+          );
+    const originalBytes = payload;
+    let metadata = originalHeaders;
+    for (let replay = 0; replay < 2; replay++) {
+      const ack = await (await tester.nats.getJsClient()).publish('wallpaper.uploaded', payload, {
+        headers: metadata,
+      });
+      await expect
+        .poll(
+          async () =>
+            (
+              await manager.consumers.info(
+                'WALLPAPER',
+                'color-extractor-wallpaper-uploaded-consumer'
+              )
+            ).ack_floor.stream_seq
+        )
+        .toBe(ack.seq);
+      const stored = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+        last_by_subj: 'color-extractor.quarantine',
+      });
+      const restored = headers();
+      for (const key of originalHeaders.keys()) {
+        expect(stored.header.values(`original-${key}`)).toEqual(originalHeaders.values(key));
+        for (const value of stored.header.values(`original-${key}`)) restored.append(key, value);
+      }
+      payload =
+        mode === 'single'
+          ? stored.data
+          : Buffer.concat(
+              await Promise.all(
+                decodeManifest(stored.json()).sequences.map(
+                  async (seq) =>
+                    (await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', { seq })).data
+                )
+              )
+            );
+      expect(Buffer.from(payload)).toEqual(Buffer.from(originalBytes));
+      metadata = restored;
+      expect(calls).toBe(0);
+    }
+  } finally {
+    await runtime.dispose();
+    await manager.streams.update('COLOR_EXTRACTOR_QUARANTINE', { max_msg_size: -1 });
+  }
+});
+
+it('repairs a deduplicated legacy quarantine receipt that lost repeated headers', async () => {
+  const fixture = uploadEnvelopeConformance().find(
+    (entry) => entry.name === 'repeated binary source'
+  );
+  if (!fixture?.metadata) throw new Error('Missing shared ambiguous-envelope fixture');
+  const options = {
+    url: tester.nats.config.endpoints.fromHost,
+    stream: 'WALLPAPER',
+    serviceName: 'quarantine-header-upgrade',
+  };
+  const makeRuntime = () =>
+    ManagedRuntime.make(
+      natsConsumerLayer(options).pipe(
+        Layer.provide(natsEventsLayer(options)),
+        Layer.provide(
+          Layer.succeed(ExtractColors, {
+            extract: () => Effect.die('Ambiguous input reached capability'),
+          })
+        )
+      )
+    );
+  const initialize = makeRuntime();
+  const replay = makeRuntime();
+  const manager = await (await tester.nats.getConnection()).jetstreamManager();
+  const js = await tester.nats.getJsClient();
+  try {
+    await initialize.runPromise(ConsumerHealth);
+    await initialize.dispose();
+    const inputAck = await js.publish('wallpaper.uploaded', fixture.payload, {
+      headers: fixture.metadata,
+    });
+    const consumer = await js.consumers.get(
+      'WALLPAPER',
+      'color-extractor-wallpaper-uploaded-consumer'
+    );
+    const message = await consumer.next({ expires: 1000 });
+    if (!message) throw new Error('Missing original delivery');
+    const legacy = planQuarantine(
+      {
+        stream: 'COLOR_EXTRACTOR_QUARANTINE',
+        source: 'https://wallpaperdb/color-extractor',
+        eventTypePrefix: 'color-extractor.upload',
+      },
+      message,
+      'Invalid',
+      100000
+    ).records[0];
+    if (!legacy) throw new Error('Missing single record');
+    legacy.headers.set('original-ce-source', fixture.metadata.get('ce-source'));
+    const legacyAck = await js.publish('color-extractor.quarantine', legacy.data, {
+      headers: legacy.headers,
+      msgID: legacy.headers.get('Nats-Msg-Id'),
+      expect: { streamName: 'COLOR_EXTRACTOR_QUARANTINE' },
+    });
+    message.nak();
+    await replay.runPromise(ConsumerHealth);
+    await expect
+      .poll(
+        async () =>
+          (await manager.consumers.info('WALLPAPER', 'color-extractor-wallpaper-uploaded-consumer'))
+            .ack_floor.stream_seq
+      )
+      .toBe(inputAck.seq);
+    const repaired = await manager.streams.getMessage('COLOR_EXTRACTOR_QUARANTINE', {
+      last_by_subj: 'color-extractor.quarantine',
+    });
+    expect(repaired.seq).toBeGreaterThan(legacyAck.seq);
+    expect(repaired.header.get('ce-id')).toBe(legacy.headers.get('ce-id'));
+    expect(repaired.header.values('original-ce-source')).toEqual(
+      fixture.metadata.values('ce-source')
+    );
+    expect(repaired.data).toEqual(fixture.payload);
+  } finally {
+    await initialize.dispose();
+    await replay.dispose();
   }
 });

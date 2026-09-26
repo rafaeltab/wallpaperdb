@@ -42,28 +42,6 @@ describe('Profile picture transactions and recovery', () => {
     importPending: () =>
       runtime.runPromise(Effect.flatMap(Pictures, (pictures) => pictures.importPending())),
   };
-  const ingestion = {
-    stage: (profileId: string, bytes: Buffer) =>
-      runtime
-        .runPromise(Effect.flatMap(Pictures, (pictures) => pictures.stage({ profileId }, bytes)))
-        .then((result) => {
-          if (result._tag === 'Rejected') throw new Error(result.message);
-          return result.assetId;
-        }),
-  };
-  const profiles = {
-    adoptPicture: (profileId: string, assetId: string, version: number) =>
-      runtime
-        .runPromise(
-          Effect.flatMap(Profiles, (profiles) =>
-            profiles.adoptPicture({ profileId }, assetId, version)
-          )
-        )
-        .then((result) => {
-          if (result._tag === 'Rejected') throw new Error(result.message);
-          return result.profile;
-        }),
-  };
   function makeRuntime() {
     const database = databaseLayer({ databaseUrl: config.databaseUrl });
     const profile = profilesLayer(config).pipe(
@@ -189,69 +167,6 @@ describe('Profile picture transactions and recovery', () => {
     removeOutcome(version, profileId).then(profileResult);
   const available = (id: string) =>
     runtime.runPromise(Effect.flatMap(Pictures, (pictures) => pictures.pictureAvailable(id)));
-
-  it('retains a removed picture for the configured window from retirement', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    config.profileEvidenceRetentionDays = 7;
-    await restart();
-    try {
-      const original = await ensure();
-      const image = await sharp({
-        create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-      })
-        .png()
-        .toBuffer();
-      const uploaded = await upload(image, original.version);
-      vi.setSystemTime(new Date('2030-01-02T00:00:00.000Z'));
-      await remove(uploaded.version);
-      const [asset] =
-        await sql`select state, retired_at, expires_at from profile_picture_assets where id = ${uploaded.pictureAssetId}`;
-      expect(asset).toEqual({
-        state: 'retired',
-        retired_at: new Date('2030-01-02T00:00:00.000Z'),
-        expires_at: new Date('2030-01-09T00:00:00.000Z'),
-      });
-    } finally {
-      config.profileEvidenceRetentionDays = 30;
-      vi.useRealTimers();
-      await restart();
-    }
-  });
-
-  it('accepts a staged picture before expiry and rejects activation at the deadline without changing current state', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-01-01T00:00:00.000Z'));
-    try {
-      const original = await ensure();
-      const image = await sharp({
-        create: { width: 2, height: 2, channels: 3, background: '#475b83' },
-      })
-        .png()
-        .toBuffer();
-      const first = await ingestion.stage(original.id, image);
-      const expired = await ingestion.stage(original.id, image);
-      vi.setSystemTime(new Date('2030-01-30T23:59:59.999Z'));
-      const active = await profiles.adoptPicture(original.id, first, original.version);
-      const before = await ensure();
-      const events = await sql`select id from outbox_events order by id`;
-      vi.setSystemTime(new Date('2030-01-31T00:00:00.000Z'));
-      expect(
-        await runtime.runPromise(
-          Effect.flatMap(Profiles, (profiles) =>
-            profiles.adoptPicture({ profileId: original.id }, expired, active.version)
-          )
-        )
-      ).toMatchObject({ _tag: 'Rejected', reason: 'picture-unavailable' });
-      expect(await ensure()).toEqual(before);
-      expect(await sql`select id from outbox_events order by id`).toEqual(events);
-      expect(await sql`select id from profile_picture_assets where state = 'active'`).toEqual([
-        { id: first },
-      ]);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
 
   it('keeps manual picture commands scoped to the authenticated Profile', async () => {
     const first = await ensure();

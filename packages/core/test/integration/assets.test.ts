@@ -1,3 +1,4 @@
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   createDefaultTesterBuilder,
   DockerTesterBuilder,
@@ -34,5 +35,43 @@ describe("immutable asset references", () => {
       })
     ).rejects.toThrow("Asset reference is already assigned");
     expect(await resolveAssetReference(client, "asset-references", reference)).toEqual(original);
+  });
+
+  it("rejects a descriptor whose recorded identity differs from the requested asset", async () => {
+    const client = tester.s3.getS3Client();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: "asset-references",
+        Key: "user/mismatched.json",
+        Body: JSON.stringify({
+          version: 1,
+          reference: { owner: "user", id: "another-picture" },
+          location: { bucket: "profile-pictures", key: "private.webp" },
+        }),
+      })
+    );
+    await expect(
+      resolveAssetReference(client, "asset-references", {
+        owner: "user",
+        id: "mismatched",
+      })
+    ).rejects.toThrow("Asset descriptor identity mismatch");
+  });
+
+  it("bounds reads of malformed oversized descriptors", async () => {
+    const client = tester.s3.getS3Client();
+    await client.send(
+      new PutObjectCommand({
+        Bucket: "asset-references",
+        Key: "user/oversized.json",
+        Body: " ".repeat(8193),
+      })
+    );
+    await expect(
+      resolveAssetReference(client, "asset-references", {
+        owner: "user",
+        id: "oversized",
+      })
+    ).rejects.toThrow("Asset descriptor exceeds 8 KiB");
   });
 });

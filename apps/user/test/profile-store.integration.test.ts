@@ -5,7 +5,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
-import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy } from '../src/profile/index.js';
+import { Identities, Profiles, ProfileStore, profilesLayer, type ProfilePolicy, type ProfileOutcome } from '../src/profile/index.js';
 
 const policy: ProfilePolicy = {
   profileHandleMinLength: 1, profileHandleMaxLength: 20, profileDisplayNameMaxLength: 80,
@@ -33,6 +33,20 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('rejects a picture that expires while its adoption waits for the owner lock', async () => {
+    await run(profiles => profiles.ensure({ profileId: 'owner' }));
+    await sql`insert into profile_picture_assets (id, profile_id, storage_bucket, storage_key, mime_type, width, height, file_size_bytes, state, expires_at) values ('queued-picture', 'owner', 'pictures', 'queued.webp', 'image/webp', 1, 1, 24, 'staged', now() + interval '1 hour')`;
+    let adoption: Promise<ProfileOutcome> | undefined;
+    await sql.begin(async tx => {
+      await tx`select id from profiles where id = 'owner' for update`;
+      adoption = run(profiles => profiles.adoptPicture({ profileId: 'owner' }, 'queued-picture', 1));
+      await expect.poll(async () => Number((await sql`select count(*) from pg_stat_activity where application_name = 'wallpaperdb-user' and wait_event_type = 'Lock'`)[0].count)).toBe(1);
+      await tx`update profile_picture_assets set expires_at = clock_timestamp() where id = 'queued-picture'`;
+    });
+    if (!adoption) throw new Error('Adoption was not started');
+    expect(await adoption).toMatchObject({ _tag: 'Rejected', reason: 'picture-unavailable' });
+    expect(await sql`select picture_asset_id, version from profiles where id = 'owner'`).toEqual([{ picture_asset_id: null, version: 1 }]);
+  });
   it('rolls back a defective domain decision without turning it into an expected technical failure', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }));
     const defect = new Error('invalid decision implementation');

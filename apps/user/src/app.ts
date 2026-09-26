@@ -35,6 +35,17 @@ export interface AppOptions {
 }
 export function userLayer(config: Config, options: AppOptions = {}) {
   const database = databaseLayer({ databaseUrl: config.databaseUrl });
+  const profilePolicy = {
+    profileHandleMinLength: config.profileHandleMinLength,
+    profileHandleMaxLength: config.profileHandleMaxLength,
+    profileDisplayNameMaxLength: config.profileDisplayNameMaxLength,
+    profileBiographyMaxLength: config.profileBiographyMaxLength,
+    profileRetainedAliasLimit: config.profileRetainedAliasLimit,
+    profileEvidenceRetentionDays: config.profileEvidenceRetentionDays,
+    profilePictureMaxBytes: config.profilePictureMaxBytes,
+    profilePictureMaxPixels: config.profilePictureMaxPixels,
+    profilePictureMaxDecodedBytes: config.profilePictureMaxDecodedBytes,
+  };
   const eventOptions = {
     url: config.natsUrl,
     stream: config.natsStream,
@@ -42,17 +53,20 @@ export function userLayer(config: Config, options: AppOptions = {}) {
     shutdownTimeoutMs: options.shutdownTimeoutMs,
   };
   const broker = brokerLayer(eventOptions);
-  const profiles = profilesLayer(config).pipe(
+  const profiles = profilesLayer(profilePolicy).pipe(
     Layer.provide(
       Layer.merge(
-        profileStoreLayer(config).pipe(Layer.provide(database)),
+        profileStoreLayer(profilePolicy).pipe(Layer.provide(database)),
         options.identities
           ? Layer.succeed(Identities, options.identities)
-          : clerkIdentitiesLayer(config)
+          : clerkIdentitiesLayer({ clerkSecretKey: config.clerkSecretKey })
       )
     )
   );
-  const pictures = picturesLayer(config).pipe(
+  const pictures = picturesLayer({
+    profileEvidenceRetentionDays: config.profileEvidenceRetentionDays,
+    profilePictureImportTimeoutMs: config.profilePictureImportTimeoutMs,
+  }).pipe(
     Layer.provide(
       Layer.mergeAll(
         profiles,
@@ -72,7 +86,7 @@ export function userLayer(config: Config, options: AppOptions = {}) {
           region: config.s3Region,
           accessKeyId: config.s3AccessKeyId,
           secretAccessKey: config.s3SecretAccessKey,
-        })
+        }).pipe(Layer.provide(database))
       )
     )
   );

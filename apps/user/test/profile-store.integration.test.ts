@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Effect, Layer, Logger, ManagedRuntime, Tracer } from 'effect';
 import postgres from 'postgres';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import {
@@ -26,11 +26,11 @@ const policy: ProfilePolicy = {
   profilePictureMaxPixels: 16000000,
   profilePictureMaxDecodedBytes: 67108864,
 };
-const testLayer = (databaseUrl: string) =>
-  profilesLayer(policy).pipe(
+const testLayer = (databaseUrl: string, settings: ProfilePolicy = policy) =>
+  profilesLayer(settings).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
-        profileStoreLayer(policy).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
+        profileStoreLayer(settings).pipe(Layer.provide(databaseLayer({ databaseUrl }))),
         Layer.succeed(Identities, {
           getIdentity: () =>
             Effect.succeed({
@@ -74,6 +74,53 @@ describe('PostgreSQL profile transactions', () => {
       })
     );
 
+  it('retains a removed picture for the configured seven days measured from retirement', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T12:00:00.000Z'));
+    const custom = ManagedRuntime.make(
+      testLayer(database.getConnectionUri().replace('localhost', '127.0.0.1'), {
+        ...policy,
+        profileEvidenceRetentionDays: 7,
+      })
+    );
+    try {
+      await custom.runPromise(Profiles.use((p) => p.ensure({ profileId: 'owner' })));
+      await sql`insert into profile_picture_assets (id, profile_id, storage_bucket, storage_key, mime_type, width, height, file_size_bytes, state, expires_at) values ('retained-picture', 'owner', 'pictures', 'retained.webp', 'image/webp', 1, 1, 24, 'staged', '2030-01-03T12:00:00Z')`;
+      expect(
+        await custom.runPromise(
+          Profiles.use((p) => p.adoptPicture({ profileId: 'owner' }, 'retained-picture', 1))
+        )
+      ).toMatchObject({
+        _tag: 'Success',
+        profile: { version: 2, pictureAssetId: 'retained-picture' },
+      });
+      vi.setSystemTime(new Date('2030-01-02T12:00:00.000Z'));
+      expect(
+        await custom.runPromise(
+          Profiles.use((p) => p.adoptPicture({ profileId: 'owner' }, null, 2))
+        )
+      ).toMatchObject({ _tag: 'Success', profile: { version: 3, pictureAssetId: null } });
+      expect(
+        await sql`select state, expires_at from profile_picture_assets where id = 'retained-picture'`
+      ).toEqual([{ state: 'retired', expires_at: new Date('2030-01-09T12:00:00.000Z') }]);
+      const events =
+        await sql`select payload from outbox_events where subject = 'profile.updated' order by created_at`;
+      expect(events).toHaveLength(2);
+      expect(events[1].payload).toMatchObject({
+        profile: { version: 3, pictureAssetId: null },
+        change: {
+          type: 'picture-changed',
+          before: 'retained-picture',
+          after: null,
+          asset: null,
+          source: 'remove',
+        },
+      });
+    } finally {
+      await custom.dispose();
+      vi.useRealTimers();
+    }
+  });
   it('does not disguise an unrelated unique constraint failure as a Handle collision', async () => {
     await sql.unsafe(
       `create function reject_outbox_identity() returns trigger language plpgsql as $$ begin raise exception using errcode = '23505', constraint = 'outbox_events_pkey', message = 'outbox identity collision'; end $$`

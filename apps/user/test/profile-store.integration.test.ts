@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { Effect, Layer, ManagedRuntime } from 'effect';
+import { Effect, Layer, ManagedRuntime, Tracer } from 'effect';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
@@ -33,6 +33,11 @@ describe('PostgreSQL profile transactions', () => {
   afterAll(async () => { await runtime?.dispose(); await sql?.end(); await database?.stop(); });
   const run = <A, E>(use: (profiles: Profiles) => Effect.Effect<A, E>) => runtime.runPromise(Effect.gen(function* () { return yield* use(yield* Profiles); }));
 
+  it('records the originating trace with the durable outbox occurrence', async () => {
+    await run(profiles => profiles.ensure({ profileId: 'owner' }).pipe(Effect.withParentSpan(Tracer.externalSpan({ traceId: '12345678901234567890123456789012', spanId: '1234567890123456', sampled: true }))));
+    const [event] = await sql`select trace_parent from outbox_events`;
+    expect(event.trace_parent).toMatch(/^00-12345678901234567890123456789012-[0-9a-f]{16}-01$/);
+  });
   it('supersedes an import lease when the owner removes a pending picture', async () => {
     await run(profiles => profiles.ensure({ profileId: 'owner' }));
     await sql`update profile_picture_imports set lease_token = 'lease-1' where profile_id = 'owner'`;

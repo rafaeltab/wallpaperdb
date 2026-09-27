@@ -1,6 +1,6 @@
 # Resolve assets through stable object layouts
 
-Status: accepted. Supersedes [ADR 0006](0006-resolve-immutable-assets-through-storage-descriptors.md).
+Status: accepted. Supersedes [ADR 0007](0007-resolve-immutable-assets-through-storage-descriptors.md).
 
 WallpaperDB has no production installation and its producers already store immutable images at predictable paths. Keep logical asset references in events, and let storage adapters derive addresses from those references, public event metadata, and deployment configuration. Remove the per-asset descriptor registry because its extra writes, permissions, health checks, backup requirements, and failure modes do not solve a current requirement.
 

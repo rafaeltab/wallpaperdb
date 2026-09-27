@@ -7,6 +7,22 @@ Use this guide when upgrading an existing installation. Fresh local setup is in 
 
 Apply generated database migrations before starting the corresponding new service. Deploy each service's complete `dist` directory: native image workers and deferred application chunks are required at runtime.
 
+## Immutable asset references
+
+Storage adapters derive addresses from logical references and the image metadata in events. Keep `S3_BUCKET` consistent across Ingestor, Variant Generator, Color Extractor, and Media. Keep `PROFILE_PICTURE_BUCKET` consistent between User and Media. Consumers need read access to their producers' objects; only owners may delete bytes. [ADR 0008](https://github.com/rafaeltab/wallpaperdb/blob/main/docs/adr/0008-resolve-assets-through-stable-object-layouts.md) records why these layouts are stable contracts.
+
+When upgrading a development installation from the descriptor-registry revision, stop producers while upgrading all applications together. Before switching, compare its descriptors against the deterministic layouts and configured buckets. Preserve any mismatching object and its descriptor, and migrate it deliberately before replaying its logical reference. The current layout preserves the original, variant, and Profile-picture paths; matching assets need no copy or reset. The old `asset-references` bucket is no longer a runtime dependency. Leave retained descriptors intact until the audit and replay checks are complete. Rolling back to descriptor-based binaries also requires descriptors for assets created after the switch; the old descriptor records alone are insufficient.
+
+Do not rename buckets or change layouts through configuration alone. A migration must preserve object bytes and identities and account for producer records, Media's stored locations, and retained messages. Historical coordinate-based events continue to use their recorded locations. Back up the object buckets with their owning databases and configuration, and verify restore and replay together. The production release procedure and Grafana alerts that reach a human are tracked in [issue 236](https://github.com/rafaeltab/wallpaperdb/issues/236).
+
+## Quarantine replay
+
+Media, Color Extractor, and Variant Generator share a replay decoder in [`@wallpaperdb/core/quarantine`](https://github.com/rafaeltab/wallpaperdb/blob/main/packages/core/src/quarantine/index.ts). Ordinary single records and raw chunk manifests retain their formats and identities. Header-heavy inputs use a manifest with `encoding: "original-message-v1"` to archive their complete original headers and bytes inside bounded chunks. Upgrade replay tooling to read this format before processing those records.
+
+Read a manifest's chunk sequences in order and pass their data with the manifest to `decodeQuarantineReplay`; pass a single record without chunks. The decoder validates bounded metadata, lengths, and SHA-256 before restoring original bytes and CloudEvent/trace headers, including repeated values. Do not silently normalize invalid metadata: repair it deliberately before replay. Archived broker publication controls are excluded from replay. Publish to the recorded original subject with a fresh broker publication ID, preserving the original CloudEvent occurrence instead of the quarantine envelope's identity.
+
+Partial chunks without a completed manifest do not establish durable handoff. Failed writes leave the original pending; restore capacity or broker availability so the application can retry. Restrict quarantine access because it contains original events.
+
 ## Ingestor
 
 The CloudEvents upload migration requires consumer-first deployment:
@@ -47,13 +63,15 @@ The durables are `media-wallpaper-uploaded-consumer` and `media-wallpaper-varian
 
 `MEDIA_QUARANTINE` has a thirty-day repair horizon, one-GiB capacity, and discard-new overflow. Startup rejects incompatible policies. Export or repair failures before expiry. Failed quarantine writes leave originals pending; restore NATS or capacity so they can retry.
 
-For chunked quarantine records, read the manifest's sequences in order, reconstruct the original bytes, and verify total length and SHA-256 before replay. Restore `original-ce-*` headers to `ce-*`, keeping the original source and ID. Never publish the quarantine envelope's identity as a new domain occurrence. Restrict access because quarantine contains original events. See the [Media decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/media/docs/adr/0001-replay-safe-delivery-catalog.md).
+Use the [shared quarantine replay procedure](#quarantine-replay), including its framed-record decoder. See the [Media decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/media/docs/adr/0001-replay-safe-delivery-catalog.md).
 
 ## Gateway
 
 Upgrading projections does not recover information older versions discarded. Existing color projections lack occurrence ordering metadata, so the first stale result after upgrade can replace their colors. Replay the complete retained color history before reopening catalogue traffic if historical ordering must be preserved. The same applies to timestamp precision lost by older millisecond-only projections.
 
 The wallpaper and Profile source streams admit messages up to 64 KiB including headers. Quarantine and the broker's `max_payload` must each allow at least 256 KiB for the quarantine envelope. Gateway startup fails before subscribing when these limits are incompatible.
+
+Gateway quarantine stores the original payload in `data.original` and complete NATS headers in `data.originalHeaders`, both base64 encoded. Decode both fields for replay, preserving the original occurrence and trace metadata while excluding archived broker publication controls. Choose a fresh broker publication ID. Oversized duplicate diagnostic fields may be omitted; the replay evidence remains intact. This format is separate from the three services' [chunked quarantine protocol](#quarantine-replay).
 
 Lowering a stream limit does not rewrite retained messages. Gateway audits retained payload and header bytes before first consumption. Its `wallpaperdb.gateway.quarantine-budget` stream metadata records the stream creation time, configured limit, policy version, and audited sequence. Version 2 replaces the earlier payload-only audit. Matching certificates avoid repeated history scans; the initial scan takes time proportional to retained history.
 
@@ -89,8 +107,10 @@ If telemetry is intentionally disabled, also disable the missing-signal alert. O
 
 Deploy a Gateway that accepts CloudEvents color results before upgrading Color Extractor. Stop legacy worker replicas before relying on durable quarantine, because they retain their earlier termination behavior. Broker-exhausted legacy messages require operator replay; changing the consumer configuration does not recover them automatically.
 
-Variant Generator quarantine has a thirty-day repair horizon and one-GiB capacity with discard-new overflow. Startup rejects incompatible policies. Reconstruct oversized records from the manifest's ordered chunks and verify byte count and SHA-256 before republishing. Partial chunks without a completed manifest do not establish durable handoff.
+Variant Generator and Color Extractor quarantine have a thirty-day repair horizon and one-GiB capacity with file-backed storage and discard-new overflow. Startup rejects incompatible policies. Explicitly migrate existing Color stream settings while preserving retained evidence.
 
-Color Extractor quarantine preserves original bytes and the original subject. Replay those bytes to that subject and preserve structured event occurrence identity. If added headers exceed the broker's message-size budget, the source stays pending until the budget is repaired. Monitor pending inputs, quarantine capacity, and publication failures for both workers.
+Both workers use the [shared quarantine replay procedure](#quarantine-replay). Inputs that exceed the complete message budget or JetStream's 64 KiB header limit after quarantine metadata is added use bounded chunks and, when necessary, the versioned original-message frame. Every chunk and the completion manifest require durable acknowledgement before the source is acknowledged. Monitor pending inputs, quarantine capacity, and publication failures.
 
 Existing variant object keys are immutable. Changing encoding settings affects new targets; replay does not regenerate an existing rendition with new settings. Deliberate regeneration needs a separately designed versioned target identity. See the [Variant Generator decision](https://github.com/rafaeltab/wallpaperdb/blob/main/apps/variant-generator/docs/adr/0001-replay-safe-variant-generation.md).
+
+New variant announcements report their actual encoded dimensions. Existing variants retain the dimensions previously announced for their immutable targets, including historical nominal preset dimensions; replay does not rewrite those facts.

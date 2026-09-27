@@ -18,10 +18,9 @@ function fixture(t) {
   for (const file of ['scripts/crap.mts', 'crap.config.mts']) {
     fs.copyFileSync(path.join(repository, file), path.join(root, file));
   }
-  fs.cpSync(path.join(repository, 'scripts/vendor'), path.join(root, 'scripts/vendor'), { recursive: true });
-  for (const dependency of ['typescript', 'istanbul-lib-coverage']) {
-    fs.symlinkSync(path.join(repository, 'node_modules', dependency), path.join(root, 'node_modules', dependency));
-  }
+  fs.mkdirSync(path.join(root, 'node_modules/@wallpaperdb'), { recursive: true });
+  fs.symlinkSync(path.join(repository, 'packages/crap-typescript-core'), path.join(root, 'node_modules/@wallpaperdb/crap-typescript-core'));
+  fs.symlinkSync(path.join(repository, 'node_modules/istanbul-lib-coverage'), path.join(root, 'node_modules/istanbul-lib-coverage'));
   fs.writeFileSync(path.join(root, 'node_modules/.bin/turbo'), `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');

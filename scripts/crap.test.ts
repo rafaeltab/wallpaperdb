@@ -12,7 +12,7 @@ import {
   coverageForMethods,
   parseCoverageReport,
   parseFileMethods,
-} from './vendor/crap-typescript-core/src/index.js';
+} from '@wallpaperdb/crap-typescript-core';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const fixtures = path.join(repository, 'scripts/fixtures/crap');

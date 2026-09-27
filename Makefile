@@ -207,7 +207,7 @@ check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
 crap-check-types: ## Type-check CRAP tooling
 	@pnpm crap:check-types
 
-test-crap: ## Test the shared CRAP analyzer and vendored core (optional ARGS)
+test-crap: ## Test CRAP integration with repository coverage providers (optional ARGS)
 	@$(MAKE) build PACKAGE=vitest-config
 	@pnpm exec vitest run --config scripts/crap-vitest.config.ts $(ARGS)
 

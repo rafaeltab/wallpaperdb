@@ -4,6 +4,8 @@ Scope: module organization and shared testing principles apply project-wide. The
 
 ## Module organization
 
+- All maintained code and scripts, including repository tooling and vendored code, must be owned by a pnpm workspace package. The root package may own repository-wide orchestration, scripts, and integration checks; a separate package is not required for every script.
+- Each workspace declares its dependencies and exposes applicable build, lint, test, and type-check tasks through the standard package scripts. These tasks must participate in the shared Turbo task graph, with dependencies, inputs, outputs, and cache behavior declared for correct execution. Define only meaningful tasks; a package that exports TypeScript source does not need an empty build task.
 - A capability exposes a small interface through one deliberate public entry point, hides its implementation, and uses only the internal layering its complexity warrants. External code and tests import only from that entry point; public entry points must not re-export the implementation, and abstractions that merely delegate are prohibited.
 - Mechanically enforce architectural dependencies: package export maps protect package interfaces, while dependency-graph checks protect capability entry points, inward dependency direction, and acyclicity.
 - Use shared packages for cohesive modules whose stable semantics are genuinely common to actual consumers, with a deliberate interface and clear ownership. Keep context-specific meanings local and accept small duplication when sharing would couple them; shared packages must not depend on deployable applications.

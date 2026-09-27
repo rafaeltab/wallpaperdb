@@ -19,6 +19,55 @@ async function* stream(value: Uint8Array) {
 }
 
 describe('production asset adapters', () => {
+  it.each([
+    'close',
+    'iterator return',
+  ] as const)('releases the S3 connection when a checksum-wrapped body is cancelled by %s', async (cancel) => {
+    let disconnected = false;
+    const server = createServer((_request, response) => {
+      response.once('close', () => {
+        disconnected = true;
+      });
+      response.writeHead(200, {
+        'Content-Type': 'application/octet-stream',
+        'x-amz-checksum-sha256': 'unused-until-the-body-finishes',
+      });
+      response.write(Buffer.from([4]));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('missing port');
+    const runtime = ManagedRuntime.make(
+      s3AssetsLayer({
+        endpoint: `http://127.0.0.1:${address.port}`,
+        region: 'us-east-1',
+        accessKeyId: 'key',
+        secretAccessKey: 'secret',
+        bucket: 'assets',
+      })
+    );
+    try {
+      const body = await runtime.runPromise(
+        Effect.flatMap(AssetReader, (reader) =>
+          reader.read({ storageBucket: 'assets', storageKey: 'cancelled' })
+        )
+      );
+      if (!body) throw new Error('expected stream');
+      if (cancel === 'close') body.close();
+      else {
+        for await (const chunk of body) {
+          expect(chunk).toEqual(Buffer.from([4]));
+          break;
+        }
+      }
+      await vi.waitFor(() => expect(disconnected).toBe(true));
+    } finally {
+      await runtime.dispose();
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it('keeps the resize trace open until native work completes', async () => {
     const spans: Tracer.Span[] = [];
     const tracer = Tracer.make({

@@ -42,6 +42,57 @@ describe('UploadDropZone', () => {
     });
   });
 
+  it.each([
+    ['JPEG', 'a.jpg', 'image/jpeg'],
+    ['PNG', 'b.png', 'image/png'],
+    ['WebP', 'c.webp', 'image/webp'],
+  ])('accepts a %s image through the picker', (_format, name, type) => {
+    const onFilesSelected = vi.fn();
+    const file = createMockFile(name, type);
+    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [file] } });
+
+    expect(onFilesSelected).toHaveBeenCalledWith([file]);
+  });
+
+  it('rejects unsupported picker files with a visible reason', () => {
+    const onFilesSelected = vi.fn();
+    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+
+    fireEvent.change(screen.getByTestId('file-input'), {
+      target: { files: [createMockFile('movie.mp4', 'video/mp4')] },
+    });
+
+    expect(onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Only JPEG, PNG, and WebP images are supported');
+  });
+
+  it('queues supported dropped files and rejects unsupported ones', () => {
+    const onFilesSelected = vi.fn();
+    const image = createMockFile('a.png', 'image/png');
+    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+
+    fireEvent.drop(screen.getByTestId('drop-zone'), {
+      dataTransfer: createDataTransfer([createMockFile('notes.txt', 'text/plain'), image]),
+    });
+
+    expect(onFilesSelected).toHaveBeenCalledWith([image]);
+    expect(screen.getByRole('alert')).toHaveTextContent('Only JPEG, PNG, and WebP images are supported');
+  });
+
+  it('rejects images larger than 50 MiB before queuing', () => {
+    const onFilesSelected = vi.fn();
+    const image = createMockFile();
+    Object.defineProperty(image, 'size', { value: 50 * 1024 * 1024 + 1 });
+    render(<UploadDropZone onFilesSelected={onFilesSelected} />);
+
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [image] } });
+
+    expect(onFilesSelected).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('Images must be 50 MiB or smaller');
+  });
+
   it('calls onFilesSelected when files dropped', async () => {
     const onFilesSelected = vi.fn();
     render(<UploadDropZone onFilesSelected={onFilesSelected} />);
@@ -112,9 +163,9 @@ describe('UploadDropZone', () => {
   });
 
   it('shows file type restrictions', () => {
-    render(<UploadDropZone onFilesSelected={vi.fn()} accept="image/*" />);
+    render(<UploadDropZone onFilesSelected={vi.fn()} />);
 
     const input = screen.getByTestId('file-input');
-    expect(input).toHaveAttribute('accept', 'image/*');
+    expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
   });
 });

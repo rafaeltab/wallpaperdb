@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { AlertCircle, Check, Copy, FileImage, FileVideo, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, Copy, FileImage, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UploadAuthGate } from '@/components/upload-auth-gate';
 import { UploadActionButtons } from '@/components/upload/upload-action-buttons';
@@ -96,8 +96,8 @@ export function UploadPage() {
           <CardHeader>
             <CardTitle className="text-2xl">Upload Wallpapers</CardTitle>
             <CardDescription>
-              Add wallpapers to your collection. Supported formats: JPEG, PNG, WebP (images) or MP4,
-              WebM (videos). You can upload up to {MAX_FILES_PER_BATCH} files at a time.
+              Add wallpapers to your collection. Supported formats: JPEG, PNG, and WebP images. You
+              can upload up to {MAX_FILES_PER_BATCH} files at a time.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -182,11 +182,7 @@ export function UploadPage() {
                       )}
                     >
                       <div className="flex-shrink-0">
-                        {queuedFile.file.type.startsWith('image/') ? (
-                          <FileImage className="h-6 w-6 text-muted-foreground" />
-                        ) : (
-                          <FileVideo className="h-6 w-6 text-muted-foreground" />
-                        )}
+                        <FileImage className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{queuedFile.file.name}</p>

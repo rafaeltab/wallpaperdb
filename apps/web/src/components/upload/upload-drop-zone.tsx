@@ -15,10 +15,10 @@ export interface UploadDropZoneProps {
 export function UploadDropZone({
   onFilesSelected,
   maxFiles,
-  accept = 'image/*,video/*',
+  accept = 'image/jpeg,image/png,image/webp',
   disabled = false,
   label,
-  description = 'Images up to 50MB, Videos up to 200MB',
+  description = 'JPEG, PNG, and WebP images up to 50 MiB',
   className,
 }: UploadDropZoneProps) {
   const [isDragActive, setIsDragActive] = useState(false);

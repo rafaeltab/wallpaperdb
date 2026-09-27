@@ -20,6 +20,11 @@ describe('UploadDropZone', () => {
 
     expect(screen.getByText(/click to upload/i)).toBeInTheDocument();
     expect(screen.getByText(/drag and drop/i)).toBeInTheDocument();
+    expect(screen.getByText('JPEG, PNG, and WebP images up to 50 MiB')).toBeInTheDocument();
+    expect(screen.getByTestId('file-input')).toHaveAttribute(
+      'accept',
+      'image/jpeg,image/png,image/webp'
+    );
   });
 
   it('calls onFilesSelected when files selected via input', async () => {

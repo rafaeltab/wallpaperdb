@@ -175,6 +175,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
           const source = variant
             ? { ...wallpaper, storageKey: variant.storageKey, storageBucket: variant.storageBucket }
             : wallpaper;
+          let rendition = variant ?? wallpaper;
           let body = yield* assets.read(source, { source: variant ? 'variant' : 'original' });
           if (!body && variant) {
             yield* Metric.update(
@@ -185,9 +186,12 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
               1
             );
             body = yield* assets.read(wallpaper, { source: 'original', fallback: true });
+            rendition = wallpaper;
           }
           if (!body) return { _tag: 'NotFound' } as const;
-          if (options && (options.width || options.height)) {
+          const matchesRendition =
+            options?.width === rendition.width && options?.height === rendition.height;
+          if (options && (options.width || options.height) && !matchesRendition) {
             const resized = yield* transformer.resize(body, {
               ...options,
               mimeType: wallpaper.mimeType,
@@ -198,7 +202,7 @@ export const deliveryLayer = (limits: DeliveryLimits) =>
             _tag: 'Found',
             body,
             mimeType: wallpaper.mimeType,
-            fileSizeBytes: wallpaper.fileSizeBytes,
+            fileSizeBytes: rendition === wallpaper ? wallpaper.fileSizeBytes : undefined,
           } as const;
         }),
         picture: Effect.fn('media.get_picture')(function* (id: string) {

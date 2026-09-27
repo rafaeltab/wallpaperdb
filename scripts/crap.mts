@@ -11,9 +11,9 @@ import {
   filterSourceFiles,
   parseCoverageReport,
   parseFileMethods,
-} from './vendor/crap-typescript-core/src/index.ts';
+} from '@wallpaperdb/crap-typescript-core';
 import istanbul from 'istanbul-lib-coverage';
-import type { MethodDescriptor } from './vendor/crap-typescript-core/src/index.ts';
+import type { MethodDescriptor } from '@wallpaperdb/crap-typescript-core';
 import type { FileCoverageData, Range } from 'istanbul-lib-coverage';
 import config from '../crap.config.mts';
 

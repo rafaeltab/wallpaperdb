@@ -12,7 +12,8 @@
         "sandcastle": "tsx .sandcastle/main.ts",
         "sandcastle:test": "vitest run .sandcastle/helpers.test.ts",
         "sandcastle:check-types": "tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck .sandcastle/*.ts",
-        "crap:check-types": "tsc --project scripts/tsconfig.crap.json"
+        "test:integration": "vitest run --config vitest.integration.config.ts",
+        "check-types": "tsc --project tsconfig.tooling.json"
     },
     "peerDependencies": {
         "graphql": "16.12.0"

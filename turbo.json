@@ -152,6 +152,39 @@
         },
         "db:migrate": {
             "cache": false
+        },
+        "//#test:integration": {
+            "dependsOn": [
+                "@wallpaperdb/vitest-config#build"
+            ],
+            "inputs": [
+                "package.json",
+                "pnpm-lock.yaml",
+                "vitest.integration.config.ts",
+                "test/integration/**",
+                "test/fixtures/crap/**",
+                "$TURBO_ROOT$/apps/gateway/package.json",
+                "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
+                "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
+            ],
+            "outputs": []
+        },
+        "//#check-types": {
+            "dependsOn": [
+                "@wallpaperdb/vitest-config#build"
+            ],
+            "inputs": [
+                "package.json",
+                "pnpm-lock.yaml",
+                "tsconfig.tooling.json",
+                "scripts/crap.mts",
+                "crap.config.mts",
+                "test/integration/**",
+                "vitest.integration.config.ts",
+                "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
+                "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
+            ],
+            "outputs": []
         }
     }
 }

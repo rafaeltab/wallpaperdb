@@ -8,6 +8,7 @@ import {
   MediaDelivery,
   PictureAuthority,
   deliveryLayer,
+  type ResizeOptions,
   type Wallpaper,
 } from '../src/delivery/index.js';
 
@@ -30,6 +31,7 @@ function fixture(
 ) {
   const reads: string[] = [];
   const queries: number[][] = [];
+  const resizes: ResizeOptions[] = [];
   let allowed = true;
   let missingVariant = false;
   let missingOriginal = false;
@@ -79,11 +81,17 @@ function fixture(
             )
           : Effect.succeed(allowed),
     }),
-    Layer.succeed(ImageTransformer, { resize: (body) => Effect.succeed(body) })
+    Layer.succeed(ImageTransformer, {
+      resize: (body, options) => {
+        resizes.push(options);
+        return Effect.succeed(body);
+      },
+    })
   );
   return {
     reads,
     queries,
+    resizes,
     loseOriginal: () => {
       missingOriginal = true;
     },
@@ -109,6 +117,37 @@ function fixture(
   };
 }
 describe('media delivery', () => {
+  it.each([
+    'contain',
+    'cover',
+    'fill',
+  ] as const)('streams matching originals and variants without consuming resize capacity for %s', async (fit) => {
+    for (const width of [1920, 960]) {
+      const f = fixture();
+      const outcome = await f.run(
+        Effect.flatMap(MediaDelivery, (d) => d.wallpaper('wall_1', { width, height: 1080, fit }))
+      );
+      expect(outcome).toMatchObject({ _tag: 'Found', mimeType: 'image/png' });
+      expect(f.reads).toEqual([width === 1920 ? 'original' : 'variant']);
+      expect(f.resizes).toEqual([]);
+      if (outcome._tag !== 'Found') throw new Error('expected image');
+      expect(outcome.fileSizeBytes).toBe(width === 1920 ? original.fileSizeBytes : undefined);
+      const chunks = [];
+      for await (const chunk of outcome.body) chunks.push(...chunk);
+      expect(chunks).toEqual([1, 2, 3]);
+    }
+  });
+  it('still resizes the original when an exact-size variant is missing', async () => {
+    const f = fixture();
+    f.loseVariant();
+    await f.run(
+      Effect.flatMap(MediaDelivery, (d) =>
+        d.wallpaper('wall_1', { width: 960, height: 1080, fit: 'contain' })
+      )
+    );
+    expect(f.reads).toEqual(['variant', 'original']);
+    expect(f.resizes).toMatchObject([{ width: 960, height: 1080, fit: 'contain' }]);
+  });
   it('fails closed when authority is unavailable without reading storage', async () => {
     const f = fixture({ authorityFailure: true });
     await expect(

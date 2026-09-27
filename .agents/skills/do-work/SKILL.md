@@ -33,4 +33,4 @@ This runs build, lint, and all tests. Fix any failures before continuing.
 
 For each feature touched, exercise the completed feature in a browser and record a short video showing it working. Put the video in the PR description as a playable attachment or link, with enough context to identify the feature. If a browser demonstration is genuinely impossible, explain why in the PR.
 
-Push the completed branch and open a PR automatically. Summarize the changes, link the relevant issue when there is one, and report the validation performed. Use the github-markdown-bodies skill for the PR description. Confirm the PR renders each video and that reviewers can access it.
+Push the completed branch and open a PR automatically. Summarize the changes, link the relevant issue when there is one, and report the validation performed. Use the github-markdown-bodies skill for the PR description and [pr-video-attachment](../pr-video-attachment/SKILL.md) for each recording. Confirm the PR renders each video and that reviewers can access it.

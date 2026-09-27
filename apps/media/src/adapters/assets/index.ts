@@ -317,7 +317,12 @@ export const s3AssetsLayer = (config: S3AssetsConfig) =>
                     throw new Error('Storage read interrupted');
                   }
                   streams.add(body);
-                  body.once('close', release);
+                  body.once('close', () => {
+                    // SDK checksum streams do not destroy their source when closed early.
+                    // Abort the HTTP request as well, or its socket stays occupied.
+                    if (!body?.readableEnded) controller.abort();
+                    release();
+                  });
                   body.on('error', () => {});
                   recordCounter('media.s3.operations.total', 1, {
                     ...attributes,

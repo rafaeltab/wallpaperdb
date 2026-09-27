@@ -75,6 +75,8 @@ describe('UploadPage', () => {
     render(<UploadPage />);
 
     expect(screen.getByTestId('upload-page')).toBeInTheDocument();
+    expect(screen.getByText(/Supported formats: JPEG, PNG, and WebP images/)).toBeInTheDocument();
+    expect(screen.getByTestId('upload-page')).not.toHaveTextContent(/MP4|WebM|videos|200 MB/i);
     expect(screen.getByTestId('drop-zone')).toBeInTheDocument();
     expect(screen.getByTestId('upload-progress-status')).toHaveTextContent('Upload complete');
     expect(screen.getByTestId('upload-progress-percent')).toHaveTextContent('100%');

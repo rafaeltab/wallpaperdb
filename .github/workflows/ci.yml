@@ -39,9 +39,6 @@ jobs:
       - name: Verify Make command interface
         run: make test-make
 
-      - name: Verify CRAP provider integration and root tooling
-        run: make test-crap crap-check-types
-
       - name: Build, lint, and type-check
         run: turbo run build lint check-types
 

@@ -30,14 +30,14 @@ GITHUB_CLI ?= gh
 TURBO := "$(CURDIR)/node_modules/.bin/turbo"
 CI_CONCURRENCY ?= 1
 
-# PACKAGE is a workspace basename; SERVICE selects a Compose app; DB selects a database.
+# PACKAGE is a workspace basename or root; SERVICE selects a Compose app; DB selects a database.
 PACKAGE ?=
 SERVICE ?=
 DB ?=
 SCRIPT ?=
 ARGS ?=
 FORCE ?=
-WORKSPACES := $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json))))
+WORKSPACES := root $(notdir $(patsubst %/,%,$(dir $(wildcard apps/*/package.json packages/*/package.json))))
 ifneq ($(strip $(PACKAGE)),)
 ifneq ($(words $(PACKAGE)),1)
 $(error PACKAGE must select exactly one workspace)
@@ -46,14 +46,15 @@ ifneq ($(filter-out $(WORKSPACES),$(PACKAGE)),)
 $(error Unknown PACKAGE '$(PACKAGE)'. Use a workspace directory name, e.g. web or ingestor)
 endif
 endif
-FILTER = $(if $(PACKAGE),--filter=@wallpaperdb/$(PACKAGE))
+TURBO_PACKAGE = $(if $(filter root,$(PACKAGE)),//,@wallpaperdb/$(PACKAGE))
+FILTER = $(if $(PACKAGE),--filter=$(TURBO_PACKAGE))
 TURBO_FLAGS = $(FILTER) $(if $(filter 1,$(FORCE)),--force)
 
 .PHONY: help install dev build test test-unit test-integration test-e2e test-focused \
         format lint lint-fix check-types check run \
         infra-start infra-stop infra-reset infra-logs apps-start apps-stop apps-build apps-logs \
         migrate psql redis-cli redis-flush redis-info nats-setup-streams nats-stream-list nats-stream-info nats-stream-setup-test \
-        storage-test storage-infra-test coverage-summary crap check-crap crap-check-types test-crap \
+        storage-test storage-infra-test coverage-summary crap check-crap \
         worktree-remove worktree-env-test sandcastle-auth sandcastle-test sandcastle-check-types test-make ci-runner-test ci clean
 
 help: ## Show commands and selectors
@@ -83,7 +84,7 @@ test: ## Run workspace test scripts (optional PACKAGE)
 
 test-focused: ## Build dependencies and run selected tests serially (requires PACKAGE; optional ARGS)
 	$(if $(PACKAGE),,$(error test-focused requires PACKAGE, e.g. make test-focused PACKAGE=web))
-	@$(TURBO) run build --filter="@wallpaperdb/$(PACKAGE)^..." --concurrency=1
+	@$(TURBO) run build --filter="$(TURBO_PACKAGE)^..." --concurrency=1
 	@pnpm --filter @wallpaperdb/$(PACKAGE) exec vitest run --maxWorkers=1 --no-file-parallelism $(ARGS)
 
 test-unit: ## Run unit tests (no containers; optional PACKAGE)
@@ -104,10 +105,10 @@ lint: ## Lint workspace code (optional PACKAGE)
 lint-fix: ## Fix workspace lint issues (optional PACKAGE)
 	@$(TURBO) run lint:fix $(TURBO_FLAGS) --log-order grouped
 
-check-types: $(if $(PACKAGE),,crap-check-types) ## Type-check workspaces and root tooling (optional PACKAGE)
+check-types: ## Type-check workspaces and root tooling (optional PACKAGE)
 	@$(TURBO) run check-types $(TURBO_FLAGS)
 
-check: $(if $(PACKAGE),,crap-check-types) ## Build, lint, and type-check (optional PACKAGE)
+check: ## Build, lint, and type-check (optional PACKAGE)
 	@$(TURBO) run build lint check-types $(TURBO_FLAGS) --log-order grouped
 
 run: ## Run a package.json script (requires PACKAGE and SCRIPT; optional ARGS)
@@ -204,13 +205,6 @@ crap: ## Rank functions using fresh test coverage (optional PACKAGE)
 check-crap: ## Check CRAP scores (requires CRAP_THRESHOLD; optional PACKAGE)
 	@PACKAGE="$(PACKAGE)" pnpm exec tsx scripts/crap.mts check
 
-crap-check-types: ## Type-check CRAP tooling
-	@pnpm crap:check-types
-
-test-crap: ## Test CRAP integration with repository coverage providers (optional ARGS)
-	@$(MAKE) build PACKAGE=vitest-config
-	@pnpm exec vitest run --config scripts/crap-vitest.config.ts $(ARGS)
-
 worktree-remove: ## Tear down this worktree and release its slot
 	@node scripts/teardown-worktree.mjs
 
@@ -253,7 +247,7 @@ worktree-env-test: ## Verify generated service credentials and environment rules
 ci-runner-test: ## Verify CI stops and reports failures correctly
 	@pnpm exec vitest run scripts/ci-runner.test.ts --maxWorkers=1 --no-file-parallelism
 
-ci: test-make test-crap crap-check-types ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
+ci: test-make ## Run full CI pipeline (FORCE=1 bypasses cache; always all packages)
 	@$(MAKE) ci-runner-test
 	@$(MAKE) worktree-env-test
 	@$(MAKE) nats-stream-setup-test

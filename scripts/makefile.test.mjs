@@ -39,7 +39,7 @@ test('workspace actions support optional package scoping', () => {
   assert.match(output('build', 'PACKAGE=web'), /run build .*--filter=@wallpaperdb\/web/);
   assert.match(output('check-types', 'PACKAGE=ingestor'), /run check-types .*--filter=@wallpaperdb\/ingestor/);
   assert.doesNotMatch(output('check-types', 'PACKAGE=ingestor'), /crap:check-types/);
-  assert.match(output('check-types'), /crap:check-types/);
+  assert.doesNotMatch(output('check-types'), /crap:check-types/);
   for (const invalid of ['typo', 'web*', '%', 'web ingestor']) {
     assert.notEqual(make('build', `PACKAGE=${invalid}`).status, 0);
   }
@@ -164,6 +164,13 @@ for (const script of ['check-types', 'build']) {
   });
 }
 
+test('root workspace checks use the shared Turbo commands', () => {
+  assert.match(output('test-integration', 'PACKAGE=root'), /run test:integration .*--filter=\/\/.*--concurrency=1/);
+  assert.match(output('check-types', 'PACKAGE=root'), /run check-types .*--filter=\/\//);
+  const ci = output('ci');
+  assert.doesNotMatch(ci, /test-crap|crap-check-types|crap:check-types/);
+});
+
 test('CRAP commands pass the optional workspace selector to the shared analyzer', () => {
   for (const target of ['crap', 'check-crap']) {
     assert.match(output(target, 'PACKAGE=ingestor'), /PACKAGE="ingestor".*scripts\/crap\.mts/);
@@ -211,7 +218,7 @@ test('force applies to both CI phases and type checks', () => {
   assert.match(ci, /run build lint check-types test:unit test:integration .*--concurrency=1/);
   const scopedCi = output('ci', 'PACKAGE=web');
   assert.doesNotMatch(scopedCi, /run (build lint check-types test:unit test:integration|test:e2e)[^\n]*--filter=/);
-  assert.match(scopedCi, /run build --filter=@wallpaperdb\/vitest-config/);
+  assert.doesNotMatch(scopedCi, /run build --filter=@wallpaperdb\/vitest-config/);
   assert.match(output('check-types', 'FORCE=1'), /run check-types .*--force/);
 });
 

@@ -1,0 +1,5009 @@
+[
+  {
+    "id": "avif-pq-p3-8-opaque",
+    "path": "/proof/work/avif/avif-pq-p3-8-opaque/avif-pq-p3-8-opaque.avif",
+    "sha256": "f53d15d9e644cc0d22aabdedd229d53d2e7f91371a683ca3b6ace55bb1e2b372",
+    "spec": {
+      "id": "avif-pq-p3-8-opaque",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 8,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-8-opaque/avif-pq-p3-8-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-8-opaque.avif",
+        "FileSize": 1863,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 1504,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "f53d15d9e644cc0d22aabdedd229d53d2e7f91371a683ca3b6ace55bb1e2b372"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.4167273087566098,
+              "p95": 1.3676728458316583,
+              "maximum": 1.388665448872436
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.014841302448727495,
+              "p95": 0.10956717741453925,
+              "maximum": 0.14497403372038065
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00020844047269669066,
+              "p95": 0.0016729802684740315,
+              "maximum": 0.004997114857820071
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7703404731599393
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.45945146510177004,
+              "p95": 1.1673740028234825,
+              "maximum": 1.3860215039507473
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5435801220216331,
+              "p95": 2.200562387596733,
+              "maximum": 3.4408752343272795
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00457954689251298,
+              "p95": 0.014975207463315397,
+              "maximum": 0.018125154403945683
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 90.91991176849538
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.6575716891157013,
+              "p95": 1.2423081614868714,
+              "maximum": 1.3036341821478192
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 5.281008157592853,
+              "p95": 10.27207909654362,
+              "maximum": 13.125785347609622
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.008248194832219757,
+              "p95": 0.0158006184848261,
+              "maximum": 0.016838312378235343
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.4799664353881
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-p3-8-alpha",
+    "path": "/proof/work/avif/avif-pq-p3-8-alpha/avif-pq-p3-8-alpha.avif",
+    "sha256": "d3491dbf323cb9aa57173bcc911df196b9aabea07f0dcf4422c22e65c3ef040a",
+    "spec": {
+      "id": "avif-pq-p3-8-alpha",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 8,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-8-alpha/avif-pq-p3-8-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-8-alpha.avif",
+        "FileSize": 2242,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 1740,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "d3491dbf323cb9aa57173bcc911df196b9aabea07f0dcf4422c22e65c3ef040a"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.4167273087566098,
+              "p95": 1.3676728458316583,
+              "maximum": 1.388665448872436
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.014841302448727495,
+              "p95": 0.10956717741453925,
+              "maximum": 0.14497403372038065
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00020844047269669066,
+              "p95": 0.0016729802684740315,
+              "maximum": 0.004997114857820071
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7703404731599393
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.4616659701136213,
+              "p95": 1.1673740028234825,
+              "maximum": 1.3860215039507473
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5432924418800192,
+              "p95": 2.200562387596733,
+              "maximum": 3.4408752343272795
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.004599701128586267,
+              "p95": 0.014975207463315397,
+              "maximum": 0.018125154403945683
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 89.91536604224527
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.6575716891157013,
+              "p95": 1.2423081614868714,
+              "maximum": 1.3036341821478192
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 5.281008157592853,
+              "p95": 10.27207909654362,
+              "maximum": 13.125785347609622
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.008248194832219757,
+              "p95": 0.0158006184848261,
+              "maximum": 0.016838312378235343
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.4799664353881
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-p3-10-opaque",
+    "path": "/proof/work/avif/avif-pq-p3-10-opaque/avif-pq-p3-10-opaque.avif",
+    "sha256": "c47d7dd17ee3019a60ad1410faa03014316c2530135b53bc045af2ead68353b4",
+    "spec": {
+      "id": "avif-pq-p3-10-opaque",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 10,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-10-opaque/avif-pq-p3-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-10-opaque.avif",
+        "FileSize": 2406,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2047,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "c47d7dd17ee3019a60ad1410faa03014316c2530135b53bc045af2ead68353b4"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.0778733500206209,
+              "p95": 0.28523478896851584,
+              "maximum": 0.3440671527915404
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.00275546906600664,
+              "p95": 0.01860347228808301,
+              "maximum": 0.02882292218994298
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 2.089067494310883e-05,
+              "p95": 0.0,
+              "maximum": 0.0006685015981794825
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7687450963808677
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.06391070367874473,
+              "p95": 0.2880656793656744,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.09073752628523353,
+              "p95": 0.5157700521466211,
+              "maximum": 0.6441165705230105
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.000608451099378003,
+              "p95": 0.003380247633969519,
+              "maximum": 0.004596405785303965
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 90.97545655030983
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.1831062081371032,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 1.4190891046180514,
+              "p95": 2.9162551646415977,
+              "maximum": 2.985341074561802
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0023067913811040813,
+              "p95": 0.004132936452253786,
+              "maximum": 0.004409293499084743
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.7435557781984
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-p3-10-alpha",
+    "path": "/proof/work/avif/avif-pq-p3-10-alpha/avif-pq-p3-10-alpha.avif",
+    "sha256": "da9dc9fa806110142e4c5f07dded0a2652178813eac32aae4d51b919a48082dc",
+    "spec": {
+      "id": "avif-pq-p3-10-alpha",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 10,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-10-alpha/avif-pq-p3-10-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-10-alpha.avif",
+        "FileSize": 2886,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 2384,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "da9dc9fa806110142e4c5f07dded0a2652178813eac32aae4d51b919a48082dc"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.0778733500206209,
+              "p95": 0.28523478896851584,
+              "maximum": 0.3440671527915404
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.00275546906600664,
+              "p95": 0.01860347228808301,
+              "maximum": 0.02882292218994298
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 2.089067494310883e-05,
+              "p95": 0.0,
+              "maximum": 0.0006685015981794825
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7687450963808677
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.06424439487618058,
+              "p95": 0.2880656793656744,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.09090208656318778,
+              "p95": 0.5157700521466211,
+              "maximum": 0.6441165705230105
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0006118258935794595,
+              "p95": 0.003380247633969519,
+              "maximum": 0.004596405785303965
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 89.96687932405526
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.1831062081371032,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 1.4190891046180514,
+              "p95": 2.9162551646415977,
+              "maximum": 2.985341074561802
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0023067913811040813,
+              "p95": 0.004132936452253786,
+              "maximum": 0.004409293499084743
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.7435557781984
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-p3-12-opaque",
+    "path": "/proof/work/avif/avif-pq-p3-12-opaque/avif-pq-p3-12-opaque.avif",
+    "sha256": "fbbc848ce94c6430d91249203cb02f174c0330be6ecb3c8258ebf5bcd220a2dd",
+    "spec": {
+      "id": "avif-pq-p3-12-opaque",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 12,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-12-opaque/avif-pq-p3-12-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-12-opaque.avif",
+        "FileSize": 3344,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2989,
+        "MediaDataOffset": 355,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "fbbc848ce94c6430d91249203cb02f174c0330be6ecb3c8258ebf5bcd220a2dd"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.02165742447403642,
+              "p95": 0.0875760823627636,
+              "maximum": 0.08823758656757164
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0008737808224301444,
+              "p95": 0.0047443560728153145,
+              "maximum": 0.013227953556366856
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 1.1208172070718248e-05,
+              "p95": 0.0,
+              "maximum": 0.00035866150626298393
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7710287917653216
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.022975060008452865,
+              "p95": 0.06735559944197167,
+              "maximum": 0.09288488853828714
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.031013499280060253,
+              "p95": 0.10713224903774687,
+              "maximum": 0.194652534070741
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00017753089328038395,
+              "p95": 0.0008180648083397572,
+              "maximum": 0.0011732204835149778
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 91.01748893993133
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.045218390872233116,
+              "p95": 0.08480991037419727,
+              "maximum": 0.08740434118910123
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.3558784141407993,
+              "p95": 0.834276980449431,
+              "maximum": 1.04539493546838
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005626557791709008,
+              "p95": 0.001071412636878332,
+              "maximum": 0.0011121051789301287
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 605.10437687687
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-p3-12-alpha",
+    "path": "/proof/work/avif/avif-pq-p3-12-alpha/avif-pq-p3-12-alpha.avif",
+    "sha256": "c6dded4ff98b5946fe795f6b3d91e8779563f1470da9730573562bca90b6ab16",
+    "spec": {
+      "id": "avif-pq-p3-12-alpha",
+      "transfer": "pq",
+      "gamut": "p3",
+      "depth": 12,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-p3-12-alpha/avif-pq-p3-12-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-p3-12-alpha.avif",
+        "FileSize": 3920,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 3422,
+        "MediaDataOffset": 498,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 12,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "c6dded4ff98b5946fe795f6b3d91e8779563f1470da9730573562bca90b6ab16"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.02165742447403642,
+              "p95": 0.0875760823627636,
+              "maximum": 0.08823758656757164
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0008737808224301444,
+              "p95": 0.0047443560728153145,
+              "maximum": 0.013227953556366856
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 1.1208172070718248e-05,
+              "p95": 0.0,
+              "maximum": 0.00035866150626298393
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7710287917653216
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.023028213681565345,
+              "p95": 0.06735559944197167,
+              "maximum": 0.09288488853828714
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.030877906622719428,
+              "p95": 0.10713224903774687,
+              "maximum": 0.194652534070741
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00017752976103394658,
+              "p95": 0.0008180648083397572,
+              "maximum": 0.0011732204835149778
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 90.00822249538795
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.045218390872233116,
+              "p95": 0.08480991037419727,
+              "maximum": 0.08740434118910123
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.3558784141407993,
+              "p95": 0.834276980449431,
+              "maximum": 1.04539493546838
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005626557791709008,
+              "p95": 0.001071412636878332,
+              "maximum": 0.0011121051789301287
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 605.10437687687
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-8-opaque",
+    "path": "/proof/work/avif/avif-pq-rec2020-8-opaque/avif-pq-rec2020-8-opaque.avif",
+    "sha256": "5b47eb4043d748ea440425daa41fbb34318cbda3f89139f69ec56e851b32f35a",
+    "spec": {
+      "id": "avif-pq-rec2020-8-opaque",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 8,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-8-opaque/avif-pq-rec2020-8-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-8-opaque.avif",
+        "FileSize": 1863,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 1504,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "5b47eb4043d748ea440425daa41fbb34318cbda3f89139f69ec56e851b32f35a"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.44031470088490726,
+              "p95": 1.367672845831878,
+              "maximum": 1.388665448872436
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.020713861519230905,
+              "p95": 0.14497403372038242,
+              "maximum": 0.2086357517753381
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005313233425402458,
+              "p95": 0.004997114857820269,
+              "maximum": 0.010863575177533811
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0437048299800822
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.4536225519366241,
+              "p95": 1.1628507182878334,
+              "maximum": 1.3860215039507473
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5465976388707002,
+              "p95": 2.2005623875967046,
+              "maximum": 3.440875234327308
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.004560665662645475,
+              "p95": 0.01497520746331522,
+              "maximum": 0.018125154403945846
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.65079958399332
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.6575716891154532,
+              "p95": 1.2423081614868714,
+              "maximum": 1.3036341821478192
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 5.281008157592855,
+              "p95": 10.272079096543735,
+              "maximum": 13.125785347609735
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00824819483221975,
+              "p95": 0.0158006184848257,
+              "maximum": 0.016838312378235163
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.4799664353878
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-8-alpha",
+    "path": "/proof/work/avif/avif-pq-rec2020-8-alpha/avif-pq-rec2020-8-alpha.avif",
+    "sha256": "a88d1b9c72c983410facfc16b785b34db54b607ed57a9ddc8fbccbdd5a40b467",
+    "spec": {
+      "id": "avif-pq-rec2020-8-alpha",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 8,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-8-alpha/avif-pq-rec2020-8-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-8-alpha.avif",
+        "FileSize": 2242,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 1740,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "a88d1b9c72c983410facfc16b785b34db54b607ed57a9ddc8fbccbdd5a40b467"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.44031470088490726,
+              "p95": 1.367672845831878,
+              "maximum": 1.388665448872436
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.020713861519230905,
+              "p95": 0.14497403372038242,
+              "maximum": 0.2086357517753381
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005313233425402458,
+              "p95": 0.004997114857820269,
+              "maximum": 0.010863575177533811
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0437048299800822
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.4558041986925363,
+              "p95": 1.1628507182878334,
+              "maximum": 1.3860215039507473
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5463347754264268,
+              "p95": 2.2005623875967046,
+              "maximum": 3.440875234327308
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00458083147150245,
+              "p95": 0.01497520746331522,
+              "maximum": 0.018125154403945846
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.64376605855452
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.6575716891154532,
+              "p95": 1.2423081614868714,
+              "maximum": 1.3036341821478192
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 5.281008157592855,
+              "p95": 10.272079096543735,
+              "maximum": 13.125785347609735
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00824819483221975,
+              "p95": 0.0158006184848257,
+              "maximum": 0.016838312378235163
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.4799664353878
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-10-opaque",
+    "path": "/proof/work/avif/avif-pq-rec2020-10-opaque/avif-pq-rec2020-10-opaque.avif",
+    "sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8",
+    "spec": {
+      "id": "avif-pq-rec2020-10-opaque",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-opaque/avif-pq-rec2020-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-10-opaque.avif",
+        "FileSize": 2406,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2047,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.08424281454625561,
+              "p95": 0.2880656793656744,
+              "maximum": 0.34406715279145295
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.004212989312512057,
+              "p95": 0.02882292218994209,
+              "maximum": 0.050853637200688695
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 9.860197934085445e-05,
+              "p95": 0.0006685015981793273,
+              "maximum": 0.0025853637200688694
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0500211127693468
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.061991634893752895,
+              "p95": 0.2628685123432817,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.09109684060131876,
+              "p95": 0.5157700521465927,
+              "maximum": 0.6441165705229537
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005901209941304326,
+              "p95": 0.0033802476339695204,
+              "maximum": 0.004596405785303755
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.70450702700448
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.18310620813726475,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 1.419089104618034,
+              "p95": 2.916255164641484,
+              "maximum": 2.9853410745620295
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0023067913811040596,
+              "p95": 0.004132936452253788,
+              "maximum": 0.004409293499084548
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7435557781982
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-10-alpha",
+    "path": "/proof/work/avif/avif-pq-rec2020-10-alpha/avif-pq-rec2020-10-alpha.avif",
+    "sha256": "851ccae94562962784b8fd612cb169c423869fe0b80df216ce060c2c7c2ea228",
+    "spec": {
+      "id": "avif-pq-rec2020-10-alpha",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-10-alpha/avif-pq-rec2020-10-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-10-alpha.avif",
+        "FileSize": 2886,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 2384,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "851ccae94562962784b8fd612cb169c423869fe0b80df216ce060c2c7c2ea228"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.08424281454625561,
+              "p95": 0.2880656793656744,
+              "maximum": 0.34406715279145295
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.004212989312512057,
+              "p95": 0.02882292218994209,
+              "maximum": 0.050853637200688695
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 9.860197934085445e-05,
+              "p95": 0.0006685015981793273,
+              "maximum": 0.0025853637200688694
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0500211127693468
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.062310913567665535,
+              "p95": 0.2628685123432817,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0912661633755822,
+              "p95": 0.5157700521465927,
+              "maximum": 0.6441165705229537
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005933598309587415,
+              "p95": 0.0033802476339695204,
+              "maximum": 0.004596405785303755
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.69338864848119
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.18310620813726475,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 1.419089104618034,
+              "p95": 2.916255164641484,
+              "maximum": 2.9853410745620295
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0023067913811040596,
+              "p95": 0.004132936452253788,
+              "maximum": 0.004409293499084548
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7435557781982
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-12-opaque",
+    "path": "/proof/work/avif/avif-pq-rec2020-12-opaque/avif-pq-rec2020-12-opaque.avif",
+    "sha256": "b3ae2fe02ace9908a837fa74613e00ed3ac5339be3edb6e66c290f33fef379ed",
+    "spec": {
+      "id": "avif-pq-rec2020-12-opaque",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 12,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-12-opaque/avif-pq-rec2020-12-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-12-opaque.avif",
+        "FileSize": 3344,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2989,
+        "MediaDataOffset": 355,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "b3ae2fe02ace9908a837fa74613e00ed3ac5339be3edb6e66c290f33fef379ed"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.022592523410199395,
+              "p95": 0.08757608236324321,
+              "maximum": 0.08823758656757164
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0011275174121088795,
+              "p95": 0.009247088281828297,
+              "maximum": 0.013227953556368632
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 1.0868530492823679e-05,
+              "p95": 0.0,
+              "maximum": 0.0003586615062631814
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0504143711578322
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.022772676259070323,
+              "p95": 0.06735559944197167,
+              "maximum": 0.09288488853828714
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.031209593072834028,
+              "p95": 0.10713224903776108,
+              "maximum": 0.194652534070741
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00018290343445379978,
+              "p95": 0.0008180648083395461,
+              "maximum": 0.0011732204835147632
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.74745953478005
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.04521839087248125,
+              "p95": 0.08480991037419727,
+              "maximum": 0.08740434119661522
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.355878414140788,
+              "p95": 0.834276980449431,
+              "maximum": 1.0453949354682663
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005626557791708884,
+              "p95": 0.001071412636878215,
+              "maximum": 0.001112105178930129
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 605.1043768768699
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-pq-rec2020-12-alpha",
+    "path": "/proof/work/avif/avif-pq-rec2020-12-alpha/avif-pq-rec2020-12-alpha.avif",
+    "sha256": "38e7171d3aab3d3250c4c2b6a82bdcf409f604f2ee71d19213c98322953ba7ba",
+    "spec": {
+      "id": "avif-pq-rec2020-12-alpha",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 12,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-pq-rec2020-12-alpha/avif-pq-rec2020-12-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-pq-rec2020-12-alpha.avif",
+        "FileSize": 3920,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 3422,
+        "MediaDataOffset": 498,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "38e7171d3aab3d3250c4c2b6a82bdcf409f604f2ee71d19213c98322953ba7ba"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.022592523410199395,
+              "p95": 0.08757608236324321,
+              "maximum": 0.08823758656757164
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0011275174121088795,
+              "p95": 0.009247088281828297,
+              "maximum": 0.013227953556368632
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 1.0868530492823679e-05,
+              "p95": 0.0,
+              "maximum": 0.0003586615062631814
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0504143711578322
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.022824473295125804,
+              "p95": 0.06735559944197167,
+              "maximum": 0.09288488853828714
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.03107455042581532,
+              "p95": 0.10713224903776108,
+              "maximum": 0.194652534070741
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0001829511331976077,
+              "p95": 0.0008180648083395461,
+              "maximum": 0.0011732204835147632
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.73565403705763
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.04521839087248125,
+              "p95": 0.08480991037419727,
+              "maximum": 0.08740434119661522
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.355878414140788,
+              "p95": 0.834276980449431,
+              "maximum": 1.0453949354682663
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005626557791708884,
+              "p95": 0.001071412636878215,
+              "maximum": 0.001112105178930129
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 605.1043768768699
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-8-opaque",
+    "path": "/proof/work/avif/avif-hlg-p3-8-opaque/avif-hlg-p3-8-opaque.avif",
+    "sha256": "b1d524a959d80775ddea3eb0f592c99427bad51b92d22ca39fb8107ea743be05",
+    "spec": {
+      "id": "avif-hlg-p3-8-opaque",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 8,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-8-opaque/avif-hlg-p3-8-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-8-opaque.avif",
+        "FileSize": 1978,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 1619,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "b1d524a959d80775ddea3eb0f592c99427bad51b92d22ca39fb8107ea743be05"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.6060489214149722,
+              "p95": 2.0695191631363015,
+              "maximum": 2.15889941832063
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.010967326987887023,
+              "p95": 0.09618188879012468,
+              "maximum": 0.09955596003357181
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7691815931155866
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.3884283879461114,
+              "p95": 0.6891068289184021,
+              "maximum": 0.7968919013216169
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5413772434603105,
+              "p95": 1.1353227973712876,
+              "maximum": 1.9656968294879391
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0037823949422663436,
+              "p95": 0.007343632607640873,
+              "maximum": 0.010142226243760008
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 90.68397762600189
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.4530343067088771,
+              "p95": 0.8938099950902956,
+              "maximum": 0.9492459255572605
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 3.463588752285229,
+              "p95": 8.642758168759656,
+              "maximum": 9.923961394859816
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.005643691992453652,
+              "p95": 0.011425941348245582,
+              "maximum": 0.012054859957608804
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 605.6938654329336
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-8-alpha",
+    "path": "/proof/work/avif/avif-hlg-p3-8-alpha/avif-hlg-p3-8-alpha.avif",
+    "sha256": "1df5a8bf5722553952d4c6920ceeeea69d776db437e395faa0c5bf4695fe5836",
+    "spec": {
+      "id": "avif-hlg-p3-8-alpha",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 8,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-8-alpha/avif-hlg-p3-8-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-8-alpha.avif",
+        "FileSize": 2357,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 1855,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "1df5a8bf5722553952d4c6920ceeeea69d776db437e395faa0c5bf4695fe5836"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.6060489214149722,
+              "p95": 2.0695191631363015,
+              "maximum": 2.15889941832063
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.010967326987887023,
+              "p95": 0.09618188879012468,
+              "maximum": 0.09955596003357181
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7691815931155866
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.38837628924473583,
+              "p95": 0.6891068289184021,
+              "maximum": 0.7968919013216169
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.5366984432231559,
+              "p95": 1.1353227973712876,
+              "maximum": 1.9656968294879391
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0037738342580918263,
+              "p95": 0.007343632607640873,
+              "maximum": 0.010142226243760008
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 89.68167764127924
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.4530343067088771,
+              "p95": 0.8938099950902956,
+              "maximum": 0.9492459255572605
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 3.463588752285229,
+              "p95": 8.642758168759656,
+              "maximum": 9.923961394859816
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.005643691992453652,
+              "p95": 0.011425941348245582,
+              "maximum": 0.012054859957608804
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 605.6938654329336
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-10-opaque",
+    "path": "/proof/work/avif/avif-hlg-p3-10-opaque/avif-hlg-p3-10-opaque.avif",
+    "sha256": "149712244d61fd1499e8f16bb9f0380a359573684032892238166a55201d85ba",
+    "spec": {
+      "id": "avif-hlg-p3-10-opaque",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 10,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-10-opaque/avif-hlg-p3-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-10-opaque.avif",
+        "FileSize": 2660,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2301,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "149712244d61fd1499e8f16bb9f0380a359573684032892238166a55201d85ba"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.1281999773536459,
+              "p95": 0.4781687451835878,
+              "maximum": 0.506811877354143
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002064104210886957,
+              "p95": 0.007847412754538041,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7715368837328327
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.10931916753946602,
+              "p95": 0.19283367015076974,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.12699900544473205,
+              "p95": 0.3629340110632029,
+              "maximum": 0.5532011319608614
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0009854942417105528,
+              "p95": 0.002406544538632986,
+              "maximum": 0.002772005263380176
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 90.93309653819304
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.12665120702670396,
+              "p95": 0.2434953001581608,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.9898794107807269,
+              "p95": 2.2510703416533033,
+              "maximum": 2.3807050151598332
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.001580981857976443,
+              "p95": 0.0030732859558412124,
+              "maximum": 0.003172666807016148
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.7934365686597
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-10-alpha",
+    "path": "/proof/work/avif/avif-hlg-p3-10-alpha/avif-hlg-p3-10-alpha.avif",
+    "sha256": "3e92f2364b32424b4dc6cdbf03ca83b02e9e0f624b01e9a88cda7749b7406c64",
+    "spec": {
+      "id": "avif-hlg-p3-10-alpha",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 10,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-10-alpha/avif-hlg-p3-10-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-10-alpha.avif",
+        "FileSize": 3140,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 2638,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "3e92f2364b32424b4dc6cdbf03ca83b02e9e0f624b01e9a88cda7749b7406c64"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.1281999773536459,
+              "p95": 0.4781687451835878,
+              "maximum": 0.506811877354143
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002064104210886957,
+              "p95": 0.007847412754538041,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7715368837328327
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.10978498294282685,
+              "p95": 0.19283367015076974,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.12674355102402945,
+              "p95": 0.3629340110632029,
+              "maximum": 0.5532011319608614
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0009885875220072072,
+              "p95": 0.002406544538632986,
+              "maximum": 0.002772005263380176
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 89.92488438489877
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.12665120702670396,
+              "p95": 0.2434953001581608,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.9898794107807269,
+              "p95": 2.2510703416533033,
+              "maximum": 2.3807050151598332
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.001580981857976443,
+              "p95": 0.0030732859558412124,
+              "maximum": 0.003172666807016148
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.7934365686597
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-12-opaque",
+    "path": "/proof/work/avif/avif-hlg-p3-12-opaque/avif-hlg-p3-12-opaque.avif",
+    "sha256": "963aefd861e2780682552f946ecc701b504cf69dd8eb77fdc2db7e9be03ab576",
+    "spec": {
+      "id": "avif-hlg-p3-12-opaque",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 12,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-12-opaque/avif-hlg-p3-12-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-12-opaque.avif",
+        "FileSize": 3530,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 3175,
+        "MediaDataOffset": 355,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "963aefd861e2780682552f946ecc701b504cf69dd8eb77fdc2db7e9be03ab576"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.038380196247690845,
+              "p95": 0.1405851097799199,
+              "maximum": 0.142819701448339
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0007667562749152205,
+              "p95": 0.0031591674041537843,
+              "maximum": 0.007291286238146455
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7707610263849236
+          },
+          "midtone": {
+            "samples": 3584,
+            "delta_e_itp": {
+              "mean": 0.02158575228832487,
+              "p95": 0.04358876458130858,
+              "maximum": 0.05287397969679475
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.026033738362787297,
+              "p95": 0.07167365294901629,
+              "maximum": 0.12597788579742542
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0001288074666555509,
+              "p95": 0.0004505179647252894,
+              "maximum": 0.0006512071109799289
+            },
+            "reference_mean_nits": 91.0,
+            "actual_mean_nits": 91.0103553138916
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.033504734105184175,
+              "p95": 0.06411460158216364,
+              "maximum": 0.06477370354061485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.26813346095613727,
+              "p95": 0.6277891323132962,
+              "maximum": 0.6723041292699463
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00041163968764170795,
+              "p95": 0.0008050522234239416,
+              "maximum": 0.000813948775908149
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.999082679899
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-p3-12-alpha",
+    "path": "/proof/work/avif/avif-hlg-p3-12-alpha/avif-hlg-p3-12-alpha.avif",
+    "sha256": "e59022c4b939f71500f9cf06555ac1aa350ed6b3d1974ab8b1b120a4c90f4a07",
+    "spec": {
+      "id": "avif-hlg-p3-12-alpha",
+      "transfer": "hlg",
+      "gamut": "p3",
+      "depth": 12,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-p3-12-alpha/avif-hlg-p3-12-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 12\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-p3-12-alpha.avif",
+        "FileSize": 4106,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 12,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 3608,
+        "MediaDataOffset": 498,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 12,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "e59022c4b939f71500f9cf06555ac1aa350ed6b3d1974ab8b1b120a4c90f4a07"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1024,
+            "delta_e_itp": {
+              "mean": 0.038380196247690845,
+              "p95": 0.1405851097799199,
+              "maximum": 0.142819701448339
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0007667562749152205,
+              "p95": 0.0031591674041537843,
+              "maximum": 0.007291286238146455
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 0.7708588734429179,
+            "actual_mean_nits": 0.7707610263849236
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.02154088314117896,
+              "p95": 0.04358876458130858,
+              "maximum": 0.05287397969679475
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.02562256796110956,
+              "p95": 0.07167365294901629,
+              "maximum": 0.12597788579742542
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00012723085736171788,
+              "p95": 0.0004505179647252894,
+              "maximum": 0.0006512071109799289
+            },
+            "reference_mean_nits": 89.990990990991,
+            "actual_mean_nits": 90.00079388741358
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.033504734105184175,
+              "p95": 0.06411460158216364,
+              "maximum": 0.06477370354061485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.26813346095613727,
+              "p95": 0.6277891323132962,
+              "maximum": 0.6723041292699463
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00041163968764170795,
+              "p95": 0.0008050522234239416,
+              "maximum": 0.000813948775908149
+            },
+            "reference_mean_nits": 605.0000000000001,
+            "actual_mean_nits": 604.999082679899
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-8-opaque",
+    "path": "/proof/work/avif/avif-hlg-rec2020-8-opaque/avif-hlg-rec2020-8-opaque.avif",
+    "sha256": "95f77a749f2a65b00a11f3b77576518e9399677134298d92911434997dcaf0a6",
+    "spec": {
+      "id": "avif-hlg-rec2020-8-opaque",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 8,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-8-opaque/avif-hlg-rec2020-8-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-8-opaque.avif",
+        "FileSize": 1977,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 1618,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "95f77a749f2a65b00a11f3b77576518e9399677134298d92911434997dcaf0a6"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.5985822320796393,
+              "p95": 2.0695191631363015,
+              "maximum": 2.15889941832063
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.01255997491393141,
+              "p95": 0.09618188879012468,
+              "maximum": 0.09955596003357181
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0508283541892762
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.48091846160596996,
+              "p95": 0.8131462179194506,
+              "maximum": 0.8131462179194506
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.6225857725444308,
+              "p95": 1.4936464427095757,
+              "maximum": 1.9656968294879675
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.004027240428011437,
+              "p95": 0.010125771297524051,
+              "maximum": 0.010142226243759623
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.3333844613535
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.45303430670875056,
+              "p95": 0.8938099950902956,
+              "maximum": 0.9492459255572605
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 3.463588752285249,
+              "p95": 8.642758168759656,
+              "maximum": 9.923961394859703
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.005643691992453677,
+              "p95": 0.011425941348245585,
+              "maximum": 0.012054859957608957
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 605.6938654329334
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-8-alpha",
+    "path": "/proof/work/avif/avif-hlg-rec2020-8-alpha/avif-hlg-rec2020-8-alpha.avif",
+    "sha256": "f9a6d9f309430b6cd55ce8621fdb4c0d5f21df086d5b4183f6725268f4cbbf59",
+    "spec": {
+      "id": "avif-hlg-rec2020-8-alpha",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 8,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-8-alpha/avif-hlg-rec2020-8-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-8-alpha.avif",
+        "FileSize": 2356,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 1854,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 8,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "f9a6d9f309430b6cd55ce8621fdb4c0d5f21df086d5b4183f6725268f4cbbf59"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-8",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.5985822320796393,
+              "p95": 2.0695191631363015,
+              "maximum": 2.15889941832063
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.01255997491393141,
+              "p95": 0.09618188879012468,
+              "maximum": 0.09955596003357181
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0508283541892762
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.48170670813148964,
+              "p95": 0.8131462179194506,
+              "maximum": 0.8131462179194506
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.6186026971149756,
+              "p95": 1.4936464427095757,
+              "maximum": 1.9656968294879675
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00402082778748756,
+              "p95": 0.010125771297524051,
+              "maximum": 0.010142226243759623
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.32787635709111
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.45303430670875056,
+              "p95": 0.8938099950902956,
+              "maximum": 0.9492459255572605
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 3.463588752285249,
+              "p95": 8.642758168759656,
+              "maximum": 9.923961394859703
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.005643691992453677,
+              "p95": 0.011425941348245585,
+              "maximum": 0.012054859957608957
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 605.6938654329334
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-10-opaque",
+    "path": "/proof/work/avif/avif-hlg-rec2020-10-opaque/avif-hlg-rec2020-10-opaque.avif",
+    "sha256": "67a58d572ff9cbab2b4e71ba757885279bd20fe2525cd9d381f807ad1d3f91a1",
+    "spec": {
+      "id": "avif-hlg-rec2020-10-opaque",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-10-opaque/avif-hlg-rec2020-10-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-10-opaque.avif",
+        "FileSize": 2660,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 2301,
+        "MediaDataOffset": 359,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "67a58d572ff9cbab2b4e71ba757885279bd20fe2525cd9d381f807ad1d3f91a1"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.12554983619241125,
+              "p95": 0.4781687451835878,
+              "maximum": 0.5068118773536634
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002218984977981994,
+              "p95": 0.007847412754537153,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0509698518159278
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.09231510795706412,
+              "p95": 0.19900953904853466,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.10065596589489842,
+              "p95": 0.22479906738158206,
+              "maximum": 0.553201131960833
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0008205135455780277,
+              "p95": 0.002223511579402712,
+              "maximum": 0.002772005263380028
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.67434569283434
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.12665120702713528,
+              "p95": 0.24349530015360443,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.9898794107807548,
+              "p95": 2.2510703416533033,
+              "maximum": 2.380705015159947
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0015809818579764863,
+              "p95": 0.003073285955841062,
+              "maximum": 0.003172666807015987
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7934365686596
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-10-alpha",
+    "path": "/proof/work/avif/avif-hlg-rec2020-10-alpha/avif-hlg-rec2020-10-alpha.avif",
+    "sha256": "ed2ef86195e57b2b2fa40edfad606ad8849d76f59b5e18c2cdd6c44bd5e9af87",
+    "spec": {
+      "id": "avif-hlg-rec2020-10-alpha",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-10-alpha/avif-hlg-rec2020-10-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-10-alpha.avif",
+        "FileSize": 3140,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 2638,
+        "MediaDataOffset": 502,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "ed2ef86195e57b2b2fa40edfad606ad8849d76f59b5e18c2cdd6c44bd5e9af87"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.12554983619241125,
+              "p95": 0.4781687451835878,
+              "maximum": 0.5068118773536634
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002218984977981994,
+              "p95": 0.007847412754537153,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0509698518159278
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.09263057568607,
+              "p95": 0.19900953904853466,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1001587069835543,
+              "p95": 0.22479906738158206,
+              "maximum": 0.553201131960833
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0008221351220943549,
+              "p95": 0.002223511579402712,
+              "maximum": 0.002772005263380028
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.66370660318867
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.12665120702713528,
+              "p95": 0.24349530015360443,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.9898794107807548,
+              "p95": 2.2510703416533033,
+              "maximum": 2.380705015159947
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0015809818579764863,
+              "p95": 0.003073285955841062,
+              "maximum": 0.003172666807015987
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7934365686596
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-12-opaque",
+    "path": "/proof/work/avif/avif-hlg-rec2020-12-opaque/avif-hlg-rec2020-12-opaque.avif",
+    "sha256": "4e0668145f055c2a7c01e3bd04678cf51ca731a4ca4cad08d32ea48334d1d49f",
+    "spec": {
+      "id": "avif-hlg-rec2020-12-opaque",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 12,
+      "alpha": false,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-12-opaque/avif-hlg-rec2020-12-opaque.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Absent\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-12-opaque.avif",
+        "FileSize": 3530,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "MediaDataSize": 3175,
+        "MediaDataOffset": 355,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Absent",
+      "sha256": "4e0668145f055c2a7c01e3bd04678cf51ca731a4ca4cad08d32ea48334d1d49f"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.037460533327786365,
+              "p95": 0.1405851097799199,
+              "maximum": 0.14281970144822909
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0007863893590997583,
+              "p95": 0.0031591674041537843,
+              "maximum": 0.007291286238144679
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.050392066553471
+          },
+          "midtone": {
+            "samples": 3552,
+            "delta_e_itp": {
+              "mean": 0.020330497721535126,
+              "p95": 0.039376584857313546,
+              "maximum": 0.052873979703988994
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.032110670858004675,
+              "p95": 0.07167365294904471,
+              "maximum": 0.12597788579742542
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00016611626377619615,
+              "p95": 0.0004505179647252895,
+              "maximum": 0.0006512071109799291
+            },
+            "reference_mean_nits": 91.72972972972971,
+            "actual_mean_nits": 91.74837436760058
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.03350473410518584,
+              "p95": 0.0641146015800853,
+              "maximum": 0.06477370354061485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.2681334609561213,
+              "p95": 0.6277891323131826,
+              "maximum": 0.67230412927006
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0004116396876416933,
+              "p95": 0.0008050522234238273,
+              "maximum": 0.0008139487759078384
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.9990826798987
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "avif-hlg-rec2020-12-alpha",
+    "path": "/proof/work/avif/avif-hlg-rec2020-12-alpha/avif-hlg-rec2020-12-alpha.avif",
+    "sha256": "18cd6b463c9654963587b39692f519c5618bd2a738a425dc304e6e10dd0297cc",
+    "spec": {
+      "id": "avif-hlg-rec2020-12-alpha",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 12,
+      "alpha": true,
+      "frames": 1
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/avif-hlg-rec2020-12-alpha/avif-hlg-rec2020-12-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "avif-hlg-rec2020-12-alpha.avif",
+        "FileSize": 4106,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 3608,
+        "MediaDataOffset": 498,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 12,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "18cd6b463c9654963587b39692f519c5618bd2a738a425dc304e6e10dd0297cc"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-12",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.037460533327786365,
+              "p95": 0.1405851097799199,
+              "maximum": 0.14281970144822909
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0007863893590997583,
+              "p95": 0.0031591674041537843,
+              "maximum": 0.007291286238144679
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.050392066553471
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.020273809267898894,
+              "p95": 0.039376584857313546,
+              "maximum": 0.052873979703988994
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.03175100738444976,
+              "p95": 0.07167365294904471,
+              "maximum": 0.12597788579742542
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.00016486449255351468,
+              "p95": 0.0004505179647252895,
+              "maximum": 0.0006512071109799291
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.7363443740974
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.03350473410518584,
+              "p95": 0.0641146015800853,
+              "maximum": 0.06477370354061485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.2681334609561213,
+              "p95": 0.6277891323131826,
+              "maximum": 0.67230412927006
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0004116396876416933,
+              "p95": 0.0008050522234238273,
+              "maximum": 0.0008139487759078384
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.9990826798987
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "animated-pq-alpha",
+    "path": "/proof/work/avif/animated-pq-alpha/animated-pq-alpha.avif",
+    "sha256": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d",
+    "spec": {
+      "id": "animated-pq-alpha",
+      "transfer": "pq",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": true,
+      "frames": 2
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/animated-pq-alpha/animated-pq-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * Repeat Count   : 2\n * 10 timescales per second, 1.00 seconds (10 timescales), 2 frames\n * Image Sequence Frames: (2 expected frames)\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 0.30 (3 timescales)] [96x64]\n   * Decoded frame [1] [pts 0.30 (3 timescales)] [duration 0.70 (7 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "animated-pq-alpha.avif",
+        "FileSize": 4858,
+        "FilePermissions": 100644,
+        "FileType": "MP4",
+        "FileTypeExtension": "MP4",
+        "MIMEType": "video/mp4",
+        "MajorBrand": "avis",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "avis",
+          "msf1",
+          "iso8",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MovieHeaderVersion": 1,
+        "CreateDate": "1970:01:01 00:00:01",
+        "ModifyDate": "1970:01:01 00:00:01",
+        "TimeScale": 10,
+        "Duration": 3,
+        "PreferredRate": 1,
+        "PreferredVolume": 1,
+        "PreviewTime": 0,
+        "PreviewDuration": 0,
+        "PosterTime": 0,
+        "SelectionTime": 0,
+        "SelectionDuration": 0,
+        "CurrentTime": 0,
+        "NextTrackID": 3,
+        "TrackHeaderVersion": 1,
+        "TrackCreateDate": "1970:01:01 00:00:01",
+        "TrackModifyDate": "1970:01:01 00:00:01",
+        "TrackID": 1,
+        "TrackDuration": 3,
+        "TrackLayer": 0,
+        "TrackVolume": 0,
+        "MatrixStructure": "1 0 0 0 1 0 0 0 1",
+        "MediaHeaderVersion": 16777216,
+        "MediaCreateDate": "1970:01:01 00:00:01",
+        "MediaModifyDate": "1970:01:01 00:00:01",
+        "MediaTimeScale": 10,
+        "MediaDuration": 1,
+        "MediaLanguageCode": "und",
+        "HandlerType": "auxv",
+        "GraphicsMode": 0,
+        "OpColor": "0 0 0",
+        "OtherFormat": "av01",
+        "MediaDataSize": 2846,
+        "MediaDataOffset": 2012,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "AvgBitrate": 7589,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.08424281454625561,
+              "p95": 0.2880656793656744,
+              "maximum": 0.34406715279145295
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.004212989312512057,
+              "p95": 0.02882292218994209,
+              "maximum": 0.050853637200688695
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 9.860197934085445e-05,
+              "p95": 0.0006685015981793273,
+              "maximum": 0.0025853637200688694
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0500211127693468
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.062310913567665535,
+              "p95": 0.2628685123432817,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0912661633755822,
+              "p95": 0.5157700521465927,
+              "maximum": 0.6441165705229537
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005933598309587415,
+              "p95": 0.0033802476339695204,
+              "maximum": 0.004596405785303755
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.69338864848119
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.18310620813726475,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 1.419089104618034,
+              "p95": 2.916255164641484,
+              "maximum": 2.9853410745620295
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0023067913811040596,
+              "p95": 0.004132936452253788,
+              "maximum": 0.004409293499084548
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7435557781982
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.08424281454625561,
+              "p95": 0.2880656793656744,
+              "maximum": 0.34406715279145295
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.004212989312512057,
+              "p95": 0.02882292218994209,
+              "maximum": 0.050853637200688695
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 9.860197934085445e-05,
+              "p95": 0.0006685015981793273,
+              "maximum": 0.0025853637200688694
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0500211127693468
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.062310913567665535,
+              "p95": 0.2628685123432817,
+              "maximum": 0.35132945474746435
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.0912661633755822,
+              "p95": 0.5157700521465927,
+              "maximum": 0.6441165705229537
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0005933598309587415,
+              "p95": 0.0033802476339695204,
+              "maximum": 0.004596405785303755
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.69338864848119
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.19328542875258284,
+              "p95": 0.325279161105243,
+              "maximum": 0.3462057686017861
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 3.0890605403526923,
+              "p95": 11.925909333265736,
+              "maximum": 11.925909333265736
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0024450708003394485,
+              "p95": 0.004132936452253788,
+              "maximum": 0.004409293499084548
+            },
+            "reference_mean_nits": 1126.0106382978722,
+            "actual_mean_nits": 1123.915401147033
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "id": "animated-hlg-alpha",
+    "path": "/proof/work/avif/animated-hlg-alpha/animated-hlg-alpha.avif",
+    "sha256": "d10cf18a5de6ca4bd4adf70008d2184f008c8457c34ca30005c46b894857d14f",
+    "spec": {
+      "id": "animated-hlg-alpha",
+      "transfer": "hlg",
+      "gamut": "rec2020",
+      "depth": 10,
+      "alpha": true,
+      "frames": 2
+    },
+    "facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/avif/animated-hlg-alpha/animated-hlg-alpha.avif\n * Resolution     : 96x64\n * Bit Depth      : 10\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 18\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * Repeat Count   : 2\n * 10 timescales per second, 1.00 seconds (10 timescales), 2 frames\n * Image Sequence Frames: (2 expected frames)\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 0.30 (3 timescales)] [96x64]\n   * Decoded frame [1] [pts 0.30 (3 timescales)] [duration 0.70 (7 timescales)] [96x64]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "animated-hlg-alpha.avif",
+        "FileSize": 5097,
+        "FilePermissions": 100644,
+        "FileType": "MP4",
+        "FileTypeExtension": "MP4",
+        "MIMEType": "video/mp4",
+        "MajorBrand": "avis",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "avis",
+          "msf1",
+          "iso8",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 96,
+        "ImageHeight": 64,
+        "ImageSpatialExtent": "96 64",
+        "ImagePixelDepth": "10 10 10",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 18,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MovieHeaderVersion": 1,
+        "CreateDate": "1970:01:01 00:00:01",
+        "ModifyDate": "1970:01:01 00:00:01",
+        "TimeScale": 10,
+        "Duration": 3,
+        "PreferredRate": 1,
+        "PreferredVolume": 1,
+        "PreviewTime": 0,
+        "PreviewDuration": 0,
+        "PosterTime": 0,
+        "SelectionTime": 0,
+        "SelectionDuration": 0,
+        "CurrentTime": 0,
+        "NextTrackID": 3,
+        "TrackHeaderVersion": 1,
+        "TrackCreateDate": "1970:01:01 00:00:01",
+        "TrackModifyDate": "1970:01:01 00:00:01",
+        "TrackID": 1,
+        "TrackDuration": 3,
+        "TrackLayer": 0,
+        "TrackVolume": 0,
+        "MatrixStructure": "1 0 0 0 1 0 0 0 1",
+        "MediaHeaderVersion": 16777216,
+        "MediaCreateDate": "1970:01:01 00:00:01",
+        "MediaModifyDate": "1970:01:01 00:00:01",
+        "MediaTimeScale": 10,
+        "MediaDuration": 1,
+        "MediaLanguageCode": "und",
+        "HandlerType": "auxv",
+        "GraphicsMode": 0,
+        "OpColor": "0 0 0",
+        "OtherFormat": "av01",
+        "MediaDataSize": 3085,
+        "MediaDataOffset": 2012,
+        "ImageSize": "96 64",
+        "Megapixels": 0.006144,
+        "AvgBitrate": 8227,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 96,
+      "height": 64,
+      "depth": 10,
+      "primaries": 9,
+      "transfer": 18,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "d10cf18a5de6ca4bd4adf70008d2184f008c8457c34ca30005c46b894857d14f"
+    },
+    "analytic_measurements": [
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.12554983619241125,
+              "p95": 0.4781687451835878,
+              "maximum": 0.5068118773536634
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002218984977981994,
+              "p95": 0.007847412754537153,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0509698518159278
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.09263057568607,
+              "p95": 0.19900953904853466,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1001587069835543,
+              "p95": 0.22479906738158206,
+              "maximum": 0.553201131960833
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0008221351220943549,
+              "p95": 0.002223511579402712,
+              "maximum": 0.002772005263380028
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.66370660318867
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.12665120702713528,
+              "p95": 0.24349530015360443,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.9898794107807548,
+              "p95": 2.2510703416533033,
+              "maximum": 2.380705015159947
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0015809818579764863,
+              "p95": 0.003073285955841062,
+              "maximum": 0.003172666807015987
+            },
+            "reference_mean_nits": 605.0,
+            "actual_mean_nits": 604.7934365686596
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      },
+      {
+        "passed": true,
+        "metric": "BT.2124 Delta E ITP",
+        "fixture_class": "avif-10",
+        "thresholds_sha256": "0863bf98e1cecc6761edbdc6f6f8e70c22a5345cfa9f9d183fc5d100be88fccf",
+        "regions": {
+          "shadow": {
+            "samples": 1056,
+            "delta_e_itp": {
+              "mean": 0.12554983619241125,
+              "p95": 0.4781687451835878,
+              "maximum": 0.5068118773536634
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.002218984977981994,
+              "p95": 0.007847412754537153,
+              "maximum": 0.0221957982001868
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0,
+              "p95": 0.0,
+              "maximum": 0.0
+            },
+            "reference_mean_nits": 1.0505298166719204,
+            "actual_mean_nits": 1.0509698518159278
+          },
+          "midtone": {
+            "samples": 3520,
+            "delta_e_itp": {
+              "mean": 0.09263057568607001,
+              "p95": 0.19900953904853466,
+              "maximum": 0.21811927098859485
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.1001587069835543,
+              "p95": 0.22479906738158206,
+              "maximum": 0.553201131960833
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0008221351220943549,
+              "p95": 0.002223511579402712,
+              "maximum": 0.002772005263380028
+            },
+            "reference_mean_nits": 90.7181818181818,
+            "actual_mean_nits": 90.66370660318867
+          },
+          "highlight": {
+            "samples": 1536,
+            "delta_e_itp": {
+              "mean": 0.10512741672345643,
+              "p95": 0.24349530015360443,
+              "maximum": 0.2504409854399636
+            },
+            "luminance_absolute_error_nits": {
+              "mean": 0.7521056245917972,
+              "p95": 2.2377663390209364,
+              "maximum": 2.380705015159947
+            },
+            "luminance_relative_error_above_absolute_floor": {
+              "mean": 0.0013111490518064811,
+              "p95": 0.003073285955841062,
+              "maximum": 0.003172666807015987
+            },
+            "reference_mean_nits": 626.0106382978723,
+            "actual_mean_nits": 625.9558231044751
+          }
+        },
+        "failures": [],
+        "alpha_scope": "Visible straight RGB only; alpha and composition need separate checks"
+      }
+    ],
+    "structural_checks": {
+      "dimensions": true,
+      "depth": true,
+      "transfer": true,
+      "gamut": true,
+      "matrix_full_range": true,
+      "orientation_baked": true,
+      "frames": true,
+      "timing": true,
+      "loop": true,
+      "alpha": true
+    },
+    "source_valid": true
+  },
+  {
+    "fixture_id": "gainmap-android-iso",
+    "sha256": "f33bd1aae8c72ded83b31e7e4e4649654ce7bb483a28bcaa4629a7999ff0f80e",
+    "metadata": {
+      "ExifTool:ExifToolVersion": 13.55,
+      "File:FileType": "JPEG",
+      "File:FileTypeExtension": "JPG",
+      "File:MIMEType": "image/jpeg",
+      "File:ExifByteOrder": "II",
+      "File:ImageWidth": 384,
+      "File:ImageHeight": 512,
+      "File:EncodingProcess": 0,
+      "File:BitsPerSample": 8,
+      "File:ColorComponents": 3,
+      "File:YCbCrSubSampling": "1 1",
+      "JFIF:JFIFVersion": "1 1",
+      "JFIF:ResolutionUnit": 0,
+      "JFIF:XResolution": 1,
+      "JFIF:YResolution": 1,
+      "IFD0:Orientation": 1,
+      "IFD0:XResolution": 72,
+      "IFD0:YResolution": 72,
+      "IFD0:ResolutionUnit": 2,
+      "IFD0:YCbCrPositioning": 1,
+      "ExifIFD:ExifVersion": "0210",
+      "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+      "ExifIFD:FlashpixVersion": "0100",
+      "ExifIFD:ColorSpace": 65535,
+      "ExifIFD:ExifImageWidth": 384,
+      "ExifIFD:ExifImageHeight": 512,
+      "ICC-header:ProfileCMMType": "",
+      "ICC-header:ProfileVersion": 1072,
+      "ICC-header:ProfileClass": "mntr",
+      "ICC-header:ColorSpaceData": "RGB ",
+      "ICC-header:ProfileConnectionSpace": "XYZ ",
+      "ICC-header:ProfileDateTime": "0000:00:00 00:00:00",
+      "ICC-header:ProfileFileSignature": "acsp",
+      "ICC-header:PrimaryPlatform": "",
+      "ICC-header:CMMFlags": 0,
+      "ICC-header:DeviceManufacturer": "",
+      "ICC-header:DeviceModel": "",
+      "ICC-header:DeviceAttributes": "0 0",
+      "ICC-header:RenderingIntent": 1,
+      "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+      "ICC-header:ProfileCreator": "",
+      "ICC-header:ProfileID": "0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0",
+      "ICC_Profile:ProfileDescription": "Display P3 Gamut with sRGB Transfer",
+      "ICC_Profile:RedMatrixColumn": "0.51511 0.24118 -0.00105",
+      "ICC_Profile:GreenMatrixColumn": "0.29196 0.69223 0.04189",
+      "ICC_Profile:BlueMatrixColumn": "0.15715 0.06659 0.78438",
+      "ICC_Profile:MediaWhitePoint": "0.9642 1 0.82491",
+      "ICC_Profile:RedTRC": "(Binary data 40 bytes, use -b option to extract)",
+      "ICC_Profile:GreenTRC": "(Binary data 40 bytes, use -b option to extract)",
+      "ICC_Profile:BlueTRC": "(Binary data 40 bytes, use -b option to extract)",
+      "ICC_Profile:ProfileCopyright": "Google Inc. 2022",
+      "APP2:UniformResourceName": "urn:iso:std:iso:ts:21496:-1",
+      "MPF0:MPFVersion": "0100",
+      "MPF0:NumberOfImages": 2,
+      "MPImage1:MPImageFlags": 0,
+      "MPImage1:MPImageFormat": 0,
+      "MPImage1:MPImageType": 196608,
+      "MPImage1:MPImageLength": 46930,
+      "MPImage1:MPImageStart": 0,
+      "MPImage1:DependentImage1EntryNumber": 0,
+      "MPImage1:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImageFlags": 0,
+      "MPImage2:MPImageFormat": 0,
+      "MPImage2:MPImageType": 0,
+      "MPImage2:MPImageLength": 8407,
+      "MPImage2:MPImageStart": 46930,
+      "MPImage2:DependentImage1EntryNumber": 0,
+      "MPImage2:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImage2": "(Binary data 8407 bytes, use -b option to extract)",
+      "Composite:ImageSize": "384 512",
+      "Composite:Megapixels": 0.196608
+    },
+    "frame_count": 1,
+    "opaque": true,
+    "coded_depth": 8,
+    "private_tags": [],
+    "base": {
+      "depth": 8,
+      "width": 384,
+      "height": 512,
+      "components": 3
+    },
+    "gain_map_present": true,
+    "map": {
+      "depth": 8,
+      "width": 192,
+      "height": 256,
+      "components": 1
+    },
+    "iso_identifier": true,
+    "android_xmp_properties": {},
+    "iso_metadata": {
+      "minimum_version": 0,
+      "writer_version": 0,
+      "use_base_colour_space": true,
+      "backward": false,
+      "base_headroom": 0.0,
+      "alternate_headroom": 5.622376441955566,
+      "channels": [
+        {
+          "minimum": 0.0,
+          "maximum": 5.622376441955566,
+          "gamma": 1.0,
+          "base_offset": 0.0,
+          "alternate_offset": 0.0
+        }
+      ]
+    },
+    "independent_hdr_decode": false,
+    "independent_hdr_blocker": "Input image /proof/fixtures/gainmap/gainmap-android-iso.jpg does not contain a gain map\n"
+  },
+  {
+    "fixture_id": "gainmap-android-xmp",
+    "sha256": "d22fd05e210df1067ebd6a1f63d0e5d94c5fa9042fe2ebd7067a10a301402271",
+    "metadata": {
+      "ExifTool:ExifToolVersion": 13.55,
+      "File:FileType": "JPEG",
+      "File:FileTypeExtension": "JPG",
+      "File:MIMEType": "image/jpeg",
+      "File:ExifByteOrder": "II",
+      "File:ImageWidth": 403,
+      "File:ImageHeight": 302,
+      "File:EncodingProcess": 0,
+      "File:BitsPerSample": 8,
+      "File:ColorComponents": 3,
+      "File:YCbCrSubSampling": "2 2",
+      "JFIF:JFIFVersion": "1 2",
+      "JFIF:ResolutionUnit": 0,
+      "JFIF:XResolution": 1,
+      "JFIF:YResolution": 1,
+      "IFD0:Make": "Google",
+      "IFD0:Model": "Pixel 4a",
+      "IFD0:Orientation": 1,
+      "IFD0:XResolution": 72,
+      "IFD0:YResolution": 72,
+      "IFD0:ResolutionUnit": 2,
+      "IFD0:Software": "GIMP 2.10.32",
+      "IFD0:ModifyDate": "2022:08:24 20:07:42",
+      "IFD0:YCbCrPositioning": 1,
+      "ExifIFD:ExposureTime": 0.000937,
+      "ExifIFD:ExposureProgram": 2,
+      "ExifIFD:ISO": 47,
+      "ExifIFD:ExifVersion": "0232",
+      "ExifIFD:DateTimeOriginal": "2022:08:24 20:07:42",
+      "ExifIFD:CreateDate": "2022:08:24 20:07:42",
+      "ExifIFD:OffsetTime": "+00:00",
+      "ExifIFD:OffsetTimeOriginal": "+00:00",
+      "ExifIFD:OffsetTimeDigitized": "+00:00",
+      "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+      "ExifIFD:ShutterSpeedValue": "0.000936781366528578",
+      "ExifIFD:ExposureCompensation": 0,
+      "ExifIFD:SubjectDistance": 0,
+      "ExifIFD:MeteringMode": 2,
+      "ExifIFD:Flash": 32,
+      "ExifIFD:SubSecTime": "023000",
+      "ExifIFD:SubSecTimeOriginal": "023000",
+      "ExifIFD:SubSecTimeDigitized": "023000",
+      "ExifIFD:FlashpixVersion": "0100",
+      "ExifIFD:ColorSpace": 1,
+      "ExifIFD:ExifImageWidth": 403,
+      "ExifIFD:ExifImageHeight": 302,
+      "ExifIFD:SensingMethod": 2,
+      "ExifIFD:SceneType": 1,
+      "ExifIFD:CustomRendered": 1,
+      "ExifIFD:ExposureMode": 0,
+      "ExifIFD:DigitalZoomRatio": 0,
+      "ExifIFD:SceneCaptureType": 0,
+      "ExifIFD:Contrast": 0,
+      "ExifIFD:Saturation": 0,
+      "ExifIFD:Sharpness": 0,
+      "ExifIFD:SubjectDistanceRange": 0,
+      "ExifIFD:LensMake": "Google",
+      "ExifIFD:LensModel": "Pixel 4a unknown camera",
+      "ExifIFD:CompositeImage": 1,
+      "InteropIFD:InteropIndex": "R98",
+      "InteropIFD:InteropVersion": "0100",
+      "XMP-x:XMPToolkit": "XMP Core 5.5.0",
+      "XMP-xmpMM:DocumentID": "gimp:docid:gimp:d19d8265-6ba3-418e-9f89-cefba3ef5b22",
+      "XMP-xmpMM:InstanceID": "xmp.iid:a21468a0-72ee-489e-8927-2f380856cb8c",
+      "XMP-xmpMM:OriginalDocumentID": "xmp.did:915da93c-438f-425b-b7c0-ddd63bad346b",
+      "XMP-xmpMM:HistoryAction": [
+        "saved",
+        "saved",
+        "saved",
+        "saved"
+      ],
+      "XMP-xmpMM:HistoryChanged": [
+        "/",
+        "/",
+        "/metadata",
+        "/"
+      ],
+      "XMP-xmpMM:HistoryInstanceID": [
+        "xmp.iid:f13d68d8-4ce1-4b96-8693-06fa2b068a09",
+        "xmp.iid:22108f79-8464-416c-9df2-f0a964bf865d",
+        "xmp.iid:d1f1b9bd-d635-4bb2-8267-e847d9e0c892",
+        "xmp.iid:c7acfa6c-c977-410c-92ff-c3b900b7af4b"
+      ],
+      "XMP-xmpMM:HistorySoftwareAgent": [
+        "Gimp 2.10 (Linux)",
+        "Gimp 2.10 (Linux)",
+        "Gimp 2.10 (Linux)",
+        "Gimp 2.10 (Linux)"
+      ],
+      "XMP-xmpMM:HistoryWhen": [
+        "2022:08:24 21:15:28+02:00",
+        "2022:08:24 21:16:53+02:00",
+        "2022:08:24 22:05:15+02:00",
+        "2022:08:24 22:07:22+02:00"
+      ],
+      "XMP-dc:Format": "image/jpeg",
+      "XMP-DICOM:PatientSex": "other",
+      "XMP-GIMP:Api": 2.0,
+      "XMP-GIMP:Platform": "Linux",
+      "XMP-GIMP:TimeStamp": "1661371642640328",
+      "XMP-GIMP:Version": "2.10.32",
+      "XMP-xmp:CreatorTool": "GIMP 2.10",
+      "XMP-xmp:MetadataDate": "2022:08:24T22:07:07+02:00",
+      "XMP-xmp:ModifyDate": "2022:08:24T22:07:07+02:00",
+      "XMP-hdrgm:Version": 1.0,
+      "XMP-xmpNote:HasExtendedXMP": "0FBF8664D08ED771A01EEB4E43F943B3",
+      "XMP-GContainer:DirectoryItemSemantic": [
+        "Primary",
+        "GainMap"
+      ],
+      "XMP-GContainer:DirectoryItemMime": [
+        "image/jpeg",
+        "image/jpeg"
+      ],
+      "XMP-GContainer:DirectoryItemLength": 14092,
+      "MPF0:MPFVersion": "0100",
+      "MPF0:NumberOfImages": 2,
+      "MPImage1:MPImageFlags": 0,
+      "MPImage1:MPImageFormat": 0,
+      "MPImage1:MPImageType": 196608,
+      "MPImage1:MPImageLength": 33487,
+      "MPImage1:MPImageStart": 0,
+      "MPImage1:DependentImage1EntryNumber": 0,
+      "MPImage1:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImageFlags": 0,
+      "MPImage2:MPImageFormat": 0,
+      "MPImage2:MPImageType": 0,
+      "MPImage2:MPImageLength": 14092,
+      "MPImage2:MPImageStart": 33487,
+      "MPImage2:DependentImage1EntryNumber": 0,
+      "MPImage2:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImage2": "(Binary data 14092 bytes, use -b option to extract)",
+      "XMP-GCamera:HDRPlusMakerNote": "(Binary data 36 bytes, use -b option to extract)",
+      "Google:GainMapImage": "(Binary data 14092 bytes, use -b option to extract)",
+      "Composite:ImageSize": "403 302",
+      "Composite:Megapixels": 0.121706,
+      "Composite:ShutterSpeed": 0.000937,
+      "Composite:SubSecCreateDate": "2022:08:24 20:07:42.023000+00:00",
+      "Composite:SubSecDateTimeOriginal": "2022:08:24 20:07:42.023000+00:00",
+      "Composite:SubSecModifyDate": "2022:08:24 20:07:42.023000+00:00"
+    },
+    "frame_count": 1,
+    "opaque": true,
+    "coded_depth": 8,
+    "private_tags": [
+      "IFD0:Make",
+      "IFD0:Model",
+      "IFD0:Software",
+      "IFD0:ModifyDate",
+      "ExifIFD:ExposureTime",
+      "ExifIFD:ExposureProgram",
+      "ExifIFD:ISO",
+      "ExifIFD:DateTimeOriginal",
+      "ExifIFD:CreateDate",
+      "ExifIFD:OffsetTime",
+      "ExifIFD:OffsetTimeOriginal",
+      "ExifIFD:OffsetTimeDigitized",
+      "ExifIFD:ShutterSpeedValue",
+      "ExifIFD:ExposureCompensation",
+      "ExifIFD:SubjectDistance",
+      "ExifIFD:MeteringMode",
+      "ExifIFD:Flash",
+      "ExifIFD:SubSecTime",
+      "ExifIFD:SubSecTimeOriginal",
+      "ExifIFD:SubSecTimeDigitized",
+      "ExifIFD:SensingMethod",
+      "ExifIFD:SceneType",
+      "ExifIFD:CustomRendered",
+      "ExifIFD:ExposureMode",
+      "ExifIFD:DigitalZoomRatio",
+      "ExifIFD:SceneCaptureType",
+      "ExifIFD:Contrast",
+      "ExifIFD:Saturation",
+      "ExifIFD:Sharpness",
+      "ExifIFD:SubjectDistanceRange",
+      "ExifIFD:LensMake",
+      "ExifIFD:LensModel",
+      "ExifIFD:CompositeImage",
+      "XMP-x:XMPToolkit",
+      "XMP-xmpMM:DocumentID",
+      "XMP-xmpMM:InstanceID",
+      "XMP-xmpMM:OriginalDocumentID",
+      "XMP-xmpMM:HistoryAction",
+      "XMP-xmpMM:HistoryChanged",
+      "XMP-xmpMM:HistoryInstanceID",
+      "XMP-xmpMM:HistorySoftwareAgent",
+      "XMP-xmpMM:HistoryWhen",
+      "XMP-dc:Format",
+      "XMP-DICOM:PatientSex",
+      "XMP-GIMP:Api",
+      "XMP-GIMP:Platform",
+      "XMP-GIMP:TimeStamp",
+      "XMP-GIMP:Version",
+      "XMP-xmp:CreatorTool",
+      "XMP-xmp:MetadataDate",
+      "XMP-xmp:ModifyDate",
+      "XMP-xmpNote:HasExtendedXMP",
+      "XMP-GCamera:HDRPlusMakerNote"
+    ],
+    "base": {
+      "depth": 8,
+      "width": 403,
+      "height": 302,
+      "components": 3
+    },
+    "gain_map_present": true,
+    "map": {
+      "depth": 8,
+      "width": 512,
+      "height": 384,
+      "components": 1
+    },
+    "iso_identifier": false,
+    "android_xmp_properties": {
+      "XMP-hdrgm:Version": 1.0,
+      "XMP-hdrgm:HDRCapacityMin": 0,
+      "XMP-hdrgm:HDRCapacityMax": 3.5,
+      "XMP-hdrgm:OffsetHDR": 0,
+      "XMP-hdrgm:OffsetSDR": 0,
+      "XMP-hdrgm:GainMapMax": [
+        3.5,
+        3.6,
+        3.7
+      ]
+    },
+    "independent_hdr_decode": true
+  },
+  {
+    "fixture_id": "gainmap-apple-old",
+    "sha256": "2e4310a0dd37a98678e057e25d936bbc4f936bb6fe17380c0ce99e58ecaa603b",
+    "metadata": {
+      "ExifTool:ExifToolVersion": 13.55,
+      "File:FileType": "JPEG",
+      "File:FileTypeExtension": "JPG",
+      "File:MIMEType": "image/jpeg",
+      "File:ExifByteOrder": "MM",
+      "File:ImageWidth": 384,
+      "File:ImageHeight": 512,
+      "File:EncodingProcess": 0,
+      "File:BitsPerSample": 8,
+      "File:ColorComponents": 3,
+      "File:YCbCrSubSampling": "2 2",
+      "JFIF:JFIFVersion": "1 1",
+      "JFIF:ResolutionUnit": 1,
+      "JFIF:XResolution": 300,
+      "JFIF:YResolution": 300,
+      "IFD0:Make": "Apple",
+      "IFD0:Model": "iPhone 13 mini",
+      "IFD0:Orientation": 1,
+      "IFD0:XResolution": 72,
+      "IFD0:YResolution": 72,
+      "IFD0:ResolutionUnit": 2,
+      "IFD0:Software": "18.7.1",
+      "IFD0:ModifyDate": "2026:01:07 15:20:14",
+      "IFD0:HostComputer": "iPhone 13 mini",
+      "IFD0:YCbCrPositioning": 1,
+      "ExifIFD:ExposureTime": 0.0009823182711,
+      "ExifIFD:FNumber": 1.6,
+      "ExifIFD:ExposureProgram": 2,
+      "ExifIFD:ISO": 50,
+      "ExifIFD:ExifVersion": "0232",
+      "ExifIFD:DateTimeOriginal": "2026:01:07 15:20:14",
+      "ExifIFD:CreateDate": "2026:01:07 15:20:14",
+      "ExifIFD:OffsetTime": "+01:00",
+      "ExifIFD:OffsetTimeOriginal": "+01:00",
+      "ExifIFD:OffsetTimeDigitized": "+01:00",
+      "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+      "ExifIFD:ShutterSpeedValue": "0.000982000000006454",
+      "ExifIFD:ApertureValue": 1.59999999932056,
+      "ExifIFD:BrightnessValue": 7.795659837,
+      "ExifIFD:ExposureCompensation": 0,
+      "ExifIFD:MeteringMode": 5,
+      "ExifIFD:Flash": 16,
+      "ExifIFD:FocalLength": 5.1,
+      "ExifIFD:SubjectArea": "2006 1508 2213 1330",
+      "ExifIFD:SubSecTimeOriginal": 930,
+      "ExifIFD:SubSecTimeDigitized": 930,
+      "ExifIFD:FlashpixVersion": "0100",
+      "ExifIFD:ColorSpace": 65535,
+      "ExifIFD:ExifImageWidth": 4032,
+      "ExifIFD:ExifImageHeight": 3024,
+      "ExifIFD:SensingMethod": 2,
+      "ExifIFD:SceneType": 1,
+      "ExifIFD:ExposureMode": 0,
+      "ExifIFD:WhiteBalance": 0,
+      "ExifIFD:FocalLengthIn35mmFormat": 26,
+      "ExifIFD:SceneCaptureType": 0,
+      "ExifIFD:LensInfo": "1.539999962 5.1 1.6 2.4",
+      "ExifIFD:LensMake": "Apple",
+      "ExifIFD:LensModel": "iPhone 13 mini back dual wide camera 5.1mm f/1.6",
+      "ExifIFD:CompositeImage": 2,
+      "Apple:MakerNoteVersion": 15,
+      "Apple:RunTimeFlags": 1,
+      "Apple:RunTimeValue": 7662998208416,
+      "Apple:RunTimeScale": 1000000000,
+      "Apple:RunTimeEpoch": 0,
+      "Apple:AEStable": 0,
+      "Apple:AETarget": 159,
+      "Apple:AEAverage": 157,
+      "Apple:AFStable": 1,
+      "Apple:AccelerationVector": "0.01757224836 -0.988631666 -0.02797703446",
+      "Apple:FocusDistanceRange": "0.18359375 0.21875",
+      "Apple:ImageCaptureType": 10,
+      "Apple:LivePhotoVideoIndex": 1112547328,
+      "Apple:PhotosAppFeatureFlags": 0,
+      "Apple:HDRHeadroom": 1.518931985,
+      "Apple:AFPerformance": "105 268435504",
+      "Apple:SignalToNoiseRatio": 54.50344462,
+      "Apple:PhotoIdentifier": "0170521C-E077-45C0-90AE-F1E1E92069E5",
+      "Apple:ColorTemperature": 5579,
+      "Apple:CameraType": 1,
+      "Apple:FocusPosition": 63,
+      "Apple:HDRGain": 0,
+      "Apple:SemanticStyle": "{_0=1,_1=0,_2=0,_3=0}",
+      "GPS:GPSLatitudeRef": "N",
+      "GPS:GPSLongitudeRef": "E",
+      "GPS:GPSAltitudeRef": 0,
+      "GPS:GPSAltitude": 47.59040248,
+      "GPS:GPSTimeStamp": "14:20:08",
+      "GPS:GPSSpeedRef": "K",
+      "GPS:GPSSpeed": 0,
+      "GPS:GPSImgDirectionRef": "T",
+      "GPS:GPSImgDirection": 101.3891449,
+      "GPS:GPSDestBearingRef": "T",
+      "GPS:GPSDestBearing": 101.3891449,
+      "GPS:GPSDateStamp": "2026:01:07",
+      "GPS:GPSHPositioningError": 13.68423872,
+      "MPF0:MPFVersion": "0100",
+      "MPF0:NumberOfImages": 2,
+      "MPImage1:MPImageFlags": 0,
+      "MPImage1:MPImageFormat": 0,
+      "MPImage1:MPImageType": 196608,
+      "MPImage1:MPImageLength": 44891,
+      "MPImage1:MPImageStart": 0,
+      "MPImage1:DependentImage1EntryNumber": 0,
+      "MPImage1:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImageFlags": 0,
+      "MPImage2:MPImageFormat": 0,
+      "MPImage2:MPImageType": 0,
+      "MPImage2:MPImageLength": 5921,
+      "MPImage2:MPImageStart": 44821,
+      "MPImage2:DependentImage1EntryNumber": 0,
+      "MPImage2:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImage2": "(Binary data 5921 bytes, use -b option to extract)",
+      "ICC-header:ProfileCMMType": "appl",
+      "ICC-header:ProfileVersion": 1024,
+      "ICC-header:ProfileClass": "mntr",
+      "ICC-header:ColorSpaceData": "RGB ",
+      "ICC-header:ProfileConnectionSpace": "XYZ ",
+      "ICC-header:ProfileDateTime": "2022:01:01 00:00:00",
+      "ICC-header:ProfileFileSignature": "acsp",
+      "ICC-header:PrimaryPlatform": "APPL",
+      "ICC-header:CMMFlags": 0,
+      "ICC-header:DeviceManufacturer": "APPL",
+      "ICC-header:DeviceModel": "",
+      "ICC-header:DeviceAttributes": "0 0",
+      "ICC-header:RenderingIntent": 0,
+      "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+      "ICC-header:ProfileCreator": "appl",
+      "ICC-header:ProfileID": "236 253 163 142 56 133 71 195 109 180 189 79 122 218 24 47",
+      "ICC_Profile:ProfileDescription": "Display P3",
+      "ICC_Profile:ProfileCopyright": "Copyright Apple Inc., 2022",
+      "ICC_Profile:MediaWhitePoint": "0.96419 1 0.82489",
+      "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+      "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+      "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+      "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.0502 0.02959 0.99048 -0.01706 -0.00923 0.01508 0.75168",
+      "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "Composite:RunTimeSincePowerUp": 7662.998208416,
+      "Composite:Aperture": 1.6,
+      "Composite:ImageSize": "384 512",
+      "Composite:Megapixels": 0.196608,
+      "Composite:ScaleFactor35efl": 5.09803921568628,
+      "Composite:ShutterSpeed": 0.0009823182711,
+      "Composite:SubSecCreateDate": "2026:01:07 15:20:14.930+01:00",
+      "Composite:SubSecDateTimeOriginal": "2026:01:07 15:20:14.930+01:00",
+      "Composite:SubSecModifyDate": "2026:01:07 15:20:14+01:00",
+      "Composite:GPSAltitude": 47.59040248,
+      "Composite:GPSDateTime": "2026:01:07 14:20:08Z",
+      "Composite:CircleOfConfusion": "0.00589368958489306",
+      "Composite:FOV": 69.3903656740024,
+      "Composite:FocalLength35efl": 26,
+      "Composite:HyperfocalDistance": 2.75824672572995,
+      "Composite:LightValue": 12.3476656563301,
+      "Composite:LensID": "iPhone 13 mini back dual wide camera 5.1mm f/1.6"
+    },
+    "frame_count": 1,
+    "opaque": true,
+    "coded_depth": 8,
+    "private_tags": [
+      "IFD0:Make",
+      "IFD0:Model",
+      "IFD0:Software",
+      "IFD0:ModifyDate",
+      "IFD0:HostComputer",
+      "ExifIFD:ExposureTime",
+      "ExifIFD:FNumber",
+      "ExifIFD:ExposureProgram",
+      "ExifIFD:ISO",
+      "ExifIFD:DateTimeOriginal",
+      "ExifIFD:CreateDate",
+      "ExifIFD:OffsetTime",
+      "ExifIFD:OffsetTimeOriginal",
+      "ExifIFD:OffsetTimeDigitized",
+      "ExifIFD:ShutterSpeedValue",
+      "ExifIFD:ApertureValue",
+      "ExifIFD:BrightnessValue",
+      "ExifIFD:ExposureCompensation",
+      "ExifIFD:MeteringMode",
+      "ExifIFD:Flash",
+      "ExifIFD:FocalLength",
+      "ExifIFD:SubjectArea",
+      "ExifIFD:SubSecTimeOriginal",
+      "ExifIFD:SubSecTimeDigitized",
+      "ExifIFD:SensingMethod",
+      "ExifIFD:SceneType",
+      "ExifIFD:ExposureMode",
+      "ExifIFD:WhiteBalance",
+      "ExifIFD:FocalLengthIn35mmFormat",
+      "ExifIFD:SceneCaptureType",
+      "ExifIFD:LensInfo",
+      "ExifIFD:LensMake",
+      "ExifIFD:LensModel",
+      "ExifIFD:CompositeImage",
+      "Apple:MakerNoteVersion",
+      "Apple:RunTimeFlags",
+      "Apple:RunTimeValue",
+      "Apple:RunTimeScale",
+      "Apple:RunTimeEpoch",
+      "Apple:AEStable",
+      "Apple:AETarget",
+      "Apple:AEAverage",
+      "Apple:AFStable",
+      "Apple:AccelerationVector",
+      "Apple:FocusDistanceRange",
+      "Apple:ImageCaptureType",
+      "Apple:LivePhotoVideoIndex",
+      "Apple:PhotosAppFeatureFlags",
+      "Apple:HDRHeadroom",
+      "Apple:AFPerformance",
+      "Apple:SignalToNoiseRatio",
+      "Apple:PhotoIdentifier",
+      "Apple:ColorTemperature",
+      "Apple:CameraType",
+      "Apple:FocusPosition",
+      "Apple:HDRGain",
+      "Apple:SemanticStyle",
+      "GPS:GPSLatitudeRef",
+      "GPS:GPSLongitudeRef",
+      "GPS:GPSAltitudeRef",
+      "GPS:GPSAltitude",
+      "GPS:GPSTimeStamp",
+      "GPS:GPSSpeedRef",
+      "GPS:GPSSpeed",
+      "GPS:GPSImgDirectionRef",
+      "GPS:GPSImgDirection",
+      "GPS:GPSDestBearingRef",
+      "GPS:GPSDestBearing",
+      "GPS:GPSDateStamp",
+      "GPS:GPSHPositioningError",
+      "Composite:RunTimeSincePowerUp",
+      "Composite:GPSAltitude",
+      "Composite:GPSDateTime"
+    ],
+    "base": {
+      "depth": 8,
+      "width": 384,
+      "height": 512,
+      "components": 3
+    },
+    "gain_map_present": true,
+    "map": {
+      "depth": 8,
+      "width": 192,
+      "height": 256,
+      "components": 1
+    },
+    "iso_identifier": false,
+    "android_xmp_properties": {},
+    "independent_hdr_decode": true
+  },
+  {
+    "fixture_id": "gainmap-apple-new",
+    "sha256": "492a94bd0636bcf15b3f560c68142a7783936c1597e78b0d0461d8be7fddc078",
+    "metadata": {
+      "ExifTool:ExifToolVersion": 13.55,
+      "File:FileType": "JPEG",
+      "File:FileTypeExtension": "JPG",
+      "File:MIMEType": "image/jpeg",
+      "File:ExifByteOrder": "MM",
+      "File:ImageWidth": 384,
+      "File:ImageHeight": 512,
+      "File:EncodingProcess": 0,
+      "File:BitsPerSample": 8,
+      "File:ColorComponents": 3,
+      "File:YCbCrSubSampling": "2 2",
+      "JFIF:JFIFVersion": "1 1",
+      "JFIF:ResolutionUnit": 1,
+      "JFIF:XResolution": 300,
+      "JFIF:YResolution": 300,
+      "IFD0:Make": "Apple",
+      "IFD0:Model": "iPhone 13 mini",
+      "IFD0:Orientation": 1,
+      "IFD0:XResolution": 72,
+      "IFD0:YResolution": 72,
+      "IFD0:ResolutionUnit": 2,
+      "IFD0:Software": "18.7.1",
+      "IFD0:ModifyDate": "2026:01:07 15:20:14",
+      "IFD0:HostComputer": "iPhone 13 mini",
+      "IFD0:YCbCrPositioning": 1,
+      "ExifIFD:ExposureTime": 0.0009823182711,
+      "ExifIFD:FNumber": 1.6,
+      "ExifIFD:ExposureProgram": 2,
+      "ExifIFD:ISO": 50,
+      "ExifIFD:ExifVersion": "0232",
+      "ExifIFD:DateTimeOriginal": "2026:01:07 15:20:14",
+      "ExifIFD:CreateDate": "2026:01:07 15:20:14",
+      "ExifIFD:OffsetTime": "+01:00",
+      "ExifIFD:OffsetTimeOriginal": "+01:00",
+      "ExifIFD:OffsetTimeDigitized": "+01:00",
+      "ExifIFD:ComponentsConfiguration": "1 2 3 0",
+      "ExifIFD:ShutterSpeedValue": "0.000982000000006454",
+      "ExifIFD:ApertureValue": 1.59999999932056,
+      "ExifIFD:BrightnessValue": 7.795659837,
+      "ExifIFD:ExposureCompensation": 0,
+      "ExifIFD:MeteringMode": 5,
+      "ExifIFD:Flash": 16,
+      "ExifIFD:FocalLength": 5.1,
+      "ExifIFD:SubjectArea": "2006 1508 2213 1330",
+      "ExifIFD:SubSecTimeOriginal": 930,
+      "ExifIFD:SubSecTimeDigitized": 930,
+      "ExifIFD:FlashpixVersion": "0100",
+      "ExifIFD:ColorSpace": 65535,
+      "ExifIFD:ExifImageWidth": 4032,
+      "ExifIFD:ExifImageHeight": 3024,
+      "ExifIFD:SensingMethod": 2,
+      "ExifIFD:SceneType": 1,
+      "ExifIFD:ExposureMode": 0,
+      "ExifIFD:WhiteBalance": 0,
+      "ExifIFD:FocalLengthIn35mmFormat": 26,
+      "ExifIFD:SceneCaptureType": 0,
+      "ExifIFD:LensInfo": "1.539999962 5.1 1.6 2.4",
+      "ExifIFD:LensMake": "Apple",
+      "ExifIFD:LensModel": "iPhone 13 mini back dual wide camera 5.1mm f/1.6",
+      "ExifIFD:CompositeImage": 2,
+      "Apple:MakerNoteVersion": 15,
+      "Apple:RunTimeFlags": 1,
+      "Apple:RunTimeValue": 7662998208416,
+      "Apple:RunTimeScale": 1000000000,
+      "Apple:RunTimeEpoch": 0,
+      "Apple:AEStable": 0,
+      "Apple:AETarget": 159,
+      "Apple:AEAverage": 157,
+      "Apple:AFStable": 1,
+      "Apple:AccelerationVector": "0.01757224836 -0.988631666 -0.02797703446",
+      "Apple:FocusDistanceRange": "0.18359375 0.21875",
+      "Apple:ImageCaptureType": 10,
+      "Apple:LivePhotoVideoIndex": 1112547328,
+      "Apple:PhotosAppFeatureFlags": 0,
+      "Apple:HDRHeadroom": 1.518931985,
+      "Apple:AFPerformance": "105 268435504",
+      "Apple:SignalToNoiseRatio": 54.50344462,
+      "Apple:PhotoIdentifier": "0170521C-E077-45C0-90AE-F1E1E92069E5",
+      "Apple:ColorTemperature": 5579,
+      "Apple:CameraType": 1,
+      "Apple:FocusPosition": 63,
+      "Apple:HDRGain": 0,
+      "Apple:SemanticStyle": "{_0=1,_1=0,_2=0,_3=0}",
+      "GPS:GPSLatitudeRef": "N",
+      "GPS:GPSLongitudeRef": "E",
+      "GPS:GPSAltitudeRef": 0,
+      "GPS:GPSAltitude": 47.59040248,
+      "GPS:GPSTimeStamp": "14:20:08",
+      "GPS:GPSSpeedRef": "K",
+      "GPS:GPSSpeed": 0,
+      "GPS:GPSImgDirectionRef": "T",
+      "GPS:GPSImgDirection": 101.3891449,
+      "GPS:GPSDestBearingRef": "T",
+      "GPS:GPSDestBearing": 101.3891449,
+      "GPS:GPSDateStamp": "2026:01:07",
+      "GPS:GPSHPositioningError": 13.68423872,
+      "MPF0:MPFVersion": "0100",
+      "MPF0:NumberOfImages": 2,
+      "MPImage1:MPImageFlags": 0,
+      "MPImage1:MPImageFormat": 0,
+      "MPImage1:MPImageType": 196608,
+      "MPImage1:MPImageLength": 44891,
+      "MPImage1:MPImageStart": 0,
+      "MPImage1:DependentImage1EntryNumber": 0,
+      "MPImage1:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImageFlags": 0,
+      "MPImage2:MPImageFormat": 0,
+      "MPImage2:MPImageType": 0,
+      "MPImage2:MPImageLength": 6003,
+      "MPImage2:MPImageStart": 44821,
+      "MPImage2:DependentImage1EntryNumber": 0,
+      "MPImage2:DependentImage2EntryNumber": 0,
+      "MPImage2:MPImage2": "(Binary data 6003 bytes, use -b option to extract)",
+      "ICC-header:ProfileCMMType": "appl",
+      "ICC-header:ProfileVersion": 1024,
+      "ICC-header:ProfileClass": "mntr",
+      "ICC-header:ColorSpaceData": "RGB ",
+      "ICC-header:ProfileConnectionSpace": "XYZ ",
+      "ICC-header:ProfileDateTime": "2022:01:01 00:00:00",
+      "ICC-header:ProfileFileSignature": "acsp",
+      "ICC-header:PrimaryPlatform": "APPL",
+      "ICC-header:CMMFlags": 0,
+      "ICC-header:DeviceManufacturer": "APPL",
+      "ICC-header:DeviceModel": "",
+      "ICC-header:DeviceAttributes": "0 0",
+      "ICC-header:RenderingIntent": 0,
+      "ICC-header:ConnectionSpaceIlluminant": "0.9642 1 0.82491",
+      "ICC-header:ProfileCreator": "appl",
+      "ICC-header:ProfileID": "236 253 163 142 56 133 71 195 109 180 189 79 122 218 24 47",
+      "ICC_Profile:ProfileDescription": "Display P3",
+      "ICC_Profile:ProfileCopyright": "Copyright Apple Inc., 2022",
+      "ICC_Profile:MediaWhitePoint": "0.96419 1 0.82489",
+      "ICC_Profile:RedMatrixColumn": "0.51512 0.2412 -0.00105",
+      "ICC_Profile:GreenMatrixColumn": "0.29198 0.69225 0.04189",
+      "ICC_Profile:BlueMatrixColumn": "0.1571 0.06657 0.78407",
+      "ICC_Profile:RedTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "ICC_Profile:ChromaticAdaptation": "1.04788 0.02292 -0.0502 0.02959 0.99048 -0.01706 -0.00923 0.01508 0.75168",
+      "ICC_Profile:BlueTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "ICC_Profile:GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
+      "Composite:RunTimeSincePowerUp": 7662.998208416,
+      "Composite:Aperture": 1.6,
+      "Composite:ImageSize": "384 512",
+      "Composite:Megapixels": 0.196608,
+      "Composite:ScaleFactor35efl": 5.09803921568628,
+      "Composite:ShutterSpeed": 0.0009823182711,
+      "Composite:SubSecCreateDate": "2026:01:07 15:20:14.930+01:00",
+      "Composite:SubSecDateTimeOriginal": "2026:01:07 15:20:14.930+01:00",
+      "Composite:SubSecModifyDate": "2026:01:07 15:20:14+01:00",
+      "Composite:GPSAltitude": 47.59040248,
+      "Composite:GPSDateTime": "2026:01:07 14:20:08Z",
+      "Composite:CircleOfConfusion": "0.00589368958489306",
+      "Composite:FOV": 69.3903656740024,
+      "Composite:FocalLength35efl": 26,
+      "Composite:HyperfocalDistance": 2.75824672572995,
+      "Composite:LightValue": 12.3476656563301,
+      "Composite:LensID": "iPhone 13 mini back dual wide camera 5.1mm f/1.6"
+    },
+    "frame_count": 1,
+    "opaque": true,
+    "coded_depth": 8,
+    "private_tags": [
+      "IFD0:Make",
+      "IFD0:Model",
+      "IFD0:Software",
+      "IFD0:ModifyDate",
+      "IFD0:HostComputer",
+      "ExifIFD:ExposureTime",
+      "ExifIFD:FNumber",
+      "ExifIFD:ExposureProgram",
+      "ExifIFD:ISO",
+      "ExifIFD:DateTimeOriginal",
+      "ExifIFD:CreateDate",
+      "ExifIFD:OffsetTime",
+      "ExifIFD:OffsetTimeOriginal",
+      "ExifIFD:OffsetTimeDigitized",
+      "ExifIFD:ShutterSpeedValue",
+      "ExifIFD:ApertureValue",
+      "ExifIFD:BrightnessValue",
+      "ExifIFD:ExposureCompensation",
+      "ExifIFD:MeteringMode",
+      "ExifIFD:Flash",
+      "ExifIFD:FocalLength",
+      "ExifIFD:SubjectArea",
+      "ExifIFD:SubSecTimeOriginal",
+      "ExifIFD:SubSecTimeDigitized",
+      "ExifIFD:SensingMethod",
+      "ExifIFD:SceneType",
+      "ExifIFD:ExposureMode",
+      "ExifIFD:WhiteBalance",
+      "ExifIFD:FocalLengthIn35mmFormat",
+      "ExifIFD:SceneCaptureType",
+      "ExifIFD:LensInfo",
+      "ExifIFD:LensMake",
+      "ExifIFD:LensModel",
+      "ExifIFD:CompositeImage",
+      "Apple:MakerNoteVersion",
+      "Apple:RunTimeFlags",
+      "Apple:RunTimeValue",
+      "Apple:RunTimeScale",
+      "Apple:RunTimeEpoch",
+      "Apple:AEStable",
+      "Apple:AETarget",
+      "Apple:AEAverage",
+      "Apple:AFStable",
+      "Apple:AccelerationVector",
+      "Apple:FocusDistanceRange",
+      "Apple:ImageCaptureType",
+      "Apple:LivePhotoVideoIndex",
+      "Apple:PhotosAppFeatureFlags",
+      "Apple:HDRHeadroom",
+      "Apple:AFPerformance",
+      "Apple:SignalToNoiseRatio",
+      "Apple:PhotoIdentifier",
+      "Apple:ColorTemperature",
+      "Apple:CameraType",
+      "Apple:FocusPosition",
+      "Apple:HDRGain",
+      "Apple:SemanticStyle",
+      "GPS:GPSLatitudeRef",
+      "GPS:GPSLongitudeRef",
+      "GPS:GPSAltitudeRef",
+      "GPS:GPSAltitude",
+      "GPS:GPSTimeStamp",
+      "GPS:GPSSpeedRef",
+      "GPS:GPSSpeed",
+      "GPS:GPSImgDirectionRef",
+      "GPS:GPSImgDirection",
+      "GPS:GPSDestBearingRef",
+      "GPS:GPSDestBearing",
+      "GPS:GPSDateStamp",
+      "GPS:GPSHPositioningError",
+      "Composite:RunTimeSincePowerUp",
+      "Composite:GPSAltitude",
+      "Composite:GPSDateTime"
+    ],
+    "base": {
+      "depth": 8,
+      "width": 384,
+      "height": 512,
+      "components": 3
+    },
+    "gain_map_present": true,
+    "map": {
+      "depth": 8,
+      "width": 192,
+      "height": 256,
+      "components": 1
+    },
+    "iso_identifier": false,
+    "android_xmp_properties": {},
+    "independent_hdr_decode": true
+  },
+  {
+    "id": "selector-sdr",
+    "sha256": "488cf7bbcb6c43de6ba785b47ff4ac76c1c4c4b47f6c598af882b24b9bcf53d1",
+    "path": "/proof/work/selectors/sdr/source.avif",
+    "generator": "selector_probes.alpha_scene",
+    "native_facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/selectors/sdr/source.avif\n * Resolution     : 40x16\n * Bit Depth      : 8\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 1\n * Transfer Char. : 13\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [40x16]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "source.avif",
+        "FileSize": 882,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf",
+          "MA1A"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 40,
+        "ImageHeight": 16,
+        "ImageSpatialExtent": "40 16",
+        "ImagePixelDepth": "8 8 8",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 1,
+        "TransferCharacteristics": 13,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 380,
+        "MediaDataOffset": 502,
+        "ImageSize": "40 16",
+        "Megapixels": 0.00064,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 40,
+      "height": 16,
+      "depth": 8,
+      "primaries": 1,
+      "transfer": 13,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "488cf7bbcb6c43de6ba785b47ff4ac76c1c4c4b47f6c598af882b24b9bcf53d1"
+    }
+  },
+  {
+    "id": "selector-hdr",
+    "sha256": "7f815a623992eaf193656958253d3a740ab9c6c01553339d99e3bb4bd0506fd8",
+    "path": "/proof/work/selectors/hdr/source.avif",
+    "generator": "selector_probes.alpha_scene",
+    "native_facts": {
+      "info": "Decoding with codec 'dav1d' (1 worker thread), please wait...\nImage decoded: /proof/work/selectors/hdr/source.avif\n * Resolution     : 40x16\n * Bit Depth      : 12\n * Format         : YUV444\n * Alpha          : Not premultiplied\n * Range          : Full\n * Color Primaries: 9\n * Transfer Char. : 16\n * Matrix Coeffs. : 0\n * ICC Profile    : Absent\n * XMP Metadata   : Present (291 bytes)\n * Exif Metadata  : Absent\n * Transformations: None\n * Progressive    : Unavailable\n * Gain map       : Absent\n * 1 timescales per second, 1.00 seconds (1 timescales), 1 frame\n * Frame:\n   * Decoded frame [0] [pts 0.00 (0 timescales)] [duration 1.00 (1 timescales)] [40x16]\n",
+      "exiftool": {
+        "ExifToolVersion": 13.55,
+        "FileName": "source.avif",
+        "FileSize": 891,
+        "FilePermissions": 100644,
+        "FileType": "AVIF",
+        "FileTypeExtension": "AVIF",
+        "MIMEType": "image/avif",
+        "MajorBrand": "avif",
+        "MinorVersion": "0.0.0",
+        "CompatibleBrands": [
+          "avif",
+          "mif1",
+          "miaf"
+        ],
+        "HandlerType": "pict",
+        "PrimaryItemReference": 1,
+        "GPSLatitude": 51,
+        "Make": "HDR-PROOF-PRIVATE-CAMERA",
+        "ImageWidth": 40,
+        "ImageHeight": 16,
+        "ImageSpatialExtent": "40 16",
+        "ImagePixelDepth": "12 12 12",
+        "AV1ConfigurationVersion": 1,
+        "ChromaFormat": 0,
+        "ChromaSamplePosition": 0,
+        "ColorProfiles": "nclx",
+        "ColorPrimaries": 9,
+        "TransferCharacteristics": 16,
+        "MatrixCoefficients": 0,
+        "VideoFullRangeFlag": 1,
+        "AuxiliaryImageType": "urn:mpeg:mpegB:cicp:systems:auxiliary:alpha",
+        "MediaDataSize": 393,
+        "MediaDataOffset": 498,
+        "ImageSize": "40 16",
+        "Megapixels": 0.00064,
+        "GPSLatitudeRef": "N"
+      },
+      "width": 40,
+      "height": 16,
+      "depth": 12,
+      "primaries": 9,
+      "transfer": 16,
+      "matrix": 0,
+      "alpha": "Not",
+      "sha256": "7f815a623992eaf193656958253d3a740ab9c6c01553339d99e3bb4bd0506fd8"
+    }
+  }
+]

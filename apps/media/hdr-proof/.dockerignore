@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!gainmap-build.sh
+!environment/
+!environment/**
+!png_decode.c

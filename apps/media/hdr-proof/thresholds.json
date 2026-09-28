@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "declared_before_native_measurements": true,
+  "metric": "ITU-R BT.2124-0 Delta E ITP from display-referred linear RGB in cd/m2",
+  "references": [
+    "https://www.itu.int/rec/R-REC-BT.2124",
+    "https://www.itu.int/rec/R-REC-BT.2100",
+    "https://github.com/rafaeltab/wallpaperdb/issues/263#issuecomment-5874883153"
+  ],
+  "scope": "These are provisional engineering gates for this fixture corpus, fixed before native measurements. They do not establish psychophysical invisibility or physical display qualification. Failed paths remain unqualified; new fixtures or revisions require new reviewed threshold profiles, never retrospective relaxation.",
+  "regions": {
+    "shadow": { "minimum_nits": 0, "maximum_nits": 10 },
+    "midtone": { "minimum_nits_exclusive": 10, "maximum_nits": 203 },
+    "highlight": { "minimum_nits_exclusive": 203 }
+  },
+  "profiles": {
+    "avif-8": {
+      "reason": "Synthetic PQ/HLG ramps and primary patches at 8 coded bits. Allow up to 3 Delta E ITP for 95% of each luminance region and 8 at any sample for quantization and native resampling near patch edges; errors are potentially visible and still require display review. A 0.1 nit absolute floor prevents quantized near-black noise dominating relative error. Eight-bit input is measured, never rejected by depth alone.",
+      "delta_e_mean_max": 1.5,
+      "delta_e_p95_max": 3,
+      "delta_e_max": 8,
+      "luminance_relative_p95_max": 0.08,
+      "luminance_absolute_floor_nits": 0.1
+    },
+    "avif-10": {
+      "reason": "Synthetic 10-bit PQ/HLG ramps and patches retain four times the code precision of 8-bit inputs. A 1.5 Delta E ITP p95 gate and 4 maximum permit rounding and interpolation while rejecting changed transfer or primaries. The 0.025 nit floor applies only near black.",
+      "delta_e_mean_max": 0.75,
+      "delta_e_p95_max": 1.5,
+      "delta_e_max": 4,
+      "luminance_relative_p95_max": 0.035,
+      "luminance_absolute_floor_nits": 0.025
+    },
+    "avif-12": {
+      "reason": "Synthetic 12-bit PQ/HLG samples should remain within roughly one just-noticeable difference for 95% of pixels in every luminance region. The 3 maximum allows isolated native interpolation/rounding differences; it cannot hide a changed transfer, clipping, or missing shadow region.",
+      "delta_e_mean_max": 0.5,
+      "delta_e_p95_max": 1,
+      "delta_e_max": 3,
+      "luminance_relative_p95_max": 0.025,
+      "luminance_absolute_floor_nits": 0.01
+    },
+    "gainmap-sdr": {
+      "reason": "Authored 8-bit photographic SDR JPEG bases, compared after matched geometry and declared colour management at a nominal 100 nit SDR display. Native JPEG re-encoding may introduce small local error, but each region must keep mean Delta E ITP below 1 and p95 below 3. No broad whole-image average can compensate for damaged shadows.",
+      "delta_e_mean_max": 1,
+      "delta_e_p95_max": 3,
+      "delta_e_max": 8,
+      "luminance_relative_p95_max": 0.06,
+      "luminance_absolute_floor_nits": 0.1
+    },
+    "gainmap-hdr": {
+      "reason": "Independently reconstructed gain-map JPEG HDR, using identical display boost and metadata conventions for source and result. Re-encoded base and map can each contribute error. A p95 Delta E ITP of 3 and maximum 8 still forbid broad exposure or grading changes. A decoder lacking the source gain-map model cannot supply evidence to this profile.",
+      "delta_e_mean_max": 1.5,
+      "delta_e_p95_max": 3,
+      "delta_e_max": 8,
+      "luminance_relative_p95_max": 0.08,
+      "luminance_absolute_floor_nits": 0.1
+    },
+    "sdr-8": {
+      "reason": "Eight-bit SDR reference images at nominal 100 nits. Compare against the authored base or independently declared tone/gamut reference, never the unmodified HDR source. Regional p95 Delta E ITP of 3 accommodates quantization but does not approve the tone/gamut mapping itself; that needs the separate policy checks.",
+      "delta_e_mean_max": 1,
+      "delta_e_p95_max": 3,
+      "delta_e_max": 8,
+      "luminance_relative_p95_max": 0.06,
+      "luminance_absolute_floor_nits": 0.1
+    }
+  },
+  "tone_map": {
+    "reason": "The synthetic chart contains neutral ramps, an exact 203 nit ordinary-white patch and 1000 nit peak. The accepted policy targets 90% nominal SDR signal, not 90% luminance. +/-0.025 signal allows codec rounding and a small perceptual grading tolerance. Below 100 nits, compare retained contrast to a linear exposure anchored at 203 nits -> sRGB 0.90. The broad 20% linear-light tolerance allows a mild shoulder; a black crush or peak-normalized dark image fails. Require at least 0.05 signal highlight headroom, no early 8-bit white clipping, no reversed neutral slope beyond one 8-bit code, and no >0.025 highlight signal jumps between the chart's closely spaced samples. Gamut mapping requires a separate, predeclared independent reference for chromatic probes.",
+    "ordinary_white_nits": 203,
+    "ordinary_white_signal": 0.9,
+    "ordinary_white_signal_tolerance": 0.025,
+    "ordinary_white_probe_tolerance_nits": 2,
+    "shadow_relative_p95_max": 0.2,
+    "midtone_relative_p95_max": 0.2,
+    "relative_luminance_floor_nits": 0.01,
+    "highlight_headroom_min": 0.05,
+    "highlight_monotonic_tolerance": 0.00392156862745098,
+    "highlight_signal_step_max": 0.025,
+    "early_clip_signal": 0.9980392156862745,
+    "minimum_neutral_levels": 8,
+    "gamut_delta_e_p95_max": 3,
+    "gamut_delta_e_max": 8
+  }
+}

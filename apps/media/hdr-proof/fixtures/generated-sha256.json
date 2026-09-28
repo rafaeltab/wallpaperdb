@@ -1,0 +1,33 @@
+{
+  "generator": "avif.py; native versions locked by environment/ and Dockerfile",
+  "sha256": {
+    "avif-pq-p3-8-opaque": "f53d15d9e644cc0d22aabdedd229d53d2e7f91371a683ca3b6ace55bb1e2b372",
+    "avif-pq-p3-8-alpha": "d3491dbf323cb9aa57173bcc911df196b9aabea07f0dcf4422c22e65c3ef040a",
+    "avif-pq-p3-10-opaque": "c47d7dd17ee3019a60ad1410faa03014316c2530135b53bc045af2ead68353b4",
+    "avif-pq-p3-10-alpha": "da9dc9fa806110142e4c5f07dded0a2652178813eac32aae4d51b919a48082dc",
+    "avif-pq-p3-12-opaque": "fbbc848ce94c6430d91249203cb02f174c0330be6ecb3c8258ebf5bcd220a2dd",
+    "avif-pq-p3-12-alpha": "c6dded4ff98b5946fe795f6b3d91e8779563f1470da9730573562bca90b6ab16",
+    "avif-pq-rec2020-8-opaque": "5b47eb4043d748ea440425daa41fbb34318cbda3f89139f69ec56e851b32f35a",
+    "avif-pq-rec2020-8-alpha": "a88d1b9c72c983410facfc16b785b34db54b607ed57a9ddc8fbccbdd5a40b467",
+    "avif-pq-rec2020-10-opaque": "43a7c7cafbb2b596e819a04eac3bd87ab8e6e2cd2102c39c66f0252f3d2505d8",
+    "avif-pq-rec2020-10-alpha": "851ccae94562962784b8fd612cb169c423869fe0b80df216ce060c2c7c2ea228",
+    "avif-pq-rec2020-12-opaque": "b3ae2fe02ace9908a837fa74613e00ed3ac5339be3edb6e66c290f33fef379ed",
+    "avif-pq-rec2020-12-alpha": "38e7171d3aab3d3250c4c2b6a82bdcf409f604f2ee71d19213c98322953ba7ba",
+    "avif-hlg-p3-8-opaque": "b1d524a959d80775ddea3eb0f592c99427bad51b92d22ca39fb8107ea743be05",
+    "avif-hlg-p3-8-alpha": "1df5a8bf5722553952d4c6920ceeeea69d776db437e395faa0c5bf4695fe5836",
+    "avif-hlg-p3-10-opaque": "149712244d61fd1499e8f16bb9f0380a359573684032892238166a55201d85ba",
+    "avif-hlg-p3-10-alpha": "3e92f2364b32424b4dc6cdbf03ca83b02e9e0f624b01e9a88cda7749b7406c64",
+    "avif-hlg-p3-12-opaque": "963aefd861e2780682552f946ecc701b504cf69dd8eb77fdc2db7e9be03ab576",
+    "avif-hlg-p3-12-alpha": "e59022c4b939f71500f9cf06555ac1aa350ed6b3d1974ab8b1b120a4c90f4a07",
+    "avif-hlg-rec2020-8-opaque": "95f77a749f2a65b00a11f3b77576518e9399677134298d92911434997dcaf0a6",
+    "avif-hlg-rec2020-8-alpha": "f9a6d9f309430b6cd55ce8621fdb4c0d5f21df086d5b4183f6725268f4cbbf59",
+    "avif-hlg-rec2020-10-opaque": "67a58d572ff9cbab2b4e71ba757885279bd20fe2525cd9d381f807ad1d3f91a1",
+    "avif-hlg-rec2020-10-alpha": "ed2ef86195e57b2b2fa40edfad606ad8849d76f59b5e18c2cdd6c44bd5e9af87",
+    "avif-hlg-rec2020-12-opaque": "4e0668145f055c2a7c01e3bd04678cf51ca731a4ca4cad08d32ea48334d1d49f",
+    "avif-hlg-rec2020-12-alpha": "18cd6b463c9654963587b39692f519c5618bd2a738a425dc304e6e10dd0297cc",
+    "animated-pq-alpha": "9bfff5fddc798e21359b944d4bbed1e6ccfc092436db633bae2cc744be872b6d",
+    "animated-hlg-alpha": "d10cf18a5de6ca4bd4adf70008d2184f008c8457c34ca30005c46b894857d14f",
+    "selector-sdr": "488cf7bbcb6c43de6ba785b47ff4ac76c1c4c4b47f6c598af882b24b9bcf53d1",
+    "selector-hdr": "7f815a623992eaf193656958253d3a740ab9c6c01553339d99e3bb4bd0506fd8"
+  }
+}

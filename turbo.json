@@ -240,6 +240,16 @@
             ],
             "outputs": []
         },
+        "proof:hdr": {
+            "cache": false,
+            "inputs": ["hdr-proof/**", "package.json"],
+            "outputs": []
+        },
+        "proof:unit": {
+            "cache": false,
+            "inputs": ["hdr-proof/**", "package.json"],
+            "outputs": []
+        },
         "@wallpaperdb/infra-local#test:unit": {
             "inputs": ["$TURBO_DEFAULT$"],
             "outputs": []

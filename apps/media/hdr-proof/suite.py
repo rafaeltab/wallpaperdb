@@ -124,15 +124,35 @@ def compact_case(case):
     return copy
 
 
+def diagnostic_report(matrix):
+    summary = matrix['diagnostic_summary']
+    required = summary['required_cases']
+    all_cases = summary['all_cases']
+    lines = [
+        '## Failure stages', '',
+        f'Of {summary["required_plan_size"]} planned required cases, {required["cases"]} have exact fixture/selector evidence and {required["qualified"]} qualify. Native encoding completed in {required["native_completed"]}; {required["native_operation_failures"]} stopped at a native operation. A native failure can occur while preparing an input fixture, before the final encoder is reached.', '',
+        f'Across all recorded cases, {all_cases["measured_failure_cases"]} have measured check failures and {all_cases["missing_evidence_cases"]} lack required evidence. These counts overlap. A missing ordinary-white patch after cropping or an unavailable independent gamut reference is an evidence gap, not a measured change to those pixels.', '',
+        'False downstream flags on a failed native operation are unevaluated. They do not establish additional appearance, decoder, or metadata privacy failures. Successful encoding also does not establish qualification. The original status enums and required passing criteria remain unchanged.', '',
+        '| Required path | Planned | Observed | Native completed | Native failure | Measured failure | Missing evidence | Qualified |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ]
+    for row in summary['required_cells']:
+        lines.append(f'| `{row["cell_id"]}` | {row["planned_cases"]} | {row["cases"]} | {row["native_completed"]} | {row["native_operation_failures"]} | {row["measured_failure_cases"]} | {row["missing_evidence_cases"]} | {row["qualified"]} |')
+    lines += ['', 'Measured failures and evidence gaps count cases once per column, even when several frames fail. Per-check counts and case diagnostics are in [the matrix](conversion-matrix.json); raw measurements and native errors remain in [measurements](measurements.json).', '']
+    return lines
+
+
 def render_report(matrix, evidence, fixtures, tone, controls, native_versions, errors, manual):
     counts = Counter(case['status'] for case in evidence)
     cell_counts = Counter(cell['status'] for cell in matrix['cells'] if cell['in_hdr_ledger'])
+    stages = matrix['diagnostic_summary']['all_cases']
     lines = ['# HDR conversion proof results','',
              'The HDR milestone remains blocked. Automated codec results do not qualify browser HDR presentation, native viewers, or OS wallpaper setters. Issue #284 remains open. Valid original requests retain exact bytes; unqualified transforms remain unsupported, and unknown required source facts remain original-only.','',
              'Reproduce from the repository root with `make run PACKAGE=media SCRIPT=proof:hdr`. Docker must support linux/amd64. The default command returns exit 2 while required codec cases or physical checks are unqualified. This is an intentional qualification failure, not a passing release gate.','',
-             f'Executed {len(evidence)} native conversion cases over {len(fixtures)} fixture records. Case outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(counts.items()))+'.',
+             f'Recorded {len(evidence)} conversion attempts over {len(fixtures)} fixture records: {stages["native_completed"]} completed native encoding, {stages["native_operation_failures"]} stopped at a native operation, and {stages["native_not_established"]} lack a confirmed native outcome. Qualification outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(counts.items()))+'.',
              f'The inventory covers {matrix["ledger_cell_count"]} HDR-ledger cells and {matrix["generic_sdr_control_count"]} labeled SDR controls. Ledger outcomes: '+', '.join(f'{value} {key}' for key,value in sorted(cell_counts.items()))+'.','',
              f'The finite required plan contains {matrix["required_case_count"]} cases. Unexecuted required cases: {sum(len(cell["missing_cases"]) for cell in matrix["cells"])}. Unlisted cross-products are untested, even when a neighboring case passes.','',
+             *diagnostic_report(matrix),
              '## Environment and reproducibility','',
              'The image uses the same Node 22 Alpine/musl deployment shape as Media. This is a proposed native proof pipeline, not the existing Sharp 0.33 production worker. No service dependency was upgraded. CPU lavapipe runs libplacebo without a host GPU. Network access is disabled during tests.','',
              f'- Node: `{native_versions["node"]}`',
@@ -235,7 +255,7 @@ def main():
     write_json(RESULTS/'measurements.json',{'cases':evidence, 'tone_controls':tone,'selector_controls':controls})
     for cell in matrix['cells']:
         for key in ('evidence','qualified_cases'):
-            cell[key] = [{field:item[field] for field in ('case_id','fixture_id','selectors','status','checks','blockers') if field in item} | {'measurements_file':'measurements.json','measurement_case_id':item['case_id']} for item in cell[key]]
+            cell[key] = [{field:item[field] for field in ('case_id','fixture_id','selectors','status','checks','blockers','diagnostics') if field in item} | {'measurements_file':'measurements.json','measurement_case_id':item['case_id']} for item in cell[key]]
     write_json(RESULTS/'conversion-matrix.json',matrix)
     write_json(RESULTS/'commands.json',{'avif_and_controls':avif.COMMANDS, 'gainmap_log_files':[str(p.relative_to(ROOT)) for p in (WORK/'gainmap').rglob('*.log')], 'gainmap_logs':[{ 'path':str(p.relative_to(ROOT)), 'text':p.read_text(errors='replace')} for p in sorted(WORK.rglob('native-encoder*.log'))]})
     manual = candidate_files(evidence,avif_result['fixtures'])

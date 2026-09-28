@@ -6,6 +6,7 @@ Its unit tests do not qualify any codec path or production endpoint.
 """
 
 import copy
+from collections import Counter
 import re
 
 
@@ -133,6 +134,80 @@ def required_cases():
     return cases
 
 
+def _measurement_failures(value, path="measurements"):
+    if isinstance(value, dict):
+        for failure in value.get("failures", []):
+            yield {"gate": "appearance", "check": str(failure), "location": path}
+        for key, child in value.items():
+            if key != "failures":
+                yield from _measurement_failures(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _measurement_failures(child, f"{path}[{index}]")
+
+
+def _case_diagnostics(case):
+    """Describe existing evidence without changing its qualification decision."""
+    checks = case.get("checks", {})
+    native = checks.get("native_encoder")
+    outcome = "completed" if native is True else ("failed" if native is False and case.get("status") == "tested and failed" else "not established")
+    detail = {"native_outcome": outcome, "measured_failures": [], "missing_evidence": [], "not_evaluated": []}
+    if outcome != "completed":
+        detail["not_evaluated"] = [key for key in CHECKS if key != "native_encoder" and checks.get(key) is not True]
+        return detail
+    if checks.get("independent_decoder") is not True:
+        detail["missing_evidence"].append({"gate": "independent_decoder", "check": "independent_decode_not_established"})
+    measurements = list(_measurement_failures(case.get("measurements", {})))
+    for failure in measurements:
+        category = "missing_evidence" if failure["check"].endswith("_missing") else "measured_failures"
+        detail[category].append(failure)
+    if checks.get("appearance") is not True and not measurements:
+        detail["missing_evidence"].append({"gate": "appearance", "check": "appearance_result_details_missing"})
+    for gate in ("structure", "privacy"):
+        if checks.get(gate) is True:
+            continue
+        failed = [key for key, passed in case.get("structural_checks", {}).items() if passed is False] if gate == "structure" else []
+        if failed:
+            detail["measured_failures"].extend({"gate": gate, "check": key} for key in failed)
+        else:
+            detail["missing_evidence"].append({"gate": gate, "check": f"{gate}_rejection_details_missing"})
+    if case.get("matches_coverage_plan") is False:
+        detail["missing_evidence"].append({"gate": "coverage", "check": "exact_planned_fixture_or_selectors_not_tested"})
+    return detail
+
+
+def _diagnostic_counts(cases):
+    completed = [case for case in cases if case["diagnostics"]["native_outcome"] == "completed"]
+    return {
+        "cases": len(cases),
+        "native_completed": len(completed),
+        "native_operation_failures": sum(case["diagnostics"]["native_outcome"] == "failed" for case in cases),
+        "native_not_established": sum(case["diagnostics"]["native_outcome"] == "not established" for case in cases),
+        "qualified": sum(case.get("status") == "qualified" for case in cases),
+        "measured_failure_cases": sum(bool(case["diagnostics"]["measured_failures"]) for case in cases),
+        "missing_evidence_cases": sum(bool(case["diagnostics"]["missing_evidence"]) for case in cases),
+        "failed_gates_after_native_completion": dict(sorted(Counter(key for case in completed for key in CHECKS if key != "native_encoder" and case.get("checks", {}).get(key) is not True).items())),
+        "measured_failure_checks": dict(sorted(Counter(check for case in cases for check in {entry["check"] for entry in case["diagnostics"]["measured_failures"]}).items())),
+        "missing_evidence_checks": dict(sorted(Counter(check for case in cases for check in {entry["check"] for entry in case["diagnostics"]["missing_evidence"]}).items())),
+    }
+
+
+def _diagnostic_summary(cells, plan):
+    cases = [case for cell in cells for case in cell["evidence"]]
+    planned = {case["case_id"] for case in plan}
+    required = [case for case in cases if case.get("case_id") in planned and case.get("matches_coverage_plan") is True]
+    by_cell = []
+    for cell in cells:
+        if cell["required"]:
+            items = [case for case in required if case["cell_id"] == cell["id"]]
+            by_cell.append({"cell_id": cell["id"], "planned_cases": sum(case["cell_id"] == cell["id"] for case in plan), **_diagnostic_counts(items)})
+    return {
+        "scope": "Diagnostic categories do not replace qualification statuses. Measured failures and missing evidence overlap. False downstream flags after a native-operation failure are not measured failures.",
+        "required_plan_size": len(plan), "required_cases": _diagnostic_counts(required),
+        "all_cases": _diagnostic_counts(cases), "required_cells": by_cell,
+    }
+
+
 def build_matrix(evidence):
     """Aggregate evidence fail-closed; successful encoding alone cannot qualify."""
     cells = ledger_cells()
@@ -167,6 +242,7 @@ def build_matrix(evidence):
             errors.append(f"Unsubstantiated qualification for {item.get('case_id')}; missing checks: {', '.join(missing)}")
             item["status"] = "tested and failed"
             item.setdefault("blockers", []).append("Incomplete qualification evidence: " + ", ".join(missing))
+        item["diagnostics"] = _case_diagnostics(item)
         grouped[cell_id].append(item)
     for cell in cells:
         items = grouped[cell["id"]]
@@ -193,6 +269,7 @@ def build_matrix(evidence):
         "ledger_cell_count": 85, "generic_sdr_control_count": 5,
         "statuses": list(STATUSES), "cells": cells,
         "required_case_count": len(plan), "evidence_errors": errors,
+        "diagnostic_summary": _diagnostic_summary(cells, plan),
         "milestone_qualified": False,
         "milestone_blockers": ["Physical browser/native viewer/OS wallpaper checks remain pending manual review."] + [cell["id"] for cell in cells if cell["required"] and cell["status"] != "qualified"],
         "policy_sources": [

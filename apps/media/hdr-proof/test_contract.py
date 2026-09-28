@@ -59,6 +59,86 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(cell["qualified_cases"], [])
         self.assertTrue(report["evidence_errors"])
 
+
+class DiagnosticTests(unittest.TestCase):
+    def case(self, **changes):
+        planned = next(case for case in required_cases() if case["cell_id"] == "static-avif:hdr:avif")
+        return {**planned, "status": "tested and failed", "checks": {key: True for key in ("native_encoder", "independent_decoder", "structure", "appearance", "privacy")}, **changes}
+
+    def diagnosed(self, evidence):
+        report = build_matrix(evidence)
+        cell = next(cell for cell in report["cells"] if cell["id"] == "static-avif:hdr:avif")
+        return report, cell["evidence"]
+
+    def test_native_failure_does_not_claim_failed_privacy_or_pixel_measurements(self):
+        case = self.case(checks={key: False for key in ("native_encoder", "independent_decoder", "structure", "appearance", "privacy")}, blockers=["avifenc exited -11"])
+        report, evidence = self.diagnosed([case])
+        detail = evidence[0]["diagnostics"]
+        self.assertEqual(detail["native_outcome"], "failed")
+        self.assertEqual(detail["measured_failures"], [])
+        self.assertEqual(detail["missing_evidence"], [])
+        self.assertEqual(set(detail["not_evaluated"]), {"independent_decoder", "structure", "appearance", "privacy"})
+        summary = report["diagnostic_summary"]["all_cases"]
+        self.assertEqual(summary["native_operation_failures"], 1)
+        self.assertEqual(summary["measured_failure_cases"], 0)
+        self.assertEqual(summary["failed_gates_after_native_completion"], {})
+
+    def test_measured_failures_and_missing_evidence_can_overlap(self):
+        case = self.case()
+        case["checks"].update(structure=False, appearance=False)
+        case["structural_checks"] = {"alpha": False, "depth": True}
+        case["measurements"] = {"frames": [{"passed": False, "failures": ["ordinary_white_signal", "gamut_mapping_reference_missing"]}]}
+        report, evidence = self.diagnosed([case])
+        detail = evidence[0]["diagnostics"]
+        self.assertEqual({failure["check"] for failure in detail["measured_failures"]}, {"alpha", "ordinary_white_signal"})
+        self.assertEqual({failure["check"] for failure in detail["missing_evidence"]}, {"gamut_mapping_reference_missing"})
+        summary = report["diagnostic_summary"]["all_cases"]
+        self.assertEqual(summary["native_completed"], 1)
+        self.assertEqual(summary["measured_failure_cases"], 1)
+        self.assertEqual(summary["missing_evidence_cases"], 1)
+        self.assertEqual(summary["failed_gates_after_native_completion"], {"appearance": 1, "structure": 1})
+        self.assertEqual(evidence[0]["status"], "tested and failed")
+
+    def test_missing_probes_are_not_reported_as_bad_rendered_pixels(self):
+        case = self.case()
+        case["checks"]["appearance"] = False
+        case["measurements"] = {"frames": [{"passed": False, "failures": ["ordinary_white_probe_missing", "shadow_probe_missing"]}]}
+        report, evidence = self.diagnosed([case])
+        self.assertEqual(evidence[0]["diagnostics"]["measured_failures"], [])
+        self.assertEqual(report["diagnostic_summary"]["all_cases"]["missing_evidence_cases"], 1)
+
+    def test_unavailable_independent_decoder_is_an_evidence_gap(self):
+        case = self.case()
+        case["checks"].update(independent_decoder=False, appearance=False)
+        report, evidence = self.diagnosed([case])
+        detail = evidence[0]["diagnostics"]
+        self.assertEqual({failure["gate"] for failure in detail["missing_evidence"]}, {"independent_decoder", "appearance"})
+        self.assertEqual(detail["measured_failures"], [])
+        self.assertEqual(report["diagnostic_summary"]["all_cases"]["native_operation_failures"], 0)
+
+    def test_encoded_facts_alone_do_not_establish_measured_rejection(self):
+        case = self.case(facts={"width": 57, "height": 38})
+        case["checks"].update(structure=False, appearance=False)
+        report, evidence = self.diagnosed([case])
+        detail = evidence[0]["diagnostics"]
+        self.assertEqual(detail["measured_failures"], [])
+        self.assertEqual({failure["gate"] for failure in detail["missing_evidence"]}, {"structure", "appearance"})
+        self.assertEqual(report["diagnostic_summary"]["all_cases"]["missing_evidence_cases"], 1)
+
+    def test_required_summary_counts_only_exact_planned_cases(self):
+        required = self.case()
+        required["checks"]["appearance"] = False
+        optional = self.case(case_id="optional-identity", status="qualified")
+        report, evidence = self.diagnosed([required, optional])
+        summary = report["diagnostic_summary"]
+        self.assertEqual(summary["all_cases"]["cases"], 2)
+        self.assertEqual(summary["all_cases"]["qualified"], 1)
+        self.assertEqual(summary["required_cases"]["cases"], 1)
+        self.assertEqual(summary["required_cases"]["qualified"], 0)
+        self.assertEqual(summary["required_plan_size"], 320)
+        self.assertEqual(summary["required_cases"]["native_completed"], 1)
+        self.assertEqual([case["status"] for case in evidence], ["tested and failed", "qualified"])
+
     def test_missing_coverage_stays_unqualified_even_with_one_qualified_tuple(self):
         case = next(case for case in required_cases() if case["cell_id"] == "static-avif:hdr:avif")
         evidence = {**case, "status": "qualified", "checks": {key: True for key in ("native_encoder", "independent_decoder", "structure", "appearance", "privacy")}}

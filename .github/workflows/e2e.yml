@@ -68,7 +68,7 @@ jobs:
         run: make apps-start
 
       - name: Run E2E tests
-        run: make test-e2e
+        run: make test-e2e PACKAGE=web-e2e
         env:
           TURBO_TOKEN: ''
           TURBO_TEAM: ''
@@ -91,9 +91,6 @@ jobs:
             apps/web-e2e/test-results
             artifacts/web-e2e
 
-      - name: Verify E2E test isolation
-        run: make run PACKAGE=ingestor-e2e SCRIPT=verify-no-imports
-
       - name: Stop application stack
         if: always()
         run: make apps-stop
@@ -101,3 +98,52 @@ jobs:
       - name: Stop infrastructure
         if: always()
         run: make infra-stop
+
+  container_e2e:
+    name: Container E2E Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      USE_VERCEL_CACHE: ${{ vars.TURBO_TEAM != '' && (github.actor_id == '29227505' || github.actor_id == '290168728') && (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ">=22.12.0 <23"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Install turbo
+        run: pnpm add -g turbo
+
+      - name: Set up Vercel Remote Cache
+        if: env.USE_VERCEL_CACHE == 'true'
+        uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
+      - name: Report unavailable Turbo cache
+        if: env.USE_VERCEL_CACHE != 'true'
+        run: echo '::warning::Vercel Remote Cache is unavailable for this run; Turbo tasks have no shared cache.'
+
+      - name: Build
+        run: make build
+
+      - name: Run container E2E tests
+        run: make test-e2e TURBO_FLAGS='--filter=!@wallpaperdb/web-e2e'
+        env:
+          TURBO_TOKEN: ''
+          TURBO_TEAM: ''
+
+      - name: Verify E2E test isolation
+        run: make run PACKAGE=ingestor-e2e SCRIPT=verify-no-imports

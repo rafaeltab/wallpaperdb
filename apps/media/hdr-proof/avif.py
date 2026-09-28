@@ -434,8 +434,10 @@ def run(output_dir, *, specs=None):
                 item['measurements']['frames'] = measurements
                 item['checks']['appearance'] = all(m['passed'] for m in measurements)
                 if sdr:
+                    from sdr_candidate import recipe
+                    parameters = recipe(peak_nits)
                     item['measurements']['tone_controls'] = tone_controls[:count]
-                    item['sdr_candidate'] = {'algorithm': 'CPU Mobius knee 0.6; exposure 1.1; output scale 0.99',
+                    item['sdr_candidate'] = {'algorithm': f'CPU Mobius knee {parameters["knee"]}; exposure {parameters["exposure"]}; output scale {parameters["output_scale"]}',
                                              'peak_nits': peak_nits,
                                              'gamut_mapping': 'Relative colorimetric D65 primary conversion with explicit sRGB channel clipping'}
                 if ext == 'jpg' and not sdr:

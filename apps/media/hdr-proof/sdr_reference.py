@@ -24,9 +24,11 @@ def reference_srgb(rgb_nits, gamut, *, peak_nits):
         raise ValueError('Expected finite nonnegative RGB luminance')
     if not np.isfinite(peak_nits) or peak_nits < 203 or np.max(rgb) > 10000:
         raise ValueError('Expected a finite HDR peak anchor and samples in the PQ display domain')
-    # Fixed candidate recipe. These are not appearance acceptance thresholds.
-    exposure = 1.1 * ((0.90 + 0.055) / 1.055) ** 2.4 / 203
-    knee = 0.6
+    # Fixed declared recipes, stated independently of the native implementation.
+    # The 4000-nit sequence keeps the same exposure/knee across both frames.
+    # These parameters do not change any appearance acceptance threshold.
+    exposure_factor, knee = (1.2, 0.54) if peak_nits == 4000 else (1.1, 0.6)
+    exposure = exposure_factor * ((0.90 + 0.055) / 1.055) ** 2.4 / 203
     rgb = rgb * exposure
     peak = peak_nits * exposure
     maximum = np.max(rgb, axis=-1, keepdims=True)

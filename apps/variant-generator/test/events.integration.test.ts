@@ -7,7 +7,7 @@ import { Effect, ManagedRuntime } from 'effect';
 import { WallpaperVariantUploadedEventSchema } from '@wallpaperdb/events/schemas';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
-import { VariantEvents, type GenerationInput } from '../src/generation/index.js';
+import { VariantEvents, type GenerationInput } from '../src/capabilities/generation/index.js';
 
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)

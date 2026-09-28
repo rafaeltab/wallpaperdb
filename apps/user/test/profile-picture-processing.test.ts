@@ -4,7 +4,7 @@ import { syncBuiltinESMExports } from 'node:module';
 import { describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { pictureCodecLayer } from '../src/adapters/pictures/index.js';
-import { PictureCodec, type PictureLimits } from '../src/pictures/index.js';
+import { PictureCodec, type PictureLimits } from '../src/capabilities/pictures/index.js';
 
 async function processProfilePicture(bytes: Buffer, limits: PictureLimits) {
   const outcome = await Effect.runPromise(

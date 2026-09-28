@@ -4,7 +4,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { Effect } from 'effect';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import { MediaDelivery, type MediaOutcome } from '../delivery/index.js';
+import { MediaDelivery, type MediaOutcome } from '../capabilities/delivery/index.js';
 
 const querySchema = z.object({
   w: z.coerce.number().int().positive().optional(),

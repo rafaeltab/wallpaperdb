@@ -1,8 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import { Effect, Layer } from 'effect';
-import { Admission } from './admission/index.js';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
-import { Ingestion } from './ingestion/index.js';
+import { Admission } from './capabilities/admission/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
+import { Ingestion } from './capabilities/ingestion/index.js';
 import { createHttpApp } from './http/index.js';
 const unavailable = () => Effect.die('Documentation generation never executes requests');
 const services = Layer.mergeAll(

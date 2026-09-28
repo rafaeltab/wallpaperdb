@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
-import { AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
-import { DeliveryUnavailable, MediaDelivery, type ResizeOptions } from '../src/delivery/index.js';
+import { AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
+import { DeliveryUnavailable, MediaDelivery, type ResizeOptions } from '../src/capabilities/delivery/index.js';
 import { createHttpApp } from '../src/http/index.js';
 
 const health = availabilityLayer.pipe(

@@ -2,7 +2,7 @@ import { uploadEnvelopeConformance } from '@wallpaperdb/test-utils/event-contrac
 import { expect, it } from 'vitest';
 import { Effect } from 'effect';
 import { deliverProjection } from '../src/adapters/events/index.js';
-import { ProjectCatalogue, type ProjectionChange } from '../src/projection/index.js';
+import { ProjectCatalogue, type ProjectionChange } from '../src/capabilities/projection/index.js';
 it.each(uploadEnvelopeConformance())('$name', async ({ payload, metadata, accepted, expected }) => {
   const changes: ProjectionChange[] = [];
   const result = await Effect.runPromise(

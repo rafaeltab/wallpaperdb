@@ -2,7 +2,7 @@ import { and, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { ulid } from 'ulid';
 import { profilePictureAssets, profilePictureImports, profiles } from '../../db/schema.js';
-import { PictureStore, PictureUnavailable, type StoredPicture } from '../../pictures/index.js';
+import { PictureStore, PictureUnavailable, type StoredPicture } from '../../capabilities/pictures/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 
 const logicalPicture = (asset: StoredPicture): StoredPicture => ({

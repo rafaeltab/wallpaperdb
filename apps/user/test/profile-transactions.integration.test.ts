@@ -11,8 +11,8 @@ import {
   type ProfileOutcome,
   type ExternalIdentity,
   type AliasClaimReference,
-} from '../src/profile/index.js';
-import { Maintenance, ProfileEvents, maintenanceLayer } from '../src/maintenance/index.js';
+} from '../src/capabilities/profile/index.js';
+import { Maintenance, ProfileEvents, maintenanceLayer } from '../src/capabilities/maintenance/index.js';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import { eventStoreLayer } from '../src/adapters/events/index.js';
@@ -21,7 +21,7 @@ import {
   profilesLayer,
   type ProfilePolicy,
   type ProfileRejection,
-} from '../src/profile/index.js';
+} from '../src/capabilities/profile/index.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const migrationPaths = readdirSync(migrationDirectory)

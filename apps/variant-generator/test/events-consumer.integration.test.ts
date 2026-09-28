@@ -15,7 +15,7 @@ import {
   VariantEvents,
   GenerationUnavailable,
   type GenerationInput,
-} from '../src/generation/index.js';
+} from '../src/capabilities/generation/index.js';
 const decodeManifest = Schema.decodeUnknownSync(Schema.Struct({
   quarantineId: Schema.String, chunkCount: Schema.Number, chunkSize: Schema.Number,
   totalBytes: Schema.Number, sha256: Schema.String, sequences: Schema.Array(Schema.Number),

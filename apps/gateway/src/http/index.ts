@@ -7,8 +7,8 @@ import { Cause, Effect, Exit, Latch, Layer, ManagedRuntime, Option, Schema } fro
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { GraphQLError, NoSchemaIntrospectionCustomRule } from 'graphql';
 import mercurius from 'mercurius';
-import { Admission } from '../admission/index.js';
-import { Availability } from '../availability/index.js';
+import { Admission } from '../capabilities/admission/index.js';
+import { Availability } from '../capabilities/availability/index.js';
 import { createGraphql } from '../graphql/index.js';
 import { HttpExecution, httpExecutionLayer, type HttpServices } from '../runtime.js';
 import { inspectQuery } from './security.js';

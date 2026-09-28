@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
-import { GenerationUnavailable } from '../../generation/index.js';
+import { GenerationUnavailable } from '../../capabilities/generation/index.js';
 
 export interface EncodingOptions {
   readonly width: number;

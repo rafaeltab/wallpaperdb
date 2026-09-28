@@ -15,10 +15,10 @@ import {
   natsEventsLayer,
   natsOutboxLayer,
 } from './adapters/events/index.js';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
-import { CatalogHealth } from './catalog/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
+import { CatalogHealth } from './capabilities/catalog/index.js';
 import type { Config } from './config.js';
-import { deliveryLayer } from './delivery/index.js';
+import { deliveryLayer } from './capabilities/delivery/index.js';
 import { createHttpApp } from './http/index.js';
 import { tracingLayer } from './runtime.js';
 

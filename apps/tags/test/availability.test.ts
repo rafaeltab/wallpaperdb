@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { Availability, AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
+import { Availability, AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
 
 it('reports the health of every shell dependency', async () => {
   const layer = availabilityLayer.pipe(

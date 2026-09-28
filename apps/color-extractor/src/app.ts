@@ -7,9 +7,9 @@ import {
   natsEventsLayer,
 } from './adapters/events/index.js';
 import { ImageHealth, imageLayer } from './adapters/image/index.js';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
 import type { Config } from './config.js';
-import { extractionLayer } from './extraction/index.js';
+import { extractionLayer } from './capabilities/extraction/index.js';
 import { createHttpApp } from './http/index.js';
 import { tracingLayer } from './runtime.js';
 

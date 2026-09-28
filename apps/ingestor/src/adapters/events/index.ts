@@ -7,7 +7,7 @@ import {
 } from '@wallpaperdb/events/schemas';
 import { Clock, Context, Effect, Exit, Layer, Semaphore } from 'effect';
 import { connect, headers, type JetStreamClient } from 'nats';
-import { IngestionUnavailable, UploadEvents, type UploadedEvent } from '../../ingestion/index.js';
+import { IngestionUnavailable, UploadEvents, type UploadedEvent } from '../../capabilities/ingestion/index.js';
 
 export interface UploadedEventsConfig {
   readonly url: string;

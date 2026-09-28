@@ -7,7 +7,7 @@ import {
   AvailabilityProbe,
   availabilityLayer,
   type Health,
-} from '../src/availability/index.js';
+} from '../src/capabilities/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
 
 const apps: Awaited<ReturnType<typeof createHttpApp>>[] = [];

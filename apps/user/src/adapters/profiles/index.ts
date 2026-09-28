@@ -30,7 +30,7 @@ import {
   type ProfileOutcome,
   type ProfileMutation,
   type ProfileDecision,
-} from '../../profile/index.js';
+} from '../../capabilities/profile/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 import { recentHistoricalHandles, type ProfileReader } from './history.js';
 

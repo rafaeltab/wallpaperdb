@@ -1,7 +1,7 @@
 import { Deferred, Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Catalogue, type Profile } from '../src/catalogue/index.js';
+import { Catalogue, type Profile } from '../src/capabilities/catalogue/index.js';
 import { createHttpApp } from '../src/http/index.js';
 import { EmptyCatalogue, httpConfig, httpTestLayer } from './unit/http-fixture.js';
 

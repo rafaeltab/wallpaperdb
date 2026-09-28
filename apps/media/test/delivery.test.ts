@@ -10,7 +10,7 @@ import {
   deliveryLayer,
   type ResizeOptions,
   type Wallpaper,
-} from '../src/delivery/index.js';
+} from '../src/capabilities/delivery/index.js';
 
 const original: Wallpaper = {
   id: 'wall_1',

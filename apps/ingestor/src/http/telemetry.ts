@@ -1,6 +1,6 @@
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Clock, Effect, Exit } from 'effect';
-import type { IngestionUnavailable, UploadOutcome } from '../ingestion/index.js';
+import type { IngestionUnavailable, UploadOutcome } from '../capabilities/ingestion/index.js';
 /** Keep the established upload metric names independent of telemetry availability. */
 export function observeUpload(
   effect: Effect.Effect<UploadOutcome, IngestionUnavailable>,

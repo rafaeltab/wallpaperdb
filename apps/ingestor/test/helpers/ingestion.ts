@@ -10,7 +10,7 @@ import {
   type AssetReference,
   type UploadedEvent,
   type UploadRecord,
-} from '../../src/ingestion/index.js';
+} from '../../src/capabilities/ingestion/index.js';
 
 export const metadata = {
   fileType: 'image' as const,

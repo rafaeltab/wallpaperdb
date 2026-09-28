@@ -9,7 +9,7 @@ import {
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
 import { z } from 'zod';
-import type { ProjectionInput, ProjectionMetadata } from '../../catalog/index.js';
+import type { ProjectionInput, ProjectionMetadata } from '../../capabilities/catalog/index.js';
 const decode = Option.liftThrowable((data: Uint8Array): unknown =>
   JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(data))
 );

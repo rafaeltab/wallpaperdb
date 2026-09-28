@@ -11,7 +11,7 @@ import {
   IngestionUnavailable,
   type UploadRecord,
   type Reservation,
-} from '../../ingestion/index.js';
+} from '../../capabilities/ingestion/index.js';
 
 const { wallpapers, uploadOutbox } = schema;
 const metadataSchema = z.object({

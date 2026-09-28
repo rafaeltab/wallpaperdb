@@ -8,7 +8,7 @@ import {
   ExtractionUnavailable,
   ImageHistogram,
   type OriginalImage,
-} from '../../extraction/index.js';
+} from '../../capabilities/extraction/index.js';
 
 export interface ImageConfig {
   readonly endpoint: string;

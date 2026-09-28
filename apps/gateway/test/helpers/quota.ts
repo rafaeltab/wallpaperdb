@@ -1,5 +1,5 @@
 import { DateTime, Effect, Layer, Ref } from 'effect';
-import { Quota, type AdmissionResult } from '../../src/admission/index.js';
+import { Quota, type AdmissionResult } from '../../src/capabilities/admission/index.js';
 
 type Windows = Map<string, { count: number; reset: number }>;
 

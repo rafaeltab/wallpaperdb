@@ -22,14 +22,14 @@ import {
   pictureStoreLayer,
 } from '../src/adapters/pictures/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
-import { Pictures, picturesLayer, type StageOutcome } from '../src/pictures/index.js';
+import { Pictures, picturesLayer, type StageOutcome } from '../src/capabilities/pictures/index.js';
 import {
   Identities,
   Profiles,
   profilesLayer,
   type OwnerProfile,
   type ProfileOutcome,
-} from '../src/profile/index.js';
+} from '../src/capabilities/profile/index.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const day = 24 * 60 * 60 * 1000;

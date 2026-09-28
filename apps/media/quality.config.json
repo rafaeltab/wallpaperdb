@@ -1,9 +1,5 @@
 {
-  "capabilities": ["delivery", "catalog", "availability"],
   "publicModules": [
-    "delivery",
-    "catalog",
-    "availability",
     "http",
     "adapters/assets",
     "adapters/catalog",

@@ -3,7 +3,7 @@ import { Effect, Layer, ManagedRuntime, Result } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/extraction/index.js';
+import { ImageHistogram } from '../src/capabilities/extraction/index.js';
 
 describe('Image storage request ownership', () => {
   it.each([

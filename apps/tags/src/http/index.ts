@@ -5,7 +5,7 @@ import cors from '@fastify/cors';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { Context, Effect, FiberSet, Layer, ManagedRuntime, Schema } from 'effect';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
-import { Availability } from '../availability/index.js';
+import { Availability } from '../capabilities/availability/index.js';
 
 export interface ConnectionsState {
   isShuttingDown: boolean;

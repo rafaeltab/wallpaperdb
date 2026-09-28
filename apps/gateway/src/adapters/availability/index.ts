@@ -1,5 +1,5 @@
 import { Effect, Layer } from 'effect';
-import { AvailabilityProbe, type DependencyHealth } from '../../availability/index.js';
+import { AvailabilityProbe, type DependencyHealth } from '../../capabilities/availability/index.js';
 
 export interface DependencyChecks {
   opensearch(): Effect.Effect<boolean, unknown>;

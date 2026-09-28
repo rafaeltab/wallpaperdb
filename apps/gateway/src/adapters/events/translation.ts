@@ -14,7 +14,7 @@ import {
 } from '@wallpaperdb/events';
 import { DateTime, Option, Predicate, Schema, SchemaGetter } from 'effect';
 import type { MsgHdrs } from 'nats';
-import type { Occurrence, ProjectionChange } from '../../projection/index.js';
+import type { Occurrence, ProjectionChange } from '../../capabilities/projection/index.js';
 
 const decodeJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown));
 const decodeUtf8 = Option.liftThrowable((payload: Uint8Array) =>

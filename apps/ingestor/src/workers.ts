@@ -1,6 +1,6 @@
 import { Cause, Clock, Effect, Layer, Metric } from 'effect';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
-import { Ingestion } from './ingestion/index.js';
+import { Ingestion } from './capabilities/ingestion/index.js';
 
 function scheduled(name: string, intervalMs: number, task: Effect.Effect<unknown, unknown>) {
   const errors = Metric.counter('reconciliation.errors.total', {

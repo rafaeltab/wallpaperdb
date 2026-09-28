@@ -3,7 +3,7 @@ import { context, propagation, trace } from '@opentelemetry/api';
 import { WallpaperVariantAvailableEventSchema } from '@wallpaperdb/events/schemas';
 import { Cause, Clock, Context, Effect, Exit, Fiber, Layer, Metric, Ref } from 'effect';
 import { headers } from 'nats';
-import { CatalogOutbox, type AvailableNotification } from '../../catalog/index.js';
+import { CatalogOutbox, type AvailableNotification } from '../../capabilities/catalog/index.js';
 import { broker, BrokerFailure, NatsBroker, type NatsEventsOptions } from './broker.js';
 export interface OutboxHealth {
   check(): Effect.Effect<boolean>;

@@ -13,7 +13,7 @@ import {
   profilesLayer,
   type ProfilePolicy,
   type ProfileOutcome,
-} from '../src/profile/index.js';
+} from '../src/capabilities/profile/index.js';
 
 const policy: ProfilePolicy = {
   profileHandleMinLength: 1,

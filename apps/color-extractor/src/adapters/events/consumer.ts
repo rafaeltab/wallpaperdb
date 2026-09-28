@@ -3,7 +3,7 @@ import { context, propagation, trace } from '@opentelemetry/api';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Cause, Clock, Context, Effect, Fiber, Layer, Ref, Schema, Stream } from 'effect';
 import { AckPolicy, type JsMsg } from 'nats';
-import { ExtractColors, ExtractionUnavailable } from '../../extraction/index.js';
+import { ExtractColors, ExtractionUnavailable } from '../../capabilities/extraction/index.js';
 import { broker, NatsBroker, type NatsEventsOptions } from './broker.js';
 import { translateUpload } from './translation.js';
 import { ensureQuarantine, quarantine } from './quarantine.js';

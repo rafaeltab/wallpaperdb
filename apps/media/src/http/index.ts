@@ -5,8 +5,8 @@ import { STATUS_CODES, type IncomingHttpHeaders } from 'node:http';
 import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { Context, Effect, FiberSet, Layer, ManagedRuntime, Schema } from 'effect';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { Availability } from '../availability/index.js';
-import { MediaDelivery } from '../delivery/index.js';
+import { Availability } from '../capabilities/availability/index.js';
+import { MediaDelivery } from '../capabilities/delivery/index.js';
 import { registerDeliveryRoutes } from './delivery.js';
 
 export interface ConnectionsState {

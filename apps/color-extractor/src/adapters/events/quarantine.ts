@@ -9,7 +9,7 @@ import {
   type MsgHdrs,
   type StreamConfig,
 } from 'nats';
-import { ExtractionUnavailable } from '../../extraction/index.js';
+import { ExtractionUnavailable } from '../../capabilities/extraction/index.js';
 import { broker, type NatsBroker } from './broker.js';
 
 const stream = 'COLOR_EXTRACTOR_QUARANTINE';

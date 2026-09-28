@@ -22,8 +22,8 @@ import {
   ProfileUnavailable,
   type ExternalIdentity,
   type Identities,
-} from '../src/profile/index.js';
-import { Maintenance } from '../src/maintenance/index.js';
+} from '../src/capabilities/profile/index.js';
+import { Maintenance } from '../src/capabilities/maintenance/index.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 const migrationPaths = readdirSync(migrationDirectory)

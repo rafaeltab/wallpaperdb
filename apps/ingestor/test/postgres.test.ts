@@ -5,7 +5,7 @@ import { Effect, ManagedRuntime } from 'effect';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { postgresUploadsLayer } from '../src/adapters/postgres/index.js';
-import { IngestionStore, type UploadRecord } from '../src/ingestion/index.js';
+import { IngestionStore, type UploadRecord } from '../src/capabilities/ingestion/index.js';
 import { ControlledStore, metadata } from './helpers/ingestion.js';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

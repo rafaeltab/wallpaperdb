@@ -7,7 +7,7 @@ import {
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer, natsOutboxLayer, OutboxHealth } from '../src/adapters/events/index.js';
-import { CatalogOutbox, CatalogFailure, type AvailableNotification } from '../src/catalog/index.js';
+import { CatalogOutbox, CatalogFailure, type AvailableNotification } from '../src/capabilities/catalog/index.js';
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(NatsTesterBuilder)

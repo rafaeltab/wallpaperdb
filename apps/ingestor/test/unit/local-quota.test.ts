@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { TestClock } from 'effect/testing';
 import { expect } from 'vitest';
 import { memoryQuotaLayer } from '../../src/adapters/quota/index.js';
-import { Quota } from '../../src/admission/index.js';
+import { Quota } from '../../src/capabilities/admission/index.js';
 
 it.effect(
   'bounds local Profile windows without losing existing quotas and frees expired capacity',

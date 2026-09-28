@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { Clock, Effect, Exit, Layer, Metric } from 'effect';
 import { headers } from 'nats';
 import { outboxEvents } from '../../db/schema.js';
-import { MaintenanceFailure, ProfileEvents } from '../../maintenance/index.js';
+import { MaintenanceFailure, ProfileEvents } from '../../capabilities/maintenance/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 import { broker, EventsBroker } from './broker.js';
 

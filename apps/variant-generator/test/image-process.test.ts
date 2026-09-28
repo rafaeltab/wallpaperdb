@@ -4,7 +4,7 @@ import { Effect, Layer, ManagedRuntime, Result } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { imageLayer } from '../src/adapters/image/index.js';
-import { VariantImages } from '../src/generation/index.js';
+import { VariantImages } from '../src/capabilities/generation/index.js';
 
 async function encoderProcess(): Promise<number> {
   return vi.waitFor(

@@ -7,7 +7,7 @@ import {
   openSearchLayer,
   type OpenSearchGatewayOptions,
 } from '../src/adapters/opensearch/index.js';
-import { ProjectCatalogue, projectionLayer } from '../src/projection/index.js';
+import { ProjectCatalogue, projectionLayer } from '../src/capabilities/projection/index.js';
 
 declare module 'vitest' {
   export interface ProvidedContext {

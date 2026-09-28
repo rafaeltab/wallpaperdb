@@ -1,6 +1,6 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Profiles, type ProfileOutcome } from '../src/profile/index.js';
+import { Profiles, type ProfileOutcome } from '../src/capabilities/profile/index.js';
 import {
   PictureCodec,
   PictureObjects,
@@ -10,7 +10,7 @@ import {
   Pictures,
   picturesLayer,
   type StoredPicture,
-} from '../src/pictures/index.js';
+} from '../src/capabilities/pictures/index.js';
 
 const runtimes: Array<{ dispose(): Promise<void> }> = [];
 afterEach(async () => {

@@ -11,7 +11,7 @@ import {
   ConsumerHealth,
   ownershipConsumerLayer,
 } from '../src/adapters/events/index.js';
-import { Maintenance, type WallpaperOwnership } from '../src/maintenance/index.js';
+import { Maintenance, type WallpaperOwnership } from '../src/capabilities/maintenance/index.js';
 
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)

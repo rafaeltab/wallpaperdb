@@ -8,7 +8,7 @@ import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { pictureStoreLayer } from '../src/adapters/pictures/index.js';
-import { PictureStore, type StoredPicture } from '../src/pictures/index.js';
+import { PictureStore, type StoredPicture } from '../src/capabilities/pictures/index.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');
 describe('Picture persistence adapter', () => {

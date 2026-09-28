@@ -6,11 +6,11 @@ import { UploadEventsHealth, uploadedEventsLayer } from './adapters/events/index
 import { imageInspectionLayer } from './adapters/inspection/index.js';
 import { PostgresUploads, postgresUploadsLayer } from './adapters/postgres/index.js';
 import { redisQuotaLayer } from './adapters/quota/index.js';
-import { admissionLayer } from './admission/index.js';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { admissionLayer } from './capabilities/admission/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
 import type { Config } from './config.js';
 import { createHttpApp } from './http/index.js';
-import { IngestionIdentity, ingestionLayer } from './ingestion/index.js';
+import { IngestionIdentity, ingestionLayer } from './capabilities/ingestion/index.js';
 import { ingestorTracingLayer } from './runtime.js';
 import { reconciliationLayer } from './workers.js';
 

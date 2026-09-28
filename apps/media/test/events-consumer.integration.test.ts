@@ -10,7 +10,7 @@ import { Deferred, Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { NatsBroker, natsEventsLayer } from '../src/adapters/events/index.js';
 import { ConsumerHealth, natsConsumerLayer } from '../src/adapters/events/index.js';
-import { CatalogProjection, CatalogFailure, type ProjectionInput } from '../src/catalog/index.js';
+import { CatalogProjection, CatalogFailure, type ProjectionInput } from '../src/capabilities/catalog/index.js';
 const decodeManifest = Schema.decodeUnknownSync(
   Schema.Struct({
     quarantineId: Schema.String,

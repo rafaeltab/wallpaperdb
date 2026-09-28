@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { expect, layer } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { CatalogueCursors } from '../src/catalogue/index.js';
+import { CatalogueCursors } from '../src/capabilities/catalogue/index.js';
 import { signedCursorsLayer } from '../src/cursors/index.js';
 import { Cursors } from './helpers/catalogue.js';
 const config = { secret: 'test-secret-that-is-definitely-long-enough', expirationMs: 60_000 };

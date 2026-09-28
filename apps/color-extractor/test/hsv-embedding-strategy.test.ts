@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeHistogram } from '../src/extraction/index.js';
+import { computeHistogram } from '../src/capabilities/extraction/index.js';
 
 describe('HsvEmbeddingStrategy', () => {
   describe('single pure red pixel', () => {

@@ -1,7 +1,7 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { TestClock } from 'effect/testing';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Profiles } from '../src/profile/index.js';
+import { Profiles } from '../src/capabilities/profile/index.js';
 import {
   PictureCodec,
   PictureObjects,
@@ -11,7 +11,7 @@ import {
   Pictures,
   picturesLayer,
   type PictureImport,
-} from '../src/pictures/index.js';
+} from '../src/capabilities/pictures/index.js';
 
 const runtimes: Array<{ dispose(): Promise<void> }> = [];
 afterEach(async () => {

@@ -3,7 +3,7 @@ import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { Cause, Clock, Context, Effect, Fiber, Layer, Metric, Ref, Schema, Stream } from 'effect';
 import { AckPolicy, type JsMsg } from 'nats';
-import { CatalogProjection, type CatalogProjectionPort } from '../../catalog/index.js';
+import { CatalogProjection, type CatalogProjectionPort } from '../../capabilities/catalog/index.js';
 import { broker, BrokerFailure, NatsBroker, type NatsEventsOptions } from './broker.js';
 import { translateEvent } from './translation.js';
 import { ensureQuarantine, quarantine } from './quarantine.js';

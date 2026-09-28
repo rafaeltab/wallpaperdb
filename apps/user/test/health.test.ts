@@ -1,6 +1,6 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Availability, AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
+import { Availability, AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
 
 describe('User availability', () => {
   it('reports partial dependency failure and does not probe during shutdown', async () => {

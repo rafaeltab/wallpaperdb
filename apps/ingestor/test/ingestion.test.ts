@@ -4,7 +4,7 @@ import {
   Ingestion,
   IngestionUnavailable,
   type ValidationRejection,
-} from '../src/ingestion/index.js';
+} from '../src/capabilities/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
 
 describe('Wallpaper ingestion', () => {

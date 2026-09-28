@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { Schema } from 'effect';
-import type { CatalogueConfig, ColorPreference } from '../src/catalogue/index.js';
+import type { CatalogueConfig, ColorPreference } from '../src/capabilities/catalogue/index.js';
 import fixture from './fixtures/color-vectors.json';
 import { setup } from './helpers/catalogue.js';
 

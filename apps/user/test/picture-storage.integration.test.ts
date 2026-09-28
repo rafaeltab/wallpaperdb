@@ -14,7 +14,7 @@ import { Effect, Layer, Logger, ManagedRuntime, Metric } from 'effect';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { pictureStorageLayer, pictureStoreLayer } from '../src/adapters/pictures/index.js';
-import { PictureObjects, PictureStore } from '../src/pictures/index.js';
+import { PictureObjects, PictureStore } from '../src/capabilities/pictures/index.js';
 
 describe('Private immutable picture storage', () => {
   const Tester = createDefaultTesterBuilder()

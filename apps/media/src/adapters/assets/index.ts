@@ -11,7 +11,7 @@ import {
   DeliveryUnavailable,
   ImageTransformer,
   PictureAuthority,
-} from '../../delivery/index.js';
+} from '../../capabilities/delivery/index.js';
 
 export const sharpTransformerLayer = (limits: {
   maxInputPixels: number;

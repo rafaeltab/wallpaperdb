@@ -27,7 +27,7 @@ import {
   TypeMetaFieldDef,
   TypeNameMetaFieldDef,
 } from 'graphql';
-import { resolvePageSize, resolveProfilePageSize } from '../catalogue/index.js';
+import { resolvePageSize, resolveProfilePageSize } from '../capabilities/catalogue/index.js';
 
 export interface QueryLimits {
   readonly graphqlMaxDepth: number;

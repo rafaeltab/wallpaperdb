@@ -8,7 +8,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Clock, Context, DateTime, Effect, Exit, Layer } from 'effect';
-import { AssetStorage, type AssetReference, IngestionUnavailable } from '../../ingestion/index.js';
+import { AssetStorage, type AssetReference, IngestionUnavailable } from '../../capabilities/ingestion/index.js';
 
 export interface AssetsConfig {
   readonly endpoint: string;

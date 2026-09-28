@@ -9,7 +9,7 @@ import { profilePictureAssets } from '../../db/schema.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 import { recordDependencyHealth } from '../observations/index.js';
 import { Effect, Layer } from 'effect';
-import { PictureObjects, PictureUnavailable } from '../../pictures/index.js';
+import { PictureObjects, PictureUnavailable } from '../../capabilities/pictures/index.js';
 
 export interface PictureStorageConfig {
   readonly endpoint?: string;

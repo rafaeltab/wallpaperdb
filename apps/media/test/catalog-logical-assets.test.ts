@@ -5,8 +5,8 @@ import { ManagedRuntime } from 'effect';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
-import { CatalogHealth, CatalogOutbox, CatalogProjection } from '../src/catalog/index.js';
-import { Catalog } from '../src/delivery/index.js';
+import { CatalogHealth, CatalogOutbox, CatalogProjection } from '../src/capabilities/catalog/index.js';
+import { Catalog } from '../src/capabilities/delivery/index.js';
 
 const timestamp = '2026-09-24T10:00:00.000Z';
 describe('Catalog logical asset locations', () => {

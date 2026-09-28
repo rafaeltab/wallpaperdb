@@ -16,10 +16,10 @@ import {
   pictureStorageLayer,
   pictureStoreLayer,
 } from './adapters/pictures/index.js';
-import { Identities, profilesLayer } from './profile/index.js';
-import { Pictures, picturesLayer } from './pictures/index.js';
-import { Maintenance, maintenanceLayer } from './maintenance/index.js';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { Identities, profilesLayer } from './capabilities/profile/index.js';
+import { Pictures, picturesLayer } from './capabilities/pictures/index.js';
+import { Maintenance, maintenanceLayer } from './capabilities/maintenance/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
 import { createHttpApp } from './http/index.js';
 import { Workers, workerLayer } from './workers.js';
 import { tracingLayer } from './runtime.js';

@@ -4,13 +4,13 @@ import { availabilityProbeLayer } from './adapters/availability/index.js';
 import { NatsProjectionConsumer, natsProjectionLayer } from './adapters/events/index.js';
 import { OpenSearchGateway, openSearchLayer } from './adapters/opensearch/index.js';
 import { redisQuotaLayer } from './adapters/redis/index.js';
-import { admissionLayer } from './admission/index.js';
-import { availabilityLayer } from './availability/index.js';
-import { catalogueLayer } from './catalogue/index.js';
+import { admissionLayer } from './capabilities/admission/index.js';
+import { availabilityLayer } from './capabilities/availability/index.js';
+import { catalogueLayer } from './capabilities/catalogue/index.js';
 import type { Config } from './config.js';
 import { signedCursorsLayer } from './cursors/index.js';
 import { createHttpApp } from './http/index.js';
-import { projectionLayer } from './projection/index.js';
+import { projectionLayer } from './capabilities/projection/index.js';
 import { gatewayTracingLayer } from './runtime.js';
 
 interface AppOptions {

@@ -12,7 +12,7 @@ import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { redisQuotaLayer } from '../src/adapters/redis/index.js';
-import { type AdmissionResult, Quota } from '../src/admission/index.js';
+import { type AdmissionResult, Quota } from '../src/capabilities/admission/index.js';
 
 let container: StartedTestContainer;
 beforeAll(async () => {

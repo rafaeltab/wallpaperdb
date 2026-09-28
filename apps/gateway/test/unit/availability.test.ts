@@ -5,7 +5,7 @@ import {
   Availability,
   AvailabilityProbe,
   availabilityLayer,
-} from '../../src/availability/index.js';
+} from '../../src/capabilities/availability/index.js';
 
 describe('gateway availability', () => {
   it.effect('reports unhealthy when every dependency is unavailable', () =>

@@ -8,7 +8,7 @@ import {
   type JsMsg,
   type MsgHdrs,
 } from 'nats';
-import { MaintenanceFailure } from '../../maintenance/index.js';
+import { MaintenanceFailure } from '../../capabilities/maintenance/index.js';
 import { broker, type EventsBroker } from './broker.js';
 
 const stream = 'USER_QUARANTINE';

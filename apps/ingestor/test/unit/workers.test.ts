@@ -1,7 +1,7 @@
 import { expect, it } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { Ingestion, IngestionUnavailable } from '../../src/ingestion/index.js';
+import { Ingestion, IngestionUnavailable } from '../../src/capabilities/ingestion/index.js';
 import { reconciliationLayer } from '../../src/workers.js';
 it.effect('runs independent recovery schedules without overlapping a running cycle', () => {
   let cycles = 0;

@@ -1,5 +1,5 @@
 import { Clock, Effect, Layer, Metric } from 'effect';
-import { Availability, type Health } from './availability/index.js';
+import { Availability, type Health } from './capabilities/availability/index.js';
 
 export interface MonitorOptions {
   readonly telemetryEnabled: boolean;

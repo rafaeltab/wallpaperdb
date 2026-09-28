@@ -6,7 +6,7 @@ import {
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
 import { z } from 'zod';
-import type { ExtractionInput } from '../../extraction/index.js';
+import type { ExtractionInput } from '../../capabilities/extraction/index.js';
 const decode = Option.liftThrowable((payload: Uint8Array): unknown =>
   JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(payload))
 );

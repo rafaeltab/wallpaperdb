@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { imageInspectionLayer } from '../src/adapters/inspection/index.js';
-import { ContentInspection, Ingestion } from '../src/ingestion/index.js';
+import { ContentInspection, Ingestion } from '../src/capabilities/ingestion/index.js';
 import { fixture } from './helpers/ingestion.js';
 
 const inspection = Effect.runSync(ContentInspection.pipe(Effect.provide(imageInspectionLayer)));

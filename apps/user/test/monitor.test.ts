@@ -1,7 +1,7 @@
 import { Effect, Layer, ManagedRuntime, Metric } from 'effect';
 import { TestClock } from 'effect/testing';
 import { describe, expect, it } from 'vitest';
-import { Availability, type DependencyHealth } from '../src/availability/index.js';
+import { Availability, type DependencyHealth } from '../src/capabilities/availability/index.js';
 import { monitorLayer } from '../src/monitor.js';
 
 const value = (dependency: string, required = 'true') =>

@@ -12,7 +12,7 @@ import {
   type ProfileMutation,
   type ProfilePolicy,
   type ProfileSnapshot,
-} from '../../src/profile/index.js';
+} from '../../src/capabilities/profile/index.js';
 
 export const profilePolicy: ProfilePolicy = {
   profileHandleMinLength: 1,

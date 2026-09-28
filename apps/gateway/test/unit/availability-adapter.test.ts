@@ -2,7 +2,7 @@ import { describe, expect, it } from '@effect/vitest';
 import { Effect, Fiber } from 'effect';
 import { TestClock } from 'effect/testing';
 import { availabilityProbeLayer } from '../../src/adapters/availability/index.js';
-import { AvailabilityProbe } from '../../src/availability/index.js';
+import { AvailabilityProbe } from '../../src/capabilities/availability/index.js';
 
 describe('dependency health adapter', () => {
   it.effect('translates technical dependency failures without failing the application read', () =>

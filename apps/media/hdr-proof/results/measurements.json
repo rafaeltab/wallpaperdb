@@ -134593,7 +134593,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "13641b76d947d4882bde6331eb0bcf24d82c0e2afb8ab16f4df3c6bc2ce28f16",
+        "sha256": "9a95c8bd864b5b5e56162b57236517f551f0ab2b7aae255fd78aa701b4c3bdaa",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -134753,7 +134753,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "03c622316929d9f3478853a87b8e339bbb1d783178a6782bff87f9f744bdcc64",
+        "sha256": "1e0e9a35c6bf2d958675c4b172396fad5814f6aef6f988eab0d70b98582ed697",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -134913,7 +134913,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-fill/reference-sdr.png",
-        "sha256": "176c2b311749f84bbd8a6cc406619b3b3f4b2f077d2857d6abf83e7f1e59da71",
+        "sha256": "47dfc41b3b0c3124041f68d58395fc634107ebba351a8a3419990af59af9e5ac",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -135074,7 +135074,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-upscale/reference-sdr.png",
-        "sha256": "d8d7e7c8ecb654113dc05a973a223f3467aa169608612a44c0e3938e4e5e01cc",
+        "sha256": "a4ad8fdfd3641c11782620ebe6a57f6f1bca352e8b10de08ccf6f58694fc3f74",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -135234,7 +135234,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-orientation/reference-sdr.png",
-        "sha256": "9c90177acd0891852bf60f6193f3a9840d438ac0e7a296d26fecccc47b4f3ee0",
+        "sha256": "826c80841b735f653c63f012991d7cbaa2d1d1741312669ced84210891816c2d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -135399,7 +135399,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-jpg-srgb-preserve-crop/reference-sdr.png",
-        "sha256": "bac6f24d8c8629d8b9f1ea6b49e8461b32e347b2a64835ca2236dbf859d14479",
+        "sha256": "ac414359fc2c05d2745b7e78c2106f6e2353662ff2435edfbc9d4e150c8e58db",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -135891,7 +135891,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-avif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "ca57dd59fb7b3a6285afc682f3ed168b0a22ab7233c863c439ff94580c358cb9",
+        "sha256": "9a95c8bd864b5b5e56162b57236517f551f0ab2b7aae255fd78aa701b4c3bdaa",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -136055,7 +136055,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-avif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "6a141819533c299ac0fa89f3014b0feb02f5b942bdf9f3a34359e8ecb6ed5766",
+        "sha256": "1e0e9a35c6bf2d958675c4b172396fad5814f6aef6f988eab0d70b98582ed697",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -136512,7 +136512,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-png-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "59de59ec9f458166fff028aaef176d06369f1b5ec2aa8e3dc6aa3f653a56d9a2",
+        "sha256": "9a95c8bd864b5b5e56162b57236517f551f0ab2b7aae255fd78aa701b4c3bdaa",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -136665,7 +136665,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-png-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "6a141819533c299ac0fa89f3014b0feb02f5b942bdf9f3a34359e8ecb6ed5766",
+        "sha256": "1e0e9a35c6bf2d958675c4b172396fad5814f6aef6f988eab0d70b98582ed697",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -137101,7 +137101,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-webp-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "59de59ec9f458166fff028aaef176d06369f1b5ec2aa8e3dc6aa3f653a56d9a2",
+        "sha256": "9a95c8bd864b5b5e56162b57236517f551f0ab2b7aae255fd78aa701b4c3bdaa",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -137247,7 +137247,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-webp-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "6a141819533c299ac0fa89f3014b0feb02f5b942bdf9f3a34359e8ecb6ed5766",
+        "sha256": "1e0e9a35c6bf2d958675c4b172396fad5814f6aef6f988eab0d70b98582ed697",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -137440,7 +137440,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-gif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "bc7d0911ff18124713ecc9f80be3acf8ba1006a3beb49454ca9ca15127c05d61",
+        "sha256": "9a95c8bd864b5b5e56162b57236517f551f0ab2b7aae255fd78aa701b4c3bdaa",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -137505,7 +137505,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-android-iso-sdr-gif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "278eb9eaac2f605500489e39997bf96503d7a69d73afbf15e20ebb126a584690",
+        "sha256": "1e0e9a35c6bf2d958675c4b172396fad5814f6aef6f988eab0d70b98582ed697",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -153507,7 +153507,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "803a6867bcbc076ac2d89c9bc97104beb08f5d811898527bfba0de6e51c78256",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -153667,7 +153667,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "953d136b73ea6a6471294e25bd4604bf5b22a23182ad2aa77d02e16be8b24c6b",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -153827,7 +153827,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-fill/reference-sdr.png",
-        "sha256": "cee2196a7eab5f1ce5dba252c9135dd004b8e6faabba0959577f01bb68c03e53",
+        "sha256": "2250acf504610639b882ba3a94a2c050646df1bd5b50ddcafe6b65601c3e6ce2",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -153988,7 +153988,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-upscale/reference-sdr.png",
-        "sha256": "642fbecbd3fe9550acec20f3901fee573524097617347a1fc6b07d63acd56d29",
+        "sha256": "46b88a760a5c42b46c92b48d6ecbdd9beef117baaf56d87d48fe6791b85ec65d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -154148,7 +154148,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-orientation/reference-sdr.png",
-        "sha256": "f1655fdae0d511760a76836a3437645cc443f68a92fb661a6196c72a3b9a51a7",
+        "sha256": "19828b94a62c5a42f540971c072ca51e0c05359ba6e0f660690072ebec9cceef",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -154313,7 +154313,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-jpg-srgb-preserve-crop/reference-sdr.png",
-        "sha256": "c1db8dacb39c5c47d32eaecfbb68d0daf27816897492af863d94ff94edbed4bb",
+        "sha256": "1f0345ef41edf63deb436e722eaa42bf984d9cbf329eca0e66046538f7ce4f65",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -154809,7 +154809,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-avif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "5694cba844940c7ae4e007947dd72e7b0de21b7f95f7de8df7cb7219b6167041",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -154974,7 +154974,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-avif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "7fa282075d33013a364364327cf3760d8b95f606cb57b2ae9a0f9e5ef9475604",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -155433,7 +155433,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-png-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "5694cba844940c7ae4e007947dd72e7b0de21b7f95f7de8df7cb7219b6167041",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -155586,7 +155586,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-png-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "35de53a231007ae206be252cdaea63d28c0eaa57c451ffa955f9c5916f0ea5e7",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -156024,7 +156024,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-webp-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "1ab7592af3a69bfdeb141c89f75e1b3093a0ba3e9d6320af475e2f88575b3231",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -156170,7 +156170,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-webp-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "35de53a231007ae206be252cdaea63d28c0eaa57c451ffa955f9c5916f0ea5e7",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -156363,7 +156363,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-gif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "1ab7592af3a69bfdeb141c89f75e1b3093a0ba3e9d6320af475e2f88575b3231",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -156428,7 +156428,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-old-sdr-gif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "35de53a231007ae206be252cdaea63d28c0eaa57c451ffa955f9c5916f0ea5e7",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166015,7 +166015,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "f14f7dc46a0f456720565325bbb654304696fbfe61267b447d6e7a886a6084a7",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166175,7 +166175,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "fcbfc1daa5ae990ca4b9a356ca4602d17f5885b29048519b9b20a98092125afa",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166335,7 +166335,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-fill/reference-sdr.png",
-        "sha256": "716fb61f635c06b99aab27d8ac95102f4c97401ecbcfdc2a0b9f51988b31ab14",
+        "sha256": "2250acf504610639b882ba3a94a2c050646df1bd5b50ddcafe6b65601c3e6ce2",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166496,7 +166496,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-upscale/reference-sdr.png",
-        "sha256": "2d277c1b0d13f8ffdf1a2a0a45b2fbdbb11c8523043e00a84652b77b00980ce1",
+        "sha256": "46b88a760a5c42b46c92b48d6ecbdd9beef117baaf56d87d48fe6791b85ec65d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166656,7 +166656,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-orientation/reference-sdr.png",
-        "sha256": "58d16fd9f7acf573c5afa5623774a498d5526e9e278baa7d6db258166f12d064",
+        "sha256": "19828b94a62c5a42f540971c072ca51e0c05359ba6e0f660690072ebec9cceef",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -166821,7 +166821,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-jpg-srgb-preserve-crop/reference-sdr.png",
-        "sha256": "1e89db6e34f2cc2e6ec4133f7de3ba06566f055e2dc29f1aaa5e5a9ed463b48c",
+        "sha256": "1f0345ef41edf63deb436e722eaa42bf984d9cbf329eca0e66046538f7ce4f65",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -167317,7 +167317,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-avif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "e2fbead33596f8dc9a87164dfda96726eb5dac7e031683013886684af0a7337d",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -167482,7 +167482,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-avif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "10460b61de89d0f350d3237546843a7e848969bf7dbef02b010c2e879255b01b",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -167941,7 +167941,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-png-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -168094,7 +168094,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-png-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "a63f89fb7c075a72d0e460e343915a93c578b3695346fd7f94ebafe295dcdd32",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -168532,7 +168532,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-webp-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -168678,7 +168678,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-webp-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "a63f89fb7c075a72d0e460e343915a93c578b3695346fd7f94ebafe295dcdd32",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -168871,7 +168871,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-gif-srgb-preserve-contain/reference-sdr.png",
-        "sha256": "92554f9bfd2324a1f04ec07e70fd4118b7a843c7fbfc513ce1e1b8758d4b068c",
+        "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {
@@ -168936,7 +168936,7 @@
       },
       "reference_sdr": {
         "path": "gainmap/cases/gainmap-apple-new-sdr-gif-srgb-preserve-cover/reference-sdr.png",
-        "sha256": "385060ced6148a9b4ea23565d6f9c94cf40fb92f46b36121948f71dcbe5a7c2f",
+        "sha256": "1f9b8fc3c92e8271a610205b04bde64138ca4bec0112f11d53dbf5964987723d",
         "purpose": "Independent matched-geometry authored SDR reference"
       },
       "color_signaling": {

@@ -4034,13 +4034,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-jpg-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "f14f7dc46a0f456720565325bbb654304696fbfe61267b447d6e7a886a6084a7",
+      "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "f14f7dc46a0f456720565325bbb654304696fbfe61267b447d6e7a886a6084a7",
+        "reference_sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "case_id": "gainmap-apple-new:sdr:jpg:srgb:preserve:contain"
       },
       "warning": null
@@ -4198,13 +4198,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-avif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "e2fbead33596f8dc9a87164dfda96726eb5dac7e031683013886684af0a7337d",
+      "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "e2fbead33596f8dc9a87164dfda96726eb5dac7e031683013886684af0a7337d",
+        "reference_sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "case_id": "gainmap-apple-new:sdr:avif:srgb:preserve:contain"
       },
       "warning": null
@@ -4346,13 +4346,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-png-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+      "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+        "reference_sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "case_id": "gainmap-apple-new:sdr:png:srgb:preserve:contain"
       },
       "warning": null
@@ -4480,13 +4480,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-webp-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+      "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "b9d3596311e2dde0d5076e909885d56c498f4bbedc61fda8253973feb5b63f57",
+        "reference_sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "case_id": "gainmap-apple-new:sdr:webp:srgb:preserve:contain"
       },
       "warning": null
@@ -4570,13 +4570,13 @@
     },
     {
       "file": "gainmap-apple-new-sdr-gif-srgb-preserve-contain-reference-sdr.png",
-      "sha256": "92554f9bfd2324a1f04ec07e70fd4118b7a843c7fbfc513ce1e1b8758d4b068c",
+      "sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
       "role": "Independent matched-geometry authored SDR reference",
       "case_id": null,
       "codec_status": "source reference, not a conversion qualification",
       "consumer_status": "pending manual review",
       "facts": {
-        "reference_sha256": "92554f9bfd2324a1f04ec07e70fd4118b7a843c7fbfc513ce1e1b8758d4b068c",
+        "reference_sha256": "10f165a1b0d1bbba698c2e1d6acae9c560052536df9b78f888d387b5acf2ff2e",
         "case_id": "gainmap-apple-new:sdr:gif:srgb:preserve:contain"
       },
       "warning": null

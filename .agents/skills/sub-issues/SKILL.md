@@ -1,6 +1,6 @@
 ---
 name: sub-issues
-description: Link GitHub issues as sub-issues of a parent issue using the GitHub REST API. Use after creating child issues from a PRD, or whenever issues need to be marked as sub-issues of a parent.
+description: Link GitHub issues as sub-issues of a parent issue using the GitHub REST API. Use after creating tickets from a spec, or whenever issues need to be marked as sub-issues of a parent.
 ---
 
 # Sub-Issues
@@ -41,7 +41,7 @@ Replace `<parent-number>` with the parent issue number (e.g. `100`), `<CHILD_ID>
 
 ## Batch linking
 
-When creating multiple sub-issues from a PRD breakdown, collect all child issue numbers first, then link them all:
+When creating multiple sub-issues from a spec breakdown, collect all child issue numbers first, then link them all:
 
 ```bash
 REPO_ID=$(gh api repos/<owner>/<repo> --jq '.id')

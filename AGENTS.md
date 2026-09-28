@@ -6,7 +6,7 @@ Use the [coding guidelines index](CODING_STANDARDS.md) to select the authoritati
 
 ### Issue tracker
 
-Issues and PRDs are tracked in GitHub Issues; external pull requests are not a triage surface. See `docs/agents/issue-tracker.md`.
+Issues and specs are tracked in GitHub Issues; external pull requests are not a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

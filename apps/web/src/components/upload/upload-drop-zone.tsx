@@ -16,7 +16,7 @@ export function UploadDropZone({
   maxFiles,
   disabled = false,
   label,
-  description = 'JPEG, PNG, and WebP images up to 50 MiB',
+  description = 'Still JPEG, PNG, and WebP images. Up to 50 MiB, 100,000,000 pixels total, and 20,000 pixels per axis.',
   className,
 }: UploadDropZoneProps) {
   const [isDragActive, setIsDragActive] = useState(false);

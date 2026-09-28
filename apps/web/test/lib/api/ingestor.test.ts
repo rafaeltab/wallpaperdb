@@ -108,7 +108,8 @@ describe('uploadWallpaperWithDetails', () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 400,
-      json: () => Promise.resolve({ detail: 'Invalid file format' }),
+      json: () =>
+        Promise.resolve({ detail: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.' }),
       headers: new Headers(),
     });
 
@@ -116,7 +117,9 @@ describe('uploadWallpaperWithDetails', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.type).toBe('validation');
-    expect(result.error?.message).toContain('Invalid file format');
+    expect(result.error?.message).toBe(
+      'Image dimensions 10001x10000 exceed the 100000000-pixel limit.'
+    );
     expect(result.error?.retryAfter).toBeUndefined();
   });
 

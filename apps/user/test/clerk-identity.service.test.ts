@@ -2,7 +2,7 @@ import { inspect } from 'node:util';
 import { Effect, Fiber, Layer, Metric } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { clerkIdentitiesLayer } from '../src/adapters/profiles/index.js';
-import { Identities } from '../src/profile/index.js';
+import { Identities } from '../src/capabilities/profile/index.js';
 
 const run = (userId = 'user_123') =>
   Effect.runPromise(

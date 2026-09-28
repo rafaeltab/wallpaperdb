@@ -6,7 +6,7 @@ import {
   type ProfilePrincipal,
   type ProfileOutcome,
   type RejectionReason,
-} from '../profile/index.js';
+} from '../capabilities/profile/index.js';
 import type { Execution } from './execution.js';
 import { problem } from './problem.js';
 const titles: Record<RejectionReason, string> = {
@@ -71,7 +71,7 @@ export function profileCommand(
     profiles: Profiles,
     principal: ProfilePrincipal,
     request: FastifyRequest
-  ) => Effect.Effect<ProfileOutcome, import('../profile/index.js').ProfileUnavailable>
+  ) => Effect.Effect<ProfileOutcome, import('../capabilities/profile/index.js').ProfileUnavailable>
 ) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const principal = request.profilePrincipal;
@@ -127,7 +127,7 @@ function validated<T>(
     principal: ProfilePrincipal,
     body: T,
     request: FastifyRequest
-  ) => Effect.Effect<ProfileOutcome, import('../profile/index.js').ProfileUnavailable>
+  ) => Effect.Effect<ProfileOutcome, import('../capabilities/profile/index.js').ProfileUnavailable>
 ) {
   return (request: FastifyRequest, reply: FastifyReply) => {
     const parsed = schema.safeParse(request.body);

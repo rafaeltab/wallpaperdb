@@ -1,9 +1,9 @@
 import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, trace } from '@opentelemetry/api';
 import { Context, Effect, FiberSet, Layer } from 'effect';
-import type { Admission } from './admission/index.js';
-import type { Availability } from './availability/index.js';
-import type { Catalogue } from './catalogue/index.js';
+import type { Admission } from './capabilities/admission/index.js';
+import type { Availability } from './capabilities/availability/index.js';
+import type { Catalogue } from './capabilities/catalogue/index.js';
 
 export type HttpServices = Catalogue | Admission | Availability;
 

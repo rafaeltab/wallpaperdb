@@ -8,7 +8,7 @@ import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/extraction/index.js';
+import { ImageHistogram } from '../src/capabilities/extraction/index.js';
 
 const TesterClass = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)

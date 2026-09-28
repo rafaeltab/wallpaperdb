@@ -3,7 +3,7 @@ import {
   planQuarantine,
   quarantineIdentity,
 } from '@wallpaperdb/core/quarantine';
-import type { ProjectionInput } from '../../catalog/index.js';
+import type { ProjectionInput } from '../../capabilities/catalog/index.js';
 import { inputAttributes } from './telemetry.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Clock, Effect, Exit, Schema } from 'effect';

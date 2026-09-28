@@ -1,7 +1,7 @@
 import { Effect, Layer } from 'effect';
-import { Pictures } from '../src/pictures/index.js';
-import { Availability, type Health } from '../src/availability/index.js';
-import { Profiles, type OwnerProfile } from '../src/profile/index.js';
+import { Pictures } from '../src/capabilities/pictures/index.js';
+import { Availability, type Health } from '../src/capabilities/availability/index.js';
+import { Profiles, type OwnerProfile } from '../src/capabilities/profile/index.js';
 export const profile: OwnerProfile = {
   id: 'user_owner',
   displayName: 'Owner',

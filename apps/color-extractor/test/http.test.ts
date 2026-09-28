@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { Availability, AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
+import { Availability, AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
 const services = availabilityLayer.pipe(
   Layer.provide(

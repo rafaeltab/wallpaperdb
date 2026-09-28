@@ -5,7 +5,7 @@ import {
 } from '@wallpaperdb/test-utils';
 import { Effect, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { AssetReader } from '../src/delivery/index.js';
+import { AssetReader } from '../src/capabilities/delivery/index.js';
 import { s3AssetsLayer } from '../src/adapters/assets/index.js';
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const tester = new Tester().withS3().withS3Bucket('assets');

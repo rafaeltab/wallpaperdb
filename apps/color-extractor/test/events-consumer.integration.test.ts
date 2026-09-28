@@ -14,7 +14,7 @@ import {
   ExtractColors,
   ExtractionUnavailable,
   type ExtractionInput,
-} from '../src/extraction/index.js';
+} from '../src/capabilities/extraction/index.js';
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)
   .with(NatsTesterBuilder)

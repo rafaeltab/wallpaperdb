@@ -6,7 +6,7 @@ import {
 import { Effect, ManagedRuntime } from 'effect';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { natsEventsLayer } from '../src/adapters/events/index.js';
-import { ColorEvents, type ExtractionInput } from '../src/extraction/index.js';
+import { ColorEvents, type ExtractionInput } from '../src/capabilities/extraction/index.js';
 
 const Tester = createDefaultTesterBuilder()
   .with(DockerTesterBuilder)

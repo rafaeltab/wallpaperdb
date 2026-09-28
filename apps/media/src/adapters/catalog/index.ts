@@ -23,8 +23,8 @@ import {
   type ProjectionInput,
   type CatalogProjectionPort,
   type AssetLocation,
-} from '../../catalog/index.js';
-import { Catalog, DeliveryUnavailable } from '../../delivery/index.js';
+} from '../../capabilities/catalog/index.js';
+import { Catalog, DeliveryUnavailable } from '../../capabilities/delivery/index.js';
 import {
   catalogOutbox,
   catalogProcessed,

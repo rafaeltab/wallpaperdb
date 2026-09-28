@@ -7,7 +7,7 @@ import {
   ProjectionUnavailable,
   type ProjectionMutation,
   type ProjectionWrite,
-} from '../src/projection/index.js';
+} from '../src/capabilities/projection/index.js';
 
 class ControlledProjection implements ProjectionStore {
   readonly changes: ProjectionMutation[] = [];

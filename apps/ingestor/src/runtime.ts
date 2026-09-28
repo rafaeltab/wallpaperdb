@@ -4,9 +4,9 @@ import { context, trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { logs as sdkLogs } from '@opentelemetry/sdk-node';
 import { Context, Effect, FiberSet, Layer } from 'effect';
-import type { Admission } from './admission/index.js';
-import type { Availability } from './availability/index.js';
-import type { Ingestion } from './ingestion/index.js';
+import type { Admission } from './capabilities/admission/index.js';
+import type { Availability } from './capabilities/availability/index.js';
+import type { Ingestion } from './capabilities/ingestion/index.js';
 
 export type HttpServices = Ingestion | Admission | Availability;
 

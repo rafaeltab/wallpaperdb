@@ -1,8 +1,8 @@
 import { Deferred, Effect, Layer, ManagedRuntime } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Admission } from '../../src/admission/index.js';
-import { Availability } from '../../src/availability/index.js';
-import { Catalogue } from '../../src/catalogue/index.js';
+import { Admission } from '../../src/capabilities/admission/index.js';
+import { Availability } from '../../src/capabilities/availability/index.js';
+import { Catalogue } from '../../src/capabilities/catalogue/index.js';
 import { HttpExecution, httpExecutionLayer } from '../../src/runtime.js';
 import { EmptyCatalogue } from './http-fixture.js';
 

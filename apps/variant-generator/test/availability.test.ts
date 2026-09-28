@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import { Availability, AvailabilityProbe, availabilityLayer } from '../src/availability/index.js';
+import { Availability, AvailabilityProbe, availabilityLayer } from '../src/capabilities/availability/index.js';
 it.each([
   [{ s3: true, nats: true, otel: true, consumer: true }, 'healthy'],
   [{ s3: false, nats: true, otel: true, consumer: true }, 'degraded'],

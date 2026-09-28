@@ -3,7 +3,7 @@ import { once } from 'node:events';
 import { Effect, ManagedRuntime } from 'effect';
 import { expect, it, vi } from 'vitest';
 import { AssetsHealth, assetsLayer } from '../../src/adapters/assets/index.js';
-import { AssetStorage } from '../../src/ingestion/index.js';
+import { AssetStorage } from '../../src/capabilities/ingestion/index.js';
 
 it('aborts connected storage requests that exceed their deadline', async () => {
   let entered = () => {};

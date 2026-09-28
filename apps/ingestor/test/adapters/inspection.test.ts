@@ -2,7 +2,7 @@ import { describe, expect, it } from '@effect/vitest';
 import { Effect } from 'effect';
 import sharp from 'sharp';
 import { imageInspectionLayer } from '../../src/adapters/inspection/index.js';
-import { ContentInspection, type ValidationLimits } from '../../src/ingestion/index.js';
+import { ContentInspection, type ValidationLimits } from '../../src/capabilities/ingestion/index.js';
 
 const limits: ValidationLimits = {
   maxFileSizeImage: 1024 * 1024,

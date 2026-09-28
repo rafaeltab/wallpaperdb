@@ -1,5 +1,5 @@
 import { DateTime } from 'effect';
-import type { ProjectionMutation } from '../../projection/index.js';
+import type { ProjectionMutation } from '../../capabilities/projection/index.js';
 
 // Removing the UTC suffix makes the separator sort before another fractional digit.
 // The stored format stays compatible with existing millisecond occurrence keys.

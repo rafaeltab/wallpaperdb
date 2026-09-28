@@ -6,13 +6,13 @@ import {
   CatalogueUnavailable,
   type ProfileSearchSelection,
   type SearchSelection,
-} from '../../catalogue/index.js';
+} from '../../capabilities/catalogue/index.js';
 import {
   type ProjectionMutation,
   ProjectionStore,
   ProjectionUnavailable,
   type ProjectionWrite,
-} from '../../projection/index.js';
+} from '../../capabilities/projection/index.js';
 import { StartupDiagnostic } from '../../startup-diagnostics.js';
 import {
   partialWallpaperResponse,

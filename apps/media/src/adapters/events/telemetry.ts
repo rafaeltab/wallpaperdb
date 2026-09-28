@@ -1,4 +1,4 @@
-import type { ProjectionInput } from '../../catalog/index.js';
+import type { ProjectionInput } from '../../capabilities/catalog/index.js';
 /** Deliberate metadata allowlist: no profile text, payload or storage locations. */
 export function inputAttributes(input: ProjectionInput | undefined) {
   if (!input) return {};

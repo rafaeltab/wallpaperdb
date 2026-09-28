@@ -29,7 +29,7 @@ import {
   type MsgHdrs,
   type NatsConnection,
 } from 'nats';
-import { ProjectCatalogue, type ProjectionOutcome } from '../../projection/index.js';
+import { ProjectCatalogue, type ProjectionOutcome } from '../../capabilities/projection/index.js';
 import { StartupDiagnostic } from '../../startup-diagnostics.js';
 import { ensureMessageBudgets, quarantineMessageBytes } from './message-budget.js';
 import { translate, type TranslatedEvent } from './translation.js';

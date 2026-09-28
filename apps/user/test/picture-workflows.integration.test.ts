@@ -12,7 +12,7 @@ import postgres from 'postgres';
 import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { Pictures, picturesLayer } from '../src/pictures/index.js';
+import { Pictures, picturesLayer } from '../src/capabilities/pictures/index.js';
 import { databaseLayer } from '../src/adapters/database/index.js';
 import { profileStoreLayer } from '../src/adapters/profiles/index.js';
 import {
@@ -21,7 +21,7 @@ import {
   pictureSourceLayer,
   pictureCodecLayer,
 } from '../src/adapters/pictures/index.js';
-import { Profiles, profilesLayer, Identities, type ProfileOutcome } from '../src/profile/index.js';
+import { Profiles, profilesLayer, Identities, type ProfileOutcome } from '../src/capabilities/profile/index.js';
 import type { Config } from '../src/config.js';
 
 const migrations = join(dirname(fileURLToPath(import.meta.url)), '../drizzle');

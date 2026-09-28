@@ -1,6 +1,6 @@
 import { Layer } from 'effect';
 import { dependencyProbeLayer } from './adapters/dependencies/index.js';
-import { availabilityLayer } from './availability/index.js';
+import { availabilityLayer } from './capabilities/availability/index.js';
 import type { Config } from './config.js';
 import { createHttpApp } from './http/index.js';
 import { tracingLayer } from './runtime.js';

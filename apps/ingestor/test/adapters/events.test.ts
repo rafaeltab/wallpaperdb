@@ -7,7 +7,7 @@ import { Effect, ManagedRuntime } from 'effect';
 import { connect, type NatsConnection } from 'nats';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { UploadEventsHealth, uploadedEventsLayer } from '../../src/adapters/events/index.js';
-import { UploadEvents, type UploadedEvent } from '../../src/ingestion/index.js';
+import { UploadEvents, type UploadedEvent } from '../../src/capabilities/ingestion/index.js';
 
 const occurrence: UploadedEvent = {
   id: 'upload-occurrence',

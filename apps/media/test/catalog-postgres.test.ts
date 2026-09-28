@@ -14,9 +14,9 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CatalogOutbox, CatalogProjection, type ProjectionInput } from '../src/catalog/index.js';
+import { CatalogOutbox, CatalogProjection, type ProjectionInput } from '../src/capabilities/catalog/index.js';
 import { CatalogPostgresLayer } from '../src/adapters/catalog/index.js';
-import { Catalog } from '../src/delivery/index.js';
+import { Catalog } from '../src/capabilities/delivery/index.js';
 import { wallpapers, variants } from '../src/db/schema.js';
 
 const wallpaper = {

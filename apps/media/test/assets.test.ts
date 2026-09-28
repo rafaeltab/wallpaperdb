@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { Effect, Layer, Logger, ManagedRuntime, Tracer } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
-import { AssetReader, ImageTransformer, PictureAuthority } from '../src/delivery/index.js';
+import { AssetReader, ImageTransformer, PictureAuthority } from '../src/capabilities/delivery/index.js';
 import {
   pictureAuthorityLayer,
   sharpTransformerLayer,

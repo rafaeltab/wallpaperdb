@@ -20,7 +20,7 @@ import {
   ProjectionUnavailable,
   type ProjectionChange,
   type ProjectionOutcome,
-} from '../src/projection/index.js';
+} from '../src/capabilities/projection/index.js';
 
 const timestamp = '2026-09-15T12:00:00.000Z';
 

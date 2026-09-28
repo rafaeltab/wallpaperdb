@@ -6,8 +6,8 @@ import {
   MaintenanceStore,
   ProfileEvents,
   maintenanceLayer,
-} from '../src/maintenance/index.js';
-import { Profiles, ProfileUnavailable } from '../src/profile/index.js';
+} from '../src/capabilities/maintenance/index.js';
+import { Profiles, ProfileUnavailable } from '../src/capabilities/profile/index.js';
 
 const unused = () => Effect.die('Unexpected Profile command');
 const profiles: Profiles = {

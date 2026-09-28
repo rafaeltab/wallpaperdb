@@ -1,0 +1,25 @@
+export type {
+  CatalogueConfig,
+  ColorPreference,
+  CursorValue,
+  HandleResolution,
+  InvalidCursor,
+  InvalidSearch,
+  PageInfo,
+  Profile,
+  ProfilePage,
+  ProfileSearchBatch,
+  ProfileSearchOutcome,
+  ProfileSearchSelection,
+  SearchBatch,
+  SearchOutcome,
+  SearchProfiles,
+  SearchSelection,
+  SearchWallpapers,
+  Variant,
+  VariantSelection,
+  Wallpaper,
+  WallpaperPage,
+} from './contract.js';
+export { Catalogue, CatalogueCursors, CatalogueRead, CatalogueUnavailable } from './contract.js';
+export { catalogueLayer, resolvePageSize, resolveProfilePageSize } from './implementation.js';

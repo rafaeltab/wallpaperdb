@@ -8,7 +8,7 @@ import { Effect, ManagedRuntime } from 'effect';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AssetsHealth, assetsLayer } from '../../src/adapters/assets/index.js';
-import { AssetStorage } from '../../src/ingestion/index.js';
+import { AssetStorage } from '../../src/capabilities/ingestion/index.js';
 
 describe('owned wallpaper assets', () => {
   let container: StartedTestContainer;

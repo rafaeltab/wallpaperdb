@@ -2,7 +2,7 @@ import { expect, it } from '@effect/vitest';
 import { OtelMetrics, Resource } from '@effect/opentelemetry';
 import { Effect, Layer, Metric } from 'effect';
 import { TestClock } from 'effect/testing';
-import { Ingestion, IngestionUnavailable } from '../../src/ingestion/index.js';
+import { Ingestion, IngestionUnavailable } from '../../src/capabilities/ingestion/index.js';
 import { reconciliationLayer } from '../../src/workers.js';
 import { fixture, uploadInput } from '../helpers/ingestion.js';
 

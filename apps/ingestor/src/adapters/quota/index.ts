@@ -1,7 +1,7 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import { Clock, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
 import Redis from 'ioredis';
-import { type AdmissionResult, Quota } from '../../admission/index.js';
+import { type AdmissionResult, Quota } from '../../capabilities/admission/index.js';
 
 class MemoryQuota implements Quota {
   private readonly windows = new Map<string, { count: number; reset: number }>();

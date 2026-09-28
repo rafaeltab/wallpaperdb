@@ -2,7 +2,7 @@ import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import { Effect, Layer, Schema } from 'effect';
 import { connect } from 'nats';
 import { Pool, type PoolClient } from 'pg';
-import { AvailabilityProbe } from '../../availability/index.js';
+import { AvailabilityProbe } from '../../capabilities/availability/index.js';
 
 export interface DependencyProbeConfig {
   readonly databaseUrl: string;

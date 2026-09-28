@@ -1,8 +1,8 @@
 import { Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { Pictures, PictureUnavailable } from '../src/pictures/index.js';
-import type { Profiles } from '../src/profile/index.js';
+import { Pictures, PictureUnavailable } from '../src/capabilities/pictures/index.js';
+import type { Profiles } from '../src/capabilities/profile/index.js';
 import { auth, profile, services } from './http-fixture.js';
 
 const unexpected = () => Effect.die('Unexpected picture command');

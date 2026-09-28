@@ -118,7 +118,7 @@ export const catalogOutbox = pgTable('catalog_outbox', {
   wallpaperId: text('wallpaper_id').notNull(),
   notification: jsonb('notification')
     .notNull()
-    .$type<import('../catalog/index.js').AvailableNotification>(),
+    .$type<import('../capabilities/catalog/index.js').AvailableNotification>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

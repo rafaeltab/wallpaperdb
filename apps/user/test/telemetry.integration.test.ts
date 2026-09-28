@@ -10,7 +10,7 @@ import { connect } from 'nats';
 import postgres from 'postgres';
 import { afterEach, expect, it, vi } from 'vitest';
 import { userLayer } from '../src/app.js';
-import { Availability } from '../src/availability/index.js';
+import { Availability } from '../src/capabilities/availability/index.js';
 import { loadConfig } from '../src/config.js';
 import { createHttpApp } from '../src/http/index.js';
 import { initializeOtel } from '../src/otel-init.js';

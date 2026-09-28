@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Effect, Layer, Semaphore } from 'effect';
 import { z } from 'zod';
-import { PictureCodec, type PictureLimits, PictureUnavailable } from '../../pictures/index.js';
+import { PictureCodec, type PictureLimits, PictureUnavailable } from '../../capabilities/pictures/index.js';
 
 const outputSchema = z.discriminatedUnion('_tag', [
   z.object({

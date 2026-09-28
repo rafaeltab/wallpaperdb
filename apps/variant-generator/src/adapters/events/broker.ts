@@ -13,7 +13,7 @@ import {
   VariantEvents,
   GenerationUnavailable,
   variantAssetReference,
-} from '../../generation/index.js';
+} from '../../capabilities/generation/index.js';
 
 export interface NatsEventsOptions {
   readonly url: string;

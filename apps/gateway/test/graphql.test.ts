@@ -1,5 +1,5 @@
 import { Effect, Layer, ManagedRuntime } from 'effect';
-import { CatalogueUnavailable } from '../src/catalogue/index.js';
+import { CatalogueUnavailable } from '../src/capabilities/catalogue/index.js';
 import { HttpExecution, httpExecutionLayer } from '../src/runtime.js';
 import { httpTestLayer } from './unit/http-fixture.js';
 import { metrics } from '@opentelemetry/api';
@@ -20,7 +20,7 @@ import type {
   SearchOutcome,
   SearchWallpapers,
   Wallpaper,
-} from '../src/catalogue/index.js';
+} from '../src/capabilities/catalogue/index.js';
 import { createGraphql, type MediaUrls } from '../src/graphql/index.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';

@@ -3,8 +3,8 @@ import { InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-tr
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { Layer, ManagedRuntime } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Admission } from '../../src/admission/index.js';
-import { Availability } from '../../src/availability/index.js';
+import { Admission } from '../../src/capabilities/admission/index.js';
+import { Availability } from '../../src/capabilities/availability/index.js';
 import { HttpExecution, httpExecutionLayer } from '../../src/runtime.js';
 import { httpTestLayer } from './http-fixture.js';
 

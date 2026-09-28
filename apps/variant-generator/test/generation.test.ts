@@ -11,7 +11,7 @@ import {
   type GeneratedVariant,
   type GenerationInput,
   type ResolutionPreset,
-} from '../src/generation/index.js';
+} from '../src/capabilities/generation/index.js';
 
 const input: GenerationInput = {
   wallpaperId: 'wallpaper-1',

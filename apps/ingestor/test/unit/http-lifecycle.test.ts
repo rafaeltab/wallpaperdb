@@ -1,12 +1,12 @@
 import { Deferred, Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Admission } from '../../src/admission/index.js';
+import { Admission } from '../../src/capabilities/admission/index.js';
 import {
   AvailabilityProbe,
   availabilityLayer,
   type DependencyHealth,
-} from '../../src/availability/index.js';
-import { Ingestion, type UploadOutcome } from '../../src/ingestion/index.js';
+} from '../../src/capabilities/availability/index.js';
+import { Ingestion, type UploadOutcome } from '../../src/capabilities/ingestion/index.js';
 import { createHttpApp } from '../../src/http/index.js';
 const receipt = {
   id: 'wlpr_test',

@@ -1,6 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { z } from 'zod';
-import { Identities, ProfileUnavailable } from '../../profile/index.js';
+import { Identities, ProfileUnavailable } from '../../capabilities/profile/index.js';
 import { monitorDependency } from '../observations/index.js';
 
 const clerkIdentity = z.object({

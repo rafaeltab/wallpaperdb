@@ -1,6 +1,6 @@
 import { Context, Deferred, Effect, Layer } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { Availability } from '../src/availability/index.js';
+import { Availability } from '../src/capabilities/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
 import { profile, auth, services } from './http-fixture.js';
 

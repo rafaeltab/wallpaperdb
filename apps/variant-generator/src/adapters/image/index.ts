@@ -11,7 +11,7 @@ import {
   type GenerationInput,
   type GeneratedVariant,
   type ResolutionPreset,
-} from '../../generation/index.js';
+} from '../../capabilities/generation/index.js';
 
 export interface ImageConfig {
   readonly endpoint: string;

@@ -7,9 +7,9 @@ import { Effect, Layer, ManagedRuntime } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { ingestorTracingLayer } from '../src/runtime.js';
-import { Ingestion, IngestionUnavailable } from '../src/ingestion/index.js';
+import { Ingestion, IngestionUnavailable } from '../src/capabilities/ingestion/index.js';
 import { fixture, uploadInput } from './helpers/ingestion.js';
-import { Quota } from '../src/admission/index.js';
+import { Quota } from '../src/capabilities/admission/index.js';
 import { GenericContainer } from 'testcontainers';
 
 afterEach(() => {

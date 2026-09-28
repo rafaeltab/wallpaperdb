@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { Effect, Layer } from 'effect';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
-import { MediaDelivery } from './delivery/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
+import { MediaDelivery } from './capabilities/delivery/index.js';
 import { createHttpApp } from './http/index.js';
 const services = Layer.merge(
   availabilityLayer.pipe(

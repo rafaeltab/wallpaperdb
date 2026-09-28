@@ -1,9 +1,5 @@
 {
-  "capabilities": ["ingestion", "admission", "availability"],
   "publicModules": [
-    "ingestion",
-    "admission",
-    "availability",
     "http",
     "adapters/postgres",
     "adapters/assets",

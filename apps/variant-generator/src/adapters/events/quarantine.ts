@@ -9,7 +9,7 @@ import {
   type MsgHdrs,
   type StreamConfig,
 } from 'nats';
-import { GenerationUnavailable } from '../../generation/index.js';
+import { GenerationUnavailable } from '../../capabilities/generation/index.js';
 import { broker, type NatsBroker } from './broker.js';
 
 const stream = 'VARIANT_GENERATOR_QUARANTINE';

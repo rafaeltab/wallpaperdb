@@ -6,8 +6,8 @@ import { registerOpenAPI } from '@wallpaperdb/core/openapi';
 import { Effect, Layer, ManagedRuntime } from 'effect';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Availability } from '../availability/index.js';
-import type { ProfilePrincipal } from '../profile/index.js';
+import { Availability } from '../capabilities/availability/index.js';
+import type { ProfilePrincipal } from '../capabilities/profile/index.js';
 import { registerUserCors } from './cors.js';
 
 export interface HttpConfig {

@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Effect, Layer } from 'effect';
 import type { FastifyInstance } from 'fastify';
-import { Admission, type AdmissionResult } from '../../src/admission/index.js';
-import { availabilityLayer, AvailabilityProbe } from '../../src/availability/index.js';
+import { Admission, type AdmissionResult } from '../../src/capabilities/admission/index.js';
+import { availabilityLayer, AvailabilityProbe } from '../../src/capabilities/availability/index.js';
 import {
   Ingestion,
   IngestionUnavailable,
   type UploadInput,
   type UploadOutcome,
-} from '../../src/ingestion/index.js';
+} from '../../src/capabilities/ingestion/index.js';
 import { createHttpApp, type HttpConfig } from '../../src/http/index.js';
 
 const receipt = {

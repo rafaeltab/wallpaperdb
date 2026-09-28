@@ -3,7 +3,7 @@ import { recordHistogram } from '@wallpaperdb/core/telemetry';
 import { Clock, Effect, Layer } from 'effect';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
-import { ContentInspection, type ValidationLimits } from '../../ingestion/index.js';
+import { ContentInspection, type ValidationLimits } from '../../capabilities/ingestion/index.js';
 
 class ImageInspection implements ContentInspection {
   readonly inspect = Effect.fn('ingestion.inspect')(function* (

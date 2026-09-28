@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { Effect, Layer } from 'effect';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
 import { createHttpApp } from './http/index.js';
 
 const app = await createHttpApp(

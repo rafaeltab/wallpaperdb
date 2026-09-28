@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { dependencyProbeLayer } from '../src/adapters/dependencies/index.js';
-import { AvailabilityProbe } from '../src/availability/index.js';
+import { AvailabilityProbe } from '../src/capabilities/availability/index.js';
 
 describe('dependency probe with PostgreSQL and NATS', () => {
   let postgres: StartedTestContainer;

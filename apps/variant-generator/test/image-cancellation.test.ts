@@ -4,7 +4,7 @@ import { TestClock } from 'effect/testing';
 import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { VariantImages } from '../src/generation/index.js';
+import { VariantImages } from '../src/capabilities/generation/index.js';
 
 const input = { wallpaperId: 'wlpr_cancel', fileType: 'image' as const, mimeType: 'image/png', width: 160, height: 90, storage: { bucket: 'wallpapers', key: 'waiting.png' }, occurrence: { source: 'test', id: 'cancel' }, timestamp: '2026-01-01T00:00:00.000Z' };
 const preset = { width: 80, height: 45, label: 'small' };

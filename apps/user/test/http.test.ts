@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { createHttpApp } from '../src/http/index.js';
-import { ProfileUnavailable, type ProfileOutcome, type Profiles } from '../src/profile/index.js';
+import { ProfileUnavailable, type ProfileOutcome, type Profiles } from '../src/capabilities/profile/index.js';
 import { profile, auth, services } from './http-fixture.js';
 
 describe('User HTTP adapter', () => {

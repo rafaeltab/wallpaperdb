@@ -1,4 +1,4 @@
-import type { ProfileSearchSelection } from '../../catalogue/index.js';
+import type { ProfileSearchSelection } from '../../capabilities/catalogue/index.js';
 
 function activeAliasFilter(now: string) {
   return {

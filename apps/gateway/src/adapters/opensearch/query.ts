@@ -1,4 +1,4 @@
-import type { SearchSelection } from '../../catalogue/index.js';
+import type { SearchSelection } from '../../capabilities/catalogue/index.js';
 
 export function searchBody(selection: SearchSelection) {
   const filter: unknown[] = [{ exists: { field: 'userId' } }];

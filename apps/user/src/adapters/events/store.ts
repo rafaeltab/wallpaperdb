@@ -1,7 +1,7 @@
 import { and, eq, gt, inArray, isNull, isNotNull, lte, or } from 'drizzle-orm';
 import { Effect, Layer } from 'effect';
 import { handleClaims, outboxEvents, wallpaperOwnership } from '../../db/schema.js';
-import { MaintenanceFailure, MaintenanceStore } from '../../maintenance/index.js';
+import { MaintenanceFailure, MaintenanceStore } from '../../capabilities/maintenance/index.js';
 import { Database, databaseDiagnostic } from '../database/index.js';
 
 const expired = (cutoff: Date) =>

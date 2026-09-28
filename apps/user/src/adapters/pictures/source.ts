@@ -1,7 +1,7 @@
 import { recordDependencyHealth } from '../observations/index.js';
 import { isIP } from 'node:net';
 import { Effect, Layer } from 'effect';
-import { PictureSource, PictureUnavailable } from '../../pictures/index.js';
+import { PictureSource, PictureUnavailable } from '../../capabilities/pictures/index.js';
 
 class PermanentPictureImportError extends Error {}
 

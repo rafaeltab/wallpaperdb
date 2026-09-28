@@ -1,8 +1,8 @@
 import { writeFile } from 'node:fs/promises';
 import { Effect, Layer } from 'effect';
-import { AvailabilityProbe, availabilityLayer } from './availability/index.js';
-import { Profiles } from './profile/index.js';
-import { Pictures } from './pictures/index.js';
+import { AvailabilityProbe, availabilityLayer } from './capabilities/availability/index.js';
+import { Profiles } from './capabilities/profile/index.js';
+import { Pictures } from './capabilities/pictures/index.js';
 import { createHttpApp } from './http/index.js';
 
 const unavailable = () => Effect.die('Schema generation does not execute commands');

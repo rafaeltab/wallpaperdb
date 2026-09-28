@@ -1,7 +1,7 @@
 import { recordCounter } from '@wallpaperdb/core/telemetry';
 import { Clock, Effect, Layer, Queue, Schema, Semaphore, Stream } from 'effect';
 import Redis from 'ioredis';
-import { type AdmissionResult, Quota } from '../../admission/index.js';
+import { type AdmissionResult, Quota } from '../../capabilities/admission/index.js';
 
 const consume = `
 local count = tonumber(redis.call('GET', KEYS[1]) or '0')

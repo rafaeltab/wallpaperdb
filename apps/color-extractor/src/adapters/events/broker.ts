@@ -10,7 +10,7 @@ import {
   type JetStreamManager,
   type NatsConnection,
 } from 'nats';
-import { ColorEvents, ExtractionUnavailable } from '../../extraction/index.js';
+import { ColorEvents, ExtractionUnavailable } from '../../capabilities/extraction/index.js';
 
 export interface NatsEventsOptions {
   readonly url: string;

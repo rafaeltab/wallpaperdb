@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { Admission, admissionLayer } from '../../src/admission/index.js';
+import { Admission, admissionLayer } from '../../src/capabilities/admission/index.js';
 import { memoryQuotaLayer } from '../../src/adapters/quota/index.js';
 
 const layer = admissionLayer({ limit: 2, windowMs: 1000 }).pipe(Layer.provide(memoryQuotaLayer));

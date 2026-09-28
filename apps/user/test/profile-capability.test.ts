@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ProfileOutcome } from '../src/profile/index.js';
+import type { ProfileOutcome } from '../src/capabilities/profile/index.js';
 import { controlledProfiles } from './helpers/profiles.js';
 
 function accepted(result: ProfileOutcome) {

@@ -7,7 +7,7 @@ import {
   ProjectionUnavailable,
   type ProjectionChange,
   type ProjectionOutcome,
-} from '../src/projection/index.js';
+} from '../src/capabilities/projection/index.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';
 const base = { eventId: 'event-1', timestamp };

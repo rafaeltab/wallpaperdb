@@ -3,7 +3,7 @@ import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { imageLayer } from '../src/adapters/image/index.js';
-import { ImageHistogram } from '../src/extraction/index.js';
+import { ImageHistogram } from '../src/capabilities/extraction/index.js';
 
 const maxImageBytes = 50 * 1024 * 1024;
 

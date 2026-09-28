@@ -3,14 +3,14 @@ import { Clock, Effect, Exit, Result, Schema } from 'effect';
 import { GraphQLError } from 'graphql';
 import { recordCounter, recordHistogram } from '@wallpaperdb/core/telemetry';
 import type { HttpExecution } from '../runtime.js';
-import { Catalogue, type CatalogueUnavailable } from '../catalogue/index.js';
+import { Catalogue, type CatalogueUnavailable } from '../capabilities/catalogue/index.js';
 import type {
   Profile,
   ProfileSearchOutcome,
   SearchOutcome,
   SearchWallpapers,
   Wallpaper,
-} from '../catalogue/index.js';
+} from '../capabilities/catalogue/index.js';
 
 export interface MediaUrls {
   mediaServiceUrl: string;

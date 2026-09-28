@@ -18,7 +18,7 @@ await Effect.runPromise(
       const { pictureSourceLayer } = yield* Effect.promise(
         () => import('../../src/adapters/pictures/index.js')
       );
-      const { PictureSource } = yield* Effect.promise(() => import('../../src/pictures/index.js'));
+      const { PictureSource } = yield* Effect.promise(() => import('../../src/capabilities/pictures/index.js'));
       yield* PictureSource.use((source) =>
         source.download(
           'https://localhost/private-source-path-marker?token=private-source-query-marker'
@@ -39,7 +39,7 @@ await Effect.runPromise(
       const { profileStoreLayer } = yield* Effect.promise(
         () => import('../../src/adapters/profiles/index.js')
       );
-      const { ProfileStore } = yield* Effect.promise(() => import('../../src/profile/index.js'));
+      const { ProfileStore } = yield* Effect.promise(() => import('../../src/capabilities/profile/index.js'));
       const result = yield* ProfileStore.use((store) =>
         store.create({
           profileId: 'privacy-owner',

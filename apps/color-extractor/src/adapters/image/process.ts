@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Effect } from 'effect';
-import { ExtractionUnavailable } from '../../extraction/index.js';
+import { ExtractionUnavailable } from '../../capabilities/extraction/index.js';
 
 // Retain Sharp's default 268402689-pixel input limit and the existing extreme
 // aspect-ratio resize behavior. Output cannot exceed this RGBA allocation.

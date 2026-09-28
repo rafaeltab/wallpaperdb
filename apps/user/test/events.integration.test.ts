@@ -20,7 +20,7 @@ import {
   MaintenanceFailure,
   MaintenanceStore,
   ProfileEvents,
-} from '../src/maintenance/index.js';
+} from '../src/capabilities/maintenance/index.js';
 
 let database: StartedPostgreSqlContainer;
 let nats: Awaited<ReturnType<typeof createNatsContainer>>;

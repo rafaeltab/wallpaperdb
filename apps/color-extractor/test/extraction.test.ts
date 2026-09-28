@@ -7,7 +7,7 @@ import {
   ImageHistogram,
   extractionLayer,
   type ExtractionInput,
-} from '../src/extraction/index.js';
+} from '../src/capabilities/extraction/index.js';
 
 const input: ExtractionInput = {
   wallpaperId: 'wallpaper-1',

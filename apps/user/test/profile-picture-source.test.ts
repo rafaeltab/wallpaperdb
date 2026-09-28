@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, ManagedRuntime, Metric } from 'effect';
 import { pictureSourceLayer } from '../src/adapters/pictures/index.js';
-import { PictureSource } from '../src/pictures/index.js';
+import { PictureSource } from '../src/capabilities/pictures/index.js';
 
 class PermanentPictureImportError extends Error {}
 async function downloadInitialPicture(

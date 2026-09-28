@@ -4,8 +4,8 @@ import { DateTime, Effect } from 'effect';
 import { TestClock } from 'effect/testing';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { OpenSearchGateway } from '../src/adapters/opensearch/index.js';
-import type { Profile, ProfileSearchSelection } from '../src/catalogue/index.js';
-import type { ProjectCatalogue } from '../src/projection/index.js';
+import type { Profile, ProfileSearchSelection } from '../src/capabilities/catalogue/index.js';
+import type { ProjectCatalogue } from '../src/capabilities/projection/index.js';
 import { acquireSearchFixture, createSearchFixture } from './search-fixture.js';
 
 const timestamp = '2026-01-01T00:00:00.000Z';

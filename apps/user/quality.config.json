@@ -1,10 +1,5 @@
 {
-  "capabilities": ["profile", "pictures", "maintenance", "availability"],
   "publicModules": [
-    "profile",
-    "pictures",
-    "maintenance",
-    "availability",
     "http",
     "adapters/database",
     "adapters/profiles",
@@ -13,6 +8,8 @@
     "adapters/observations"
   ],
   "allowedCapabilityDependencies": {
-    "profile": ["@wallpaperdb/profile-markdown"]
+    "profile": [
+      "@wallpaperdb/profile-markdown"
+    ]
   }
 }

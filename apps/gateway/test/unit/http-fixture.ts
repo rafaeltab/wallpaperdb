@@ -1,12 +1,12 @@
 import { Effect, Layer } from 'effect';
-import { Admission, admissionLayer } from '../../src/admission/index.js';
+import { Admission, admissionLayer } from '../../src/capabilities/admission/index.js';
 import {
   Availability,
   AvailabilityProbe,
   availabilityLayer,
-} from '../../src/availability/index.js';
+} from '../../src/capabilities/availability/index.js';
 import { memoryQuotaLayer } from '../helpers/quota.js';
-import { Catalogue } from '../../src/catalogue/index.js';
+import { Catalogue } from '../../src/capabilities/catalogue/index.js';
 import { createHttpApp, type HttpConfig } from '../../src/http/index.js';
 
 export interface HttpTestServices {

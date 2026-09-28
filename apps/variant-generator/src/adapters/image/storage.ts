@@ -6,7 +6,7 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { Effect, Schema } from 'effect';
-import { GenerationUnavailable, type GeneratedVariant } from '../../generation/index.js';
+import { GenerationUnavailable, type GeneratedVariant } from '../../capabilities/generation/index.js';
 
 const preconditionFailed = Schema.is(
   Schema.Struct({

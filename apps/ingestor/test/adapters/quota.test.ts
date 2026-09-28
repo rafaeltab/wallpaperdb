@@ -3,7 +3,7 @@ import Redis from 'ioredis';
 import { GenericContainer, type StartedTestContainer } from 'testcontainers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { redisQuotaLayer } from '../../src/adapters/quota/index.js';
-import { Quota } from '../../src/admission/index.js';
+import { Quota } from '../../src/capabilities/admission/index.js';
 
 describe('upload quota storage', () => {
   let container: StartedTestContainer;

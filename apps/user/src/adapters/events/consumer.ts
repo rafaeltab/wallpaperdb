@@ -14,7 +14,7 @@ import {
   Stream,
 } from 'effect';
 import { AckPolicy, type JsMsg } from 'nats';
-import { Maintenance, MaintenanceFailure } from '../../maintenance/index.js';
+import { Maintenance, MaintenanceFailure } from '../../capabilities/maintenance/index.js';
 import { broker, EventsBroker, type EventsOptions } from './broker.js';
 import { translateOwnership } from './translation.js';
 import { ensureQuarantine, quarantine } from './quarantine.js';

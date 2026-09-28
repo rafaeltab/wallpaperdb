@@ -4,7 +4,7 @@ import { Effect, ManagedRuntime, Result } from 'effect';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ImageHealth, imageLayer } from '../src/adapters/image/index.js';
-import { VariantImages, type GenerationInput } from '../src/generation/index.js';
+import { VariantImages, type GenerationInput } from '../src/capabilities/generation/index.js';
 
 const Tester = createDefaultTesterBuilder().with(DockerTesterBuilder).with(S3TesterBuilder).build();
 const input: GenerationInput = {

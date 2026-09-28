@@ -6,7 +6,7 @@ import {
 import { Option, Predicate } from 'effect';
 import type { MsgHdrs } from 'nats';
 import { z } from 'zod';
-import type { GenerationInput } from '../../generation/index.js';
+import type { GenerationInput } from '../../capabilities/generation/index.js';
 const decode = Option.liftThrowable((payload: Uint8Array): unknown =>
   JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(payload))
 );

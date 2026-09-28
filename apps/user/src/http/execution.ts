@@ -2,9 +2,9 @@ import * as OtelTracer from '@effect/opentelemetry/OtelTracer';
 import { context, propagation, trace } from '@opentelemetry/api';
 import { Context, Effect, FiberSet, Layer } from 'effect';
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { Profiles } from '../profile/index.js';
-import { Availability } from '../availability/index.js';
-import { Pictures } from '../pictures/index.js';
+import { Profiles } from '../capabilities/profile/index.js';
+import { Availability } from '../capabilities/availability/index.js';
+import { Pictures } from '../capabilities/pictures/index.js';
 export type HttpServices = Profiles | Pictures | Availability;
 export interface Execution {
   run<A, E>(

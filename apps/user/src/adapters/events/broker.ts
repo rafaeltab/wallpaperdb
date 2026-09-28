@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from 'effect';
 import { connect, type JetStreamClient, type JetStreamManager, type NatsConnection } from 'nats';
-import { MaintenanceFailure } from '../../maintenance/index.js';
+import { MaintenanceFailure } from '../../capabilities/maintenance/index.js';
 
 export interface EventsOptions {
   readonly url: string;

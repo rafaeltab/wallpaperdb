@@ -1,12 +1,12 @@
 import { observeUpload } from './telemetry.js';
 import { installRequestLifecycle } from './lifecycle.js';
 import cors from '@fastify/cors';
-import { Availability } from '../availability/index.js';
+import { Availability } from '../capabilities/availability/index.js';
 import { installOpenApi, uploadSchema } from './openapi.js';
 import { problem, sendProblem, sendUpload } from './problems.js';
 import multipart from '@fastify/multipart';
-import { Admission } from '../admission/index.js';
-import { Ingestion } from '../ingestion/index.js';
+import { Admission } from '../capabilities/admission/index.js';
+import { Ingestion } from '../capabilities/ingestion/index.js';
 import { clerkPlugin, getAuth } from '@clerk/fastify';
 import { Effect, Layer, ManagedRuntime, Schema } from 'effect';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';

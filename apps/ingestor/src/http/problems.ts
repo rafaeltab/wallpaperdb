@@ -1,5 +1,5 @@
 import type { FastifyReply } from 'fastify';
-import type { UploadOutcome } from '../ingestion/index.js';
+import type { UploadOutcome } from '../capabilities/ingestion/index.js';
 export function problem(status: number, type: string, title: string, detail?: string) {
   return {
     type: `https://github.com/rafaeltab/wallpaperdb/blob/main/docs/problems/${type}.md`,

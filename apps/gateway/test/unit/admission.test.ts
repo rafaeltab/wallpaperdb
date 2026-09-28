@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@effect/vitest';
 import { Effect, Layer } from 'effect';
 import { TestClock } from 'effect/testing';
-import { Admission, Quota, admissionLayer } from '../../src/admission/index.js';
+import { Admission, Quota, admissionLayer } from '../../src/capabilities/admission/index.js';
 import { memoryQuotaLayer } from '../helpers/quota.js';
 
 const policy = { enabled: true, limit: 2, windowMs: 1000 };

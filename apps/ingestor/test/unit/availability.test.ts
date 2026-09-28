@@ -4,7 +4,7 @@ import {
   Availability,
   AvailabilityProbe,
   availabilityLayer,
-} from '../../src/availability/index.js';
+} from '../../src/capabilities/availability/index.js';
 
 describe('ingestor availability', () => {
   it.effect('reports required dependencies and readiness without sharing request state', () =>

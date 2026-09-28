@@ -12,7 +12,7 @@ import { Effect, Layer, Metric } from 'effect';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initializeOtel } from '../src/otel-init.js';
 import { tagsLayer } from '../src/app.js';
-import { Availability } from '../src/availability/index.js';
+import { Availability } from '../src/capabilities/availability/index.js';
 import { createHttpApp } from '../src/http/index.js';
 import type { Config } from '../src/config.js';
 

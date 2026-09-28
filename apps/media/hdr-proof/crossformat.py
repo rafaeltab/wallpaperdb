@@ -8,8 +8,15 @@ from PIL import Image
 
 from appearance import compare_appearance
 from avif import decode_avif, decode_transfer
-from gainmap import ROOT, command, digest, independent_hdr, inspect
+from gainmap import ROOT, command, digest, independent_hdr, inspect, output_gamut
 from gainmap_iso import reconstruct
+
+
+def established_output_gamut(facts):
+    gamut = output_gamut(facts)
+    if gamut is None:
+        raise ValueError('Unknown emitted color profile; no default sRGB or substring-based gamut inference permits reconstruction')
+    return gamut
 
 
 def run(output_dir, fixture_directory=None):
@@ -52,8 +59,7 @@ def run(output_dir, fixture_directory=None):
             facts = inspect(output, case_dir)
             item["facts"] = facts
             item["checks"]["privacy"] = not facts["private_tags"]
-            profile = facts["metadata"].get("ICC_Profile:ProfileDescription", "").lower()
-            actual_gamut = "p3" if "p3" in profile else "rec2020" if "2020" in profile else "srgb"
+            actual_gamut = established_output_gamut(facts)
             item["checks"]["structure"] = (facts["base"]["width"] == 173 and facts["base"]["height"] == 115
                                               and facts["base"]["depth"] == 8 and facts.get("map", {}).get("depth") == 8
                                               and bool(facts.get("iso_metadata")) and actual_gamut == source["gamut"]

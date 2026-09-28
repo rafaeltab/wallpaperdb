@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 
-function fixture(t, allowedCapabilityDependencies = {}) {
+function fixture(t, allowedCapabilityDependencies = {}, configOverrides = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'architecture-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const example = path.join(root, 'apps/example');
@@ -21,6 +21,7 @@ function fixture(t, allowedCapabilityDependencies = {}) {
     capabilities: ['catalogue', 'projection'],
     allowedCapabilityDependencies,
     publicModules: ['catalogue', 'projection', 'adapters/search'],
+    ...configOverrides,
   }));
   fs.symlinkSync(path.join(repository, 'scripts/node_modules'), path.join(example, 'node_modules'), 'dir');
 
@@ -31,6 +32,7 @@ function fixture(t, allowedCapabilityDependencies = {}) {
     return filename;
   }
   return {
+    root,
     write,
     source: (relative, content) => write(`apps/example/src/${relative}`, content),
     run() {
@@ -44,6 +46,86 @@ function fixture(t, allowedCapabilityDependencies = {}) {
     },
   };
 }
+
+test('ingestor capability arrangement accepts a public upload call and private collaborators', (t) => {
+  const project = fixture(t, {}, {
+    capabilities: ['ingestion', 'admission'],
+    publicModules: ['ingestion', 'admission', 'adapters/events'],
+  });
+  project.source('ingestion/private.ts', 'export const normalize = (value: string) => value.trim();\n');
+  project.source('ingestion/index.ts', "import { normalize } from './private.js';\nexport const upload = normalize;\n");
+  project.source('admission/index.ts', "import { upload } from '../ingestion/index.js';\nexport const admit = upload;\n");
+  project.source('adapters/events/index.ts', 'export const publish = () => {};\n');
+  project.source('app.ts', "import { upload } from './ingestion/index.js';\nexport const run = upload;\n");
+  assert.equal(project.run().status, 0);
+  project.source('admission/index.ts', "import { normalize } from '../ingestion/private.js';\nexport const admit = normalize;\n");
+  const rejected = project.run();
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /admission\/index\.ts:1: import ingestion through its index\.ts entry point/);
+});
+
+test('Turbo invalidates a cached architecture check when another workspace adds an illegal import', (t) => {
+  const project = fixture(t);
+  validGraph(project);
+  project.write('package.json', JSON.stringify({
+    name: '@wallpaperdb/root',
+    private: true,
+    packageManager: 'pnpm@10.18.3',
+    scripts: { 'architecture:workspaces': 'node -e ""' },
+  }));
+  project.write('pnpm-workspace.yaml', 'packages:\n  - apps/*\n  - packages/*\n');
+  project.write('pnpm-lock.yaml', "lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n  apps/example: {}\n  packages/other: {}\n");
+  project.write('.gitignore', 'node_modules/\n.turbo/\n');
+  const productionTasks = JSON.parse(fs.readFileSync(path.join(repository, 'turbo.json'), 'utf8')).tasks;
+  project.write('turbo.json', JSON.stringify({ tasks: {
+    '//#architecture:workspaces': productionTasks['//#architecture:workspaces'],
+    'lint:architecture': productionTasks['lint:architecture'],
+  } }));
+  fs.copyFileSync(path.join(repository, 'scripts/check-architecture-workspaces.mjs'), path.join(project.root, 'scripts/check-architecture-workspaces.mjs'));
+  project.write('apps/example/Dockerfile', 'FROM scratch\n');
+  project.write('apps/example/package.json', JSON.stringify({
+    name: '@wallpaperdb/example',
+    type: 'module',
+    scripts: { 'lint:architecture': 'node ../../scripts/check-architecture.mjs apps/example' },
+  }));
+  project.write('packages/other/package.json', JSON.stringify({ name: '@wallpaperdb/other' }));
+  project.write('packages/other/test/consumer.ts', 'export const consumer = true;\n');
+  assert.equal(spawnSync('git', ['init', '-q'], { cwd: project.root }).status, 0);
+  assert.equal(spawnSync('git', ['add', '.'], { cwd: project.root }).status, 0);
+  const turbo = path.join(repository, 'node_modules/.bin/turbo');
+  const run = () => spawnSync(turbo, ['run', 'lint:architecture', '--filter=@wallpaperdb/example'], {
+    cwd: project.root,
+    encoding: 'utf8',
+    timeout: 30_000,
+    env: { ...process.env, TURBO_TELEMETRY_DISABLED: '1' },
+  });
+  const first = run();
+  assert.equal(first.status, 0, first.stdout + first.stderr);
+  const cached = run();
+  assert.equal(cached.status, 0, cached.stdout + cached.stderr);
+  assert.match(cached.stdout, /cache hit/, first.stdout + '\nSECOND RUN\n' + cached.stdout);
+  project.write('packages/other/test/consumer.ts', "import '@wallpaperdb/example/catalogue';\n");
+  const changed = run();
+  assert.equal(changed.status, 1, changed.stdout + changed.stderr);
+  assert.match(changed.stdout + changed.stderr, /another workspace must communicate with the example/);
+});
+
+test('architecture workspace check rejects a deployable backend without opt-in', (t) => {
+  const project = fixture(t);
+  fs.copyFileSync(path.join(repository, 'scripts/check-architecture-workspaces.mjs'), path.join(project.root, 'scripts/check-architecture-workspaces.mjs'));
+  project.write('apps/example/Dockerfile', 'FROM scratch\n');
+  const run = () => spawnSync(process.execPath, [path.join(project.root, 'scripts/check-architecture-workspaces.mjs')], {
+    cwd: project.root, encoding: 'utf8',
+  });
+  const missing = run();
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /example.*lint:architecture/);
+  project.write('apps/example/package.json', JSON.stringify({
+    name: '@wallpaperdb/example',
+    scripts: { 'lint:architecture': 'wallpaperdb-check-architecture apps/example' },
+  }));
+  assert.equal(run().status, 0);
+});
 
 function validGraph(project) {
   project.source('catalogue/private.ts', 'export const normalize = (value: string) => value.toLowerCase();\n');
@@ -144,6 +226,17 @@ for (const [name, directory, specifier] of [
     const result = project.run();
     assert.equal(result.status, 1);
     assert.match(result.stderr, /another workspace must communicate with the example through its external contracts/);
+  });
+}
+
+for (const directory of ['test', 'scripts']) {
+  test(`architecture rejects another workspace ${directory} importing a deployable application`, (t) => {
+    const project = fixture(t);
+    validGraph(project);
+    project.write(`packages/other/${directory}/bypass.ts`, "import { search } from '@wallpaperdb/example/catalogue';\n");
+    const result = project.run();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /packages\/other\/(test|scripts)\/bypass\.ts: another workspace must communicate with the example/);
   });
 }
 

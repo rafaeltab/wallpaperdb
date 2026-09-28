@@ -52,8 +52,9 @@ test('shared tooling is invoked through the scripts workspace', () => {
   for (const app of ['ingestor', 'media', 'tags', 'user', 'gateway', 'color-extractor', 'variant-generator']) {
     const manifest = JSON.parse(readFileSync(`apps/${app}/package.json`, 'utf8'));
     assert.equal(manifest.devDependencies['@wallpaperdb/scripts'], 'workspace:*');
-    assert.match(manifest.scripts.lint, /wallpaperdb-check-architecture/);
+    assert.match(manifest.scripts['lint:architecture'], /wallpaperdb-check-architecture/);
   }
+  assert.ok(plannedTask('lint', 'gateway', 'lint').dependencies.includes('@wallpaperdb/gateway#lint:architecture'));
   assert.match(output('crap'), /wallpaperdb-crap report/);
 });
 

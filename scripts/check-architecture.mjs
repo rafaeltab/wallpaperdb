@@ -72,18 +72,22 @@ for (const filename of [...sourceFiles, ...files(path.join(application, 'test'))
 }
 
 // Package exports cannot prevent relative imports that bypass the application package.
-// Verify other workspace source trees do not reach into this deployable application.
+// Verify maintained code in other workspaces does not reach into this deployable application.
 for (const group of ['apps', 'packages']) {
   for (const entry of fs.readdirSync(path.join(repo, group), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const directory = path.join(repo, group, entry.name, 'src');
-    if (directory === src || !fs.existsSync(directory)) continue;
-    for (const filename of files(directory)) {
-      const source = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
-      for (const { specifier } of importPaths(source)) {
-        const target = specifier.startsWith('.') ? path.resolve(path.dirname(filename), specifier) : undefined;
-        if (specifier === packageName || specifier.startsWith(`${packageName}/`) || target?.startsWith(`${application}${path.sep}`)) {
-          errors.push(`${path.relative(repo, filename)}: another workspace must communicate with the ${applicationName} through its external contracts`);
+    const workspace = path.join(repo, group, entry.name);
+    if (workspace === application) continue;
+    for (const directoryName of ['src', 'test', 'scripts']) {
+      const directory = path.join(workspace, directoryName);
+      if (!fs.existsSync(directory)) continue;
+      for (const filename of files(directory)) {
+        const source = ts.createSourceFile(filename, fs.readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
+        for (const { specifier } of importPaths(source)) {
+          const target = specifier.startsWith('.') ? path.resolve(path.dirname(filename), specifier) : undefined;
+          if (specifier === packageName || specifier.startsWith(`${packageName}/`) || target?.startsWith(`${application}${path.sep}`)) {
+            errors.push(`${path.relative(repo, filename)}: another workspace must communicate with the ${applicationName} through its external contracts`);
+          }
         }
       }
     }

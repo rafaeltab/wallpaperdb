@@ -11,7 +11,7 @@
     "start": "node dist/index.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "lint": "biome lint . && node ../../scripts/check-architecture.mjs apps/user",
+    "lint": "biome lint . && wallpaperdb-check-architecture apps/user",
     "lint:fix": "biome lint --write .",
     "check-types": "tsc --noEmit",
     "check": "biome check --write .",
@@ -23,8 +23,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "format:files": "biome format --write",
-    "test:architecture": "node --test ../../scripts/check-architecture.test.mjs",
-    "check:architecture": "node ../../scripts/check-architecture.mjs apps/user"
+    "check:architecture": "wallpaperdb-check-architecture apps/user"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",
@@ -62,6 +61,7 @@
     "@clerk/fastify": "^3.1.19"
   },
   "devDependencies": {
+    "@wallpaperdb/scripts": "workspace:*",
     "@biomejs/biome": "^2.3.8",
     "@testcontainers/postgresql": "^11.9.0",
     "@types/node": "^22.10.2",

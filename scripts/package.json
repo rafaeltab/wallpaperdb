@@ -1,0 +1,28 @@
+{
+	"name": "@wallpaperdb/scripts",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"wallpaperdb-check-architecture": "./check-architecture.mjs",
+		"wallpaperdb-crap": "./crap.mts"
+	},
+	"scripts": {
+		"format": "biome format --write .",
+		"lint": "biome lint .",
+		"test:unit": "cd .. && node --test scripts/*.test.mjs scripts/lib/*.test.mjs && scripts/node_modules/.bin/vitest run scripts/ci-runner.test.ts scripts/lib/env-pipeline.test.ts --maxWorkers=1 --no-file-parallelism",
+		"check-types": "tsc --project tsconfig.json"
+	},
+	"dependencies": {
+		"@wallpaperdb/crap-typescript-core": "workspace:*",
+		"istanbul-lib-coverage": "3.2.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.8",
+		"@types/istanbul-lib-coverage": "2.0.6",
+		"@types/node": "^26.0.1",
+		"tsx": "^4.22.4",
+		"typescript": "^5.7.2",
+		"vitest": "5.0.2"
+	}
+}

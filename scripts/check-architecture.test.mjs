@@ -22,7 +22,7 @@ function fixture(t, allowedCapabilityDependencies = {}) {
     allowedCapabilityDependencies,
     publicModules: ['catalogue', 'projection', 'adapters/search'],
   }));
-  fs.symlinkSync(path.join(repository, 'node_modules'), path.join(example, 'node_modules'), 'dir');
+  fs.symlinkSync(path.join(repository, 'scripts/node_modules'), path.join(example, 'node_modules'), 'dir');
 
   function write(relative, content) {
     const filename = path.join(root, relative);

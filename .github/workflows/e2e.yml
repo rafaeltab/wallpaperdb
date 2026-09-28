@@ -42,7 +42,7 @@ jobs:
         run: pnpm add -g turbo
 
       - name: Build
-        run: turbo run build
+        run: make build
 
       - name: Install Playwright browsers
         run: pnpm --filter @wallpaperdb/web-e2e exec playwright install --with-deps chromium

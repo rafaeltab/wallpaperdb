@@ -49,6 +49,10 @@
         "lint": {
             "dependsOn": [
                 "^build"
+            ],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/scripts/check-architecture.mjs"
             ]
         },
         "lint:fix": {
@@ -181,13 +185,43 @@
                 "packages/*/vitest*.ts",
                 "apps/*/package.json",
                 "packages/*/package.json",
-                "scripts/crap.mts",
                 "crap.config.mts",
                 "test/integration/**",
                 "vitest.integration.config.ts",
                 "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
                 "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
             ],
+            "outputs": []
+        },
+        "@wallpaperdb/scripts#test:unit": {
+            "cache": false
+        },
+        "@wallpaperdb/scripts#check-types": {
+            "dependsOn": ["^build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/crap.config.mts",
+                "$TURBO_ROOT$/packages/crap-typescript-core/src/**",
+                "$TURBO_ROOT$/packages/crap-typescript-core/package.json"
+            ],
+            "outputs": []
+        },
+        "@wallpaperdb/web#test:integration": {
+            "dependsOn": ["^build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/Makefile",
+                "$TURBO_ROOT$/turbo.json",
+                "$TURBO_ROOT$/pnpm-workspace.yaml",
+                "$TURBO_ROOT$/package.json",
+                "$TURBO_ROOT$/pnpm-lock.yaml",
+                "$TURBO_ROOT$/packages/profile-markdown/src/**",
+                "$TURBO_ROOT$/packages/profile-markdown/package.json"
+            ],
+            "outputs": []
+        },
+        "@wallpaperdb/infra-local#test:unit": {
+            "inputs": ["$TURBO_DEFAULT$"],
             "outputs": []
         }
     }

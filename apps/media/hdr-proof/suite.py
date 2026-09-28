@@ -90,7 +90,8 @@ def candidate_files(evidence, fixtures):
     for case in selected:
         artifacts = case.get('artifacts')
         values = [artifacts.get('output')] if isinstance(artifacts,dict) else artifacts or []
-        for value in values[:1]:
+        image_values = [value for value in values if value and Path(value).suffix in ('.jpg','.avif','.png','.webp','.gif')]
+        for value in image_values[:1]:
             if not value:
                 continue
             source = artifact_path(value)

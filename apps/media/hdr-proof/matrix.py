@@ -157,6 +157,8 @@ def _case_diagnostics(case):
         return detail
     if checks.get("independent_decoder") is not True:
         detail["missing_evidence"].append({"gate": "independent_decoder", "check": "independent_decode_not_established"})
+    if checks.get("independent_source_decoder") is False:
+        detail["missing_evidence"].append({"gate": "independent_source_decoder", "check": "independent_source_decode_not_established"})
     measurements = list(_measurement_failures(case.get("measurements", {})))
     for failure in measurements:
         category = "missing_evidence" if failure["check"].endswith("_missing") else "measured_failures"
@@ -186,7 +188,7 @@ def _diagnostic_counts(cases):
         "qualified": sum(case.get("status") == "qualified" for case in cases),
         "measured_failure_cases": sum(bool(case["diagnostics"]["measured_failures"]) for case in cases),
         "missing_evidence_cases": sum(bool(case["diagnostics"]["missing_evidence"]) for case in cases),
-        "failed_gates_after_native_completion": dict(sorted(Counter(key for case in completed for key in CHECKS if key != "native_encoder" and case.get("checks", {}).get(key) is not True).items())),
+        "failed_gates_after_native_completion": dict(sorted(Counter(key for case in completed for key in sorted(set(CHECKS) | set(case.get("checks", {}))) if key != "native_encoder" and case.get("checks", {}).get(key) is not True).items())),
         "measured_failure_checks": dict(sorted(Counter(check for case in cases for check in {entry["check"] for entry in case["diagnostics"]["measured_failures"]}).items())),
         "missing_evidence_checks": dict(sorted(Counter(check for case in cases for check in {entry["check"] for entry in case["diagnostics"]["missing_evidence"]}).items())),
     }
@@ -237,7 +239,7 @@ def build_matrix(evidence):
                 item["status"] = "tested and failed"
                 item.setdefault("blockers", []).append("Evidence selectors or fixture do not match the declared coverage-plan case.")
         checks = item.get("checks", {})
-        missing = [key for key in CHECKS if checks.get(key) is not True]
+        missing = [key for key in sorted(set(CHECKS) | set(checks)) if checks.get(key) is not True]
         if item["status"] == "qualified" and missing:
             errors.append(f"Unsubstantiated qualification for {item.get('case_id')}; missing checks: {', '.join(missing)}")
             item["status"] = "tested and failed"

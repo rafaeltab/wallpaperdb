@@ -20,7 +20,9 @@ describe('UploadDropZone', () => {
 
     expect(screen.getByText(/click to upload/i)).toBeInTheDocument();
     expect(screen.getByText(/drag and drop/i)).toBeInTheDocument();
-    expect(screen.getByText('JPEG, PNG, and WebP images up to 50 MiB')).toBeInTheDocument();
+    expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('50 MiB');
+    expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('100,000,000 pixels');
+    expect(screen.getByText(/Still JPEG, PNG, and WebP images/)).toHaveTextContent('20,000 pixels per axis');
     expect(screen.getByTestId('file-input')).toHaveAttribute(
       'accept',
       'image/jpeg,image/png,image/webp'

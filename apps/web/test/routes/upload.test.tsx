@@ -96,7 +96,10 @@ describe('UploadPage', () => {
             id: 'file-1',
             file: new File(['a'], 'fixture-b.jpg', { type: 'image/jpeg' }),
             status: 'failed',
-            error: { type: 'server', message: 'Upload failed' },
+            error: {
+              type: 'validation',
+              message: 'Image dimensions 10001x10000 exceed the 100000000-pixel limit.',
+            },
           },
         ],
         isPaused: false,
@@ -123,6 +126,9 @@ describe('UploadPage', () => {
     render(<UploadPage />);
 
     expect(screen.getByTestId('upload-failed-count')).toHaveTextContent('1 failed');
+    expect(screen.getByTestId('upload-file-item')).toHaveTextContent(
+      'Image dimensions 10001x10000 exceed the 100000000-pixel limit.'
+    );
     expect(screen.getByTestId('retry-failed-button')).toBeInTheDocument();
   });
 });

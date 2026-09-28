@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 
 from gainmap_iso import iso_metadata
+from gainmap import inspect
 
 ROOT = Path(__file__).parent
 BINARIES = Path("/opt/proof/ultrahdr")
@@ -106,6 +107,33 @@ class NativeGainMapPatchTests(unittest.TestCase):
                                           "--ignore-profile", "--cicp", "12/13/0", "-q", "100", "--qgain-map", "100",
                                           "-s", "10", "-y", "444", "-d", "8"], capture_output=True, text=True)
                 self.assertEqual(decoded.returncode, 0, decoded.stderr)
+
+    def test_retained_map_geometry_strips_private_tags_from_both_layers(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            base, gain = directory / "base.jpg", directory / "gain.jpg"
+            source, output = directory / "private.jpg", directory / "output.jpg"
+            extracted = native("both", "extract", self.fixture("new"), base, gain)
+            self.assertEqual(extracted.returncode, 0, extracted.stderr)
+            for layer in (base, gain):
+                subprocess.run(["exiftool", "-overwrite_original", "-Artist=Private author",
+                                "-XMP-dc:Creator=Private creator", str(layer)],
+                               check=True, capture_output=True, timeout=30)
+            packed = native("both", "pack", self.fixture("new"), base, gain, source)
+            self.assertEqual(packed.returncode, 0, packed.stderr)
+            before = inspect(source, directory / "source-inspection")
+            self.assertIn("IFD0:Artist", before["private_tags"])
+            self.assertIn("gain-map:IFD0:Artist", before["private_tags"])
+            job = {"case_id": "private-layers", "input": str(source), "output": str(output),
+                   "format": "jpg", "geometry": "contain", "gamut": "preserve", "mode": "native-retain"}
+            result = subprocess.run(["node", str(ROOT / "gainmap.cjs")], input=json.dumps([job]),
+                                    capture_output=True, text=True, check=True, timeout=30)
+            self.assertTrue(json.loads(result.stdout)["ok"], result.stdout)
+            after = inspect(output, directory / "output-inspection")
+            self.assertEqual(after["private_tags"], [])
+            self.assertEqual(after["map_private_tags"], [])
+            self.assertTrue(after["android_xmp_properties"])
+            self.assertIn("iso_metadata", after)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,15 @@ FIXTURES = ROOT / "fixtures" / "gainmap"
 NAMES = ("gainmap-android-iso", "gainmap-android-xmp", "gainmap-apple-old", "gainmap-apple-new")
 FORMATS = ("jpg", "avif", "png", "webp", "gif")
 GEOMETRIES = ("contain", "cover", "fill", "upscale", "orientation", "crop")
+NATIVE_RETAIN_BUILD = {
+    "libultrahdr_version": "2.0.2",
+    "source_commit": "e5f5a022fe96fc4dc2ee35c19f733a50df807abe",
+    "patch_commits": ["2ae3c547c37c0dd19f051cfb7b5427d24eb26138",
+                      "5b2ce500f5f8103a24a388b76d3c6b615d1028e4",
+                      "2b058012b5bf4a8433c3593c3c9b15daf8cd7848"],
+    "upstream_patch_status": "Experimental pinned PR484 and PR491 patches; not an upstream release.",
+    "pipeline": "Patched native compressed base/map extraction; Sharp 0.35.5 geometry on each layer; native compressed-layer packing with dual ISO/Android metadata.",
+}
 
 
 def command(args, log, *, data=None, binary=False):
@@ -39,6 +48,31 @@ def command(args, log, *, data=None, binary=False):
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def private_metadata_tags(tags):
+    private_names = ("GPS", "Make", "Model", "SerialNumber", "OwnerName", "Artist", "Copyright",
+                     "DateTimeOriginal", "CreateDate", "ModifyDate", "UserComment", "DocumentID",
+                     "InstanceID", "OriginalDocumentID", "Patient", "History", "PhotoIdentifier", "RunTime")
+    safe_exif = {"Orientation", "XResolution", "YResolution", "ResolutionUnit", "YCbCrPositioning",
+                 "ExifVersion", "ComponentsConfiguration", "FlashpixVersion", "ColorSpace",
+                 "ExifImageWidth", "ExifImageHeight"}
+    safe_xmp_groups = {"XMP-hdrgm", "XMP-GContainer", "XMP-HDRGainMap"}
+    private_tags = []
+    for key in tags:
+        group, _, tag = key.partition(":")
+        if group.startswith("ICC"):
+            continue
+        # The pinned native packer emits this fixed XMP wrapper marker. It is
+        # generated software metadata, never a carried-through source value.
+        if key == "XMP-x:XMPToolkit" and tags[key] == "Adobe XMP Core 5.1.2":
+            continue
+        private = any(tag.startswith(name) for name in private_names)
+        private |= group in ("IFD0", "ExifIFD", "GPS", "Apple") and tag not in safe_exif
+        private |= group.startswith("XMP-") and group not in safe_xmp_groups
+        if private:
+            private_tags.append(key)
+    return private_tags
 
 
 def inspect(path, directory):
@@ -68,23 +102,7 @@ def inspect(path, directory):
         elif path.suffix == ".gif":
             result["coded_depth"] = 8 if tags.get("File:FileType") == "GIF" else None
             result["depth_basis"] = "Decoded GIF palette entries contain three 8-bit channel samples; index depth is reported separately."
-    private_names = ("GPS", "Make", "Model", "SerialNumber", "OwnerName", "Artist", "Copyright",
-                     "DateTimeOriginal", "CreateDate", "ModifyDate", "UserComment", "DocumentID",
-                     "InstanceID", "OriginalDocumentID", "Patient", "History", "PhotoIdentifier", "RunTime")
-    safe_exif = {"Orientation", "XResolution", "YResolution", "ResolutionUnit", "YCbCrPositioning",
-                 "ExifVersion", "ComponentsConfiguration", "FlashpixVersion", "ColorSpace",
-                 "ExifImageWidth", "ExifImageHeight"}
-    safe_xmp_groups = {"XMP-hdrgm", "XMP-GContainer", "XMP-HDRGainMap"}
-    result["private_tags"] = []
-    for key in tags:
-        group, _, tag = key.partition(":")
-        if group.startswith("ICC"):
-            continue
-        private = any(tag.startswith(name) for name in private_names)
-        private |= group in ("IFD0", "ExifIFD", "GPS", "Apple") and tag not in safe_exif
-        private |= group.startswith("XMP-") and group not in safe_xmp_groups
-        if private:
-            result["private_tags"].append(key)
+    result["private_tags"] = private_metadata_tags(tags)
     if path.suffix == ".jpg":
         result["base"] = jpeg_facts(path.read_bytes())
         map_data = command(["exiftool", "-b", "-MPImage2", path], directory / "map-extraction.log", binary=True)
@@ -96,6 +114,8 @@ def inspect(path, directory):
                                              for marker, value in segments(map_data))
             xmp = command(["exiftool", "-json", "-G1", "-s", directory / "map.jpg"], directory / "map-exiftool.log")
             map_tags = json.loads(xmp)[0]
+            result["map_private_tags"] = private_metadata_tags(map_tags)
+            result["private_tags"].extend("gain-map:" + key for key in result["map_private_tags"])
             result["android_xmp_properties"] = {key: value for key, value in map_tags.items()
                                                  if key.startswith("XMP-hdrgm:")}
             if result["iso_identifier"]:
@@ -220,7 +240,8 @@ def run(output_dir):
                             input_path = case_dir / "input-orientation-6.jpg"
                             shutil.copyfile(path, input_path)
                             command(["exiftool", "-overwrite_original", "-Orientation#=6", input_path], case_dir / "orientation-fixture.log")
-                        jobs.append({"case_id": case_id, "fixture_id": name, "mode": mode,
+                        native_mode = "native-retain" if mode == "keep" and fmt == "jpg" else mode
+                        jobs.append({"case_id": case_id, "fixture_id": name, "mode": native_mode,
                                      "input": str(input_path), "output": str(case_dir / f"output.{fmt}"),
                                      "geometry": operation, "orientation": 6 if operation == "orientation" else 1,
                                      "gamut": gamut_selector, "format": fmt})
@@ -233,7 +254,8 @@ def run(output_dir):
                 input_path = case_dir / f"input-orientation-{orientation}.jpg"
                 shutil.copyfile(path, input_path)
                 command(["exiftool", "-overwrite_original", f"-Orientation#={orientation}", input_path], case_dir / "orientation-fixture.log")
-                jobs.append({"case_id": case_id, "fixture_id": name, "mode": mode,
+                jobs.append({"case_id": case_id, "fixture_id": name,
+                             "mode": "native-retain" if mode == "keep" else mode,
                              "input": str(input_path), "output": str(case_dir / "output.jpg"),
                              "geometry": "orientation", "orientation": orientation, "gamut": "preserve", "format": "jpg"})
 
@@ -253,6 +275,17 @@ def run(output_dir):
                     "structure": False, "appearance": False, "privacy": False},
                 "blockers": [], "artifacts": [], "measurements": {}}
         case["selectors"]["format"] = job["format"]
+        if job["mode"] == "native-retain":
+            case["candidate"] = "libultrahdr-2.0.2+PR484+PR491:retain-base-and-map:sharp-0.35.5-geometry"
+            case["native_build"] = NATIVE_RETAIN_BUILD
+            native_log = case_dir / "native-parts-both" / "native-commands.json"
+            if native_log.exists():
+                case["artifacts"].append(str(native_log.relative_to(output_dir)))
+            if encoded["ok"]:
+                case["source_gainmap_metadata"] = encoded["source_gainmap_metadata"]
+                case["native_variant"] = encoded["native_variant"]
+                case["retained_parts"] = {key: str(Path(value).relative_to(output_dir))
+                                          for key, value in encoded["retained_parts"].items()}
         if job["geometry"] == "crop":
             case["probe_crop_rectangle"] = {"left": 13, "top": 17, "width": 271, "height": 239}
         if not encoded["ok"]:
@@ -301,6 +334,9 @@ def run(output_dir):
             case["measurements"]["rgb_mae_code_255"] = float(np.mean(np.abs(np.asarray(reference) - actual * 255)))
             case["checks"]["appearance"] = sdr_measurement["passed"]
             if is_hdr:
+                case["checks"]["independent_source_decoder"] = source["facts"]["independent_hdr_decode"]
+                if not source["facts"]["independent_hdr_decode"]:
+                    case["blockers"].append("Source HDR has no maintained independent decoder in this pinned environment; supplementary source reconstruction cannot qualify this conversion.")
                 try:
                     hdr_output = independent_hdr(path, case_dir, actual_gamut)
                     hdr_gamut = "rec2020"

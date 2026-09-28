@@ -11,23 +11,35 @@ No frame-adaptive exposure is used. This remains a proof candidate; selecting
 BT.709 primaries alone does not qualify its chromatic mapping.
 """
 from avif import native
+from native_transfer import hlg_to_linear
 
 WHITE_LINEAR = ((0.90 + 0.055) / 1.055) ** 2.4
 NOMINAL_PEAK = 203 / (WHITE_LINEAR * 1.1)
 
 
 def convert(source, output, transfer, gamut, *, peak_nits):
-    if transfer != 'pq':
-        raise ValueError('This SDR candidate currently supports PQ only')
+    transfer_name = {'pq': 'smpte2084', 'hlg': 'arib-std-b67'}[transfer]
     primaries = {'rec2020': 'bt2020', 'p3': 'smpte432'}[gamut]
+    linearize = (f'zscale=transferin={transfer_name}:primariesin={primaries}:matrixin=gbr:rangein=full:'
+                 f'transfer=linear:primaries={primaries}:matrix=gbr:range=full:npl={NOMINAL_PEAK}')
+    if transfer == 'hlg':
+        linearize = hlg_to_linear(gamut, NOMINAL_PEAK) + f',setparams=color_trc=linear:color_primaries={primaries}:colorspace=gbr:range=full'
+    # zscale otherwise associates RGB with alpha in the nonlinear transfer
+    # domain. Its premultiplied negotiation bypasses that implicit operation;
+    # the stored samples remain straight at both transfer-only boundaries.
+    start = 'format=gbrap16le,setparams=alpha_mode=premultiplied,'
+    if transfer == 'hlg':
+        start += 'format=gbrapf32le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'
+    linear_output = ('format=gbrapf32le:alpha_modes=straight,' if transfer == 'hlg' else
+                     'format=gbrapf32le:alpha_modes=premultiplied,setparams=alpha_mode=straight,')
     filters = (
-        'format=gbrapf32le,'
-        f'zscale=transferin=smpte2084:primariesin={primaries}:matrixin=gbr:rangein=full:'
-        f'transfer=linear:primaries={primaries}:matrix=gbr:range=full:npl={NOMINAL_PEAK},'
+        start + linearize + ',' + linear_output +
         f'tonemap=mobius:param=0.6:desat=0:peak={peak_nits/NOMINAL_PEAK},'
         'colorchannelmixer=rr=0.99:gg=0.99:bb=0.99,'
+        'setparams=alpha_mode=premultiplied,'
         'zscale=transfer=iec61966-2-1:primaries=bt709:matrix=gbr:range=full,'
-        'format=rgba64be'
+        'format=gbrap16le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'
+        'format=rgba64be:alpha_modes=straight'
     )
     native(['ffmpeg','-v','error','-y','-i',source,'-vf',filters,'-frames:v','1',
             '-map_metadata','-1','-threads','1',output])

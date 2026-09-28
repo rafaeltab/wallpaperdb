@@ -35,6 +35,10 @@ export function sendUpload(reply: FastifyReply, result: UploadOutcome) {
         receivedMimeType: result.mimeType,
         detail: 'Only JPEG, PNG, and WebP images are supported.',
       });
+    case 'UnsupportedAnimation':
+      return sendProblem(reply, 400, 'unsupported-animation', 'Unsupported Animation', {
+        detail: 'Animated PNG and WebP images are not supported. Upload a still image.',
+      });
     case 'TooLarge':
       return sendProblem(reply, 413, 'file-too-large', 'File Too Large', {
         fileSizeBytes: result.fileSizeBytes,
@@ -46,7 +50,14 @@ export function sendUpload(reply: FastifyReply, result: UploadOutcome) {
       const { _tag, ...dimensions } = result;
       return sendProblem(reply, 400, 'dimensions-out-of-bounds', 'Dimensions Out of Bounds', {
         ...dimensions,
-        detail: `Image dimensions must be between ${result.minWidth}x${result.minHeight} and ${result.maxWidth}x${result.maxHeight} pixels.`,
+        detail: `Image dimensions ${result.width}x${result.height} exceed the ${result.maxWidth}-pixel per-axis limit.`,
+      });
+    }
+    case 'TooManyPixels': {
+      const { _tag, ...dimensions } = result;
+      return sendProblem(reply, 400, 'pixels-out-of-bounds', 'Pixel Limit Exceeded', {
+        ...dimensions,
+        detail: `Image dimensions ${result.width}x${result.height} exceed the ${result.maxPixels}-pixel limit.`,
       });
     }
   }

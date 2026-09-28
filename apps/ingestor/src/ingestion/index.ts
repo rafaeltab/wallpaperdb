@@ -3,19 +3,17 @@ import { Clock, Context, Effect, Exit, Layer, Metric, Schema } from 'effect';
 export interface ValidationLimits {
   readonly maxFileSizeImage: number;
   readonly maxFileSizeVideo: number;
-  readonly minWidth: number;
-  readonly minHeight: number;
   readonly maxWidth: number;
   readonly maxHeight: number;
+  readonly maxPixels: number;
   readonly allowedFormats: readonly string[];
 }
 export const validationLimits: ValidationLimits = {
   maxFileSizeImage: 50 * 1024 * 1024,
   maxFileSizeVideo: 200 * 1024 * 1024,
-  minWidth: 1280,
-  minHeight: 720,
-  maxWidth: 7680,
-  maxHeight: 4320,
+  maxWidth: 20000,
+  maxHeight: 20000,
+  maxPixels: 100_000_000,
   allowedFormats: ['image/jpeg', 'image/png', 'image/webp'],
 };
 export interface FileMetadata {
@@ -29,6 +27,7 @@ export interface FileMetadata {
 }
 export type ValidationRejection =
   | { readonly _tag: 'InvalidFormat'; readonly mimeType: string }
+  | { readonly _tag: 'UnsupportedAnimation' }
   | {
       readonly _tag: 'TooLarge';
       readonly fileSizeBytes: number;
@@ -39,10 +38,14 @@ export type ValidationRejection =
       readonly _tag: 'InvalidDimensions';
       readonly width: number;
       readonly height: number;
-      readonly minWidth: number;
-      readonly minHeight: number;
       readonly maxWidth: number;
       readonly maxHeight: number;
+    }
+  | {
+      readonly _tag: 'TooManyPixels';
+      readonly width: number;
+      readonly height: number;
+      readonly maxPixels: number;
     };
 export class IngestionUnavailable extends Schema.TaggedError<IngestionUnavailable>()(
   'IngestionUnavailable',

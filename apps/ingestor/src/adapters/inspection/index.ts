@@ -19,7 +19,8 @@ class ImageInspection implements ContentInspection {
       Effect.tapError((cause) => Effect.logDebug('File signature could not be decoded', { cause })),
       Effect.catch(() => Effect.succeed(undefined))
     );
-    const mimeType = detected?.mime ?? declaredMimeType;
+    const mimeType =
+      detected?.mime === 'image/apng' ? 'image/png' : (detected?.mime ?? declaredMimeType);
     const fileType = mimeType.startsWith('image/') ? 'image' : 'video';
     const maxFileSizeBytes =
       fileType === 'image' ? limits.maxFileSizeImage : limits.maxFileSizeVideo;
@@ -32,6 +33,7 @@ class ImageInspection implements ContentInspection {
       } as const;
     if (!detected || !limits.allowedFormats.includes(mimeType) || fileType !== 'image')
       return { _tag: 'InvalidFormat', mimeType } as const;
+    if (detected.mime === 'image/apng') return { _tag: 'UnsupportedAnimation' } as const;
     const metadataStarted = yield* Clock.currentTimeMillis;
     const dimensions = yield* Effect.tryPromise({
       try: () => sharp(bytes, { limitInputPixels: 268402689, sequentialRead: true }).metadata(),
@@ -43,20 +45,21 @@ class ImageInspection implements ContentInspection {
     if (!dimensions?.width || !dimensions.height)
       return { _tag: 'InvalidFormat', mimeType } as const;
     yield* duration('file_processor.metadata_extraction_duration_ms', metadataStarted);
-    if (
-      dimensions.width < limits.minWidth ||
-      dimensions.height < limits.minHeight ||
-      dimensions.width > limits.maxWidth ||
-      dimensions.height > limits.maxHeight
-    )
+    if ((dimensions.pages ?? 1) > 1) return { _tag: 'UnsupportedAnimation' } as const;
+    if (dimensions.width > limits.maxWidth || dimensions.height > limits.maxHeight)
       return {
         _tag: 'InvalidDimensions',
         width: dimensions.width,
         height: dimensions.height,
-        minWidth: limits.minWidth,
-        minHeight: limits.minHeight,
         maxWidth: limits.maxWidth,
         maxHeight: limits.maxHeight,
+      } as const;
+    if (dimensions.width * dimensions.height > limits.maxPixels)
+      return {
+        _tag: 'TooManyPixels',
+        width: dimensions.width,
+        height: dimensions.height,
+        maxPixels: limits.maxPixels,
       } as const;
     const hashStarted = yield* Clock.currentTimeMillis;
     const contentHash = createHash('sha256').update(bytes).digest('hex');
@@ -65,7 +68,7 @@ class ImageInspection implements ContentInspection {
     return {
       _tag: 'Inspected',
       metadata: {
-        mimeType: detected.mime,
+        mimeType,
         fileType: 'image',
         width: dimensions.width,
         height: dimensions.height,

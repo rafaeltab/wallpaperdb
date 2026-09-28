@@ -7,10 +7,9 @@ import { ContentInspection, type ValidationLimits } from '../../src/ingestion/in
 const limits: ValidationLimits = {
   maxFileSizeImage: 1024 * 1024,
   maxFileSizeVideo: 2 * 1024 * 1024,
-  minWidth: 1,
-  minHeight: 1,
   maxWidth: 100,
   maxHeight: 100,
+  maxPixels: 10000,
   allowedFormats: ['image/jpeg', 'image/png', 'image/webp'],
 };
 
@@ -50,7 +49,7 @@ describe('image inspection', () => {
       });
     }).pipe(Effect.provide(imageInspectionLayer))
   );
-  it.effect('reports dimensions outside the accepted bounds', () =>
+  it.effect('reports dimensions above the axis maximum', () =>
     Effect.gen(function* () {
       const bytes = yield* Effect.promise(() =>
         sharp({
@@ -65,13 +64,11 @@ describe('image inspection', () => {
           .toBuffer()
       );
       const inspector = yield* ContentInspection;
-      expect(yield* inspector.inspect(bytes, 'image/jpeg', { ...limits, minWidth: 20 })).toEqual({
+      expect(yield* inspector.inspect(bytes, 'image/jpeg', { ...limits, maxWidth: 10 })).toEqual({
         _tag: 'InvalidDimensions',
         width: 12,
         height: 8,
-        minWidth: 20,
-        minHeight: 1,
-        maxWidth: 100,
+        maxWidth: 10,
         maxHeight: 100,
       });
     }).pipe(Effect.provide(imageInspectionLayer))

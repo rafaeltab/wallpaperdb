@@ -29,3 +29,7 @@ When designing backend behavior, follow [application and domain guidelines](appl
 - Tests are deterministic, independently runnable, and parallel-safe: control nondeterministic inputs, isolate test data and state, and await observable asynchronous conditions with bounded deadlines rather than fixed sleeps. Treat flakiness as a defect; retries must not conceal it.
 
 For backend test boundaries, read the relevant subject: [capabilities and domain](application-and-domain.md#testing), [adapters](adapters.md#testing), or [composition and operations](composition-and-operations.md#testing). These backend test categories do not prescribe a frontend test architecture.
+
+## Browser E2E testing
+
+Browser E2E tests cover a small set of successful, complete user journeys through the web UI and real application services. They do not repeat the full behavioral matrix. Follow the [browser workspace README](../../apps/web-e2e/README.md) for setup and execution.

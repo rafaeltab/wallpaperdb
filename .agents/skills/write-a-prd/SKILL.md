@@ -15,7 +15,7 @@ This skill will be invoked when the user wants to create a PRD. You may skip ste
 
 A deep module (as opposed to a shallow module) is one which encapsulates a lot of functionality in a simple, testable interface which rarely changes.
 
-Check with the user that these modules match their expectations. Check with the user which modules they want tests written for.
+Before proposing test seams or asking the user to confirm a test strategy, load the [testing skill](../testing/SKILL.md) and the applicable guidelines from [CODING_STANDARDS.md](../../../CODING_STANDARDS.md). Use WallpaperDB's test vocabulary when deciding where each behavior belongs. Check with the user that the modules and proposed test seams match their expectations.
 
 5. Once you have a complete understanding of the problem and solution, use the template below to write the PRD. The PRD should be submitted as a GitHub issue.
 
@@ -60,6 +60,7 @@ Do NOT include specific file paths or code snippets. They may end up being outda
 A list of testing decisions that were made. Include:
 
 - A description of what makes a good test (only test external behavior, not implementation details)
+- The test seams selected for each behavior, using the repository's test vocabulary
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)
 

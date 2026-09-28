@@ -11,6 +11,7 @@
 | Backend NATS publishers, consumers, subject partitioning, or stream retention | [NATS and JetStream](docs/coding-standards/nats.md) |
 | Backend startup, configuration, resource lifetimes, or telemetry | [Composition and operations](docs/coding-standards/composition-and-operations.md) |
 | Test design and isolation in any workspace | [Shared testing principles](docs/coding-standards/project-organization.md#shared-testing-principles) |
+| Browser E2E test coverage | [Browser E2E testing](docs/coding-standards/project-organization.md#browser-e2e-testing) |
 | Backend capability or domain tests | [Application and domain testing](docs/coding-standards/application-and-domain.md#testing) |
 | Backend driving/driven adapter tests | [Adapter testing](docs/coding-standards/adapters.md#testing) |
 | Backend composition, deployment, or telemetry tests | [Composition and operations testing](docs/coding-standards/composition-and-operations.md#testing) |

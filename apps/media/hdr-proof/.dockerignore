@@ -6,3 +6,4 @@
 !png_decode.c
 !native-gainmap-build.sh
 !native_gainmap.cpp
+!libavif-sequence-transform.patch

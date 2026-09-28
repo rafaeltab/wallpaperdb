@@ -45,6 +45,10 @@ def versions():
                    'apk_lock_sha256':avif.digest(ROOT/'environment/apk-lock.json'),
                    'npm_lock_sha256':avif.digest(ROOT/'environment/package-lock.json'),
                    'png_decoder_source_sha256':avif.digest(ROOT/'png_decode.c'),
+                   'libavif_local_patch_sha256':avif.digest(ROOT/'libavif-sequence-transform.patch'),
+                   'avifenc_binary_sha256':avif.digest(Path('/usr/local/bin/avifenc')),
+                   'libultrahdr_build_recipe_sha256':avif.digest(ROOT/'native-gainmap-build.sh'),
+                   'libultrahdr_variant_binaries':Path('/opt/proof/ultrahdr/binary-sha256.txt').read_text(),
                    'thresholds_sha256':avif.digest(ROOT/'thresholds.json')})
     return values
 

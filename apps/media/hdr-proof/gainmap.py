@@ -134,6 +134,17 @@ def source_image(path, gamut):
     return image
 
 
+def output_gamut(facts):
+    """Recognize only the exact ICC descriptions used by this pinned corpus.
+
+    This is not an arbitrary ICC interpreter. Unknown descriptions and absent
+    profiles remain unknown, even when a decoder returns plausible RGB samples.
+    """
+    profiles = {"sRGB": "srgb", "Display P3": "p3",
+                "Display P3 Gamut with sRGB Transfer": "p3"}
+    return profiles.get(facts["metadata"].get("ICC_Profile:ProfileDescription"))
+
+
 def geometry(image, operation, orientation=1):
     if operation == "orientation":
         transforms = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180,
@@ -310,7 +321,16 @@ def run(output_dir):
             actual = decoded_rgb(path, case_dir)
             case["checks"]["independent_decoder"] = True
             width, height = reference.size
-            actual_gamut = "p3" if "P3" in facts["metadata"].get("ICC_Profile:ProfileDescription", "") else "srgb"
+            actual_gamut = output_gamut(facts)
+            case["color_signaling"] = {
+                "gamut": actual_gamut,
+                "basis": "Independently parsed exact ICC profile description from the pinned fixture/encoder allowlist.",
+                "limitation": "This proof does not interpret arbitrary ICC profiles; absent and unrecognized profiles stay unqualified.",
+            }
+            if actual_gamut is None:
+                case["blockers"].append("Emitted gamut signaling is absent or unrecognized; decoded RGB cannot establish an sRGB or Display P3 output.")
+                cases.append(case)
+                continue
             expected_gamut = source["gamut"] if job["gamut"] == "preserve" else "srgb"
             structure = actual.shape == (height, width, 3) and actual_gamut == expected_gamut
             structure &= facts["metadata"].get("IFD0:Orientation", 1) == 1

@@ -63,11 +63,9 @@ class FixtureTests(unittest.TestCase):
                     self.assertTrue(measurement['passed'], measurement)
                     self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
 
-    def test_alpha_downscale_boundary_mismatch_remains_unqualified(self):
-        # zimg clamps samples beyond the source edge; the declared independent
-        # Pillow reference truncates and normalizes its kernel. This residual
-        # is a failed proof, even after fixing transfer and premultiplication.
-        # Keep it observable until native boundary handling is implemented.
+    def test_alpha_downscale_normalizes_truncated_source_edge_weights(self):
+        # Native filtering must preserve the independently declared edge kernel,
+        # including the fractional alpha ramp crossing the white/black boundary.
         with tempfile.TemporaryDirectory() as temporary:
             source, target = Path(temporary)/'source.png', Path(temporary)/'target.png'
             scene = make_scene(True)
@@ -84,9 +82,44 @@ class FixtureTests(unittest.TestCase):
                 reference_gamut='rec2020', actual_gamut='rec2020',
                 fixture_class='avif-12', alpha=reference[..., 3],
             )
-            self.assertFalse(measurement['passed'])
-            self.assertIn('shadow.delta_e_max', measurement['failures'])
-            self.assertGreater(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+            self.assertTrue(measurement['passed'], measurement)
+            self.assertLessEqual(np.max(np.abs(reference[..., 3]-actual[..., 3])), 2/4095)
+
+    def test_native_alpha_downscale_roundtrip_preserves_hdr_depths_and_animation(self):
+        from avif import fixture_specs, generate_fixture, decode_avif, encode_avif, inspect_avif, structure_checks
+        with tempfile.TemporaryDirectory() as temporary:
+            for spec in fixture_specs():
+                if not spec['alpha']:
+                    continue
+                folder = Path(temporary)/spec['id']
+                source, _, _ = generate_fixture(spec, folder)
+                source_frames = decode_avif(source, folder, spec['frames'])
+                references = []
+                for frame in source_frames:
+                    reference = frame.copy()
+                    reference[..., :3] = decode_transfer(frame[..., :3], spec['transfer'], spec['gamut'])
+                    references.append(reference)
+                for mode in ('contain', 'fill'):
+                    with self.subTest(fixture=spec['id'], mode=mode):
+                        case = folder/mode
+                        case.mkdir()
+                        matched = [geometry_reference(frame, mode) for frame in references]
+                        converted = []
+                        for index in range(spec['frames']):
+                            png = case/f'converted-{index}.png'
+                            convert_frame(folder/f'decoded-{index}.png', png, spec['transfer'], spec['gamut'], mode)
+                            converted.append(png)
+                        target = case/'output.avif'
+                        encode_avif(converted, target, spec['transfer'], spec['gamut'], spec['depth'])
+                        facts = inspect_avif(target)
+                        actual = decode_avif(target, case, spec['frames'])
+                        checks = structure_checks(facts, actual, spec, matched, spec['transfer'], spec['gamut'], spec['depth'], spec['frames'])
+                        self.assertTrue(all(checks.values()), checks)
+                        for reference, frame in zip(matched, actual):
+                            measured = compare_appearance(reference[..., :3], decode_transfer(frame[..., :3], spec['transfer'], spec['gamut']),
+                                reference_gamut=spec['gamut'], actual_gamut=spec['gamut'],
+                                fixture_class=f'avif-{spec["depth"]}', alpha=reference[..., 3])
+                            self.assertTrue(measured['passed'], measured)
 
     def test_native_cover_filters_before_cropping_the_white_black_boundary(self):
         for transfer, gamut in (('pq', 'rec2020'), ('hlg', 'p3')):

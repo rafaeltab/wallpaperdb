@@ -188,27 +188,46 @@ def _convert_hdr_frame(source, output, transfer, gamut, mode, width, height):
                   + f',setparams=color_trc={source_transfer},zscale={base}:'
                   f'transferin={source_transfer}:transfer={source_transfer}')
 
-    geometry = f'zscale=w={width}:h={height}:filter=bilinear,'
+    scaled_width = width
+    final_crop = ''
     if mode == 'cover':
         # Fit the full image before the final crop so antialias taps can read
         # source pixels immediately outside the requested box. Cropping first
         # removes those samples and changes the white/black boundary pixels.
-        geometry = (f'zscale=w=iw*{height}/ih:h={height}:filter=bilinear,'
-                    f'crop={width}:{height}:(iw-ow)/2:0,')
+        with Image.open(source) as image:
+            scaled_width = image.width * height // image.height
+        final_crop = f'crop={width}:{height}:(iw-ow)/2:0,'
+
+    # zimg clamps taps beyond the image edge; the independent reference drops
+    # those taps and normalizes the remaining weights. Transparent zero padding
+    # exposes the truncated numerator. Resampling an all-one coverage image
+    # with the same native filter supplies its denominator, including corners.
+    # Padding by a full source extent keeps the original/output grids aligned.
+    resample = (f'zscale=w={scaled_width*3}:h={height*3}:filter=bilinear,'
+                'format=gbrapf32le:alpha_modes=premultiplied,'
+                f'crop={scaled_width}:{height}:{scaled_width}:{height}')
+    coverage = 'between(X,W/3,2*W/3-1)*between(Y,H/3,2*H/3-1)'
     # zimg otherwise premultiplies *nonlinear* values before a transfer change.
     # During transfer-only stages both negotiated alpha modes are therefore
     # marked premultiplied to suppress its implicit association changes. The
     # actual multiplication occurs explicitly below, after linearization.
     filters = (
-        'format=gbrap16le,setparams=alpha_mode=premultiplied,' + linearize + ','
-        'premultiply=inplace=1,setparams=alpha_mode=premultiplied,' + geometry +
+        # FFmpeg pad only supports integer formats. Pad before linearization,
+        # where zero remains zero under both PQ and HLG, to retain float light.
+        '[0:v]format=gbrap16le,pad=iw*3:ih*3:iw:ih:color=black@0,'
+        'setparams=alpha_mode=premultiplied,' + linearize + ','
+        'premultiply=inplace=1,setparams=alpha_mode=premultiplied,split[pixels][coverage];'
+        '[pixels]' + resample + '[numerator];'
+        '[coverage]geq=' + ':'.join(f"{channel}='{coverage}'" for channel in 'rgba') + ',' + resample + '[weight];'
+        "[numerator][weight]blend=all_expr='if(gt(B,0),A/B,0)'," + final_crop +
         'format=gbrapf32le:alpha_modes=premultiplied,unpremultiply=inplace=1,'
         'setparams=alpha_mode=premultiplied,' + encode + ','
         'format=gbrap16le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'
-        'format=rgba64le:alpha_modes=straight'
+        'format=rgba64le:alpha_modes=straight[out]'
     )
-    native(['ffmpeg', '-v', 'error', '-y', '-filter_threads', '1', '-i', source,
-            '-vf', filters, '-frames:v', '1', '-map_metadata', '-1', '-threads', '1', output])
+    native(['ffmpeg', '-v', 'error', '-y', '-filter_complex_threads', '1', '-i', source,
+            '-filter_complex', filters, '-map', '[out]', '-frames:v', '1',
+            '-map_metadata', '-1', '-threads', '1', output])
 
 
 def fixture_specs():

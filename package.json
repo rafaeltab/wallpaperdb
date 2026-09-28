@@ -9,6 +9,7 @@
     "scripts": {
         "postinstall": "test -f scripts/setup-worktree.mjs && node scripts/setup-worktree.mjs || true",
         "test": "vitest",
+        "architecture:workspaces": "node scripts/check-architecture-workspaces.mjs",
         "test:coverage": "vitest run --coverage",
         "test:ui": "vitest --ui",
         "coverage:merge": "mkdir -p coverage && find packages apps -path '*/coverage/*' -name lcov.info -exec cat {} + > coverage/lcov.info",

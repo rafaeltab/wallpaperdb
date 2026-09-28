@@ -10,7 +10,9 @@ linear colors and clip out-of-gamut sRGB channels after the primary conversion.
 This intentionally trades saturated out-of-gamut detail for exact in-gamut
 colors; it is not perceptual gamut compression. Physical review must assess
 that tradeoff. The existing independent color/luminance thresholds still apply.
-The reference is limited to the declared nonnegative fixture domain and peak.
+The reference covers nonnegative display light through 10000 nits. The declared
+peak is a curve anchor, not a source admission limit: valid 8-bit PQ rounding
+can put samples slightly above a nominal 1000-nit fixture peak.
 """
 import numpy as np
 from appearance import RGB_TO_XYZ
@@ -20,8 +22,8 @@ def reference_srgb(rgb_nits, gamut, *, peak_nits):
     rgb = np.asarray(rgb_nits, dtype=np.float64)
     if rgb.shape[-1] != 3 or not np.all(np.isfinite(rgb)) or np.any(rgb < 0):
         raise ValueError('Expected finite nonnegative RGB luminance')
-    if peak_nits < 203 or np.max(rgb) > peak_nits + 2:
-        raise ValueError('Declared peak must contain the reference luminance')
+    if not np.isfinite(peak_nits) or peak_nits < 203 or np.max(rgb) > 10000:
+        raise ValueError('Expected a finite HDR peak anchor and samples in the PQ display domain')
     # Fixed candidate recipe. These are not appearance acceptance thresholds.
     exposure = 1.1 * ((0.90 + 0.055) / 1.055) ** 2.4 / 203
     knee = 0.6

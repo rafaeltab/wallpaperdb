@@ -71,3 +71,12 @@ class NativeSdrTests(unittest.TestCase):
                     fixture_class='sdr-8', alpha=scene[..., 3])
                 self.assertTrue(measured['passed'], measured)
                 np.testing.assert_allclose(actual[..., 3], scene[..., 3], atol=2/65535)
+
+    def test_reference_includes_valid_pq_quantization_above_nominal_peak(self):
+        signal = np.rint(encode_transfer(np.array([[[1000., 1000., 1000.]]]), 'pq', 'rec2020') * 255) / 255
+        from avif import decode_transfer
+        actual_nits = decode_transfer(signal, 'pq', 'rec2020')
+        self.assertGreater(float(actual_nits.max()), 1000)
+        mapped = reference_srgb(actual_nits, 'rec2020', peak_nits=1000)
+        self.assertTrue(np.all(np.isfinite(mapped)))
+        self.assertTrue(np.all((mapped >= 0) & (mapped <= 1)))

@@ -63,12 +63,24 @@ def _source(directory, dynamic_range):
 
 
 def _compose(foreground, background, output, transfer, gamut):
-    # Native FFmpeg 8.1/libplacebo performs linear-light composition across two
-    # independently tagged inputs. setparams describes verified PNG samples;
-    # libplacebo, not setparams, converts the sRGB background and blends layers.
-    tags = "format=rgba64le,setparams=range=full:colorspace=0"
-    filters = f"[0:v]{tags}:color_primaries=1:color_trc=13,hwupload[bg];[1:v]{tags}:color_primaries={PRIMARIES[gamut]}:color_trc={TRANSFERS[transfer]},hwupload[fg];[bg][fg]libplacebo=inputs=2:colorspace=0:color_primaries={PRIMARIES[gamut]}:color_trc={TRANSFERS[transfer]}:range=pc:peak_detect=0:tonemapping=clip:gamut_mode=clip:contrast_recovery=0:dithering=none:alpha_mode=straight,hwdownload,format=rgba64le[out]"
-    native(["ffmpeg", "-v", "error", "-y", "-init_hw_device", "vulkan=vk:0", "-filter_hw_device", "vk", "-i", background, "-i", foreground,
+    # Normalize both inputs to the requested reference white, then blend their
+    # straight RGB in display-linear float. zimg converts the background's
+    # primaries; maskedmerge uses foreground alpha and retains opaque bg alpha.
+    # The original libplacebo candidate added measurable off-channel light to
+    # saturated red. These native stages pass the same frozen selector limits.
+    normalization = 100 if transfer == 'srgb' else 203
+    base = f'primaries={PRIMARIES[gamut]}:matrixin=0:matrix=0:rangein=full:range=full:npl={normalization}:agamma=0'
+    integer = 'format=gbrap16le,setparams=alpha_mode=premultiplied,'
+    floating = 'format=gbrapf32le:alpha_modes=premultiplied'
+    filters = (
+        f'[0:v]{integer}zscale={base}:primariesin=1:transferin=13:transfer=linear,{floating}[bg];'
+        f'[1:v]{integer}zscale={base}:primariesin={PRIMARIES[gamut]}:transferin={TRANSFERS[transfer]}:transfer=linear,{floating},split[fg][mask];'
+        "[mask]geq=r='alpha(X,Y)':g='alpha(X,Y)':b='alpha(X,Y)':a='1'[alpha];"
+        '[bg][fg][alpha]maskedmerge=planes=7,setparams=alpha_mode=premultiplied,'
+        f'zscale={base}:primariesin={PRIMARIES[gamut]}:transferin=linear:transfer={TRANSFERS[transfer]},'
+        'format=gbrap16le:alpha_modes=premultiplied,setparams=alpha_mode=straight,format=rgba64le[out]'
+    )
+    native(["ffmpeg", "-v", "error", "-y", "-filter_complex_threads", "1", "-i", background, "-i", foreground,
             "-filter_complex", filters, "-map", "[out]", "-frames:v", "1", "-map_metadata", "-1", "-threads", "1", output])
 
 

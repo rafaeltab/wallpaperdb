@@ -1,14 +1,34 @@
 """Tests for selector fixture/reference math; native observations are separate."""
 
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 
-from avif import decode_transfer
-from selector_probes import alpha_scene, composed_reference
+from avif import decode_avif, decode_transfer, encode_avif, write_png
+from selector_probes import THRESHOLDS, _compose, _source, alpha_scene, composed_reference
 
 
 class SelectorReferenceTests(unittest.TestCase):
+    def test_native_background_composition_preserves_hdr_color_and_fractional_alpha(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            source, decoded, transfer, gamut, depth = _source(folder, 'hdr')
+            for background in ((255, 255, 255), (255, 0, 0), (32, 128, 224)):
+                with self.subTest(background=background):
+                    decode_avif(source, folder, 1)
+                    pixels = np.ones_like(decoded)
+                    pixels[..., :3] = np.array(background)/255
+                    write_png(folder/'background.png', pixels)
+                    _compose(folder/'decoded-0.png', folder/'background.png', folder/'composed.png', transfer, gamut)
+                    encode_avif([folder/'composed.png'], folder/'composed.avif', transfer, gamut, depth)
+                    actual = decode_avif(folder/'composed.avif', folder, 1)[0]
+                    reference = composed_reference(decoded, background, 'hdr')
+                    error = float(np.max(np.abs(actual[..., :3]-reference)))
+                    self.assertLessEqual(error, THRESHOLDS['hdr_pq_signal_max_error'])
+                    self.assertTrue(np.all(actual[..., 3] == 1))
+
     def test_fully_transparent_hdr_white_is_reference_white(self):
         source = alpha_scene("hdr")
         signal = composed_reference(source, (255, 255, 255), "hdr")

@@ -143,8 +143,12 @@ def decode_avif(path, directory, count):
 
 
 def convert_frame(source, output, transfer, gamut, mode, *, sdr=False, mapper='bt.2446a'):
-    width, height = Image.open(source).size
+    with Image.open(source) as image:
+        width, height = image.size
     outw, outh = {'identity': (width,height), 'static': (width,height), 'orientation': (58,87), 'contain': (57,38), 'cover': (40,40), 'fill': (40,48), 'upscale': (120,80)}[mode]
+    if not sdr:
+        _convert_hdr_frame(source, output, transfer, gamut, mode, outw, outh)
+        return
     target_gamut = 'srgb' if sdr else gamut
     target_transfer = 'srgb' if sdr else transfer
     options = f'w={outw}:h={outh}:colorspace=0:color_primaries={PRIMARIES[target_gamut]}:color_trc={TRANSFERS[target_transfer]}:range=pc:peak_detect=0:tonemapping={mapper if sdr else "clip"}:gamut_mode={"perceptual" if sdr else "clip"}:contrast_recovery=0:dithering=none:upscaler=bilinear:downscaler=bilinear:sigmoid=0:alpha_mode=straight'
@@ -152,6 +156,46 @@ def convert_frame(source, output, transfer, gamut, mode, *, sdr=False, mapper='b
         options += ':crop_w=ih:crop_h=ih:crop_x=(iw-ih)/2:crop_y=0'
     filters = f'format=rgba64le,setparams=range=full:color_primaries={PRIMARIES[gamut]}:color_trc={TRANSFERS[transfer]}:colorspace=0,hwupload,libplacebo={options},hwdownload,format=rgba64le'
     native(['ffmpeg', '-v', 'error', '-y', '-init_hw_device', 'vulkan=vk:0', '-filter_hw_device', 'vk', '-i', source, '-vf', filters, '-frames:v', '1', '-map_metadata', '-1', '-threads', '1', output])
+
+
+def _convert_hdr_frame(source, output, transfer, gamut, mode, width, height):
+    from native_transfer import hlg_to_linear, linear_to_hlg
+
+    # Geometry operates on display-linear light. A 10000-nit normalization
+    # preserves the full PQ domain in float without changing absolute exposure.
+    base = (f'primariesin={PRIMARIES[gamut]}:primaries={PRIMARIES[gamut]}:'
+            'matrixin=0:matrix=0:rangein=full:range=full:npl=10000:agamma=0')
+    source_transfer = TRANSFERS[transfer]
+    linearize = (f'zscale={base}:transferin={source_transfer}:transfer=linear,'
+                 'format=gbrapf32le:alpha_modes=premultiplied,setparams=alpha_mode=straight')
+    encode = f'zscale={base}:transferin=linear:transfer={source_transfer}'
+    if transfer == 'hlg':
+        # zimg's HLG transfer applies gamma per channel. BT.2100 display light
+        # instead couples the system gamma to luminance, including for P3.
+        linearize = (f'zscale={base}:transferin={source_transfer}:transfer={source_transfer},'
+                     'format=gbrapf32le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'
+                     + hlg_to_linear(gamut, 10000)
+                     + ',setparams=color_trc=linear')
+        encode = (linear_to_hlg(gamut, 10000)
+                  + f',setparams=color_trc={source_transfer},zscale={base}:'
+                  f'transferin={source_transfer}:transfer={source_transfer}')
+
+    crop = 'crop=ih:ih:(iw-ih)/2:0,' if mode == 'cover' else ''
+    # zimg otherwise premultiplies *nonlinear* values before a transfer change.
+    # During transfer-only stages both negotiated alpha modes are therefore
+    # marked premultiplied to suppress its implicit association changes. The
+    # actual multiplication occurs explicitly below, after linearization.
+    filters = (
+        'format=gbrap16le,setparams=alpha_mode=premultiplied,' + linearize + ','
+        'premultiply=inplace=1,setparams=alpha_mode=premultiplied,' + crop
+        + f'zscale=w={width}:h={height}:filter=bilinear,'
+        'format=gbrapf32le:alpha_modes=premultiplied,unpremultiply=inplace=1,'
+        'setparams=alpha_mode=premultiplied,' + encode + ','
+        'format=gbrap16le:alpha_modes=premultiplied,setparams=alpha_mode=straight,'
+        'format=rgba64le:alpha_modes=straight'
+    )
+    native(['ffmpeg', '-v', 'error', '-y', '-filter_threads', '1', '-i', source,
+            '-vf', filters, '-frames:v', '1', '-map_metadata', '-1', '-threads', '1', output])
 
 
 def fixture_specs():

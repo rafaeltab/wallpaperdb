@@ -6,6 +6,7 @@ import numpy as np
 from appearance import evaluate_sdr_tone_map
 from avif import make_scene, encode_transfer, write_png, read_png
 from sdr_candidate import convert
+from sdr_reference import reference_srgb
 
 
 class NativeSdrTests(unittest.TestCase):
@@ -22,3 +23,19 @@ class NativeSdrTests(unittest.TestCase):
             measured = evaluate_sdr_tone_map(scene[..., :3], actual[..., :3], source_gamut='rec2020')
             self.assertTrue(measured['tone_curve_passed'], measured)
             np.testing.assert_array_equal(actual[..., 3], scene[..., 3])
+
+    def test_native_gamut_conversion_matches_independent_colorimetric_reference(self):
+        for gamut in ('p3', 'rec2020'):
+            with self.subTest(gamut=gamut), tempfile.TemporaryDirectory() as directory:
+                directory = Path(directory)
+                scene = make_scene(False)
+                signal = scene.copy()
+                signal[..., :3] = encode_transfer(scene[..., :3], 'pq', gamut)
+                source, output = directory/'input.png', directory/'output.png'
+                write_png(source, signal)
+                convert(source, output, 'pq', gamut, peak_nits=1000)
+                actual = read_png(output)
+                expected = reference_srgb(scene[..., :3], gamut, peak_nits=1000)
+                measured = evaluate_sdr_tone_map(scene[..., :3], actual[..., :3],
+                    source_gamut=gamut, reference_srgb=expected)
+                self.assertTrue(measured['passed'], measured)
